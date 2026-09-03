@@ -29,7 +29,7 @@
     "@types/three": "^0.184.1",
     "brepjs": "^18.118.0",
     "clsx": "^2.1.1",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.511.0",
     "manifold-3d": "^3.5.0",
     "next": "^15.3.2",
