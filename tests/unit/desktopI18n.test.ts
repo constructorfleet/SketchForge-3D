@@ -3,16 +3,7 @@ import desktopI18nModule from "../../apps/desktop/i18n.cjs";
 import enDesktop from "@/i18n/locales/en/desktop.json";
 import ruDesktop from "@/i18n/locales/ru/desktop.json";
 
-type DesktopI18n = {
-  getLocale: () => string;
-  resolveLocale: (languages: string[]) => string;
-  setLocale: (code: unknown) => boolean;
-  supportedLocale: (code: unknown) => string | null;
-  t: (key: string, params?: Record<string, string | number>) => string;
-};
-
-// apps/desktop is plain CommonJS without type declarations.
-const { createDesktopI18n } = desktopI18nModule as { createDesktopI18n: (load?: (locale: string) => unknown) => DesktopI18n };
+const { createDesktopI18n } = desktopI18nModule;
 
 describe("desktop main-process i18n", () => {
   it("reads the web catalogs and resolves the OS language", () => {

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The test suite is now type-checked (`npm run typecheck:tests`, wired into `npm run ci` and GitHub CI). It previously was not, so a change to a function's signature could leave its tests calling it with the old arguments and fail only at runtime.
 - Fixed a tapered shape losing its taper when grouped with a hole. The fast boolean paths substituted a plain cuboid or primitive solid built from width, depth, and height, which cannot express a taper; they now decline a tapered shape and fall back to its real mesh.
 - Fixed holes whose profile carries its own absolute dimensions — a loft's independent top end, and the taper rows on every other kind — being padded only at their generic size before subtraction. The cutter changed shape instead of growing, so the hole came out wrong and its unpadded end stayed coplanar with the solid, tearing faces off the result.
 - Fixed the rotation axis rings never appearing: they were parented to the selection-helper group, which is rebuilt whenever the selection changes and hidden for the duration of a rotate drag.

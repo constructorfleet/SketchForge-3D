@@ -1,4 +1,14 @@
-export type TooltipButton = Pick<HTMLButtonElement, "title" | "textContent" | "getAttribute">;
+/**
+ * Just the parts of a button this helper reads and writes.
+ *
+ * Declared structurally rather than picked off HTMLButtonElement: a real button
+ * satisfies it, and a test can supply a plain object without pulling in a DOM.
+ */
+export type TooltipButton = {
+  title: string;
+  textContent: string | null;
+  getAttribute: (name: string) => string | null;
+};
 
 export function buttonTooltipFromLabel(button: TooltipButton): string | null {
   const label = button.getAttribute("aria-label") ?? button.textContent?.trim();

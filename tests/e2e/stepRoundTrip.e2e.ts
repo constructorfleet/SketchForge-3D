@@ -55,6 +55,9 @@ function shape(overrides: Partial<WorkplaneShape>): WorkplaneShape {
 async function reimportVolume(blob: Blob): Promise<number> {
   const r = await brep.importSTEP(blob);
   if (!r.ok) throw new Error(`reimport failed: ${String(r.error?.message ?? r.error)}`);
+  // importSTEP does not know the dimension of what it read; measuring a volume
+  // only means something for a solid, so narrow before asking.
+  if (!brep.isShape3D(r.value)) throw new Error(`reimport produced ${brep.getShapeKind(r.value)}, not a solid`);
   const v = brep.measureVolume(r.value);
   if (!v.ok) throw new Error("measureVolume failed");
   return v.value;

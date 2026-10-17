@@ -1,0 +1,17 @@
+{
+  "extends": "./apps/web/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "incremental": false,
+    "paths": {
+      "@/*": [
+        "./apps/web/src/*"
+      ]
+    }
+  },
+  "include": [
+    "tests/**/*.ts",
+    "apps/web/src/**/*.d.ts"
+  ]
+}

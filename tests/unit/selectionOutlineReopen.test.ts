@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { editorHistoryEntry } from "@/lib/editorHistory";
 import * as THREE from "three";
 import { bakedBoxSelectionFrame, bakeCadMetadataForShapeTransform } from "@/lib/cadBakeMetadata";
 import { exportSkfProject, importSkfProject } from "@/lib/skfProject";
@@ -132,6 +133,8 @@ describe("selection outline after project reopen", () => {
       createdAt: 1_700_000_000_000,
       modifiedAt: 1_700_000_000_100,
       shapes: [rotated],
+      history: [editorHistoryEntry([rotated], [])],
+      historyIndex: 0,
       assets: [],
       workspace: DEFAULT_WORKPLANE_WORKSPACE,
       snapGrid: DEFAULT_SNAP_GRID,
@@ -159,6 +162,8 @@ describe("selection outline after project reopen", () => {
       createdAt: 1_700_000_000_000,
       modifiedAt: 1_700_000_000_100,
       shapes: [returned],
+      history: [editorHistoryEntry([returned], [])],
+      historyIndex: 0,
       assets: [],
       workspace: DEFAULT_WORKPLANE_WORKSPACE,
       snapGrid: DEFAULT_SNAP_GRID,

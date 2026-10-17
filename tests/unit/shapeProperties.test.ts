@@ -45,7 +45,7 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
     ...SHAPE_KINDS.map((kind) => shapeOfKind(kind)),
     ...SHAPE_KINDS.map((kind) => shapeOfKind(kind, { taperTopWidth: 10, taperTopDepth: 10, taperBottomWidth: 20, taperBottomDepth: 20 })),
     shapeOfKind("sketch", { sketchOperation: "revolve" }),
-    shapeOfKind("scribble", { sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 96 } }),
+    shapeOfKind("scribble", { sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 96, quality: 6 } }),
     shapeOfKind("gear", { gearType: "spur" }),
     shapeOfKind("gear", { gearType: "helical" }),
     shapeOfKind("gear", { gearType: "bevel" }),
