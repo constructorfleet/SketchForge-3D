@@ -3,39 +3,16 @@
 import { ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
-import {
-  DEFAULT_GEAR_HELIX_ANGLE,
-  DEFAULT_GEAR_HELIX_QUALITY,
-  DEFAULT_GEAR_TEETH,
-  DEFAULT_GEAR_TOOTH_SIZE,
-  MAX_GEAR_HELIX_ANGLE,
-  MAX_GEAR_HELIX_QUALITY,
-  MIN_GEAR_HELIX_ANGLE,
-  MIN_GEAR_HELIX_QUALITY,
-  gearCenterHoleLimits,
-  normalizeGearHelixAngle,
-  normalizeGearHelixQuality,
-  normalizeGearCenterHoleSize,
-  normalizeGearToothSize,
-  normalizeGearToothWidth,
-  normalizeGearType,
-  gearToothPitch,
-} from "@/lib/gearGeometry";
-import { unitLabel, useTranslations, type MessageKey, type Translator } from "@/i18n";
+import { normalizeGearType } from "@/lib/gearGeometry";
+import { unitLabel, useTranslations } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
-import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
-import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
-import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
   GEAR_TYPE_OPTIONS,
-  MIN_SHAPE_SIZE,
-  TEXT_FONT_OPTIONS,
   clamp,
   getShapePropertiesWithAppLimits,
   getShapeTaperProperties,
-  textFontLabel,
   propertyUsesLengthUnit,
   type RangePropertyConfig,
   type SelectPropertyConfig,

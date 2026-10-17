@@ -12,15 +12,12 @@ import {
   LocalizedError,
   englishNotice,
   errorFromPayload,
-  errorFromResponse,
   errorText,
   notice,
   translatorFor,
   unitLabel,
   useTranslations,
-  type ErrorResponseFields,
   type MessageKey,
-  type MessageParams,
   type Notice,
   type Translator,
 } from "@/i18n";
@@ -79,7 +76,6 @@ import {
   cleanRotationDegrees,
   fallbackSolidColor,
   meshYawDegrees,
-  mirroredAxisCount,
   mirrorSign,
   normalizeDegrees,
   preservesEdgeTreatmentSize,
@@ -88,7 +84,6 @@ import {
   shapeDepth,
   shapeHasTaper,
   shapeTransformShouldRemainEditable,
-  shapeTaperScaleAt,
   shapeWidth,
   withHoleMode,
   workplaneShapesEqual,
@@ -112,7 +107,7 @@ import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
 import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/booleanPrimitives";
-import { CUTTER_PADDING, CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
+import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
 import { createLocalId } from "@/lib/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
