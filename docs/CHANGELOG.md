@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed the rotation axis rings never appearing: they were parented to the selection-helper group, which is rebuilt whenever the selection changes and hidden for the duration of a rotate drag.
 - Added interface localization in English, Czech, German, Spanish, French, Polish, Brazilian Portuguese and Russian. The language follows the system by default and can be changed in Settings → Language; the desktop tray and update dialogs follow the same choice. Local server errors and editor notices are translated as well; MCP tool results stay in English. Languages are ICU JSON catalogs (see `docs/TRANSLATIONS.md`); the non-English translations were made with AI help and have not been reviewed by native speakers yet.
 - Added a Loft primitive that morphs a solid between two 2D cross-sections. Each end is an Oval, Rectangle, Triangle, Pentagon, or Hexagon with independent size and rotation, the way cone's Top Radius works independently of its base. Wired into `.skf` projects and the MCP bridge's `sketchforge_create_shape` as `kind: "loft"`.
 - Replaced the corner rotate-handle icons with three world-space coloured axis rings as the primary rotation control on desktop. Near edge-on rings tip up slightly so they stay hittable, and opacity eases for hover, active drag, and camera motion. The corner icons remain as a fallback on touch and narrow viewports, a "Use classic rotate handles" setting forces them everywhere, and `?rotationMode=classic|rings` overrides both.

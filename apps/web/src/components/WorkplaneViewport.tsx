@@ -4238,7 +4238,10 @@ export function WorkplaneViewport({
     state.raycaster.setFromCamera(state.pointer, state.camera);
     state.raycaster.layers.set(RENDER_LAYER_HELPERS);
 
-    const intersections = state.raycaster.intersectObjects(state.helperLayer.children, true);
+    const intersections = state.raycaster.intersectObjects(
+      [...state.helperLayer.children, state.rotationRingSet.group],
+      true,
+    );
     const hit = intersections.find((entry) => typeof entry.object.userData.transformHandle === "string");
     if (!hit) {
       return null;
@@ -5503,8 +5506,10 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     mesh.userData.transformHandleKey = `rotate-ring-${axis}`;
     mesh.userData.rotationRingAxis = axis;
   }
-  helperLayer.add(rotationRingSet.group);
-  scene.add(workplaneLayer, workplanePreviewLayer, shapeLayer, helperLayer, transformGuideLayer, moveDimensionLayer, modifierLayer);
+  // The rings are their own scene child, not part of helperLayer: that group is
+  // disposed whenever the selection helpers are rebuilt, and it is hidden while
+  // a rotate drag runs -- which would take the ring being dragged with it.
+  scene.add(workplaneLayer, workplanePreviewLayer, shapeLayer, helperLayer, rotationRingSet.group, transformGuideLayer, moveDimensionLayer, modifierLayer);
 
   const raycaster = new THREE.Raycaster();
   raycaster.params.Line = { threshold: 1.15 };
