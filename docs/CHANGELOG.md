@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Closing the window now quits SketchForge on Linux, where a system tray cannot be relied on. Windows and macOS keep hiding to the tray. A desktop that provides no tray no longer blocks startup, and the Linux launcher entry gained `GenericName`, `Keywords`, and `StartupWMClass`.
 - Moved the project name field out of the tool ribbon and into the tab row above, so the Visibility, Combine, Modify, Arrange, and Manage groups stay reachable without the ribbon's horizontal scrollbar at narrower window widths.
 - The Fillet toolbar marker and the shape inspector's length units are now keyed on property configuration rather than on visible English label text, so both keep working when the interface is translated.
 - Generated button tooltips now refresh when the accessible name changes, so toggles such as Lock and Hide no longer describe the opposite action after being clicked. Tooltips written in the markup are still left alone.
