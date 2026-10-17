@@ -357,6 +357,14 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   }
 
   if (parts.length === 0) {
+    // Saying "no box/cylinder/sphere" to someone looking at a sphere is simply
+    // wrong: the shape was understood and then skipped for a reason, so report
+    // the reason rather than a list of kinds.
+    if (skipped.length > 0) {
+      throw new LocalizedError("errors.step.allSkipped", {
+        detail: skipped.map((entry) => `${entry.name}: ${entry.reason}`).join("; "),
+      });
+    }
     throw new LocalizedError("errors.step.nothingToExport");
   }
 

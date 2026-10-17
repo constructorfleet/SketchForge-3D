@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A STEP export where every shape was skipped now names the shapes and why, instead of reporting "No box/cylinder/sphere or imported STEP solids to export" — which contradicted what was on screen when the skipped shape was a sphere.
 - STEP export now honours a cylinder's facet count and a shape's taper. A deliberately faceted cylinder exports as the prism it is instead of a round cylinder, and keeps its rotation; a tapered box or cylinder exports with its taper instead of straight-sided. A taper that cannot be built exactly is reported as skipped rather than written as a different shape.
 - STEP export now includes shapes carrying a fillet or chamfer, whose exact geometry lives in `cadBrep`. They were skipped as having no B-Rep source, and an export containing nothing else failed outright.
 - Added a projection toggle to the camera controls, switching between perspective and orthographic view. The capability already existed on the `O` key but had no visible control; the button shows which projection is active and keeps in step with the shortcut.

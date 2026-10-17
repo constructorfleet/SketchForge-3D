@@ -134,8 +134,11 @@ describe("STEP export round-trip (real OCCT kernel)", () => {
     expect(skipped.find((s) => s.kind === "mesh")?.reason).toMatch(/no B-Rep source/i);
   });
 
-  it("throws when there is nothing exact to export", async () => {
-    await expect(exportShapesToStep([shape({ kind: "pyramid", name: "Pyramid" })])).rejects.toThrow(/No box\/cylinder\/sphere/i);
+  it("throws when there is nothing exact to export, naming the shape and the reason", async () => {
+    await expect(exportShapesToStep([shape({ kind: "pyramid", name: "Pyramid" })])).rejects.toMatchObject({
+      key: "errors.step.allSkipped",
+      params: { detail: expect.stringContaining("Pyramid: no exact B-Rep mapping") },
+    });
   });
 });
 
@@ -290,6 +293,25 @@ describe("STEP export of faceted and tapered shapes (upstream #94)", () => {
     expect(skipped).toEqual([]);
     const expected = (PI * 10 / 3) * (100 + 10 * 5 + 25);
     expect(near(await reimportVolume(blob), expected)).toBe(true);
+  });
+
+  it("explains why when the only shape was skipped, instead of listing kinds", async () => {
+    // Telling someone looking at a sphere "no box/cylinder/sphere" is wrong:
+    // the shape was understood, then skipped, so the reason is what helps.
+    const taperedSphere = shape({
+      kind: "sphere", name: "Blob", width: 20, depth: 20, height: 20,
+      taperTopWidth: 10, taperTopDepth: 10,
+    });
+    await expect(exportShapesToStep([taperedSphere])).rejects.toMatchObject({
+      key: "errors.step.allSkipped",
+    });
+    await expect(exportShapesToStep([taperedSphere])).rejects.toMatchObject({
+      params: { detail: expect.stringContaining("Blob") },
+    });
+  });
+
+  it("still reports nothing to export when there genuinely is nothing", async () => {
+    await expect(exportShapesToStep([])).rejects.toMatchObject({ key: "errors.step.nothingToExport" });
   });
 
   it("reports a taper it cannot build rather than writing a straight body", async () => {

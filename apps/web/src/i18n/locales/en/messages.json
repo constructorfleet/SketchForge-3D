@@ -1302,7 +1302,8 @@
       "readFailed": "Could not read STEP: {detail}",
       "noSolidGeometry": "STEP file has no solid geometry to import",
       "nothingToExport": "No box/cylinder/sphere or imported STEP solids to export as B-Rep STEP",
-      "exportFailed": "STEP export failed: {detail}"
+      "exportFailed": "STEP export failed: {detail}",
+      "allSkipped": "Nothing could be exported as B-Rep STEP — {detail}"
     },
     "stl": {
       "noGeometry": "STL has no readable geometry",
