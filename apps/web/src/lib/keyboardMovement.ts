@@ -10,9 +10,12 @@ export function isMovementKey(key: string) {
 
 export function moveShapesByKeyboard(
   shapes: WorkplaneShape[], selectedIds: string[], event: KeyboardMovementEvent, workplane: PlacementWorkplane,
+  // Distance one press moves, from keyboardNudgeStep: the snap grid, so a
+  // nudge lands on the same lattice a pointer drag snaps to. Shift is already
+  // folded in by the caller, which is the only place that knows the grid.
+  step: number,
 ) {
   if (!isMovementKey(event.key)) return shapes;
-  const step = event.shiftKey ? 5 : 1;
   const vertical = (event.ctrlKey || event.metaKey) && (event.key === "ArrowUp" || event.key === "ArrowDown");
   const axis = vertical ? workplane.normal
     : event.key === "ArrowLeft" || event.key === "ArrowRight" ? workplane.xAxis : workplane.zAxis;

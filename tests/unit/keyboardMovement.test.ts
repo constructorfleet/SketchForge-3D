@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { appendEditorHistorySnapshot, editorHistoryEntry } from "@/lib/editorHistory";
 import { createKeyboardMovementInteraction, moveShapesByKeyboard, type KeyboardMovementEvent } from "@/lib/keyboardMovement";
 import { horizontalPlacementWorkplane, type PlacementWorkplane } from "@/lib/placementWorkplane";
+import { keyboardNudgeStep } from "@/lib/workplaneSettings";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(id = "box", locked = false): WorkplaneShape {
@@ -26,7 +27,7 @@ function editorHarness(initial = [box()], selectedIds = ["box"]) {
   });
   const movement = createKeyboardMovementInteraction({
     begin,
-    move: (event) => { shapes = moveShapesByKeyboard(shapes, selectedIds, event, horizontalPlacementWorkplane()); },
+    move: (event) => { shapes = moveShapesByKeyboard(shapes, selectedIds, event, horizontalPlacementWorkplane(), keyboardNudgeStep("1.0 mm", event.shiftKey)); },
     end: () => {
       busy = false;
       const appended = appendEditorHistorySnapshot(history, index, editorHistoryEntry(shapes, selectedIds));
@@ -143,11 +144,11 @@ describe("keyboard movement interactions", () => {
       origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 0, y: 1, z: 0 },
       zAxis: { x: 1, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 },
     };
-    const nudged = moveShapesByKeyboard(shapes, ["box", "locked"], key("ArrowRight", { shiftKey: true }), plane);
+    const nudged = moveShapesByKeyboard(shapes, ["box", "locked"], key("ArrowRight", { shiftKey: true }), plane, keyboardNudgeStep("1.0 mm", true));
     expect(nudged[0]).toMatchObject({ x: 0, z: 0, elevation: 5 });
     expect(nudged[1]).toBe(shapes[1]);
     expect(nudged[2]).toBe(shapes[2]);
-    const raised = moveShapesByKeyboard(nudged, ["box"], key("ArrowUp", { ctrlKey: true }), plane);
+    const raised = moveShapesByKeyboard(nudged, ["box"], key("ArrowUp", { ctrlKey: true }), plane, keyboardNudgeStep("1.0 mm", false));
     expect(raised[0]).toMatchObject({ x: 0, z: 1, elevation: 5 });
   });
 });

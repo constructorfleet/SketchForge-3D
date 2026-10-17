@@ -106,7 +106,7 @@ import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
-import { normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import {
   normalizePlacementWorkplane,
   placementPatchForNewShape,
@@ -6199,7 +6199,8 @@ export function SketchForgeEditor({
       return true;
     },
     move: (event) => {
-      const next = moveShapesByKeyboard(shapesRef.current, selectedIdsRef.current, event, placementWorkplaneRef.current);
+      const step = keyboardNudgeStep(snapGridRef.current, event.shiftKey);
+      const next = moveShapesByKeyboard(shapesRef.current, selectedIdsRef.current, event, placementWorkplaneRef.current, step);
       if (next === shapesRef.current) return;
       interactionHistoryChangedRef.current = true;
       shapesRef.current = next;
