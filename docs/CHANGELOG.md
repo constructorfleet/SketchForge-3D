@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a Center view on selection button next to Home, bound to Shift+F. It keeps the current viewing direction, moves the orbit target to the middle of the selection, and backs off far enough for the selection to fit, changing distance for a perspective camera and zoom for an orthographic one.
 - Added a Center on workplane button to Arrange, which places the selection in the middle of the build plate. The selection moves as one so several objects keep their relative spacing, locked objects stay put and stay out of the bounding box, and an already-centred selection records no history entry.
 - Arrow keys now move the selection towards the workplane axis closest to the direction the arrow points on screen, instead of along fixed world axes. The Front view and the default home view keep the mapping they always had, steps stay on an axis with no diagonals, and Ctrl/Cmd+arrow elevation changes and workplanes laid on a face are unaffected.
 - The workplane now carries its name flat along its near edge, so which edge is the front is readable at a glance instead of having to be inferred from the symmetric axis lines. This also tells you which way an arrow-key nudge will move the selection, since those keys follow the plane's axes.
