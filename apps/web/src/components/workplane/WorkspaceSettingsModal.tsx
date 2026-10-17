@@ -114,11 +114,13 @@ export function WorkspaceSettingsModal({
   themePreference,
   moveDimensionsEnabled,
   showProjectNameInToolbar,
+  preferClassicRotateHandles,
   onWorkspaceChange,
   onSnapChange,
   onThemePreferenceChange,
   onMoveDimensionsEnabledChange,
   onShowProjectNameInToolbarChange,
+  onPreferClassicRotateHandlesChange,
   onMakeDefault,
   onClose,
 }: {
@@ -127,11 +129,13 @@ export function WorkspaceSettingsModal({
   themePreference: AppThemePreference;
   moveDimensionsEnabled: boolean;
   showProjectNameInToolbar: boolean;
+  preferClassicRotateHandles: boolean;
   onWorkspaceChange: (next: WorkspaceSettings) => void;
   onSnapChange: (next: GridSize) => void;
   onThemePreferenceChange?: (preference: AppThemePreference) => void;
   onMoveDimensionsEnabledChange: (enabled: boolean) => void;
   onShowProjectNameInToolbarChange?: (show: boolean) => void;
+  onPreferClassicRotateHandlesChange: (preferClassic: boolean) => void;
   onMakeDefault: () => void;
   onClose: () => void;
 }) {
@@ -344,6 +348,11 @@ export function WorkspaceSettingsModal({
                     label="Select before moving"
                     checked={workspace.selectBeforeMove}
                     onChange={(selectBeforeMove) => patchWorkspace({ selectBeforeMove })}
+                  />
+                  <WorkspaceToggle
+                    label="Use classic rotate handles"
+                    checked={preferClassicRotateHandles}
+                    onChange={onPreferClassicRotateHandlesChange}
                   />
                   <WorkspaceToggle label="Show shadows" checked={workspace.showShadows} onChange={(showShadows) => patchWorkspace({ showShadows })} />
                   <WorkspaceToggle

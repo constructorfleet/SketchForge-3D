@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the corner rotate-handle icons with three world-space coloured axis rings as the primary rotation control on desktop. Near edge-on rings tip up slightly so they stay hittable, and opacity eases for hover, active drag, and camera motion. The corner icons remain as a fallback on touch and narrow viewports, a "Use classic rotate handles" setting forces them everywhere, and `?rotationMode=classic|rings` overrides both.
 - Added a Center view on selection button next to Home, bound to Shift+F. It keeps the current viewing direction, moves the orbit target to the middle of the selection, and backs off far enough for the selection to fit, changing distance for a perspective camera and zoom for an orthographic one.
 - Added a Center on workplane button to Arrange, which places the selection in the middle of the build plate. The selection moves as one so several objects keep their relative spacing, locked objects stay put and stay out of the bounding box, and an already-centred selection records no history entry.
 - Arrow keys now move the selection towards the workplane axis closest to the direction the arrow points on screen, instead of along fixed world axes. The Front view and the default home view keep the mapping they always had, steps stay on an axis with no diagonals, and Ctrl/Cmd+arrow elevation changes and workplanes laid on a face are unaffected.
