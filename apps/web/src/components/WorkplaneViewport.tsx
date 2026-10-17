@@ -37,6 +37,7 @@ import {
   type PlacementWorkplane,
 } from "@/lib/placementWorkplane";
 import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
+import { orbitDirection, orbitFromDrag, type CameraOrbit } from "@/lib/viewCubeOrbit";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
@@ -2993,18 +2994,25 @@ export function WorkplaneViewport({
     const animate = () => {
       state.animationId = window.requestAnimationFrame(animate);
       const now = performance.now();
-      const controlsChanged = state.controls.update();
+      // While the view cube is driving the camera, OrbitControls must not also
+      // write it. update() re-derives its spherical state from the camera each
+      // call and re-applies any residual delta, so leaving it running means two
+      // writers correcting each other every frame -- which reads as jitter, and
+      // as a jump when a fast drag makes the correction large.
+      const controlsChanged = cubeDragActiveRef.current ? true : state.controls.update();
       const cameraSettled = state.wasCameraMoving && !controlsChanged;
       if (!controlsChanged && !state.needsRender && !cameraSettled && !state.rotationRingsAnimating) {
         return;
       }
-      constrainCamera(state, workspaceRef.current);
+      if (!cubeDragActiveRef.current) {
+        constrainCamera(state, workspaceRef.current);
+      }
       // Future edits: keep this before any view cube or transform-overlay projection.
       // OrbitControls changes camera position/quaternion, but manual Vector3.project()
       // can read the previous matrix unless we force the matrix world current here.
       // Removing this brings back the one-frame-late handle/line lag during camera motion.
       state.camera.updateMatrixWorld();
-      if (now - state.lastViewCubeSync > 48 || cameraSettled || state.needsRender) {
+      if (cubeDragActiveRef.current || now - state.lastViewCubeSync > 48 || cameraSettled || state.needsRender) {
         syncViewCube(state, viewCubeRef.current);
         onCameraOrientationChangeRef.current?.(cameraOrientation(state));
         state.lastViewCubeSync = now;
@@ -4915,6 +4923,90 @@ export function WorkplaneViewport({
     }
   }, []);
 
+  // Dragging the cube orbits the camera, the way Tinkercad's does. The orbit at
+  // pointerdown is captured once and the total delta applied to it, so a long
+  // drag cannot accumulate rounding drift, and releasing without moving leaves
+  // the face buttons to handle the click.
+  const cubeDragRef = useRef<{ pointerId: number; x: number; y: number; start: CameraOrbit; moved: boolean; damping: boolean } | null>(null);
+  // Set when a drag turned the camera, so the click that follows the release
+  // does not also snap the view to whichever face was under the pointer.
+  const cubeDragJustEndedRef = useRef(false);
+  const cubeDragActiveRef = useRef(false);
+
+  const orbitCameraTo = useCallback((orbit: CameraOrbit) => {
+    const state = threeRef.current;
+    if (!state) return;
+    const target = state.controls.target;
+    const distance = Math.max(0.001, state.camera.position.distanceTo(target));
+    const [dx, dy, dz] = orbitDirection(orbit);
+    state.camera.up.set(0, 1, 0);
+    state.camera.position.set(target.x + dx * distance, target.y + dy * distance, target.z + dz * distance);
+    state.camera.lookAt(target);
+    state.camera.updateProjectionMatrix();
+    state.needsRender = true;
+  }, []);
+
+  const beginCubeDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = threeRef.current;
+    if (!state || event.button !== 0) return;
+    cubeDragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      start: cameraOrientation(state),
+      moved: false,
+      damping: state.controls.enableDamping,
+    };
+    // Neither the camera nor the pointer is taken yet: a press that never
+    // moves has to stay a click on the face button underneath. Capturing here
+    // would retarget the click to this element, and the face would never
+    // respond. The move handler claims both once the gesture becomes a drag.
+    cubeDragJustEndedRef.current = false;
+  }, []);
+
+  const moveCubeDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cubeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.x;
+    const deltaY = event.clientY - drag.y;
+    // A few pixels of slop so a click on a face is still a click.
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < 3) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      // Now it is a drag: take the camera, and capture so it keeps tracking
+      // when the pointer leaves the cube.
+      const state = threeRef.current;
+      if (state) {
+        drag.damping = state.controls.enableDamping;
+        state.controls.enableDamping = false;
+      }
+      cubeDragActiveRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    orbitCameraTo(orbitFromDrag(drag.start, deltaX, deltaY));
+  }, [orbitCameraTo]);
+
+  const endCubeDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cubeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    cubeDragRef.current = null;
+    const state = threeRef.current;
+    if (drag.moved) {
+      cubeDragActiveRef.current = false;
+      if (state) {
+        state.controls.enableDamping = drag.damping;
+        // Hand the camera back: one update resyncs the controls' own state to
+        // where the drag left it, so the next orbit does not snap.
+        state.controls.update();
+      }
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+    // A drag that turned the camera must not also trigger the face underneath.
+    cubeDragJustEndedRef.current = drag.moved;
+  }, []);
+
   const setViewCubeFace = useCallback((face: ViewCubeFace) => {
     const state = threeRef.current;
     if (!state) {
@@ -5191,7 +5283,15 @@ export function WorkplaneViewport({
 
   return (
     <main className={`workplane-stage ${challengeTutorial ? `key-tag-tutorial-active ${challengeTutorialCollapsed ? "key-tag-tutorial-collapsed" : ""}` : ""}`}>
-      <div className="view-cube" aria-label={t("workspace.viewCube.label")} onPointerDown={(event) => event.stopPropagation()}>
+      <div
+        className="view-cube"
+        aria-label={t("workspace.viewCube.label")}
+        onPointerDown={(event) => { event.stopPropagation(); beginCubeDrag(event); }}
+        onPointerMove={moveCubeDrag}
+        onPointerUp={endCubeDrag}
+        onPointerCancel={endCubeDrag}
+        onClickCapture={(event) => { if (cubeDragJustEndedRef.current) { event.preventDefault(); event.stopPropagation(); cubeDragJustEndedRef.current = false; } }}
+      >
         <div className="view-cube-inner" ref={viewCubeRef}>
           <button type="button" className="cube-face cube-top" aria-label={t("workspace.viewCube.view.bottom")} aria-keyshortcuts="6" title={t("workspace.shortcutHint", { label: t("workspace.viewCube.view.bottom"), key: "6" })} onClick={() => setViewCubeFace("bottom")}>{t("workspace.viewCube.face.bottom")}</button>
           <button type="button" className="cube-face cube-bottom" aria-label={t("workspace.viewCube.view.top")} aria-keyshortcuts="5" title={t("workspace.shortcutHint", { label: t("workspace.viewCube.view.top"), key: "5" })} onClick={() => setViewCubeFace("top")}>{t("workspace.viewCube.face.top")}</button>

@@ -4087,6 +4087,8 @@ button {
   z-index: 4;
   width: 82px;
   height: 82px;
+  /* The cube can be dragged to orbit, so it says so before the drag starts. */
+  cursor: grab;
   perspective: 420px;
   color: #96a2ad;
   font-size: 10px;
@@ -4097,6 +4099,10 @@ button {
   filter: drop-shadow(0 2px 3px rgba(45, 64, 82, 0.14));
   opacity: 0.9;
   pointer-events: auto;
+}
+
+.view-cube:active {
+  cursor: grabbing;
 }
 
 .view-cube-inner {
