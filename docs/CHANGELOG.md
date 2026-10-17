@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Fillet toolbar marker and the shape inspector's length units are now keyed on property configuration rather than on visible English label text, so both keep working when the interface is translated.
 - Generated button tooltips now refresh when the accessible name changes, so toggles such as Lock and Hide no longer describe the opposite action after being clicked. Tooltips written in the markup are still left alone.
 - The rotate handle now shows a pointer cursor on hover instead of the canvas orbit cursor.
 - Imported STL, OBJ, and SVG models now land on the workplane centre instead of a fixed 10mm offset.
