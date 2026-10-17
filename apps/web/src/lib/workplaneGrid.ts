@@ -7,7 +7,6 @@ export const WORKPLANE_MAJOR_GRID_INTERVAL = 5;
 export const DEFAULT_WORKPLANE_GRID_COLOR = "#28b4de";
 
 /** Printed along the front edge so the plane's orientation is readable. */
-export const WORKPLANE_LABEL_TEXT = "Workplane";
 /** Width to height of the label texture, and so of the mesh that carries it. */
 export const WORKPLANE_LABEL_ASPECT = 4;
 const WORKPLANE_LABEL_MIN_HEIGHT = 3;

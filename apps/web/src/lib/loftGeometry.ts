@@ -3,6 +3,22 @@ import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.j
 import { cleanRotationDegrees } from "@/lib/workplaneShapes";
 import type { LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
+import type { MessageKey, Translator } from "@/i18n";
+
+/** Display text for a loft cross-section, keyed on the value saved in projects. */
+const LOFT_PROFILE_SHAPE_KEYS: Record<LoftProfileShape, MessageKey> = {
+  Oval: "panels.loftShape.oval",
+  Rectangle: "panels.loftShape.rectangle",
+  Triangle: "panels.loftShape.triangle",
+  Pentagon: "panels.loftShape.pentagon",
+  Hexagon: "panels.loftShape.hexagon",
+};
+
+export function loftProfileShapeLabel(t: Translator, option: string): string {
+  const key = LOFT_PROFILE_SHAPE_KEYS[option as LoftProfileShape];
+  return key ? t(key) : option;
+}
+
 export const LOFT_PROFILE_SHAPES: LoftProfileShape[] = ["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"];
 export const DEFAULT_LOFT_BOTTOM_SHAPE: LoftProfileShape = "Rectangle";
 export const DEFAULT_LOFT_TOP_SHAPE: LoftProfileShape = "Oval";

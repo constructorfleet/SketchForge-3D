@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { translatorFor } from "@/i18n/translator";
 import {
+  ABOVE_SLIDER_MAX_PROPERTIES,
+  LENGTH_UNIT_PROPERTIES,
   getShapePropertiesWithAppLimits,
   getShapeTaperProperties,
   propertyUsesLengthUnit,
   type RangePropertyConfig,
   type ShapePropertyConfig,
+  type ShapePropertyId,
 } from "@/lib/shapeProperties";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
+
+const en = translatorFor("en");
 
 const SHAPE_KINDS: ShapeKind[] = [
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof",
@@ -31,9 +37,9 @@ function shapeOfKind(kind: ShapeKind, overrides: Partial<WorkplaneShape> = {}): 
   };
 }
 
-// Every branch of the property list, not just the per-kind default: the
-// revolve and gear-variant branches declare their own rows, and the taper rows
-// are built by a separate function.
+// Every branch of the property list, not just the per-kind default: the revolve
+// and gear-variant branches declare their own rows, the loft rows depend on each
+// end's profile, and the taper rows are built by a separate function.
 function everyPropertyVariant(): ShapePropertyConfig[] {
   const shapes: WorkplaneShape[] = [
     ...SHAPE_KINDS.map((kind) => shapeOfKind(kind)),
@@ -43,8 +49,6 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
     shapeOfKind("gear", { gearType: "spur" }),
     shapeOfKind("gear", { gearType: "helical" }),
     shapeOfKind("gear", { gearType: "bevel" }),
-    // Which loft rows appear depends on each end's profile: a polygon end has
-    // no independent Length, so both variants have to be swept.
     shapeOfKind("loft", { loftTopShape: "Oval", loftBottomShape: "Oval" }),
     shapeOfKind("loft", { loftTopShape: "Hexagon", loftBottomShape: "Triangle" }),
   ];
@@ -54,48 +58,67 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
   ]);
 }
 
-function rangeProperties() {
-  return everyPropertyVariant().filter(
-    (property): property is RangePropertyConfig => property.type === undefined || property.type === "range",
-  );
-}
+const declaredIds = () => [...new Set(everyPropertyVariant().map((property) => property.id))];
+const rangeProperties = () => everyPropertyVariant().filter(
+  (property): property is RangePropertyConfig => property.type === undefined || property.type === "range",
+);
 
-// The label lists these assertions compare against are the pre-#89 behaviour,
-// kept in shapeProperties as the fallback for an unannotated property. They
-// are English-only, so a translated build would silently stop matching them:
-// these tests fail if a length property is ever added without the explicit
-// configuration that replaced them.
+// Rows are keyed on a stable ShapePropertyId, never on their visible text: the
+// id picks the label message and drives the unit and slider-overflow rules, so
+// none of it changes with the interface language. These tests fail if a row is
+// added without a label message, or if either rule drifts from the English
+// label rules they replaced.
 describe("shape inspector property configuration", () => {
-  it("covers every branch that declares a length property", () => {
-    const labels = new Set(rangeProperties().map((property) => property.label));
-    // Default rows, the revolve branch, gear teeth/helix rows, and taper rows.
-    for (const label of ["Length", "Width", "Height", "Start Angle", "Sweep", "Tooth Size", "Tooth Width", "Center Hole", "Helix Angle", "Top Length", "Bottom Width", "Top Width", "Bottom Length", "Layers"]) {
-      expect(labels, `missing coverage for ${label}`).toContain(label);
+  it("covers every branch that declares properties", () => {
+    const ids = new Set(declaredIds());
+    for (const id of ["length", "width", "height", "startAngle", "sweep", "toothSize", "toothWidth", "centerHole", "helixAngle", "topLength", "bottomWidth", "topShape", "bottomRotation", "layers", "text", "font"] as ShapePropertyId[]) {
+      expect(ids, `missing coverage for ${id}`).toContain(id);
     }
   });
 
-  it("declares a length unit on every property the label list would have matched", () => {
-    const unannotated = rangeProperties()
-      .filter((property) => propertyUsesLengthUnit(property.label) && property.unit !== "length")
-      .map((property) => property.label);
-    expect([...new Set(unannotated)]).toEqual([]);
+  it("has a label message for every property it declares", () => {
+    const unlabelled = declaredIds().filter((id) => {
+      const label = en(`panels.property.${id}` as Parameters<typeof en>[0]);
+      return !label || label.includes(`panels.property.${id}`);
+    });
+    expect(unlabelled).toEqual([]);
   });
 
-  it("never marks a non-length property as a length", () => {
-    const mislabelled = rangeProperties()
-      .filter((property) => property.unit === "length" && !propertyUsesLengthUnit(property.label))
-      .map((property) => property.label);
-    expect([...new Set(mislabelled)]).toEqual([]);
+  it("keeps the unit rule matching the English label rule it replaced", () => {
+    const LENGTH_LABELS = ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width"];
+    const diverged = declaredIds().filter((id) => {
+      const label = en(`panels.property.${id}` as Parameters<typeof en>[0]);
+      return LENGTH_LABELS.includes(label) !== propertyUsesLengthUnit(id);
+    });
+    expect(diverged).toEqual([]);
   });
 
-  it("keeps allowsAboveSliderMax matching the label rule it replaced", () => {
-    const legacyAllowsAboveSliderMax = (label: string) =>
+  it("keeps the slider-overflow rule matching the English label rule it replaced", () => {
+    const legacy = (label: string) =>
       label === "Length" || label === "Width" || label === "Height"
       || label.endsWith(" Length") || label.endsWith(" Width");
+    const diverged = declaredIds().filter((id) => {
+      const label = en(`panels.property.${id}` as Parameters<typeof en>[0]);
+      return legacy(label) !== ABOVE_SLIDER_MAX_PROPERTIES.includes(id);
+    });
+    expect(diverged).toEqual([]);
+  });
 
-    const diverged = rangeProperties()
-      .filter((property) => (property.allowsAboveSliderMax ?? false) !== legacyAllowsAboveSliderMax(property.label))
-      .map((property) => `${property.label}=${property.allowsAboveSliderMax ?? false}`);
-    expect([...new Set(diverged)]).toEqual([]);
+  it("lists no id that nothing declares", () => {
+    const declared = new Set(declaredIds());
+    // A stale entry in either list is dead configuration: it reads as a rule
+    // that applies to something, while no row ever asks for it.
+    for (const id of [...LENGTH_UNIT_PROPERTIES, ...ABOVE_SLIDER_MAX_PROPERTIES]) {
+      expect(declared, `${id} is listed but never declared`).toContain(id);
+    }
+  });
+
+  it("never marks a non-range property as a length", () => {
+    const ranges = new Set(rangeProperties().map((property) => property.id));
+    const nonRange = everyPropertyVariant()
+      .filter((property) => property.type === "text" || property.type === "select")
+      .map((property) => property.id)
+      .filter((id) => !ranges.has(id) && propertyUsesLengthUnit(id));
+    expect(nonRange).toEqual([]);
   });
 });

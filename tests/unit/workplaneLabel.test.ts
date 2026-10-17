@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { LOCALES } from "@/i18n/locales";
+import { translatorFor } from "@/i18n/translator";
 import {
   WORKPLANE_LABEL_ASPECT,
-  WORKPLANE_LABEL_TEXT,
   workplaneLabelLayout,
 } from "@/lib/workplaneGrid";
 import { DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
@@ -94,6 +95,13 @@ describe("workplane label layout", () => {
   });
 
   it("labels the plane in the language the rest of the editor uses", () => {
-    expect(WORKPLANE_LABEL_TEXT).toBe("Workplane");
+    // The label is drawn into a canvas texture outside React, so it reads the
+    // message rather than a hardcoded string: every language must supply one.
+    for (const locale of LOCALES) {
+      const label = translatorFor(locale.code)("workspace.workplane.label");
+      expect(label, locale.code).toBeTruthy();
+      expect(label, locale.code).not.toContain("workspace.workplane.label");
+    }
+    expect(translatorFor("en")("workspace.workplane.label")).toBe("Workplane");
   });
 });
