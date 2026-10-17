@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dimension marks now keep a minimum screen distance from the edge they measure, so a width or depth label is no longer hidden under a rotate handle when zoomed out. The rotate handle's hit area shrank from 52px to 40px around its 26px glyph, and dimension labels now sit on the same layer as the transform handles.
 - Closing the window now quits SketchForge on Linux, where a system tray cannot be relied on. Windows and macOS keep hiding to the tray. A desktop that provides no tray no longer blocks startup, and the Linux launcher entry gained `GenericName`, `Keywords`, and `StartupWMClass`.
 - Moved the project name field out of the tool ribbon and into the tab row above, so the Visibility, Combine, Modify, Arrange, and Manage groups stay reachable without the ribbon's horizontal scrollbar at narrower window widths.
 - The Fillet toolbar marker and the shape inspector's length units are now keyed on property configuration rather than on visible English label text, so both keep working when the interface is translated.
