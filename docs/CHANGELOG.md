@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed holes whose profile carries its own absolute dimensions — a loft's independent top end, and the taper rows on every other kind — being padded only at their generic size before subtraction. The cutter changed shape instead of growing, so the hole came out wrong and its unpadded end stayed coplanar with the solid, tearing faces off the result.
 - Fixed the rotation axis rings never appearing: they were parented to the selection-helper group, which is rebuilt whenever the selection changes and hidden for the duration of a rotate drag.
 - Added interface localization in English, Czech, German, Spanish, French, Polish, Brazilian Portuguese and Russian. The language follows the system by default and can be changed in Settings → Language; the desktop tray and update dialogs follow the same choice. Local server errors and editor notices are translated as well; MCP tool results stay in English. Languages are ICU JSON catalogs (see `docs/TRANSLATIONS.md`); the non-English translations were made with AI help and have not been reviewed by native speakers yet.
 - Added a Loft primitive that morphs a solid between two 2D cross-sections. Each end is an Oval, Rectangle, Triangle, Pentagon, or Hexagon with independent size and rotation, the way cone's Top Radius works independently of its base. Wired into `.skf` projects and the MCP bridge's `sketchforge_create_shape` as `kind: "loft"`.

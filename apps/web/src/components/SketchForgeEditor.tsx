@@ -111,6 +111,7 @@ import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEn
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
+import { CUTTER_PADDING, CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
 import { createLocalId } from "@/lib/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
@@ -261,9 +262,7 @@ declare global {
   }
 }
 
-const CUTTER_PADDING = 0.05;
 const POINT_TOLERANCE = 0.0001;
-const CUTTER_RESIDUAL_INSET = CUTTER_PADDING * 0.4;
 const MIN_SHAPE_DIMENSION = 0.01;
 const MAX_SKETCH_HISTORY_ENTRIES = 100;
 const MODEL_DIMENSION_PRECISION = 3;
@@ -3326,21 +3325,6 @@ function cuboidFromBox3(box: THREE.Box3): Cuboid {
     maxY: box.max.y,
     minZ: box.min.z,
     maxZ: box.max.z,
-  };
-}
-
-function paddedCutterShape(shape: WorkplaneShape): WorkplaneShape {
-  const width = shapeWidth(shape) + CUTTER_PADDING * 2;
-  const depth = shapeDepth(shape) + CUTTER_PADDING * 2;
-  const height = shape.height + CUTTER_PADDING * 2;
-  return {
-    ...shape,
-    width,
-    depth,
-    height,
-    size: Math.max(width, depth),
-    elevation: (shape.elevation ?? 0) - CUTTER_PADDING,
-    baseRadius: shape.baseRadius ? shape.baseRadius + CUTTER_PADDING : shape.baseRadius,
   };
 }
 
