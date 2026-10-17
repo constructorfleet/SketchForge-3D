@@ -5,6 +5,7 @@ import {
   LENGTH_UNIT_PROPERTIES,
   getShapePropertiesWithAppLimits,
   getShapeTaperProperties,
+  placementProperties,
   propertyUsesLengthUnit,
   type RangePropertyConfig,
   type ShapePropertyConfig,
@@ -55,6 +56,7 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
   return shapes.flatMap((shape) => [
     ...getShapePropertiesWithAppLimits(shape, () => {}),
     ...getShapeTaperProperties(shape, () => {}, 480),
+    ...placementProperties(shape, () => {}, { halfWidth: 150, halfDepth: 150, maxElevation: 300 }),
   ]);
 }
 
@@ -68,10 +70,18 @@ const rangeProperties = () => everyPropertyVariant().filter(
 // none of it changes with the interface language. These tests fail if a row is
 // added without a label message, or if either rule drifts from the English
 // label rules they replaced.
+// Rows added after the label lists were replaced have no legacy label to
+// compare against, so the two parity tests below skip them. Every other check
+// still covers them.
+const POSTDATES_LABEL_RULES: ShapePropertyId[] = [
+  "positionX", "positionY", "positionZ", "rotationX", "rotationY", "rotationZ",
+  "topShape", "bottomShape", "topRotation", "bottomRotation", "layers",
+];
+
 describe("shape inspector property configuration", () => {
   it("covers every branch that declares properties", () => {
     const ids = new Set(declaredIds());
-    for (const id of ["length", "width", "height", "startAngle", "sweep", "toothSize", "toothWidth", "centerHole", "helixAngle", "topLength", "bottomWidth", "topShape", "bottomRotation", "layers", "text", "font"] as ShapePropertyId[]) {
+    for (const id of ["length", "width", "height", "startAngle", "sweep", "toothSize", "toothWidth", "centerHole", "helixAngle", "topLength", "bottomWidth", "topShape", "bottomRotation", "layers", "text", "font", "positionX", "positionY", "positionZ", "rotationY"] as ShapePropertyId[]) {
       expect(ids, `missing coverage for ${id}`).toContain(id);
     }
   });
@@ -87,6 +97,7 @@ describe("shape inspector property configuration", () => {
   it("keeps the unit rule matching the English label rule it replaced", () => {
     const LENGTH_LABELS = ["Radius", "Length", "Width", "Height", "Bevel", "Top Radius", "Base Radius", "Thickness", "Tooth Size", "Tooth Width", "Center Hole", "Top Length", "Top Width", "Bottom Length", "Bottom Width"];
     const diverged = declaredIds().filter((id) => {
+      if (POSTDATES_LABEL_RULES.includes(id)) return false;
       const label = en(`panels.property.${id}` as Parameters<typeof en>[0]);
       return LENGTH_LABELS.includes(label) !== propertyUsesLengthUnit(id);
     });
@@ -98,6 +109,7 @@ describe("shape inspector property configuration", () => {
       label === "Length" || label === "Width" || label === "Height"
       || label.endsWith(" Length") || label.endsWith(" Width");
     const diverged = declaredIds().filter((id) => {
+      if (POSTDATES_LABEL_RULES.includes(id)) return false;
       const label = en(`panels.property.${id}` as Parameters<typeof en>[0]);
       return legacy(label) !== ABOVE_SLIDER_MAX_PROPERTIES.includes(id);
     });

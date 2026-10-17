@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a Placement section to the object panel with numeric X, Y, Z position and rotation fields. The panel could already set an exact size but not an exact place or angle, so precise work meant nudging with the arrow keys. Negative and fractional values are accepted, and rotation reads as a signed turn so a shape stored at 350 degrees shows as -10.
 - Fixed the dashboard hanging with "Maximum update depth exceeded" when a project had a tilted workplane. Normalising such a workplane alternated between two values in the last digits rather than settling, so the effect that persists the project list never saw a stable result and re-ran until React gave up. A workplane that is already a valid frame is now left alone, and that effect can no longer rewrite the same list twice.
 - Added a scene list: a panel showing every shape, with search by name or kind, expandable groups, per-shape show/hide, lock and delete, and group/ungroup for the selection. It shares the right-hand rail with Object details, so collapsing one gives its room to the other.
 - The snap grid moved to the foot of the right-hand rail. It used to be two controls — one docked inside Object details, one floating when nothing was selected — so it moved around or vanished depending on what was selected.

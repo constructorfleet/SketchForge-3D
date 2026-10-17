@@ -13,6 +13,7 @@ import {
   clamp,
   getShapePropertiesWithAppLimits,
   getShapeTaperProperties,
+  placementProperties,
   propertyUsesLengthUnit,
   type RangePropertyConfig,
   type SelectPropertyConfig,
@@ -117,9 +118,16 @@ export function ShapeInspector({
     : [];
   const taperDimensionMax = workspace.shapeCustomizations[shape.kind]?.maxDimension ?? 480;
   const taperProperties = getShapeTaperProperties(shape, onUpdate, taperDimensionMax);
+  // The sliders span the build plate; typed values may still go beyond it.
+  const placementRows = placementProperties(shape, onUpdate, {
+    halfWidth: workspace.width / 2,
+    halfDepth: workspace.depth / 2,
+    maxElevation: Math.max(workspace.width, workspace.depth),
+  });
   const isSketchRevolve = shape.sketchOperation === "revolve" || Boolean(shape.sketchRevolve);
   const inspectorRef = useRef<HTMLElement>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [placementOpen, setPlacementOpen] = useState(false);
   const [taperOpen, setTaperOpen] = useState(false);
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
@@ -295,6 +303,23 @@ export function ShapeInspector({
           ) : null}
         </div>
       ) : null}
+      <div className={`property-card ${placementOpen ? "" : "collapsed"}`}>
+        <button
+          className="property-card-header"
+          type="button"
+          aria-expanded={placementOpen}
+          aria-controls={`placement-${shape.id}`}
+          onClick={() => setPlacementOpen((open) => !open)}
+        >
+          <span>{t("panels.inspector.placement")}</span>
+          <ChevronUp className={placementOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+        </button>
+        {placementOpen ? (
+          <div className="property-list" id={`placement-${shape.id}`}>
+            <ShapePropertyRows properties={placementRows} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+          </div>
+        ) : null}
+      </div>
       {shape.kind === "gear" ? (
         <div className={`property-card ${gearTeethOpen ? "" : "collapsed"}`}>
           <button
