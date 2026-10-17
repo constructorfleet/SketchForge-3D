@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added server-side project storage: setting `SKETCHFORGE_PROJECTS_DIR` makes the server hold every project instead of the browser, so a cleared browser profile no longer takes them with it. The dashboard reads its list from the server and autosaves there, projects already in a browser are moved up on first run, and a browser whose projects cannot all be moved keeps its own storage rather than showing half a list.
 - Numbers can now be typed during a drag, the way FreeCAD and Tinkercad allow. While dragging a rotate, lift, or height handle, typing digits sets the exact value shown on the live dimension label instead of the dragged one; Backspace corrects a digit and Escape returns to following the pointer. Typed digits no longer reach the camera-view shortcuts.
 - The Placement section of the object panel now starts expanded, since its numeric position and rotation fields are the only way to enter an exact angle and were easy to miss collapsed.
 - Added a Placement section to the object panel with numeric X, Y, Z position and rotation fields. The panel could already set an exact size but not an exact place or angle, so precise work meant nudging with the arrow keys. Negative and fractional values are accepted, and rotation reads as a signed turn so a shape stored at 350 degrees shows as -10.

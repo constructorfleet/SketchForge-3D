@@ -235,6 +235,12 @@
     },
     "loading": {
       "editor": "Loading editor"
+    },
+    "serverStorage": {
+      "migrated": "Moved {count, plural, one {# project} other {# projects}} to server storage",
+      "migrateFailed": "Could not move projects to server storage; they are still stored in this browser",
+      "badge": "On server",
+      "hint": "Projects are stored on the server at {name}"
     }
   },
   "editor": {
@@ -1449,6 +1455,21 @@
       "localFailed": "Could not update local SketchForge",
       "serviceStatus": "Update service returned {status}",
       "startFailed": "Could not start the update"
+    },
+    "projects": {
+      "notConfigured": "{name} is not configured",
+      "disabled": "Server project storage is disabled",
+      "invalidId": "Invalid project id",
+      "notFound": "That project is not on the server",
+      "sameOrigin": "Server project storage only accepts same-origin writes",
+      "busySaving": "This project is currently being saved",
+      "missingMetadata": "Project upload is missing its details",
+      "invalidMetadata": "Project details could not be read",
+      "tooLarge": "Project exceeds the server storage size limit",
+      "changedBeforeSave": "This project was changed elsewhere. Reload before saving again.",
+      "loadFailed": "Could not load projects from the server",
+      "saveFailed": "Could not save the project to the server",
+      "deleteFailed": "Could not delete the project from the server"
     }
   }
 }

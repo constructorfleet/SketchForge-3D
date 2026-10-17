@@ -206,6 +206,24 @@ If that works, SketchForge is running.
 
 The container listens on port `3000`. It also accepts connections on port `80` for backward compatibility with older UnRAID templates and forwards them to the same server. New Docker and UnRAID configurations should use container port `3000`.
 
+### Server-Side Project Storage
+
+By default every private project autosaves in the browser that made it, which a cleared profile takes with it. Set `SKETCHFORGE_PROJECTS_DIR` and the server holds them instead:
+
+```bash
+docker run -d --name sketchforge --restart unless-stopped \
+  -p 3000:3000 \
+  -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
+  -v sketchforge-projects:/data/my-projects \
+  ghcr.io/formsmith746/sketchforge-3d:latest
+```
+
+The directory *replaces* browser storage rather than mirroring it: the dashboard reads its list from the server, autosave writes there, and deleting a project deletes it there. Each project is two files — `<project id>.json` for the dashboard's own record of it and `<project id>.skf` for the geometry — written through a temporary file so an interrupted save cannot leave half a project behind.
+
+Projects already held in a browser are moved up the first time it reaches a server with the directory set, and the dashboard says how many it moved. If any of them cannot be moved, that browser keeps its own storage and says so, rather than carrying on with half a list on the server.
+
+This needs the server, so it does not apply to a static-export build. Shared projects below are unaffected and remain a separate, explicitly-published library.
+
 ### Shared Docker Projects
 
 Docker deployments include a shared `.skf` project library. Private projects still autosave in each user's browser. The **Shared** dashboard section lists files stored in `/data/projects`, and **Export → SKF → Save to shared** writes the current project there. Revision-matched PNG previews are stored beside the library in `/data/projects/.thumbnails` and appear on shared project cards.

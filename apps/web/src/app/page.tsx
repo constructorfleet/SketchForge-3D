@@ -37,6 +37,14 @@ import {
 } from "@/lib/placementWorkplane";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
+import {
+  deleteServerProject,
+  fetchServerProjectPackage,
+  probeServerProjects,
+  saveServerProjectMetadata,
+  saveServerProjectPackage,
+  type ServerProjectRecord,
+} from "@/lib/serverProjectStore";
 import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
@@ -45,6 +53,7 @@ import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings
 type AppView = "dashboard" | "editor";
 type ViewMode = "grid" | "list";
 type DashboardSection = "home" | "shared" | "challenges" | "customization";
+type ProjectStorageMode = "browser" | "server";
 type DownloadMode = "browser" | "folder";
 
 type DashboardProject = {
@@ -205,6 +214,19 @@ function projectShapeSaveContext(project: Pick<DashboardProject, "name" | "creat
   };
 }
 
+/**
+ * Server-side project storage (upstream issue #109).
+ *
+ * `SKETCHFORGE_PROJECTS_DIR` makes the server the only store: the list comes
+ * from `/api/projects` instead of `localStorage`, and each project's packed
+ * `.skf` goes to the server instead of IndexedDB. The flag lives at module
+ * scope because the storage primitives below are module functions, and it is
+ * set once -- after the probe, and after any browser-held projects have been
+ * migrated up -- so a save can never land in the browser and be reported as
+ * stored on the server.
+ */
+let serverProjectStorageActive = false;
+
 function openProjectShapesDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof window === "undefined" || !window.indexedDB) {
@@ -236,6 +258,23 @@ function projectResourceRecordId(projectId: string, kind: ProjectShapeResourceRe
 }
 
 async function loadProjectShapes(projectId: string) {
+  if (serverProjectStorageActive) {
+    const packageBytes = await fetchServerProjectPackage(projectId);
+    if (!packageBytes) return null;
+    const restored = await importSkfProject(packageBytes);
+    return {
+      id: projectId,
+      // Carried so the caller reads this as an already-packed record and does
+      // not try to migrate it back up to the server it just came from.
+      skfPackage: packageBytes,
+      updatedAt: restored.modifiedAt || Date.now(),
+      revision: restored.modifiedAt || Date.now(),
+      shapes: restored.shapes,
+      history: restored.history,
+      historyIndex: restored.historyIndex,
+      assets: restored.assets,
+    };
+  }
   const database = await openProjectShapesDb();
   const record = await new Promise<ProjectShapeRecord | null>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readonly");
@@ -331,6 +370,10 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
     sketchPlacementWorkplane: context.sketchPlacementWorkplane,
     compressionLevel: 1,
   });
+  if (serverProjectStorageActive) {
+    await saveServerProjectPackage(projectId, skfPackage, entry.revision);
+    return;
+  }
   const database = await openProjectShapesDb();
   return new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
@@ -384,6 +427,10 @@ function saveProjectShapesWhenIdle(projectId: string, entry: ProjectShapeCacheEn
 }
 
 async function deleteProjectShapes(projectId: string) {
+  if (serverProjectStorageActive) {
+    await deleteServerProject(projectId);
+    return;
+  }
   const database = await openProjectShapesDb();
   return new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
@@ -399,19 +446,22 @@ async function deleteProjectShapes(projectId: string) {
   });
 }
 
-function readStoredProjects() {
-  const legacyShapes: Record<string, ProjectShapeCacheEntry> = {};
-  if (typeof window === "undefined") return { projects: [] as DashboardProject[], legacyShapes };
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(PROJECTS_STORAGE_KEY) ?? "[]") as StoredDashboardProject[];
-    const projects = parsed
-      .filter((project) => typeof project.id === "string" && typeof project.name === "string")
-      .map((project, index) => {
+/**
+ * One stored project as the dashboard holds it.
+ *
+ * Shared by the `localStorage` list and the server store (upstream #109),
+ * whose metadata sidecars hold this same serialized shape.
+ */
+function normalizeStoredProject(
+  project: StoredDashboardProject,
+  index: number,
+  legacyShapes?: Record<string, ProjectShapeCacheEntry>,
+): DashboardProject {
         const id = project.id as string;
         const updatedAt = typeof project.updatedAt === "number" ? project.updatedAt : Date.now();
         const revision = typeof project.revision === "number" ? project.revision : updatedAt;
         const designShapes = Array.isArray(project.designShapes) ? (project.designShapes as WorkplaneShape[]) : null;
-        if (designShapes) {
+        if (designShapes && legacyShapes) {
           legacyShapes[id] = projectShapeCacheEntry(revision, designShapes);
         }
         return {
@@ -433,7 +483,20 @@ function readStoredProjects() {
             ? { fileName: project.sharedProject.fileName, revision: project.sharedProject.revision }
             : undefined,
         };
-      });
+}
+
+function storedProjectIsUsable(project: StoredDashboardProject) {
+  return typeof project.id === "string" && typeof project.name === "string";
+}
+
+function readStoredProjects() {
+  const legacyShapes: Record<string, ProjectShapeCacheEntry> = {};
+  if (typeof window === "undefined") return { projects: [] as DashboardProject[], legacyShapes };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PROJECTS_STORAGE_KEY) ?? "[]") as StoredDashboardProject[];
+    const projects = parsed
+      .filter(storedProjectIsUsable)
+      .map((project, index) => normalizeStoredProject(project, index, legacyShapes));
     return { projects, legacyShapes };
   } catch {
     return { projects: [], legacyShapes };
@@ -536,6 +599,7 @@ export default function Home() {
   const [downloadFolder, setDownloadFolder] = useState("");
   const [showProjectNameInToolbar, setShowProjectNameInToolbar] = useState(true);
   const [dashboardNotice, setDashboardNotice] = useState("");
+  const [projectStorageMode, setProjectStorageMode] = useState<ProjectStorageMode>("browser");
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
   const [sharedProjectsLoading, setSharedProjectsLoading] = useState(false);
@@ -544,6 +608,8 @@ export default function Home() {
   const projectsJsonRef = useRef("");
   // The last list this effect rewrote, so it cannot rewrite the same one twice.
   const projectsRewriteRef = useRef<string | null>(null);
+  // What the server already holds for each project, so an unchanged list is not re-posted.
+  const serverProjectMetadataRef = useRef(new Map<string, string>());
   const dashboardImportInputRef = useRef<HTMLInputElement | null>(null);
   const nextProjectRevisionRef = useRef(0);
   const projectShapeSaveQueuesRef = useRef<Record<string, Promise<void>>>({});
@@ -634,21 +700,106 @@ export default function Home() {
     void refreshSharedProjects();
   }, [mounted, refreshSharedProjects]);
 
+  const dashboardProjectsFromServer = useCallback((records: ServerProjectRecord[]) => {
+    const projects = records
+      .map((record) => record.metadata as StoredDashboardProject)
+      .filter(storedProjectIsUsable)
+      .map((project, index) => normalizeStoredProject(project, index));
+    serverProjectMetadataRef.current = new Map(projects.map((project) => {
+      const stored = projectForStorage(project);
+      return [stored.id, JSON.stringify(stored)];
+    }));
+    return projects;
+  }, []);
+
+  // Server-side project storage (upstream #109). Anything the browser is still
+  // holding is pushed up before the switch, so enabling the directory adopts
+  // the projects that are already here instead of hiding them. A migration that
+  // fails anywhere leaves the browser in charge: half a list on the server is
+  // worse than none.
+  useEffect(() => {
+    if (!mounted || STATIC_EXPORT_BUILD) return;
+    let canceled = false;
+    void (async () => {
+      const listing = await probeServerProjects().catch(() => null);
+      if (canceled || !listing?.enabled) return;
+
+      const serverProjectIds = new Set(listing.projects.map((record) => record.projectId));
+      const browserProjects = readStoredProjects().projects.filter((project) => !serverProjectIds.has(project.id));
+      for (const project of browserProjects) {
+        try {
+          const record = await loadProjectShapes(project.id);
+          await saveServerProjectMetadata(project.id, projectForStorage(project));
+          if (record?.skfPackage) {
+            await saveServerProjectPackage(project.id, record.skfPackage, project.revision ?? record.revision);
+          }
+        } catch (error) {
+          if (canceled) return;
+          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
+          return;
+        }
+      }
+      if (canceled) return;
+
+      const adopted = browserProjects.length > 0 ? await probeServerProjects().catch(() => listing) : listing;
+      if (canceled || !adopted.enabled) return;
+      serverProjectStorageActive = true;
+      const serverProjects = dashboardProjectsFromServer(adopted.projects);
+      projectsJsonRef.current = JSON.stringify(serverProjects.map(projectForStorage));
+      setProjects(serverProjects);
+      setProjectStorageMode("server");
+      try {
+        window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+      } catch {
+        // The list is on the server either way; a browser that refuses to
+        // forget its copy only leaves a stale one behind.
+      }
+      if (browserProjects.length > 0) {
+        setDashboardNotice(translate("dashboard.serverStorage.migrated", { count: browserProjects.length }));
+      }
+      // A reload straight into the editor checked the browser list, which the
+      // server has now replaced, so the requested project could not be found.
+      const params = new URLSearchParams(window.location.search);
+      const requestedProjectId = params.get("editor") === "1" ? params.get("project") : null;
+      if (requestedProjectId && serverProjects.some((project) => project.id === requestedProjectId)) {
+        setActiveProjectId((current) => current ?? requestedProjectId);
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [dashboardProjectsFromServer, mounted]);
+
   useEffect(() => {
     if (!mounted) return;
     const localSerialized = JSON.stringify(projects);
-    const storageProjects = mergeProjectsForStorage(projects);
+    // In server mode there is no stored list to merge against: each project's
+    // metadata sidecar is the record, and the server rejects a write that is
+    // older than the one it holds.
+    const storageProjects = projectStorageMode === "server" ? projects.map(projectForStorage) : mergeProjectsForStorage(projects);
     const serialized = JSON.stringify(storageProjects);
     if (projectsJsonRef.current === serialized) return;
-    try {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
-    } catch (error) {
+    if (projectStorageMode === "server") {
+      storageProjects.forEach((project) => {
+        const projectJson = JSON.stringify(project);
+        if (serverProjectMetadataRef.current.get(project.id) === projectJson) return;
+        serverProjectMetadataRef.current.set(project.id, projectJson);
+        void saveServerProjectMetadata(project.id, project).catch((error) => {
+          serverProjectMetadataRef.current.delete(project.id);
+          setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
+        });
+      });
+    } else {
       try {
-        window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
         window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
-      } catch {
-        setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveListFailed"));
-        return;
+      } catch (error) {
+        try {
+          window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+          window.localStorage.setItem(PROJECTS_STORAGE_KEY, serialized);
+        } catch {
+          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveListFailed"));
+          return;
+        }
       }
     }
     projectsJsonRef.current = serialized;
@@ -662,18 +813,18 @@ export default function Home() {
       projectsRewriteRef.current = localSerialized;
       setProjects(storageProjects);
     }
-  }, [mounted, projects]);
+  }, [mounted, projectStorageMode, projects]);
 
   useEffect(() => {
     if (!mounted) return;
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== PROJECTS_STORAGE_KEY) return;
+      if (event.key !== PROJECTS_STORAGE_KEY || projectStorageMode === "server") return;
       projectsJsonRef.current = event.newValue ?? "[]";
       setProjects(readProjects());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [mounted]);
+  }, [mounted, projectStorageMode]);
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -1289,6 +1440,7 @@ export default function Home() {
           downloadFolder={downloadFolder}
           downloadMode={downloadMode}
           projects={visibleProjects}
+          projectStorageMode={projectStorageMode}
           query={query}
           settingsOpen={settingsOpen}
           sharedProjects={visibleSharedProjects}
@@ -1450,6 +1602,7 @@ function Dashboard({
   downloadFolder,
   downloadMode,
   projects,
+  projectStorageMode,
   query,
   settingsOpen,
   sharedProjects,
@@ -1485,6 +1638,7 @@ function Dashboard({
   downloadFolder: string;
   downloadMode: DownloadMode;
   projects: DashboardProject[];
+  projectStorageMode: ProjectStorageMode;
   query: string;
   settingsOpen: boolean;
   sharedProjects: SharedProject[];
@@ -1902,7 +2056,10 @@ function Dashboard({
               <div className="dashboard-section-header">
                 <div>
                   <h1>{t("dashboard.projects.title")}</h1>
-                  <span>{t("dashboard.projects.visible", { count: projects.length })}</span>
+                  <span>
+                    {t("dashboard.projects.visible", { count: projects.length })}
+                    {projectStorageMode === "server" ? ` - ${t("dashboard.serverStorage.badge")}` : null}
+                  </span>
                 </div>
                 <div className="dashboard-controls">
                   <label className="dashboard-select">
