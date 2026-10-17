@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The workplane now carries its name flat along its near edge, so which edge is the front is readable at a glance instead of having to be inferred from the symmetric axis lines. This also tells you which way an arrow-key nudge will move the selection, since those keys follow the plane's axes.
 - Arrow keys now move the selection by the Snap Grid instead of a fixed millimetre, so a keyboard nudge lands on the same lattice a pointer drag snaps to. Shift keeps its coarser step, and the old 1mm/5mm steps stand when the grid is off. At the default 1.0 mm grid nothing changes.
 - A snap grid or workspace setting chosen from a control now reaches the editor and the saved project immediately, instead of being swallowed until an unrelated change.
 - Dimension marks now keep a minimum screen distance from the edge they measure, so a width or depth label is no longer hidden under a rotate handle when zoomed out. The rotate handle's hit area shrank from 52px to 40px around its 26px glyph, and dimension labels now sit on the same layer as the transform handles.
