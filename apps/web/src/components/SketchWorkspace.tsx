@@ -791,7 +791,7 @@ export function SketchWorkspace({
     <main className="sketch-workspace-stage">
       <div className="sketch-mode-badge">{operation === "revolve" ? t("workspace.sketch.badge.revolve") : t("workspace.sketch.badge.extrude")}</div>
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
-      <div className="camera-controls sketch-camera-controls" aria-label={t("workspace.sketch.viewControls")}>
+      <div className="view-tools sketch-view-tools" aria-label={t("workspace.sketch.viewControls")}>
         <button aria-label={t("workspace.sketch.resetView")} onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}><Home size={28} /></button>
         <button aria-label={t("workspace.camera.zoomIn")} onClick={() => setZoom((value) => clamp(value * 1.25, 0.75, 6))}><Plus size={33} /></button>
         <button aria-label={t("workspace.camera.zoomOut")} onClick={() => setZoom((value) => clamp(value / 1.25, 0.75, 6))}><Minus size={33} /></button>

@@ -7135,6 +7135,39 @@ export function SketchForgeEditor({
     );
   }, [commitShapes, hasSelection, selectedIds, shapes, t]);
 
+  const deleteShapeById = useCallback((id: string) => {
+    const target = shapesRef.current.find((shape) => shape.id === id);
+    if (!target || target.locked) {
+      return;
+    }
+    commitShapes(
+      shapesRef.current.filter((shape) => shape.id !== id),
+      selectedIdsRef.current.filter((selected) => selected !== id),
+      notice((t) => t("editor.notice.deleted", { count: 1 })),
+    );
+  }, [commitShapes]);
+
+  const setShapeHidden = useCallback((id: string, hidden: boolean) => {
+    const target = shapesRef.current.find((shape) => shape.id === id);
+    // Hiding a locked shape would strand it: it cannot be selected to bring back.
+    if (!target || target.locked) {
+      return;
+    }
+    commitShapes(
+      shapesRef.current.map((shape) => (shape.id === id ? { ...shape, hidden } : shape)),
+      selectedIdsRef.current,
+      notice((t) => t(hidden ? "editor.notice.selectionHidden" : "editor.notice.selectionVisible")),
+    );
+  }, [commitShapes]);
+
+  const setShapeLocked = useCallback((id: string, locked: boolean) => {
+    commitShapes(
+      shapesRef.current.map((shape) => (shape.id === id ? { ...shape, locked } : shape)),
+      selectedIdsRef.current,
+      notice((t) => t(locked ? "editor.notice.shapeLocked" : "editor.notice.shapeUnlocked")),
+    );
+  }, [commitShapes]);
+
   const duplicateSelected = useCallback(() => {
     if (!hasSelection) {
       setNotice(notice((t) => t("editor.notice.selectShapeFirst")));
@@ -9313,6 +9346,11 @@ export function SketchForgeEditor({
           onMirrorPreviewClear={clearMirrorPreview}
           onMirrorSelection={mirrorSelectionAcross}
           onSelectShape={selectShape}
+          onDeleteShapeById={deleteShapeById}
+          onSetShapeHidden={setShapeHidden}
+          onSetShapeLocked={setShapeLocked}
+          onGroupShapes={groupSelected}
+          onUngroupShapes={ungroupSelected}
           onSetPlacementWorkplane={setViewportPlacementWorkplane}
           onToggleWorkplaneTool={activateWorkplaneTool}
           onInteractionActiveChange={updateProjectInteractionActive}

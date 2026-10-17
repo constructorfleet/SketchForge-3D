@@ -678,11 +678,6 @@
       }
     },
     "camera": {
-      "controls": "Controles da câmera",
-      "showControls": "Mostrar controles",
-      "showControlsLabel": "Mostrar os controles da câmera",
-      "hideControls": "Ocultar controles",
-      "hideControlsLabel": "Ocultar os controles da câmera",
       "home": "Vista inicial",
       "zoomIn": "Aproximar",
       "zoomOut": "Afastar"

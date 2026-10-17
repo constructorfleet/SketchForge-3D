@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a scene list: a panel showing every shape, with search by name or kind, expandable groups, per-shape show/hide, lock and delete, and group/ungroup for the selection. It shares the right-hand rail with Object details, so collapsing one gives its room to the other.
+- The snap grid moved to the foot of the right-hand rail. It used to be two controls — one docked inside Object details, one floating when nothing was selected — so it moved around or vanished depending on what was selected.
+- Renamed the left rail from "camera controls" to "view tools", in markup and in what screen readers announce. It holds the workplane tool, the ruler, and now the scene list, so naming the whole group after the camera was wrong.
 - A STEP export where every shape was skipped now names the shapes and why, instead of reporting "No box/cylinder/sphere or imported STEP solids to export" — which contradicted what was on screen when the skipped shape was a sphere.
 - STEP export now honours a cylinder's facet count and a shape's taper. A deliberately faceted cylinder exports as the prism it is instead of a round cylinder, and keeps its rotation; a tapered box or cylinder exports with its taper instead of straight-sided. A taper that cannot be built exactly is reported as skipped rather than written as a different shape.
 - STEP export now includes shapes carrying a fillet or chamfer, whose exact geometry lives in `cadBrep`. They were skipped as having no B-Rep source, and an export containing nothing else failed outright.

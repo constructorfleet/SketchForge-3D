@@ -4166,7 +4166,7 @@ button {
   transform: rotateY(-90deg) translateZ(29px);
 }
 
-.camera-controls {
+.view-tools {
   position: absolute;
   top: 173px;
   left: 10px;
@@ -4182,7 +4182,7 @@ button {
   backdrop-filter: blur(14px) saturate(1.15);
 }
 
-.camera-controls button {
+.view-tools button {
   position: relative;
   display: grid;
   width: 44px;
@@ -4197,24 +4197,24 @@ button {
   transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
-.camera-controls button:hover {
+.view-tools button:hover {
   color: #071f32;
   background: rgba(223, 239, 247, 0.82);
   border-color: rgba(155, 190, 207, 0.7);
   transform: translateX(1px);
 }
 
-.camera-controls button:focus-visible {
+.view-tools button:focus-visible {
   outline: 2px solid #28a9d2;
   outline-offset: 1px;
 }
 
-.camera-controls.collapsed {
+.view-tools.collapsed {
   border-radius: 17px;
 }
 
-.camera-controls button.active,
-.camera-controls button[aria-pressed="true"] {
+.view-tools button.active,
+.view-tools button[aria-pressed="true"] {
   color: #006b94;
   background: #def5fb;
   border-color: #6fc8df;
@@ -4255,13 +4255,13 @@ button {
   animation: ruler-tools-in 130ms ease-out;
 }
 
-.camera-controls .ruler-tool-popover button {
+.view-tools .ruler-tool-popover button {
   width: 35px;
   height: 35px;
   border-radius: 9px;
 }
 
-.camera-controls .ruler-tool-popover .ruler-delete-button.active {
+.view-tools .ruler-tool-popover .ruler-delete-button.active {
   color: #b42318;
   background: #fff0ee;
   border-color: #ee9b92;
@@ -4927,29 +4927,47 @@ button {
   box-shadow: 0 2px 8px rgba(20, 42, 58, 0.14);
 }
 
-.shape-inspector {
+/* The right-hand rail: panels stack and share the height, so collapsing one
+   gives its room to the other instead of each owning a fixed slice. */
+.inspector-rail {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   z-index: 8;
   display: flex;
-  flex-direction: column;
   width: 320px;
-  max-height: none;
+  flex-direction: column;
+  /* Only a layout box: the panels paint themselves, so when they are all
+     collapsed the viewport shows through instead of a full-height blank. */
+  pointer-events: none;
+}
+
+.inspector-rail:empty {
+  display: none;
+}
+
+.shape-inspector {
+  display: flex;
   overflow-y: auto;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   -ms-overflow-style: none;
   scrollbar-width: none;
   color: #243d56;
+  pointer-events: auto;
   background: rgba(244, 246, 248, 0.96);
   border-left: 1px solid #d8e0e7;
   box-shadow: -2px 0 10px rgba(36, 61, 86, 0.08);
 }
 
+/* Collapsed to its header, which is what hands the space to the panel below. */
 .shape-inspector.minimized {
-  bottom: auto;
-  height: 50px;
   overflow: hidden;
+  height: 50px;
+  flex: 0 0 50px;
 }
 
 .shape-inspector.sketch-revolve-inspector,
@@ -4971,10 +4989,23 @@ button {
 }
 
 .shape-inspector-header strong {
+  overflow: hidden;
   flex: 1;
-  padding-left: 13px;
+  padding-left: 8px;
   font-size: 18px;
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-header-glyph {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-left: 4px;
+  color: #40596f;
+  place-items: center;
 }
 
 .inspector-header-actions {
@@ -4985,17 +5016,6 @@ button {
 
 .shape-inspector button {
   font: inherit;
-}
-
-.inspector-snap-dock {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: auto;
-  padding: 14px 12px 16px;
-  background: linear-gradient(180deg, rgba(244, 246, 248, 0), rgba(244, 246, 248, 0.98) 18px, rgba(244, 246, 248, 0.98));
-  border-top: 1px solid rgba(216, 224, 231, 0.75);
 }
 
 .inspector-header-icon {
@@ -5606,13 +5626,20 @@ button {
   clip-path: polygon(22% 0, 100% 50%, 22% 100%, 0 84%, 56% 50%, 0 16%);
 }
 
-.grid-settings {
-  position: absolute;
-  right: 12px;
-  bottom: 11px;
-  z-index: 6;
+.inspector-rail-footer {
+  display: flex;
+  /* Pinned to the bottom of the rail, so the snap grid keeps one place
+     whether the panels above it are expanded, collapsed or absent. */
+  margin-top: auto;
+  padding: 10px 12px 11px;
+  justify-content: flex-end;
   color: #435a72;
   font-size: 13px;
+  pointer-events: auto;
+  background: rgba(244, 246, 248, 0.96);
+  border-top: 1px solid #d8e0e7;
+  border-left: 1px solid #d8e0e7;
+  box-shadow: -2px 0 10px rgba(36, 61, 86, 0.08);
 }
 
 .settings-button {
@@ -6859,10 +6886,6 @@ button {
     inset: 0;
   }
 
-  .grid-settings {
-    right: 12px;
-  }
-
   .shape-floating-controls {
     left: 86px;
     right: 18px;
@@ -6942,7 +6965,7 @@ button {
     transform-origin: top left;
   }
 
-  .camera-controls {
+  .view-tools {
     left: 7px;
     transform: scale(0.86);
     transform-origin: top left;
@@ -7299,7 +7322,7 @@ html[data-theme="dark"] .shape-menu-dropdown,
 html[data-theme="dark"] .visibility-dropdown,
 html[data-theme="dark"] .top-action-panel,
 html[data-theme="dark"] .edge-modifier-panel,
-html[data-theme="dark"] .camera-controls,
+html[data-theme="dark"] .view-tools,
 html[data-theme="dark"] .ruler-tool-popover,
 html[data-theme="dark"] .editor-toast,
 html[data-theme="dark"] .snap-menu {
@@ -7366,13 +7389,13 @@ html[data-theme="dark"] .shape-menu-item .sketch-shape-menu-icon {
   border-color: #405765;
 }
 
-html[data-theme="dark"] .camera-controls button,
+html[data-theme="dark"] .view-tools button,
 html[data-theme="dark"] .snap-menu button,
 html[data-theme="dark"] .snap-row {
   color: #c0d1dc;
 }
 
-html[data-theme="dark"] .camera-controls button:hover {
+html[data-theme="dark"] .view-tools button:hover {
   color: #ecf8ff;
   background: rgba(46, 70, 84, 0.9);
   border-color: #4c6979;
@@ -7455,11 +7478,6 @@ html[data-theme="dark"] .transform-guides #dimension-arrow path {
 html[data-theme="dark"] .rotate-handle,
 html[data-theme="dark"] .rotate-handle:hover {
   color: #ffffff;
-}
-
-html[data-theme="dark"] .inspector-snap-dock {
-  background: linear-gradient(180deg, rgba(20, 30, 39, 0), rgba(20, 30, 39, 0.98) 18px, rgba(20, 30, 39, 0.98));
-  border-color: #334753;
 }
 
 html[data-theme="dark"] .property-card-header:hover,
@@ -7907,10 +7925,6 @@ html[data-theme="dark"] .cube-face:focus-visible {
   box-shadow: inset 0 0 0 1px rgba(109, 204, 228, 0.2), 0 0 0 2px rgba(80, 190, 220, 0.16);
 }
 
-html[data-theme="dark"] .grid-settings {
-  color: #a9bdca;
-}
-
 /* Challenge 1: Key Tag */
 .challenge-key-tag-page {
   position: relative;
@@ -8093,12 +8107,8 @@ html[data-theme="dark"] .grid-settings {
   box-shadow: -10px 0 28px rgba(25, 48, 68, 0.14);
 }
 
-.workplane-stage.key-tag-tutorial-active .shape-inspector {
+.workplane-stage.key-tag-tutorial-active .inspector-rail {
   right: clamp(320px, 30vw, 390px);
-}
-
-.workplane-stage.key-tag-tutorial-active .grid-settings {
-  right: calc(clamp(320px, 30vw, 390px) + 12px);
 }
 
 .key-tag-tutorial-panel.key-tag-tutorial-panel-collapsed {
@@ -8109,12 +8119,8 @@ html[data-theme="dark"] .grid-settings {
   padding: 10px 0 14px;
 }
 
-.workplane-stage.key-tag-tutorial-collapsed .shape-inspector {
+.workplane-stage.key-tag-tutorial-collapsed .inspector-rail {
   right: 54px;
-}
-
-.workplane-stage.key-tag-tutorial-collapsed .grid-settings {
-  right: 66px;
 }
 
 .key-tag-tutorial-expand,
@@ -8449,20 +8455,12 @@ html[data-theme="dark"] .grid-settings {
     width: clamp(300px, 42vw, 360px);
   }
 
-  .workplane-stage.key-tag-tutorial-active .shape-inspector {
+  .workplane-stage.key-tag-tutorial-active .inspector-rail {
     right: clamp(300px, 42vw, 360px);
   }
 
-  .workplane-stage.key-tag-tutorial-active .grid-settings {
-    right: calc(clamp(300px, 42vw, 360px) + 12px);
-  }
-
-  .workplane-stage.key-tag-tutorial-collapsed .shape-inspector {
+  .workplane-stage.key-tag-tutorial-collapsed .inspector-rail {
     right: 54px;
-  }
-
-  .workplane-stage.key-tag-tutorial-collapsed .grid-settings {
-    right: 66px;
   }
 }
 
@@ -8520,16 +8518,10 @@ html[data-theme="dark"] .grid-settings {
     box-shadow: 0 7px 22px rgba(25, 48, 68, 0.2);
   }
 
-  .workplane-stage.key-tag-tutorial-active .shape-inspector,
-  .workplane-stage.key-tag-tutorial-collapsed .shape-inspector {
+  .workplane-stage.key-tag-tutorial-active .inspector-rail,
+  .workplane-stage.key-tag-tutorial-collapsed .inspector-rail {
     right: 0;
   }
-
-  .workplane-stage.key-tag-tutorial-active .grid-settings,
-  .workplane-stage.key-tag-tutorial-collapsed .grid-settings {
-    right: 12px;
-  }
-
   .key-tag-tutorial-header,
   .key-tag-tutorial-footer {
     padding: 10px 12px;
@@ -8716,4 +8708,308 @@ html[data-theme="dark"] .nameplate-fillet-coachmark {
   .nameplate-fillet-button-target {
     animation: none;
   }
+}
+
+/* Scene list -------------------------------------------------------------
+   A left-docked sidebar listing everything in the scene. The view cube and
+   camera controls are also anchored left, so the stage shifts them aside
+   while it is open rather than letting them overlap. */
+.scene-inspector {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  color: #243d56;
+  pointer-events: auto;
+  background: rgba(244, 246, 248, 0.96);
+  border-left: 1px solid #d8e0e7;
+  box-shadow: -2px 0 10px rgba(36, 61, 86, 0.08);
+}
+
+/* Collapsed to its header, which is what hands the space to the panel above. */
+.scene-inspector.collapsed {
+  flex: 0 0 50px;
+  height: 50px;
+}
+
+.scene-inspector-body {
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 9px 10px 12px;
+  gap: 8px;
+}
+
+.scene-inspector-summary {
+  margin: 0;
+  color: #53687a;
+  font-size: 11px;
+}
+
+.scene-inspector-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.scene-inspector-actions button {
+  height: 32px;
+  flex: 1;
+  padding: 4px 10px;
+  color: #50677a;
+  font-size: 13px;
+  font-weight: 750;
+  background: #f4f8fb;
+  border: 1px solid #d3dfe8;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.scene-inspector-actions button:hover:not(:disabled) {
+  border-color: #159fd0;
+}
+
+.scene-inspector-actions button:disabled {
+  color: #9fb0bf;
+  cursor: default;
+  opacity: 0.7;
+}
+
+.scene-inspector-search {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  color: #8296a7;
+  background: #f4f8fb;
+  border: 1px solid #d3dfe8;
+  border-radius: 999px;
+}
+
+.scene-inspector-search input {
+  width: 100%;
+  padding: 0;
+  color: #28516d;
+  font-size: 13px;
+  font-weight: 650;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.scene-inspector-empty {
+  margin: 10px 2px;
+  color: #53687a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scene-inspector-list {
+  display: flex;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  list-style: none;
+}
+
+.scene-row {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding-right: 4px;
+  gap: 6px;
+  border-radius: 999px;
+}
+
+.scene-row:hover {
+  background: rgba(21, 159, 208, 0.08);
+}
+
+.scene-row.selected {
+  background: rgba(21, 159, 208, 0.18);
+}
+
+.scene-row.hidden-shape .scene-row-label {
+  color: #9fb0bf;
+  font-style: italic;
+}
+
+.scene-row-expand,
+.scene-row-expand-spacer {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+}
+
+.scene-row-expand {
+  color: #607589;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.scene-row-swatch {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border: 1px solid rgba(32, 54, 72, 0.2);
+  border-radius: 3px;
+}
+
+.scene-row-name {
+  display: flex;
+  overflow: hidden;
+  padding: 2px 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  color: #28516d;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.scene-row-name.static {
+  color: #607589;
+  cursor: default;
+}
+
+.scene-row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-row-count,
+.scene-row-tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  color: #53687a;
+  font-size: 11px;
+  font-weight: 750;
+  background: rgba(32, 54, 72, 0.08);
+  border-radius: 999px;
+}
+
+.scene-row-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1px;
+  opacity: 0;
+}
+
+.scene-row:hover .scene-row-controls,
+.scene-row.selected .scene-row-controls,
+.scene-row-controls:focus-within {
+  opacity: 1;
+}
+
+.scene-row-controls button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  color: #607589;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.scene-row-controls button:hover:not(:disabled) {
+  color: #17405c;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.scene-row-controls button.active {
+  color: #159fd0;
+}
+
+.scene-row-controls button:disabled {
+  color: #c3ced8;
+  cursor: default;
+}
+
+.scene-row-delete:hover:not(:disabled) {
+  color: #d41721;
+}
+
+/* A hidden or locked shape keeps its controls visible: they are the only way
+   to bring it back, and a row that reveals them on hover alone is a trap. */
+.scene-row.hidden-shape .scene-row-controls {
+  opacity: 1;
+}
+
+html[data-theme="dark"] .inspector-rail-footer {
+  color: #a9bdca;
+  background: rgba(20, 30, 39, 0.97);
+  border-top-color: #334753;
+  border-left-color: #334753;
+  box-shadow: -3px 0 14px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .scene-inspector {
+  background: rgba(20, 30, 39, 0.97);
+  border-right-color: #334753;
+  box-shadow: 3px 0 14px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .scene-row-name {
+  color: #d3e1ea;
+}
+
+html[data-theme="dark"] .scene-inspector-summary,
+html[data-theme="dark"] .scene-inspector-empty,
+html[data-theme="dark"] .scene-row-name.static,
+html[data-theme="dark"] .scene-row-expand,
+html[data-theme="dark"] .scene-row-controls button {
+  color: #8fa6b6;
+}
+
+html[data-theme="dark"] .inspector-header-glyph,
+html[data-theme="dark"] .scene-inspector-actions button,
+html[data-theme="dark"] .scene-inspector-search {
+  color: #d3e1ea;
+  background: rgba(14, 22, 29, 0.9);
+  border-color: #334753;
+}
+
+html[data-theme="dark"] .scene-inspector-search input {
+  color: #d3e1ea;
+}
+
+html[data-theme="dark"] .scene-row:hover {
+  background: rgba(66, 199, 235, 0.1);
+}
+
+html[data-theme="dark"] .scene-row.selected {
+  background: rgba(66, 199, 235, 0.22);
+}
+
+html[data-theme="dark"] .scene-row-controls button:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(66, 199, 235, 0.16);
+}
+
+html[data-theme="dark"] .scene-row-count,
+html[data-theme="dark"] .scene-row-tag {
+  color: #b7cfde;
+  background: rgba(183, 207, 222, 0.14);
+}
+
+html[data-theme="dark"] .scene-row.hidden-shape .scene-row-label {
+  color: #6f8698;
 }
