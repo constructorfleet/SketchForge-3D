@@ -117,6 +117,7 @@ import {
   type PlacementPoint,
   type PlacementWorkplane,
 } from "@/lib/placementWorkplane";
+import { DEFAULT_CAMERA_ORIENTATION, type CameraOrientation } from "@/lib/screenAlignedNudge";
 import { placeSketchExtrusion } from "@/lib/sketchPlacement";
 import {
   SKETCHFORGE_MCP_HEARTBEAT_MS,
@@ -6190,6 +6191,11 @@ export function SketchForgeEditor({
     [finalizeInteractionHistory],
   );
 
+  const cameraOrientationRef = useRef<CameraOrientation>(DEFAULT_CAMERA_ORIENTATION);
+  const rememberCameraOrientation = useCallback((orientation: CameraOrientation) => {
+    cameraOrientationRef.current = orientation;
+  }, []);
+
   const keyboardMovement = useMemo(() => createKeyboardMovementInteraction({
     begin: () => {
       if (projectInteractionActiveRef.current) return false;
@@ -6200,7 +6206,10 @@ export function SketchForgeEditor({
     },
     move: (event) => {
       const step = keyboardNudgeStep(snapGridRef.current, event.shiftKey);
-      const next = moveShapesByKeyboard(shapesRef.current, selectedIdsRef.current, event, placementWorkplaneRef.current, step);
+      const next = moveShapesByKeyboard(
+        shapesRef.current, selectedIdsRef.current, event, placementWorkplaneRef.current, step,
+        cameraOrientationRef.current,
+      );
       if (next === shapesRef.current) return;
       interactionHistoryChangedRef.current = true;
       shapesRef.current = next;
@@ -9249,6 +9258,7 @@ export function SketchForgeEditor({
           onSetPlacementWorkplane={setViewportPlacementWorkplane}
           onToggleWorkplaneTool={activateWorkplaneTool}
           onInteractionActiveChange={updateProjectInteractionActive}
+          onCameraOrientationChange={rememberCameraOrientation}
           onEditSketch={beginSketchEdit}
           canSeparateParts={canSeparateSelectedParts}
           onSeparateParts={separateSelectedParts}

@@ -152,3 +152,78 @@ describe("keyboard movement interactions", () => {
     expect(raised[0]).toMatchObject({ x: 0, z: 1, elevation: 5 });
   });
 });
+
+describe("moveShapesByKeyboard follows the camera", () => {
+  const plane = horizontalPlacementWorkplane();
+  const step = keyboardNudgeStep("1.0 mm", false);
+  // Pitched above the horizon, like every default view.
+  const view = (yawDegrees: number) => ({ yawDegrees, pitchDegrees: 35 });
+
+  function moved(arrow: string, camera?: { yawDegrees: number; pitchDegrees: number }) {
+    const result = moveShapesByKeyboard([box()], ["box"], key(arrow), plane, step, camera);
+    return { x: result[0].x, z: result[0].z, elevation: result[0].elevation };
+  }
+
+  it("keeps the Front view mapping when no camera is supplied", () => {
+    // The fixed mapping these keys had before they followed the view.
+    expect(moved("ArrowRight")).toMatchObject({ x: 1, z: 0 });
+    expect(moved("ArrowLeft")).toMatchObject({ x: -1, z: 0 });
+    expect(moved("ArrowDown")).toMatchObject({ x: 0, z: 1 });
+    expect(moved("ArrowUp")).toMatchObject({ x: 0, z: -1 });
+  });
+
+  it("leaves the default home view on the axes it always used", () => {
+    // Home sits at yaw 45, exactly between two axes, and the tie rounds to the
+    // axis the editor already used -- so a user who never orbits sees no change.
+    for (const arrow of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+      expect(moved(arrow, view(45))).toEqual(moved(arrow));
+    }
+  });
+
+  it("sends an arrow towards the axis it points at on screen once orbited", () => {
+    // Orbited a quarter turn, Right must no longer be +X: that is the reported
+    // bug, where the shape walked into the screen instead of to the right.
+    expect(moved("ArrowRight", view(90))).toMatchObject({ x: 0, z: -1 });
+    expect(moved("ArrowLeft", view(90))).toMatchObject({ x: 0, z: 1 });
+    expect(moved("ArrowRight", view(180))).toMatchObject({ x: -1, z: 0 });
+    expect(moved("ArrowRight", view(270))).toMatchObject({ x: 0, z: 1 });
+  });
+
+  it("never steps diagonally, whatever the yaw", () => {
+    for (let yaw = -360; yaw <= 360; yaw += 7) {
+      for (const arrow of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+        const result = moved(arrow, view(yaw));
+        const movedAxes = [result.x, result.z].filter((value) => value !== 0);
+        expect(movedAxes, `yaw ${yaw} ${arrow}`).toHaveLength(1);
+        expect(Math.abs(movedAxes[0])).toBeCloseTo(step, 10);
+      }
+    }
+  });
+
+  it("mirrors screen down when the camera is below the horizon", () => {
+    const above = moved("ArrowDown", { yawDegrees: 0, pitchDegrees: 20 });
+    const below = moved("ArrowDown", { yawDegrees: 0, pitchDegrees: -20 });
+    expect(below).toMatchObject({ x: 0, z: -above.z! });
+  });
+
+  it("keeps elevation changes off the camera entirely", () => {
+    // Ctrl/Cmd + Up/Down moves along the plane normal, which is not a screen
+    // direction, so no view may turn it into a horizontal move.
+    for (const yaw of [0, 45, 90, 180, 270]) {
+      const result = moveShapesByKeyboard([box()], ["box"], key("ArrowUp", { ctrlKey: true }), plane, step, view(yaw));
+      expect(result[0]).toMatchObject({ x: 0, z: 0, elevation: 1 });
+    }
+  });
+
+  it("leaves a workplane laid on a face on its own axes", () => {
+    // Following the camera there would walk the selection off the face.
+    const onFace: PlacementWorkplane = {
+      origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 0, y: 1, z: 0 },
+      zAxis: { x: 1, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 },
+    };
+    for (const yaw of [0, 90, 180, 270]) {
+      const result = moveShapesByKeyboard([box()], ["box"], key("ArrowRight"), onFace, step, view(yaw));
+      expect(result[0]).toMatchObject({ x: 0, z: 0, elevation: 1 });
+    }
+  });
+});

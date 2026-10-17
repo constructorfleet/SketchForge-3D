@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Arrow keys now move the selection towards the workplane axis closest to the direction the arrow points on screen, instead of along fixed world axes. The Front view and the default home view keep the mapping they always had, steps stay on an axis with no diagonals, and Ctrl/Cmd+arrow elevation changes and workplanes laid on a face are unaffected.
 - The workplane now carries its name flat along its near edge, so which edge is the front is readable at a glance instead of having to be inferred from the symmetric axis lines. This also tells you which way an arrow-key nudge will move the selection, since those keys follow the plane's axes.
 - Arrow keys now move the selection by the Snap Grid instead of a fixed millimetre, so a keyboard nudge lands on the same lattice a pointer drag snaps to. Shift keeps its coarser step, and the old 1mm/5mm steps stand when the grid is off. At the default 1.0 mm grid nothing changes.
 - A snap grid or workspace setting chosen from a control now reaches the editor and the saved project immediately, instead of being swallowed until an unrelated change.
