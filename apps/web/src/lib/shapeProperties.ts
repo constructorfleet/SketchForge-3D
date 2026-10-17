@@ -18,10 +18,19 @@ import {
   normalizeGearToothWidth,
   normalizeGearType,
 } from "@/lib/gearGeometry";
+import {
+  LOFT_PROFILE_SHAPES,
+  MAX_LOFT_LAYERS,
+  MAX_LOFT_SEGMENTS,
+  MIN_LOFT_LAYERS,
+  MIN_LOFT_SEGMENTS,
+  isPolygonLoftShape,
+  loftSettings,
+} from "@/lib/loftGeometry";
 import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
 import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
 import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
-import type { GearType, WorkplaneShape } from "@/types/sketchforge";
+import type { GearType, LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
 export const MIN_SHAPE_SIZE = 0.01;
 export const TEXT_FONT_OPTIONS = ["Multilanguage", "Sans", "Serif", "Script", "Monospace", "Rounded", "Stencil"];
@@ -290,6 +299,37 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
       },
       { label: "Length", unit: "length", allowsAboveSliderMax: true, value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearDepth },
       { label: "Width", unit: "length", allowsAboveSliderMax: true, value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearWidth },
+      { label: "Height", unit: "length", allowsAboveSliderMax: true, value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    );
+    return properties;
+  }
+
+  if (shape.kind === "loft") {
+    const settings = loftSettings(shape);
+    const topWidth = shape.loftTopWidth ?? width;
+    const topDepth = shape.loftTopDepth ?? depth;
+    // Top is an independent end (like cone's Top Radius) -- its size never touches the shape's
+    // own width/depth. Bottom's size *is* the shape's generic width/depth, so the on-canvas
+    // resize gizmo (which always drags width/depth/height) keeps working for it unmodified.
+    const properties: ShapePropertyConfig[] = [
+      { type: "select", label: "Top Shape", value: settings.topShape, options: LOFT_PROFILE_SHAPES, onChange: (value) => onUpdate({ loftTopShape: value as LoftProfileShape }) },
+    ];
+    if (!isPolygonLoftShape(settings.topShape)) {
+      properties.push({ label: "Top Length", unit: "length", allowsAboveSliderMax: true, value: topDepth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopDepth: value }) });
+    }
+    properties.push(
+      { label: "Top Width", unit: "length", allowsAboveSliderMax: true, value: topWidth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopWidth: value }) },
+      { label: "Top Rotation", value: settings.topRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftTopRotation: value }) },
+      { type: "select", label: "Bottom Shape", value: settings.bottomShape, options: LOFT_PROFILE_SHAPES, onChange: (value) => onUpdate({ loftBottomShape: value as LoftProfileShape }) },
+    );
+    if (!isPolygonLoftShape(settings.bottomShape)) {
+      properties.push({ label: "Bottom Length", unit: "length", allowsAboveSliderMax: true, value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth });
+    }
+    properties.push(
+      { label: "Bottom Width", unit: "length", allowsAboveSliderMax: true, value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { label: "Bottom Rotation", value: settings.bottomRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftBottomRotation: value }) },
+      { label: "Segments", value: settings.segments, min: MIN_LOFT_SEGMENTS, max: MAX_LOFT_SEGMENTS, step: 1, onChange: (value) => onUpdate({ loftSegments: Math.round(value) }) },
+      { label: "Layers", value: settings.layers, min: MIN_LOFT_LAYERS, max: MAX_LOFT_LAYERS, step: 1, onChange: (value) => onUpdate({ loftLayers: Math.round(value) }) },
       { label: "Height", unit: "length", allowsAboveSliderMax: true, value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     );
     return properties;

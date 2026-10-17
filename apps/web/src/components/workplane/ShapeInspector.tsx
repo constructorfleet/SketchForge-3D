@@ -54,13 +54,10 @@ const SOLID_COLORS = [
   "#111111",
 ];
 
-
 function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step: number) {
   if (step >= 1) return String(Math.round(value));
   return formatMeasurementNumber(value, accuracy, step);
 }
-
-
 
 function getShapeProperties(shape: WorkplaneShape, onUpdate: ShapeInspectorUpdate, workspace: WorkplaneWorkspaceSettings): ShapePropertyConfig[] {
   const customLimit = workspace.shapeCustomizations[shape.kind]?.maxDimension;

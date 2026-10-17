@@ -11,7 +11,7 @@ import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 const SHAPE_KINDS: ShapeKind[] = [
   "box", "cylinder", "sphere", "sketch", "scribble", "cone", "pyramid", "roof",
   "text", "roundRoof", "halfSphere", "torus", "tube", "gear", "ring", "wedge",
-  "polygon", "icosahedron", "mesh",
+  "polygon", "icosahedron", "mesh", "loft",
 ];
 
 function shapeOfKind(kind: ShapeKind, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -43,6 +43,10 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
     shapeOfKind("gear", { gearType: "spur" }),
     shapeOfKind("gear", { gearType: "helical" }),
     shapeOfKind("gear", { gearType: "bevel" }),
+    // Which loft rows appear depends on each end's profile: a polygon end has
+    // no independent Length, so both variants have to be swept.
+    shapeOfKind("loft", { loftTopShape: "Oval", loftBottomShape: "Oval" }),
+    shapeOfKind("loft", { loftTopShape: "Hexagon", loftBottomShape: "Triangle" }),
   ];
   return shapes.flatMap((shape) => [
     ...getShapePropertiesWithAppLimits(shape, () => {}),
@@ -65,7 +69,7 @@ describe("shape inspector property configuration", () => {
   it("covers every branch that declares a length property", () => {
     const labels = new Set(rangeProperties().map((property) => property.label));
     // Default rows, the revolve branch, gear teeth/helix rows, and taper rows.
-    for (const label of ["Length", "Width", "Height", "Start Angle", "Sweep", "Tooth Size", "Tooth Width", "Center Hole", "Helix Angle", "Top Length", "Bottom Width"]) {
+    for (const label of ["Length", "Width", "Height", "Start Angle", "Sweep", "Tooth Size", "Tooth Width", "Center Hole", "Helix Angle", "Top Length", "Bottom Width", "Top Width", "Bottom Length", "Layers"]) {
       expect(labels, `missing coverage for ${label}`).toContain(label);
     }
   });
