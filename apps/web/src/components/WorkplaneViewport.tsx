@@ -38,6 +38,7 @@ import {
   type PlacementWorkplane,
 } from "@/lib/placementWorkplane";
 import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
+import { appendTypedCharacter, backspaceTypedEntry, typedEntryValue } from "@/lib/numericEntry";
 import { orbitDirection, orbitFromDrag, type CameraOrbit } from "@/lib/viewCubeOrbit";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
@@ -2478,6 +2479,10 @@ export function WorkplaneViewport({
   const moveDimensionsEnabledRef = useRef(true);
   const marqueeRef = useRef<MarqueeState | null>(null);
   const transformRef = useRef<TransformDragState | null>(null);
+  // Digits typed while a gesture is in progress, as FreeCAD and Tinkercad do:
+  // the drag shows a number, so typing replaces that number exactly.
+  const typedEntryRef = useRef<string | null>(null);
+  const lastTransformPointerRef = useRef<{ x: number; y: number; shiftKey: boolean; altKey: boolean } | null>(null);
   const lastResizeAnchorRef = useRef<ResizeAnchorMemory | null>(null);
   const suppressNextLiftEditRef = useRef(false);
   const snapRef = useRef(snap);
@@ -3594,6 +3599,7 @@ export function WorkplaneViewport({
       } else {
         setPinnedRotationWheelView(null);
       }
+      typedEntryRef.current = null;
       transformRef.current = {
         id: shape.id,
         ids: frame.ids,
@@ -3743,6 +3749,9 @@ export function WorkplaneViewport({
       if (!transform) {
         return false;
       }
+      // Remembered so a keystroke can re-run the gesture from where the
+      // pointer already is, without waiting for it to move again.
+      lastTransformPointerRef.current = { x: clientX, y: clientY, shiftKey, altKey };
       if (Math.hypot(clientX - transform.startClientX, clientY - transform.startClientY) > 3) {
         transform.hasMoved = true;
       }
@@ -3759,7 +3768,12 @@ export function WorkplaneViewport({
         const resizingFromBottom = transform.handleKey === "bottom-height";
         const rawFrameHeight = transform.selectionFrame.height + (resizingFromBottom ? -rawDelta : rawDelta);
         const maxHeight = Math.max(...transform.items.map((item) => shapeDimensionLimit(workspaceRef.current, item.startShape.kind, 180)));
-        const nextFrameHeight = snapDimension(rawFrameHeight, step, MIN_SHAPE_SIZE, maxHeight);
+        const typedFrameHeight = typedEntryValue(typedEntryRef.current);
+        const nextFrameHeight = typedFrameHeight !== null
+          // Typed heights are exact: the grid is there to help a drag land on
+          // a round number, not to round a number already stated.
+          ? clamp(typedFrameHeight, MIN_SHAPE_SIZE, maxHeight)
+          : snapDimension(rawFrameHeight, step, MIN_SHAPE_SIZE, maxHeight);
         transform.items.forEach((item) => {
           onUpdateShape(
             item.id,
@@ -3778,7 +3792,10 @@ export function WorkplaneViewport({
         const rawDelta = currentPoint && transform.liftStartPoint
           ? currentPoint.clone().sub(transform.liftStartPoint).dot(axis)
           : 0;
-        const delta = gridAlignedDelta(transform.liftStartValue ?? 0, rawDelta, step);
+        const typedHeight = typedEntryValue(typedEntryRef.current);
+        const delta = typedHeight !== null
+          ? typedHeight - (transform.liftStartValue ?? 0)
+          : gridAlignedDelta(transform.liftStartValue ?? 0, rawDelta, step);
         transform.items.forEach((item) => {
           const nextCenter = item.startCenter.clone().addScaledVector(axis, delta);
           onUpdateShape(item.id, {
@@ -3796,7 +3813,9 @@ export function WorkplaneViewport({
           setRotationReadout({
             x: readoutPoint.x + 28,
             y: readoutPoint.y - 30,
-            text: formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
+            text: typedEntryRef.current !== null
+              ? typedEntryRef.current
+              : formatMeasure((transform.liftStartValue ?? 0) + delta, workspaceRef.current.accuracy),
           });
         }
         return true;
@@ -3882,7 +3901,7 @@ export function WorkplaneViewport({
         transform.rotationWheelAppliedDelta = undefined;
         transform.rotationWheelAppliedPointerAngle = undefined;
       }
-      const delta = wheelRotation?.delta ?? snappedRotationDelta(rawDelta, false, shiftKey);
+      const delta = typedEntryValue(typedEntryRef.current) ?? wheelRotation?.delta ?? snappedRotationDelta(rawDelta, false, shiftKey);
 
       const deltaQuaternion = new THREE.Quaternion().setFromAxisAngle(axisVector, THREE.MathUtils.degToRad(delta));
       const rotationDelta = deltaQuaternion.clone();
@@ -3890,7 +3909,7 @@ export function WorkplaneViewport({
         setRotationReadout({
           x: transform.wheelCenter ? transform.wheelCenter.x : localClientX + 18,
           y: transform.wheelCenter ? transform.wheelCenter.y - 92 : localClientY - 18,
-          text: `${Number(delta.toFixed(1))}°`,
+          text: typedEntryRef.current !== null ? `${typedEntryRef.current}°` : `${Number(delta.toFixed(1))}°`,
           angle: delta,
           pointerAngle: wheelRotation?.pointerAngle ?? rawPointerAngle,
         });
@@ -3918,12 +3937,13 @@ export function WorkplaneViewport({
     }, 250);
   }, []);
 
-  const finishTransform = useCallback((event: ReactPointerEvent<Element>) => {
+  const finishTransform = useCallback((event?: ReactPointerEvent<Element>) => {
+    typedEntryRef.current = null;
     const transform = transformRef.current;
     if (!transform) {
       return;
     }
-    if (event.currentTarget.hasPointerCapture(transform.pointerId)) {
+    if (event && event.currentTarget.hasPointerCapture(transform.pointerId)) {
       event.currentTarget.releasePointerCapture(transform.pointerId);
     }
     const bakeRotatedShapes = transform.kind === "rotate" && transform.hasMoved ? transform.ids : [];
@@ -5233,6 +5253,68 @@ export function WorkplaneViewport({
     },
     [removeRulerSegment, resolveRulerCandidate, selectRulerCandidate],
   );
+
+  // Typing during a gesture, the way FreeCAD and Tinkercad allow: rotate and
+  // lift already show a number while dragging, so digits replace that number
+  // and Enter commits it exactly. Only those two, because typing into a
+  // readout that is not on screen would be a value with no referent.
+  useEffect(() => {
+    const typable = () => {
+      const kind = transformRef.current?.kind;
+      // Every gesture that shows a number while it runs: rotate and lift have
+      // their readout, height has its dimension label. A typed value always
+      // replaces something already on screen.
+      return kind === "rotate" || kind === "lift" || kind === "height";
+    };
+    const reapply = () => {
+      const pointer = lastTransformPointerRef.current;
+      if (pointer) updateTransform(pointer.x, pointer.y, pointer.shiftKey, pointer.altKey);
+    };
+    const setEntry = (next: string | null) => {
+      typedEntryRef.current = next;
+      // No state here: re-running the gesture refreshes the readout, which is
+      // the only thing that shows the typed value.
+      reapply();
+    };
+
+    // preventDefault alone is not enough: the camera view shortcuts are another
+    // keydown listener on window, so a consumed key has to stop propagating or
+    // "1" both types a 1 and jumps to the front view.
+    const consume = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!typable()) return;
+      const appended = appendTypedCharacter(typedEntryRef.current, event.key);
+      if (appended !== null) {
+        consume(event);
+        setEntry(appended);
+        return;
+      }
+      if (event.key === "Backspace" && typedEntryRef.current !== null) {
+        consume(event);
+        setEntry(backspaceTypedEntry(typedEntryRef.current));
+        return;
+      }
+      if (event.key === "Escape" && typedEntryRef.current !== null) {
+        // Abandon the typed value and hand the gesture back to the pointer.
+        consume(event);
+        setEntry(null);
+        return;
+      }
+      if (event.key === "Enter" && typedEntryRef.current !== null) {
+        consume(event);
+        finishTransform();
+        typedEntryRef.current = null;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [finishTransform, updateTransform]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {

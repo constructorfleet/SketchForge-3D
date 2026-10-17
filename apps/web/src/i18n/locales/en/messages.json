@@ -861,7 +861,13 @@
       "bottomShape": "Bottom Shape",
       "topRotation": "Top Rotation",
       "bottomRotation": "Bottom Rotation",
-      "layers": "Layers"
+      "layers": "Layers",
+      "positionX": "X",
+      "positionY": "Y",
+      "positionZ": "Z",
+      "rotationX": "Tilt X",
+      "rotationY": "Turn Y",
+      "rotationZ": "Tilt Z"
     },
     "inspector": {
       "label": "{name} shape settings",
@@ -889,7 +895,8 @@
         "teeth": "Teeth",
         "helix": "Helix"
       },
-      "gearType": "Gear Type"
+      "gearType": "Gear Type",
+      "placement": "Placement"
     },
     "edgeModifier": {
       "title": {

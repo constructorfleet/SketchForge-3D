@@ -93,7 +93,13 @@ export type ShapePropertyId =
   | "bottomShape"
   | "topRotation"
   | "bottomRotation"
-  | "layers";
+  | "layers"
+  | "positionX"
+  | "positionY"
+  | "positionZ"
+  | "rotationX"
+  | "rotationY"
+  | "rotationZ";
 
 export type RangePropertyConfig = {
   type?: "range";
@@ -125,9 +131,9 @@ export type ShapePropertyConfig = RangePropertyConfig | TextPropertyConfig | Sel
 export type ShapeInspectorUpdateOptions = { resizeAxis?: "width" | "depth" | "height" };
 export type ShapeInspectorUpdate = (patch: Partial<WorkplaneShape>, options?: ShapeInspectorUpdateOptions) => void;
 
-export const LENGTH_UNIT_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "toothSize", "toothWidth", "centerHole", "topLength", "topWidth", "bottomLength", "bottomWidth"];
+export const LENGTH_UNIT_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "toothSize", "toothWidth", "centerHole", "topLength", "topWidth", "bottomLength", "bottomWidth", "positionX", "positionY", "positionZ"];
 /** Typed values may exceed the slider maximum (the slider still clamps). */
-export const ABOVE_SLIDER_MAX_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "topLength", "topWidth", "bottomLength", "bottomWidth", "toothWidth"];
+export const ABOVE_SLIDER_MAX_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "topLength", "topWidth", "bottomLength", "bottomWidth", "toothWidth", "positionX", "positionY", "positionZ"];
 
 export function propertyUsesLengthUnit(id: ShapePropertyId) {
   return LENGTH_UNIT_PROPERTIES.includes(id);
@@ -446,5 +452,47 @@ export function getShapeTaperProperties(
       max: taperDimensionMax,
       onChange: (taperBottomWidth) => onUpdate({ taperBottomWidth, taperBottomDepth: taper.bottomDepth, taperBottomScale: undefined }),
     },
+  ];
+}
+
+/** Degrees folded into the half-open turn the placement rows show, so a shape
+ *  stored at 350 reads as -10 rather than pinning the slider at its maximum. */
+export function signedDegrees(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  const wrapped = ((value % 360) + 360) % 360;
+  return wrapped > 180 ? wrapped - 360 : wrapped;
+}
+
+export type PlacementBounds = {
+  /** Half-extent of the build plate on X, in millimetres. */
+  halfWidth: number;
+  /** Half-extent on Z. */
+  halfDepth: number;
+  /** Highest elevation the sliders reach. */
+  maxElevation: number;
+};
+
+/**
+ * Position and rotation rows for the object panel.
+ *
+ * The panel could already set an exact size but not an exact place or angle,
+ * so precise work meant nudging with the arrow keys and reading the result off
+ * a dimension label. These are plain property rows, so they inherit the typed
+ * entry, units, and clamping the size rows already have -- including negative
+ * and fractional values.
+ */
+export function placementProperties(
+  shape: WorkplaneShape,
+  onUpdate: ShapeInspectorUpdate,
+  bounds: PlacementBounds,
+): ShapePropertyConfig[] {
+  const spin = (patch: Partial<WorkplaneShape>) => onUpdate(patch);
+  return [
+    { id: "positionX", value: shape.x, min: -bounds.halfWidth, max: bounds.halfWidth, step: 0.1, onChange: (x) => spin({ x }) },
+    { id: "positionY", value: shape.elevation ?? 0, min: 0, max: bounds.maxElevation, step: 0.1, onChange: (elevation) => spin({ elevation }) },
+    { id: "positionZ", value: shape.z, min: -bounds.halfDepth, max: bounds.halfDepth, step: 0.1, onChange: (z) => spin({ z }) },
+    { id: "rotationX", value: signedDegrees(shape.rotationX ?? 0), min: -180, max: 180, step: 1, onChange: (rotationX) => spin({ rotationX }) },
+    { id: "rotationY", value: signedDegrees(shape.rotation), min: -180, max: 180, step: 1, onChange: (rotation) => spin({ rotation }) },
+    { id: "rotationZ", value: signedDegrees(shape.rotationZ ?? 0), min: -180, max: 180, step: 1, onChange: (rotationZ) => spin({ rotationZ }) },
   ];
 }
