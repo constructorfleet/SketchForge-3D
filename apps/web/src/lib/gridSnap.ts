@@ -44,3 +44,36 @@ export function snapShapeFootprintToVisibleGrid(
     z: cleanCoordinate(shape.z + deltaZ),
   };
 }
+
+/** Nearest multiple of the snap grid. A step of 0 (grid off) leaves the value alone. */
+export function snapToGrid(value: number, step: number) {
+  return step > 0 ? Math.round(value / step) * step : value;
+}
+
+/**
+ * Snap a dimension — a width, depth or height — onto the grid.
+ *
+ * The *size* is snapped, not the change in size, so dragging a handle lands on
+ * a multiple of the grid whatever the shape started at. A grid coarser than the
+ * minimum raises the floor to one full step, so a snapped dimension is never
+ * rounded down to something off-grid.
+ */
+export function snapDimension(value: number, step: number, min = 0.01, max = 220) {
+  const snapped = snapToGrid(value, step);
+  const effectiveMin = step > 0 ? Math.max(min, Math.min(step, max)) : min;
+  return clamp(snapped, effectiveMin, max);
+}
+
+/**
+ * The movement to apply so that a value which starts at `start` lands on the
+ * grid after moving by `rawDelta`.
+ *
+ * Snapping the movement itself only works when the starting value is already on
+ * the grid: an object sitting at 1mm moved by a 5mm grid would land on 6mm,
+ * never on the lattice the grid draws. Snapping the destination instead means
+ * the object ends up where the grid says, which is what makes a grid global.
+ */
+export function gridAlignedDelta(start: number, rawDelta: number, step: number) {
+  if (!(step > 0)) return rawDelta;
+  return snapToGrid(start + rawDelta, step) - start;
+}

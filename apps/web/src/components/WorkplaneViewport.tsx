@@ -36,6 +36,7 @@ import {
   type PlacementPoint,
   type PlacementWorkplane,
 } from "@/lib/placementWorkplane";
+import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
@@ -532,16 +533,6 @@ function shouldBuildCutPreviews(transform: TransformDragState | null, drag: Drag
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function snapValue(value: number, step: number) {
-  return step > 0 ? Math.round(value / step) * step : value;
-}
-
-function snapDimension(value: number, step: number, min = MIN_SHAPE_SIZE, max = 220) {
-  const snapped = step > 0 ? snapValue(value, step) : value;
-  const effectiveMin = step > 0 ? Math.max(min, Math.min(step, max)) : min;
-  return clamp(snapped, effectiveMin, max);
 }
 
 function snapPositionValue(value: number, step: number, min: number, max: number) {
@@ -3745,11 +3736,7 @@ export function WorkplaneViewport({
         const resizingFromBottom = transform.handleKey === "bottom-height";
         const rawFrameHeight = transform.selectionFrame.height + (resizingFromBottom ? -rawDelta : rawDelta);
         const maxHeight = Math.max(...transform.items.map((item) => shapeDimensionLimit(workspaceRef.current, item.startShape.kind, 180)));
-        const nextFrameHeight = clamp(
-          transform.selectionFrame.height + snapValue(rawFrameHeight - transform.selectionFrame.height, step),
-          MIN_SHAPE_SIZE,
-          maxHeight,
-        );
+        const nextFrameHeight = snapDimension(rawFrameHeight, step, MIN_SHAPE_SIZE, maxHeight);
         transform.items.forEach((item) => {
           onUpdateShape(
             item.id,
@@ -3768,7 +3755,7 @@ export function WorkplaneViewport({
         const rawDelta = currentPoint && transform.liftStartPoint
           ? currentPoint.clone().sub(transform.liftStartPoint).dot(axis)
           : 0;
-        const delta = snapValue(rawDelta, step);
+        const delta = gridAlignedDelta(transform.liftStartValue ?? 0, rawDelta, step);
         transform.items.forEach((item) => {
           const nextCenter = item.startCenter.clone().addScaledVector(axis, delta);
           onUpdateShape(item.id, {
