@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The view cube can now be dragged to orbit the camera, the way Tinkercad's does, and shows a grab cursor to say so. Clicking a face still snaps to that view; a drag that turned the camera no longer also snaps on release.
 - A STEP export where every shape was skipped now names the shapes and why, instead of reporting "No box/cylinder/sphere or imported STEP solids to export" — which contradicted what was on screen when the skipped shape was a sphere.
 - STEP export now honours a cylinder's facet count and a shape's taper. A deliberately faceted cylinder exports as the prism it is instead of a round cylinder, and keeps its rotation; a tapered box or cylinder exports with its taper instead of straight-sided. A taper that cannot be built exactly is reported as skipped rather than written as a different shape.
 - STEP export now includes shapes carrying a fillet or chamfer, whose exact geometry lives in `cadBrep`. They were skipped as having no B-Rep source, and an export containing nothing else failed outright.
