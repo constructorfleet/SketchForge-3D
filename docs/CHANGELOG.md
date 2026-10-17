@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed a tapered shape losing its taper when grouped with a hole. The fast boolean paths substituted a plain cuboid or primitive solid built from width, depth, and height, which cannot express a taper; they now decline a tapered shape and fall back to its real mesh.
 - Fixed holes whose profile carries its own absolute dimensions — a loft's independent top end, and the taper rows on every other kind — being padded only at their generic size before subtraction. The cutter changed shape instead of growing, so the hole came out wrong and its unpadded end stayed coplanar with the solid, tearing faces off the result.
 - Fixed the rotation axis rings never appearing: they were parented to the selection-helper group, which is rebuilt whenever the selection changes and hidden for the duration of a rotate drag.
 - Added interface localization in English, Czech, German, Spanish, French, Polish, Brazilian Portuguese and Russian. The language follows the system by default and can be changed in Settings → Language; the desktop tray and update dialogs follow the same choice. Local server errors and editor notices are translated as well; MCP tool results stay in English. Languages are ICU JSON catalogs (see `docs/TRANSLATIONS.md`); the non-English translations were made with AI help and have not been reviewed by native speakers yet.

@@ -111,7 +111,9 @@ import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEn
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
+import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/booleanPrimitives";
 import { CUTTER_PADDING, CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
+import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
 import { createLocalId } from "@/lib/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
@@ -166,8 +168,6 @@ type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
 type ToolbarMode = "geometry" | "sketch";
-type Vec3 = [number, number, number];
-type MeshData = { name: string; vertices: Vec3[]; faces: [number, number, number][] };
 type Cuboid = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
 type ShapeUpdatePatch = Partial<WorkplaneShape> & { bakeTransform?: boolean };
 type WithoutRequestId<T> = T extends unknown ? Omit<T, "requestId"> : never;
@@ -1809,45 +1809,6 @@ async function restoreEdgeTreatmentInShape(
       edgeTreatmentHistory: shape.edgeTreatmentHistory?.length ? compactEdgeTreatmentHistory(shape.edgeTreatmentHistory) : undefined,
     }),
     feature: restoredChild.feature,
-  };
-}
-
-function transformMesh(mesh: MeshData, shape: WorkplaneShape): MeshData {
-  const centerY = shape.height / 2;
-  const tapered = shapeHasTaper(shape);
-  let minLocalY = 0;
-  let maxLocalY = 1;
-  if (tapered && mesh.vertices.length) {
-    minLocalY = Number.POSITIVE_INFINITY;
-    maxLocalY = Number.NEGATIVE_INFINITY;
-    mesh.vertices.forEach((vertex) => {
-      minLocalY = Math.min(minLocalY, vertex[1]);
-      maxLocalY = Math.max(maxLocalY, vertex[1]);
-    });
-  }
-  const taperHeight = Math.max(1e-6, maxLocalY - minLocalY);
-  const matrix = new THREE.Matrix4().makeRotationFromEuler(
-    new THREE.Euler(
-      THREE.MathUtils.degToRad(shape.rotationX ?? 0),
-      THREE.MathUtils.degToRad(meshYawDegrees(shape)),
-      THREE.MathUtils.degToRad(shape.rotationZ ?? 0),
-      "XYZ",
-    ),
-  );
-  const mirrorX = mirrorSign(shape.mirrorX);
-  const mirrorY = mirrorSign(shape.mirrorY);
-  const mirrorZ = mirrorSign(shape.mirrorZ);
-  const reversedWinding = mirroredAxisCount(shape) % 2 === 1;
-  return {
-    ...mesh,
-    vertices: mesh.vertices.map(([x, y, z]) => {
-      const normalizedHeight = (y - minLocalY) / taperHeight;
-      const widthScale = tapered ? shapeTaperScaleAt(shape, normalizedHeight, "width") : 1;
-      const depthScale = tapered ? shapeTaperScaleAt(shape, normalizedHeight, "depth") : 1;
-      const vertex = new THREE.Vector3(x * widthScale * mirrorX, (y - centerY) * mirrorY, z * depthScale * mirrorZ).applyMatrix4(matrix);
-      return [vertex.x + shape.x, vertex.y + (shape.elevation ?? 0) + centerY, vertex.z + shape.z] as Vec3;
-    }),
-    faces: reversedWinding ? mesh.faces.map(([a, b, c]) => [a, c, b] as [number, number, number]) : mesh.faces,
   };
 }
 
@@ -3524,15 +3485,6 @@ function cutterTouchedTriangleCount(mesh: MeshData, cutters: WorkplaneShape[]) {
   }, 0);
 }
 
-function isAxisAlignedBoxCutter(shape: WorkplaneShape) {
-  const rotation = Math.abs(normalizeDegrees(shape.rotation));
-  const rotationX = Math.abs(normalizeDegrees(shape.rotationX ?? 0));
-  const rotationZ = Math.abs(normalizeDegrees(shape.rotationZ ?? 0));
-  const straightY = rotation < 0.001 || Math.abs(rotation - 180) < 0.001 || Math.abs(rotation - 360) < 0.001;
-  const straightX = rotationX < 0.001 || Math.abs(rotationX - 180) < 0.001 || Math.abs(rotationX - 360) < 0.001;
-  const straightZ = rotationZ < 0.001 || Math.abs(rotationZ - 180) < 0.001 || Math.abs(rotationZ - 360) < 0.001;
-  return shape.kind === "box" && straightX && straightY && straightZ;
-}
 
 type ClipPlane = { axis: 0 | 1 | 2; value: number; keepGreater: boolean };
 
@@ -4183,6 +4135,11 @@ function transformedPrimitiveManifold(runtime: ManifoldToplevel, primitive: Mani
 }
 
 function primitiveManifoldForShape(runtime: ManifoldToplevel, shape: WorkplaneShape, created: ManifoldSolid[]) {
+  // Every primitive below is built from one size per axis, which cannot express
+  // a taper. Declining here falls through to the shape's real mesh.
+  if (!canUsePrimitiveSolid(shape)) {
+    return null;
+  }
   const width = shapeWidth(shape);
   const depth = shapeDepth(shape);
   const height = shape.height;
