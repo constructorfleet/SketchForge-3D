@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- STEP export now includes shapes carrying a fillet or chamfer, whose exact geometry lives in `cadBrep`. They were skipped as having no B-Rep source, and an export containing nothing else failed outright.
 - Added a projection toggle to the camera controls, switching between perspective and orthographic view. The capability already existed on the `O` key but had no visible control; the button shows which projection is active and keeps in step with the shortcut.
 - The snap grid now applies globally rather than relative to where a shape started. Resizing a 1mm-tall box with the grid at 5mm lands on 5mm instead of 6mm, and the lift handle moves a selection onto the grid rather than by whole steps from wherever it sat. Width and depth already behaved this way; height and elevation were the outliers.
 - The test suite is now type-checked (`npm run typecheck:tests`, wired into `npm run ci` and GitHub CI). It previously was not, so a change to a function's signature could leave its tests calling it with the old arguments and fail only at runtime.

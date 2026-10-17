@@ -163,3 +163,72 @@ describe("STEP import → re-export round-trip (real OCCT kernel)", () => {
     expect(near(await reimportVolume(reexport.blob), 12 * 8 * 6)).toBe(true);
   });
 });
+
+describe("STEP export of edge-treated shapes (upstream #94)", () => {
+  // A filleted or chamfered shape becomes kind "mesh" and carries its exact
+  // geometry in cadBrep. Rather than run the CAD worker here, build the same
+  // thing the worker stores: a real solid serialised to a BREP string, placed
+  // through cadBrepFrame.
+  function cadBrepShape(overrides: Partial<WorkplaneShape>, solidWidth = 10, solidHeight = 10, solidDepth = 10) {
+    // The worker stores cadBrep in world coordinates as of the bake, so the
+    // solid sits at the centre cadBrepFrame describes: (x, elevation + h/2, z).
+    const atFrameCentre = brep.translate(
+      brep.box(solidWidth, solidHeight, solidDepth, { centered: true }),
+      [0, solidHeight / 2, 0],
+    );
+    const serialised = brep.toBREP(atFrameCentre);
+    if (!serialised.ok) throw new Error("toBREP failed");
+    return shape({
+      kind: "mesh",
+      name: "Filleted",
+      width: solidWidth,
+      depth: solidDepth,
+      height: solidHeight,
+      cadBrep: serialised.value,
+      cadBrepFrame: {
+        x: 0,
+        z: 0,
+        elevation: 0,
+        width: solidWidth,
+        depth: solidDepth,
+        height: solidHeight,
+      },
+      ...overrides,
+    });
+  }
+
+  it("exports a shape whose geometry lives in cadBrep instead of skipping it", async () => {
+    const filleted = cadBrepShape({});
+    const { blob, exportedCount, skipped } = await exportShapesToStep([filleted]);
+    expect(skipped).toEqual([]);
+    expect(exportedCount).toBe(1);
+    expect(near(await reimportVolume(blob), 10 * 10 * 10)).toBe(true);
+  });
+
+  it("no longer throws when every shape is edge-treated", async () => {
+    // Previously: "No box/cylinder/sphere or imported STEP solids to export".
+    await expect(exportShapesToStep([cadBrepShape({})])).resolves.toBeTruthy();
+  });
+
+  it("places a moved shape where the editor shows it", async () => {
+    const moved = cadBrepShape({ x: 25, z: -15, elevation: 7 });
+    const { blob } = await exportShapesToStep([moved]);
+    const r = await brep.importSTEP(blob);
+    if (!r.ok) throw new Error("reimport failed");
+    if (!brep.isShape3D(r.value)) throw new Error("not a solid");
+    const bounds = brep.getBounds(r.value);
+    // Y-up world becomes Z-up in CAD, so the editor's elevation is the Z range.
+    expect(near((bounds.xMin + bounds.xMax) / 2, 25)).toBe(true);
+    expect(near((bounds.zMin + bounds.zMax) / 2, 7 + 5)).toBe(true);
+    expect(near(await reimportVolume(blob), 1000)).toBe(true);
+  });
+
+  it("keeps the volume under rotation, which exercises the matrix convention", async () => {
+    // A transposed basis would still rotate, but a non-uniform scale combined
+    // with it would not preserve the box's dimensions, so scale it too.
+    const rotated = cadBrepShape({ rotation: 30, rotationX: 20, width: 20, height: 10, depth: 6 });
+    const { blob, skipped } = await exportShapesToStep([rotated]);
+    expect(skipped).toEqual([]);
+    expect(near(await reimportVolume(blob), 20 * 10 * 6)).toBe(true);
+  });
+});

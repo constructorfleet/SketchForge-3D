@@ -1,6 +1,7 @@
 import type { WorkplaneShape } from "@/types/sketchforge";
 import { LocalizedError } from "@/i18n/LocalizedError";
 import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
+import { cadBrepTransformForShape } from "@/lib/cadBakeMetadata";
 import { loadBrepWithOcct, type Brep, type BrepSolid } from "@/lib/brepKernel";
 
 export type SkippedShape = {
@@ -154,6 +155,45 @@ async function buildImportedBody(brep: Brep, shape: WorkplaneShape): Promise<Bui
   return { solid: body };
 }
 
+// A 12-element CAD transform is row-major 3x4: three rows of (basis, offset).
+// applyMatrix wants the 3x3 basis and the offset separately.
+function cadTransformParts(transform: number[]) {
+  return {
+    linear: [
+      transform[0], transform[1], transform[2],
+      transform[4], transform[5], transform[6],
+      transform[8], transform[9], transform[10],
+    ] as [number, number, number, number, number, number, number, number, number],
+    translation: [transform[3], transform[7], transform[11]] as [number, number, number],
+  };
+}
+
+// A shape carrying an edge treatment (fillet/chamfer) becomes kind "mesh" and
+// keeps its exact geometry in `cadBrep` — a third source the exporter used to
+// know nothing about, so a filleted shape was skipped as "no B-Rep source" and
+// an export of nothing but filleted shapes failed outright.
+//
+// The stored B-Rep sits in the frame recorded in `cadBrepFrame`;
+// cadBrepTransformForShape turns that plus the shape's current placement into
+// the world matrix, which is the same transform the viewport renders it with.
+function buildCadBrepBody(brep: Brep, shape: WorkplaneShape): BuildOutcome {
+  const loaded = brep.fromBREP(shape.cadBrep as string);
+  if (!loaded.ok) {
+    return { skip: "stored B-Rep failed to load" };
+  }
+
+  let body = loaded.value as unknown as BrepSolid;
+  const transform = cadBrepTransformForShape(shape);
+  if (transform) {
+    const applied = brep.applyMatrix(body, cadTransformParts(transform));
+    if (!applied.ok) {
+      return { skip: `placing the stored B-Rep failed: ${String(applied.error.message ?? applied.error)}` };
+    }
+    body = applied.value as unknown as BrepSolid;
+  }
+  return { solid: body };
+}
+
 function describe(shape: WorkplaneShape, reason: string): SkippedShape {
   return { name: shape.name, kind: shape.kind, reason };
 }
@@ -215,12 +255,15 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   }
 
   const isImportedBody = (shape: WorkplaneShape) => shape.kind === "mesh" && Boolean(shape.importedMesh?.brepStep);
+  const hasStoredCadBrep = (shape: WorkplaneShape) => typeof shape.cadBrep === "string" && shape.cadBrep.length > 0;
 
   const parts: { shape: BrepSolid; name: string; color: string }[] = [];
   for (const shape of shapes.filter((s) => !s.hole)) {
     let built: BuildOutcome;
     if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
+    } else if (hasStoredCadBrep(shape)) {
+      built = buildCadBrepBody(brep, shape);
     } else if (EXACT_KINDS.has(shape.kind)) {
       built = buildExactSolid(brep, shape);
     } else {
