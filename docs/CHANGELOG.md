@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The rotate handle now shows a pointer cursor on hover instead of the canvas orbit cursor.
 - Imported STL, OBJ, and SVG models now land on the workplane centre instead of a fixed 10mm offset.
 - Arrow-key holds (including Ctrl/Cmd+arrow elevation changes) now finish as one undo step and one save on release. Separate taps remain separate undo steps.
 - Reduced autosave work after transforms by sharing CAD display edges across undo states and reusing immutable mesh, B-Rep, and image encoding.
