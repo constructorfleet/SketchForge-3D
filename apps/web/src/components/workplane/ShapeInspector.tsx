@@ -127,7 +127,7 @@ export function ShapeInspector({
   const isSketchRevolve = shape.sketchOperation === "revolve" || Boolean(shape.sketchRevolve);
   const inspectorRef = useRef<HTMLElement>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
-  const [placementOpen, setPlacementOpen] = useState(false);
+  const [placementOpen, setPlacementOpen] = useState(true);
   const [taperOpen, setTaperOpen] = useState(false);
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);

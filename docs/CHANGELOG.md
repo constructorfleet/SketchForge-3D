@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Numbers can now be typed during a drag, the way FreeCAD and Tinkercad allow. While dragging a rotate, lift, or height handle, typing digits sets the exact value shown on the live dimension label instead of the dragged one; Backspace corrects a digit and Escape returns to following the pointer. Typed digits no longer reach the camera-view shortcuts.
+- The Placement section of the object panel now starts expanded, since its numeric position and rotation fields are the only way to enter an exact angle and were easy to miss collapsed.
 - Added a Placement section to the object panel with numeric X, Y, Z position and rotation fields. The panel could already set an exact size but not an exact place or angle, so precise work meant nudging with the arrow keys. Negative and fractional values are accepted, and rotation reads as a signed turn so a shape stored at 350 degrees shows as -10.
 - Fixed the dashboard hanging with "Maximum update depth exceeded" when a project had a tilted workplane. Normalising such a workplane alternated between two values in the last digits rather than settling, so the effect that persists the project list never saw a stable result and re-ran until React gave up. A workplane that is already a valid frame is now left alone, and that effect can no longer rewrite the same list twice.
 - Added a scene list: a panel showing every shape, with search by name or kind, expandable groups, per-shape show/hide, lock and delete, and group/ungroup for the selection. It shares the right-hand rail with Object details, so collapsing one gives its room to the other.
