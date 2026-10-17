@@ -693,7 +693,9 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "centerOnSelection": "Center view on selection",
-      "centerOnSelectionShortcut": "Center view on selection (Shift+F)"
+      "centerOnSelectionShortcut": "Center view on selection (Shift+F)",
+      "orthographicView": "Orthographic view",
+      "perspectiveView": "Perspective view"
     },
     "workplane": {
       "label": "Workplane",

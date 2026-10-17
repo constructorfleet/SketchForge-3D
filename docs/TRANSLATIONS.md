@@ -115,14 +115,14 @@ reads (`englishNotice`). API routes keep their English `error` text and add `err
 ## Pending translations in this fork
 
 This fork carries features that upstream's localization did not cover, so each language other than English is marked
-`complete: false` in `i18n/locales.ts` and is missing 19 strings — the loft primitive and its property rows, Center on
-workplane and its notices, Center view on selection, Use classic rotate handles, and the workplane label. They show in
+`complete: false` in `i18n/locales.ts` and is missing 21 strings — the loft primitive and its property rows, Center on
+workplane and its notices, Center view on selection, Use classic rotate handles, the workplane label, and the projection toggle. They show in
 English until translated.
 
 `npm test` lists them per language as a todo, for example:
 
 ```
-□ de catalog > translate 19 of 1157 strings, shown in English until then: common.shape.loft, …
+□ de catalog > translate 21 of 1159 strings, shown in English until then: common.shape.loft, …
 ```
 
 Translating a language's remaining strings and setting its `complete` back to `true` makes a later regression a failure

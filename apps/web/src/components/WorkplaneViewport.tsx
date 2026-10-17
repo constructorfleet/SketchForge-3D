@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Crosshair, Home, Minus, MousePointer2, PanelsTopLeft, Plus, Ruler, X } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Crosshair, Home, Minus, MousePointer2, PanelsTopLeft, Plus, Ruler, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type DragEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction, type WheelEvent as ReactWheelEvent } from "react";
 import * as THREE from "three";
 import { Brush, Evaluator, HOLLOW_INTERSECTION } from "three-bvh-csg";
@@ -481,6 +481,8 @@ type TransformDragItem = {
   startCenter: THREE.Vector3;
   startQuaternion: THREE.Quaternion;
 };
+
+type CameraProjection = "perspective" | "orthographic";
 
 type SelectionFrame = {
   ids: string[];
@@ -2401,6 +2403,7 @@ export function WorkplaneViewport({
 }: WorkplaneViewportProps) {
   // Used only in the returned JSX; never list it in scene effect deps (a locale change must not rebuild the scene).
   const t = useTranslations();
+  const [cameraProjection, setCameraProjection] = useState<CameraProjection>("perspective");
   const [snapOpen, setSnapOpen] = useState(false);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -4945,7 +4948,7 @@ export function WorkplaneViewport({
     if (!state) {
       return;
     }
-    toggleCameraProjection(state);
+    setCameraProjection(toggleCameraProjection(state));
   }, []);
 
   const togglePlacementWorkplane = useCallback(() => {
@@ -5220,6 +5223,21 @@ export function WorkplaneViewport({
               onClick={focusSelection}
             >
               <Crosshair size={24} strokeWidth={2.25} />
+            </button>
+            <button
+              className={cameraProjection === "orthographic" ? "active" : ""}
+              aria-label={t(cameraProjection === "orthographic" ? "workspace.camera.perspectiveView" : "workspace.camera.orthographicView")}
+              aria-keyshortcuts="O"
+              aria-pressed={cameraProjection === "orthographic"}
+              title={t("workspace.shortcutHint", {
+                label: t(cameraProjection === "orthographic" ? "workspace.camera.perspectiveView" : "workspace.camera.orthographicView"),
+                key: "O",
+              })}
+              onClick={toggleProjection}
+            >
+              {cameraProjection === "orthographic"
+                ? <Box size={24} strokeWidth={2.15} aria-hidden="true" />
+                : <Square size={24} strokeWidth={2.15} aria-hidden="true" />}
             </button>
             <button aria-label={t("workspace.camera.zoomIn")} onClick={() => zoomCamera(0.7)}>
               <Plus size={28} strokeWidth={2.15} />
@@ -5630,7 +5648,7 @@ function updateOrthographicFrustum(camera: THREE.OrthographicCamera, aspect: num
   camera.updateProjectionMatrix();
 }
 
-function toggleCameraProjection(state: ThreeState) {
+function toggleCameraProjection(state: ThreeState): CameraProjection {
   const current = state.camera;
   const target = state.controls.target;
   const canvas = state.renderer.domElement;
@@ -5675,6 +5693,7 @@ function toggleCameraProjection(state: ThreeState) {
   state.controls.object = next;
   state.controls.update();
   state.needsRender = true;
+  return state.camera instanceof THREE.OrthographicCamera ? "orthographic" : "perspective";
 }
 
 function setCameraToViewFace(state: ThreeState, face: ViewCubeFace) {
