@@ -47,6 +47,37 @@ export function horizontalPlacementWorkplane(elevation = 0): PlacementWorkplane 
   };
 }
 
+/** How far a stored frame may drift from orthonormal and still be kept as-is. */
+const FRAME_EPSILON = 1e-9;
+
+/**
+ * Whether a stored frame is already exactly what the builder would produce:
+ * unit normal and x axis, perpendicular to each other, with z = x cross normal.
+ */
+function isBuiltFrame(normal: PlacementPoint, xAxis: PlacementPoint, zAxis: PlacementPoint | null) {
+  if (!zAxis) return false;
+  const n = vector(normal);
+  const x = vector(xAxis);
+  if (Math.abs(n.lengthSq() - 1) > FRAME_EPSILON) return false;
+  if (Math.abs(x.lengthSq() - 1) > FRAME_EPSILON) return false;
+  if (Math.abs(n.dot(x)) > FRAME_EPSILON) return false;
+  return x.clone().cross(n).distanceToSquared(vector(zAxis)) < FRAME_EPSILON;
+}
+
+/**
+ * A stored workplane as a valid frame, rebuilt only when it is not one already.
+ *
+ * Rebuilding unconditionally is not idempotent: projecting the x axis onto the
+ * plane and re-normalising lands on a slightly different float each time, and
+ * for a tilted plane the result alternates between two values forever. Anything
+ * that compares a normalised workplane against its own previous value then
+ * never settles -- which is how the dashboard's project-persistence effect,
+ * which re-serialises projects and writes them back to state, could spin until
+ * React gave up with "Maximum update depth exceeded".
+ *
+ * A frame that already satisfies the builder's own invariants is therefore
+ * returned untouched, which makes normalising a fixed point.
+ */
 export function normalizePlacementWorkplane(value: unknown, fallbackElevation = 0): PlacementWorkplane {
   if (!value || typeof value !== "object") return horizontalPlacementWorkplane(fallbackElevation);
   const candidate = value as Partial<PlacementWorkplane>;
@@ -55,6 +86,15 @@ export function normalizePlacementWorkplane(value: unknown, fallbackElevation = 
   const xAxis = finitePoint(candidate.xAxis);
   if (!origin || !normal || !xAxis || vector(normal).lengthSq() < EPSILON || vector(xAxis).lengthSq() < EPSILON) {
     return horizontalPlacementWorkplane(fallbackElevation);
+  }
+  const zAxis = finitePoint(candidate.zAxis);
+  if (isBuiltFrame(normal, xAxis, zAxis)) {
+    return {
+      origin: { x: origin.x, y: origin.y, z: origin.z },
+      normal: { x: normal.x, y: normal.y, z: normal.z },
+      xAxis: { x: xAxis.x, y: xAxis.y, z: xAxis.z },
+      zAxis: { x: zAxis!.x, y: zAxis!.y, z: zAxis!.z },
+    };
   }
   return placementWorkplaneFromSurface(origin, normal, xAxis);
 }

@@ -542,6 +542,8 @@ export default function Home() {
   const [activeChallengeTutorial, setActiveChallengeTutorial] = useState<ChallengeTutorialId | null>(null);
   const [projectShapesById, setProjectShapesById] = useState<Record<string, ProjectShapeCacheEntry>>({});
   const projectsJsonRef = useRef("");
+  // The last list this effect rewrote, so it cannot rewrite the same one twice.
+  const projectsRewriteRef = useRef<string | null>(null);
   const dashboardImportInputRef = useRef<HTMLInputElement | null>(null);
   const nextProjectRevisionRef = useRef(0);
   const projectShapeSaveQueuesRef = useRef<Record<string, Promise<void>>>({});
@@ -651,6 +653,13 @@ export default function Home() {
     }
     projectsJsonRef.current = serialized;
     if (serialized !== localSerialized) {
+      // Writing the normalised list back re-runs this effect, which is fine
+      // while normalising settles. If it ever does not -- a normaliser that
+      // alternates between two values, say -- the comparison above can never
+      // match and the effect spins until React gives up. Refusing to rewrite
+      // the same list twice bounds that to one wasted pass instead of a hang.
+      if (projectsRewriteRef.current === localSerialized) return;
+      projectsRewriteRef.current = localSerialized;
       setProjects(storageProjects);
     }
   }, [mounted, projects]);
