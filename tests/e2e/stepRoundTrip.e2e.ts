@@ -232,3 +232,75 @@ describe("STEP export of edge-treated shapes (upstream #94)", () => {
     expect(near(await reimportVolume(blob), 20 * 10 * 6)).toBe(true);
   });
 });
+
+describe("STEP export of faceted and tapered shapes (upstream #94)", () => {
+  // Area of a regular n-gon inscribed in radius r.
+  const polyArea = (r: number, n: number) => (n / 2) * r * r * Math.sin((2 * PI) / n);
+
+  it("exports a faceted cylinder as the prism it is, not as a round cylinder", async () => {
+    const hex = shape({ kind: "cylinder", name: "Hex bar", sides: 6, width: 10, depth: 10, height: 20 });
+    const { blob, exportedCount, skipped } = await exportShapesToStep([hex]);
+    expect(skipped).toEqual([]);
+    expect(exportedCount).toBe(1);
+    // A round cylinder would be PI*25*20 = 1570.8; the hexagon is 1299.
+    expect(near(await reimportVolume(blob), polyArea(5, 6) * 20)).toBe(true);
+  });
+
+  it("still exports a default-resolution cylinder as an exact round one", async () => {
+    const round = shape({ kind: "cylinder", name: "Rod", sides: 96, width: 10, depth: 10, height: 20 });
+    const { blob } = await exportShapesToStep([round]);
+    expect(near(await reimportVolume(blob), PI * 25 * 20)).toBe(true);
+  });
+
+  it("keeps a faceted cylinder's rotation, which a round one is allowed to drop", async () => {
+    const turned = shape({ kind: "cylinder", name: "Hex", sides: 6, width: 10, depth: 10, height: 20, rotation: 30 });
+    const { blob } = await exportShapesToStep([turned]);
+    const r = await brep.importSTEP(blob);
+    if (!r.ok || !brep.isShape3D(r.value)) throw new Error("reimport failed");
+    const bounds = brep.getBounds(r.value);
+    // A hexagon first-vertex-to-+Z spans its full width across the flats in X
+    // only once turned; an unrotated one is narrower in X than in Y.
+    const unturned = await exportShapesToStep([shape({ kind: "cylinder", sides: 6, width: 10, depth: 10, height: 20 })]);
+    const r2 = await brep.importSTEP(unturned.blob);
+    if (!r2.ok || !brep.isShape3D(r2.value)) throw new Error("reimport failed");
+    const bounds2 = brep.getBounds(r2.value);
+    const spanX = bounds.xMax - bounds.xMin;
+    const spanX2 = bounds2.xMax - bounds2.xMin;
+    expect(Math.abs(spanX - spanX2)).toBeGreaterThan(0.1);
+  });
+
+  it("exports a tapered box as a loft with the frustum's volume", async () => {
+    const frustum = shape({
+      kind: "box", name: "Frustum", width: 20, depth: 20, height: 10,
+      taperBottomWidth: 20, taperBottomDepth: 20, taperTopWidth: 10, taperTopDepth: 10,
+    });
+    const { blob, skipped } = await exportShapesToStep([frustum]);
+    expect(skipped).toEqual([]);
+    // Prismatoid: h/6 * (A_bottom + 4*A_mid + A_top), mid side = 15.
+    const expected = (10 / 6) * (400 + 4 * 225 + 100);
+    expect(near(await reimportVolume(blob), expected)).toBe(true);
+  });
+
+  it("exports a round tapered cylinder as a cone with the frustum's volume", async () => {
+    const taperedCyl = shape({
+      kind: "cylinder", name: "Taper", width: 20, depth: 20, height: 10,
+      taperBottomWidth: 20, taperBottomDepth: 20, taperTopWidth: 10, taperTopDepth: 10,
+    });
+    const { blob, skipped } = await exportShapesToStep([taperedCyl]);
+    expect(skipped).toEqual([]);
+    const expected = (PI * 10 / 3) * (100 + 10 * 5 + 25);
+    expect(near(await reimportVolume(blob), expected)).toBe(true);
+  });
+
+  it("reports a taper it cannot build rather than writing a straight body", async () => {
+    const taperedSphere = shape({
+      kind: "sphere", name: "Blob", width: 20, depth: 20, height: 20,
+      taperTopWidth: 10, taperTopDepth: 10,
+    });
+    const box = shape({ kind: "box", name: "Keep", x: 60, width: 10, depth: 10, height: 10 });
+    const { exportedCount, skipped } = await exportShapesToStep([taperedSphere, box]);
+    expect(exportedCount).toBe(1);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].reason).toContain("taper");
+  });
+});

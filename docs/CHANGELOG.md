@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- STEP export now honours a cylinder's facet count and a shape's taper. A deliberately faceted cylinder exports as the prism it is instead of a round cylinder, and keeps its rotation; a tapered box or cylinder exports with its taper instead of straight-sided. A taper that cannot be built exactly is reported as skipped rather than written as a different shape.
 - STEP export now includes shapes carrying a fillet or chamfer, whose exact geometry lives in `cadBrep`. They were skipped as having no B-Rep source, and an export containing nothing else failed outright.
 - Added a projection toggle to the camera controls, switching between perspective and orthographic view. The capability already existed on the `O` key but had no visible control; the button shows which projection is active and keeps in step with the shortcut.
 - The snap grid now applies globally rather than relative to where a shape started. Resizing a 1mm-tall box with the grid at 5mm lands on 5mm instead of 6mm, and the lift handle moves a selection onto the grid rather than by whole steps from wherever it sat. Width and depth already behaved this way; height and elevation were the outliers.

@@ -2,6 +2,7 @@ import type { WorkplaneShape } from "@/types/sketchforge";
 import { LocalizedError } from "@/i18n/LocalizedError";
 import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import { cadBrepTransformForShape } from "@/lib/cadBakeMetadata";
+import { exportYawDegrees, isFacetedCylinder, planTaper, polygonRing, type ProfilePoint } from "@/lib/stepProfiles";
 import { loadBrepWithOcct, type Brep, type BrepSolid } from "@/lib/brepKernel";
 
 export type SkippedShape = {
@@ -36,12 +37,48 @@ function unsupportedReason(): string {
 // translated off-origin. Circular cylinders/cones ignore yaw, matching the
 // editor's meshYawDegrees so the exported diameter is invariant.
 export function shapeYawDegrees(shape: WorkplaneShape): number {
-  const round = shape.kind === "cylinder" || shape.kind === "cone";
-  const circular = Math.abs(shapeWidth(shape) - shapeDepth(shape)) < SIZE_EPS;
-  return round && circular ? 0 : shape.rotation;
+  return exportYawDegrees(shape, SIZE_EPS);
 }
 
 type BuildOutcome = { solid: BrepSolid } | { skip: string };
+
+// A ring of points becomes a planar face; its wire is what loft consumes.
+function ringFace(brep: Brep, points: ProfilePoint[]) {
+  return brep.polygon(points as unknown as Parameters<Brep["polygon"]>[0]);
+}
+
+// A prism: the editor draws a cylinder as `sides` flats, so a deliberately
+// faceted one has to export as the polygon it is, not as a round cylinder.
+function buildPrism(brep: Brep, shape: WorkplaneShape, width: number, depth: number, height: number): BuildOutcome {
+  const face = ringFace(brep, polygonRing(width / 2, depth / 2, shape.sides as number, -height / 2));
+  if (!face.ok) {
+    return { skip: "faceted profile could not be built" };
+  }
+  const solid = brep.extrude(face.value, [0, height, 0]);
+  if (!solid.ok) {
+    return { skip: `extruding the faceted profile failed: ${String(solid.error.message ?? solid.error)}` };
+  }
+  return { solid: solid.value as unknown as BrepSolid };
+}
+
+// A taper lofts between the shape's two end rings, so the exported body
+// narrows the way the screen shows instead of coming back straight-sided.
+function buildLoft(brep: Brep, bottom: ProfilePoint[], top: ProfilePoint[]): BuildOutcome {
+  const bottomFace = ringFace(brep, bottom);
+  const topFace = ringFace(brep, top);
+  if (!bottomFace.ok || !topFace.ok) {
+    return { skip: "taper profile could not be built" };
+  }
+  const wires = [brep.getWires(bottomFace.value)[0], brep.getWires(topFace.value)[0]];
+  if (wires.some((wire) => !wire)) {
+    return { skip: "taper profile has no closed wire" };
+  }
+  const lofted = brep.loft(wires, { ruled: true });
+  if (!lofted.ok) {
+    return { skip: `lofting the taper failed: ${String(lofted.error.message ?? lofted.error)}` };
+  }
+  return { solid: lofted.value as unknown as BrepSolid };
+}
 
 // Builds the shape in SketchForge's Y-up world frame (Y is the vertical/height
 // axis). The caller converts the whole assembly to CAD Z-up afterwards.
@@ -53,6 +90,43 @@ function buildExactSolid(brep: Brep, shape: WorkplaneShape): BuildOutcome {
     return { skip: "degenerate dimensions" };
   }
 
+  // Taper changes the silhouette with height and a facet count replaces the
+  // round surface outright; neither is expressible as one analytic primitive,
+  // so both are resolved before the per-kind primitives below.
+  const taper = planTaper(shape, SIZE_EPS);
+  if (taper.kind === "skip") {
+    return { skip: taper.reason };
+  }
+
+  const built: BuildOutcome =
+    taper.kind === "cone"
+      ? { solid: brep.cone(taper.bottomRadius, taper.topRadius, height, { axis: [0, 1, 0], centered: true }) }
+      : taper.kind === "loft"
+        ? buildLoft(brep, taper.bottom, taper.top)
+        : isFacetedCylinder(shape)
+          ? buildPrism(brep, shape, width, depth, height)
+          : buildPrimitiveSolid(brep, shape, width, depth, height);
+  if ("skip" in built) {
+    return built;
+  }
+
+  return { solid: placeSolid(brep, shape, built.solid, height) };
+}
+
+// Rotate into place and translate to the shape's centre. Shared by every
+// builder so a prism or a loft lands exactly where a primitive would.
+function placeSolid(brep: Brep, shape: WorkplaneShape, input: BrepSolid, height: number): BrepSolid {
+  let solid = input;
+  const rotZ = shape.rotationZ ?? 0;
+  const rotY = shapeYawDegrees(shape);
+  const rotX = shape.rotationX ?? 0;
+  if (rotZ) solid = brep.rotate(solid, rotZ, { axis: [0, 0, 1] });
+  if (rotY) solid = brep.rotate(solid, rotY, { axis: [0, 1, 0] });
+  if (rotX) solid = brep.rotate(solid, rotX, { axis: [1, 0, 0] });
+  return brep.translate(solid, [shape.x, (shape.elevation ?? 0) + height / 2, shape.z]);
+}
+
+function buildPrimitiveSolid(brep: Brep, shape: WorkplaneShape, width: number, depth: number, height: number): BuildOutcome {
   let solid: BrepSolid;
   switch (shape.kind) {
     case "box": {
@@ -90,15 +164,6 @@ function buildExactSolid(brep: Brep, shape: WorkplaneShape): BuildOutcome {
       return { skip: "no exact B-Rep mapping" };
   }
 
-  const rotZ = shape.rotationZ ?? 0;
-  const rotY = shapeYawDegrees(shape);
-  const rotX = shape.rotationX ?? 0;
-  if (rotZ) solid = brep.rotate(solid, rotZ, { axis: [0, 0, 1] });
-  if (rotY) solid = brep.rotate(solid, rotY, { axis: [0, 1, 0] });
-  if (rotX) solid = brep.rotate(solid, rotX, { axis: [1, 0, 0] });
-
-  const center: [number, number, number] = [shape.x, (shape.elevation ?? 0) + height / 2, shape.z];
-  solid = brep.translate(solid, center);
   return { solid };
 }
 
