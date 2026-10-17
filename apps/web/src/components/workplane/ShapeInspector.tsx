@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from "lucide-react";
+import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
 import { normalizeGearType } from "@/lib/gearGeometry";
@@ -158,6 +158,7 @@ export function ShapeInspector({
         >
           {minimized ? <ChevronDown size={26} strokeWidth={2.8} /> : <ChevronUp size={26} strokeWidth={2.8} />}
         </button>
+        <span className="inspector-header-glyph" aria-hidden="true"><Box size={18} strokeWidth={2.2} /></span>
         <strong>{shapeDisplayName(t, shape.name)}</strong>
         <div className="inspector-header-actions">
           <button className={locked ? "inspector-header-icon active" : "inspector-header-icon"} aria-label={locked ? t("panels.inspector.unlock") : t("panels.inspector.lock")} onClick={() => onUpdate({ locked: !locked })}>
@@ -332,9 +333,6 @@ export function ShapeInspector({
           ) : null}
         </div>
       ) : null}
-      <div className="inspector-snap-dock">
-        <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={onSnapChange} onSnapOpenChange={onSnapOpenChange} />
-      </div>
         </>
       ) : null}
     </aside>

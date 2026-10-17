@@ -13,6 +13,7 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { AlignOverlay, MirrorOverlay, type AlignOverlayState, type MirrorOverlayState } from "@/components/workplane/ActionOverlays";
 import { MoveDimensionOverlay } from "@/components/workplane/MoveDimensionOverlay";
+import { SceneInspector } from "@/components/workplane/SceneInspector";
 import { ShapeInspector, SnapGridControl, type ShapeInspectorUpdateOptions } from "@/components/workplane/ShapeInspector";
 import { KeyTagTutorialPanel } from "@/components/workplane/KeyTagTutorialPanel";
 import { NameplateTutorialPanel } from "@/components/workplane/NameplateTutorialPanel";
@@ -208,6 +209,11 @@ type WorkplaneViewportProps = {
   onMirrorPreviewClear: () => void;
   onMirrorSelection: (axis: AlignAxis) => void;
   onSelectShape: (id: string | string[] | null, mode?: "replace" | "toggle") => void;
+  onDeleteShapeById: (id: string) => void;
+  onSetShapeHidden: (id: string, hidden: boolean) => void;
+  onSetShapeLocked: (id: string, locked: boolean) => void;
+  onGroupShapes: () => void;
+  onUngroupShapes: () => void;
   onSetPlacementWorkplane: (workplane: PlacementWorkplane, source: "shape" | "base") => void;
   onToggleWorkplaneTool: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -2381,6 +2387,11 @@ export function WorkplaneViewport({
   onMirrorPreviewClear,
   onMirrorSelection,
   onSelectShape,
+  onDeleteShapeById,
+  onSetShapeHidden,
+  onSetShapeLocked,
+  onGroupShapes,
+  onUngroupShapes,
   onSetPlacementWorkplane,
   onToggleWorkplaneTool,
   onInteractionActiveChange,
@@ -2405,6 +2416,7 @@ export function WorkplaneViewport({
   // Used only in the returned JSX; never list it in scene effect deps (a locale change must not rebuild the scene).
   const t = useTranslations();
   const [cameraProjection, setCameraProjection] = useState<CameraProjection>("perspective");
+  const [sceneListCollapsed, setSceneListCollapsed] = useState(false);
   const [snapOpen, setSnapOpen] = useState(false);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -2427,7 +2439,7 @@ export function WorkplaneViewport({
   const [rulerDeleteMode, setRulerDeleteMode] = useState(false);
   const [rulerMoveMode, setRulerMoveMode] = useState(false);
   const [rulerToolsOpen, setRulerToolsOpen] = useState(false);
-  const [cameraControlsCollapsed, setCameraControlsCollapsed] = useState(false);
+  const [viewToolsCollapsed, setViewToolsCollapsed] = useState(false);
   const [rulerModel, setRulerModel] = useState<RulerModel>({ points: [], segments: [], startPointId: null, hover: null });
   const [rulerOverlay, setRulerOverlay] = useState<RulerOverlayState | null>(null);
   const [moveDimensionOverlay, setMoveDimensionOverlay] = useState<MoveDimensionOverlayState | null>(null);
@@ -5114,8 +5126,8 @@ export function WorkplaneViewport({
     onSelectShape(null);
   }, [onSelectShape, onWorkplaneModeChange, setRulerActive]);
 
-  const collapseCameraControls = useCallback(() => {
-    setCameraControlsCollapsed(true);
+  const collapseViewTools = useCallback(() => {
+    setViewToolsCollapsed(true);
     setRulerToolsOpen(false);
     setRulerActive(false);
     rulerDeleteModeRef.current = false;
@@ -5281,6 +5293,8 @@ export function WorkplaneViewport({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [focusSelection, onWorkplaneModeChange, resetView, rulerToolsOpen, setPlacementWorkplaneAtSelection, setRulerActive, setViewCubeFace, togglePlacementWorkplane, toggleProjection, zoomCamera]);
 
+  const selectableShapes = shapes.filter((shape) => !shape.locked && selectedIds.includes(shape.id));
+
   return (
     <main className={`workplane-stage ${challengeTutorial ? `key-tag-tutorial-active ${challengeTutorialCollapsed ? "key-tag-tutorial-collapsed" : ""}` : ""}`}>
       <div
@@ -5302,14 +5316,14 @@ export function WorkplaneViewport({
         </div>
       </div>
 
-      <div className={`camera-controls ${cameraControlsCollapsed ? "collapsed" : ""}`} aria-label={t("workspace.camera.controls")}>
-        {cameraControlsCollapsed ? (
-          <button className="camera-controls-toggle" aria-label={t("workspace.camera.showControlsLabel")} title={t("workspace.camera.showControls")} aria-expanded={false} onClick={() => setCameraControlsCollapsed(false)}>
+      <div className={`view-tools ${viewToolsCollapsed ? "collapsed" : ""}`} aria-label={t("workspace.viewTools.label")}>
+        {viewToolsCollapsed ? (
+          <button className="view-tools-toggle" aria-label={t("workspace.viewTools.showLabel")} title={t("workspace.viewTools.show")} aria-expanded={false} onClick={() => setViewToolsCollapsed(false)}>
             <ChevronRight size={24} strokeWidth={2.25} aria-hidden="true" />
           </button>
         ) : (
           <>
-            <button className="camera-controls-toggle" aria-label={t("workspace.camera.hideControlsLabel")} title={t("workspace.camera.hideControls")} aria-expanded={true} onClick={collapseCameraControls}>
+            <button className="view-tools-toggle" aria-label={t("workspace.viewTools.hideLabel")} title={t("workspace.viewTools.hide")} aria-expanded={true} onClick={collapseViewTools}>
               <ChevronLeft size={24} strokeWidth={2.25} aria-hidden="true" />
             </button>
             <button aria-label={t("workspace.camera.home")} onClick={resetView}>
@@ -5458,30 +5472,46 @@ export function WorkplaneViewport({
         </div>
       </section>
 
-      {selectedShape && !modifierActive && !rulerMode && !rulerDeleteMode && !rulerMoveMode ? (
-        <ShapeInspector
-          shape={selectedShape}
-          snap={snap}
-          snapOpen={snapOpen}
-          workspace={workspace}
-          onUpdate={(patch, options) => {
-            clearMoveDimensions();
-            onUpdateShape(selectedShape.id, patchWithResizeAnchor(selectedShape, patch, options?.resizeAxis, lastResizeAnchorRef.current));
-          }}
-          onSnapChange={chooseSnapGrid}
-          onSnapOpenChange={setSnapOpen}
-          onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
-          canSeparateParts={canSeparateParts}
-          onSeparateParts={onSeparateParts}
-          onInteractionActiveChange={onInteractionActiveChange}
-        />
-      ) : null}
+      <div className="inspector-rail">
+        {selectedShape && !modifierActive && !rulerMode && !rulerDeleteMode && !rulerMoveMode ? (
+          <ShapeInspector
+            shape={selectedShape}
+            snap={snap}
+            snapOpen={snapOpen}
+            workspace={workspace}
+            onUpdate={(patch, options) => {
+              clearMoveDimensions();
+              onUpdateShape(selectedShape.id, patchWithResizeAnchor(selectedShape, patch, options?.resizeAxis, lastResizeAnchorRef.current));
+            }}
+            onSnapChange={chooseSnapGrid}
+            onSnapOpenChange={setSnapOpen}
+            onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
+            canSeparateParts={canSeparateParts}
+            onSeparateParts={onSeparateParts}
+            onInteractionActiveChange={onInteractionActiveChange}
+          />
+        ) : null}
 
-      {!selectedShape ? (
-        <div className="grid-settings">
+        <SceneInspector
+          shapes={shapes}
+          selectedIds={selectedIds}
+          onSelectRow={(id, additive) => onSelectShape(id, additive ? "toggle" : "replace")}
+          onToggleHidden={onSetShapeHidden}
+          onToggleLocked={onSetShapeLocked}
+          onDelete={onDeleteShapeById}
+          onGroup={onGroupShapes}
+          onUngroup={onUngroupShapes}
+          canGroup={selectableShapes.length > 1}
+          canUngroup={selectedIds.length > 0 && shapes.some((shape) => selectedIds.includes(shape.id) && (shape.groupedShapes?.length ?? 0) > 0)}
+          collapsed={sceneListCollapsed}
+          onCollapsedChange={setSceneListCollapsed}
+        />
+
+        <div className="inspector-rail-footer">
           <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={chooseSnapGrid} onSnapOpenChange={setSnapOpen} />
         </div>
-      ) : null}
+      </div>
+
 
       {settingsOpen ? (
         <WorkspaceSettingsModal

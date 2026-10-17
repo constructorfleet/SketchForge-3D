@@ -678,11 +678,6 @@
       }
     },
     "camera": {
-      "controls": "Ovládání kamery",
-      "showControls": "Zobrazit ovládání",
-      "showControlsLabel": "Zobrazit ovládání kamery",
-      "hideControls": "Skrýt ovládání",
-      "hideControlsLabel": "Skrýt ovládání kamery",
       "home": "Výchozí pohled",
       "zoomIn": "Přiblížit",
       "zoomOut": "Oddálit"

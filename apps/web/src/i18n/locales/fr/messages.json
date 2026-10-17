@@ -678,11 +678,6 @@
       }
     },
     "camera": {
-      "controls": "Commandes de la caméra",
-      "showControls": "Afficher les commandes",
-      "showControlsLabel": "Afficher les commandes de la caméra",
-      "hideControls": "Masquer les commandes",
-      "hideControlsLabel": "Masquer les commandes de la caméra",
       "home": "Vue initiale",
       "zoomIn": "Zoom avant",
       "zoomOut": "Zoom arrière"

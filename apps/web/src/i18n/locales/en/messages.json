@@ -280,7 +280,9 @@
       "unlockBeforeCentering": "Unlock the selection before centering it",
       "nothingToCenter": "Selection has no measurable geometry to center",
       "alreadyCentered": "Selection is already centered on the workplane",
-      "centeredOnWorkplane": "{count, plural, one {Centered selection on the workplane} other {Centered # objects on the workplane}}"
+      "centeredOnWorkplane": "{count, plural, one {Centered selection on the workplane} other {Centered # objects on the workplane}}",
+      "shapeLocked": "Shape locked",
+      "shapeUnlocked": "Shape unlocked"
     },
     "workplane": {
       "toolActive": "Workplane tool: click a face or empty grid; hold Shift to reverse",
@@ -684,11 +686,6 @@
       }
     },
     "camera": {
-      "controls": "Camera controls",
-      "showControls": "Show controls",
-      "showControlsLabel": "Show camera controls",
-      "hideControls": "Hide controls",
-      "hideControlsLabel": "Hide camera controls",
       "home": "Home",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
@@ -696,6 +693,13 @@
       "centerOnSelectionShortcut": "Center view on selection (Shift+F)",
       "orthographicView": "Orthographic view",
       "perspectiveView": "Perspective view"
+    },
+    "viewTools": {
+      "label": "View tools",
+      "show": "Show tools",
+      "showLabel": "Show view tools",
+      "hide": "Hide tools",
+      "hideLabel": "Hide view tools"
     },
     "workplane": {
       "label": "Workplane",
@@ -1128,6 +1132,25 @@
       "triangle": "Triangle",
       "pentagon": "Pentagon",
       "hexagon": "Hexagon"
+    },
+    "scene": {
+      "title": "Scene",
+      "open": "Scene list",
+      "summary": "{count, plural, =0 {Nothing in the scene} one {# shape} other {# shapes}}{hidden, plural, =0 {} one { · # hidden} other { · # hidden}}",
+      "searchPlaceholder": "Search shapes",
+      "searchLabel": "Search shapes by name or kind",
+      "empty": "Add a shape and it will appear here.",
+      "noMatches": "No shape matches that search.",
+      "hole": "Hole",
+      "show": "Show {name}",
+      "hide": "Hide {name}",
+      "lock": "Lock {name}",
+      "unlock": "Unlock {name}",
+      "delete": "Delete {name}",
+      "expandGroup": "Show what {name} groups",
+      "collapseGroup": "Hide what {name} groups",
+      "collapse": "Collapse the scene list",
+      "expand": "Expand the scene list"
     }
   },
   "errors": {

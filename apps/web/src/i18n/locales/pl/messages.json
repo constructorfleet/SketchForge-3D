@@ -678,11 +678,6 @@
       }
     },
     "camera": {
-      "controls": "Sterowanie kamerą",
-      "showControls": "Pokaż sterowanie",
-      "showControlsLabel": "Pokaż sterowanie kamerą",
-      "hideControls": "Ukryj sterowanie",
-      "hideControlsLabel": "Ukryj sterowanie kamerą",
       "home": "Widok początkowy",
       "zoomIn": "Przybliż",
       "zoomOut": "Oddal"

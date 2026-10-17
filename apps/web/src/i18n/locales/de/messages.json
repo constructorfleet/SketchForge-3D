@@ -678,11 +678,6 @@
       }
     },
     "camera": {
-      "controls": "Kamerasteuerung",
-      "showControls": "Steuerung einblenden",
-      "showControlsLabel": "Kamerasteuerung einblenden",
-      "hideControls": "Steuerung ausblenden",
-      "hideControlsLabel": "Kamerasteuerung ausblenden",
       "home": "Startansicht",
       "zoomIn": "Hineinzoomen",
       "zoomOut": "Herauszoomen"
@@ -815,7 +810,7 @@
     "gearType": {
       "label": "Zahnradart",
       "spur": "Stirnrad",
-      "helical": "Schräg\u00adstirnrad",
+      "helical": "Schräg­stirnrad",
       "bevel": "Kegelrad"
     },
     "property": {
