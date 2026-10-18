@@ -39,13 +39,14 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.8",
     "@types/three": "^0.184.1",
+    "@vitest/mocker": "^4.1.12",
     "brepjs": "^18.118.0",
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.511.0",
     "manifold-3d": "^3.5.0",
-    "next": "^15.3.2",
+    "next": "^15.5.28",
     "occt-wasm": "^3.6.1",
     "react": "^19.1.0",
     "react-colorful": "^5.8.0",
@@ -62,10 +63,21 @@
     "@types/node": "^22.15.18",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
-    "electron": "^43.4.0",
+    "electron": "^43.8.0",
     "electron-builder": "^26.15.3",
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^4.3.2",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "^0.8.15",
+    "brace-expansion": "^1.1.21",
+    "fast-uri": "^3.1.8",
+    "http-cache-semantics": "^4.2.1",
+    "nanoid": "^3.3.18",
+    "postcss": "^8.5.30",
+    "sharp": "^0.35.5",
+    "source-map-js": "^1.2.2",
+    "undici": "^6.29.1"
   }
 }
