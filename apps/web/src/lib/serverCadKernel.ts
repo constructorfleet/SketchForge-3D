@@ -9,9 +9,15 @@
  *
  * Node-only. Never import this from anything the browser bundles.
  *
- * The kernel is loaded once per process and reused. It holds an arena of shape
- * handles, so every operation releases what it allocated: a long-lived server
- * that leaked handles would grow without bound.
+ * The kernel is loaded once per process and reused, and `withCadKernel` is the
+ * only way in: it runs one operation at a time and empties the handle arena
+ * afterwards.
+ *
+ * Both halves of that matter. The arena is global to the kernel, so releasing
+ * handles by hand while another operation holds its own leaves dangling
+ * pointers -- which surface much later as "null function or function signature
+ * mismatch" from an unrelated call. And the WASM build is single-threaded, so
+ * serialising costs nothing that was ever available.
  */
 
 import type { OcctKernel } from "occt-wasm";
@@ -50,4 +56,31 @@ export async function serverCadAvailable() {
   } catch {
     return false;
   }
+}
+
+let pending: Promise<unknown> = Promise.resolve();
+
+/**
+ * Run one CAD operation with exclusive use of the kernel.
+ *
+ * Everything the operation allocated is released when it finishes, so nothing
+ * has to track handles and a long-lived server cannot grow without bound.
+ * Queue position is kept even if the previous operation threw.
+ */
+export function withCadKernel<T>(work: (cad: OcctKernel) => Promise<T> | T): Promise<T> {
+  const run = pending.then(async () => {
+    const cad = await serverCadKernel();
+    try {
+      return await work(cad);
+    } finally {
+      try {
+        cad.releaseAll();
+      } catch {
+        // An arena left empty by a failed operation is already in the state
+        // this is trying to reach.
+      }
+    }
+  });
+  pending = run.catch(() => undefined);
+  return run;
 }

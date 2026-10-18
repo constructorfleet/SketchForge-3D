@@ -16,7 +16,8 @@
  */
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { serverCadKernel } from "@/lib/serverCadKernel";
+import { withCadKernel } from "@/lib/serverCadKernel";
+import { exactSolidForShape, shapeIsTurned, UnbuildableShapeError } from "@/lib/serverCadSolids";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -113,10 +114,22 @@ function solidFromMesh(cad: OcctKernel, positions: number[]) {
 }
 
 /**
- * The shape as an exact solid, in its own local frame.
+ * Whether a treated result should keep the shape's rotation or has it baked in.
  *
- * A box is rebuilt from its dimensions rather than its mesh, so its fillet is
- * exact rather than a rounded approximation of a tessellation.
+ * Exact geometry is built turned the way the shape sits, so the result must not
+ * be turned again. Stored geometry -- a previous result's BREP, an imported
+ * mesh -- is already in the frame the shape's own rotation applies to.
+ */
+export function treatmentBakesRotation(shape: WorkplaneShape) {
+  if (shape.cadBrep || meshPositionsOf(shape)) return false;
+  return shapeIsTurned(shape);
+}
+
+/**
+ * The shape as an exact solid.
+ *
+ * A parametric shape is rebuilt from its dimensions rather than its mesh, so
+ * its fillet is exact rather than a rounded approximation of a tessellation.
  */
 function solidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   if (shape.cadBrep) return solidFromBrep(cad, shape.cadBrep);
@@ -124,31 +137,12 @@ function solidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   const positions = meshPositionsOf(shape);
   if (positions) return solidFromMesh(cad, [...positions]);
 
-  if (shape.kind === "box") {
-    const width = shape.width ?? shape.size ?? 0;
-    const depth = shape.depth ?? shape.size ?? 0;
-    const height = shape.height;
-    if (width <= 0 || depth <= 0 || height <= 0) {
-      throw new ServerCadError("That box has no size to work from.");
-    }
-    // SketchForge's Y axis is up, and so is OCCT's here, so the box is built
-    // width x height x depth -- not width x depth x height.
-    return cad.makeBox(width, height, depth);
+  try {
+    return exactSolidForShape(cad, shape);
+  } catch (error) {
+    if (error instanceof UnbuildableShapeError) throw new ServerCadError(error.message);
+    throw error;
   }
-
-  throw new ServerCadError(
-    `The server can only fillet or chamfer a box, an imported model, or a shape that already carries exact geometry -- not a ${shape.kind}. Do it in the editor instead.`,
-  );
-}
-
-function release(cad: OcctKernel, handles: ShapeHandle[]) {
-  handles.forEach((handle) => {
-    try {
-      cad.release(handle);
-    } catch {
-      // A failed operation can invalidate handles it was given.
-    }
-  });
 }
 
 function edgeSummary(cad: OcctKernel, handle: ShapeHandle, index: number): ServerCadEdge {
@@ -172,15 +166,11 @@ function edgeSummary(cad: OcctKernel, handle: ShapeHandle, index: number): Serve
 }
 
 /** The edges of a shape, in the order a treatment request refers to them by index. */
-export async function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
-  const cad = await serverCadKernel();
-  const solid = solidForShape(cad, shape);
-  const handles = cad.getSubShapes(solid, "edge");
-  try {
-    return handles.map((handle, index) => edgeSummary(cad, handle, index));
-  } finally {
-    release(cad, [...handles, solid]);
-  }
+export function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
+  return withCadKernel((cad) => {
+    const solid = solidForShape(cad, shape);
+    return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, handle, index));
+  });
 }
 
 export type ServerCadResult = {
@@ -196,16 +186,14 @@ export type ServerCadResult = {
  * Both are kept: the BREP is what STEP export and any later treatment work
  * from, and the mesh is what the viewport draws.
  */
-export async function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTreatment): Promise<ServerCadResult> {
+export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTreatment): Promise<ServerCadResult> {
   if (!Number.isFinite(treatment.amount) || treatment.amount <= 0) {
-    throw new ServerCadError("The fillet radius or chamfer distance must be greater than zero.", 400);
+    return Promise.reject(new ServerCadError("The fillet radius or chamfer distance must be greater than zero.", 400));
   }
 
-  const cad = await serverCadKernel();
-  const solid = solidForShape(cad, shape);
-  const allEdges = cad.getSubShapes(solid, "edge");
-  const temporary: ShapeHandle[] = [...allEdges, solid];
-  try {
+  return withCadKernel((cad) => {
+    const solid = solidForShape(cad, shape);
+    const allEdges = cad.getSubShapes(solid, "edge");
     const requested = treatment.edges;
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
       throw new ServerCadError(`Edge indexes must be between 0 and ${allEdges.length - 1}.`, 400);
@@ -231,14 +219,11 @@ export async function applyEdgeTreatment(shape: WorkplaneShape, treatment: Serve
           : "That chamfer is too large for this shape's edges. Try a smaller one.",
       );
     }
-    temporary.push(treated);
-
     // Both fillet and chamfer hand back a compound wrapping the result, and
     // OCCT refuses a compound as the input to another treatment -- so storing
     // that as the shape's exact geometry would make the next fillet fail for
     // no visible reason. Unwrap the single solid inside it.
     const treatedSolids = cad.getSubShapes(treated, "solid");
-    temporary.push(...treatedSolids);
     const result = treatedSolids.length === 1 ? treatedSolids[0] : treated;
 
     const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
@@ -257,9 +242,7 @@ export async function applyEdgeTreatment(shape: WorkplaneShape, treatment: Serve
       normals: normals.length === positions.length ? normals : null,
       triangleCount: mesh.triangleCount,
     };
-  } finally {
-    release(cad, temporary);
-  }
+  });
 }
 
 
@@ -305,6 +288,10 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
     );
   }
 
+  // A result built from exact geometry already carries the shape's rotation, so
+  // keeping it would turn the solid twice. One rebuilt from a stored mesh does
+  // not, so its rotation has to stay.
+  const bakedRotation = treatmentBakesRotation(shape);
   return canonicalizeShape({
     ...shape,
     kind: "mesh",
@@ -312,11 +299,11 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
     depth,
     height,
     size: Math.max(width, depth),
-    // The treated geometry is already in its final form; carrying a rotation or
-    // a taper forward would apply it to the result a second time.
-    rotation: 0,
-    rotationX: 0,
-    rotationZ: 0,
+    // The treated geometry is already in its final form; carrying a taper
+    // forward would apply it to the result a second time.
+    rotation: bakedRotation ? 0 : shape.rotation,
+    rotationX: bakedRotation ? 0 : shape.rotationX,
+    rotationZ: bakedRotation ? 0 : shape.rotationZ,
     mirrorX: undefined,
     mirrorY: undefined,
     mirrorZ: undefined,
