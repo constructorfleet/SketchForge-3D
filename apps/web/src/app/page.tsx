@@ -457,32 +457,32 @@ function normalizeStoredProject(
   index: number,
   legacyShapes?: Record<string, ProjectShapeCacheEntry>,
 ): DashboardProject {
-        const id = project.id as string;
-        const updatedAt = typeof project.updatedAt === "number" ? project.updatedAt : Date.now();
-        const revision = typeof project.revision === "number" ? project.revision : updatedAt;
-        const designShapes = Array.isArray(project.designShapes) ? (project.designShapes as WorkplaneShape[]) : null;
-        if (designShapes && legacyShapes) {
-          legacyShapes[id] = projectShapeCacheEntry(revision, designShapes);
-        }
-        return {
-          id,
-          name: project.name as string,
-          createdAt: typeof project.createdAt === "number" ? project.createdAt : Date.now(),
-          updatedAt,
-          shapes: typeof project.shapes === "number" ? project.shapes : (designShapes?.length ?? 0),
-          accent: PROJECT_ACCENTS.includes(project.accent as DashboardProject["accent"]) ? (project.accent as DashboardProject["accent"]) : PROJECT_ACCENTS[index % PROJECT_ACCENTS.length],
-          thumbnailUrl: typeof project.thumbnailUrl === "string" ? project.thumbnailUrl : null,
-          thumbnailVersion: typeof project.thumbnailVersion === "number" ? project.thumbnailVersion : undefined,
-          revision,
-          workspace: normalizeWorkspaceSettings(project.workspace),
-          snapGrid: normalizeSnapGrid(project.snapGrid),
-          placementElevation: typeof project.placementElevation === "number" && Number.isFinite(project.placementElevation) ? project.placementElevation : 0,
-          placementWorkplane: normalizePlacementWorkplane(project.placementWorkplane, project.placementElevation),
-          sketchPlacementWorkplane: normalizePlacementWorkplane(project.sketchPlacementWorkplane),
-          sharedProject: typeof project.sharedProject?.fileName === "string" && typeof project.sharedProject.revision === "string"
-            ? { fileName: project.sharedProject.fileName, revision: project.sharedProject.revision }
-            : undefined,
-        };
+  const id = project.id as string;
+  const updatedAt = typeof project.updatedAt === "number" ? project.updatedAt : Date.now();
+  const revision = typeof project.revision === "number" ? project.revision : updatedAt;
+  const designShapes = Array.isArray(project.designShapes) ? (project.designShapes as WorkplaneShape[]) : null;
+  if (designShapes && legacyShapes) {
+    legacyShapes[id] = projectShapeCacheEntry(revision, designShapes);
+  }
+  return {
+    id,
+    name: project.name as string,
+    createdAt: typeof project.createdAt === "number" ? project.createdAt : Date.now(),
+    updatedAt,
+    shapes: typeof project.shapes === "number" ? project.shapes : (designShapes?.length ?? 0),
+    accent: PROJECT_ACCENTS.includes(project.accent as DashboardProject["accent"]) ? (project.accent as DashboardProject["accent"]) : PROJECT_ACCENTS[index % PROJECT_ACCENTS.length],
+    thumbnailUrl: typeof project.thumbnailUrl === "string" ? project.thumbnailUrl : null,
+    thumbnailVersion: typeof project.thumbnailVersion === "number" ? project.thumbnailVersion : undefined,
+    revision,
+    workspace: normalizeWorkspaceSettings(project.workspace),
+    snapGrid: normalizeSnapGrid(project.snapGrid),
+    placementElevation: typeof project.placementElevation === "number" && Number.isFinite(project.placementElevation) ? project.placementElevation : 0,
+    placementWorkplane: normalizePlacementWorkplane(project.placementWorkplane, project.placementElevation),
+    sketchPlacementWorkplane: normalizePlacementWorkplane(project.sketchPlacementWorkplane),
+    sharedProject: typeof project.sharedProject?.fileName === "string" && typeof project.sharedProject.revision === "string"
+      ? { fileName: project.sharedProject.fileName, revision: project.sharedProject.revision }
+      : undefined,
+  };
 }
 
 function storedProjectIsUsable(project: StoredDashboardProject) {
@@ -724,24 +724,42 @@ export default function Home() {
       const listing = await probeServerProjects().catch(() => null);
       if (canceled || !listing?.enabled) return;
 
+      // The listing is driven by metadata sidecars, so a project counts as
+      // migrated once its sidecar exists. Writing the package first therefore
+      // means a half-migrated project is simply not there yet and is tried
+      // again, rather than appearing on the server with no geometry behind it.
+      const migrateProject = async (project: DashboardProject) => {
+        const record = await loadProjectShapes(project.id);
+        if (record?.skfPackage) {
+          await saveServerProjectPackage(project.id, record.skfPackage, project.revision ?? record.revision);
+        }
+        await saveServerProjectMetadata(project.id, projectForStorage(project));
+      };
+
+      let migratedCount = 0;
       const serverProjectIds = new Set(listing.projects.map((record) => record.projectId));
-      const browserProjects = readStoredProjects().projects.filter((project) => !serverProjectIds.has(project.id));
-      for (const project of browserProjects) {
-        try {
-          const record = await loadProjectShapes(project.id);
-          await saveServerProjectMetadata(project.id, projectForStorage(project));
-          if (record?.skfPackage) {
-            await saveServerProjectPackage(project.id, record.skfPackage, project.revision ?? record.revision);
+      // Re-reading the browser list between passes picks up a project created
+      // while an earlier pass was still uploading, which would otherwise be
+      // dropped when the server list replaces the browser's.
+      for (let pass = 0; pass < 3; pass += 1) {
+        const pending = readStoredProjects().projects.filter((project) => !serverProjectIds.has(project.id));
+        if (pending.length === 0) break;
+        for (const project of pending) {
+          try {
+            await migrateProject(project);
+          } catch (error) {
+            if (canceled) return;
+            setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
+            return;
           }
-        } catch (error) {
           if (canceled) return;
-          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
-          return;
+          migratedCount += 1;
+          serverProjectIds.add(project.id);
         }
       }
       if (canceled) return;
 
-      const adopted = browserProjects.length > 0 ? await probeServerProjects().catch(() => listing) : listing;
+      const adopted = migratedCount > 0 ? await probeServerProjects().catch(() => listing) : listing;
       if (canceled || !adopted.enabled) return;
       serverProjectStorageActive = true;
       const serverProjects = dashboardProjectsFromServer(adopted.projects);
@@ -754,8 +772,8 @@ export default function Home() {
         // The list is on the server either way; a browser that refuses to
         // forget its copy only leaves a stale one behind.
       }
-      if (browserProjects.length > 0) {
-        setDashboardNotice(translate("dashboard.serverStorage.migrated", { count: browserProjects.length }));
+      if (migratedCount > 0) {
+        setDashboardNotice(translate("dashboard.serverStorage.migrated", { count: migratedCount }));
       }
       // A reload straight into the editor checked the browser list, which the
       // server has now replaced, so the requested project could not be found.

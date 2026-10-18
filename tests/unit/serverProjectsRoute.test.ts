@@ -129,6 +129,16 @@ describe("server project storage", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("does not list a project whose package arrived without its metadata", async () => {
+    // Migration writes the package first and the metadata second, so a run
+    // that fails in between leaves a project the listing does not show -- and
+    // the next run migrates it again instead of opening it empty.
+    await POST(saveRequest("project-1", { project: new Uint8Array([1, 2, 3]), revision: 11 }));
+
+    expect((await listing()).projects).toEqual([]);
+    expect(await fs.readdir(projectsRoot)).toEqual(["project-1.skf"]);
+  });
+
   it("ignores a stray file that is not a project", async () => {
     await fs.writeFile(path.join(projectsRoot, "notes.txt"), "hello");
     await fs.writeFile(path.join(projectsRoot, "broken.json"), "{ not json");
