@@ -226,6 +226,10 @@ Turning the directory back off restores that browser's own list, so the projects
 
 This needs the server, so it does not apply to a static-export build. Shared projects below are unaffected and remain a separate, explicitly-published library.
 
+### REST API
+
+With server-side storage on, setting `SKETCHFORGE_API_TOKEN` also exposes a REST API for building projects from a script: it creates projects and adds, changes, and deletes shapes described as JSON, with no editor open. Without the token there is no API at all. See [docs/REST_API.md](docs/REST_API.md).
+
 ### Shared Docker Projects
 
 Docker deployments include a shared `.skf` project library. Private projects still autosave in each user's browser. The **Shared** dashboard section lists files stored in `/data/projects`, and **Export → SKF → Save to shared** writes the current project there. Revision-matched PNG previews are stored beside the library in `/data/projects/.thumbnails` and appear on shared project cards.
