@@ -47,9 +47,21 @@ The project and shape are named in the query string rather than the path. That i
 { "kind": "cylinder", "width": 8, "height": 30, "sides": 6, "x": 12, "name": "Post" }
 ```
 
-`kind` is one of `box`, `cube`, `cylinder`, `text`, `loft`. A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together.
+`kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`. A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. Only `mesh`, `sketch`, and `scribble` are left out: those need geometry or a drawn profile rather than numbers.
 
-Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`. Per kind: `sides` (cylinder -- 6 gives a hex prism); `text`, `font`, `bevel`, `segments` (text); `loftBottomShape`, `loftTopShape`, `loftTopWidth`, `loftTopDepth`, `loftBottomRotation`, `loftTopRotation`, `loftSegments`, `loftLayers` (loft).
+Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
+
+Per kind:
+
+| Fields | For |
+| --- | --- |
+| `sides` | `cylinder` (6 gives a hex prism), `pyramid` (4 unless you say otherwise), `cone` |
+| `bevel` | `tube` and `ring` -- the wall thickness, measured inwards |
+| `topRadius` | `cone` |
+| `steps` | `sphere`, `halfSphere` |
+| `text`, `font`, `bevel`, `segments` | `text` |
+| `teeth`, `toothSize`, `toothWidth`, `centerHoleSize`, `helixAngle` | `gear` |
+| `loftBottomShape`, `loftTopShape`, `loftTopWidth`, `loftTopDepth`, `loftBottomRotation`, `loftTopRotation`, `loftSegments`, `loftLayers` | `loft` |
 
 Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default the editor would have used, so a request need only carry what it cares about.
 
@@ -92,10 +104,21 @@ Each shape is rebuilt as true geometry from what the project stores, rather than
 | `loft` | A loft between its two profiles, each at its own size and rotation. |
 | `polygon` | A six-sided prism. |
 | `tube`, `ring` | A cylinder with its bore cut out, at the wall thickness the shape carries. |
+| `roof` | A triangular prism with its ridge over the middle. |
+| `wedge` | The same, with the ridge over one side so one face is vertical. |
+| `roundRoof` | Half an ellipse, extruded. |
+| `pyramid` | A base and one triangle per side; four sides unless the shape says otherwise. |
+| `torus` | A ring sized the way the editor sizes one, and centred on the workplane rather than sitting on it. |
 
 It also works from **exact geometry a shape already carries** -- anything previously treated, or a STEP import -- and from **an imported model's triangles**, sewn back into a solid.
 
-Other kinds answer `422` naming the kind: `text`, `gear`, `sketch`, `scribble`, `icosahedron`, `pyramid`, `roof`, `roundRoof`, `wedge`, `torus`. Their geometry is either font- or tessellation-derived, or has a convention the server does not yet reproduce exactly, and approximating it would quietly give you a different part. Treat those in the editor.
+Other kinds answer `422` naming the kind: `text`, `gear`, `sketch`, `scribble`, and `icosahedron`. Their geometry is font- or tessellation-derived, and approximating it would quietly give you a different part. Treat those in the editor.
+
+### Which edges can be rounded
+
+Each entry in the edge listing carries `filletable`. An edge between two faces can be rounded; a **seam** -- where one curved surface meets itself, as along a cylinder's side or around a torus -- has no two faces to blend, and OCCT refuses it.
+
+A request for every edge rounds every edge that can be. Naming a seam explicitly is an error rather than a silent skip, so a script cannot think it did something it did not. A shape with no roundable edges at all -- a torus, a sphere -- says so, instead of blaming the radius.
 
 A shape's rotation is built into the geometry, so a turned shape comes back turned.
 

@@ -71,16 +71,31 @@ export function withCadKernel<T>(work: (cad: OcctKernel) => Promise<T> | T): Pro
   const run = pending.then(async () => {
     const cad = await serverCadKernel();
     try {
-      return await work(cad);
-    } finally {
+      const result = await work(cad);
       try {
         cad.releaseAll();
       } catch {
-        // An arena left empty by a failed operation is already in the state
-        // this is trying to reach.
+        // Nothing left to release is the state this wanted anyway.
       }
+      return result;
+    } catch (error) {
+      // An OCCT operation that throws leaves the kernel in a state its own
+      // API cannot describe, let alone repair: a later unrelated call fails
+      // with "null function or function signature mismatch" instead. The
+      // editor's answer is to terminate the worker and start another, and
+      // this is the same move -- the next request builds a fresh kernel.
+      //
+      // A fillet radius that does not fit is the common way to get here, so
+      // this has to be a recovery rather than a fault.
+      discardCadKernel();
+      throw error;
     }
   });
   pending = run.catch(() => undefined);
   return run;
+}
+
+/** Drop the loaded kernel so the next caller builds a new one. */
+export function discardCadKernel() {
+  kernelPromise = null;
 }

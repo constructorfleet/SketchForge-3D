@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
 import { applyEdgeTreatment, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
+import { sceneShape } from "@/lib/shapeCatalog";
 import { shapeFromRequest } from "@/lib/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -136,11 +137,65 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(treated.rotationZ).toBe(10);
   });
 
+  it("still works after an operation OCCT threw on", async () => {
+    // A failed OCCT call leaves the kernel in a state its own API cannot
+    // describe: the next unrelated call fails with "null function or function
+    // signature mismatch". A long-lived server would be broken until
+    // restarted by one fillet radius that did not fit.
+    await expect(applyEdgeTreatment(box({ height: 1 }), { kind: "fillet", amount: 5 })).rejects.toThrow();
+
+    const result = await applyEdgeTreatment(box(), { kind: "fillet", amount: 2 });
+
+    expect(result.triangleCount).toBeGreaterThan(0);
+    expect(result.brep).toContain("CASCADE Topology");
+  });
+
   it("says what it cannot do rather than approximating it", async () => {
     const text = shapeFromRequest({ kind: "text", width: 20, depth: 20, height: 20, text: "HI" }) as WorkplaneShape;
 
     await expect(applyEdgeTreatment(text, { kind: "fillet", amount: 1 })).rejects.toThrow(/text/);
     await expect(applyEdgeTreatment(text, { kind: "fillet", amount: 1 })).rejects.toThrow(ServerCadError);
+  });
+
+  it("fillets a roof, a wedge, a barrel roof, and a pyramid", async () => {
+    for (const kind of ["roof", "wedge", "roundRoof", "pyramid"] as const) {
+      const subject = sceneShape({ name: kind, kind, color: "#d41721", width: 40, depth: 40, height: 12, size: 40 });
+      await expect(applyEdgeTreatment(subject, { kind: "fillet", amount: 1 }), kind)
+        .resolves.toMatchObject({ triangleCount: expect.any(Number) });
+    }
+  });
+
+  it("says a torus has nothing to round rather than blaming the radius", async () => {
+    // A torus is one closed surface: its only edges are the seams where that
+    // surface meets itself, and there is no corner there to blend.
+    const torus = sceneShape({ name: "torus", kind: "torus", color: "#d41721", width: 40, depth: 40, height: 12, size: 40 });
+
+    const edges = await shapeEdges(torus);
+    expect(edges.length).toBeGreaterThan(0);
+    expect(edges.every((edge) => !edge.filletable)).toBe(true);
+
+    await expect(applyEdgeTreatment(torus, { kind: "fillet", amount: 1 }))
+      .rejects.toThrow(/no edges to round/);
+  });
+
+  it("rounds only the edges that can be rounded when asked for all of them", async () => {
+    // A cylinder's side is one surface meeting itself, so one of its three
+    // edges is a seam. Including it fails the whole operation.
+    const cylinder = shapeFromRequest({ kind: "cylinder", width: 30, depth: 30, height: 20 }) as WorkplaneShape;
+
+    const edges = await shapeEdges(cylinder);
+
+    expect(edges.filter((edge) => edge.filletable)).toHaveLength(2);
+    expect(edges.filter((edge) => !edge.filletable)).toHaveLength(1);
+    await expect(applyEdgeTreatment(cylinder, { kind: "fillet", amount: 2 })).resolves.toBeDefined();
+  });
+
+  it("refuses a seam the caller named outright, instead of silently skipping it", async () => {
+    const cylinder = shapeFromRequest({ kind: "cylinder", width: 30, depth: 30, height: 20 }) as WorkplaneShape;
+    const seam = (await shapeEdges(cylinder)).find((edge) => !edge.filletable);
+
+    await expect(applyEdgeTreatment(cylinder, { kind: "fillet", amount: 2, edges: [seam!.index] }))
+      .rejects.toThrow(/seams in a curved surface/);
   });
 
   it("fillets the kinds that used to need the editor", async () => {

@@ -26,6 +26,14 @@ export type ServerCadEdge = {
   length: number;
   curveType: string;
   midpoint: { x: number; y: number; z: number };
+  /**
+   * Whether this edge is one a fillet or chamfer can act on.
+   *
+   * An edge between two faces can be rounded. A seam -- where one curved
+   * surface meets itself, as on a cylinder's side or around a torus -- has no
+   * two faces to blend, and OCCT refuses it.
+   */
+  filletable: boolean;
 };
 
 export type ServerCadTreatment = {
@@ -145,7 +153,16 @@ function solidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   }
 }
 
-function edgeSummary(cad: OcctKernel, handle: ShapeHandle, index: number): ServerCadEdge {
+/** How many faces of the solid meet along this edge. A seam reports one. */
+function adjacentFaceCount(cad: OcctKernel, solid: ShapeHandle, handle: ShapeHandle) {
+  try {
+    return cad.adjacentFaces(solid, handle).length;
+  } catch {
+    return 0;
+  }
+}
+
+function edgeSummary(cad: OcctKernel, solid: ShapeHandle, handle: ShapeHandle, index: number): ServerCadEdge {
   const bounds = cad.getBoundingBox(handle, false);
   let curveType = "unknown";
   try {
@@ -162,6 +179,7 @@ function edgeSummary(cad: OcctKernel, handle: ShapeHandle, index: number): Serve
       y: (bounds.ymin + bounds.ymax) / 2,
       z: (bounds.zmin + bounds.zmax) / 2,
     },
+    filletable: adjacentFaceCount(cad, solid, handle) >= 2,
   };
 }
 
@@ -169,7 +187,7 @@ function edgeSummary(cad: OcctKernel, handle: ShapeHandle, index: number): Serve
 export function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
   return withCadKernel((cad) => {
     const solid = solidForShape(cad, shape);
-    return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, handle, index));
+    return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, solid, handle, index));
   });
 }
 
@@ -198,8 +216,22 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
       throw new ServerCadError(`Edge indexes must be between 0 and ${allEdges.length - 1}.`, 400);
     }
-    const edges = requested && requested.length > 0 ? requested.map((index) => allEdges[index]) : allEdges;
-    if (edges.length === 0) throw new ServerCadError("That shape has no edges to treat.");
+    // Seams cannot be rounded, and asking OCCT to try fails the whole
+    // operation -- so a request for every edge means every edge that can be.
+    const filletable = allEdges.filter((handle) => adjacentFaceCount(cad, solid, handle) >= 2);
+    if (filletable.length === 0) {
+      throw new ServerCadError(
+        "That shape has no edges to round: its surface closes on itself, so there is no corner to blend.",
+      );
+    }
+    const chosen = requested && requested.length > 0 ? requested.map((index) => allEdges[index]) : filletable;
+    const edges = chosen.filter((handle) => adjacentFaceCount(cad, solid, handle) >= 2);
+    if (edges.length === 0) {
+      throw new ServerCadError(
+        "None of those edges can be rounded: they are seams in a curved surface rather than corners. Check `filletable` in the edge listing.",
+        400,
+      );
+    }
 
     let treated: ShapeHandle;
     try {

@@ -3,6 +3,7 @@ import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
 import { EXACT_SOLID_KINDS, exactSolidForShape, UnbuildableShapeError } from "@/lib/serverCadSolids";
 import { sceneShape } from "@/lib/shapeCatalog";
+import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest } from "@/lib/shapeRequests";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(kind: ShapeKind, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -151,6 +152,63 @@ describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(measured.volume / ((2 / 3) * Math.PI * 20 * 20 * 20)).toBeCloseTo(1, 3);
   });
 
+  it("builds a gable roof as a triangular prism", async () => {
+    const measured = await measure(shape("roof"));
+
+    expect(measured.isSolid).toBe(true);
+    expect(measured.bottom).toBeCloseTo(0, 6);
+    expect(measured.width).toBeCloseTo(40, 6);
+    expect(measured.depth).toBeCloseTo(40, 6);
+    expect(measured.volume).toBeCloseTo(0.5 * 40 * 10 * 40, 3);
+  });
+
+  it("builds a wedge with one vertical face", async () => {
+    const measured = await measure(shape("wedge"));
+
+    // Same triangle area as the roof, with the apex over one side instead of
+    // the middle -- so the volume matches but the shape does not.
+    expect(measured.volume).toBeCloseTo(0.5 * 40 * 10 * 40, 3);
+    expect(measured.faces).toBe(5);
+  });
+
+  it("builds a barrel roof as half an ellipse extruded", async () => {
+    const measured = await measure(shape("roundRoof"));
+
+    expect(measured.bottom).toBeCloseTo(0, 6);
+    expect(measured.height).toBeCloseTo(10, 3);
+    // Half an ellipse with semi-axes 20 and 10, extruded 40 deep.
+    expect(measured.volume).toBeCloseTo(0.5 * Math.PI * 20 * 10 * 40, 1);
+  });
+
+  it("builds a square pyramid", async () => {
+    const measured = await measure(shape("pyramid"));
+
+    expect(measured.faces).toBe(5);
+    expect(measured.volume).toBeCloseTo((1 / 3) * 40 * 40 * 10, 3);
+  });
+
+  it("builds a pyramid on a polygon base, fitted to width and depth", async () => {
+    const measured = await measure(shape("pyramid", { sides: 6 }));
+
+    expect(measured.faces).toBe(7);
+    expect(measured.width).toBeCloseTo(40, 3);
+    expect(measured.depth).toBeCloseTo(40, 3);
+    // A positive volume is the check that the sewn faces ended up facing out.
+    expect(measured.volume).toBeGreaterThan(0);
+  });
+
+  it("builds a torus the size the editor draws, centred on the workplane", async () => {
+    const measured = await measure(shape("torus", { height: 10 }));
+
+    // Tube radius from the height, major radius from the smaller footprint,
+    // and centred rather than sitting on the plane -- the one kind that is.
+    expect(measured.width).toBeCloseTo(40, 1);
+    expect(measured.depth).toBeCloseTo(40, 1);
+    expect(measured.height).toBeCloseTo(10, 3);
+    expect(measured.bottom).toBeCloseTo(-5, 3);
+    expect(measured.volume / (2 * Math.PI ** 2 * 15 * 25)).toBeCloseTo(1, 2);
+  });
+
   it("turns a shape the way it sits in the project", async () => {
     const straight = await measure(shape("box", { depth: 10 }));
     const turned = await measure(shape("box", { depth: 10, rotation: 90 }));
@@ -167,6 +225,27 @@ describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(() => exactSolidForShape(cad, shape("gear"))).toThrow(UnbuildableShapeError);
     expect(() => exactSolidForShape(cad, shape("text", { text: "HI" }))).toThrow(/text/);
     expect(() => exactSolidForShape(cad, shape("icosahedron"))).toThrow(/icosahedron/);
+  });
+
+  it("can build every kind the API accepts, except the ones it names", async () => {
+    const cad = await serverCadKernel();
+    // The API accepts more kinds than the server can build exactly -- a gear's
+    // teeth and a letterform are tessellations, not surfaces -- and those are
+    // the only ones it may refuse.
+    const expectedRefusals = ["text", "gear", "icosahedron"];
+
+    const refused = REQUESTABLE_SHAPE_KINDS.filter((kind) => {
+      const subject = shapeFromRequest({ kind, width: 40, depth: 40, height: 20, text: "HI" });
+      if (!subject) return false;
+      try {
+        exactSolidForShape(cad, subject);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    expect([...refused].sort()).toEqual([...expectedRefusals].sort());
   });
 
   it("builds every kind it claims to", async () => {

@@ -26,8 +26,19 @@ import type { WorkplaneShape } from "@/types/sketchforge";
 export const MIN_REQUESTED_DIMENSION = 0.01;
 export const MAX_REQUESTED_DIMENSION = 10_000;
 
-/** The kinds that can be built from parameters alone, with no OCCT and no browser. */
-export const REQUESTABLE_SHAPE_KINDS = ["box", "cube", "cylinder", "text", "loft"] as const;
+/**
+ * The kinds that can be built from parameters alone, with no OCCT and no
+ * browser.
+ *
+ * `cube` is not a kind of its own -- it is a box whose sides match -- but it is
+ * accepted because it is what a caller means. Left out: `mesh`, `sketch`, and
+ * `scribble`, which need geometry or a drawn profile rather than numbers.
+ */
+export const REQUESTABLE_SHAPE_KINDS = [
+  "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus",
+  "tube", "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge",
+  "icosahedron", "text", "loft", "gear",
+] as const;
 
 export type RequestableShapeKind = (typeof REQUESTABLE_SHAPE_KINDS)[number];
 
@@ -49,16 +60,20 @@ function dimension(value: unknown, fallback: number) {
 }
 
 function defaultColorFor(kind: RequestableShapeKind) {
-  if (kind === "cylinder") return "#d97813";
+  if (kind === "cylinder" || kind === "tube" || kind === "ring") return "#d97813";
   if (kind === "loft") return "#5b5ce2";
   return "#d41721";
 }
 
+const KIND_NAMES: Partial<Record<RequestableShapeKind, string>> = {
+  cube: "Cube",
+  halfSphere: "Half sphere",
+  roundRoof: "Round roof",
+  text: "Text",
+};
+
 function defaultNameFor(kind: RequestableShapeKind) {
-  if (kind === "cylinder") return "Cylinder";
-  if (kind === "loft") return "Loft";
-  if (kind === "text") return "Text";
-  return kind === "cube" ? "Cube" : "Box";
+  return KIND_NAMES[kind] ?? `${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
 }
 
 export type ShapeRequest = Record<string, unknown>;
@@ -114,6 +129,49 @@ export function shapeFromRequest(request: ShapeRequest, defaults: { elevation?: 
     return canonicalizeShape(sceneShape({
       ...base,
       sides: Math.max(3, Math.floor(finiteNumber(request.sides, 96))),
+    }));
+  }
+
+  if (kind === "pyramid" || kind === "polygon") {
+    // A pyramid takes a facet count the way a cylinder does; `polygon` is
+    // always the editor's six-sided prism, so its count is not a parameter.
+    return canonicalizeShape(sceneShape({
+      ...base,
+      ...(kind === "pyramid" ? { sides: Math.max(3, Math.floor(finiteNumber(request.sides, 4))) } : {}),
+    }));
+  }
+
+  if (kind === "tube" || kind === "ring") {
+    // `bevel` carries the wall thickness for these two.
+    return canonicalizeShape(sceneShape({
+      ...base,
+      bevel: Math.max(0.1, finiteNumber(request.bevel, 4)),
+    }));
+  }
+
+  if (kind === "cone") {
+    return canonicalizeShape(sceneShape({
+      ...base,
+      topRadius: Math.max(0, finiteNumber(request.topRadius, 0)),
+      sides: request.sides === undefined ? undefined : Math.max(3, Math.floor(finiteNumber(request.sides, 96))),
+    }));
+  }
+
+  if (kind === "gear") {
+    return canonicalizeShape(sceneShape({
+      ...base,
+      teeth: request.teeth === undefined ? undefined : Math.max(3, Math.floor(finiteNumber(request.teeth, 12))),
+      toothSize: request.toothSize === undefined ? undefined : Math.max(0.1, finiteNumber(request.toothSize, 1)),
+      toothWidth: request.toothWidth === undefined ? undefined : Math.max(0.1, finiteNumber(request.toothWidth, 1)),
+      centerHoleSize: request.centerHoleSize === undefined ? undefined : Math.max(0, finiteNumber(request.centerHoleSize, 0)),
+      helixAngle: request.helixAngle === undefined ? undefined : finiteNumber(request.helixAngle, 0),
+    }));
+  }
+
+  if (kind === "halfSphere" || kind === "sphere") {
+    return canonicalizeShape(sceneShape({
+      ...base,
+      steps: request.steps === undefined ? undefined : Math.max(4, Math.floor(finiteNumber(request.steps, 32))),
     }));
   }
 
