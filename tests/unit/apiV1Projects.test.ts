@@ -6,6 +6,7 @@ import { DELETE as deleteProject, GET as getProjects, POST as createProject } fr
 import { DELETE as deleteShape, GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { GET as edges } from "@/app/api/v1/edges/route";
 import { POST as treatments } from "@/app/api/v1/treatments/route";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -325,7 +326,8 @@ describe("REST API v1", () => {
   });
 });
 
-describe("REST API v1 edge treatments", () => {
+// These go through the CAD kernel; see the note in serverCadSolids.test.ts.
+describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   beforeEach(async () => {
     previousRoot = process.env[SERVER_PROJECTS_ENV];
     previousToken = process.env[API_TOKEN_ENV];

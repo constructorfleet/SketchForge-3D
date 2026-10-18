@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
 import { EXACT_SOLID_KINDS, exactSolidForShape, UnbuildableShapeError } from "@/lib/serverCadSolids";
 import { sceneShape } from "@/lib/shapeCatalog";
@@ -32,7 +33,9 @@ async function measure(subject: WorkplaneShape) {
   };
 }
 
-describe("exact solids for stored shapes", () => {
+// Loading the OCCT kernel and building solids takes far longer than the default
+// 5s budget on a cold CI runner, and it is the kernel's time, not the test's.
+describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   it("builds a box at its stored size, sitting on the workplane", async () => {
     const measured = await measure(shape("box"));
 

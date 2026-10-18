@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
 import { applyEdgeTreatment, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
 import { shapeFromRequest } from "@/lib/shapeRequests";
@@ -8,7 +9,8 @@ function box(overrides: Record<string, unknown> = {}) {
   return shapeFromRequest({ kind: "box", width: 40, depth: 40, height: 10, ...overrides }) as WorkplaneShape;
 }
 
-describe("server-side fillet and chamfer", () => {
+// See the note in serverCadSolids.test.ts: the kernel, not the test, needs the time.
+describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   it("lists a box's twelve edges", async () => {
     const edges = await shapeEdges(box());
 
