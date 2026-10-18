@@ -26,6 +26,7 @@ import {
   rectangleRing,
   type ProfilePoint,
 } from "@/lib/stepProfiles";
+import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import { shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/workplaneShapes";
 import type { LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
@@ -201,6 +202,115 @@ function loftSolid(cad: OcctKernel, shape: WorkplaneShape) {
   return loftedProfiles(cad, bottom, top);
 }
 
+
+/** A prism from a cross-section in the XY plane, centred on Z the way the editor draws it. */
+function extrudedCrossSection(cad: OcctKernel, points: ProfilePoint[], depth: number) {
+  const wire = wireThroughPoints(cad, points);
+  const prism = cad.extrude(cad.makeFace(wire), 0, 0, depth);
+  return cad.translate(prism, 0, 0, -depth / 2);
+}
+
+/** A gable roof: a triangular prism with its ridge over the middle. */
+function roofSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const halfWidth = shapeWidth(shape) / 2;
+  return extrudedCrossSection(cad, [
+    [-halfWidth, 0, 0],
+    [halfWidth, 0, 0],
+    [0, shape.height, 0],
+  ], shapeDepth(shape));
+}
+
+/** A wedge: the same prism with its ridge over one side, so one face is vertical. */
+function wedgeSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const halfWidth = shapeWidth(shape) / 2;
+  return extrudedCrossSection(cad, [
+    [-halfWidth, 0, 0],
+    [halfWidth, 0, 0],
+    [halfWidth, shape.height, 0],
+  ], shapeDepth(shape));
+}
+
+/**
+ * A barrel roof: half an ellipse, extruded.
+ *
+ * The editor extrudes a half disc of the shape's half-width and then scales it
+ * in Y to the height, which is an ellipse with those two semi-axes -- so this
+ * builds that ellipse directly rather than a scaled circle.
+ */
+function roundRoofSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const halfWidth = shapeWidth(shape) / 2;
+  const depth = shapeDepth(shape);
+  const arc = cad.makeEllipseArc({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, halfWidth, shape.height, 0, Math.PI);
+  const base = cad.makeLineEdge({ x: -halfWidth, y: 0, z: 0 }, { x: halfWidth, y: 0, z: 0 });
+  const prism = cad.extrude(cad.makeFace(cad.makeWire([arc, base])), 0, 0, depth);
+  return cad.translate(prism, 0, 0, -depth / 2);
+}
+
+/**
+ * A pyramid: a base and one triangle per side, sewn into a solid.
+ *
+ * Lofting the base to an apex vertex gets the volume right but splits every
+ * side in two, leaving a seam down each face that the editor's pyramid does
+ * not have -- and a seam is a selectable edge, so it would show up when
+ * choosing what to fillet. Building the faces outright keeps one per side.
+ *
+ * Four sides is a rectangle; any other count is the regular polygon the editor
+ * builds, fitted to width and depth through the same footprint scale it uses.
+ */
+function pyramidSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const width = shapeWidth(shape);
+  const depth = shapeDepth(shape);
+  const sides = Math.max(3, Math.round(shape.sides ?? 4));
+  let ring: ProfilePoint[];
+  let apex: ProfilePoint;
+  if (sides === 4) {
+    ring = rectangleRing(width, depth, 0);
+    apex = [0, shape.height, 0];
+  } else {
+    const footprint = regularPolygonFootprintScale(width, depth, sides);
+    ring = polygonRing(footprint.x, footprint.z, sides, 0)
+      .map(([x, y, z]): ProfilePoint => [x + footprint.offsetX, y, z + footprint.offsetZ]);
+    apex = [footprint.offsetX, shape.height, footprint.offsetZ];
+  }
+
+  const point = ([x, y, z]: ProfilePoint) => ({ x, y, z });
+  const faces = [cad.makeFace(wireThroughPoints(cad, ring))];
+  for (let index = 0; index < ring.length; index += 1) {
+    const from = ring[index];
+    const to = ring[(index + 1) % ring.length];
+    faces.push(cad.makeFace(cad.makeWire([
+      cad.makeLineEdge(point(from), point(to)),
+      cad.makeLineEdge(point(to), point(apex)),
+      cad.makeLineEdge(point(apex), point(from)),
+    ])));
+  }
+  // Sewing takes the winding it is given, which can leave the solid inside out
+  // -- a negative volume, and normals pointing the wrong way for any boolean
+  // or export that follows.
+  return solidOf(cad, cad.fixFaceOrientations(cad.sewAndSolidify(faces, 1e-6)));
+}
+
+/**
+ * A torus, as the editor sizes one.
+ *
+ * Its tube radius comes from the height and its major radius from the smaller
+ * of width and depth, and it is then stretched so the outer diameter matches
+ * width and depth separately. Unlike every other kind here it is centred on
+ * the workplane rather than sitting on it, which is what the editor draws.
+ */
+function torusSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const width = shapeWidth(shape);
+  const depth = shapeDepth(shape);
+  const tubeRadius = Math.max(0.1, shape.height / 2);
+  const majorRadius = Math.max(0.2, Math.min(width, depth) / 2 - tubeRadius);
+  const ring = cad.rotate(cad.makeTorus(majorRadius, tubeRadius), X_AXIS, Math.PI / 2);
+  const outerDiameter = (majorRadius + tubeRadius) * 2;
+  const scaleX = width / Math.max(0.001, outerDiameter);
+  const scaleZ = depth / Math.max(0.001, outerDiameter);
+  if (Math.abs(scaleX - 1) < 1e-9 && Math.abs(scaleZ - 1) < 1e-9) return ring;
+  return cad.generalTransform(ring, [scaleX, 0, 0, 0, 0, 1, 0, 0, 0, 0, scaleZ, 0]);
+}
+
 /**
  * The shape as an exact solid, sitting on y = 0 and centred on x = z = 0.
  *
@@ -229,6 +339,16 @@ function untransformedSolid(cad: OcctKernel, shape: WorkplaneShape) {
     case "tube":
     case "ring":
       return hollowCylinderSolid(cad, shape);
+    case "roof":
+      return roofSolid(cad, shape);
+    case "wedge":
+      return wedgeSolid(cad, shape);
+    case "roundRoof":
+      return roundRoofSolid(cad, shape);
+    case "pyramid":
+      return pyramidSolid(cad, shape);
+    case "torus":
+      return torusSolid(cad, shape);
     case "halfSphere": {
       // An ellipsoid of the full height, with its lower half cut away, which is
       // the dome the editor draws.
@@ -246,7 +366,10 @@ function untransformedSolid(cad: OcctKernel, shape: WorkplaneShape) {
 }
 
 /** The kinds `exactSolidForShape` can build, for an error message to name. */
-export const EXACT_SOLID_KINDS = ["box", "cylinder", "cone", "sphere", "loft", "polygon", "tube", "ring", "halfSphere"] as const;
+export const EXACT_SOLID_KINDS = [
+  "box", "cylinder", "cone", "sphere", "halfSphere", "loft",
+  "polygon", "tube", "ring", "roof", "roundRoof", "wedge", "pyramid", "torus",
+] as const;
 
 /**
  * The shape as an exact solid, turned the way it sits in the project.
