@@ -31,13 +31,15 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | Method | Path | Does |
 | --- | --- | --- |
 | `GET` | `/projects` | Lists projects: id, name, shape count, revision. |
+| `GET` | `/projects?projectId=` | One project with its shapes and settings. |
 | `POST` | `/projects` | Creates an empty project. Body: `{ "name": "Bracket" }`. |
-| `GET` | `/projects/{id}` | One project with its shapes and settings. |
-| `DELETE` | `/projects/{id}` | Deletes the project and its geometry. |
-| `GET` | `/projects/{id}/shapes` | The project's shapes. |
-| `POST` | `/projects/{id}/shapes` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
-| `PATCH` | `/projects/{id}/shapes/{shapeId}` | Changes the fields you send and leaves the rest. |
-| `DELETE` | `/projects/{id}/shapes/{shapeId}` | Removes one shape. |
+| `DELETE` | `/projects?projectId=` | Deletes the project and its geometry. |
+| `GET` | `/shapes?projectId=` | The project's shapes. |
+| `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
+| `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest. |
+| `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
+
+The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
 ## Describing a shape
 
@@ -54,6 +56,43 @@ Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default
 **Sketch extrusions, fillets, chamfers, and boolean operations are not available here.** Their geometry comes from OCCT, which runs in the editor's worker; the API builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
 
 A locked shape answers `409` to a change or delete; send `locked: false` to unlock it.
+
+## Fillets and chamfers, on the server
+
+The editor rounds and cuts edges in a browser worker: every client downloads a 22 MB CAD kernel and runs the solid modelling on whatever hardware it has. These two endpoints do it on the server instead, which is also the only way a script can ask for geometry that cannot be described as parameters.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| `GET` | `/edges?projectId=&shapeId=` | The shape's edges: index, length, curve type, midpoint. |
+| `POST` | `/treatments?projectId=&shapeId=` | Applies a fillet or chamfer. |
+
+```bash
+# Every edge
+curl -X POST "$HOST/projects/$PROJECT/shapes/$SHAPE/treatments"   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"kind":"fillet","amount":3}'
+
+# Named edges, by the index the edges endpoint gave them
+curl -X POST "$HOST/projects/$PROJECT/shapes/$SHAPE/treatments"   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"kind":"chamfer","amount":2,"angle":30,"edges":[0,1,2,3]}'
+```
+
+`kind` is `fillet` or `chamfer`; `amount` is the radius or distance in mm; `angle` applies to chamfers (45 degrees, the default, is symmetric); `edges` is a list of indexes, or omitted for all of them.
+
+The treated shape keeps its place and its size, and stores the exact geometry alongside the mesh -- so STEP export writes true surfaces rather than triangles, and a further treatment builds on the real solid.
+
+### What it can work from
+
+The server has no mesher, so unlike the editor it cannot start from any shape. It works from:
+
+- **a box**, rebuilt from its dimensions, so the fillet is exact rather than a rounding of a tessellation;
+- **a shape that already carries exact geometry** -- anything previously treated here, or a STEP import;
+- **an imported model's triangles**, sewn back into a solid.
+
+Anything else -- a cylinder, text, a loft, a sketch extrusion -- answers `422` naming the kind, rather than approximating it. Those are parametric in a stored project and only the editor can mesh them.
+
+### When it refuses
+
+A radius or distance that does not fit the geometry answers `422` ("too large for this shape's edges"). This is the common mistake: a 5 mm fillet on a 1 mm plate has nowhere to go. OCCT reports it in milliseconds here rather than grinding, and the project is left exactly as it was.
+
+Stacking treatments works, but OCCT will refuse a second one on edges immediately adjacent to the first -- the surfaces there are already tangent. Treat the edges you want in one request where you can.
 
 ## Example: a plate with a row of holes
 
@@ -76,7 +115,7 @@ for index in range(5):
         "name": f"Hole {index + 1}",
     })
 request = urllib.request.Request(
-    f"http://localhost:3000/api/v1/projects/{project}/shapes",
+    f"http://localhost:3000/api/v1/shapes?projectId={project}",
     data=json.dumps({"shapes": shapes}).encode(),
     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
 )
