@@ -240,7 +240,8 @@
       "migrated": "Moved {count, plural, one {# project} other {# projects}} to server storage",
       "migrateFailed": "Could not move projects to server storage; they are still stored in this browser",
       "badge": "On server",
-      "hint": "Projects are stored on the server at {name}"
+      "hint": "Projects are stored on the server at {name}",
+      "restored": "Server storage is off; restored {count, plural, one {# project} other {# projects}} from this browser"
     }
   },
   "editor": {

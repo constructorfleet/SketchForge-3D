@@ -135,6 +135,10 @@ type ProjectShapeResourceRecord =
     };
 
 const PROJECTS_STORAGE_KEY = "sketchForge.projects";
+// The browser list as it stood when server storage adopted it. Kept so that
+// unsetting SKETCHFORGE_PROJECTS_DIR gives the projects back: IndexedDB still
+// holds their geometry, but without a list nothing would show it.
+const MIGRATED_PROJECTS_STORAGE_KEY = "sketchForge.projects.beforeServerStorage";
 const PROJECT_SHAPES_DB_NAME = "sketchForge.projectShapes";
 const PROJECT_SHAPES_STORE_NAME = "projectShapes";
 const PROJECT_SHAPE_RESOURCES_STORE_NAME = "projectShapeResources";
@@ -507,6 +511,32 @@ function readProjects() {
   return readStoredProjects().projects;
 }
 
+/**
+ * Put the browser list back after server storage has been turned off again.
+ *
+ * Adopting projects onto the server empties the browser list, so a server that
+ * stops answering would otherwise leave a dashboard with nothing on it even
+ * though IndexedDB still holds every project's geometry. Restoring only when
+ * the live list is empty means this can never fight with projects made since.
+ */
+function restoreProjectsFromBeforeServerStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    const backup = window.localStorage.getItem(MIGRATED_PROJECTS_STORAGE_KEY);
+    if (!backup) return null;
+    const current = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+    if (current && current !== "[]") {
+      window.localStorage.removeItem(MIGRATED_PROJECTS_STORAGE_KEY);
+      return null;
+    }
+    window.localStorage.setItem(PROJECTS_STORAGE_KEY, backup);
+    window.localStorage.removeItem(MIGRATED_PROJECTS_STORAGE_KEY);
+    return readStoredProjects().projects;
+  } catch {
+    return null;
+  }
+}
+
 function mergeProjectForStorage(project: DashboardProject, storedProject?: DashboardProject) {
   if (!storedProject) {
     return project;
@@ -722,7 +752,15 @@ export default function Home() {
     let canceled = false;
     void (async () => {
       const listing = await probeServerProjects().catch(() => null);
-      if (canceled || !listing?.enabled) return;
+      if (canceled) return;
+      if (!listing?.enabled) {
+        const restored = restoreProjectsFromBeforeServerStorage();
+        if (restored && restored.length > 0) {
+          setProjects(restored);
+          setDashboardNotice(translate("dashboard.serverStorage.restored", { count: restored.length }));
+        }
+        return;
+      }
 
       // The listing is driven by metadata sidecars, so a project counts as
       // migrated once its sidecar exists. Writing the package first therefore
@@ -767,6 +805,10 @@ export default function Home() {
       setProjects(serverProjects);
       setProjectStorageMode("server");
       try {
+        const browserList = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+        if (browserList && browserList !== "[]") {
+          window.localStorage.setItem(MIGRATED_PROJECTS_STORAGE_KEY, browserList);
+        }
         window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
       } catch {
         // The list is on the server either way; a browser that refuses to

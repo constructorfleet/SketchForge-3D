@@ -222,6 +222,8 @@ The directory *replaces* browser storage rather than mirroring it: the dashboard
 
 Projects already held in a browser are moved up the first time it reaches a server with the directory set, and the dashboard says how many it moved. If any of them cannot be moved, that browser keeps its own storage and says so, rather than carrying on with half a list on the server.
 
+Turning the directory back off restores that browser's own list, so the projects it had before the move reappear rather than the dashboard coming up empty. Anything created while the server held the projects stays on the server.
+
 This needs the server, so it does not apply to a static-export build. Shared projects below are unaffected and remain a separate, explicitly-published library.
 
 ### Shared Docker Projects
