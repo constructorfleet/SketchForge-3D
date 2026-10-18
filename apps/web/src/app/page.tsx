@@ -1141,6 +1141,9 @@ export default function Home() {
         };
       });
       if (!changed) return current;
+      // In server mode the list effect owns the write, and claiming it was
+      // already persisted here would stop the change ever reaching the server.
+      if (serverProjectStorageActive) return next;
       try {
         const storageProjects = mergeProjectsForStorage(next);
         const serialized = JSON.stringify(storageProjects);
