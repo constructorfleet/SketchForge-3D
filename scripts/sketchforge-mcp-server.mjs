@@ -139,6 +139,19 @@ const tools = [
     },
   },
   {
+    name: "sketchforge_distribute_objects",
+    description: "Spread three or more SketchForge objects evenly along an axis, the way the editor's Distribute buttons do. The outermost two keep their places and define the span.",
+    inputSchema: {
+      ...editorTargetSchema,
+      properties: {
+        ...editorTargetSchema.properties,
+        ids: { type: "array", items: { type: "string" }, description: "Object ids to distribute. If omitted, uses the current selection." },
+        axis: { type: "string", enum: ["x", "z"], description: "Axis to spread along. Omit to use whichever axis the objects are already most spread along." },
+        spacing: { type: "string", enum: ["gaps", "centers"], description: "gaps=equal clear space between objects (default); centers=equal centre-to-centre pitch." },
+      },
+    },
+  },
+  {
     name: "sketchforge_align_objects",
     description: "Align two or more SketchForge objects using the same alignment logic as the editor Alignment button.",
     inputSchema: {
@@ -323,6 +336,8 @@ async function callTool(name, args) {
       return bridgeCommand("update_object", args);
     case "sketchforge_align_objects":
       return bridgeCommand("align_objects", args);
+    case "sketchforge_distribute_objects":
+      return bridgeCommand("distribute_objects", args);
     case "sketchforge_group_objects":
       return bridgeCommand("group_objects", args, 30000);
     case "sketchforge_ungroup_objects":

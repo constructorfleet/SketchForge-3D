@@ -183,6 +183,71 @@ export function ToolbarDropToWorkplaneIcon() {
   return <ToolbarCommandImage file="toolbar-drop-workplane.png" className="toolbar-user-art-icon" />;
 }
 
+/**
+ * The trigger for the Distribute menu: three blocks spread across a span.
+ *
+ * It deliberately shows neither measurement -- the menu names those -- only
+ * that this is the control that spaces a row out.
+ */
+export function ToolbarDistributeIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={["toolbar-vector-art-icon", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <rect x="4" y="13" width="8" height="22" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="19" y="13" width="10" height="22" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="36" y="13" width="8" height="22" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <path d="M14.5 24h3M31.5 24h3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Three blocks with equal clear space between them.
+ *
+ * The blocks are deliberately different widths, because that is what tells
+ * even gaps apart from even centres at a glance.
+ */
+export function ToolbarDistributeGapsIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={["toolbar-vector-art-icon", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <rect x="4" y="10" width="7" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="20" y="10" width="11" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="37" y="10" width="7" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      {/* The two gaps, marked between the blocks and the same length. */}
+      <path d="M11.5 38h8M31.5 38h5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M11.5 34v8M19.5 34v8M31.5 34v8M36.5 34v8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The same three blocks, with their centre lines at an equal pitch. */
+export function ToolbarDistributeCentersIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={["toolbar-vector-art-icon", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <rect x="4" y="10" width="8" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="18" y="10" width="12" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      <rect x="36" y="10" width="8" height="20" rx="1.5" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.4" />
+      {/* Centre lines, and the equal distance between them. */}
+      <path d="M8 6v34M24 6v34M40 6v34" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeDasharray="3 3" />
+      <path d="M8 38h16M24 38h16" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ToolbarCenterOnWorkplaneIcon({ className, ...props }: IconProps) {
   return (
     <svg
