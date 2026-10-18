@@ -80,13 +80,24 @@ The treated shape keeps its place and its size, and stores the exact geometry al
 
 ### What it can work from
 
-The server has no mesher, so unlike the editor it cannot start from any shape. It works from:
+Each shape is rebuilt as true geometry from what the project stores, rather than from a mesh of it. A round cylinder is a cylinder -- three faces, one of them a real cylindrical surface -- so a fillet lands on the surface rather than on a 96-sided approximation of it. These kinds are built exactly:
 
-- **a box**, rebuilt from its dimensions, so the fillet is exact rather than a rounding of a tessellation;
-- **a shape that already carries exact geometry** -- anything previously treated here, or a STEP import;
-- **an imported model's triangles**, sewn back into a solid.
+| Kind | Built as |
+| --- | --- |
+| `box` | A box; a tapered one lofts between its two end rectangles. |
+| `cylinder` | A cylinder. A deliberately faceted one (`sides` under 96) is the prism it is; one wider than it is deep is a true ellipse; a tapered one is a cone, or a lofted prism when faceted. |
+| `cone` | A cone, honouring its top radius. |
+| `sphere` | An ellipsoid of its three dimensions. |
+| `halfSphere` | The same, with its lower half cut away. |
+| `loft` | A loft between its two profiles, each at its own size and rotation. |
+| `polygon` | A six-sided prism. |
+| `tube`, `ring` | A cylinder with its bore cut out, at the wall thickness the shape carries. |
 
-Anything else -- a cylinder, text, a loft, a sketch extrusion -- answers `422` naming the kind, rather than approximating it. Those are parametric in a stored project and only the editor can mesh them.
+It also works from **exact geometry a shape already carries** -- anything previously treated, or a STEP import -- and from **an imported model's triangles**, sewn back into a solid.
+
+Other kinds answer `422` naming the kind: `text`, `gear`, `sketch`, `scribble`, `icosahedron`, `pyramid`, `roof`, `roundRoof`, `wedge`, `torus`. Their geometry is either font- or tessellation-derived, or has a convention the server does not yet reproduce exactly, and approximating it would quietly give you a different part. Treat those in the editor.
+
+A shape's rotation is built into the geometry, so a turned shape comes back turned.
 
 ### When it refuses
 

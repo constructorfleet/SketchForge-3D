@@ -6,6 +6,7 @@ import { DELETE as deleteProject, GET as getProjects, POST as createProject } fr
 import { DELETE as deleteShape, GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { GET as edges } from "@/app/api/v1/edges/route";
 import { POST as treatments } from "@/app/api/v1/treatments/route";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -325,7 +326,8 @@ describe("REST API v1", () => {
   });
 });
 
-describe("REST API v1 edge treatments", () => {
+// These go through the CAD kernel; see the note in serverCadSolids.test.ts.
+describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   beforeEach(async () => {
     previousRoot = process.env[SERVER_PROJECTS_ENV];
     previousToken = process.env[API_TOKEN_ENV];
@@ -411,14 +413,30 @@ describe("REST API v1 edge treatments", () => {
   });
 
   it("says what it cannot treat instead of approximating it", async () => {
-    const projectId = await makeProject("Loft");
-    const created = await addShape(projectId, { kind: "loft", width: 20, depth: 20, height: 20 });
+    const projectId = await makeProject("Lettering");
+    const created = await addShape(projectId, { kind: "text", width: 20, depth: 20, height: 20, text: "HI" });
     const shapeId = created.payload.shapes![0].id;
 
     const response = await treat(projectId, shapeId, { kind: "fillet", amount: 1 });
 
     expect(response.status).toBe(422);
-    expect((await response.json() as { error: string }).error).toMatch(/not a loft/);
+    expect((await response.json() as { error: string }).error).toMatch(/text/);
+  });
+
+  it("treats the parametric kinds, not just boxes", async () => {
+    const projectId = await makeProject("Everything");
+    const created = await addShape(projectId, {
+      shapes: [
+        { kind: "cylinder", width: 30, depth: 30, height: 20, name: "Round" },
+        { kind: "cylinder", width: 30, depth: 30, height: 20, sides: 6, name: "Hex" },
+        { kind: "loft", width: 30, depth: 30, height: 20, name: "Loft" },
+      ],
+    });
+
+    for (const shape of created.payload.shapes!) {
+      const response = await treat(projectId, shape.id, { kind: "fillet", amount: 1 });
+      expect(response.status, shape.kind).toBe(200);
+    }
   });
 
   it("advances the revision so an open editor reloads the treated shape", async () => {

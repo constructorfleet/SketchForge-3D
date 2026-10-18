@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
 import { applyEdgeTreatment, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
 import { shapeFromRequest } from "@/lib/shapeRequests";
@@ -8,7 +9,8 @@ function box(overrides: Record<string, unknown> = {}) {
   return shapeFromRequest({ kind: "box", width: 40, depth: 40, height: 10, ...overrides }) as WorkplaneShape;
 }
 
-describe("server-side fillet and chamfer", () => {
+// See the note in serverCadSolids.test.ts: the kernel, not the test, needs the time.
+describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   it("lists a box's twelve edges", async () => {
     const edges = await shapeEdges(box());
 
@@ -113,10 +115,55 @@ describe("server-side fillet and chamfer", () => {
     expect(cad.isSolid(stored)).toBe(true);
   });
 
-  it("says what it cannot do rather than approximating it", async () => {
-    const loft = shapeFromRequest({ kind: "loft", width: 20, depth: 20, height: 20 }) as WorkplaneShape;
+  it("keeps the rotation of a shape whose geometry was already stored", async () => {
+    // Stored geometry is in the shape's own frame, with its rotation applied on
+    // top -- so unlike a rebuilt parametric shape, that rotation has to survive
+    // the treatment or the shape springs back to square.
+    // Filleting only the vertical edges first: a box with every edge filleted
+    // has no line edge left that is not bounded by a fillet surface, which
+    // OCCT rightly refuses to fillet again.
+    const plain = box();
+    const vertical = (await shapeEdges(plain)).filter((edge) => Math.abs(edge.length - 10) < 1e-6);
+    const first = await applyEdgeTreatment(plain, { kind: "fillet", amount: 3, edges: vertical.map((edge) => edge.index) });
+    const stored = { ...plain, cadBrep: first.brep, rotation: 45, rotationZ: 10 } as WorkplaneShape;
+    const edges = await shapeEdges(stored);
+    const untouched = edges.find((edge) => edge.curveType === "line" && edge.length > 30);
 
-    await expect(applyEdgeTreatment(loft, { kind: "fillet", amount: 1 })).rejects.toThrow(/not a loft/);
-    await expect(applyEdgeTreatment(loft, { kind: "fillet", amount: 1 })).rejects.toThrow(ServerCadError);
+    const result = await applyEdgeTreatment(stored, { kind: "fillet", amount: 0.5, edges: [untouched!.index] });
+    const treated = shapeWithCadResult(stored, result);
+
+    expect(treated.rotation).toBe(45);
+    expect(treated.rotationZ).toBe(10);
+  });
+
+  it("says what it cannot do rather than approximating it", async () => {
+    const text = shapeFromRequest({ kind: "text", width: 20, depth: 20, height: 20, text: "HI" }) as WorkplaneShape;
+
+    await expect(applyEdgeTreatment(text, { kind: "fillet", amount: 1 })).rejects.toThrow(/text/);
+    await expect(applyEdgeTreatment(text, { kind: "fillet", amount: 1 })).rejects.toThrow(ServerCadError);
+  });
+
+  it("fillets the kinds that used to need the editor", async () => {
+    const cylinder = shapeFromRequest({ kind: "cylinder", width: 30, depth: 30, height: 20 }) as WorkplaneShape;
+    const hex = shapeFromRequest({ kind: "cylinder", width: 30, depth: 30, height: 20, sides: 6 }) as WorkplaneShape;
+    const loft = shapeFromRequest({ kind: "loft", width: 30, depth: 30, height: 20 }) as WorkplaneShape;
+
+    await expect(applyEdgeTreatment(cylinder, { kind: "fillet", amount: 2 })).resolves.toMatchObject({ triangleCount: expect.any(Number) });
+    await expect(applyEdgeTreatment(hex, { kind: "chamfer", amount: 1 })).resolves.toMatchObject({ triangleCount: expect.any(Number) });
+    await expect(applyEdgeTreatment(loft, { kind: "fillet", amount: 1 })).resolves.toMatchObject({ triangleCount: expect.any(Number) });
+  });
+
+  it("keeps a turned shape turned", async () => {
+    // The geometry is built already turned, so the result must not carry the
+    // rotation as well -- that would turn it twice.
+    const turned = { ...box({ depth: 10 }), rotation: 90 } as WorkplaneShape;
+
+    const result = await applyEdgeTreatment(turned, { kind: "fillet", amount: 1 });
+    const treated = shapeWithCadResult(turned, result);
+
+    expect(treated.rotation).toBe(0);
+    // A quarter turn puts the 40mm side along Z.
+    expect(treated.width).toBeCloseTo(10, 1);
+    expect(treated.depth).toBeCloseTo(40, 1);
   });
 });
