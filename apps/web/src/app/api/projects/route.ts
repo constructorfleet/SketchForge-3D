@@ -1,17 +1,23 @@
-import { randomUUID } from "crypto";
-import { promises as fs } from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
+import { sameOriginRequest } from "@/lib/apiRequests";
+import {
+  deleteProjectFiles,
+  ensureProjectsDirectory,
+  listProjectRecords,
+  projectRecord,
+  readProjectMetadata,
+  readProjectPackage,
+  withProjectLock,
+  writeProjectMetadata,
+  writeProjectPackage,
+  type ProjectMetadata,
+} from "@/lib/serverProjectFiles";
 import {
   SERVER_PROJECTS_ENV,
   safeServerProjectId,
-  serverProjectMetadataFileName,
-  serverProjectPackageFileName,
   serverProjectWriteIsStale,
-  sortedServerProjects,
-  type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
 import { SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 
@@ -20,85 +26,6 @@ export const revalidate = false;
 
 const MAX_METADATA_BYTES = 256 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
-
-// The same shape as a localStorage project entry, so the dashboard can
-// normalise a server record through the path it already has for stored ones.
-type ProjectMetadata = Record<string, unknown>;
-
-function projectsDirectory() {
-  const configured = process.env[SERVER_PROJECTS_ENV]?.trim();
-  return configured ? path.resolve(configured) : null;
-}
-
-/** Deliberately duplicated from the shared-projects route, which is byte-identical to upstream's. */
-function sameOriginRequest(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    const requestUrl = new URL(request.url);
-    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-    const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const host = forwardedHost || request.headers.get("host") || requestUrl.host;
-    const protocol = forwardedProtocol || requestUrl.protocol.replace(/:$/, "");
-    return new URL(origin).origin === `${protocol}://${host}`;
-  } catch {
-    return false;
-  }
-}
-
-async function regularFileStat(filePath: string) {
-  try {
-    const stat = await fs.lstat(filePath);
-    if (stat.isSymbolicLink() || !stat.isFile()) return null;
-    return stat;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-}
-
-async function readMetadata(root: string, projectId: string): Promise<ProjectMetadata | null> {
-  const filePath = path.join(root, serverProjectMetadataFileName(projectId));
-  if (!(await regularFileStat(filePath))) return null;
-  try {
-    const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as ProjectMetadata) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Write through a temporary file in the same directory, so a crash cannot leave a half-written project. */
-async function writeFileAtomically(filePath: string, bytes: Uint8Array | string) {
-  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.tmp`);
-  const handle = await fs.open(temporaryPath, "wx");
-  try {
-    await handle.writeFile(bytes);
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  try {
-    await fs.rename(temporaryPath, filePath);
-  } catch (error) {
-    await fs.unlink(temporaryPath).catch(() => undefined);
-    throw error;
-  }
-}
-
-async function projectRecord(root: string, projectId: string, metadata: ProjectMetadata): Promise<ServerProjectRecord> {
-  const packageStat = await regularFileStat(path.join(root, serverProjectPackageFileName(projectId)));
-  const metadataStat = await regularFileStat(path.join(root, serverProjectMetadataFileName(projectId)));
-  const updatedAt = typeof metadata.updatedAt === "number" && Number.isFinite(metadata.updatedAt)
-    ? metadata.updatedAt
-    : Math.max(packageStat?.mtimeMs ?? 0, metadataStat?.mtimeMs ?? 0);
-  return {
-    projectId,
-    updatedAt,
-    packageBytes: packageStat?.size ?? 0,
-    metadata,
-  };
-}
 
 function disabledResponse() {
   return NextResponse.json(
@@ -112,18 +39,15 @@ function disabledResponse() {
 }
 
 export async function GET(request: Request) {
-  const root = projectsDirectory();
-  if (!root) return disabledResponse();
   try {
-    await fs.mkdir(root, { recursive: true });
+    const root = await ensureProjectsDirectory();
+    if (!root) return disabledResponse();
     const requestedId = new URL(request.url).searchParams.get("projectId");
     if (requestedId !== null) {
       const projectId = safeServerProjectId(requestedId);
       if (!projectId) return errorResponse("errors.projects.invalidId", 400);
-      const filePath = path.join(root, serverProjectPackageFileName(projectId));
-      const stat = await regularFileStat(filePath);
-      if (!stat) return errorResponse("errors.projects.notFound", 404);
-      const bytes = await fs.readFile(filePath);
+      const bytes = await readProjectPackage(root, projectId);
+      if (!bytes) return errorResponse("errors.projects.notFound", 404);
       return new Response(bytes, {
         headers: {
           "Cache-Control": "no-store",
@@ -133,18 +57,8 @@ export async function GET(request: Request) {
       });
     }
 
-    const entries = await fs.readdir(root, { withFileTypes: true });
-    const records = await Promise.all(entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-      .map(async (entry) => {
-        const projectId = safeServerProjectId(entry.name.slice(0, -".json".length));
-        if (!projectId) return null;
-        const metadata = await readMetadata(root, projectId);
-        if (!metadata) return null;
-        return projectRecord(root, projectId, metadata);
-      }));
     return NextResponse.json(
-      { enabled: true, projects: sortedServerProjects(records.filter((record): record is ServerProjectRecord => Boolean(record))) },
+      { enabled: true, projects: await listProjectRecords(root) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -153,8 +67,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const root = projectsDirectory();
-  if (!root) return errorResponse("errors.projects.disabled", 404);
   if (!sameOriginRequest(request)) return errorResponse("errors.projects.sameOrigin", 403);
 
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
@@ -162,9 +74,9 @@ export async function POST(request: Request) {
     return errorResponse("errors.projects.tooLarge", 413);
   }
 
-  let lockHandle: Awaited<ReturnType<typeof fs.open>> | null = null;
-  let lockPath = "";
   try {
+    const root = await ensureProjectsDirectory();
+    if (!root) return errorResponse("errors.projects.disabled", 404);
     const projectId = safeServerProjectId(new URL(request.url).searchParams.get("projectId") ?? "");
     if (!projectId) return errorResponse("errors.projects.invalidId", 400);
 
@@ -198,73 +110,44 @@ export async function POST(request: Request) {
     const revisionField = formData.get("revision");
     const writtenRevision = metadata ?? (typeof revisionField === "string" ? { revision: Number(revisionField) } : null);
 
-    await fs.mkdir(root, { recursive: true });
-    lockPath = path.join(root, `${projectId}.lock`);
-    try {
-      lockHandle = await fs.open(lockPath, "wx");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") return errorResponse("errors.projects.busySaving", 409);
-      throw error;
-    }
+    const locked = await withProjectLock(root, projectId, async () => {
+      const stored = await readProjectMetadata(root, projectId);
+      if (serverProjectWriteIsStale(stored, writtenRevision)) {
+        return errorResponse("errors.projects.changedBeforeSave", 409);
+      }
 
-    const stored = await readMetadata(root, projectId);
-    if (serverProjectWriteIsStale(stored, writtenRevision)) {
-      return errorResponse("errors.projects.changedBeforeSave", 409);
-    }
+      if (packageBytes) await writeProjectPackage(root, projectId, packageBytes);
+      if (metadata) await writeProjectMetadata(root, projectId, metadata);
 
-    if (packageBytes) {
-      await writeFileAtomically(path.join(root, serverProjectPackageFileName(projectId)), packageBytes);
-    }
-    if (metadata) {
-      await writeFileAtomically(path.join(root, serverProjectMetadataFileName(projectId)), `${JSON.stringify(metadata, null, 2)}\n`);
-    }
-
-    const savedMetadata = metadata ?? stored;
-    return NextResponse.json(
-      { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
-      { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
-    );
+      const savedMetadata = metadata ?? stored;
+      return NextResponse.json(
+        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
+        { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
+      );
+    });
+    return locked.busy ? errorResponse("errors.projects.busySaving", 409) : locked.result;
   } catch (error) {
     return caughtErrorResponse(error, "errors.projects.saveFailed", 400);
-  } finally {
-    if (lockHandle) await lockHandle.close().catch(() => undefined);
-    if (lockPath) await fs.unlink(lockPath).catch(() => undefined);
   }
 }
 
 export async function DELETE(request: Request) {
-  const root = projectsDirectory();
-  if (!root) return errorResponse("errors.projects.disabled", 404);
   if (!sameOriginRequest(request)) return errorResponse("errors.projects.sameOrigin", 403);
 
-  let lockHandle: Awaited<ReturnType<typeof fs.open>> | null = null;
-  let lockPath = "";
   try {
+    const root = await ensureProjectsDirectory();
+    if (!root) return errorResponse("errors.projects.disabled", 404);
     const projectId = safeServerProjectId(new URL(request.url).searchParams.get("projectId") ?? "");
     if (!projectId) return errorResponse("errors.projects.invalidId", 400);
 
-    await fs.mkdir(root, { recursive: true });
-    lockPath = path.join(root, `${projectId}.lock`);
-    try {
-      lockHandle = await fs.open(lockPath, "wx");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") return errorResponse("errors.projects.busySaving", 409);
-      throw error;
-    }
-
-    const metadataPath = path.join(root, serverProjectMetadataFileName(projectId));
-    const packagePath = path.join(root, serverProjectPackageFileName(projectId));
-    const existed = Boolean(await regularFileStat(metadataPath)) || Boolean(await regularFileStat(packagePath));
-    if (!existed) return errorResponse("errors.projects.notFound", 404);
-
-    await Promise.all([metadataPath, packagePath].map((filePath) => fs.unlink(filePath).catch((error) => {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    })));
-    return NextResponse.json({ deleted: true, projectId }, { headers: { "Cache-Control": "no-store" } });
+    const locked = await withProjectLock(root, projectId, async () => {
+      const existed = await deleteProjectFiles(root, projectId);
+      return existed
+        ? NextResponse.json({ deleted: true, projectId }, { headers: { "Cache-Control": "no-store" } })
+        : errorResponse("errors.projects.notFound", 404);
+    });
+    return locked.busy ? errorResponse("errors.projects.busySaving", 409) : locked.result;
   } catch (error) {
     return caughtErrorResponse(error, "errors.projects.deleteFailed", 500);
-  } finally {
-    if (lockHandle) await lockHandle.close().catch(() => undefined);
-    if (lockPath) await fs.unlink(lockPath).catch(() => undefined);
   }
 }
