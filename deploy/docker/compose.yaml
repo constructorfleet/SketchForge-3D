@@ -12,6 +12,9 @@ services:
       # in each browser. The volume below is mounted either way, so turning this
       # on needs no other change.
       SKETCHFORGE_PROJECTS_DIR: "${SKETCHFORGE_PROJECTS_DIR:-}"
+      # Set alongside SKETCHFORGE_PROJECTS_DIR to expose the scripting REST API
+      # (docs/REST_API.md). Anyone holding this token can change every project.
+      SKETCHFORGE_API_TOKEN: "${SKETCHFORGE_API_TOKEN:-}"
       SKETCHFORGE_UPDATE_TRIGGER_URL: "${SKETCHFORGE_UPDATE_TRIGGER_URL:-}"
       SKETCHFORGE_UPDATE_ADMIN_KEY: "${SKETCHFORGE_UPDATE_ADMIN_KEY:-}"
       SKETCHFORGE_UPDATE_TRIGGER_TOKEN: "${SKETCHFORGE_UPDATE_TRIGGER_TOKEN:-}"
