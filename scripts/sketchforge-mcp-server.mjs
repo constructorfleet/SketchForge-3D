@@ -61,13 +61,23 @@ const tools = [
   },
   {
     name: "sketchforge_create_shape",
-    description: "Create a box/cube, cylinder, loft, or simple extruded sketch in SketchForge.",
+    description: "Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or thread in SketchForge.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["kind"],
       properties: {
         ...editorTargetSchema.properties,
-        kind: { type: "string", enum: ["box", "cube", "cylinder", "sketch", "loft"] },
+        kind: { type: "string", enum: ["box", "cube", "cylinder", "sketch", "loft", "revolve", "thread"] },
+        profile: {
+          type: "array",
+          description: "For kind revolve: the closed outline to revolve, as [x, z] pairs. x is the distance from the axis, z runs along it. A triangle makes a thread, a rectangle a tube, a polygon a spring.",
+          items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
+        },
+        pitch: { type: "number", description: "For kind revolve/thread: axial rise per turn in mm. 0 is a plain revolve; negative is a left-hand thread." },
+        turns: { type: "number", description: "For kind revolve/thread: how many full turns to sweep (default 8 for a thread)." },
+        diameter: { type: "number", description: "For kind thread: outside diameter in mm (default 8, i.e. M8). The 60-degree ISO profile follows from this and the pitch." },
+        startAngle: { type: "number", description: "For kind revolve: rotation the sweep starts at, in degrees." },
+        sweepAngle: { type: "number", description: "For kind revolve with no pitch: how far round to revolve, in degrees (±360)." },
         name: { type: "string" },
         color: { type: "string" },
         x: { type: "number" },

@@ -22,12 +22,13 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
-  // The OCCT kernel runs server-side for the REST API's fillet and chamfer
-  // operations (upstream #55). Its Emscripten glue loads its own .wasm with
-  // `createRequire`, which does not survive bundling -- the bundled copy fails
-  // at runtime with "createRequire is not a function" -- so Node must require
-  // it from node_modules instead.
-  serverExternalPackages: ["occt-wasm"],
+  // The OCCT kernel and manifold both run server-side for the REST API -- OCCT
+  // for fillet and chamfer, manifold for revolves and threads (upstream #55).
+  // Their Emscripten glue loads its own .wasm with `createRequire`, which does
+  // not survive bundling: the bundled copy fails at runtime with
+  // "createRequire is not a function". Node must require them from node_modules
+  // instead.
+  serverExternalPackages: ["occt-wasm", "manifold-3d"],
   // brepjs (loaded lazily by the STEP exporter) ships an auto-init helper that
   // tries optional kernel backends via guarded `import().catch()`. We only install
   // and use occt-wasm, so silence the resolution warnings for the backends we omit.

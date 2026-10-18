@@ -40,6 +40,7 @@ import {
   normalizeLoftTopSize,
 } from "@/lib/loftGeometry";
 import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/distributeShapes";
+import { metricThreadOutline, parseRevolveRequest, revolvedShapeFromRequest } from "@/lib/revolveRequests";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import {
   ToolbarAlignIcon,
@@ -8153,6 +8154,33 @@ export function SketchForgeEditor({
         const color = mcpString(params.color, kind === "cylinder" ? "#d97813" : kind === "loft" ? "#5b5ce2" : "#d41721");
         const name = mcpString(params.name, kind === "cylinder" ? "Cylinder" : kind === "sketch" ? "Sketch extrusion" : kind === "loft" ? "Loft" : rawKind === "cube" ? "Cube" : "Box");
         let shape: WorkplaneShape;
+        if (rawKind === "revolve" || rawKind === "thread") {
+          // Threads and springs are described by an outline and a pitch, not by
+          // width and height, so they take the same shorthand the REST API does.
+          const parsed = parseRevolveRequest(
+            rawKind === "thread"
+              ? {
+                ...params,
+                profile: params.profile ?? metricThreadOutline(mcpNumber(params.diameter, 8), Math.abs(mcpNumber(params.pitch, 1.25)) || 1.25),
+                pitch: mcpNumber(params.pitch, 1.25),
+                turns: mcpNumber(params.turns, 8),
+              }
+              : params,
+          );
+          if (!parsed.ok) throw new Error(parsed.error);
+          const runtime = await getManifoldRuntime();
+          const revolved = revolvedShapeFromRequest(runtime, parsed, {
+            name: mcpString(params.name, rawKind === "thread" ? "Thread" : "Revolve"),
+            color: mcpString(params.color, "#78b96b"),
+            x,
+            z,
+            elevation,
+            rotation: mcpNumber(params.rotation, 0),
+            hole: params.hole === true,
+          });
+          commitShapes([...currentShapes(), revolved], revolved.id, notice((t) => t("editor.mcp.added", { name: revolved.name })));
+          return { object: mcpShapeSummary(revolved) };
+        }
         if (kind === "sketch") {
           const profile = defaultMcpSketchProfile(width, depth);
           const extruded = await cadShapeFromSketchProfile(profile, height);
