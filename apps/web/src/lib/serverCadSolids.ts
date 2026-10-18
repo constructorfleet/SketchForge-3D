@@ -20,7 +20,6 @@ import {
   normalizeLoftTopSize,
 } from "@/lib/loftGeometry";
 import {
-  ROUND_CYLINDER_SIDES,
   isFacetedCylinder,
   planTaper,
   polygonRing,
