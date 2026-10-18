@@ -289,7 +289,12 @@
       "alreadyCentered": "Selection is already centered on the workplane",
       "centeredOnWorkplane": "{count, plural, one {Centered selection on the workplane} other {Centered # objects on the workplane}}",
       "shapeLocked": "Shape locked",
-      "shapeUnlocked": "Shape unlocked"
+      "shapeUnlocked": "Shape unlocked",
+      "distributeNeedsThree": "Select at least three objects to distribute",
+      "distributeNeedsSpread": "Move the objects apart before distributing them",
+      "distributeBlocked": "Unlock the objects between the outer two before distributing",
+      "distributeAlreadyEven": "Those objects are already evenly spaced",
+      "distributed": "Distributed {count, plural, one {# object} other {# objects}} along {axis}"
     },
     "workplane": {
       "toolActive": "Workplane tool: click a face or empty grid; hold Shift to reverse",
@@ -587,7 +592,13 @@
       "editorMode": "Editor mode",
       "geometry": "Geometry",
       "sketch": "Sketch",
-      "centerOnWorkplane": "Center on workplane"
+      "centerOnWorkplane": "Center on workplane",
+      "distributeGaps": "Equal gaps",
+      "distributeCenters": "Equal pitch",
+      "distribute": "Distribute",
+      "distributeGapsHint": "Same clear space between objects",
+      "distributeCentersHint": "Same distance centre to centre",
+      "distributeHelp": "The same for objects of one size; they differ once the sizes do. The outer two stay put."
     },
     "panel": {
       "import": "Import",
@@ -669,6 +680,11 @@
       "separated": "{count, plural, one {MCP separated {count} part} other {MCP separated {count} parts}}",
       "filleted": "{count, plural, one {Filleted {count} edge by MCP} other {Filleted {count} edges by MCP}}",
       "chamfered": "{count, plural, one {Chamfered {count} edge by MCP} other {Chamfered {count} edges by MCP}}"
+    },
+    "axis": {
+      "x": "X",
+      "y": "Y",
+      "z": "Z"
     }
   },
   "workspace": {

@@ -39,10 +39,14 @@ import {
   normalizeLoftShape,
   normalizeLoftTopSize,
 } from "@/lib/loftGeometry";
+import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/distributeShapes";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import {
   ToolbarAlignIcon,
   ToolbarCenterOnWorkplaneIcon,
+  ToolbarDistributeCentersIcon,
+  ToolbarDistributeGapsIcon,
+  ToolbarDistributeIcon,
   ToolbarChamferIcon,
   ToolbarCaretDownIcon,
   ToolbarCopyIcon,
@@ -7866,6 +7870,63 @@ export function SketchForgeEditor({
     );
   }, [commitShapes, hasSelection, placementWorkplane, selectedIds, shapes, t]);
 
+  /**
+   * Spread the selection out evenly (upstream issue #51).
+   *
+   * The axis is whichever one the selection is already most spread along: a
+   * row of objects along X is a row someone meant to be a row. The outer two
+   * define the span and stay put, which is also why a locked object among them
+   * is no obstacle -- only a locked object in the middle is.
+   */
+  const distributeSelection = useCallback((spacing: DistributeSpacing) => {
+    if (!hasSelection) {
+      setNotice(notice((t) => t("editor.notice.selectShapeFirst")));
+      return;
+    }
+    const selected = selectedShapes.filter((shape) => selectedIds.includes(shape.id));
+    if (selected.length < 3) {
+      setNotice(notice((t) => t("editor.notice.distributeNeedsThree")));
+      return;
+    }
+
+    const entries = selected.map((shape) => {
+      const bounds = meshAabb(shape);
+      return {
+        shape,
+        x: { id: shape.id, min: bounds.minX, max: bounds.maxX, locked: shape.locked },
+        z: { id: shape.id, min: bounds.minZ, max: bounds.maxZ, locked: shape.locked },
+      };
+    });
+    const axis = widestDistributeAxis(entries);
+    if (!axis) {
+      setNotice(notice((t) => t("editor.notice.distributeNeedsSpread")));
+      return;
+    }
+
+    const shifts = distributeShifts(entries.map((entry) => entry[axis]), spacing);
+    if (shifts.length === 0) {
+      setNotice(notice((t) => t(
+        entries.some((entry) => entry[axis].locked && entry.shape.id !== entries[0].shape.id)
+          ? "editor.notice.distributeBlocked"
+          : "editor.notice.distributeAlreadyEven",
+      )));
+      return;
+    }
+
+    const deltaById = new Map(shifts.map((shift) => [shift.id, shift.delta]));
+    commitShapes(
+      shapes.map((shape) => {
+        const delta = deltaById.get(shape.id);
+        if (delta === undefined) return shape;
+        return axis === "x"
+          ? { ...shape, x: cleanNearZero(Number((shape.x + delta).toFixed(4))) }
+          : { ...shape, z: cleanNearZero(Number((shape.z + delta).toFixed(4))) };
+      }),
+      selectedIds,
+      notice((t) => t("editor.notice.distributed", { count: shifts.length, axis: t(`editor.axis.${axis}`) })),
+    );
+  }, [commitShapes, hasSelection, selectedIds, selectedShapes, shapes]);
+
   const centerSelectionOnWorkplane = useCallback(() => {
     if (!hasSelection) {
       setNotice(notice((t) => t("editor.notice.selectShapeFirst")));
@@ -8246,6 +8307,48 @@ export function SketchForgeEditor({
         const updated = nextShapes.find((shape) => shape.id === target.id) as WorkplaneShape;
         commitShapes(nextShapes, target.id, notice((t) => t("editor.mcp.updated", { name: updated.name })));
         return { object: mcpShapeSummary(updated) };
+      }
+
+      if (command.action === "distribute_objects") {
+        const spacing = params.spacing === "centers" ? "centers" : "gaps";
+        const requestedIds = mcpStringArray(params.ids);
+        const ids = requestedIds.length ? requestedIds : selectedIdsRef.current;
+        const selectedForDistribute = currentShapes().filter((shape) => ids.includes(shape.id));
+        if (selectedForDistribute.length < 3) throw new Error("Select at least three objects to distribute");
+        const validIds = selectedForDistribute.map((shape) => shape.id);
+        const entries = selectedForDistribute.map((shape) => {
+          const bounds = meshAabb(shape);
+          return {
+            shape,
+            x: { id: shape.id, min: bounds.minX, max: bounds.maxX, locked: shape.locked },
+            z: { id: shape.id, min: bounds.minZ, max: bounds.maxZ, locked: shape.locked },
+          };
+        });
+        const requestedAxis = params.axis === "x" || params.axis === "z" ? params.axis : null;
+        const axis = requestedAxis ?? widestDistributeAxis(entries);
+        if (!axis) throw new Error("Move the objects apart, or pass axis x or z, before distributing");
+        const shifts = distributeShifts(entries.map((entry) => entry[axis]), spacing);
+        if (shifts.length === 0) {
+          setSelectedIds(validIds);
+          selectedIdsRef.current = validIds;
+          return { moved: 0, axis, spacing, selectedIds: validIds, objects: selectedForDistribute.map(mcpShapeSummary) };
+        }
+        const deltaById = new Map(shifts.map((shift) => [shift.id, shift.delta]));
+        const nextShapes = currentShapes().map((shape) => {
+          const delta = deltaById.get(shape.id);
+          if (delta === undefined) return shape;
+          return axis === "x"
+            ? { ...shape, x: cleanNearZero(Number((shape.x + delta).toFixed(4))) }
+            : { ...shape, z: cleanNearZero(Number((shape.z + delta).toFixed(4))) };
+        });
+        commitShapes(nextShapes, validIds, notice((t) => t("editor.notice.distributed", { count: shifts.length, axis: t(`editor.axis.${axis}`) })));
+        return {
+          moved: shifts.length,
+          axis,
+          spacing,
+          selectedIds: validIds,
+          objects: nextShapes.filter((shape) => validIds.includes(shape.id)).map(mcpShapeSummary),
+        };
       }
 
       if (command.action === "align_objects") {
@@ -9220,6 +9323,7 @@ export function SketchForgeEditor({
         canUngroup={selectedShapes.some((shape) => Boolean(shape.groupedShapes?.length))}
         hasClipboard={clipboard.length > 0 || systemClipboardSupported}
         hasSelection={hasSelection}
+        selectionCount={selectedIds.length}
         hiddenShapeCount={shapes.filter((shape) => shape.hidden).length}
         selectionHidden={hasSelection && selectedShapes.every((shape) => shape.hidden)}
         alignMode={alignMode}
@@ -9255,6 +9359,8 @@ export function SketchForgeEditor({
         onDelete={deleteSelected}
         onDuplicate={duplicateSelected}
         onCenterOnWorkplane={centerSelectionOnWorkplane}
+        onDistributeGaps={() => distributeSelection("gaps")}
+        onDistributeCenters={() => distributeSelection("centers")}
         onDropToWorkplane={dropSelectedToWorkplane}
         onGroup={groupSelected}
         onIntersect={intersectSelected}
@@ -9544,6 +9650,7 @@ function SecondaryToolbar({
   canUndo,
   hasClipboard,
   hasSelection,
+  selectionCount,
   hiddenShapeCount,
   selectionHidden,
   mirrorMode,
@@ -9569,6 +9676,8 @@ function SecondaryToolbar({
   onDelete,
   onDuplicate,
   onCenterOnWorkplane,
+  onDistributeGaps,
+  onDistributeCenters,
   onDropToWorkplane,
   onGroup,
   onIntersect,
@@ -9600,6 +9709,8 @@ function SecondaryToolbar({
   canUndo: boolean;
   hasClipboard: boolean;
   hasSelection: boolean;
+  /** How many objects are selected: distributing needs at least three. */
+  selectionCount: number;
   hiddenShapeCount: number;
   selectionHidden: boolean;
   mirrorMode: boolean;
@@ -9625,6 +9736,8 @@ function SecondaryToolbar({
   onDelete: () => void;
   onDuplicate: () => void;
   onCenterOnWorkplane: () => void;
+  onDistributeGaps: () => void;
+  onDistributeCenters: () => void;
   onDropToWorkplane: () => void;
   onGroup: () => void;
   onIntersect: () => void;
@@ -9645,9 +9758,12 @@ function SecondaryToolbar({
   const [sketchCreateOpen, setSketchCreateOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
+  const [distributeOpen, setDistributeOpen] = useState(false);
+  const [distributeMenuPosition, setDistributeMenuPosition] = useState({ top: 0, left: 0 });
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const sketchCreateMenuRef = useRef<HTMLDivElement>(null);
   const visibilityMenuRef = useRef<HTMLDivElement>(null);
+  const distributeMenuRef = useRef<HTMLDivElement>(null);
   const touchShapeStartRef = useRef<{ id: string; x: number; y: number } | null>(null);
   const suppressNextShapeClickRef = useRef(false);
   const cancelProjectNameEditRef = useRef(false);
@@ -9749,6 +9865,53 @@ function SecondaryToolbar({
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
   }, [visibilityOpen]);
+  useEffect(() => {
+    if (!distributeOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!distributeMenuRef.current?.contains(event.target as Node)) setDistributeOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDistributeOpen(false);
+    };
+    const closeOnViewportChange = () => setDistributeOpen(false);
+    window.addEventListener("pointerdown", closeOnPointerDown);
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [distributeOpen]);
+
+  const toggleDistributeMenu = () => {
+    if (distributeOpen) {
+      setDistributeOpen(false);
+      return;
+    }
+    const triggerBounds = distributeMenuRef.current?.getBoundingClientRect();
+    if (triggerBounds) {
+      const viewportGutter = 12;
+      const menuWidth = Math.min(300, Math.max(0, window.innerWidth - viewportGutter * 2));
+      setDistributeMenuPosition({
+        top: triggerBounds.bottom + 8,
+        left: Math.max(
+          viewportGutter,
+          Math.min(
+            triggerBounds.left + triggerBounds.width / 2 - menuWidth / 2,
+            window.innerWidth - menuWidth - viewportGutter,
+          ),
+        ),
+      });
+    }
+    setVisibilityOpen(false);
+    setShapesOpen(false);
+    setSketchCreateOpen(false);
+    setDistributeOpen(true);
+  };
+
   const toggleVisibilityMenu = () => {
     if (visibilityOpen) {
       setVisibilityOpen(false);
@@ -9810,6 +9973,9 @@ function SecondaryToolbar({
     { id: "drop-to-workplane", label: t("editor.toolbar.dropToWorkplane"), icon: ToolbarDropToWorkplaneIcon, action: onDropToWorkplane, enabled: hasSelection },
     { id: "center-on-workplane", label: t("editor.toolbar.centerOnWorkplane"), icon: ToolbarCenterOnWorkplaneIcon, action: onCenterOnWorkplane, enabled: hasSelection },
   ];
+  // Three objects is the least that has a middle to space out, so the menu
+  // stays shut until there is something for it to do.
+  const canDistribute = selectionCount >= 3;
   const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number]) => {
     const { id, icon: Icon, action, enabled, label } = tool;
     const active = "active" in tool && Boolean(tool.active);
@@ -10002,7 +10168,64 @@ function SecondaryToolbar({
         </div>
         <div className="toolbar-section">
           <div className="toolbar-section-label">{t("editor.toolbar.arrange")}</div>
-          <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
+          <div className="toolbar-section-tools">
+            {arrangeTools.map(renderToolButton)}
+            {/*
+              The two spacings share one button because they are one idea with
+              two answers: they agree for objects of a single size and only
+              diverge once the sizes differ, which is impossible to tell from
+              two icons but easy to read as two named choices.
+            */}
+            <div className="toolbar-menu-anchor" ref={distributeMenuRef}>
+              <button
+                className={`toolbar-icon ${canDistribute ? "" : "disabled"} ${distributeOpen ? "active" : ""}`}
+                type="button"
+                aria-label={t("editor.toolbar.distribute")}
+                title={t("editor.toolbar.distribute")}
+                aria-haspopup="menu"
+                aria-expanded={distributeOpen}
+                disabled={!canDistribute}
+                onClick={toggleDistributeMenu}
+              >
+                <ToolbarDistributeIcon />
+              </button>
+              {distributeOpen ? (
+                <div className="distribute-dropdown" role="menu" aria-label={t("editor.toolbar.distribute")} style={distributeMenuPosition}>
+                  <button
+                    className="distribute-dropdown-action"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setDistributeOpen(false);
+                      onDistributeGaps();
+                    }}
+                  >
+                    <ToolbarDistributeGapsIcon className="distribute-dropdown-icon" />
+                    <span>
+                      <strong>{t("editor.toolbar.distributeGaps")}</strong>
+                      <small>{t("editor.toolbar.distributeGapsHint")}</small>
+                    </span>
+                  </button>
+                  <button
+                    className="distribute-dropdown-action"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setDistributeOpen(false);
+                      onDistributeCenters();
+                    }}
+                  >
+                    <ToolbarDistributeCentersIcon className="distribute-dropdown-icon" />
+                    <span>
+                      <strong>{t("editor.toolbar.distributeCenters")}</strong>
+                      <small>{t("editor.toolbar.distributeCentersHint")}</small>
+                    </span>
+                  </button>
+                  <div className="distribute-dropdown-help">{t("editor.toolbar.distributeHelp")}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
       <div className="toolbar-section toolbar-actions-section">

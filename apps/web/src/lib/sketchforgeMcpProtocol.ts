@@ -80,6 +80,7 @@ export type SketchForgeMcpCommandName =
   | "import_mesh"
   | "update_object"
   | "align_objects"
+  | "distribute_objects"
   | "group_objects"
   | "ungroup_objects"
   | "boolean_cut"
