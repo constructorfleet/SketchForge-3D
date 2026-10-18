@@ -8,12 +8,18 @@ services:
       - "${SKETCHFORGE_PORT:-3000}:3000"
     environment:
       SKETCHFORGE_SHARED_PROJECTS_DIR: /data/projects
+      # Set to /data/my-projects to keep every project on the server instead of
+      # in each browser. The volume below is mounted either way, so turning this
+      # on needs no other change.
+      SKETCHFORGE_PROJECTS_DIR: "${SKETCHFORGE_PROJECTS_DIR:-}"
       SKETCHFORGE_UPDATE_TRIGGER_URL: "${SKETCHFORGE_UPDATE_TRIGGER_URL:-}"
       SKETCHFORGE_UPDATE_ADMIN_KEY: "${SKETCHFORGE_UPDATE_ADMIN_KEY:-}"
       SKETCHFORGE_UPDATE_TRIGGER_TOKEN: "${SKETCHFORGE_UPDATE_TRIGGER_TOKEN:-}"
     volumes:
       - "${SKETCHFORGE_SHARED_PROJECTS_VOLUME:-sketchforge-shared-projects}:/data/projects"
+      - "${SKETCHFORGE_PROJECTS_VOLUME:-sketchforge-projects}:/data/my-projects"
     restart: unless-stopped
 
 volumes:
   sketchforge-shared-projects:
+  sketchforge-projects:
