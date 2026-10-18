@@ -36,6 +36,17 @@ export function presentedApiToken(request: Request) {
 
 export type ApiAuthorization = "ok" | "disabled" | "unauthorized";
 
+/**
+ * Whether a request may use the API.
+ *
+ * The configured-token check comes first deliberately. With no token this
+ * answers without touching the request, which lets a static-export build
+ * prerender a GET route into a file containing the "disabled" message -- an
+ * odd-looking artifact, but the alternative is worse: a handler that always
+ * reads the request cannot be rendered under `output: export` at all, and
+ * fails the whole export build. A static site has no API either way, and what
+ * it serves at those paths says exactly that.
+ */
 export function authorizeApiRequest(request: Request): ApiAuthorization {
   const configured = configuredApiToken();
   if (!configured) return "disabled";

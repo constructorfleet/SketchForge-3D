@@ -30,3 +30,26 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+  static-export:
+    # The Cloudflare deploy workflow builds this, and nothing else checked it:
+    # the export build was broken for months behind a script that silently did
+    # not set STATIC_EXPORT outside Windows.
+    name: Static export build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run export

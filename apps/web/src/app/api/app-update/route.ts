@@ -10,7 +10,9 @@ import { appUpdateIsAvailable, OFFICIAL_UPDATE_GUIDE_URL, type AppUpdateStatus }
 import { SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: it is what this route already is -- every handler here
+// reads request headers -- and declaring it fails the static-export build
+// outright rather than leaving the route out of it.
 export const revalidate = false;
 
 const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Formsmith746/SketchForge-3D/main/package.json";
