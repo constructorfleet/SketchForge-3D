@@ -49,8 +49,22 @@ export async function apiContext(request: Request) {
   return { root };
 }
 
-export function apiProjectId(value: string | undefined) {
-  return value ? safeServerProjectId(decodeURIComponent(value)) : null;
+/**
+ * The project and shape a request names, from its query string.
+ *
+ * Query parameters rather than path segments: a dynamic route segment makes
+ * the whole static-export build fail, because `output: export` has no server
+ * to resolve one against. The dashboard's own routes are shaped this way for
+ * the same reason.
+ */
+export function apiTarget(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const requestedProject = params.get("projectId");
+  const requestedShape = params.get("shapeId");
+  return {
+    projectId: requestedProject ? safeServerProjectId(requestedProject) : null,
+    shapeId: requestedShape?.trim() || null,
+  };
 }
 
 export async function apiJsonBody(request: Request) {

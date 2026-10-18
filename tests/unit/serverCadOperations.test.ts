@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import { serverCadKernel } from "@/lib/serverCadKernel";
+import { applyEdgeTreatment, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
+import { shapeFromRequest } from "@/lib/shapeRequests";
+import type { WorkplaneShape } from "@/types/sketchforge";
+
+function box(overrides: Record<string, unknown> = {}) {
+  return shapeFromRequest({ kind: "box", width: 40, depth: 40, height: 10, ...overrides }) as WorkplaneShape;
+}
+
+describe("server-side fillet and chamfer", () => {
+  it("lists a box's twelve edges", async () => {
+    const edges = await shapeEdges(box());
+
+    expect(edges).toHaveLength(12);
+    expect(edges.map((edge) => edge.index)).toEqual([...Array(12).keys()]);
+    expect(edges.every((edge) => edge.length > 0)).toBe(true);
+    expect(new Set(edges.map((edge) => edge.curveType))).toEqual(new Set(["line"]));
+  });
+
+  it("fillets every edge of a box and returns exact geometry with a mesh of it", async () => {
+    const result = await applyEdgeTreatment(box(), { kind: "fillet", amount: 3 });
+
+    expect(result.brep).toContain("CASCADE Topology");
+    expect(result.triangleCount).toBeGreaterThan(100);
+    expect(result.positions.length).toBe(result.triangleCount * 9);
+    expect(result.normals?.length).toBe(result.positions.length);
+  });
+
+  it("keeps the shape's size and place when it becomes a treated mesh", async () => {
+    const source = { ...box(), x: 15, z: -8, elevation: 4 } as WorkplaneShape;
+    const result = await applyEdgeTreatment(source, { kind: "fillet", amount: 3 });
+
+    const treated = shapeWithCadResult(source, result);
+
+    expect(treated.kind).toBe("mesh");
+    // A fillet only removes material from the edges, so the footprint is kept.
+    expect(treated.width).toBeCloseTo(40, 1);
+    expect(treated.depth).toBeCloseTo(40, 1);
+    expect(treated.height).toBeCloseTo(10, 1);
+    expect(treated).toMatchObject({ x: 15, z: -8, elevation: 4, rotation: 0 });
+    expect(treated.cadBrep).toBe(result.brep);
+    expect(treated.importedMesh?.triangleCount).toBe(result.triangleCount);
+
+    // Centred in X and Z, measured from the bottom in Y.
+    const positions = treated.importedMesh!.positions;
+    const xs = positions.filter((_, index) => index % 3 === 0);
+    const ys = positions.filter((_, index) => index % 3 === 1);
+    expect(Math.min(...xs)).toBeCloseTo(-20, 1);
+    expect(Math.max(...xs)).toBeCloseTo(20, 1);
+    expect(Math.min(...ys)).toBeCloseTo(0, 5);
+  });
+
+  it("chamfers only the edges it was asked for", async () => {
+    const all = await applyEdgeTreatment(box(), { kind: "chamfer", amount: 2 });
+    const one = await applyEdgeTreatment(box(), { kind: "chamfer", amount: 2, edges: [0] });
+
+    expect(one.triangleCount).toBeLessThan(all.triangleCount);
+  });
+
+  it("takes a chamfer angle other than 45 degrees", async () => {
+    const result = await applyEdgeTreatment(box(), { kind: "chamfer", amount: 2, angle: 30, edges: [0] });
+
+    expect(result.triangleCount).toBeGreaterThan(0);
+  });
+
+  it("reports a radius too large for the shape instead of grinding on it", async () => {
+    // The case that hangs the editor: a radius that cannot fit a thin plate.
+    await expect(applyEdgeTreatment(box({ height: 1 }), { kind: "fillet", amount: 5 }))
+      .rejects.toThrow(/too large/);
+  });
+
+  it("refuses a radius of zero or less", async () => {
+    await expect(applyEdgeTreatment(box(), { kind: "fillet", amount: 0 })).rejects.toThrow(/greater than zero/);
+    await expect(applyEdgeTreatment(box(), { kind: "fillet", amount: -1 })).rejects.toThrow(/greater than zero/);
+  });
+
+  it("refuses an edge index that is not there", async () => {
+    await expect(applyEdgeTreatment(box(), { kind: "fillet", amount: 1, edges: [99] })).rejects.toThrow(/between 0 and 11/);
+  });
+
+  it("works from a previous result's exact geometry, so treatments stack", async () => {
+    // Fillet the four vertical edges, then treat an untouched top edge of the
+    // result. This only works because the result is unwrapped to its solid:
+    // OCCT refuses the compound that fillet actually returns.
+    const plain = box();
+    const vertical = (await shapeEdges(plain)).filter((edge) => Math.abs(edge.length - 10) < 1e-6);
+    const first = await applyEdgeTreatment(plain, { kind: "fillet", amount: 3, edges: vertical.map((edge) => edge.index) });
+    const filletedShape = { ...plain, cadBrep: first.brep } as WorkplaneShape;
+
+    const edges = await shapeEdges(filletedShape);
+    const untouched = edges.find((edge) => edge.curveType === "line" && edge.length > 30);
+    expect(edges.length).toBeGreaterThan(12);
+    expect(untouched).toBeDefined();
+
+    const second = await applyEdgeTreatment(filletedShape, { kind: "fillet", amount: 0.5, edges: [untouched!.index] });
+
+    expect(second.brep).not.toBe(first.brep);
+    expect(second.triangleCount).toBeGreaterThan(first.triangleCount);
+  });
+
+  it("stores a solid rather than the compound OCCT hands back", async () => {
+    // Both fillet and chamfer return a compound wrapping the result, and OCCT
+    // refuses a compound as the input to another treatment. Reading a shape
+    // back here unwraps a compound anyway, so this asserts on the stored BREP
+    // itself: anything else reading it -- STEP export, the editor's worker --
+    // should find a solid.
+    const result = await applyEdgeTreatment(box(), { kind: "fillet", amount: 2 });
+
+    const cad = await serverCadKernel();
+    const stored = cad.fromBREP(result.brep);
+    expect(cad.getShapeType(stored)).toBe("solid");
+    expect(cad.isSolid(stored)).toBe(true);
+  });
+
+  it("says what it cannot do rather than approximating it", async () => {
+    const loft = shapeFromRequest({ kind: "loft", width: 20, depth: 20, height: 20 }) as WorkplaneShape;
+
+    await expect(applyEdgeTreatment(loft, { kind: "fillet", amount: 1 })).rejects.toThrow(/not a loft/);
+    await expect(applyEdgeTreatment(loft, { kind: "fillet", amount: 1 })).rejects.toThrow(ServerCadError);
+  });
+});

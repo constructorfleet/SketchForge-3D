@@ -2,10 +2,10 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { GET as getProjects, POST as createProject } from "@/app/api/v1/projects/route";
-import { DELETE as deleteProject, GET as getProject } from "@/app/api/v1/projects/[projectId]/route";
-import { GET as getShapes, POST as createShapes } from "@/app/api/v1/projects/[projectId]/shapes/route";
-import { DELETE as deleteShape, PATCH as patchShape } from "@/app/api/v1/projects/[projectId]/shapes/[shapeId]/route";
+import { DELETE as deleteProject, GET as getProjects, POST as createProject } from "@/app/api/v1/projects/route";
+import { DELETE as deleteShape, GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
+import { GET as edges } from "@/app/api/v1/edges/route";
+import { POST as treatments } from "@/app/api/v1/treatments/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -42,14 +42,6 @@ function authorized(url: string, init: RequestInit = {}) {
   return new Request(`http://localhost${url}`, { ...init, headers });
 }
 
-function projectParams(projectId: string) {
-  return { params: Promise.resolve({ projectId }) };
-}
-
-function shapeParams(projectId: string, shapeId: string) {
-  return { params: Promise.resolve({ projectId, shapeId }) };
-}
-
 async function makeProject(name = "Bracket") {
   const response = await createProject(authorized("/api/v1/projects", { method: "POST", body: JSON.stringify({ name }) }));
   const payload = await response.json() as { project: { id: string } };
@@ -58,8 +50,7 @@ async function makeProject(name = "Bracket") {
 
 async function addShape(projectId: string, shape: Record<string, unknown>) {
   const response = await createShapes(
-    authorized(`/api/v1/projects/${projectId}/shapes`, { method: "POST", body: JSON.stringify(shape) }),
-    projectParams(projectId),
+    authorized(`/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify(shape) }),
   );
   return { status: response.status, payload: await response.json() as { shapes?: Array<{ id: string; kind: string }>; error?: string } };
 }
@@ -125,7 +116,7 @@ describe("REST API v1", () => {
     const created = await addShape(projectId, { kind: "cylinder", width: 8, height: 30, sides: 6, x: 12, name: "Post" });
     expect(created.status).toBe(201);
 
-    const payload = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as {
+    const payload = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as {
       shapes: Array<{ name: string; kind: string; sides?: number; width: number; height: number; x: number }>;
     };
 
@@ -146,7 +137,7 @@ describe("REST API v1", () => {
 
     expect(created.status).toBe(201);
     expect(created.payload.shapes).toHaveLength(3);
-    const listing = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as { shapes: Array<{ name: string }> };
+    const listing = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: Array<{ name: string }> };
     expect(listing.shapes.map((shape) => shape.name)).toEqual(["A", "B", "C"]);
   });
 
@@ -157,23 +148,21 @@ describe("REST API v1", () => {
 
     expect(created.status).toBe(422);
     expect(created.payload.error).toContain("unsupported kind");
-    const listing = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as { shapes: unknown[] };
+    const listing = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: unknown[] };
     expect(listing.shapes).toEqual([]);
   });
 
   it("changes one shape and leaves the others alone", async () => {
     const projectId = await makeProject();
     await addShape(projectId, { shapes: [{ kind: "cube", size: 10, name: "A" }, { kind: "cube", size: 10, name: "B" }] });
-    const before = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as { shapes: Array<{ id: string; name: string }> };
+    const before = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: Array<{ id: string; name: string }> };
     const target = before.shapes[0];
 
     const response = await patchShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${target.id}`, { method: "PATCH", body: JSON.stringify({ height: 42, name: "Taller" }) }),
-      shapeParams(projectId, target.id),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${target.id}`, { method: "PATCH", body: JSON.stringify({ height: 42, name: "Taller" }) }));
 
     expect(response.status).toBe(200);
-    const after = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as {
+    const after = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as {
       shapes: Array<{ id: string; name: string; height: number }>;
     };
     expect(after.shapes.find((shape) => shape.id === target.id)).toMatchObject({ name: "Taller", height: 42 });
@@ -186,12 +175,10 @@ describe("REST API v1", () => {
     const shapeId = created.payload.shapes![0].id;
 
     const response = await deleteShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "DELETE" }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "DELETE" }));
 
     expect(response.status).toBe(200);
-    const listing = await (await getShapes(authorized(`/api/v1/projects/${projectId}/shapes`), projectParams(projectId))).json() as { shapes: unknown[] };
+    const listing = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: unknown[] };
     expect(listing.shapes).toEqual([]);
   });
 
@@ -200,18 +187,12 @@ describe("REST API v1", () => {
     const created = await addShape(projectId, { kind: "cube", size: 10 });
     const shapeId = created.payload.shapes![0].id;
     await patchShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: true }) }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: true }) }));
 
     const blockedPatch = await patchShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "PATCH", body: JSON.stringify({ height: 99 }) }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "PATCH", body: JSON.stringify({ height: 99 }) }));
     const blockedDelete = await deleteShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "DELETE" }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "DELETE" }));
 
     expect(blockedPatch.status).toBe(409);
     expect(blockedDelete.status).toBe(409);
@@ -222,14 +203,10 @@ describe("REST API v1", () => {
     const created = await addShape(projectId, { kind: "cube", size: 10 });
     const shapeId = created.payload.shapes![0].id;
     await patchShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: true }) }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: true }) }));
 
     const response = await patchShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: false }) }),
-      shapeParams(projectId, shapeId),
-    );
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, { method: "PATCH", body: JSON.stringify({ locked: false }) }));
 
     expect(response.status).toBe(200);
   });
@@ -237,12 +214,10 @@ describe("REST API v1", () => {
   it("reports a project, shape, and project id that are not there", async () => {
     const projectId = await makeProject();
 
-    expect((await getProject(authorized("/api/v1/projects/project-missing"), projectParams("project-missing"))).status).toBe(404);
-    expect((await getShapes(authorized("/api/v1/projects/..%2Fescaped/shapes"), projectParams("../escaped"))).status).toBe(400);
+    expect((await getProjects(authorized("/api/v1/projects?projectId=project-missing"))).status).toBe(404);
+    expect((await getShapes(authorized("/api/v1/shapes?projectId=..%2Fescaped"))).status).toBe(400);
     expect((await deleteShape(
-      authorized(`/api/v1/projects/${projectId}/shapes/shape-missing`, { method: "DELETE" }),
-      shapeParams(projectId, "shape-missing"),
-    )).status).toBe(404);
+      authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=shape-missing`, { method: "DELETE" }))).status).toBe(404);
   });
 
   it("advances the project revision so an open dashboard reloads it", async () => {
@@ -343,9 +318,116 @@ describe("REST API v1", () => {
     const projectId = await makeProject();
     await addShape(projectId, { kind: "cube", size: 10 });
 
-    const response = await deleteProject(authorized(`/api/v1/projects/${projectId}`, { method: "DELETE" }), projectParams(projectId));
+    const response = await deleteProject(authorized(`/api/v1/projects?projectId=${projectId}`, { method: "DELETE" }));
 
     expect(response.status).toBe(200);
     expect(await fs.readdir(projectsRoot)).toEqual([]);
+  });
+});
+
+describe("REST API v1 edge treatments", () => {
+  beforeEach(async () => {
+    previousRoot = process.env[SERVER_PROJECTS_ENV];
+    previousToken = process.env[API_TOKEN_ENV];
+    projectsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sketchforge-api-cad-"));
+    process.env[SERVER_PROJECTS_ENV] = projectsRoot;
+    process.env[API_TOKEN_ENV] = TOKEN;
+  });
+
+  afterEach(async () => {
+    if (previousRoot === undefined) delete process.env[SERVER_PROJECTS_ENV];
+    else process.env[SERVER_PROJECTS_ENV] = previousRoot;
+    if (previousToken === undefined) delete process.env[API_TOKEN_ENV];
+    else process.env[API_TOKEN_ENV] = previousToken;
+    await fs.rm(projectsRoot, { recursive: true, force: true });
+  });
+
+  async function boxProject() {
+    const projectId = await makeProject("Filleted");
+    const created = await addShape(projectId, { kind: "box", width: 40, depth: 40, height: 10, name: "Plate" });
+    return { projectId, shapeId: created.payload.shapes![0].id };
+  }
+
+  function treat(projectId: string, shapeId: string, body: Record<string, unknown>) {
+    return treatments(
+      authorized(`/api/v1/treatments?projectId=${projectId}&shapeId=${shapeId}`, { method: "POST", body: JSON.stringify(body) }));
+  }
+
+  it("lists a box's edges", async () => {
+    const { projectId, shapeId } = await boxProject();
+
+    const response = await edges(authorized(`/api/v1/edges?projectId=${projectId}&shapeId=${shapeId}`));
+    const payload = await response.json() as { edges: Array<{ index: number; length: number }> };
+
+    expect(response.status).toBe(200);
+    expect(payload.edges).toHaveLength(12);
+  });
+
+  it("fillets a box and stores exact geometry on the shape", async () => {
+    const { projectId, shapeId } = await boxProject();
+
+    const response = await treat(projectId, shapeId, { kind: "fillet", amount: 3 });
+    const payload = await response.json() as { shape: { kind: string }; triangles: number };
+
+    expect(response.status).toBe(200);
+    expect(payload.shape.kind).toBe("mesh");
+    expect(payload.triangles).toBeGreaterThan(100);
+
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const shape = document?.shapes.find((candidate) => candidate.id === shapeId);
+    expect(shape?.cadBrep).toContain("CASCADE Topology");
+    expect(shape?.importedMesh?.positions.length).toBe(payload.triangles * 9);
+  });
+
+  it("chamfers only the edges it is given", async () => {
+    const { projectId, shapeId } = await boxProject();
+
+    const response = await treat(projectId, shapeId, { kind: "chamfer", amount: 2, edges: [0, 1] });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("reports a radius the geometry cannot take", async () => {
+    const projectId = await makeProject("Thin");
+    const created = await addShape(projectId, { kind: "box", width: 40, depth: 40, height: 1 });
+    const shapeId = created.payload.shapes![0].id;
+
+    const response = await treat(projectId, shapeId, { kind: "fillet", amount: 5 });
+
+    expect(response.status).toBe(422);
+    expect((await response.json() as { error: string }).error).toMatch(/too large/);
+    // The project is left as it was, not half-treated.
+    const document = await readProjectDocument(projectsRoot, projectId);
+    expect(document?.shapes[0].cadBrep).toBeUndefined();
+  });
+
+  it("checks the request before touching the kernel", async () => {
+    const { projectId, shapeId } = await boxProject();
+
+    expect((await treat(projectId, shapeId, { amount: 3 })).status).toBe(400);
+    expect((await treat(projectId, shapeId, { kind: "fillet" })).status).toBe(400);
+    expect((await treat(projectId, shapeId, { kind: "fillet", amount: 3, edges: "some" })).status).toBe(400);
+    expect((await treat(projectId, shapeId, { kind: "fillet", amount: 3, angle: "wide" })).status).toBe(400);
+  });
+
+  it("says what it cannot treat instead of approximating it", async () => {
+    const projectId = await makeProject("Loft");
+    const created = await addShape(projectId, { kind: "loft", width: 20, depth: 20, height: 20 });
+    const shapeId = created.payload.shapes![0].id;
+
+    const response = await treat(projectId, shapeId, { kind: "fillet", amount: 1 });
+
+    expect(response.status).toBe(422);
+    expect((await response.json() as { error: string }).error).toMatch(/not a loft/);
+  });
+
+  it("advances the revision so an open editor reloads the treated shape", async () => {
+    const { projectId, shapeId } = await boxProject();
+    const before = await (await getProjects(authorized("/api/v1/projects"))).json() as { projects: Array<{ revision: number }> };
+
+    await treat(projectId, shapeId, { kind: "fillet", amount: 3 });
+
+    const after = await (await getProjects(authorized("/api/v1/projects"))).json() as { projects: Array<{ revision: number }> };
+    expect(after.projects[0].revision).toBeGreaterThan(before.projects[0].revision);
   });
 });
