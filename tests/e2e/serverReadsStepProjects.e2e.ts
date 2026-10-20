@@ -2,14 +2,14 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { importedShapeFromStepOnKernel } from "@sketchforge/engine/stepImportKernel";
-import { withCadKernel } from "@sketchforge/engine/serverCadKernel";
-import { exportSkfProject } from "@sketchforge/engine/skfProject";
-import { readProjectDocument } from "@sketchforge/engine/serverProjectDocument";
-import { writeProjectMetadata, writeProjectPackage } from "@sketchforge/engine/serverProjectFiles";
-import { editorHistoryEntry } from "@sketchforge/engine/editorHistory";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
-import { projectAssetFromBytes } from "@sketchforge/engine/projectAssets";
+import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { exportSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
+import { readProjectDocument } from "@constructorfleet/sketchforge-engine/serverProjectDocument";
+import { writeProjectMetadata, writeProjectPackage } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
+import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/projectAssets";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**

@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/shapeBounds";
+export * from "@constructorfleet/sketchforge-engine/shapeBounds";

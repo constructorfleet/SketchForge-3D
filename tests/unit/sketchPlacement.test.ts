@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placementWorkplaneFromSurface } from "@sketchforge/engine/placementWorkplane";
+import { placementWorkplaneFromSurface } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { placeSketchExtrusion } from "@/lib/sketchPlacement";
 import type { WorkplaneShape } from "@/types/sketchforge";
 

@@ -19,7 +19,7 @@
         {
           "type": "json",
           "path": "packages/sketchforge-client/package.json",
-          "jsonpath": "$['dependencies']['@sketchforge/engine']"
+          "jsonpath": "$['dependencies']['@constructorfleet/sketchforge-engine']"
         },
         {
           "type": "toml",

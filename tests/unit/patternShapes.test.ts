@@ -5,7 +5,7 @@ import {
   MAX_PATTERN_COUNT,
   MIN_PATTERN_COUNT,
   suggestedLinearStep,
-} from "@sketchforge/engine/patternShapes";
+} from "@constructorfleet/sketchforge-engine/patternShapes";
 
 describe("linear patterns", () => {
   it("makes one fewer copy than the count, since the original is the first", () => {

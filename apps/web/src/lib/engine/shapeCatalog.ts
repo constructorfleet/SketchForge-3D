@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/shapeCatalog";
+export * from "@constructorfleet/sketchforge-engine/shapeCatalog";

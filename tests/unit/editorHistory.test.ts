@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@sketchforge/engine/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@constructorfleet/sketchforge-engine/editorHistory";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

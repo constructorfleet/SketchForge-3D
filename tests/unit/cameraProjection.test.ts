@@ -7,7 +7,7 @@ import {
   perspectiveDistanceForHalfHeight,
   toggledCameraProjection,
 } from "@/lib/cameraProjection";
-import { DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@sketchforge/engine/workplaneSettings";
+import { DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 
 const FOV = 38;
 

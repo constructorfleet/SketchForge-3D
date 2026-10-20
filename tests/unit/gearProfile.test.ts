@@ -15,7 +15,7 @@ import {
   normalizeGearToothSize,
   normalizeGearToothWidth,
   normalizeGearType,
-} from "@sketchforge/engine/gearProfile";
+} from "@constructorfleet/sketchforge-engine/gearProfile";
 import type { GearType } from "@/types/sketchforge";
 
 // Direct coverage of the gear's pure half, now that `gearProfile` can be imported without the

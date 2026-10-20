@@ -1,9 +1,9 @@
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { editorHistoryEntry } from "@sketchforge/engine/editorHistory";
-import { makeShapeFromAsset, toolbarShapeAssets } from "@sketchforge/engine/shapeCatalog";
-import type { SkfProjectExportInput } from "@sketchforge/engine/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
+import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { makeShapeFromAsset, toolbarShapeAssets } from "@constructorfleet/sketchforge-engine/shapeCatalog";
+import type { SkfProjectExportInput } from "@constructorfleet/sketchforge-engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 
 // The UI language must only change what is shown, never what is saved. The store and the serializer are loaded
 // fresh per language so a serializer that started reading the language would see the switch.

@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/primitiveGeometry";
+export * from "@constructorfleet/sketchforge-engine/primitiveGeometry";

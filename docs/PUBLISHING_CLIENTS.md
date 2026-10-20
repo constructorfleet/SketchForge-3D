@@ -7,10 +7,10 @@ All three are published by `.github/workflows/release.yml`, from the same `v<ver
 | Package | Registry | Version |
 | --- | --- | --- |
 | `@constructorfleet/sketchforge3d` | npm | the release version |
-| `@sketchforge/engine` | npm | the release version |
+| `@constructorfleet/sketchforge-engine` | npm | the release version |
 | `sketchforge3d` | PyPI | the release version |
 
-The packages carry the app's version rather than their own. The npm job publishes `@sketchforge/engine` before `@constructorfleet/sketchforge3d`, whose local MCP mode depends on that exact engine version. The workflow also runs from the Actions tab (`workflow_dispatch`) with the version typed in, and has switches there to publish only some artifacts -- which is how to recover from a release where one registry upload failed after the Docker image succeeded.
+The packages carry the app's version rather than their own. The npm job publishes `@constructorfleet/sketchforge-engine` before `@constructorfleet/sketchforge3d`, whose local MCP mode depends on that exact engine version. The workflow also runs from the Actions tab (`workflow_dispatch`) with the version typed in, and has switches there to publish only some artifacts -- which is how to recover from a release where one registry upload failed after the Docker image succeeded.
 
 ## How a release happens
 
@@ -60,8 +60,8 @@ Neither of these can be set up from the repository; both need an account action.
 
 ### npm
 
-1. Sign in to npmjs.com as an owner of both the `@constructorfleet` and `@sketchforge` scopes.
-2. **Access Tokens** -> **Generate New Token** -> **Granular Access Token** (classic "Automation" also works). Give it **Read and write** on packages in both scopes, and an expiry you are willing to rotate.
+1. Sign in to npmjs.com as an owner of the `@constructorfleet` scope.
+2. **Access Tokens** -> **Generate New Token** -> **Granular Access Token** (classic "Automation" also works). Give it **Read and write** on packages in the `@constructorfleet` scope, and an expiry you are willing to rotate.
 3. In GitHub, **Settings -> Secrets and variables -> Actions -> New repository secret**:
    - Name: `NPM_TOKEN`
    - Value: the token from step 2.

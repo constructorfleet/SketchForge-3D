@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/domain/cameraProjection";
+export * from "@constructorfleet/sketchforge-engine/domain/cameraProjection";

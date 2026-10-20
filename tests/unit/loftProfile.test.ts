@@ -16,7 +16,7 @@ import {
   shapeCorners,
   shapePoint,
   smootherstep,
-} from "@sketchforge/engine/loftProfile";
+} from "@constructorfleet/sketchforge-engine/loftProfile";
 import type { LoftProfileShape } from "@/types/sketchforge";
 
 // These were only ever reachable through `createLoftGeometry`, which meant every assertion about

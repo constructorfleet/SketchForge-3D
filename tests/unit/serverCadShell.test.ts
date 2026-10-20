@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
-import { serverCadKernel } from "@sketchforge/engine/serverCadKernel";
-import { applyEdgeTreatment, shapeWithCadResult, ServerCadError } from "@sketchforge/engine/serverCadOperations";
-import { applyShell, shapeFaces } from "@sketchforge/engine/serverCadShell";
-import { sceneShape } from "@sketchforge/engine/shapeCatalog";
-import { shapeFromRequest } from "@sketchforge/engine/shapeRequests";
+import { serverCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { applyEdgeTreatment, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { applyShell, shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
+import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
+import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /** A 20 mm cube, because every number in this file is a closed form of one. */

@@ -7,4 +7,4 @@ export {
   type ErrorKey,
   type ErrorResponseFields,
   type LocalizedErrorPayload,
-} from "@sketchforge/engine/support/i18n/LocalizedError";
+} from "@constructorfleet/sketchforge-engine/support/i18n/LocalizedError";

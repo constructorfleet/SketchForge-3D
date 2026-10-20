@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { appendEditorHistorySnapshot, editorHistoryEntry } from "@sketchforge/engine/editorHistory";
+import { appendEditorHistorySnapshot, editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
 import { createKeyboardMovementInteraction, moveShapesByKeyboard, type KeyboardMovementEvent } from "@/lib/keyboardMovement";
-import { horizontalPlacementWorkplane, type PlacementWorkplane } from "@sketchforge/engine/placementWorkplane";
-import { keyboardNudgeStep } from "@sketchforge/engine/workplaneSettings";
+import { horizontalPlacementWorkplane, type PlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
+import { keyboardNudgeStep } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(id = "box", locked = false): WorkplaneShape {

@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/sphereTessellation";
+export * from "@constructorfleet/sketchforge-engine/sphereTessellation";
