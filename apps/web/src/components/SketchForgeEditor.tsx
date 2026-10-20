@@ -8460,6 +8460,50 @@ export function SketchForgeEditor({
         return { object: mcpShapeSummary(updated) };
       }
 
+      if (command.action === "pattern_objects") {
+        const kind = params.kind === "circular" ? "circular" : "linear";
+        const requestedIds = mcpStringArray(params.ids);
+        const ids = requestedIds.length ? requestedIds : selectedIdsRef.current;
+        const sources = currentShapes().filter((shape) => ids.includes(shape.id));
+        if (sources.length === 0) throw new Error("Select at least one object to repeat");
+
+        const bounds = boundsForShapes(sources);
+        const origin = { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
+        const count = mcpNumber(params.count, 4);
+        const placements = kind === "linear"
+          ? linearPatternPlacements({ count, stepX: mcpNumber(params.stepX, 0), stepZ: mcpNumber(params.stepZ, 0) })
+          : circularPatternPlacements({
+            count,
+            centerX: mcpNumber(params.centerX, 0),
+            centerZ: mcpNumber(params.centerZ, 0),
+            sweepAngle: mcpNumber(params.sweepAngle, 360),
+            rotateCopies: params.rotateCopies !== false,
+          }, origin);
+        if (placements.length === 0) {
+          throw new Error(kind === "linear"
+            ? "A row needs a stepX or stepZ, or every copy lands on the original"
+            : "A ring needs a sweepAngle other than zero");
+        }
+
+        const copies = placements.flatMap((placement) => sources.map((shape) => {
+          const clone = cloneWorkplaneShapeTreeWithFreshIds(shape, "pattern");
+          return canonicalizeShape({
+            ...clone,
+            x: cleanNearZero(Number((clone.x + placement.dx).toFixed(4))),
+            z: cleanNearZero(Number((clone.z + placement.dz).toFixed(4))),
+            rotation: placement.rotation === 0 ? clone.rotation : cleanRotationDegrees(clone.rotation + placement.rotation),
+          });
+        }));
+        const copyIds = copies.map((shape) => shape.id);
+        commitShapes([...currentShapes(), ...copies], copyIds, notice((t) => t("editor.notice.patterned", { count: copies.length })));
+        return {
+          created: copies.length,
+          kind,
+          selectedIds: copyIds,
+          objects: copies.map(mcpShapeSummary),
+        };
+      }
+
       if (command.action === "distribute_objects") {
         const spacing = params.spacing === "centers" ? "centers" : "gaps";
         const requestedIds = mcpStringArray(params.ids);
