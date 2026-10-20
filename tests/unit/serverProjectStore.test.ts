@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  openableProjectIds,
   safeServerProjectId,
   serverProjectRevision,
   serverProjectWriteIsStale,
@@ -60,6 +61,34 @@ describe("server project listing order", () => {
     const projects = [record("older", 100), record("newest", 300)];
     sortedServerProjects(projects);
     expect(projects.map((entry) => entry.projectId)).toEqual(["older", "newest"]);
+  });
+});
+
+describe("which list says a project exists", () => {
+  const stored = [{ id: "browser-only" }];
+  const live = [{ id: "server-only" }];
+
+  it("asks localStorage in browser mode", () => {
+    const openable = openableProjectIds("browser", { stored, live });
+
+    expect(openable.has("browser-only")).toBe(true);
+    expect(openable.has("server-only")).toBe(false);
+  });
+
+  it("asks the live list in server mode", () => {
+    // The regression this exists for: in server mode localStorage is empty by
+    // design, so a check against it called every project missing -- which
+    // emptied the dashboard every time one was clicked.
+    const openable = openableProjectIds("server", { stored: [], live });
+
+    expect(openable.has("server-only")).toBe(true);
+    expect(openable.size).toBe(1);
+  });
+
+  it("does not fall back to localStorage in server mode", () => {
+    const openable = openableProjectIds("server", { stored, live });
+
+    expect(openable.has("browser-only")).toBe(false);
   });
 });
 
