@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, unzip, zip, type AsyncZippable } from "fflate";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { editorHistoryEntry, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
+import { editorHistoryEntry, hydrateEditorHistoryState, liveEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
 import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "@/lib/placementWorkplane";
 import { importedShapeFromObj } from "@/lib/objImport";
 import { normalizeProjectAsset, sha256Hex } from "@/lib/projectAssets";
@@ -795,7 +795,7 @@ function unzipAsync(bytes: Uint8Array) {
 }
 
 export async function exportSkfProject(input: SkfProjectExportInput) {
-  const hydrated = hydrateEditorHistoryState(input.shapes, input.history, input.historyIndex);
+  const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex);
   if (hydrated.entries.length > SKF_LIMITS.states) throw new LocalizedError("errors.skf.tooManyStates");
   const exportEntries = hydrated.entries.map((entry) => {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
@@ -1385,7 +1385,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
   }
   const history = document.history.entries.map((entry) => editorHistoryEntry(restoredStates.get(entry.stateId) ?? [], entry.selectedObjectIds));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
-  const hydrated = hydrateEditorHistoryState(shapes, history, document.history.index);
+  const hydrated = liveEditorHistoryState(shapes, history, document.history.index);
   if (hydrated.entries.length !== history.length || hydrated.index !== document.history.index) throw new LocalizedError("errors.skf.historyRestoreLoss");
   return {
     sourceProjectId: document.metadata.projectId,

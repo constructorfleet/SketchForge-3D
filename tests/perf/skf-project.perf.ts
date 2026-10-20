@@ -64,3 +64,39 @@ it("benchmarks autosave after loading a large project with duplicated V1 edges",
   expect(savedFiles["project.json"].length).toBeLessThan(legacyJsonBytes / 100);
   expect(loaded.history).toHaveLength(80);
 });
+
+// The benchmark above shares every resource object across its 80 history
+// entries, so the fingerprint cache hides the cost of re-deriving them. A real
+// project is wide as well as deep: many distinct shapes, each with its own
+// geometry, and a history of small edits to them. That is the shape of the
+// autosave stall reported upstream (#97), so measure it directly.
+it("benchmarks autosave of a wide scene with a deep history", async () => {
+  const shapeCount = 200;
+  const historyDepth = 60;
+  const baseShapes: WorkplaneShape[] = Array.from({ length: shapeCount }, (_, index) => ({
+    id: `shape-${index}`, name: `Shape ${index}`, kind: "mesh", color: "#223344",
+    x: index % 20, z: Math.floor(index / 20), size: 10, width: 10, depth: 10, height: 10, rotation: 0,
+    cadDisplayEdgesVersion: 2,
+    cadDisplayEdges: [{ points: Array.from({ length: 600 }, (_, point) => Math.sin(index * 600 + point)) }],
+  }));
+  const history = Array.from({ length: historyDepth }, (_, step) => editorHistoryEntry(
+    baseShapes.map((shape, index) => (index === step % shapeCount ? { ...shape, x: shape.x + step } : shape)),
+    [],
+  ));
+  const active = history[historyDepth - 1];
+  const input: SkfProjectExportInput = {
+    projectName: "Wide scene benchmark", createdAt: 1_700_000_000_000, modifiedAt: 1_700_000_100_000,
+    // The editor's `shapes` state is a different array from the active entry's
+    // own canonicalized copy, so do not hand the exporter that array.
+    shapes: [...active.shapes], history, historyIndex: historyDepth - 1, assets: [],
+    workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0, compressionLevel: 1,
+  };
+  const rows: Array<Record<string, string | number>> = [];
+  for (const pass of ["First autosave", "Repeated autosave"]) {
+    const start = performance.now();
+    const saved = await exportSkfProject(input);
+    rows.push({ step: pass, elapsedMs: Math.round(performance.now() - start), archiveBytes: saved.length });
+  }
+  console.table(rows);
+  expect(rows[0].archiveBytes).toBeGreaterThan(0);
+});
