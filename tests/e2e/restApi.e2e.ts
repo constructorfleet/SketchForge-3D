@@ -53,7 +53,18 @@ beforeAll(async () => {
   origin = `http://127.0.0.1:${port}`;
   server = spawn("npx", ["next", "dev", "apps/web", "-p", String(port)], {
     cwd: process.cwd(),
-    env: { ...process.env, SKETCHFORGE_API_TOKEN: TOKEN, SKETCHFORGE_PROJECTS_DIR: projectsDir },
+    env: {
+      ...process.env,
+      // The config puts the dev compiler in `.next-dev` only when NODE_ENV says
+      // development, and Next leaves an NODE_ENV that is already set alone --
+      // under vitest that is `test`, so this dev server would build into
+      // `.next` and fight the production build `productionApi.e2e.ts` runs.
+      // The symptom is the other suite's build failing, or this one dying with
+      // "Cannot find module for page: /_document" when its chunks vanish.
+      NODE_ENV: "development",
+      SKETCHFORGE_API_TOKEN: TOKEN,
+      SKETCHFORGE_PROJECTS_DIR: projectsDir,
+    },
     stdio: "ignore",
   });
 
