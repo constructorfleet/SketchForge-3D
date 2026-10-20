@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@/lib/serverCadKernel";
-import { applyEdgeTreatment, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
+import { applyEdgeTreatment, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
 import { sceneShape } from "@/lib/shapeCatalog";
 import { shapeFromRequest } from "@/lib/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -241,5 +241,35 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     // A quarter turn puts the 40mm side along Z.
     expect(treated.width).toBeCloseTo(10, 1);
     expect(treated.depth).toBeCloseTo(40, 1);
+  });
+});
+
+describe("cadResultIsValid", () => {
+  it("accepts a solid", async () => {
+    const cad = await serverCadKernel();
+    const solid = cad.makeBoxFromCorners({ x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 10 });
+    expect(cadResultIsValid(cad, solid)).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("accepts a cut that split one solid into two bodies", async () => {
+    // The reason this does not ask `isSolid`: a cut can legitimately leave
+    // several bodies, which is what `POST /parts` separates. Requiring a single
+    // solid here would refuse a real result as invalid.
+    const cad = await serverCadKernel();
+    const plate = cad.makeBoxFromCorners({ x: -20, y: 0, z: -10 }, { x: 20, y: 10, z: 10 });
+    const slot = cad.makeBoxFromCorners({ x: -2, y: -1, z: -11 }, { x: 2, y: 11, z: 11 });
+    const halves = cad.cutAll(plate, [slot]);
+
+    expect(cad.getSubShapes(halves, "solid")).toHaveLength(2);
+    expect(cad.isSolid(halves)).toBe(false);
+    expect(cadResultIsValid(cad, halves)).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("reports invalid rather than throwing when the kernel refuses the question", () => {
+    const throwing = { isValid: () => { throw new Error("no"); } } as unknown as Parameters<typeof cadResultIsValid>[0];
+    expect(cadResultIsValid(throwing, 0 as never)).toBe(false);
+
+    const refusing = { isValid: () => false } as unknown as Parameters<typeof cadResultIsValid>[0];
+    expect(cadResultIsValid(refusing, 0 as never)).toBe(false);
   });
 });

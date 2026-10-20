@@ -18,7 +18,7 @@
 import type { Matrix4 } from "three";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "@/lib/serverCadKernel";
-import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError } from "@/lib/serverCadOperations";
+import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "@/lib/serverCadOperations";
 import { UnbuildableShapeError } from "@/lib/serverCadSolids";
 import { createLocalId } from "@/lib/localIds";
 import type { MeshData } from "@/lib/meshTransform";
@@ -97,11 +97,25 @@ function singleSolid(cad: OcctKernel, shape: ShapeHandle) {
  * spanning two touching plates goes through both, rather than through whichever
  * one happened to be cut first.
  */
-function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[]) {
+type CutOutcome = {
+  cut: ShapeHandle;
+  /** Volume of everything fused together, before any hole was taken out. */
+  fusedVolume: number;
+  /** Volume left afterwards. Equal to `fusedVolume` when no hole met the solid. */
+  cutVolume: number;
+};
+
+function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[]): CutOutcome {
   const solidHandles = solids.map((shape) => placedSolidForShape(cad, shape));
   const holeHandles = holes.map((shape) => placedSolidForShape(cad, shape));
-  const fused = solidHandles.length === 1 ? solidHandles[0] : cad.fuseAll(solidHandles);
-  return singleSolid(cad, cad.cutAll(singleSolid(cad, fused), holeHandles));
+  const fused = singleSolid(cad, solidHandles.length === 1 ? solidHandles[0] : cad.fuseAll(solidHandles));
+  // Measured, because `cutAll` returns the solid untouched when nothing met it
+  // and says nothing about having done so. The worker path has reported these
+  // two volumes since it was written; this one did not, so a hole that missed
+  // was stored and answered as a successful cut.
+  const fusedVolume = cad.getVolume(fused);
+  const cut = singleSolid(cad, cad.cutAll(fused, holeHandles));
+  return { cut, fusedVolume, cutVolume: cad.getVolume(cut) };
 }
 
 /**
@@ -127,7 +141,21 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
   let result;
   try {
     result = await withCadKernel((cad) => {
-      const cut = cutSolids(cad, solids, holes);
+      const { cut, fusedVolume, cutVolume } = cutSolids(cad, solids, holes);
+      // The same threshold the editor uses to reject a cut that removed
+      // nothing, so the two paths agree about what counts as a cut. A script
+      // has no picture to check this against, which makes answering 200 with
+      // an unchanged solid worse here than it would be in the editor.
+      if (cutVolume >= fusedVolume - 1e-6) {
+        throw new ServerCadError("None of the holes meet the solid, so there is nothing to cut.");
+      }
+      // Asked before the result is stored, not after. The exact geometry goes
+      // into `cadBrep`, which a later fillet or a STEP export reads, so storing
+      // something the kernel calls invalid defers the failure to whoever opens
+      // the project next.
+      if (!cadResultIsValid(cad, cut)) {
+        throw new ServerCadError("That cut produced geometry the kernel reports as invalid.");
+      }
       const meshed = meshedCadResult(cad, cut);
       const bounds = boundsForPositions(meshed.positions);
       if (!bounds) return { meshed, brep: null };

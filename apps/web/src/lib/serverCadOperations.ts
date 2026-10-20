@@ -83,6 +83,23 @@ function asciiStlFromPositions(positions: number[]) {
   return lines.join("\n");
 }
 
+/**
+ * Whether the kernel considers a shape sound.
+ *
+ * Deliberately does not require a single solid, which `isValidSolid` below
+ * does: a cut can split one solid into several bodies -- that is what
+ * `POST /parts` exists to separate -- so a compound is a legitimate result and
+ * must not be refused as invalid. Same semantics as the CAD modifier worker's
+ * own check, so the two paths agree about what a usable result is.
+ */
+export function cadResultIsValid(cad: OcctKernel, shape: ShapeHandle) {
+  try {
+    return Boolean(cad.isValid(shape));
+  } catch {
+    return false;
+  }
+}
+
 function isValidSolid(cad: OcctKernel, shape: ShapeHandle) {
   try {
     return cad.isSolid(shape) && Boolean(cad.isValid(shape));
