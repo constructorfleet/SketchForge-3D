@@ -54,6 +54,13 @@ export async function POST(request: Request) {
 
     const outcome = await buildGroupFromSelection(operands);
     if ("error" in outcome) return apiError(outcome.error, outcome.status, "geometry_failed");
+    // Nothing was removed, so this is not the operation the caller asked for.
+    // Refused before the project is written, and refused rather than answered
+    // with the solid unchanged, which is the one reply a script cannot tell
+    // from success. The editor treats the same case as a failed cut.
+    if (outcome.cutRemovedNothing) {
+      return apiError("None of the holes meet the solid, so there is nothing to cut.", 422, "geometry_failed");
+    }
 
     const shapes = [...document.shapes.filter((shape) => !operandIds.has(shape.id)), outcome.group];
     const written = await writeProjectDocument(context.root, projectId, document, shapes);
