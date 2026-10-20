@@ -1,7 +1,6 @@
-import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
+import { apiContext, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
 import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
-import { readProjectDocument } from "@/lib/serverProjectDocument";
-import { shapeEdges, ServerCadError } from "@/lib/serverCadOperations";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -14,17 +13,11 @@ export async function GET(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
   if (!shapeId) return apiErrors.shapeIdRequired();
 
-  const document = await readProjectDocument(context.root, projectId);
-  if (!document) return apiErrors.projectNotFound();
-  const shape = document.shapes.find((candidate) => candidate.id === shapeId);
-  if (!shape) return apiErrors.shapeNotFound();
-
-  try {
-    return apiJson({ edges: await shapeEdges(shape) });
-  } catch (error) {
-    if (error instanceof ServerCadError) return apiError(error.message, error.status, "cad_failed");
-    return apiError("The CAD kernel could not read that shape.", 500, "cad_failed");
+  const edges = await apiEngine(context.root).edges(projectId, shapeId);
+  if (!edges.ok) {
+    return apiEngineError(edges.failure, { oneShape: true, cadFailed: "The CAD kernel could not read that shape." });
   }
+  return apiJson({ edges: edges.value });
 }
 
 /**

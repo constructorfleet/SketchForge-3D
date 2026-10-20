@@ -4,7 +4,7 @@ import {
   cadBrepTransformForShape,
   cadModifierPrimitiveForAnalyticBox,
   cadModifierPrimitiveForBakedShape,
-} from "@/lib/cadBakeMetadata";
+} from "@/lib/engine/cadBakeMetadata";
 import { cadTransformRequiresGeneralTransform } from "@/lib/cadModifierRuntime";
 import type { WorkplaneShape } from "@/types/sketchforge";
 

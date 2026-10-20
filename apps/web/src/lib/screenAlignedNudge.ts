@@ -1,4 +1,4 @@
-import type { PlacementWorkplane } from "@/lib/placementWorkplane";
+import type { PlacementWorkplane } from "@/lib/engine/placementWorkplane";
 
 export type CameraOrientation = {
   yawDegrees: number;

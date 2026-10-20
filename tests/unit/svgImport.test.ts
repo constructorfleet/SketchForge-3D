@@ -8,7 +8,7 @@ import {
   normalizeSvgUseReferences,
   validateClosedSolidTriangleSoup,
   validateSvgSourcePreflight,
-} from "@/lib/svgImport";
+} from "@/lib/engine/svgImport";
 
 function shapePath(points: Array<[number, number]>, options: { closed?: boolean; fill?: string; fillOpacity?: number; opacity?: number; stroke?: string; strokeOpacity?: number; strokeWidth?: number } = {}) {
   const path = new THREE.ShapePath();

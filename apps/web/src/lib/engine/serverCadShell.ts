@@ -28,8 +28,8 @@
  */
 
 import type { OcctKernel, ShapeHandle, Vec3 } from "occt-wasm";
-import { withCadKernel } from "@/lib/serverCadKernel";
-import { meshedCadResult, orientedSolidForShape, ServerCadError, type ServerCadResult } from "@/lib/serverCadOperations";
+import { withCadKernel } from "@/lib/engine/serverCadKernel";
+import { meshedCadResult, orientedSolidForShape, ServerCadError, type ServerCadResult } from "@/lib/engine/serverCadOperations";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**

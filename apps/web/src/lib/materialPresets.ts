@@ -12,7 +12,10 @@
  * the readout is the solid-part weight, which is the upper bound and the usual
  * thing a designer wants when picking a size or a material.
  */
-import type { MessageKey, Translator } from "@/i18n";
+// React-free i18n entry points only: `@/i18n` re-exports `useTranslations`, and
+// `lib/engine/workplaneSettings` reaches this module for its normalizers.
+import type { MessageKey } from "@/i18n/locales";
+import type { Translator } from "@/i18n/translator";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type MaterialId = "pla" | "petg" | "abs" | "asa" | "tpu" | "pa12" | "pc" | "resin";

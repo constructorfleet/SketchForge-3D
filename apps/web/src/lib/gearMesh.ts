@@ -17,7 +17,7 @@ import {
   normalizeGearToothSize,
   normalizeGearToothWidth,
   normalizeGearType,
-} from "@/lib/gearProfile";
+} from "@/lib/engine/gearProfile";
 import type { GearType } from "@/types/sketchforge";
 
 export type GearGeometryOptions = {

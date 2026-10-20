@@ -7,7 +7,7 @@
  * dashboard its copy is behind.
  */
 
-import { appendEditorHistorySnapshot, editorHistoryEntry, type EditorHistoryEntry } from "@/lib/editorHistory";
+import { appendEditorHistorySnapshot, editorHistoryEntry, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import {
   projectRecord,
   readProjectMetadata,
@@ -15,12 +15,12 @@ import {
   writeProjectMetadata,
   writeProjectPackage,
   type ProjectMetadata,
-} from "@/lib/serverProjectFiles";
-import { exportSkfProject, importSkfProject } from "@/lib/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
-import { horizontalPlacementWorkplane } from "@/lib/placementWorkplane";
+} from "@/lib/engine/serverProjectFiles";
+import { exportSkfProject, importSkfProject } from "@/lib/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { horizontalPlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
-import type { PlacementWorkplane } from "@/lib/placementWorkplane";
+import type { PlacementWorkplane } from "@/lib/engine/placementWorkplane";
 
 export type ProjectDocument = {
   metadata: ProjectMetadata;

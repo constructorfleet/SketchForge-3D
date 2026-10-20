@@ -1,4 +1,4 @@
-import type { MeshPoint } from "@/lib/meshCoordinates";
+import type { MeshPoint } from "@/lib/engine/meshCoordinates";
 
 export type ObjExportMesh = {
   name: string;

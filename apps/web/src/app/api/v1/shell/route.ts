@@ -1,9 +1,6 @@
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
-import { applyShell } from "@/lib/serverCadShell";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -54,29 +51,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const locked = await withProjectLock(context.root, projectId, async () => {
-    const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiErrors.projectNotFound();
-    const shape = document.shapes.find((candidate) => candidate.id === shapeId);
-    if (!shape) return apiErrors.shapeNotFound();
-    if (shape.locked) return apiErrors.shapeLocked();
-
-    let hollowed;
-    try {
-      const result = await applyShell(shape, { thickness, openFaces: faces });
-      hollowed = shapeWithCadResult(shape, result);
-    } catch (error) {
-      if (error instanceof ServerCadError) return apiError(error.message, error.status, "cad_failed");
-      return apiError("The CAD kernel could not complete that operation.", 500, "cad_failed");
-    }
-
-    const shapes = document.shapes.map((candidate) => (candidate.id === shapeId ? hollowed : candidate));
-    const written = await writeProjectDocument(context.root, projectId, document, shapes);
-    return apiJson({
-      shape: apiShapeSummary(hollowed),
-      triangles: hollowed.importedMesh?.triangleCount ?? 0,
-      revision: written.revision,
-    });
+  const hollowed = await apiEngine(context.root).shell(projectId, shapeId, { thickness, openFaces: faces });
+  if (!hollowed.ok) return apiEngineError(hollowed.failure, { oneShape: true });
+  return apiJson({
+    shape: apiShapeSummary(hollowed.value.shape),
+    triangles: hollowed.value.shape.importedMesh?.triangleCount ?? 0,
+    revision: hollowed.value.revision,
   });
-  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

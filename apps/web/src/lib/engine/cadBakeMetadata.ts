@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { WorkplaneShape } from "@/types/sketchforge";
 import type { CadModifierPrimitivePart } from "@/lib/cadModifierTypes";
-import { mirrorSign, resizedImportedCoordinates, shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
+import { mirrorSign, resizedImportedCoordinates, shapeDepth, shapeWidth } from "@/lib/engine/workplaneShapes";
 
 export type BakedCadMetadataFrame = {
   centerX: number;

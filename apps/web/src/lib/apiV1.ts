@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { authorizeApiRequest, API_TOKEN_ENV } from "@/lib/apiTokens";
-import { ensureProjectsDirectory } from "@/lib/serverProjectFiles";
+import { ensureProjectsDirectory } from "@/lib/engine/serverProjectFiles";
 import { SERVER_PROJECTS_ENV, safeServerProjectId } from "@/lib/serverProjectStore";
 
 export const API_V1_PREFIX = "/api/v1";

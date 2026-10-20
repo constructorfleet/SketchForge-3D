@@ -1,5 +1,5 @@
-import { canonicalizeShape } from "@/lib/workplaneShapes";
-import { createLocalId } from "@/lib/localIds";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
+import { createLocalId } from "@/lib/engine/localIds";
 import {
   DEFAULT_GEAR_CENTER_HOLE_SIZE,
   DEFAULT_GEAR_HELIX_ANGLE,
@@ -14,14 +14,14 @@ import {
   normalizeGearToothSize,
   normalizeGearToothWidth,
   normalizeGearType,
-} from "@/lib/gearProfile";
+} from "@/lib/engine/gearProfile";
 import {
   DEFAULT_LOFT_BOTTOM_SHAPE,
   DEFAULT_LOFT_LAYERS,
   DEFAULT_LOFT_ROTATION,
   DEFAULT_LOFT_SEGMENTS,
   DEFAULT_LOFT_TOP_SHAPE,
-} from "@/lib/loftProfile";
+} from "@/lib/engine/loftProfile";
 import type { ShapeAsset, ShapeCustomization, ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 export type ToolbarShapeAsset = ShapeAsset & { menuIcon: string };

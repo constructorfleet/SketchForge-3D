@@ -13,13 +13,13 @@ import {
   writeProjectMetadata,
   writeProjectPackage,
   type ProjectMetadata,
-} from "@/lib/serverProjectFiles";
+} from "@/lib/engine/serverProjectFiles";
 import {
   SERVER_PROJECTS_ENV,
   safeServerProjectId,
   serverProjectWriteIsStale,
 } from "@/lib/serverProjectStore";
-import { SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfProject";
+import { SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 
 export const runtime = "nodejs";
 export const revalidate = false;

@@ -1,7 +1,7 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { withProjectLock } from "@/lib/engine/serverProjectFiles";
 import {
   isRevolveShape,
   outlineFromProfile,
@@ -9,10 +9,10 @@ import {
   rebuiltRevolveShape,
   resolveThreadRequest,
   revolvedShapeFromRequest,
-} from "@/lib/revolveRequests";
-import { serverManifoldRuntime } from "@/lib/serverManifoldRuntime";
-import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest, shapeWithRequestedChanges } from "@/lib/shapeRequests";
-import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
+} from "@/lib/engine/revolveRequests";
+import { serverManifoldRuntime } from "@/lib/engine/serverManifoldRuntime";
+import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest, shapeWithRequestedChanges } from "@/lib/engine/shapeRequests";
+import { normalizeSketchRevolveSettings } from "@/lib/engine/sketchRevolve";
 import type { SketchRevolveSettings, WorkplaneShape } from "@/types/sketchforge";
 
 export const runtime = "nodejs";

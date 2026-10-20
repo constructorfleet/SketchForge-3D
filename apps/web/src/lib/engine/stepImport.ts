@@ -1,6 +1,6 @@
 import type { WorkplaneShape } from "@/types/sketchforge";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { importedShapeFromTriangleSoup } from "@/lib/stlImport";
+import { importedShapeFromTriangleSoup } from "@/lib/engine/stlImport";
 import { loadBrepWithOcct } from "@/lib/brepKernel";
 
 const STEP_EXTENSIONS = new Set(["step", "stp"]);

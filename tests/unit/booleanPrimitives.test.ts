@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/booleanPrimitives";
-import { transformMesh, type MeshData } from "@/lib/meshTransform";
+import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/engine/booleanPrimitives";
+import { transformMesh, type MeshData } from "@/lib/engine/meshTransform";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

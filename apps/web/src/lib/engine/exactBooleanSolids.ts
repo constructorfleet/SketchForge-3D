@@ -20,7 +20,7 @@
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import type { CadModifierExactPart, CadModifierMeshPart } from "@/lib/cadModifierTypes";
-import { exactSolidForShape } from "@/lib/serverCadSolids";
+import { exactSolidForShape } from "@/lib/engine/cadSolids";
 
 /** Linear deflection for the mesh drawn from an exact cut. Matches the server's. */
 export const EXACT_BOOLEAN_MESH_DEFLECTION = 0.1;

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
+import { regularPolygonFootprintScale } from "@/lib/engine/regularPolygonFootprint";
 
 /**
  * The mesh primitives the editor draws, in one place.

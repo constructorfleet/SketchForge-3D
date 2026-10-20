@@ -17,8 +17,8 @@ import {
 import { textFontLabel } from "@/components/workplane/ShapeInspector";
 import { gearCenterHoleLimits, gearToothPitch } from "@/lib/gearGeometry";
 import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, snapGridLabel, WORKSPACE_UNIT_OPTIONS, workspaceScaleLabel, workspaceUnitsLabel } from "@/lib/measurementUnits";
-import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/shapeCatalog";
-import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION } from "@/lib/workplaneSettings";
+import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
+import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOLUTION_SIDES, MIN_CUSTOM_SHAPE_DIMENSION } from "@/lib/engine/workplaneSettings";
 import type { GearType, GridSize, ShapeCustomization, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;

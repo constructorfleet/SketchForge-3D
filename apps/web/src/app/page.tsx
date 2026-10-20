@@ -27,16 +27,16 @@ import {
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
-import { hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
+import { hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
-import { createLocalId } from "@/lib/localIds";
+import { createLocalId } from "@/lib/engine/localIds";
 import {
   horizontalPlacementWorkplane,
   normalizePlacementWorkplane,
   placementWorkplaneFingerprint,
   type PlacementWorkplane,
-} from "@/lib/placementWorkplane";
-import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/projectAssets";
+} from "@/lib/engine/placementWorkplane";
+import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
 import {
   deleteServerProject,
@@ -47,9 +47,9 @@ import {
   saveServerProjectPackage,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
-import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
+import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 type AppView = "dashboard" | "editor";
@@ -1370,7 +1370,7 @@ export default function Home() {
           const bytes = new Uint8Array(await file.arrayBuffer());
           const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
           const parsedShape = isStep
-            ? await import("@/lib/stepImport").then(({ importedShapeFromStep }) => importedShapeFromStep(file.name, buffer))
+            ? await import("@/lib/engine/stepImport").then(({ importedShapeFromStep }) => importedShapeFromStep(file.name, buffer))
             : isObj
               ? importedShapeFromObj(file.name, new TextDecoder().decode(bytes))
               : isSvg

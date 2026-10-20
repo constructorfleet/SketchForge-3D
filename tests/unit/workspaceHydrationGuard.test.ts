@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceHydrationSyncDecision } from "@/lib/workplaneSettings";
+import { workspaceHydrationSyncDecision } from "@/lib/engine/workplaneSettings";
 
 /**
  * Models the two effects in WorkplaneViewport that share

@@ -3,7 +3,7 @@
  *
  * Every primitive in this editor is built twice over: once as a three.js mesh
  * for the viewport and the mesh boolean fallbacks, and once as an OCCT solid in
- * `serverCadSolids.ts` for the REST API, the exact cut and every edge treatment.
+ * `cadSolids.ts` for the REST API, the exact cut and every edge treatment.
  * Two dispatches over the same `shape.kind` union, and until this file nothing
  * checked that they agreed about what a roof is. They are not required to agree
  * triangle for triangle -- one tessellates a curve and the other does not -- but
@@ -38,11 +38,11 @@ import {
   createRoundRoofGeometry,
   createTorusGeometry,
   createWedgeGeometry,
-} from "@/lib/primitiveGeometry";
-import { withCadKernel } from "@/lib/serverCadKernel";
-import { exactSolidForShape } from "@/lib/serverCadSolids";
-import { sceneShape } from "@/lib/shapeCatalog";
-import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
+} from "@/lib/engine/primitiveGeometry";
+import { withCadKernel } from "@/lib/engine/serverCadKernel";
+import { exactSolidForShape } from "@/lib/engine/cadSolids";
+import { sceneShape } from "@/lib/engine/shapeCatalog";
+import { shapeDepth, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 import type * as THREE from "three";
 import { measureMesh } from "../unit/support/meshMeasure";

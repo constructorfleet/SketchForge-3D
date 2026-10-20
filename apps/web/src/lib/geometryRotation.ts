@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import type { PlacementWorkplane } from "@/lib/placementWorkplane";
-import { cleanNearZero, cleanRotationDegrees } from "@/lib/workplaneShapes";
+import type { PlacementWorkplane } from "@/lib/engine/placementWorkplane";
+import { cleanNearZero, cleanRotationDegrees } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export const GEOMETRY_ROTATION_STEP_DEGREES = 45;

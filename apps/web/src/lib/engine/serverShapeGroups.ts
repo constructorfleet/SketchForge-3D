@@ -16,8 +16,8 @@
  */
 
 import * as THREE from "three";
-import { createLocalId } from "@/lib/localIds";
-import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
+import { createLocalId } from "@/lib/engine/localIds";
+import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
 import {
   canonicalizeShape,
   cleanNearZero,
@@ -29,7 +29,7 @@ import {
   shapeOverallFootprintDimensions,
   shapeWidth,
   withHoleMode,
-} from "@/lib/workplaneShapes";
+} from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type ShapeBounds = {

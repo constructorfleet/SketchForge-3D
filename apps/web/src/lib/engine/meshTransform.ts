@@ -5,7 +5,7 @@ import {
   mirroredAxisCount,
   shapeHasTaper,
   shapeTaperScaleAt,
-} from "@/lib/workplaneShapes";
+} from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type Vec3 = [number, number, number];

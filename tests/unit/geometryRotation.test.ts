@@ -7,7 +7,7 @@ import {
   geometryRotationDelta,
   rotatedGeometryShapePatch,
 } from "@/lib/geometryRotation";
-import { horizontalPlacementWorkplane, placementWorkplaneFromSurface } from "@/lib/placementWorkplane";
+import { horizontalPlacementWorkplane, placementWorkplaneFromSurface } from "@/lib/engine/placementWorkplane";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

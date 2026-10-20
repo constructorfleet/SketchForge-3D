@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
 import { appUpdateIsAvailable, OFFICIAL_UPDATE_GUIDE_URL, type AppUpdateStatus } from "@/lib/appUpdates";
-import { SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
+import { SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 
 export const runtime = "nodejs";
 // No `force-dynamic`: it is what this route already is -- every handler here

@@ -1,13 +1,13 @@
 import { strFromU8, strToU8, unzip, zip, type AsyncZippable } from "fflate";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { editorHistoryEntry, hydrateEditorHistoryState, liveEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
-import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "@/lib/placementWorkplane";
-import { importedShapeFromObj } from "@/lib/objImport";
-import { normalizeProjectAsset, sha256Hex } from "@/lib/projectAssets";
-import { canonicalizeShape } from "@/lib/workplaneShapes";
-import { importedShapeFromStl } from "@/lib/stlImport";
-import { importedShapeFromSvg } from "@/lib/svgImport";
-import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
+import { editorHistoryEntry, hydrateEditorHistoryState, liveEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
+import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "@/lib/engine/placementWorkplane";
+import { importedShapeFromObj } from "@/lib/engine/objImport";
+import { normalizeProjectAsset, sha256Hex } from "@/lib/engine/projectAssets";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
+import { importedShapeFromStl } from "@/lib/engine/stlImport";
+import { importedShapeFromSvg } from "@/lib/engine/svgImport";
+import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/engine/workplaneSettings";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -1207,7 +1207,7 @@ async function defaultSourceImporter(asset: ProjectAsset) {
   if (asset.sourceFormat === "obj") return importedShapeFromObj(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "svg") return importedShapeFromSvg(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "step") {
-    const { importedShapeFromStep } = await import("@/lib/stepImport");
+    const { importedShapeFromStep } = await import("@/lib/engine/stepImport");
     return (await importedShapeFromStep(asset.name, exactArrayBuffer(asset.bytes))).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   }
   throw new LocalizedError("errors.skf.sourceFormatUnsupported");

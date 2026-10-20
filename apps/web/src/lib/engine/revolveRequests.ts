@@ -15,9 +15,9 @@
  */
 
 import type { ManifoldToplevel } from "manifold-3d";
-import { createLocalId } from "@/lib/localIds";
-import { sceneShape } from "@/lib/shapeCatalog";
-import { buildSketchRevolveMesh, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
+import { createLocalId } from "@/lib/engine/localIds";
+import { sceneShape } from "@/lib/engine/shapeCatalog";
+import { buildSketchRevolveMesh, normalizeSketchRevolveSettings } from "@/lib/engine/sketchRevolve";
 import {
   coreOverlapForPitch,
   DEFAULT_THREAD_SIZE,
@@ -26,8 +26,8 @@ import {
   threadGeometry,
   threadSize,
   threadTurnsForLength,
-} from "@/lib/threadCatalog";
-import { canonicalizeShape } from "@/lib/workplaneShapes";
+} from "@/lib/engine/threadCatalog";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
 import type { SketchProfile, SketchRevolveSettings, WorkplaneShape } from "@/types/sketchforge";
 
 /** Turns to sweep when a request says neither turns nor a length. */

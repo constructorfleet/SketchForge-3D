@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editorHistoryEntry } from "@/lib/editorHistory";
+import { editorHistoryEntry } from "@/lib/engine/editorHistory";
 import { compactProjectShapeState, hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry } from "@/lib/projectShapePersistence";
 import type { WorkplaneShape } from "@/types/sketchforge";
 

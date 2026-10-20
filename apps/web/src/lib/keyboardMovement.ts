@@ -1,6 +1,6 @@
-import type { PlacementWorkplane } from "@/lib/placementWorkplane";
+import type { PlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import { DEFAULT_CAMERA_ORIENTATION, screenAlignedNudge, type CameraOrientation } from "@/lib/screenAlignedNudge";
-import { cleanNearZero } from "@/lib/workplaneShapes";
+import { cleanNearZero } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type KeyboardMovementEvent = Pick<KeyboardEvent, "key" | "repeat" | "ctrlKey" | "metaKey" | "shiftKey">;

@@ -38,8 +38,8 @@ import {
   createWedgeGeometry,
   putGeometryOnBase,
   type PrimitiveGeometryOptions,
-} from "@/lib/primitiveGeometry";
-import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
+} from "@/lib/engine/primitiveGeometry";
+import { regularPolygonFootprintScale } from "@/lib/engine/regularPolygonFootprint";
 import { measureMesh, meshExtents } from "./support/meshMeasure";
 
 const W = 41;
@@ -229,7 +229,7 @@ describe("tessellated curves", () => {
       expect(value, `torus centroid on ${"xyz"[axis]}`).toBeCloseTo(0, 6);
     });
     // The one kind that is not sitting on y = 0 -- which the exact builder in
-    // `serverCadSolids.ts` matches, and which `putGeometryOnBase` then fixes.
+    // `cadSolids.ts` matches, and which `putGeometryOnBase` then fixes.
     expectExtents(createTorusGeometry(W, H, D), -H / 2, "torus");
   });
 });

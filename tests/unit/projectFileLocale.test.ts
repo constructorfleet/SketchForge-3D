@@ -1,9 +1,9 @@
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { editorHistoryEntry } from "@/lib/editorHistory";
-import { makeShapeFromAsset, toolbarShapeAssets } from "@/lib/shapeCatalog";
-import type { SkfProjectExportInput } from "@/lib/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
+import { editorHistoryEntry } from "@/lib/engine/editorHistory";
+import { makeShapeFromAsset, toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
+import type { SkfProjectExportInput } from "@/lib/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 
 // The UI language must only change what is shown, never what is saved. The store and the serializer are loaded
 // fresh per language so a serializer that started reading the language would see the switch.
@@ -17,7 +17,7 @@ async function loadFor(systemLanguage: string) {
   vi.resetModules();
   const store = await import("@/i18n/store");
   store.initLanguage();
-  const { exportSkfProject } = await import("@/lib/skfProject");
+  const { exportSkfProject } = await import("@/lib/engine/skfProject");
   return { locale: store.getLocale(), exportSkfProject };
 }
 

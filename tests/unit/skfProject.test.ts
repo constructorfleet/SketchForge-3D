@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { editorHistoryEntry } from "@/lib/editorHistory";
-import { placementWorkplaneFromSurface } from "@/lib/placementWorkplane";
-import { projectAssetFromBytes } from "@/lib/projectAssets";
-import * as projectAssets from "@/lib/projectAssets";
-import { canonicalizeShape } from "@/lib/workplaneShapes";
+import { editorHistoryEntry } from "@/lib/engine/editorHistory";
+import { placementWorkplaneFromSurface } from "@/lib/engine/placementWorkplane";
+import { projectAssetFromBytes } from "@/lib/engine/projectAssets";
+import * as projectAssets from "@/lib/engine/projectAssets";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
 import {
   exportSkfProject,
   importSkfProject,
@@ -14,8 +14,8 @@ import {
   SKF_SCHEMA_ID,
   type SkfProjectDocumentV1,
   type SkfProjectExportInput,
-} from "@/lib/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
+} from "@/lib/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(kind: ShapeKind, id = `${kind}-1`, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

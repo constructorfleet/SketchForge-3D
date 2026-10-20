@@ -1,8 +1,8 @@
 import type { WorkplaneShape } from "@/types/sketchforge";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
-import { cadBrepTransformForShape } from "@/lib/cadBakeMetadata";
-import { exportYawDegrees, isFacetedCylinder, planTaper, polygonRing, type ProfilePoint } from "@/lib/stepProfiles";
+import { shapeDepth, shapeWidth } from "@/lib/engine/workplaneShapes";
+import { cadBrepTransformForShape } from "@/lib/engine/cadBakeMetadata";
+import { exportYawDegrees, isFacetedCylinder, planTaper, polygonRing, type ProfilePoint } from "@/lib/engine/stepProfiles";
 import { loadBrepWithOcct, type Brep, type BrepSolid } from "@/lib/brepKernel";
 
 export type SkippedShape = {

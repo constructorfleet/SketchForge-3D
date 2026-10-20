@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { createLocalId } from "@/lib/localIds";
-import { zUpToSketchForge } from "@/lib/meshCoordinates";
+import { createLocalId } from "@/lib/engine/localIds";
+import { zUpToSketchForge } from "@/lib/engine/meshCoordinates";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const stlLoader = new STLLoader();

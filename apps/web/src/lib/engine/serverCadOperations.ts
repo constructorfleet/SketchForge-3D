@@ -16,14 +16,14 @@
  */
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { withCadKernel } from "@/lib/serverCadKernel";
+import { withCadKernel } from "@/lib/engine/serverCadKernel";
 import {
   exactSolidForShape,
   shapeIsTurned,
   unrotatedSolidForShape,
   UnbuildableShapeError,
-} from "@/lib/serverCadSolids";
-import { canonicalizeShape } from "@/lib/workplaneShapes";
+} from "@/lib/engine/cadSolids";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type ServerCadEdge = {

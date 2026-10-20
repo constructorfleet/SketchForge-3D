@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sha256Hex } from "@/lib/projectAssets";
+import { sha256Hex } from "@/lib/engine/projectAssets";
 
 const utf8 = new TextEncoder();
 

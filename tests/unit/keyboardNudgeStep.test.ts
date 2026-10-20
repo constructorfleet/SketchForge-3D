@@ -5,7 +5,7 @@ import {
   KEYBOARD_NUDGE_FALLBACK_STEP,
   keyboardNudgeStep,
   snapGridStep,
-} from "@/lib/workplaneSettings";
+} from "@/lib/engine/workplaneSettings";
 import type { GridSize } from "@/types/sketchforge";
 
 const ALL_SIZES: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];

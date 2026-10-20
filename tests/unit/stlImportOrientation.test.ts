@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importedShapeFromStl } from "@/lib/stlImport";
+import { importedShapeFromStl } from "@/lib/engine/stlImport";
 
 function boxStl(width: number, ySize: number, zSize: number, name = "box") {
   const vertices = [

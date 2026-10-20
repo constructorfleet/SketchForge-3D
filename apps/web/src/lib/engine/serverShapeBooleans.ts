@@ -17,11 +17,11 @@
 
 import type { Matrix4 } from "three";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { withCadKernel } from "@/lib/serverCadKernel";
-import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "@/lib/serverCadOperations";
-import { UnbuildableShapeError } from "@/lib/serverCadSolids";
-import { createLocalId } from "@/lib/localIds";
-import type { MeshData } from "@/lib/meshTransform";
+import { withCadKernel } from "@/lib/engine/serverCadKernel";
+import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "@/lib/engine/serverCadOperations";
+import { UnbuildableShapeError } from "@/lib/engine/cadSolids";
+import { createLocalId } from "@/lib/engine/localIds";
+import type { MeshData } from "@/lib/engine/meshTransform";
 import {
   boundsForPositions,
   expandGroupsForBoolean,
@@ -30,7 +30,7 @@ import {
   shapeAsGroupChild,
   shapePlacementMatrix,
   worldMeshForShape,
-} from "@/lib/serverShapeGroups";
+} from "@/lib/engine/serverShapeGroups";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type GroupBuildOutcome =

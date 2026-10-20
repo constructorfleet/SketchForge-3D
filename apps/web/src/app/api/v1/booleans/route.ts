@@ -1,10 +1,6 @@
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { buildGroupFromSelection } from "@/lib/serverShapeBooleans";
-import { withHoleMode } from "@/lib/workplaneShapes";
-import type { WorkplaneShape } from "@/types/sketchforge";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -16,6 +12,11 @@ export const revalidate = false;
  * holes should not have to go back and PATCH each one to `hole: true` before it
  * can take them out, and the same shape may well be a solid in one design and a
  * cutter in the next.
+ *
+ * Everything below the validation is `Engine.cut`: the project lock, the id
+ * resolution, the document-order rule that decides whose colour the result
+ * takes, and the refusal of a cut that removed nothing. This handler's job is
+ * the request and the reply.
  */
 export async function POST(request: Request) {
   const context = await apiContext(request);
@@ -32,43 +33,15 @@ export async function POST(request: Request) {
   const both = solidIds.filter((id) => holeIds.includes(id));
   if (both.length > 0) return apiError(`A shape cannot be both a solid and a hole: ${both.join(", ")}.`, 400, "invalid_request");
 
-  const locked = await withProjectLock(context.root, projectId, async () => {
-    const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiErrors.projectNotFound();
-
-    const byId = new Map(document.shapes.map((shape) => [shape.id, shape]));
-    const missing = [...solidIds, ...holeIds].filter((id) => !byId.has(id));
-    if (missing.length > 0) return apiErrors.shapesNotFound(missing);
-
-    const holes = new Set(holeIds);
-    const operandIds = new Set([...solidIds, ...holeIds]);
-    // Document order, not request order: it decides which solid's colour the
-    // result takes, and a project's own order is the one the editor would use.
-    const operands: WorkplaneShape[] = document.shapes
-      .filter((shape) => operandIds.has(shape.id))
-      .map((shape) => withHoleMode(shape, holes.has(shape.id)));
-    const immovable = operands.filter((shape) => shape.locked);
-    if (immovable.length > 0) {
-      return apiErrors.shapeLocked(`Unlock every operand first; these are locked: ${immovable.map((shape) => shape.id).join(", ")}.`);
-    }
-
-    const outcome = await buildGroupFromSelection(operands);
-    if ("error" in outcome) return apiError(outcome.error, outcome.status, "geometry_failed");
-    // Nothing was removed, so this is not the operation the caller asked for.
-    // Refused before the project is written, and refused rather than answered
-    // with the solid unchanged, which is the one reply a script cannot tell
-    // from success. The editor treats the same case as a failed cut.
-    if (outcome.cutRemovedNothing) {
-      return apiError("None of the holes meet the solid, so there is nothing to cut.", 422, "geometry_failed");
-    }
-
-    const shapes = [...document.shapes.filter((shape) => !operandIds.has(shape.id)), outcome.group];
-    const written = await writeProjectDocument(context.root, projectId, document, shapes);
-    return apiJson({
-      shape: apiShapeSummary(outcome.group),
-      triangles: outcome.group.importedMesh?.triangleCount ?? 0,
-      revision: written.revision,
-    }, 201);
-  });
-  return locked.busy ? apiErrors.projectBusy() : locked.result;
+  const cut = await apiEngine(context.root).cut(projectId, { solidIds, holeIds });
+  if (!cut.ok) {
+    return apiEngineError(cut.failure, {
+      locked: (ids) => `Unlock every operand first; these are locked: ${ids.join(", ")}.`,
+    });
+  }
+  return apiJson({
+    shape: apiShapeSummary(cut.value.shape),
+    triangles: cut.value.shape.importedMesh?.triangleCount ?? 0,
+    revision: cut.value.revision,
+  }, 201);
 }

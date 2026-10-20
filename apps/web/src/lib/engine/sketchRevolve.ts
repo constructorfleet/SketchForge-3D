@@ -1,7 +1,7 @@
 import type { ManifoldToplevel } from "manifold-3d";
 import { LocalizedError } from "@/i18n/LocalizedError";
 import type { SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment } from "@/types/sketchforge";
-import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
+import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/engine/workplaneSettings";
 
 export const DEFAULT_SKETCH_REVOLVE_SETTINGS: SketchRevolveSettings = {
   startAngle: 0,

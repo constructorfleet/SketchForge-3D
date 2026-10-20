@@ -7,7 +7,7 @@ import {
   threadSize,
   threadSizesInSeries,
   threadTurnsForLength,
-} from "@/lib/threadCatalog";
+} from "@/lib/engine/threadCatalog";
 
 describe("thread catalog", () => {
   it("knows the coarse pitch for each metric size", () => {

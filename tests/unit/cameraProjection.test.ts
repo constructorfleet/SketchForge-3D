@@ -7,7 +7,7 @@ import {
   perspectiveDistanceForHalfHeight,
   toggledCameraProjection,
 } from "@/lib/cameraProjection";
-import { DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
+import { DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@/lib/engine/workplaneSettings";
 
 const FOV = 38;
 

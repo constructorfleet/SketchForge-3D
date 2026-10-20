@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { LocalizedError } from "@/i18n/LocalizedError";
-import { createLocalId } from "@/lib/localIds";
-import { zUpToSketchForge } from "@/lib/meshCoordinates";
+import { createLocalId } from "@/lib/engine/localIds";
+import { zUpToSketchForge } from "@/lib/engine/meshCoordinates";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 type ObjFaceVertex = {

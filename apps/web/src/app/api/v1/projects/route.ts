@@ -1,8 +1,8 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { createLocalId } from "@/lib/localIds";
-import { horizontalPlacementWorkplane } from "@/lib/placementWorkplane";
-import { readProjectDocument } from "@/lib/serverProjectDocument";
+import { createLocalId } from "@/lib/engine/localIds";
+import { horizontalPlacementWorkplane } from "@/lib/engine/placementWorkplane";
+import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import {
   deleteProjectFiles,
   listProjectRecords,
@@ -10,8 +10,8 @@ import {
   withProjectLock,
   writeProjectMetadata,
   type ProjectMetadata,
-} from "@/lib/serverProjectFiles";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/workplaneSettings";
+} from "@/lib/engine/serverProjectFiles";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 
 export const runtime = "nodejs";
 export const revalidate = false;

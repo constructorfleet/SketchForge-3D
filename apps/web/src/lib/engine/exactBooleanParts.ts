@@ -21,13 +21,13 @@
  * editor falls back to its mesh booleans. Half a cut is worse than a mesh cut.
  */
 
-import { cadBrepTransformForShape } from "@/lib/cadBakeMetadata";
+import { cadBrepTransformForShape } from "@/lib/engine/cadBakeMetadata";
 import type { CadModifierExactPart, CadModifierMeshPart } from "@/lib/cadModifierTypes";
-import { cutterShapeForBoolean } from "@/lib/cutterPadding";
-import { EXACT_SOLID_KINDS } from "@/lib/serverCadSolids";
-import { worldMeshForShape } from "@/lib/serverShapeGroups";
-import { planTaper } from "@/lib/stepProfiles";
-import { shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/workplaneShapes";
+import { cutterShapeForBoolean } from "@/lib/engine/cutterPadding";
+import { EXACT_SOLID_KINDS } from "@/lib/engine/cadSolids";
+import { worldMeshForShape } from "@/lib/engine/serverShapeGroups";
+import { planTaper } from "@/lib/engine/stepProfiles";
+import { shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const MIN_EXACT_BOOLEAN_DIMENSION = 0.0001;

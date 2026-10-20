@@ -1,8 +1,6 @@
-import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
+import { apiContext, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { separateShapeParts } from "@/lib/serverShapeGroups";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -21,24 +19,7 @@ export async function POST(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
   if (!shapeId) return apiErrors.shapeIdRequired();
 
-  const locked = await withProjectLock(context.root, projectId, async () => {
-    const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiErrors.projectNotFound();
-    const shape = document.shapes.find((candidate) => candidate.id === shapeId);
-    if (!shape) return apiErrors.shapeNotFound();
-    if (shape.locked) return apiErrors.shapeLocked();
-    if (shape.hole) return apiError("A hole has nothing to separate; it is a cutter, not a body.", 422, "invalid_request");
-
-    const parts = separateShapeParts(shape);
-    if (parts.length <= 1) {
-      // A shape built from parameters is one body by construction, so the
-      // server can answer this without meshing anything.
-      return apiError("That shape is a single connected body.", 422, "invalid_request");
-    }
-
-    const shapes = [...document.shapes.filter((candidate) => candidate.id !== shapeId), ...parts];
-    const written = await writeProjectDocument(context.root, projectId, document, shapes);
-    return apiJson({ shapes: parts.map(apiShapeSummary), revision: written.revision });
-  });
-  return locked.busy ? apiErrors.projectBusy() : locked.result;
+  const separated = await apiEngine(context.root).separate(projectId, shapeId);
+  if (!separated.ok) return apiEngineError(separated.failure, { oneShape: true });
+  return apiJson({ shapes: separated.value.shapes.map(apiShapeSummary), revision: separated.value.revision });
 }

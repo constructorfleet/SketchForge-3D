@@ -1,4 +1,4 @@
-import { shapeDepth, shapeHasTaper, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
+import { shapeDepth, shapeHasTaper, shapeTaperDimensions, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type ProfilePoint = [number, number, number];
