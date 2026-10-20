@@ -23,7 +23,14 @@ function isLocalRequest(request: Request) {
   if (origin) {
     try {
       const originUrl = new URL(origin);
-      if (originUrl.origin !== requestUrl.origin || !LOCAL_HOSTS.has(originUrl.hostname)) {
+      // Compared by host and port, not as whole origin strings. Next rewrites
+      // `request.url`'s hostname to `localhost` whatever the Host header said,
+      // so a string comparison locked an editor opened at
+      // http://127.0.0.1:3000 out of its own API: every heartbeat came back
+      // 403 and the tab never appeared in `sketchforge_list_editors`, with
+      // nothing in the UI to say why. Both ends still have to be a local host
+      // on the same port, which is the check this was always meant to be.
+      if (!LOCAL_HOSTS.has(originUrl.hostname) || originUrl.port !== requestUrl.port) {
         return false;
       }
     } catch {
