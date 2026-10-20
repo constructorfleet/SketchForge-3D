@@ -316,3 +316,75 @@ export function rebuiltRevolveShape(
     hidden: shape.hidden,
   });
 }
+
+/**
+ * `kind: "thread"` is `kind: "revolve"` with the outline filled in.
+ *
+ * A size from the catalog carries its own pitch, so "M8" is enough; an
+ * explicit diameter and pitch still work for anything unlisted. `hole: true`
+ * cuts the form wider by a clearance so a bolt of that size fits, and marks
+ * the shape as a hole for the boolean to subtract.
+ *
+ * A request already carrying a `profile` is passed through: the caller has
+ * described the outline itself, and the catalog has nothing to add to it.
+ */
+export function resolvedThreadRequest(
+  request: Record<string, unknown>,
+): { request: Record<string, unknown>; error?: undefined } | { error: string; request?: undefined } {
+  if (request.profile) return { request };
+  const resolved = resolveThreadRequest(request);
+  if ("error" in resolved) return { error: resolved.error };
+  return {
+    request: {
+      ...request,
+      profile: resolved.profile,
+      pitch: resolved.pitch,
+      turns: resolved.turns,
+      coreRadius: resolved.coreRadius,
+      hole: resolved.hole,
+      name: typeof request.name === "string" ? request.name : (resolved.hole ? `${resolved.designation} hole` : resolved.designation),
+    },
+  };
+}
+
+/**
+ * The settings a change names, over the ones a revolve already has.
+ *
+ * `sides` means the sweep's angular resolution here, not a facet count, which
+ * is why a revolve's settings are read apart from the per-kind parameters: the
+ * stored kind is `mesh`, and a mesh has no facets to count.
+ */
+export const REVOLVE_SETTING_NAMES = ["startAngle", "sweepAngle", "sides", "quality", "pitch", "turns", "coreRadius"] as const;
+
+/**
+ * The change fields that can only mean a sweep.
+ *
+ * `sides` is left out because it is also a prism's facet count, and a cylinder
+ * naming it is asking about facets, not about a helix it does not have.
+ */
+export const REVOLVE_ONLY_FIELDS = ["startAngle", "sweepAngle", "quality", "pitch", "turns", "coreRadius", "revolve", "profile", "outline"] as const;
+
+/** Everything a change to a swept shape may name that belongs to the sweep. */
+export const REVOLVE_CHANGE_FIELDS = [...REVOLVE_SETTING_NAMES, "revolve", "profile", "outline"] as const;
+
+/**
+ * A revolve's settings with the ones a change named replaced.
+ *
+ * Settings may arrive nested under `revolve`, which is how the shape summary
+ * reports them, or flat alongside the rest of the change -- so reading a shape
+ * back and sending it with one number changed works either way.
+ */
+export function requestedRevolveSettings(
+  existing: SketchRevolveSettings,
+  body: Record<string, unknown>,
+): SketchRevolveSettings {
+  const nested = body.revolve && typeof body.revolve === "object" && !Array.isArray(body.revolve)
+    ? (body.revolve as Record<string, unknown>)
+    : {};
+  const requested: Record<string, unknown> = { ...existing };
+  for (const name of REVOLVE_SETTING_NAMES) {
+    const value = nested[name] ?? body[name];
+    if (value !== undefined) requested[name] = value;
+  }
+  return normalizeSketchRevolveSettings(requested as Partial<SketchRevolveSettings>);
+}

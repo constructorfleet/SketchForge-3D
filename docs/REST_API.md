@@ -53,6 +53,10 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
 | `DELETE` | `/groups?projectId=&shapeId=` | Takes a group apart. |
 | `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
+| `POST` | `/align?projectId=` | Lines shapes up on one coordinate. Body: `{ "ids": [...], "axis": "y", "target": "max" }`. |
+| `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
+| `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
+| `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
@@ -150,9 +154,10 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `project_busy` | 409 | Another write holds the project's lock. **Retry.** |
 | `shape_locked` | 409 | The shape is locked. Unlock it; retrying will not help. |
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
+| `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |
 | `unapplicable_fields` | 422 | A change named fields the shape cannot take. `fields` lists them. |
 | `too_many_shapes` | 413 | More than 200 shapes in one `POST`. |
-| `geometry_failed` | 422 | The sweep or the boolean could not be built. |
+| `geometry_failed` | 422 | The sweep, the boolean, or an imported model could not be built. |
 | `cad_failed` | 4xx / 500 | OCCT refused, or fell over. |
 
 A server from before codes sends only `error`, so a client should keep whatever prose match it had as a fallback. Both bundled client libraries do exactly that.
@@ -428,6 +433,130 @@ Each end names a shape and what part of it to measure from -- the whole solid, o
 `angleDegrees` is the angle between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
 
 Naming an index the shape does not have is a `422` with `cad_failed`, and the message says how many there were: a script that has not re-listed after changing the shape finds out rather than measuring the wrong face. A shape **changes shape** when it is hollowed or filleted, so re-measure a result before naming indexes on it.
+
+## Arranging what is already there
+
+Three operations the editor has had for longer than this API has existed, and which until now you could only reach with a mouse. Each is one write of the project, so one request is one undo step however many shapes it touched.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| `POST` | `/align?projectId=` | Puts one edge or one centre of every shape on the same coordinate. |
+| `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
+| `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring. |
+
+`ids` is required on all three. There is no selection on a server, which is the one thing the editor has and this does not.
+
+**Each measures a shape by its stored footprint** -- `width`, `depth`, `height` and `elevation` -- rather than by its triangles, because there are no triangles here to measure. For everything built from parameters those are the same thing. They part company on a rotated shape: a box turned 45 degrees sweeps a wider footprint than its own width, and this uses the width. That is also the number you sent, so the answer is the one you can predict.
+
+### Lining shapes up
+
+```jsonc
+// Flush tops: y is the vertical axis, and max is the top of each shape.
+{ "ids": ["boss-a", "boss-b", "post"], "axis": "y", "target": "max" }
+
+// Left edges, against one shape that stays put.
+{ "ids": ["boss-a", "boss-b"], "axis": "x", "target": "min", "anchorId": "boss-a" }
+```
+
+`axis` is `x` (left/right), `z` (front/back) or `y` (bottom/top); `target` is `min`, `max` or `center`. Together they are the editor's own nine alignment handles: `x`+`min` is its Left, `y`+`max` its Top.
+
+With no `anchorId` the reference is the box around the whole selection, so `max` brings everything up to whichever shape is already highest. A **locked** shape in the selection becomes the anchor whatever `anchorId` said -- it cannot move, so it is the only thing the rest can be aligned to -- and the reply says which shape was used:
+
+```json
+{ "moved": 4, "axis": "y", "target": "max", "anchorId": "post", "shapes": [ ... ], "revision": 1771234567890 }
+```
+
+`moved` is the answer to "did anything happen". A selection already flush reports `0`, writes nothing, and leaves `revision` where it was -- a write would push an undo entry and tell every open dashboard to reload, in order to say that nothing changed.
+
+### Spreading them out
+
+```jsonc
+// Equal clear space between neighbours, along whichever axis they are already spread on.
+{ "ids": ["a", "b", "c", "d"] }
+
+// Equal centre-to-centre pitch, along X.
+{ "ids": ["a", "b", "c", "d"], "axis": "x", "spacing": "centers" }
+```
+
+The outermost two shapes never move: they define the span, which is the one thing you have already decided. `spacing` is `gaps` (the default) or `centers`, and these are genuinely different answers for shapes of different sizes -- `gaps` is what a rail of mixed-diameter bosses wants, `centers` is what a bolt pitch is. Leave `axis` out and it is whichever axis the shapes are already most spread along; a selection sitting at the same place on both is a `422`, because there is no row to even out.
+
+A shape in the **middle** of the span that is locked blocks the whole operation, and the reply says `moved: 0` rather than refusing: the project is as you asked for it to be, give or take what you locked. A locked shape at either end is no obstacle, since the ends do not move anyway.
+
+### Repeating them
+
+```jsonc
+// Four bosses at a 25mm pitch. The step is centre to centre, not a gap.
+{ "ids": ["boss"], "kind": "linear", "count": 4, "stepX": 25 }
+
+// Six tapped holes on a bolt circle about the origin, each turned to follow it.
+{ "ids": ["m8-hole"], "kind": "circular", "count": 6, "centerX": 0, "centerZ": 0 }
+
+// Three vanes across a quarter turn, each keeping the original's heading.
+{ "ids": ["vane"], "kind": "circular", "count": 3, "sweepAngle": 90, "rotateCopies": false }
+```
+
+| Field | Means |
+| --- | --- |
+| `kind` | `linear` for a row, `circular` for a ring. Default `linear`. |
+| `count` | Total copies **including** the original, so 4 adds 3. From 2 to 200. Default 4. |
+| `stepX`, `stepZ` | `linear`: centre-to-centre step along each axis, in mm. At least one must be non-zero. |
+| `centerX`, `centerZ` | `circular`: the point to turn about. Default the origin. |
+| `sweepAngle` | `circular`: how far round to spread the copies, in degrees. Default 360. |
+| `rotateCopies` | `circular`: whether each copy turns to follow the ring. On by default. |
+
+The step is centre to centre because that is what a hole pitch is: "eight at 20mm" is unambiguous, where "eight with 20mm between them" depends on how wide they are.
+
+A **full turn divides by the count**, so eight copies land every 45 degrees and the last does not sit on the first. A **partial sweep divides by the gaps**, so three across 90 degrees puts one at each end and one in the middle, which is what asking for a quarter arc means.
+
+`rotateCopies` matters more than it looks. A bolt hole does not care which way round it is; a spoke, a tooth or a vane does, and without it they all point the way the original did, which reads as a mistake rather than a pattern. The ring turns about its centre, so each copy keeps its distance from it.
+
+A row with no step and a ring with no sweep are both `422`: every copy would land on top of the original, and a reply saying it added shapes you cannot see is worse than a refusal.
+
+### When they refuse
+
+| Status | When |
+| --- | --- |
+| `400` | No `ids`, an `axis` or `target` that is not one of the listed words, a `count` outside 2-200, or a non-numeric step. |
+| `404` | No such project, or an id that is not in it -- and the message names which ids. |
+| `422` | Fewer shapes than the operation needs (two to align, three to distribute, one to repeat), nothing to spread along, or a pattern with no step. |
+
+## Importing a model file
+
+```jsonc
+// POST /imports?projectId=...
+{ "fileName": "bracket.stl", "data": "<the file's bytes, base64>" }
+```
+
+Or as a form, which is what a person at a terminal wants:
+
+```bash
+curl -X POST "$HOST/imports?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F file=@bracket.stl
+```
+
+`stl`, `obj` and `svg`. STEP answers `415`, and not for want of a reader: the server can read one. What it cannot yet do is read the *project* back afterwards -- a shape imported from a source file is regenerated from that file when the project is opened, and that path needs the kernel only a browser has. An import the server could write and could not then read would be worse than a refusal, so the editor keeps STEP and this endpoint declines it.
+
+**`fileName` is not decoration.** It chooses the importer, it names the stored asset, and for an STL it decides which way is up: a slicer writes Z-up and SketchForge's own older exports are Y-up, recognised by the word in the file header. Send it even when posting a form whose file already has a name, if the name you want differs.
+
+The model lands centred on the workplane in X and Z and seated on it in Y, the same as a drag-and-drop import into the editor, and the reply reports its measured size:
+
+```json
+{ "shape": { "id": "uploaded-mesh-...", "kind": "mesh", "name": "bracket",
+             "width": 80, "depth": 60, "height": 20, "x": 0, "z": 0, "elevation": 0 },
+  "triangles": 12, "revision": 1771234567890 }
+```
+
+The source file is kept on the project as an asset and the shape points at it, both in the same write. That is the half of an import that is easy to leave out: a shape stored without its asset loses its geometry the next time the project is saved.
+
+| Status | When |
+| --- | --- |
+| `400` | No `fileName`, no `data`, or `data` that is not readable base64. |
+| `413` | A file over 64MB. |
+| `415` | A format nothing here reads; the message lists the ones it does. `code: "unsupported_format"`. |
+| `422` | The format is right and the file is not -- truncated, empty, or no geometry in it. `code: "geometry_failed"`. |
+
+An SVG needs an XML parser the Node runtime does not provide, so a server without one answers `422` saying so rather than failing somewhere inside a loader. Export the drawing as STL or OBJ for now.
 
 ## Example: a plate with a row of holes
 

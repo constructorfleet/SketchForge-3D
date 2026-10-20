@@ -286,6 +286,101 @@ describe("the REST API over HTTP", () => {
     expect(refused.body.code).toBe("invalid_request");
   });
 
+  it("repeats, aligns and distributes a row over HTTP", async () => {
+    // Its own project: this walks the three arranging routes in the order a
+    // script would -- make the copies, line them up, space them out -- and the
+    // shared one above is a thread, which has no row in it.
+    const created = await api("/projects", { method: "POST", body: JSON.stringify({ name: "Bolt rail" }) });
+    const rail = ((created.body.project as Record<string, string>) ?? {}).id;
+
+    const boss = await api(`/shapes?projectId=${rail}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "cylinder", width: 9, depth: 9, height: 6, x: 11, z: -4, name: "Boss" }),
+    });
+    const bossId = (boss.body.shapes as Array<Record<string, string>>)[0].id;
+
+    // Four at a 25 mm pitch, which is centre to centre: 11, 36, 61, 86.
+    const repeated = await api(`/patterns?projectId=${rail}`, {
+      method: "POST",
+      body: JSON.stringify({ ids: [bossId], kind: "linear", count: 4, stepX: 25 }),
+    });
+    expect(repeated.status).toBe(201);
+    expect(repeated.body.created).toBe(3);
+    const copies = (repeated.body.shapes as Array<Record<string, any>>).map((shape) => shape.id);
+    expect((repeated.body.shapes as Array<Record<string, any>>).map((shape) => shape.x)).toEqual([36, 61, 86]);
+
+    // A taller shape off the row, to align the bosses' tops to.
+    const post = await api(`/shapes?projectId=${rail}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "box", width: 8, depth: 8, height: 20, x: 11, z: 40, elevation: 3 }),
+    });
+    const postId = (post.body.shapes as Array<Record<string, string>>)[0].id;
+
+    const aligned = await api(`/align?projectId=${rail}`, {
+      method: "POST",
+      body: JSON.stringify({ ids: [bossId, ...copies, postId], axis: "y", target: "max", anchorId: postId }),
+    });
+    expect(aligned.status).toBe(200);
+    expect(aligned.body.anchorId).toBe(postId);
+    // The post's top is 3 + 20 = 23, so a 6 mm boss sits at 17 to match it.
+    expect(aligned.body.moved).toBe(4);
+    const tops = (aligned.body.shapes as Array<Record<string, any>>).map((shape) => shape.elevation + shape.height);
+    expect(new Set(tops)).toEqual(new Set([23]));
+
+    // And then re-spaced by centres across the span the outer two define.
+    const spread = await api(`/distribute?projectId=${rail}`, {
+      method: "POST",
+      body: JSON.stringify({ ids: [bossId, ...copies], axis: "x", spacing: "centers" }),
+    });
+    expect(spread.status).toBe(200);
+    // They were already at an even 25 mm pitch, so there is nothing to do --
+    // and that is reported rather than written.
+    expect(spread.body.moved).toBe(0);
+    expect(spread.body.axis).toBe("x");
+  });
+
+  it("imports an STL over HTTP and keeps the file with the project", async () => {
+    const created = await api("/projects", { method: "POST", body: JSON.stringify({ name: "Imported plate" }) });
+    const projectForImport = ((created.body.project as Record<string, string>) ?? {}).id;
+
+    // A unit tetrahedron in the slicer's Z-up convention, written as ASCII STL.
+    // Four facets is the smallest closed solid there is, and its own three side
+    // lengths differ so a swapped axis cannot hide.
+    const corners = [[0, 0, 0], [30, 0, 0], [0, 18, 0], [0, 0, 9]];
+    const facets = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]].map(([a, b, c]) => [
+      "facet normal 0 0 0",
+      "  outer loop",
+      `    vertex ${corners[a].join(" ")}`,
+      `    vertex ${corners[b].join(" ")}`,
+      `    vertex ${corners[c].join(" ")}`,
+      "  endloop",
+      "endfacet",
+    ].join("\n")).join("\n");
+    const stl = `solid wedge\n${facets}\nendsolid wedge`;
+
+    const imported = await api(`/imports?projectId=${projectForImport}`, {
+      method: "POST",
+      body: JSON.stringify({ fileName: "wedge.stl", data: Buffer.from(stl, "utf8").toString("base64") }),
+    });
+    expect(imported.status).toBe(201);
+    expect(imported.body.triangles).toBe(4);
+    // Z-up: the file's Z is SketchForge's height, so 30 x 18 x 9 reads as 30
+    // wide, 18 deep and 9 high. Through a real server rather than in-process,
+    // because the importers pull `three` into the route bundle and that is the
+    // kind of thing only a bundled server gets wrong.
+    expect(imported.body.shape).toMatchObject({ kind: "mesh", name: "wedge", width: 30, depth: 18, height: 9 });
+
+    const read = await api(`/projects?projectId=${projectForImport}`);
+    expect((read.body.project as Record<string, unknown[]>).shapes).toHaveLength(1);
+
+    const refused = await api(`/imports?projectId=${projectForImport}`, {
+      method: "POST",
+      body: JSON.stringify({ fileName: "wedge.3mf", data: Buffer.from(stl, "utf8").toString("base64") }),
+    });
+    expect(refused.status).toBe(415);
+    expect(refused.body.code).toBe("unsupported_format");
+  });
+
   it("refuses a change naming fields the shape cannot take, and applies none of it", async () => {
     const refused = await api(`/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
       method: "PATCH",

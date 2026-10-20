@@ -39,7 +39,7 @@ import {
   normalizeLoftShape,
   normalizeLoftTopSize,
 } from "@/lib/loftGeometry";
-import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/distributeShapes";
+import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/engine/distributeShapes";
 import {
   parseRevolveRequest,
   resolveThreadRequest,
@@ -142,7 +142,7 @@ import {
   suggestedLinearStep,
   type CircularPatternRequest,
   type LinearPatternRequest,
-} from "@/lib/patternShapes";
+} from "@/lib/engine/patternShapes";
 import { threadSizesInSeries } from "@/lib/engine/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";

@@ -532,3 +532,102 @@ class TreatmentResult:
 
 #: Hollowing answers with the same three fields a treatment does.
 ShellResult = TreatmentResult
+
+#: ``x`` is left/right, ``z`` front/back, ``y`` bottom/top.
+ALIGN_AXES = ("x", "y", "z")
+
+#: Which edge or centre of each shape to line up.
+ALIGN_TARGETS = ("min", "center", "max")
+
+#: ``gaps`` leaves equal clear space; ``centers`` puts the centres at an equal pitch.
+DISTRIBUTE_SPACINGS = ("gaps", "centers")
+
+PATTERN_KINDS = ("linear", "circular")
+
+MIN_PATTERN_COUNT = 2
+MAX_PATTERN_COUNT = 200
+
+#: The model file formats the server reads with no browser and no CAD kernel.
+IMPORTABLE_MESH_FORMATS = ("stl", "obj", "svg")
+
+
+@dataclass(frozen=True)
+class AlignResult:
+    """What an alignment did.
+
+    ``moved`` is the answer to "did anything happen": a selection that was
+    already flush reports zero, nothing is written, and ``revision`` comes back
+    where it was.
+
+    ``anchor_id`` is the shape everything else lined up against, which is not
+    necessarily the one that was asked for -- a locked shape in the selection
+    cannot move, so it anchors the alignment instead.
+    """
+
+    moved: int
+    axis: str
+    target: str
+    anchor_id: Optional[str]
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "AlignResult":
+        anchor = payload.get("anchorId")
+        return cls(
+            moved=int(_number(payload, "moved")),
+            axis=_text(payload, "axis"),
+            target=_text(payload, "target"),
+            anchor_id=anchor if isinstance(anchor, str) else None,
+            shapes=[ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])],
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class DistributeResult:
+    """What a distribution did, and along which axis it decided to work.
+
+    ``axis`` is worth reading even when it was sent: left out, the server picks
+    whichever axis the shapes are already most spread along, and this says
+    which one that was.
+    """
+
+    moved: int
+    axis: str
+    spacing: str
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "DistributeResult":
+        return cls(
+            moved=int(_number(payload, "moved")),
+            axis=_text(payload, "axis"),
+            spacing=_text(payload, "spacing"),
+            shapes=[ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])],
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class PatternResult:
+    """The copies a pattern added. ``created`` excludes the original."""
+
+    created: int
+    kind: str
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "PatternResult":
+        return cls(
+            created=int(_number(payload, "created")),
+            kind=_text(payload, "kind"),
+            shapes=[ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])],
+            revision=int(_number(payload, "revision")),
+        )
+
+
+#: An import answers with the same three fields a treatment does.
+MeshImportResult = TreatmentResult

@@ -49,6 +49,14 @@ export type ApiFailureWording = {
   oneShape?: boolean;
   locked?: (ids: string[]) => string;
   cadFailed?: string;
+  /**
+   * How many shapes this operation needs, in its own words.
+   *
+   * The engine reports the count; the sentence is the route's, because "at
+   * least two to align" and "at least three to distribute" say *why* in a way
+   * a number on its own does not.
+   */
+  tooFewShapes?: (needed: number, given: number) => string;
   refusal?: Partial<Record<"not_a_group" | "single_body" | "hole_has_no_parts" | "cut_removed_nothing", string>>;
 };
 
@@ -69,6 +77,27 @@ const REFUSAL_CODES: Record<keyof typeof DEFAULT_REFUSALS, ApiErrorCode> = {
   cut_removed_nothing: "geometry_failed",
 };
 
+/**
+ * A message about one entry of a batch, named by its position.
+ *
+ * `POST /shapes` takes up to two hundred shapes in one request, so "that is not
+ * a valid profile" is useless without saying which of them. An operation about
+ * a single shape has no index and reads as a plain sentence.
+ */
+function atIndex(message: string, index: number | undefined) {
+  return index === undefined ? message : `Shape ${index}: ${message}`;
+}
+
+/** The three readings of `unapplicable_fields`, each a 422 with `fields` attached. */
+function unapplicableFields(failure: Extract<EngineFailure, { reason: "unapplicable_fields" }>) {
+  const message = failure.because === "no_sweep"
+    ? `A shape of kind "${failure.kind}" has no sweep to change: ${failure.fields.join(", ")}.`
+    : failure.because === "outline_not_described"
+      ? "That revolve's outline was drawn rather than described, so the sweep cannot be rebuilt from it. Send a profile to replace it."
+      : `A shape of kind "${failure.kind}" cannot take: ${failure.fields.join(", ")}.`;
+  return apiError(message, 422, "unapplicable_fields", { fields: failure.fields });
+}
+
 export function apiEngineError(failure: EngineFailure, wording: ApiFailureWording = {}) {
   switch (failure.reason) {
     case "project_busy":
@@ -85,6 +114,47 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
       return apiError(failure.message, failure.status, "cad_failed");
     case "cad_failed":
       return apiError(wording.cadFailed ?? "The CAD kernel could not complete that operation.", 500, "cad_failed");
+    case "unsupported_kind":
+      return apiError(
+        `Shape ${failure.index} has an unsupported kind. The API can build: ${failure.kinds.join(", ")}.`,
+        422,
+        "unsupported_kind",
+      );
+    case "invalid_shape_request":
+      return apiError(atIndex(failure.message, failure.index), 400, "invalid_request");
+    case "sweep_failed":
+      return apiError(atIndex(`${failure.message}.`, failure.index), 422, "geometry_failed");
+    case "unapplicable_fields":
+      return unapplicableFields(failure);
+    case "selection_too_small":
+      return apiError(
+        wording.tooFewShapes?.(failure.needed, failure.given)
+          ?? `This needs at least ${failure.needed} shapes; ${failure.given} were given.`,
+        422,
+        "invalid_request",
+      );
+    case "no_distribute_axis":
+      return apiError(
+        "Every shape sits at the same place along both axes, so there is nothing to spread. Move them apart, or send axis as x or z.",
+        422,
+        "invalid_request",
+      );
+    case "pattern_has_no_step":
+      return apiError(
+        failure.kind === "linear"
+          ? "A row needs a stepX or a stepZ, or every copy lands on top of the original."
+          : "A ring needs a sweepAngle other than zero, or every copy lands on top of the original.",
+        422,
+        "invalid_request",
+      );
+    case "import_unsupported":
+      return apiError(
+        `Nothing here can read "${failure.fileName}". The readable formats are: ${failure.formats.join(", ")}.`,
+        415,
+        "unsupported_format",
+      );
+    case "import_failed":
+      return apiError(`${failure.fileName}: ${failure.message}`, 422, "geometry_failed");
     default:
       return apiError(
         wording.refusal?.[failure.reason] ?? DEFAULT_REFUSALS[failure.reason],

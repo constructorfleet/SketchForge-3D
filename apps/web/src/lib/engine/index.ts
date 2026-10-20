@@ -27,13 +27,66 @@ export { directoryProjectStore, type ProjectDocument, type ProjectMetadata, type
 // --- operations, on an Engine bound to a store -------------------------------
 export {
   createEngine,
+  type AlignOutcome,
+  type AlignRequest,
   type CutRequest,
+  type DistributeOutcome,
+  type DistributeRequest,
   type Engine,
   type EngineFailure,
   type EngineResult,
+  type MeshImportRequest,
+  type PatternKind,
+  type PatternRequest,
+  type ProjectRead,
+  type ShapeRemoved,
+  type ShapesArranged,
   type ShapeWritten,
   type ShapesWritten,
 } from "@/lib/engine/engine";
+
+// --- arranging what is already there -----------------------------------------
+//
+// Pure arithmetic over extents, shared by the editor and the operations above.
+// The editor measures the extents off the mesh and the engine measures them off
+// the parameters; the spacing rules are the same either way.
+export {
+  alignCoordinate,
+  alignShifts,
+  effectiveAlignAnchorId,
+  ALIGN_EPSILON,
+  type AlignAxis,
+  type AlignEntry,
+  type AlignShift,
+  type AlignTarget,
+} from "@/lib/engine/alignShapes";
+export {
+  distributeShifts,
+  widestDistributeAxis,
+  type DistributeEntry,
+  type DistributeShift,
+  type DistributeSpacing,
+} from "@/lib/engine/distributeShapes";
+export {
+  circularPatternPlacements,
+  linearPatternPlacements,
+  suggestedLinearStep,
+  MAX_PATTERN_COUNT,
+  MIN_PATTERN_COUNT,
+  type CircularPatternRequest,
+  type LinearPatternRequest,
+  type PatternPlacement,
+} from "@/lib/engine/patternShapes";
+export { boundsForShapes, footprintCenter, shapeBounds, type ShapeBounds } from "@/lib/engine/shapeBounds";
+
+// --- importing a model file ---------------------------------------------------
+export {
+  importableMeshFormat,
+  importedMeshFromFile,
+  IMPORTABLE_MESH_FORMATS,
+  type ImportableMeshFormat,
+  type ImportedMesh,
+} from "@/lib/engine/meshImport";
 
 // --- the format -------------------------------------------------------------
 export {

@@ -484,6 +484,111 @@ export type MeasurementPair = {
   angleUnavailable: MeasurementAngleUnavailableCode | null;
 };
 
+export const ALIGN_AXES = ["x", "y", "z"] as const;
+
+/** `x` is left/right, `z` front/back, `y` bottom/top. */
+export type AlignAxis = (typeof ALIGN_AXES)[number];
+
+export const ALIGN_TARGETS = ["min", "center", "max"] as const;
+
+/** Which edge or centre of each shape to line up. */
+export type AlignTarget = (typeof ALIGN_TARGETS)[number];
+
+export type AlignRequest = {
+  ids: readonly string[];
+  axis: AlignAxis;
+  target: AlignTarget;
+  /**
+   * The shape to keep fixed.
+   *
+   * Omit and the reference is the box around the whole selection. A locked
+   * shape in the selection becomes the anchor whatever this says, since it
+   * cannot move, and the result reports which shape was used.
+   */
+  anchorId?: string;
+};
+
+export type AlignResult = {
+  /** How many shapes actually moved. Zero means the selection was already flush. */
+  moved: number;
+  axis: AlignAxis;
+  target: AlignTarget;
+  anchorId: string | null;
+  shapes: ShapeSummary[];
+  revision: number;
+};
+
+export const DISTRIBUTE_SPACINGS = ["gaps", "centers"] as const;
+
+/** `gaps` leaves equal clear space; `centers` puts the centres at an equal pitch. */
+export type DistributeSpacing = (typeof DISTRIBUTE_SPACINGS)[number];
+
+export type DistributeRequest = {
+  ids: readonly string[];
+  /** Omit to spread along whichever axis the shapes are already most spread along. */
+  axis?: "x" | "z";
+  spacing?: DistributeSpacing;
+};
+
+export type DistributeResult = {
+  moved: number;
+  axis: "x" | "z";
+  spacing: DistributeSpacing;
+  shapes: ShapeSummary[];
+  revision: number;
+};
+
+export const PATTERN_KINDS = ["linear", "circular"] as const;
+
+export type PatternKind = (typeof PATTERN_KINDS)[number];
+
+export const MIN_PATTERN_COUNT = 2;
+export const MAX_PATTERN_COUNT = 200;
+
+export type PatternRequest = {
+  ids: readonly string[];
+  kind?: PatternKind;
+  /** Total copies including the original, so 4 adds 3. From 2 to 200; default 4. */
+  count?: number;
+  /** `linear`: centre-to-centre step along each axis, in mm. A pitch, not a gap. */
+  stepX?: number;
+  stepZ?: number;
+  /** `circular`: the point to turn about. Default the origin. */
+  centerX?: number;
+  centerZ?: number;
+  /** `circular`: how far round to spread the copies, in degrees. Default 360. */
+  sweepAngle?: number;
+  /** `circular`: whether each copy turns to follow the ring. On by default. */
+  rotateCopies?: boolean;
+};
+
+export type PatternResult = {
+  /** How many copies were added, which is `count` minus the original. */
+  created: number;
+  kind: PatternKind;
+  shapes: ShapeSummary[];
+  revision: number;
+};
+
+export const IMPORTABLE_MESH_FORMATS = ["stl", "obj", "svg"] as const;
+
+/**
+ * A model file to import.
+ *
+ * `fileName` chooses the importer, names the stored asset, and for an STL
+ * decides which way is up -- a slicer writes Z-up and SketchForge's own older
+ * exports are Y-up, recognised by the word in the file header.
+ */
+export type MeshImportRequest = {
+  fileName: string;
+  bytes: Uint8Array;
+  /** Recorded on the stored asset; the format's own default otherwise. */
+  mediaType?: string;
+};
+
+/** The same three fields a treatment answers with; an import is one more of them. */
+export type MeshImportResult = TreatmentResult;
+
 export type ShapeWriteResult = { shapes: ShapeSummary[]; revision: number };
 export type ShapePatchResult = { shape: ShapeSummary; revision: number };
 export type TreatmentResult = { shape: ShapeSummary; triangles: number; revision: number };

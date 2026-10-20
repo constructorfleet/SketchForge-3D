@@ -3,8 +3,10 @@ export { API_ERROR_CODES, SketchForgeApiError, SketchForgeTransportError, type A
 export { Transport, normalizeBaseUrl, buildUrl, type FetchLike, type RequestSpec, type TransportOptions } from "./http.js";
 export { Projects } from "./resources/projects.js";
 export { Shapes, chunk, shapePatchFromSummary } from "./resources/shapes.js";
+export { Align, Distribute, Patterns } from "./resources/arrange.js";
 export { Edges } from "./resources/edges.js";
 export { Faces } from "./resources/faces.js";
+export { Imports } from "./resources/imports.js";
 export { Measurements } from "./resources/measurements.js";
 export { Shell } from "./resources/shell.js";
 export { Treatments } from "./resources/treatments.js";

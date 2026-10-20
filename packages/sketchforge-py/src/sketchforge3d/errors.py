@@ -22,6 +22,7 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "shape_not_found",
     "shape_locked",
     "unsupported_kind",
+    "unsupported_format",
     "unapplicable_fields",
     "too_many_shapes",
     "geometry_failed",
