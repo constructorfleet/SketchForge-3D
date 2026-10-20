@@ -91,13 +91,20 @@ function prepareObject(mesh: ThreeMfExportMesh): PreparedObject {
   if (worldVertices.length === 0) {
     return { vertices: [], faces: mesh.faces, translation: [0, 0, 0] };
   }
-  const xs = worldVertices.map((vertex) => vertex[0]);
-  const ys = worldVertices.map((vertex) => vertex[1]);
-  const zs = worldVertices.map((vertex) => vertex[2]);
+  const bounds = worldVertices.reduce(
+    (current, [x, y, z]) => ({
+      minX: Math.min(current.minX, x),
+      maxX: Math.max(current.maxX, x),
+      minY: Math.min(current.minY, y),
+      maxY: Math.max(current.maxY, y),
+      minZ: Math.min(current.minZ, z),
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity },
+  );
   const translation: [number, number, number] = [
-    (Math.min(...xs) + Math.max(...xs)) / 2,
-    (Math.min(...ys) + Math.max(...ys)) / 2,
-    Math.min(...zs),
+    (bounds.minX + bounds.maxX) / 2,
+    (bounds.minY + bounds.maxY) / 2,
+    bounds.minZ,
   ];
   return {
     vertices: worldVertices.map(([x, y, z]) => [x - translation[0], y - translation[1], z - translation[2]]),

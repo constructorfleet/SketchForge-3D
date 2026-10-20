@@ -125,6 +125,15 @@ describe("3MF archive structure", () => {
 });
 
 describe("3MF model XML", () => {
+  it("handles imported meshes with enough vertices to exceed argument-spread limits", async () => {
+    const mesh: ThreeMfExportMesh = {
+      name: "large import",
+      vertices: Array.from({ length: 150_000 }, (_, index) => [index, index % 7, index % 11] as [number, number, number]),
+      faces: [],
+    };
+    await expect(exportMeshesTo3mf([mesh])).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   it("declares the core namespace and millimeter units", () => {
     const model = threeMfModelXml([boxMesh("cube", { x: 0, y: 10, z: 0 }, { width: 20, height: 20, depth: 20 })]);
     expect(model.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);

@@ -126,6 +126,7 @@ import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
 import { meshVolumeMm3 } from "@/lib/materialPresets";
 import { analyzeMeshTopology } from "@/lib/engine/meshValidation";
+import { projectedMeshContours } from "@/lib/engine/svgMeshProjection";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
@@ -2458,25 +2459,20 @@ async function toSvg(shapes: WorkplaneShape[], title: string) {
   const layers: SvgProjectionLayer[] = [];
 
   for (const shape of shapes) {
-    const created: ManifoldSolid[] = [];
     const projectedObjects: unknown[] = [];
     try {
-      const solid = shapeToManifoldSolid(runtime, shape, created);
-      if (!solid || solid.status() !== "NoError" || solid.numTri() < 1) {
-        throw new LocalizedError("errors.editor.svgOutline", { name: shape.name });
-      }
-
-      const topView = solid.rotate([90, 0, 0]);
-      if (topView !== solid) created.push(topView);
-      const projection = topView.project();
-      projectedObjects.push(projection);
-      const simplified = projection.simplify(0.00001);
-      if (simplified !== projection) projectedObjects.push(simplified);
+      const mesh = meshForShape(shape);
+      const contours = projectedMeshContours(mesh.vertices, mesh.faces);
+      if (!contours.length) throw new LocalizedError("errors.editor.svgOutline", { name: shape.name });
+      const section = new runtime.CrossSection(contours, "Positive");
+      projectedObjects.push(section);
+      const simplified = section.simplify(0.00001);
+      if (simplified !== section) projectedObjects.push(simplified);
       const polygons = simplified.toPolygons();
       if (!polygons.length) throw new LocalizedError("errors.editor.svgNoArea", { name: shape.name });
       layers.push({ name: shape.name, color: shape.color, polygons });
     } finally {
-      [...new Set([...projectedObjects, ...created])].reverse().forEach(disposeManifold);
+      [...new Set(projectedObjects)].reverse().forEach(disposeManifold);
     }
   }
 
@@ -8218,13 +8214,20 @@ export function SketchForgeEditor({
       if (command.action === "export_scene") {
         const requestedIds = mcpStringArray(params.shapeIds);
         const source = requestedIds.length ? currentShapes().filter((shape) => requestedIds.includes(shape.id)) : selectedIdsRef.current.length ? currentShapes().filter((shape) => selectedIdsRef.current.includes(shape.id)) : currentShapes();
-        const exportable = source.filter((shape) => !shape.hole && !shape.hidden);
+        const visibleSource = source.filter((shape) => !shape.hidden);
+        const format = params.format;
+        const basename = projectExportFileName(mcpString(params.name, projectName), "skf").slice(0, -4);
+        if (format === "step") {
+          const { exportShapesToStep } = await import("@/lib/engine/stepExport");
+          const result = await exportShapesToStep(visibleSource);
+          const bytes = new Uint8Array(await result.blob.arrayBuffer());
+          return { filename: `${basename}.step`, mimeType: "application/step", bytes: bytes.byteLength, shapeCount: result.exportedCount, skipped: result.skipped, base64: mcpBase64(bytes) };
+        }
+        const exportable = visibleSource.filter((shape) => !shape.hole);
         if (!exportable.length) throw new Error("No visible solid objects to export");
         const meshes = exportable.map(meshForShape);
-        const format = params.format;
         let bytes: Uint8Array;
         let mimeType: string;
-        const basename = mcpString(params.name, projectName).replace(/[\\/:*?"<>|]+/g, "-").trim() || "SketchForge";
         const packageProject = async () => {
           const exportedHistory = editorHistoryForExport(historyRef.current, historyIndexRef.current, "unlimited");
           return exportSkfProject({
@@ -9017,7 +9020,7 @@ export function SketchForgeEditor({
 
   const exportDesign = useCallback((format: DirectExportFormat, exportName: string) => {
     const sourceShapes = hasSelection ? selectedShapes : shapes;
-    const exportable = sourceShapes.filter((shape) => !shape.hole);
+    const exportable = sourceShapes.filter((shape) => !shape.hole && !shape.hidden);
     if (exportable.length === 0) {
       setNotice(notice((t) => t(hasSelection ? "editor.export.needSolidSelected" : "editor.export.needSolid")));
       return;
@@ -9075,7 +9078,7 @@ export function SketchForgeEditor({
     if (stepExporting) {
       return;
     }
-    const sourceShapes = hasSelection ? selectedShapes : shapes;
+    const sourceShapes = (hasSelection ? selectedShapes : shapes).filter((shape) => !shape.hidden);
     if (sourceShapes.some((shape) => shape.hole) && !sourceShapes.some((shape) => !shape.hole)) {
       setNotice(notice((t) => t("editor.export.needSolidStep")));
       return;
