@@ -28,11 +28,13 @@
     }
   },
   "bin": {
-    "sketchforge-macro": "./dist/cli.js"
+    "sketchforge-macro": "./dist/cli.js",
+    "sketchforge-mcp": "./mcp/server.mjs"
   },
   "files": [
     "dist",
     "examples",
+    "mcp",
     "README.md"
   ],
   "engines": {

@@ -408,6 +408,12 @@ Start the local SketchForge MCP bridge for editor automation:
 npm run mcp:sketchforge
 ```
 
+Outside a checkout, the same bridge is a published binary -- see "MCP" below:
+
+```bash
+npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp
+```
+
 Create a production build:
 
 ```bash
@@ -475,7 +481,17 @@ http://127.0.0.1:3000/?editor=1
 The AI client starts the MCP server with:
 
 ```bash
-node scripts/sketchforge-mcp-server.mjs
+npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp
+```
+
+No clone and no build: the bridge ships in the published client package, so an
+MCP client can start it the same way it starts any other stdio server. Point it
+at a SketchForge that is not on the default port with `SKETCHFORGE_URL`.
+
+From a checkout, the same bridge runs without the download:
+
+```bash
+npm run mcp:sketchforge
 ```
 
 ### Codex

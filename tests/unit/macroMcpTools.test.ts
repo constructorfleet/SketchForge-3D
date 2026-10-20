@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // @ts-expect-error - the MCP bridge and its helpers are plain ESM scripts with no types.
-import { MACRO_DIR_ENV, listMacros, runMacroByName } from "../../scripts/sketchforgeMacroTools.mjs";
+import { MACRO_DIR_ENV, listMacros, runMacroByName } from "../../packages/sketchforge-client/mcp/macroTools.mjs";
 
 let macroDirectory = "";
 let outsideDirectory = "";

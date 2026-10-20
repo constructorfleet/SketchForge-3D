@@ -1,8 +1,27 @@
 #!/usr/bin/env node
 
-import { listMacros, macroTools, runMacroByName } from "./sketchforgeMacroTools.mjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
+
+/**
+ * The version this bridge reports is the package's, read at startup rather than
+ * written here: it ships inside `@constructorfleet/sketchforge3d`, whose version
+ * tracks the app's, and a client that logs a hand-written number would say
+ * something untrue after the first release.
+ */
+const version = (() => {
+  try {
+    const manifest = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    const parsed = JSON.parse(readFileSync(manifest, "utf8"));
+    return typeof parsed.version === "string" ? parsed.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 const MCP_ROUTE = "/api/sketchforge-mcp";
 const baseUrl = process.env.SKETCHFORGE_URL || DEFAULT_BASE_URL;
 
@@ -448,7 +467,7 @@ async function handleMessage(message) {
       sendResult(id, {
         protocolVersion: params?.protocolVersion || "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo: { name: "sketchforge-mcp", version: "0.1.0" },
+        serverInfo: { name: "sketchforge-mcp", version },
       });
       return;
     }

@@ -20,8 +20,11 @@ npm run dev
 3. Configure your MCP client to start the stdio server:
 
 ```bash
-node scripts/sketchforge-mcp-server.mjs
+npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp
 ```
+
+From a checkout of the repository, `npm run mcp:sketchforge` runs the same
+bridge without the download.
 
 The MCP server talks to the app through `/api/sketchforge-mcp`. Open editor tabs heartbeat into that route and receive commands from it. Production and Docker/static builds intentionally return 404 for the MCP route.
 
@@ -29,7 +32,7 @@ The MCP server talks to the app through `/api/sketchforge-mcp`. Open editor tabs
 
 Codex can use this folder as a skill and the MCP server as tools. Install the folder under `~/.codex/skills/sketchforge-mcp-skill` and configure the MCP server in Codex.
 
-Claude Desktop does not read Codex skills, but it can use the same `scripts/sketchforge-mcp-server.mjs` MCP server through Claude's `mcpServers` JSON config. Use the repository README for client setup examples.
+Claude Desktop does not read Codex skills, but it can use the same `sketchforge-mcp` server through Claude's `mcpServers` JSON config -- `docs/mcp/claude-desktop-config.example.json` is a ready-made entry. Use the repository README for client setup examples.
 
 ## Targeting Editors
 
