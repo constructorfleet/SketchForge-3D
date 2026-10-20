@@ -1,4 +1,5 @@
 import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
 import { readProjectDocument } from "@/lib/serverProjectDocument";
 import { shapeEdges, ServerCadError } from "@/lib/serverCadOperations";
 
@@ -25,3 +26,9 @@ export async function GET(request: Request) {
     return apiError("The CAD kernel could not read that shape.", 500, "cad_failed");
   }
 }
+
+/**
+ * The methods this route answers, and -- more importantly -- the reason it is
+ * not prerendered into a permanent 404. See `apiV1Methods`.
+ */
+export const OPTIONS = apiReadOnlyOptions;

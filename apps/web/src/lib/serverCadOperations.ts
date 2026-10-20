@@ -367,7 +367,20 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
       sourceFormat: "json",
     },
     cadBrep: result.brep,
-    cadBrepFrame: { x: shape.x, z: shape.z, elevation: shape.elevation ?? 0, width, depth, height },
+    // The frame says where the stored B-Rep *is*, not where the shape is.
+    //
+    // Both readers -- STEP export and the editor's own CAD worker, through
+    // `cadBrepTransformForShape` -- place the geometry by subtracting this
+    // frame's centre and adding the shape's current one. So a frame carrying
+    // the shape's placement, for geometry that is actually in the local frame
+    // every builder here produces, cancels the placement out: a filleted,
+    // chamfered or hollowed shape at x=25, z=-15, elevation=7 exported to STEP
+    // at the origin instead. Nothing caught it because a shape left where it
+    // was created -- which is where a test shape sits -- subtracts zero.
+    //
+    // These are the result's own bounds, which is what the editor's worker
+    // records for exactly the same reason.
+    cadBrepFrame: { x: centerX, z: centerZ, elevation: minY, width, depth, height },
     cadPrimitiveFrame: undefined,
     cadDisplayEdges: undefined,
     cadDisplayEdgesVersion: undefined,
