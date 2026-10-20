@@ -312,6 +312,38 @@ export function appendEditorHistorySnapshot(
   return { entries: nextEntries, index: nextEntries.length - 1, changed: true };
 }
 
+// `hydrateEditorHistoryState` re-derives every stored entry, which is right for
+// entries parsed out of a file and pure waste for the live editor state an
+// autosave is writing out: those entries were built by `editorHistoryEntry`
+// already, so canonicalizing and fingerprinting them again produces exactly
+// what is already there. At a few hundred shapes and a few dozen undo steps
+// that re-derivation was the longest unyielded block of a save (upstream #97).
+// This keeps the checks that matter -- the active entry must agree with the
+// shapes being saved, and the index must be in range -- and skips the rest.
+export function liveEditorHistoryState(
+  currentShapes: WorkplaneShape[],
+  storedEntries: EditorHistoryEntry[] | undefined,
+  requestedIndex: number | undefined,
+  limit: EditorHistoryExportLimit = "unlimited",
+): EditorHistoryState {
+  if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
+    return { entries: [editorHistoryEntry(currentShapes, [])], index: 0 };
+  }
+  const index = Number.isInteger(requestedIndex)
+    ? Math.min(Math.max(0, requestedIndex as number), storedEntries.length - 1)
+    : storedEntries.length - 1;
+  const active = storedEntries[index];
+  // The reference check is the cheap path and the fingerprint the correct one:
+  // a caller that hands over the active entry's own shapes array pays nothing,
+  // and anything else is compared by content, exactly as hydration would.
+  const agrees = Array.isArray(active?.shapes)
+    && (active.shapes === currentShapes || active.fingerprint === editorHistoryEntry(currentShapes, []).fingerprint);
+  if (!agrees) {
+    return { entries: [editorHistoryEntry(currentShapes, [])], index: 0 };
+  }
+  return boundedEditorHistoryState(storedEntries, index, limit);
+}
+
 export function hydrateEditorHistoryState(
   currentShapes: WorkplaneShape[],
   storedEntries: EditorHistoryEntry[] | undefined,

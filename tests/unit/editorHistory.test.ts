@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, projectShapesFingerprint } from "@/lib/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@/lib/editorHistory";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -208,6 +208,56 @@ describe("editor history snapshots", () => {
     expect(restored.index).toBe(0);
     expect(restored.entries).toHaveLength(1);
     expect(restored.entries[0].shapes[0].x).toBe(9);
+  });
+
+  it("keeps live history entries as they are instead of re-deriving them", () => {
+    const entries = [0, 5, 10].map((x) => editorHistoryEntry([box({ x })], ["box-1"]));
+    const live = liveEditorHistoryState([box({ x: 5 })], entries, 1);
+
+    expect(live.index).toBe(1);
+    // Identity, not equality: re-deriving an entry would produce an equal
+    // object, and re-deriving is the cost this exists to avoid.
+    expect(live.entries).toBe(entries);
+    entries.forEach((entry, index) => expect(live.entries[index]).toBe(entry));
+    expect(live.entries[1].selectedIds).toEqual(["box-1"]);
+  });
+
+  it("accepts the active entry's own shapes array without fingerprinting it", () => {
+    const entries = [editorHistoryEntry([box({ x: 3 })], [])];
+    const live = liveEditorHistoryState(entries[0].shapes, entries, 0);
+
+    expect(live.entries).toBe(entries);
+    expect(live.index).toBe(0);
+  });
+
+  it("discards live history whose active entry disagrees with the scene being saved", () => {
+    const stale = [editorHistoryEntry([box({ x: 1 })], [])];
+    const live = liveEditorHistoryState([box({ x: 9 })], stale, 0);
+
+    expect(live.entries).toHaveLength(1);
+    expect(live.entries[0]).not.toBe(stale[0]);
+    expect(live.entries[0].shapes[0].x).toBe(9);
+    expect(live.index).toBe(0);
+  });
+
+  it("clamps a live history index that is out of range and bounds the retained entries", () => {
+    const entries = Array.from({ length: 80 }, (_, x) => editorHistoryEntry([box({ x })], []));
+    const beyondEnd = liveEditorHistoryState([box({ x: 79 })], entries, 500);
+    expect(beyondEnd.index).toBe(79);
+
+    const bounded = liveEditorHistoryState([box({ x: 60 })], entries, 60, 30);
+    expect(bounded.entries).toHaveLength(31);
+    expect(bounded.index).toBe(30);
+    expect(bounded.entries[0].shapes[0].x).toBe(30);
+    expect(bounded.entries[bounded.index].shapes[0].x).toBe(60);
+  });
+
+  it("falls back to the current scene when there is no live history at all", () => {
+    const live = liveEditorHistoryState([box({ x: 4 })], undefined, undefined);
+
+    expect(live.entries).toHaveLength(1);
+    expect(live.entries[0].shapes[0].x).toBe(4);
+    expect(live.index).toBe(0);
   });
 
   it("selects all history or the requested number of recent undo actions for project export", () => {

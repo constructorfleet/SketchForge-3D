@@ -28,6 +28,7 @@ import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type
 import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
 import { hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/editorHistory";
+import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createLocalId } from "@/lib/localIds";
 import {
   horizontalPlacementWorkplane,
@@ -94,6 +95,14 @@ type ProjectShapeCacheEntry = {
   history: EditorHistoryEntry[];
   historyIndex: number;
   assets: ProjectAsset[];
+};
+
+/** One queued autosave. `shapeCount` and `revision` are what the list shows once it lands. */
+type ProjectSaveJob = {
+  entry: ProjectShapeCacheEntry;
+  context: ProjectShapeSaveContext;
+  revision: number;
+  shapeCount: number;
 };
 
 type ProjectShapeRecord = {
@@ -643,7 +652,29 @@ export default function Home() {
   const serverProjectMetadataRef = useRef(new Map<string, string>());
   const dashboardImportInputRef = useRef<HTMLInputElement | null>(null);
   const nextProjectRevisionRef = useRef(0);
-  const projectShapeSaveQueuesRef = useRef<Record<string, Promise<void>>>({});
+  // Autosave used to chain: each edit queued a full write behind the last, so a
+  // burst of transforms wrote the project once per edit even though every write
+  // serializes the scene as it is when it runs. Only the newest one is worth
+  // keeping, so a burst now costs the write in flight plus one.
+  const projectSaveQueueRef = useRef<CoalescingSaveQueue<ProjectSaveJob> | null>(null);
+  if (projectSaveQueueRef.current === null) {
+    projectSaveQueueRef.current = createCoalescingSaveQueue<ProjectSaveJob>({
+      run: (projectId, job) => saveProjectShapesWhenIdle(projectId, job.entry, job.context),
+      onSaved: (projectId, job) => {
+        setProjects((current) => current.map((project) => (
+          project.id === projectId && (project.revision ?? 0) <= job.revision
+            ? { ...project, shapes: job.shapeCount, updatedAt: job.revision, revision: job.revision }
+            : project
+        )));
+      },
+      onError: (_projectId, _job, error, outcome) => {
+        // A newer save is already queued behind this one; its result is what
+        // the user will see, so do not report a failure they cannot act on.
+        if (outcome.waiting) return;
+        setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveFailed"));
+      },
+    });
+  }
   const editorLoadingStartedAtRef = useRef(0);
 
   const startEditorTransition = useCallback(() => {
@@ -1114,7 +1145,6 @@ export default function Home() {
       };
     });
 
-    const previousSave = projectShapeSaveQueuesRef.current[snapshot.projectId] ?? Promise.resolve();
     const saveContext: ProjectShapeSaveContext = {
       projectName: snapshot.projectName,
       createdAt: snapshot.projectCreatedAt,
@@ -1124,29 +1154,12 @@ export default function Home() {
       placementWorkplane: normalizePlacementWorkplane(snapshot.placementWorkplane, snapshot.placementElevation),
       sketchPlacementWorkplane: normalizePlacementWorkplane(snapshot.sketchPlacementWorkplane),
     };
-    const queuedSave = previousSave.catch(() => undefined).then(() => saveProjectShapesWhenIdle(snapshot.projectId, entry, saveContext));
-    projectShapeSaveQueuesRef.current[snapshot.projectId] = queuedSave;
-
-    void queuedSave
-      .then(() => {
-        setProjects((current) =>
-          current.map((project) =>
-            project.id === snapshot.projectId && (project.revision ?? 0) <= revision
-              ? { ...project, shapes: snapshot.shapes.length, updatedAt: revision, revision }
-              : project,
-          ),
-        );
-      })
-      .catch((error) => {
-        if (projectShapeSaveQueuesRef.current[snapshot.projectId] === queuedSave) {
-          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveFailed"));
-        }
-      })
-      .finally(() => {
-        if (projectShapeSaveQueuesRef.current[snapshot.projectId] === queuedSave) {
-          delete projectShapeSaveQueuesRef.current[snapshot.projectId];
-        }
-      });
+    projectSaveQueueRef.current?.enqueue(snapshot.projectId, {
+      entry,
+      context: saveContext,
+      revision,
+      shapeCount: snapshot.shapes.length,
+    });
   }, []);
 
   const updateProjectWorkspace = useCallback((snapshot: {
