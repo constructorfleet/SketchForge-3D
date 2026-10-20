@@ -9,7 +9,7 @@
  * shape rather than engine vocabulary.
  *
  * Nothing under `lib/engine/` may reach `@/i18n`, `@/components`, `react` or
- * `next`. `tests/unit/serverCadImportBoundary.test.ts` asserts it over the
+ * `next`. `tests/unit/engineImportBoundary.test.ts` asserts it over the
  * transitive `@/` closure, type-only imports included, and lists the few edges
  * that still point back out of the directory so they cannot quietly multiply.
  *
