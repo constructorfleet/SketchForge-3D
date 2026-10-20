@@ -229,13 +229,17 @@ const TOO_THICK =
  * A thickness that merely does not fit does not throw: it comes back as an
  * empty compound, a solid that fails its own validity check, or the original
  * untouched, all of which `hollowedSolid` catches by measuring. A throw is the
- * other failure, and in this kernel it is the shape rather than the number:
- * every kind whose outside is one continuous curved skin -- sphere, torus,
- * cone, round-walled tube, barrel roof -- fails at every thickness, and at
- * every reconstruction tolerance the kernel offers.
+ * other failure, and it tracks the *kind of surface* rather than the number.
+ *
+ * It is not "curved": an analytic sphere, cylinder, cone and torus all offset
+ * perfectly well. What fails is a **spline** skin -- OCCT will not offset one
+ * inwards at any thickness or at any reconstruction tolerance (checked at 1e-6,
+ * 1e-4, 1e-3 and 1e-2). In this app that is an elliptical ball, a loft, and
+ * anything built by extruding a profile wire, because those surfaces are
+ * splines however round they look.
  */
 const CANNOT_OFFSET =
-  "OCCT could not hollow this shape: its surfaces cannot be offset inwards into a sound solid. A shape whose outside is one continuous curved skin -- a sphere, a torus, a cone, a tube's round wall -- fails this way at any wall thickness.";
+  "OCCT could not hollow this shape: its surfaces cannot be offset inwards into a sound solid. A shape whose skin is a spline rather than an analytic surface -- a ball with unequal radii, a loft -- fails this way at any wall thickness, however round it looks.";
 
 /** What a result OCCT built but cannot write out means, which is nothing good. */
 const UNREADABLE =
