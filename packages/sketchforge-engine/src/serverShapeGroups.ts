@@ -220,6 +220,38 @@ function rotationFromQuaternion(quaternion: THREE.Quaternion) {
   };
 }
 
+/** Reflect selected objects around the selection bounds, preserving their turned orientation. */
+export function mirrorShapes(shapes: WorkplaneShape[], selectedIds: string[], axis: "x" | "y" | "z") {
+  const selected = new Set(selectedIds);
+  const selectedShapes = shapes.filter((shape) => selected.has(shape.id));
+  if (!selectedShapes.length) return { nextShapes: shapes, moved: 0 };
+  const bounds = boundsForShapes(selectedShapes);
+  const pivot = axis === "x" ? (bounds.minX + bounds.maxX) / 2 : axis === "z" ? (bounds.minZ + bounds.maxZ) / 2 : (bounds.minY + bounds.maxY) / 2;
+  const reflection = new THREE.Matrix4().makeScale(axis === "x" ? -1 : 1, axis === "y" ? -1 : 1, axis === "z" ? -1 : 1);
+  let moved = 0;
+  const nextShapes = shapes.map((shape) => {
+    if (!selected.has(shape.id) || shape.locked) return shape;
+    moved += 1;
+    const centerY = (shape.elevation ?? 0) + shape.height / 2;
+    const center = axis === "x" ? shape.x : axis === "z" ? shape.z : centerY;
+    const nextCenter = 2 * pivot - center;
+    const world = reflection.clone();
+    const local = reflection.clone();
+    const rotation = new THREE.Matrix4().makeRotationFromQuaternion(quaternionForShape(shape));
+    const euler = new THREE.Euler().setFromRotationMatrix(world.multiply(rotation).multiply(local), "XYZ");
+    return {
+      ...shape,
+      ...(axis === "x" ? { x: Number(nextCenter.toFixed(4)), mirrorX: !shape.mirrorX } : {}),
+      ...(axis === "z" ? { z: Number(nextCenter.toFixed(4)), mirrorZ: !shape.mirrorZ } : {}),
+      ...(axis === "y" ? { elevation: Number((nextCenter - shape.height / 2).toFixed(4)), mirrorY: !shape.mirrorY } : {}),
+      rotationX: cleanRotationDegrees(THREE.MathUtils.radToDeg(euler.x)),
+      rotation: cleanRotationDegrees(THREE.MathUtils.radToDeg(euler.y)),
+      rotationZ: cleanRotationDegrees(THREE.MathUtils.radToDeg(euler.z)),
+    };
+  });
+  return { nextShapes, moved };
+}
+
 /**
  * The children of a group, put back where they belong as shapes of their own.
  *

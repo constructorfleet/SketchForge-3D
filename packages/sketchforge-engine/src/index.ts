@@ -134,3 +134,6 @@ export {
   type RadiusUnavailableCode,
 } from "./cadMeasurements.js";
 export { exportShapesToStep, type StepExportResult } from "./stepExport.js";
+export { meshProjectShapes } from "./projectMeshes.js";
+export { analyzeMeshTopology, type TriangleFace } from "./meshValidation.js";
+export { mirrorShapes } from "./serverShapeGroups.js";

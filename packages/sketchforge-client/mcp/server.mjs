@@ -325,7 +325,7 @@ const tools = [
   },
   {
     name: "sketchforge_capture_image",
-    description: "Capture a PNG image of the editor viewport from current/home/top/bottom/front/back/right/left view.",
+    description: "Capture a PNG image from current/home/top/bottom/front/back/right/left view. Local project mode renders the model headlessly; editor mode captures the live viewport.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
@@ -341,7 +341,7 @@ const tools = [
   },
   {
     name: "sketchforge_validate_scene",
-    description: "Check triangle mesh topology and pairwise clearance bounds for scene objects. Clearance values are conservative AABB lower bounds, not exact surface distances.",
+    description: "Check triangle topology, conservative AABB clearance bounds, and exact Manifold intersection volumes for overlapping scene objects.",
     inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
   },
   // Hollowing runs on the headless REST API rather than in an editor tab: the
@@ -515,7 +515,9 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
 }
 
 async function callTool(name, args) {
-  if (process.env.SKETCHFORGE_PROJECTS_DIR && name !== "sketchforge_list_macros" && name !== "sketchforge_run_macro") {
+  if (process.env.SKETCHFORGE_PROJECTS_DIR) {
+    if (name === "sketchforge_list_macros") return listMacros();
+    if (name === "sketchforge_run_macro") return runMacroByName(args);
     return callLocalEngineTool(name, args);
   }
   switch (name) {

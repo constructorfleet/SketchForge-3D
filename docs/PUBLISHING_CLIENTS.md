@@ -1,21 +1,22 @@
 # Publishing the client libraries
 
-Two packages are published from this repository, independently of the app's own version:
+Three packages are published from this repository, independently of the app's own version:
 
-Both are published by `.github/workflows/release.yml`, from the same `v<version>` tag that releases the app itself:
+All three are published by `.github/workflows/release.yml`, from the same `v<version>` tag that releases the app itself:
 
 | Package | Registry | Version |
 | --- | --- | --- |
 | `@constructorfleet/sketchforge3d` | npm | the release version |
+| `@sketchforge/engine` | npm | the release version |
 | `sketchforge3d` | PyPI | the release version |
 
-The clients carry the app's version rather than their own, so a user can reason about which client matches which server without a compatibility table. The workflow also runs from the Actions tab (`workflow_dispatch`) with the version typed in, and has switches there to publish only some of the three artifacts -- which is how to recover from a release where, say, the npm publish failed and the Docker image succeeded.
+The packages carry the app's version rather than their own. The npm job publishes `@sketchforge/engine` before `@constructorfleet/sketchforge3d`, whose local MCP mode depends on that exact engine version. The workflow also runs from the Actions tab (`workflow_dispatch`) with the version typed in, and has switches there to publish only some artifacts -- which is how to recover from a release where one registry upload failed after the Docker image succeeded.
 
 ## How a release happens
 
 Releases are driven from `main` by **release-please**, not by a tag typed by hand.
 
-1. Every merge to `main` updates a standing **release pull request**, which carries the next version number -- worked out from the commit prefixes, so a `feat:` since the last release means a minor bump and a `fix:` a patch -- and the release notes for it. It bumps all three manifests together: the root `package.json`, the TypeScript client's, and the Python client's.
+1. Every merge to `main` updates a standing **release pull request**, which carries the next version number -- worked out from the commit prefixes, so a `feat:` since the last release means a minor bump and a `fix:` a patch -- and the release notes for it. It bumps the root, engine, TypeScript client, and Python package versions together, along with the TypeScript client's exact engine dependency.
 2. **Merging that pull request is the release.** release-please tags the merge commit `v<version>` and creates the GitHub release.
 3. The same workflow then publishes what the release consists of: it dispatches `release.yml` (Docker image, npm, PyPI) and `desktop-release.yml` (installers, attached to the release), passing the version to each.
 
@@ -25,7 +26,7 @@ Both are **dispatched**, not called with `uses:`. `release.yml` was a reusable w
 
 The cost of dispatching is that `release-please.yml` finishes without knowing whether the publishing succeeded -- the runs are separate, and the Actions tab is where their results are. The draft release is the gate that matters: it is not published until the artifacts are attached and checked.
 
-So the version number lives in the tree, committed by the release pull request, and the tag only points at it. `release.yml` checks all three manifests equal the tag and **stops before publishing if any disagree** -- which can only happen if a tag was made by hand or a manifest was edited after the release pull request merged.
+So the version number lives in the tree, committed by the release pull request, and the tag only points at it. `release.yml` checks all four package manifests and the engine dependency equal the tag and **stops before publishing if any disagree** -- which can only happen if a tag was made by hand or a manifest was edited after the release pull request merged.
 
 The clients carry the app's version rather than their own, so a user can tell which client matches which server without a compatibility table.
 
@@ -59,8 +60,8 @@ Neither of these can be set up from the repository; both need an account action.
 
 ### npm
 
-1. Sign in to npmjs.com as the owner of the `@constructorfleet` scope.
-2. **Access Tokens** -> **Generate New Token** -> **Granular Access Token** (classic "Automation" also works). Give it **Read and write** on packages in the `@constructorfleet` scope, and an expiry you are willing to rotate.
+1. Sign in to npmjs.com as an owner of both the `@constructorfleet` and `@sketchforge` scopes.
+2. **Access Tokens** -> **Generate New Token** -> **Granular Access Token** (classic "Automation" also works). Give it **Read and write** on packages in both scopes, and an expiry you are willing to rotate.
 3. In GitHub, **Settings -> Secrets and variables -> Actions -> New repository secret**:
    - Name: `NPM_TOKEN`
    - Value: the token from step 2.
@@ -94,10 +95,10 @@ Verified locally: both packages build, their unit tests pass with the same comma
 
 ## What `release.yml` does, in order
 
-1. **Verify.** Resolves the version from the tag, runs `npm run ci` and the static export build, and checks all three manifests equal it. Nothing is published from a tree that does not pass its own checks: a bad release can only be superseded on npm and PyPI, never withdrawn.
+1. **Verify.** Resolves the version from the tag, runs `npm run ci` and the static export build, and checks all four package manifests and the client engine dependency equal it. Nothing is published from a tree that does not pass its own checks: a bad release can only be superseded on npm and PyPI, never withdrawn.
 
 2. **Docker image** to `ghcr.io`, tagged `v<version>`, `<version>`, `<major>.<minor>` and `latest`, for `linux/amd64` and `linux/arm64`. A release is now the only thing that moves `latest`. `docker.yml` still builds every push to `main`, but publishes it only as the `main` tag and by short SHA -- previously it moved `latest` too, so two workflows fought over that tag and `latest` meant "newest commit" for Docker while meaning "newest release" everywhere else.
 
-3. **npm and PyPI**, in parallel.
+3. **npm and PyPI**, in parallel. The npm job publishes the engine first and the MCP client second; dispatch inputs can skip either upload when recovering from a partial publish.
 
 The Actions tab can run this workflow by hand with the version typed in, and has switches to publish only some of the three artifacts -- which is how to recover from a release where, say, npm failed and the Docker image succeeded.

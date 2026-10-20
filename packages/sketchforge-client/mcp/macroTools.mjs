@@ -97,6 +97,12 @@ function javascriptRunner(environment) {
 }
 
 function runnerFor(macroName, environment) {
+  if (environment.SKETCHFORGE_PROJECTS_DIR) {
+    if (path.extname(macroName).toLowerCase() === ".py") {
+      throw new MacroToolError("Python macros need the HTTP API adapter; local project mode runs JavaScript macros directly against the engine.");
+    }
+    return { command: process.execPath, leadingArguments: [path.join(moduleDirectory, "localMacroRunner.mjs")], extraEnvironment: {} };
+  }
   if (path.extname(macroName).toLowerCase() === ".py") {
     const python = environment.SKETCHFORGE_MACRO_PYTHON || "python3";
     const pythonPath = existsSync(bundledPythonSource)

@@ -69,6 +69,12 @@ describe("creating a shape applies what the request asked for", () => {
     expect("ok" in change && change.ok).toBe(false);
   });
 
+  it("allows each mirror axis to be toggled by a shape change", () => {
+    const box = created({ kind: "box", width: 20, depth: 20, height: 20 });
+    const change = shapeWithRequestedChanges(box, { mirrorX: true, mirrorY: true, mirrorZ: true });
+    expect(change).toMatchObject({ ok: true, shape: { mirrorX: true, mirrorY: true, mirrorZ: true } });
+  });
+
   it("applies every table parameter its kind claims, on create as on change", () => {
     // Table-driven so a parameter added later is covered without anyone
     // remembering this test exists.
