@@ -129,17 +129,31 @@ export function workplaneThemePalette(
       };
 }
 
+/**
+ * The interior grid lines of one axis, as coordinates and lattice indices.
+ *
+ * The lattice is anchored on the world origin — every line is a whole number of
+ * steps from 0 — not on the near edge of the plate. Anchoring it on the edge
+ * (upstream issue #117) meant a plate whose span was not a whole number of grid
+ * blocks drew lines that missed the origin entirely, so there was no axis line
+ * to read, the lines did not agree with where a drag or a snap put a shape, and
+ * resizing the plate slid the whole grid sideways under the model.
+ *
+ * `index` is that lattice index, which is what makes a major line every fifth
+ * block fall in the same place whatever the plate measures.
+ */
 export function interiorWorkplaneGridCoordinates(span: number, step: number): WorkplaneGridCoordinate[] {
   if (!Number.isFinite(span) || !Number.isFinite(step) || span <= 0 || step <= 0) {
     return [];
   }
 
   const halfSpan = span / 2;
-  const count = Math.floor(span / step);
+  const firstIndex = Math.ceil(-halfSpan / step);
+  const lastIndex = Math.floor(halfSpan / step);
   const coordinates: WorkplaneGridCoordinate[] = [];
 
-  for (let index = 0; index <= count; index += 1) {
-    const rawCoordinate = -halfSpan + index * step;
+  for (let index = firstIndex; index <= lastIndex; index += 1) {
+    const rawCoordinate = index * step;
     const coordinate = Math.abs(rawCoordinate) < WORKPLANE_BOUNDARY_EPSILON ? 0 : rawCoordinate;
     const isBoundary = Math.abs(Math.abs(coordinate) - halfSpan) < WORKPLANE_BOUNDARY_EPSILON;
     if (!isBoundary) {

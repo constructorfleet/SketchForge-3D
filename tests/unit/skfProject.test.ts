@@ -77,6 +77,30 @@ describe("SketchForge .skf project packages", () => {
     vi.restoreAllMocks();
   });
 
+  // Upstream issue #116: the camera projection is a workspace preference, so it
+  // travels in the project file. A file written by a build that has the setting
+  // must still open in one that does not, and the other way round.
+  it("round-trips the camera projection and opens a project saved without it", async () => {
+    const shapes = [canonicalizeShape(shape("box"))];
+    const bytes = await exportSkfProject(input(shapes, {
+      workspace: { ...DEFAULT_WORKPLANE_WORKSPACE, cameraProjection: "orthographic" },
+    }));
+
+    const { document } = packageDocument(bytes);
+    expect(document.editor.workspace.cameraProjection).toBe("orthographic");
+    expect((await importSkfProject(bytes)).workspace.cameraProjection).toBe("orthographic");
+
+    const withoutSetting = mutateProject(bytes, (doc) => {
+      delete (doc.editor.workspace as Partial<typeof doc.editor.workspace>).cameraProjection;
+    });
+    expect((await importSkfProject(withoutSetting)).workspace.cameraProjection).toBe("perspective");
+
+    const corrupt = mutateProject(bytes, (doc) => {
+      (doc.editor.workspace as Record<string, unknown>).cameraProjection = "isometric";
+    });
+    expect((await importSkfProject(corrupt)).workspace.cameraProjection).toBe("perspective");
+  });
+
   it("encodes shared geometry once across a long transform history and subsequent saves", async () => {
     const points = Array.from({ length: 30_000 }, (_, index) => Math.sin(index));
     const resource = shape("mesh", "shared-geometry", {

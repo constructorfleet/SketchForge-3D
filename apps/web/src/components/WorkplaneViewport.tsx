@@ -22,6 +22,7 @@ import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
+import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
@@ -100,6 +101,8 @@ const WORKSPACE_DEFAULTS_STORAGE_PREFIX = "sketchForge.workspaceDefault.";
 const MOVE_DIMENSIONS_ENABLED_STORAGE_KEY = "sketchForge.editor.moveDimensionsEnabled";
 const DEFAULT_WORKSPACE = DEFAULT_WORKPLANE_WORKSPACE;
 const CAMERA_FOV = 38;
+const MIN_CAMERA_DISTANCE = 22;
+const MAX_CAMERA_DISTANCE = 4200;
 const CAMERA_HOME = new THREE.Vector3(118, 96, 118);
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
 const MIN_SHAPE_SIZE = 0.01;
@@ -489,8 +492,6 @@ type TransformDragItem = {
   startCenter: THREE.Vector3;
   startQuaternion: THREE.Quaternion;
 };
-
-type CameraProjection = "perspective" | "orthographic";
 
 type SelectionFrame = {
   ids: string[];
@@ -2416,12 +2417,14 @@ export function WorkplaneViewport({
 }: WorkplaneViewportProps) {
   // Used only in the returned JSX; never list it in scene effect deps (a locale change must not rebuild the scene).
   const t = useTranslations();
-  const [cameraProjection, setCameraProjection] = useState<CameraProjection>("perspective");
   const [sceneListCollapsed, setSceneListCollapsed] = useState(false);
   const [snapOpen, setSnapOpen] = useState(false);
   const [snap, setSnap] = useState<GridSize>(() => normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
+  // Read straight off the workspace settings rather than mirrored into view state,
+  // so the button cannot drift out of step with what the project has stored.
+  const cameraProjection = workspace.cameraProjection;
   const [transformOverlay, setTransformOverlay] = useState<TransformOverlayState | null>(null);
   const [alignOverlay, setAlignOverlay] = useState<AlignOverlayState | null>(null);
   const [mirrorOverlay, setMirrorOverlay] = useState<MirrorOverlayState | null>(null);
@@ -2728,6 +2731,22 @@ export function WorkplaneViewport({
     onWorkspaceSettingsChange?.({ workspace: normalizedWorkspace, snap: normalizedSnap });
   }, [onWorkspaceSettingsChange, snap, workspace]);
 
+  // Applies the stored projection to the live camera, both when the preference is
+  // toggled and when a project is loaded with one already chosen. The switch is
+  // idempotent, so a workspace change that leaves the projection alone — a grid
+  // colour, say — does not disturb the camera.
+  useEffect(() => {
+    const state = threeRef.current;
+    if (!state) {
+      return;
+    }
+    if (applyCameraProjection(state, cameraProjection)) {
+      // The render loop constrains the camera every frame, so only the cube needs
+      // telling; the orbit direction is unchanged, but its projection is not.
+      syncViewCube(state, viewCubeRef.current);
+    }
+  }, [cameraProjection]);
+
   useEffect(() => {
     const openWorkspaceSettings = () => setSettingsOpen(true);
     window.addEventListener("sketchforge:open-workspace-settings", openWorkspaceSettings);
@@ -2983,6 +3002,9 @@ export function WorkplaneViewport({
     const state = createThreeScene(host);
     threeRef.current = state;
     rebuildWorkplane(state, workspaceRef.current, resolvedThemeRef.current, placementWorkplaneRef.current);
+    // The scene is built after the projection effect has already run for the first
+    // time, so the stored preference is applied here on mount.
+    applyCameraProjection(state, workspaceRef.current.cameraProjection);
     window.sketchforgeCaptureCanvas = () => {
       state.camera.updateMatrixWorld();
       state.renderer.render(state.scene, state.camera);
@@ -4930,9 +4952,9 @@ export function WorkplaneViewport({
       const halfHeight = Math.max(0.001, (state.camera.top - state.camera.bottom) / 2);
       const zoom = orthographicFramingZoom(radius, halfHeight, aspect);
       if (zoom) state.camera.zoom = clamp(zoom, 0.02, 100);
-      state.camera.position.copy(center).add(direction.multiplyScalar(clamp(offset.length(), 22, 4200)));
+      state.camera.position.copy(center).add(direction.multiplyScalar(clamp(offset.length(), MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE)));
     } else {
-      const distance = clamp(perspectiveFramingDistance(radius, CAMERA_FOV, aspect), 22, 4200);
+      const distance = clamp(perspectiveFramingDistance(radius, CAMERA_FOV, aspect), MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
       state.camera.position.copy(center).add(direction.multiplyScalar(distance));
     }
 
@@ -5058,7 +5080,7 @@ export function WorkplaneViewport({
       state.camera.zoom = clamp(state.camera.zoom / scale, 0.02, 100);
     } else {
       const offset = state.camera.position.clone().sub(state.controls.target);
-      const distance = clamp(offset.length() * scale, 22, 4200);
+      const distance = clamp(offset.length() * scale, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
       offset.setLength(distance);
       state.camera.position.copy(state.controls.target).add(offset);
     }
@@ -5067,13 +5089,13 @@ export function WorkplaneViewport({
     state.needsRender = true;
   }, []);
 
+  // The projection is a workspace preference, so it is persisted with the project
+  // and survives a reload. Writing the setting is all the toggle does; the effect
+  // that watches it is what moves the camera, so a projection restored from a
+  // saved project takes effect by the same path as one picked here.
   const toggleProjection = useCallback(() => {
-    const state = threeRef.current;
-    if (!state) {
-      return;
-    }
-    setCameraProjection(toggleCameraProjection(state));
-  }, []);
+    chooseWorkspace((current) => ({ ...current, cameraProjection: toggledCameraProjection(current.cameraProjection) }));
+  }, [chooseWorkspace]);
 
   const togglePlacementWorkplane = useCallback(() => {
     setRulerToolsOpen(false);
@@ -5824,8 +5846,7 @@ function resetCamera(state: ThreeState) {
   state.controls.target.copy(CAMERA_TARGET);
   if (state.camera instanceof THREE.OrthographicCamera) {
     state.camera.zoom = 1;
-    const distance = CAMERA_HOME.distanceTo(CAMERA_TARGET);
-    const halfHeight = distance * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2));
+    const halfHeight = orthographicHalfHeightAtDistance(CAMERA_HOME.distanceTo(CAMERA_TARGET), CAMERA_FOV);
     const canvas = state.renderer.domElement;
     updateOrthographicFrustum(state.camera, canvas.clientWidth / Math.max(1, canvas.clientHeight), halfHeight);
   } else {
@@ -5860,7 +5881,26 @@ function updateOrthographicFrustum(camera: THREE.OrthographicCamera, aspect: num
   camera.updateProjectionMatrix();
 }
 
-function toggleCameraProjection(state: ThreeState): CameraProjection {
+function cameraProjectionOf(state: ThreeState): CameraProjection {
+  return state.camera instanceof THREE.OrthographicCamera ? "orthographic" : "perspective";
+}
+
+/**
+ * Put the camera into the given projection, framing the same scene from the
+ * same direction.
+ *
+ * Switching must not move the view. The orthographic frustum is built as tall as
+ * the perspective camera already saw at the orbit target and the camera keeps its
+ * position, and coming back the camera is placed at the distance that sees the
+ * frustum the orthographic camera was showing — zoom included, since an
+ * orthographic camera zooms by shrinking its frustum rather than by moving.
+ *
+ * Idempotent, so the effect that applies the stored preference can run freely.
+ */
+function applyCameraProjection(state: ThreeState, projection: CameraProjection) {
+  if (cameraProjectionOf(state) === projection) {
+    return false;
+  }
   const current = state.camera;
   const target = state.controls.target;
   const canvas = state.renderer.domElement;
@@ -5872,10 +5912,7 @@ function toggleCameraProjection(state: ThreeState): CameraProjection {
   let next: THREE.PerspectiveCamera | THREE.OrthographicCamera;
 
   if (current instanceof THREE.PerspectiveCamera) {
-    const visibleHalfHeight = Math.max(
-      0.001,
-      offset.length() * Math.tan(THREE.MathUtils.degToRad(current.getEffectiveFOV() / 2)),
-    );
+    const visibleHalfHeight = orthographicHalfHeightAtDistance(offset.length(), current.getEffectiveFOV());
     next = new THREE.OrthographicCamera(
       -visibleHalfHeight * aspect,
       visibleHalfHeight * aspect,
@@ -5886,11 +5923,11 @@ function toggleCameraProjection(state: ThreeState): CameraProjection {
     );
     next.position.copy(current.position);
   } else {
-    const visibleHalfHeight = Math.max(0.001, (current.top - current.bottom) / (2 * current.zoom));
+    const visibleHalfHeight = orthographicVisibleHalfHeight(current.top - current.bottom, current.zoom);
     const distance = clamp(
-      visibleHalfHeight / Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2)),
-      22,
-      4200,
+      perspectiveDistanceForHalfHeight(visibleHalfHeight, CAMERA_FOV),
+      MIN_CAMERA_DISTANCE,
+      MAX_CAMERA_DISTANCE,
     );
     next = new THREE.PerspectiveCamera(CAMERA_FOV, aspect, current.near, current.far);
     next.position.copy(target).addScaledVector(direction, distance);
@@ -5905,12 +5942,12 @@ function toggleCameraProjection(state: ThreeState): CameraProjection {
   state.controls.object = next;
   state.controls.update();
   state.needsRender = true;
-  return state.camera instanceof THREE.OrthographicCamera ? "orthographic" : "perspective";
+  return true;
 }
 
 function setCameraToViewFace(state: ThreeState, face: ViewCubeFace) {
   const offset = state.camera.position.clone().sub(state.controls.target);
-  const distance = clamp(offset.length(), 22, 4200);
+  const distance = clamp(offset.length(), MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
   const directionByFace: Record<ViewCubeFace, THREE.Vector3> = {
     top: new THREE.Vector3(0, 1, 0),
     bottom: new THREE.Vector3(0, -1, 0),
