@@ -16,7 +16,8 @@ import {
   writeProjectPackage,
   type ProjectMetadata,
 } from "@/lib/engine/serverProjectFiles";
-import { exportSkfProject, importSkfProject } from "@/lib/engine/skfProject";
+import { importedShapeFromStepOnKernel } from "@/lib/engine/stepImportKernel";
+import { exportSkfProject, importSkfProject, importSkfSourceAsset } from "@/lib/engine/skfProject";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 import { horizontalPlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
@@ -81,7 +82,13 @@ export async function readProjectDocument(root: string, projectId: string): Prom
       sketchPlacementWorkplane: horizontalPlacementWorkplane(),
     };
   }
-  const restored = await importSkfProject(packageBytes);
+  const restored = await importSkfProject(packageBytes, {
+    sourceImporter: async (asset) => {
+      if (asset.sourceFormat !== "step") return importSkfSourceAsset(asset);
+      const { shape } = await importedShapeFromStepOnKernel(asset.name, new TextDecoder().decode(asset.bytes));
+      return shape.importedMesh!;
+    },
+  });
   return {
     metadata,
     projectName: restored.projectName || projectName,
