@@ -226,6 +226,8 @@ type WorkplaneViewportProps = {
   onEditSketch?: () => void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
+  /** Solid volume of the selected shape, for the inspector's material readout. */
+  selectedShapeVolumeMm3?: number;
   onUpdateShape: (id: string, patch: ShapeUpdatePatch) => void;
   onWorkspaceSettingsChange?: (settings: { workspace: WorkplaneWorkspaceSettings; snap: GridSize }) => void;
   onWorkplaneModeChange: (active: boolean) => void;
@@ -2401,6 +2403,7 @@ export function WorkplaneViewport({
   onEditSketch,
   canSeparateParts = false,
   onSeparateParts,
+  selectedShapeVolumeMm3,
   onUpdateShape,
   onWorkspaceSettingsChange,
   onWorkplaneModeChange,
@@ -5592,6 +5595,11 @@ export function WorkplaneViewport({
             onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
             canSeparateParts={canSeparateParts}
             onSeparateParts={onSeparateParts}
+            volumeMm3={selectedShapeVolumeMm3}
+            onMaterialPriceChange={(materialId, pricePerKg) => chooseWorkspace((current) => ({
+              ...current,
+              materialPricesPerKg: { ...current.materialPricesPerKg, [materialId]: pricePerKg },
+            }))}
             onInteractionActiveChange={onInteractionActiveChange}
           />
         ) : null}

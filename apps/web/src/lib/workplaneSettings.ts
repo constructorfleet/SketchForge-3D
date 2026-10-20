@@ -1,4 +1,5 @@
 import type { GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomization, ShapeCustomizationMap, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import { normalizeMaterialPrices } from "@/lib/materialPresets";
 import { normalizeScaleForUnits } from "@/lib/measurementUnits";
 import { DEFAULT_CAMERA_PROJECTION, normalizeCameraProjection } from "@/lib/cameraProjection";
 import { DEFAULT_WORKPLANE_GRID_COLOR } from "@/lib/workplaneGrid";
@@ -32,6 +33,7 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   accuracy: 2,
   historyLimit: 100,
   shapeCustomizations: {},
+  materialPricesPerKg: {},
 };
 
 const snapGridOptions: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];
@@ -200,6 +202,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     accuracy: accuracyOrDefault(candidate.accuracy, fallback.accuracy),
     historyLimit: historyLimitOrDefault(candidate.historyLimit, fallback.historyLimit),
     shapeCustomizations: normalizeShapeCustomizations(candidate.shapeCustomizations, fallback.shapeCustomizations),
+    materialPricesPerKg: normalizeMaterialPrices(candidate.materialPricesPerKg, fallback.materialPricesPerKg),
   };
 }
 
