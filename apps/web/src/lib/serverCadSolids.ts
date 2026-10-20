@@ -384,15 +384,28 @@ export const EXACT_SOLID_KINDS = [
  * rotation of its own, so a shape filleted while turned would otherwise come
  * back straightened.
  */
+const Z_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } } as const;
+
 export function exactSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   let solid = untransformedSolid(cad, shape);
   const yaw = shape.rotation ?? 0;
   const pitch = shape.rotationX ?? 0;
   const roll = shape.rotationZ ?? 0;
-  // The editor applies yaw about Y, then pitch about X, then roll about Z.
-  if (yaw) solid = cad.rotate(solid, Y_AXIS, degreesToRadians(-yaw));
+  // The editor orients a shape with THREE.Euler(rotationX, rotation, rotationZ)
+  // in its default "XYZ" order, which is the matrix Rx * Ry * Rz -- so a point
+  // is turned by roll first, then yaw, then pitch. Each `rotate` here
+  // left-multiplies, so the calls run in that same order: roll, yaw, pitch.
+  //
+  // This used to negate the yaw and apply the three in the opposite order, and
+  // nothing noticed, because the shapes anyone had filleted while turned were
+  // symmetric: a box or a cylinder is unchanged by the 180-degree error a
+  // negated yaw produces, and a single pitch or roll was already right. On an
+  // asymmetric shape -- a wedge, a roof, a cone with a top radius -- the result
+  // came back mirrored about the yaw, and any two non-zero rotations came back
+  // in the wrong order.
+  if (roll) solid = cad.rotate(solid, Z_AXIS, degreesToRadians(roll));
+  if (yaw) solid = cad.rotate(solid, Y_AXIS, degreesToRadians(yaw));
   if (pitch) solid = cad.rotate(solid, X_AXIS, degreesToRadians(pitch));
-  if (roll) solid = cad.rotate(solid, { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } }, degreesToRadians(roll));
   return solid;
 }
 
