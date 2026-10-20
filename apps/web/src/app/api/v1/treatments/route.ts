@@ -1,8 +1,6 @@
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
-import { withProjectLock } from "@/lib/engine/serverProjectFiles";
-import { applyEdgeTreatment, shapeWithCadResult, ServerCadError } from "@/lib/engine/serverCadOperations";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -37,29 +35,16 @@ export async function POST(request: Request) {
   const edges = edgeIndexes(body.edges);
   if (edges === null) return apiError('edges must be a list of edge indexes, or "all".', 400, "invalid_request");
 
-  const locked = await withProjectLock(context.root, projectId, async () => {
-    const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiErrors.projectNotFound();
-    const shape = document.shapes.find((candidate) => candidate.id === shapeId);
-    if (!shape) return apiErrors.shapeNotFound();
-    if (shape.locked) return apiErrors.shapeLocked();
-
-    let treated;
-    try {
-      const result = await applyEdgeTreatment(shape, { kind, amount: body.amount as number, angle: body.angle as number | undefined, edges });
-      treated = shapeWithCadResult(shape, result);
-    } catch (error) {
-      if (error instanceof ServerCadError) return apiError(error.message, error.status, "cad_failed");
-      return apiError("The CAD kernel could not complete that operation.", 500, "cad_failed");
-    }
-
-    const shapes = document.shapes.map((candidate) => (candidate.id === shapeId ? treated : candidate));
-    const written = await writeProjectDocument(context.root, projectId, document, shapes);
-    return apiJson({
-      shape: apiShapeSummary(treated),
-      triangles: treated.importedMesh?.triangleCount ?? 0,
-      revision: written.revision,
-    });
+  const treated = await apiEngine(context.root).treat(projectId, shapeId, {
+    kind,
+    amount: body.amount,
+    angle: body.angle as number | undefined,
+    edges,
   });
-  return locked.busy ? apiErrors.projectBusy() : locked.result;
+  if (!treated.ok) return apiEngineError(treated.failure, { oneShape: true });
+  return apiJson({
+    shape: apiShapeSummary(treated.value.shape),
+    triangles: treated.value.shape.importedMesh?.triangleCount ?? 0,
+    revision: treated.value.revision,
+  });
 }
