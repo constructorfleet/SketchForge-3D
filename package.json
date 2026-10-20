@@ -45,7 +45,7 @@
     "preexport": "npm run engine:build",
     "pretypecheck": "npm run engine:build",
     "pretypecheck:tests": "npm run engine:build",
-    "pretest": "npm run engine:build",
+    "pretest": "npm run engine:build && npm run client:build",
     "pretest:e2e": "npm run engine:build",
     "predesktop:web:build": "npm run engine:build",
     "premcp:sketchforge": "npm run engine:build"
