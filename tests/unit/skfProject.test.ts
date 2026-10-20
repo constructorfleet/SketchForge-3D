@@ -250,7 +250,7 @@ describe("SketchForge .skf project packages", () => {
     const revolve = shape("mesh", "revolve-sketch", {
       name: "Sketch revolve",
       sketchOperation: "revolve",
-      sketchRevolve: { startAngle: 25, sweepAngle: -220, sides: 48, quality: 8 },
+      sketchRevolve: { startAngle: 25, sweepAngle: -220, sides: 48, quality: 8, pitch: 1.5, turns: 2 },
       sketchProfile: {
         points: [{ id: "p1", x: -4, z: 0 }, { id: "p2", x: -8, z: 0 }, { id: "p3", x: -8, z: 16 }, { id: "p4", x: -4, z: 16 }],
         segments: [

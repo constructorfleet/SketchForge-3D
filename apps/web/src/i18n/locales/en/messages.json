@@ -890,7 +890,9 @@
       "positionZ": "Z",
       "rotationX": "Tilt X",
       "rotationY": "Turn Y",
-      "rotationZ": "Tilt Z"
+      "rotationZ": "Tilt Z",
+      "pitch": "Pitch",
+      "turns": "Turns"
     },
     "inspector": {
       "label": "{name} shape settings",

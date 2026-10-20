@@ -142,6 +142,51 @@ describe("REST API v1", () => {
     expect(listing.shapes.map((shape) => shape.name)).toEqual(["A", "B", "C"]);
   });
 
+  it("creates a thread from a diameter and a pitch", async () => {
+    const projectId = await makeProject();
+
+    const created = await addShape(projectId, { kind: "thread", diameter: 8, pitch: 1.25, turns: 6, name: "M8" });
+
+    expect(created.status).toBe(201);
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const thread = document?.shapes[0];
+    expect(thread?.name).toBe("M8");
+    expect(thread?.width).toBeCloseTo(8, 0);
+    // Six turns of rise plus the one-pitch-tall profile.
+    expect(thread?.height).toBeCloseTo(1.25 * 7, 1);
+    // Still a revolve, so its pitch is editable in the inspector afterwards.
+    expect(thread?.sketchRevolve).toMatchObject({ pitch: 1.25, turns: 6 });
+  });
+
+  it("creates a revolve from an outline, with or without a pitch", async () => {
+    const projectId = await makeProject();
+    const outline = [[4, 0], [6, 0], [6, 3], [4, 3]];
+
+    const spring = await addShape(projectId, { kind: "revolve", profile: outline, pitch: 5, turns: 4, name: "Coil" });
+    const ring = await addShape(projectId, { kind: "revolve", profile: outline, name: "Ring" });
+
+    expect(spring.status).toBe(201);
+    expect(ring.status).toBe(201);
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const coil = document?.shapes.find((shape) => shape.name === "Coil");
+    const plain = document?.shapes.find((shape) => shape.name === "Ring");
+    expect(coil?.height).toBeCloseTo(5 * 4 + 3, 1);
+    // No pitch: a plain ring of the profile's own height.
+    expect(plain?.height).toBeCloseTo(3, 1);
+  });
+
+  it("explains an outline it cannot revolve", async () => {
+    const projectId = await makeProject();
+
+    const missing = await addShape(projectId, { kind: "revolve" });
+    const tooFew = await addShape(projectId, { kind: "revolve", profile: [[1, 1], [2, 2]] });
+
+    expect(missing.status).toBe(400);
+    expect(missing.payload.error).toContain("profile");
+    expect(tooFew.status).toBe(400);
+    expect(tooFew.payload.error).toContain("at least 3");
+  });
+
   it("reports a kind it cannot build without saying it worked", async () => {
     const projectId = await makeProject();
 
