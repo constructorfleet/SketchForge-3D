@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
@@ -48,6 +48,9 @@ const tools = [
       properties: {
         ...editorTargetSchema.properties,
         includeRawShapes: { type: "boolean", description: "Include raw WorkplaneShape JSON. Can be large for imported meshes." },
+        shapeIds: { type: "array", items: { type: "string" }, description: "Limit the response to these object ids (including rawShapes)." },
+        excludeShapeIds: { type: "array", items: { type: "string" }, description: "Omit these object ids, useful for large reference meshes." },
+        includeRawShapeIds: { type: "array", items: { type: "string" }, description: "Include raw geometry only for these ids; takes precedence over includeRawShapes." },
       },
     },
   },
@@ -67,6 +70,11 @@ const tools = [
         ids: { type: "array", items: { type: "string" } },
       },
     },
+  },
+  {
+    name: "sketchforge_mirror_objects",
+    description: "Mirror objects across the center plane of their combined bounds, using the editor's mirror behavior.",
+    inputSchema: { ...editorTargetSchema, required: ["axis"], properties: { ...editorTargetSchema.properties, ids: { type: "array", items: { type: "string" }, description: "Object ids; defaults to the current selection." }, axis: { type: "string", enum: ["x", "y", "z"] } } },
   },
   {
     name: "sketchforge_delete_objects",
@@ -91,7 +99,7 @@ const tools = [
         kind: { type: "string", enum: ["box", "cube", "cylinder", "sketch", "loft", "revolve", "thread"] },
         profile: {
           type: "array",
-          description: "For kind revolve: the closed outline to revolve, as [x, z] pairs. x is the distance from the axis, z runs along it. A triangle makes a thread, a rectangle a tube, a polygon a spring.",
+          description: "For kind sketch: a closed 2D outline to extrude, as [x, z] pairs. For kind revolve: the closed outline to revolve, where x is distance from axis and z runs along it.",
           items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
         },
         pitch: { type: "number", description: "For kind revolve/thread: axial rise per turn in mm. 0 is a plain revolve; negative is a left-hand thread." },
@@ -324,6 +332,16 @@ const tools = [
       },
     },
   },
+  {
+    name: "sketchforge_export_scene",
+    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, or a ZIP kit. Set outputPath to save directly on the MCP host and avoid returning large base64 data. Use shapeIds to keep a reference mesh out of mesh exports.",
+    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+  },
+  {
+    name: "sketchforge_validate_scene",
+    description: "Check triangle mesh topology and pairwise clearance bounds for scene objects. Clearance values are conservative AABB lower bounds, not exact surface distances.",
+    inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
+  },
   // Hollowing runs on the headless REST API rather than in an editor tab: the
   // operation is server-side OCCT, and the editor has no action for it yet.
   {
@@ -504,6 +522,8 @@ async function callTool(name, args) {
       return bridgeCommand("list_objects", args);
     case "sketchforge_select_objects":
       return bridgeCommand("select_objects", args);
+    case "sketchforge_mirror_objects":
+      return bridgeCommand("mirror_objects", args);
     case "sketchforge_delete_objects":
       return bridgeCommand("delete_objects", args);
     case "sketchforge_create_shape":
@@ -551,6 +571,17 @@ async function callTool(name, args) {
       return bridgeCommand("inspect_errors", args);
     case "sketchforge_capture_image":
       return bridgeCommand("capture_image", args, 30000);
+    case "sketchforge_export_scene": {
+      const artifact = await bridgeCommand("export_scene", args, 60000);
+      if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+        const destination = path.resolve(args.outputPath);
+        writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
+        return { filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount, savedTo: destination };
+      }
+      return artifact;
+    }
+    case "sketchforge_validate_scene":
+      return bridgeCommand("validate_scene", args, 60000);
     case "sketchforge_list_macros":
       return listMacros();
     case "sketchforge_run_macro":

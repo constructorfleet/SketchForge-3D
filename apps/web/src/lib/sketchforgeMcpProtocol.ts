@@ -75,6 +75,7 @@ export type SketchForgeMcpCommandName =
   | "get_scene"
   | "list_objects"
   | "select_objects"
+  | "mirror_objects"
   | "delete_objects"
   | "create_shape"
   | "import_mesh"
@@ -89,7 +90,9 @@ export type SketchForgeMcpCommandName =
   | "list_edges"
   | "apply_edge_treatment"
   | "inspect_errors"
-  | "capture_image";
+  | "capture_image"
+  | "export_scene"
+  | "validate_scene";
 
 export type SketchForgeMcpCommand = {
   id: string;
