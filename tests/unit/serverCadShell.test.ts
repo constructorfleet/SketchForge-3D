@@ -188,28 +188,73 @@ describe("hollowing a solid on the server", { timeout: CAD_TEST_TIMEOUT_MS }, ()
     await expect(applyShell(sphere, { thickness: 2, openFaces: ["top"] })).rejects.toThrow(/no flat top face/);
   });
 
-  it("hollows the flat-faced kinds and refuses the curved-skin ones by name", async () => {
-    // Which kinds this works on is a property of the kernel rather than a
-    // choice: a sphere, a torus, a cone and a round-walled tube are each one
-    // continuous surface, and OCCT refuses to offset any of them inwards --
-    // at every thickness and at every tolerance it offers. Pinned here so a
-    // kernel upgrade that widens or narrows it shows up as a failing test
-    // rather than as a support answer.
-    for (const kind of ["box", "cylinder", "polygon", "pyramid", "roof", "wedge"] as const) {
-      const shape = sceneShape({ name: kind, kind, color: "#d41721", width: 20, depth: 20, height: 20, size: 20 });
+  it("hollows a ball to the volume the arithmetic says", async () => {
+    // A 40mm ball with a 2mm wall: 4/3 pi (20^3 - 18^3), and still centred on
+    // its own centre, which for a sphere sitting on the workplane is its radius
+    // above it. Exact rather than close, because a ball of three equal radii is
+    // built as a true sphere -- OCCT's ellipsoid is a revolved spline, which it
+    // then refuses to offset at all.
+    const ball = sceneShape({ name: "ball", kind: "sphere", color: "#d41721", width: 40, depth: 40, height: 40, size: 40 });
+
+    const result = await applyShell(ball, { thickness: 2 });
+
+    const { volume, centre } = await measure(result.brep);
+    expect(volume).toBeCloseTo((4 / 3) * Math.PI * (20 ** 3 - 18 ** 3), 3);
+    expect(centre.x).toBeCloseTo(0, 6);
+    expect(centre.y).toBeCloseTo(20, 6);
+    expect(centre.z).toBeCloseTo(0, 6);
+  });
+
+  it("hollows the kinds whose surfaces are analytic, round ones included", async () => {
+    // Which kinds this works on is a property of the kernel, not a choice, and
+    // the line is not "curved": an analytic sphere, cylinder, cone and torus
+    // all offset inwards perfectly well. Pinned here so a kernel upgrade that
+    // moves the line shows up as a failing test rather than a support answer.
+    const flat = ["box", "cylinder", "polygon", "pyramid", "roof", "wedge"] as const;
+    for (const kind of flat) {
+      const shape = sceneShape({ name: kind, kind, color: "#d41721", width: 40, depth: 40, height: 40, size: 40 });
       await expect(applyShell(shape, { thickness: 2 }), kind).resolves.toMatchObject({
         triangleCount: expect.any(Number),
       });
     }
-    for (const kind of ["sphere", "torus", "cone", "tube", "ring"] as const) {
-      const shape = sceneShape({ name: kind, kind, color: "#d41721", width: 20, depth: 20, height: 20, size: 20 });
+
+    const curved: Array<[string, WorkplaneShape]> = [
+      ["ball", sceneShape({ name: "ball", kind: "sphere", color: "#d41721", width: 40, depth: 40, height: 40, size: 40 })],
+      ["dome", sceneShape({ name: "dome", kind: "halfSphere", color: "#d41721", width: 40, depth: 40, height: 20, size: 40 })],
+      ["torus", sceneShape({ name: "torus", kind: "torus", color: "#d41721", width: 40, depth: 40, height: 16, size: 40 })],
+      ["frustum", shapeFromRequest({ kind: "cone", width: 40, depth: 40, height: 40, topRadius: 10 }) as WorkplaneShape],
+    ];
+    for (const [label, shape] of curved) {
+      const thick = await measure((await applyShell(shape, { thickness: 2 })).brep);
+      const thin = await measure((await applyShell(shape, { thickness: 0.5 })).brep);
+      // No clean closed form for these, so the checks are the ones that still
+      // mean something. The volume of a hollow *is* the volume of its wall, so
+      // a 2mm wall has to weigh more than a 0.5mm one -- which is also what
+      // rules out the failure mode where OCCT hands back the original solid,
+      // since that would weigh the same either way. And a shape symmetric
+      // about the vertical axis has to stay that way.
+      expect(thick.volume, label).toBeGreaterThan(0);
+      expect(thick.volume, label).toBeGreaterThan(thin.volume * 1.5);
+      expect(thick.centre.x, label).toBeCloseTo(0, 2);
+      expect(thick.centre.z, label).toBeCloseTo(0, 2);
+    }
+  });
+
+  it("refuses a spline skin, which is what it cannot offset", async () => {
+    // An elliptical ball is the same kind as a round one and cannot be
+    // hollowed, because only equal radii get a true sphere; the rest stay a
+    // revolved spline. A loft is a spline all over by construction.
+    const elliptical = sceneShape({ name: "egg", kind: "sphere", color: "#d41721", width: 40, depth: 40, height: 20, size: 40 });
+    await expect(applyShell(elliptical, { thickness: 2 })).rejects.toThrow(/skin is a spline/);
+    await expect(applyShell(elliptical, { thickness: 2 })).rejects.toThrow(ServerCadError);
+
+    for (const kind of ["tube", "ring"] as const) {
+      const shape = sceneShape({ name: kind, kind, color: "#d41721", width: 40, depth: 40, height: 40, size: 40 });
       // A refusal the API can answer with, not a WASM exception reaching the
-      // route as a 500. Which of the two refusals each kind earns depends on
-      // where OCCT gives up, so only the kind of failure is pinned here.
+      // route as a 500. Where OCCT gives up on these varies, so only the kind
+      // of failure is pinned.
       await expect(applyShell(shape, { thickness: 2 }), kind).rejects.toThrow(ServerCadError);
     }
-    const sphere = sceneShape({ name: "sphere", kind: "sphere", color: "#d41721", width: 20, depth: 20, height: 20, size: 20 });
-    await expect(applyShell(sphere, { thickness: 2 })).rejects.toThrow(/could not hollow this shape/);
   });
 
   it("refuses a result OCCT can build but cannot write out", async () => {

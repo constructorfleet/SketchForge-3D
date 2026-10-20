@@ -112,14 +112,24 @@ describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(measured.volume).toBeCloseTo((10 / 3) * (bottomArea + Math.sqrt(bottomArea * topArea) + topArea), 0);
   });
 
-  // OCCT builds an ellipsoid as a revolved spline, so its volume is right to a
-  // fraction of a percent rather than exactly.
   it("builds a sphere sitting on the workplane rather than through it", async () => {
     const measured = await measure(shape("sphere", { height: 40 }));
 
     expect(measured.bottom).toBeCloseTo(0, 6);
     expect(measured.height).toBeCloseTo(40, 6);
-    expect(measured.volume / ((4 / 3) * Math.PI * 20 * 20 * 20)).toBeCloseTo(1, 3);
+    // A ball of three equal radii is a true sphere, so this is exact rather
+    // than right to a fraction of a percent: OCCT's ellipsoid is a revolved
+    // spline and measured 4187.0 where the sphere measures 4188.79.
+    expect(measured.volume).toBeCloseTo((4 / 3) * Math.PI * 20 * 20 * 20, 6);
+  });
+
+  it("still builds an elliptical ball as the spline it has to be", async () => {
+    // Only the equal-radii case can be analytic; a 40x40x20 ball is a genuine
+    // ellipsoid and keeps the spline, approximation and all.
+    const measured = await measure(shape("sphere", { height: 20 }));
+
+    expect(measured.height).toBeCloseTo(20, 6);
+    expect(measured.volume / ((4 / 3) * Math.PI * 20 * 10 * 20)).toBeCloseTo(1, 3);
   });
 
   it("builds a cone", async () => {

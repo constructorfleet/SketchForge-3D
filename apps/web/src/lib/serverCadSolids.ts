@@ -316,6 +316,26 @@ function torusSolid(cad: OcctKernel, shape: WorkplaneShape) {
 }
 
 /**
+ * A ball of three radii -- a true sphere when they agree.
+ *
+ * `makeEllipsoid` builds a revolved B-spline whatever it is given, including
+ * three equal radii, and that has two costs. Its volume is a fraction of a
+ * percent out (4187.0 against 4188.79 for a 20mm ball), which a boolean then
+ * cuts with. And OCCT will not offset a B-spline skin inwards at all, so a
+ * sphere could not be hollowed -- `BRepOffsetAPI_MakeThickSolid` threw on it at
+ * every thickness and every tolerance, while the same call on an analytic
+ * sphere is exact.
+ *
+ * So the equal-radii case is worth taking separately. A genuinely elliptical
+ * one still has to be the spline, and still cannot be hollowed.
+ */
+function ballSolid(cad: OcctKernel, radiusX: number, radiusY: number, radiusZ: number) {
+  const spherical =
+    Math.abs(radiusX - radiusY) < CIRCULAR_EPSILON && Math.abs(radiusX - radiusZ) < CIRCULAR_EPSILON;
+  return spherical ? cad.makeSphere(radiusX) : cad.makeEllipsoid(radiusX, radiusY, radiusZ);
+}
+
+/**
  * The shape as an exact solid, sitting on y = 0 and centred on x = z = 0.
  *
  * Its own rotation is not applied here; `exactSolidForShape` does that, so a
@@ -343,7 +363,7 @@ export function unrotatedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
     case "cone":
       return standing(cad, cad.makeCone(shapeWidth(shape) / 2, shape.topRadius ?? 0, shape.height));
     case "sphere": {
-      const solid = cad.makeEllipsoid(shapeWidth(shape) / 2, shape.height / 2, shapeDepth(shape) / 2);
+      const solid = ballSolid(cad, shapeWidth(shape) / 2, shape.height / 2, shapeDepth(shape) / 2);
       return cad.translate(solid, 0, shape.height / 2, 0);
     }
     case "loft":
@@ -369,7 +389,7 @@ export function unrotatedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
       // the dome the editor draws.
       const radiusX = shapeWidth(shape) / 2;
       const radiusZ = shapeDepth(shape) / 2;
-      const dome = cad.makeEllipsoid(radiusX, shape.height, radiusZ);
+      const dome = ballSolid(cad, radiusX, shape.height, radiusZ);
       const below = cad.translate(cad.makeBox(shapeWidth(shape) * 2, shape.height * 2, shapeDepth(shape) * 2), -shapeWidth(shape), -shape.height * 2, -shapeDepth(shape));
       return solidOf(cad, cad.cut(dome, below));
     }

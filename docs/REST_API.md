@@ -300,7 +300,7 @@ Two ways, and they can be mixed in one request.
 
 **By direction.** `top`, `bottom`, `left`, `right`, `front`, `back` -- in the shape's own frame, with `top` towards +Y and `front` towards the viewer, which is the frame the editor's own alignment buttons use. Nobody should have to list a box's faces to find out which one is the lid.
 
-A direction means the **outermost flat face pointing that way**, and only that one. This matters on a part that is already hollow: the floor of its cavity points up as surely as its lid does, and opening the floor instead of the lid looks exactly like nothing happening. A shape with no flat face pointing that way -- a sphere, a cone, a pyramid, a roof -- answers `422` saying so, rather than opening whichever face came closest.
+A direction means the **outermost flat face pointing that way**, and only that one. This matters on a part that is already hollow: the floor of its cavity points up as surely as its lid does, and opening the floor instead of the lid looks exactly like nothing happening. A shape with no flat face pointing that way -- a sphere, a torus, a pointed cone, a pyramid, a roof -- answers `422` saying so, rather than opening whichever face came closest. Those kinds can still be hollowed **sealed**; they just have no lid to take off.
 
 **By index**, from `GET /faces`, which is the only way to name a face no direction describes -- one wall of a hexagonal pot, say:
 
@@ -322,11 +322,20 @@ The same exact builders the fillet endpoint uses, so the kinds listed under "Wha
 
 | Hollows | Does not |
 | --- | --- |
-| `box`, `cylinder` (round, faceted, or a hex prism), `polygon`, `pyramid`, `roof`, `wedge` | `sphere`, `halfSphere`, `torus`, `cone`, `tube`, `ring`, `roundRoof`, `loft` |
+| `box`, `cylinder` (round, faceted, or a hex prism), `polygon`, `pyramid`, `roof`, `wedge`, `sphere` and `halfSphere` (equal radii), `torus`, `cone` with a `topRadius` | an elliptical `sphere` or `halfSphere`, a pointed `cone`, `tube`, `ring`, `roundRoof`, `loft` |
 
-Everything in the right-hand column has an outside that is one continuous curved skin, or a wall OCCT builds as a single B-spline surface. There are no separate faces there to offset inwards, and the kernel refuses them -- at every thickness, and at every reconstruction tolerance it offers. It answers `422` saying that rather than approximating a wall, because a wall that is nearly right is a part that nearly holds water.
+The line is **not** curved against flat. An analytic sphere, cylinder, cone and torus all offset inwards perfectly well, and a ball hollows to the volume the arithmetic says: 40mm across with a 2mm wall is 4/3 pi (20³ - 18³) = 9081.30 mm³, exactly.
 
-Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /booleans`. That is a different operation with a different result -- a boolean cavity has the shape you gave it rather than a constant wall -- but it is the one that works on a sphere.
+What OCCT will not offset is a **spline** skin -- at any thickness, and at every reconstruction tolerance it offers. In this app that means:
+
+- a ball with **unequal** radii. Equal radii give a true sphere; anything else is a revolved spline, so a 40 x 40 x 20 ball is refused while a 40mm one is not.
+- a pointed `cone`. Offsetting inwards from an apex has nowhere to go; give it a `topRadius` and it hollows.
+- `tube`, `ring` and `roundRoof`, whose walls are built by extruding a profile, which is a spline surface however round it looks.
+- `loft`, which is a spline all over by construction.
+
+Those answer `422` saying so rather than approximating a wall, because a wall that is nearly right is a part that nearly holds water.
+
+Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /booleans`. That is a different operation with a different result -- a boolean cavity has the shape you gave it rather than a constant wall -- but it works on anything.
 
 ### When it refuses
 
