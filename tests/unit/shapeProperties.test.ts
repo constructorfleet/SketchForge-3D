@@ -46,7 +46,7 @@ function everyPropertyVariant(): ShapePropertyConfig[] {
     ...SHAPE_KINDS.map((kind) => shapeOfKind(kind)),
     ...SHAPE_KINDS.map((kind) => shapeOfKind(kind, { taperTopWidth: 10, taperTopDepth: 10, taperBottomWidth: 20, taperBottomDepth: 20 })),
     shapeOfKind("sketch", { sketchOperation: "revolve" }),
-    shapeOfKind("scribble", { sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 96, quality: 6 } }),
+    shapeOfKind("scribble", { sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 96, quality: 6, pitch: 0, turns: 1 } }),
     shapeOfKind("gear", { gearType: "spur" }),
     shapeOfKind("gear", { gearType: "helical" }),
     shapeOfKind("gear", { gearType: "bevel" }),
@@ -76,12 +76,15 @@ const rangeProperties = () => everyPropertyVariant().filter(
 const POSTDATES_LABEL_RULES: ShapePropertyId[] = [
   "positionX", "positionY", "positionZ", "rotationX", "rotationY", "rotationZ",
   "topShape", "bottomShape", "topRotation", "bottomRotation", "layers",
+  // Pitch is a length and Turns is a count, and both accept a typed value past
+  // the slider -- neither of which the old label rules could have known.
+  "pitch", "turns",
 ];
 
 describe("shape inspector property configuration", () => {
   it("covers every branch that declares properties", () => {
     const ids = new Set(declaredIds());
-    for (const id of ["length", "width", "height", "startAngle", "sweep", "toothSize", "toothWidth", "centerHole", "helixAngle", "topLength", "bottomWidth", "topShape", "bottomRotation", "layers", "text", "font", "positionX", "positionY", "positionZ", "rotationY"] as ShapePropertyId[]) {
+    for (const id of ["length", "width", "height", "startAngle", "sweep", "pitch", "turns", "toothSize", "toothWidth", "centerHole", "helixAngle", "topLength", "bottomWidth", "topShape", "bottomRotation", "layers", "text", "font", "positionX", "positionY", "positionZ", "rotationY"] as ShapePropertyId[]) {
       expect(ids, `missing coverage for ${id}`).toContain(id);
     }
   });

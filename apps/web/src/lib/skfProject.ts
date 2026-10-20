@@ -987,6 +987,11 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   if (definition.sketchRevolve !== undefined) {
     const settings = objectRecord(definition.sketchRevolve, `${label}.sketchRevolve`);
     ["startAngle", "sweepAngle", "sides", "quality"].forEach((field) => finiteNumber(settings[field], `${label}.sketchRevolve.${field}`));
+    // Helical revolves came later, so a project written before them has
+    // neither field and must still read.
+    ["pitch", "turns"].forEach((field) => {
+      if (settings[field] !== undefined) finiteNumber(settings[field], `${label}.sketchRevolve.${field}`);
+    });
   }
   if (kind === "gear") {
     const teeth = finiteNumber(definition.teeth, `${label}.teeth`);

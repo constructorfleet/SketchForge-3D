@@ -156,6 +156,15 @@ export type SketchRevolveSettings = {
   sweepAngle: number;
   sides: number;
   quality: number;
+  /**
+   * Axial rise per full turn, in mm. Zero is a plain revolve.
+   *
+   * The sign is the handedness: positive rises as it turns, which is a
+   * right-hand thread, and negative is a left-hand one.
+   */
+  pitch: number;
+  /** Full turns to sweep when `pitch` is set; `sweepAngle` governs a plain revolve. */
+  turns: number;
 };
 
 export type EdgeTreatmentFeature = {

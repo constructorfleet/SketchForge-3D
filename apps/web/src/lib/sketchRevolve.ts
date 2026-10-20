@@ -8,7 +8,23 @@ export const DEFAULT_SKETCH_REVOLVE_SETTINGS: SketchRevolveSettings = {
   sweepAngle: 360,
   sides: 64,
   quality: 6,
+  pitch: 0,
+  turns: 1,
 };
+
+export const MAX_REVOLVE_TURNS = 20;
+export const MAX_REVOLVE_PITCH = 200;
+
+/**
+ * Most rings a helical sweep may be built from.
+ *
+ * Rings cost triangles twice over -- once per profile point, once per step --
+ * so a 64-sided, 20-turn sweep of a finely sampled profile can reach millions
+ * of triangles and take the editor with it. Past this the sweep is built at a
+ * coarser angular step rather than refused: a slightly faceted thread is more
+ * use than none.
+ */
+export const MAX_REVOLVE_RINGS = 2400;
 
 type OrderedStep = { segment: SketchSegment; from: SketchPoint; to: SketchPoint };
 type OrderedPath = { steps: OrderedStep[]; closed: boolean };
@@ -34,12 +50,33 @@ function finiteOr(value: number | undefined, fallback: number) {
 export function normalizeSketchRevolveSettings(settings?: Partial<SketchRevolveSettings>): SketchRevolveSettings {
   const rawSweep = clamp(finiteOr(settings?.sweepAngle, DEFAULT_SKETCH_REVOLVE_SETTINGS.sweepAngle), -360, 360);
   const sweepAngle = Math.abs(rawSweep) < 1 ? (rawSweep < 0 ? -1 : 1) : rawSweep;
+  const pitch = clamp(finiteOr(settings?.pitch, DEFAULT_SKETCH_REVOLVE_SETTINGS.pitch), -MAX_REVOLVE_PITCH, MAX_REVOLVE_PITCH);
   return {
     startAngle: ((finiteOr(settings?.startAngle, DEFAULT_SKETCH_REVOLVE_SETTINGS.startAngle) % 360) + 360) % 360,
     sweepAngle,
     sides: Math.round(clamp(finiteOr(settings?.sides, DEFAULT_SKETCH_REVOLVE_SETTINGS.sides), 3, MAX_HIGH_RESOLUTION_SIDES)),
     quality: Math.round(clamp(finiteOr(settings?.quality, DEFAULT_SKETCH_REVOLVE_SETTINGS.quality), 1, 10)),
+    // A pitch too small to see is no pitch: it keeps the plain revolve, whose
+    // geometry is both exact and cheaper.
+    pitch: Math.abs(pitch) < 1e-6 ? 0 : pitch,
+    turns: clamp(finiteOr(settings?.turns, DEFAULT_SKETCH_REVOLVE_SETTINGS.turns), 0.1, MAX_REVOLVE_TURNS),
   };
+}
+
+/** Whether these settings describe a helical sweep rather than a plain revolve. */
+export function isHelicalRevolve(settings: SketchRevolveSettings) {
+  return settings.pitch !== 0;
+}
+
+/**
+ * How many rings a helical sweep will be built from, and the angle between them.
+ *
+ * `sides` is per full turn, so the ring count follows the number of turns --
+ * up to the ceiling, past which the step opens up instead.
+ */
+export function helicalRevolveSteps(settings: SketchRevolveSettings) {
+  const requested = Math.max(2, Math.round(settings.sides * settings.turns));
+  return Math.min(requested, MAX_REVOLVE_RINGS);
 }
 
 function orderedPaths(profile: SketchProfile): OrderedPath[] {
@@ -194,6 +231,80 @@ function dispose(value: unknown) {
   (value as { delete?: () => void } | null)?.delete?.();
 }
 
+/**
+ * A helical sweep of the section, as a watertight mesh.
+ *
+ * Manifold can revolve a cross-section but not sweep one along a helix, so the
+ * rings are built here: each step turns the section about the axis and lifts it
+ * by its share of the pitch. The walls between consecutive rings are quads, and
+ * the two ends are closed with manifold's own triangulator -- which, unlike an
+ * ear clip written here, handles a section with holes in it.
+ *
+ * Returned through `Manifold.ofMesh` rather than as raw triangles, so a mesh
+ * that does not close reports itself instead of becoming a boolean's problem
+ * later.
+ */
+function helicalRevolveSolid(
+  runtime: ManifoldToplevel,
+  polygons: Point2[][],
+  settings: SketchRevolveSettings,
+) {
+  const steps = helicalRevolveSteps(settings);
+  const sectionPoints = polygons.flat();
+  const pointsPerRing = sectionPoints.length;
+
+  const vertProperties = new Float32Array((steps + 1) * pointsPerRing * 3);
+  let vertex = 0;
+  for (let step = 0; step <= steps; step += 1) {
+    const progress = step / steps;
+    const angle = ((settings.startAngle + 360 * settings.turns * progress) * Math.PI) / 180;
+    const rise = settings.pitch * settings.turns * progress;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    for (const [radius, axial] of sectionPoints) {
+      vertProperties[vertex] = radius * cos;
+      vertProperties[vertex + 1] = radius * sin;
+      vertProperties[vertex + 2] = axial + rise;
+      vertex += 3;
+    }
+  }
+
+  const caps = runtime.triangulate(polygons);
+  const triangles = new Uint32Array((steps * pointsPerRing * 2 + caps.length * 2) * 3);
+  let index = 0;
+  const pushTriangle = (a: number, b: number, c: number) => {
+    triangles[index] = a;
+    triangles[index + 1] = b;
+    triangles[index + 2] = c;
+    index += 3;
+  };
+
+  let contourBase = 0;
+  for (const contour of polygons) {
+    for (let step = 0; step < steps; step += 1) {
+      const ring = step * pointsPerRing + contourBase;
+      for (let point = 0; point < contour.length; point += 1) {
+        const a = ring + point;
+        const b = ring + ((point + 1) % contour.length);
+        pushTriangle(a, a + pointsPerRing, b);
+        pushTriangle(b, a + pointsPerRing, b + pointsPerRing);
+      }
+    }
+    contourBase += contour.length;
+  }
+
+  // The start cap faces back down the sweep, so its winding is the reverse of
+  // the end cap's.
+  const lastRing = steps * pointsPerRing;
+  for (const [a, b, c] of caps) {
+    pushTriangle(a, b, c);
+    pushTriangle(lastRing + c, lastRing + b, lastRing + a);
+  }
+
+  const mesh = new runtime.Mesh({ numProp: 3, vertProperties, triVerts: triangles });
+  return runtime.Manifold.ofMesh(mesh);
+}
+
 export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: SketchProfile, requestedSettings?: Partial<SketchRevolveSettings>): SketchRevolveMesh {
   const settings = normalizeSketchRevolveSettings(requestedSettings);
   const polygons = sketchProfileToRevolvePolygons(profile, settings);
@@ -206,6 +317,15 @@ export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: Sketc
     const simplified = section.simplify(Math.max(1e-7, scale * 1e-8));
     disposable.push(simplified);
     if (simplified.toPolygons().length === 0) throw new LocalizedError("errors.revolve.noFilledArea");
+    // A helical sweep carries its own start angle, so it skips the rotation the
+    // plain revolve applies afterwards.
+    if (isHelicalRevolve(settings)) {
+      const helical = helicalRevolveSolid(runtime, simplified.toPolygons() as Point2[][], settings);
+      disposable.push(helical);
+      if (helical.status() !== "NoError" || helical.numTri() < 1) throw new LocalizedError("errors.revolve.invalidSolid");
+      return meshFromManifold(helical);
+    }
+
     const sweep = Math.abs(settings.sweepAngle);
     const solid = simplified.revolve(settings.sides, sweep);
     disposable.push(solid);
@@ -214,7 +334,20 @@ export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: Sketc
     if (revolved !== solid) disposable.push(revolved);
     if (revolved.status() !== "NoError" || revolved.numTri() < 1) throw new LocalizedError("errors.revolve.invalidSolid");
 
-    const manifoldPositions = manifoldMeshPositions(revolved.getMesh());
+    return meshFromManifold(revolved);
+  } finally {
+    [...new Set(disposable)].reverse().forEach(dispose);
+  }
+}
+
+/**
+ * A manifold solid as the editor's own mesh: Y up, centred on X and Z, resting
+ * on y = 0.
+ *
+ * Manifold revolves around its Z axis, which is the editor's Y.
+ */
+function meshFromManifold(solid: InstanceType<ManifoldToplevel["Manifold"]>): SketchRevolveMesh {
+    const manifoldPositions = manifoldMeshPositions(solid.getMesh());
     const positions = new Array<number>(manifoldPositions.length);
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
@@ -250,7 +383,4 @@ export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: Sketc
       height: Math.max(0.01, maxY - minY),
       triangleCount: Math.floor(positions.length / 9),
     };
-  } finally {
-    [...new Set(disposable)].reverse().forEach(dispose);
-  }
 }

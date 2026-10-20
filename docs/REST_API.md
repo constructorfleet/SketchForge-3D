@@ -47,7 +47,7 @@ The project and shape are named in the query string rather than the path. That i
 { "kind": "cylinder", "width": 8, "height": 30, "sides": 6, "x": 12, "name": "Post" }
 ```
 
-`kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`. A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. Only `mesh`, `sketch`, and `scribble` are left out: those need geometry or a drawn profile rather than numbers.
+`kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`, plus `revolve` and `thread` (below). A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. Only `mesh`, `sketch`, and `scribble` are left out: those need geometry or a drawn profile rather than numbers.
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
 
@@ -68,6 +68,40 @@ Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default
 **Sketch extrusions, fillets, chamfers, and boolean operations are not available here.** Their geometry comes from OCCT, which runs in the editor's worker; the API builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
 
 A locked shape answers `409` to a change or delete; send `locked: false` to unlock it.
+
+## Revolves and threads
+
+A revolve is described by an outline rather than by dimensions, so it has its own two kinds. This is the one shape nobody wants to place by hand: a thread's profile is three points and its pitch is a number from a table.
+
+```bash
+# An M8 bolt thread: the 60-degree ISO profile follows from diameter and pitch
+curl -X POST "$HOST/shapes?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"thread","diameter":8,"pitch":1.25,"turns":10,"name":"M8"}'
+
+# A spring of square wire: any closed outline, swept along a helix
+curl -X POST "$HOST/shapes?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"revolve","profile":[[8,0],[10,0],[10,2],[8,2]],"pitch":6,"turns":6}'
+
+# No pitch: a plain ring, revolved once
+curl -X POST "$HOST/shapes?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"revolve","profile":[[4,0],[6,0],[6,3],[4,3]]}'
+```
+
+| Field | Means |
+| --- | --- |
+| `profile` | The closed outline to revolve, as `[x, z]` pairs. `x` is the distance from the axis, `z` runs along it. A triangle makes a thread, a rectangle a tube or a coil of square wire, a many-sided polygon a round spring. Distances may be written positive. |
+| `pitch` | Axial rise per full turn, in mm. `0` is a plain revolve. **Negative is a left-hand thread.** |
+| `turns` | How many full turns to sweep (0.1–20). |
+| `startAngle` | Rotation the sweep starts at. |
+| `sweepAngle` | How far round to revolve when there is no pitch (±360). |
+| `diameter` | `thread` only: outside diameter, default 8 (an M8). With `pitch`, it gives the ISO 60-degree profile. |
+
+A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable in the editor's inspector** afterwards.
+
+Threads and springs are built by manifold rather than OCCT, so unlike a fillet they need no exact B-Rep -- but for the same reason the fillet endpoints will not treat one: a swept mesh has no analytic surface to blend. Fillet the profile instead, before sweeping it.
 
 ## Fillets and chamfers, on the server
 
