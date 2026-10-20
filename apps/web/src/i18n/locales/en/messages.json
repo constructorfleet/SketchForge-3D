@@ -969,7 +969,7 @@
       "cost": "Cost",
       "volume": "Volume",
       "grams": "{grams} g",
-      "cubicCentimeters": "{volume} cm\u00b3",
+      "cubicCentimeters": "{volume} cm³",
       "holeHint": "A hole removes material, so it has no weight of its own.",
       "name": {
         "pla": "PLA",
@@ -981,7 +981,7 @@
         "pc": "Polycarbonate",
         "resin": "Resin"
       },
-      "density": "{density} g/cm\u00b3"
+      "density": "{density} g/cm³"
     },
     "edgeModifier": {
       "title": {
@@ -1416,6 +1416,7 @@
     "step": {
       "readFailed": "Could not read STEP: {detail}",
       "noSolidGeometry": "STEP file has no solid geometry to import",
+      "meshFailed": "This STEP file is too complex for the browser to mesh. Importing it needs a SketchForge server, which does the work with the CAD kernel directly.",
       "nothingToExport": "No box/cylinder/sphere or imported STEP solids to export as B-Rep STEP",
       "exportFailed": "STEP export failed: {detail}",
       "allSkipped": "Nothing could be exported as B-Rep STEP — {detail}"

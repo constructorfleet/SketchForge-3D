@@ -22,7 +22,21 @@ export async function importedShapeFromStep(fileName: string, buffer: ArrayBuffe
   // kernel ops (rotate/translate) are used throughout normalization because they
   // preserve the exact geometry; a matrix transform here corrupts later export.
   const flipped = brep.rotate(imported.value, -90, { axis: [1, 0, 0] });
-  const tess = brep.mesh(flipped);
+  // brepjs's mesher gives up on a real assembly where the kernel underneath it
+  // does not: a 74 MB FreeCAD export of 45,689 faces reads and rotates here in
+  // 22s and then dies with "memory access out of bounds", while the kernel's
+  // own `tessellate` meshes the identical shape in 5s. It is not a heap
+  // ceiling -- the module grows to 4 GB and coarsening the deflection does not
+  // move it. So say what happened instead of surfacing a WebAssembly trap:
+  // `stepImportKernel.ts` is the path that can do it, and it needs a server.
+  let tess;
+  try {
+    tess = brep.mesh(flipped);
+  } catch (error) {
+    throw new LocalizedError("errors.step.meshFailed", {
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
   if (tess.vertices.length < 9) {
     throw new LocalizedError("errors.step.noSolidGeometry");
   }
