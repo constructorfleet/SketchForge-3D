@@ -9,6 +9,15 @@ export const CAD_MODIFIER_RUNTIME_BASE = "/occt";
 export const CAD_MODIFIER_REQUEST_TIMEOUT_MS = 30_000;
 export const CAD_MODIFIER_MAX_PREPARE_TIMEOUT_MS = 180_000;
 export const CAD_MODIFIER_MAX_SHARP_ANGLE = 90;
+/**
+ * How long an exact boolean may take before the editor gives up on it.
+ *
+ * Shorter than a fillet's budget on purpose. A cut has a mesh fallback waiting,
+ * so the cost of waiting is the whole cost: a user who grouped two shapes is
+ * better served by a mesh cut now than an exact one in half a minute. The
+ * kernel's first load is the slow part, which is why this is not a few seconds.
+ */
+export const CAD_BOOLEAN_REQUEST_TIMEOUT_MS = 15_000;
 
 export type CadModifierRequestPhase = "prepare" | "preview";
 

@@ -4,6 +4,7 @@ import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
+import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/exactBooleanSolids";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -187,6 +188,11 @@ function reconstructPrimitiveSolid(cad: OcctKernel, primitive: CadModifierPrimit
 function reconstructSolid(cad: OcctKernel, part: CadModifierMeshPart) {
   if (part.primitive) {
     return reconstructPrimitiveSolid(cad, part.primitive);
+  }
+  if (part.exact) {
+    // Built from the shape's own parameters, so the operand carries true
+    // surfaces into the boolean rather than a tessellation of them.
+    return exactPartSolid(cad, part.exact);
   }
   if (part.brep) {
     let exact = cad.fromBREP(part.brep);
@@ -398,6 +404,34 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
     if (request.type === "dispose") {
       releaseSession(activeCad);
       post({ type: "disposed", requestId: request.requestId });
+      return;
+    }
+    if (request.type === "boolean") {
+      // An exact cut is one operation with nothing kept for a follow-up
+      // request, so the handle arena is emptied afterwards -- unless an edge
+      // modifier session is open, whose retained handles `releaseAll` would
+      // take with it.
+      const sessionOpen = baseShape !== null;
+      try {
+        const exact = exactCutFromParts(activeCad, request.parts, (part) => reconstructSolid(activeCad, part));
+        if (!cadShapeIsValid(activeCad, exact.cut)) throw new LocalizedError("errors.cadModifier.invalidResult");
+        const meshed = meshedExactCut(activeCad, exact.cut);
+        post(
+          {
+            type: "boolean",
+            requestId: request.requestId,
+            positions: meshed.positions,
+            normals: meshed.normals,
+            triangleCount: meshed.triangleCount,
+            brep: meshed.brep,
+            fusedVolume: exact.fusedVolume,
+            cutVolume: exact.cutVolume,
+          },
+          [meshed.positions.buffer, meshed.normals.buffer],
+        );
+      } finally {
+        if (!sessionOpen) releaseSession(activeCad);
+      }
       return;
     }
     if (request.type === "prepare") {
