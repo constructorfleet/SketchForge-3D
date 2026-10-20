@@ -41,7 +41,6 @@ import {
 } from "@/lib/loftGeometry";
 import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/distributeShapes";
 import {
-  metricThreadOutline,
   parseRevolveRequest,
   resolveThreadRequest,
   revolvedShapeFromRequest,
