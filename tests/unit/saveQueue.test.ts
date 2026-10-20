@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCoalescingSaveQueue } from "@/lib/saveQueue";
+import { createCoalescingSaveQueue, type SaveOutcome } from "@/lib/saveQueue";
 
 function deferred() {
   let resolve!: () => void;
@@ -92,6 +92,32 @@ describe("createCoalescingSaveQueue", () => {
     expect(errors[0].job).toBe("doomed");
     expect(ran).toEqual(["doomed", "newest"]);
     expect(saved).toEqual(["newest"]);
+  });
+
+  it("says whether a newer job was already waiting when one finished", async () => {
+    const gates = [deferred(), deferred()];
+    const ran: string[] = [];
+    const outcomes: Array<{ job: string; waiting: boolean }> = [];
+    const record = (job: string, outcome: SaveOutcome) => void outcomes.push({ job, waiting: outcome.waiting });
+    const queue = createCoalescingSaveQueue<string>({
+      run: (_key, job) => {
+        ran.push(job);
+        return gates[ran.length - 1].promise;
+      },
+      onSaved: (_key, job, outcome) => record(job, outcome),
+      onError: (_key, job, _error, outcome) => record(job, outcome),
+    });
+
+    queue.enqueue("project", "first");
+    queue.enqueue("project", "second");
+    gates[0].resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    gates[1].resolve();
+    await queue.idle();
+
+    // The first save's result was already obsolete; the second's was not.
+    expect(outcomes).toEqual([{ job: "first", waiting: true }, { job: "second", waiting: false }]);
   });
 
   it("starts a fresh job after the queue has drained", async () => {
