@@ -5,7 +5,7 @@ import {
   WORKPLANE_LABEL_ASPECT,
   workplaneLabelLayout,
 } from "@/lib/workplaneGrid";
-import { DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
 
 // Workspace presets the editor offers, plus the extremes either side.
 const SIZES: Array<[number, number]> = [

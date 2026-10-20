@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { withCadKernel } from "@/lib/engine/serverCadKernel";
-import { exactSolidForShape } from "@/lib/engine/cadSolids";
+import { withCadKernel } from "@sketchforge/engine/serverCadKernel";
+import { exactSolidForShape } from "@sketchforge/engine/cadSolids";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**

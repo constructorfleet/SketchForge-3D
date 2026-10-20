@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { horizontalPlacementWorkplane, placementWorkplaneFromSurface } from "@/lib/engine/placementWorkplane";
+import { horizontalPlacementWorkplane, placementWorkplaneFromSurface } from "@sketchforge/engine/placementWorkplane";
 import { DEFAULT_CAMERA_ORIENTATION, screenAlignedNudge } from "@/lib/screenAlignedNudge";
 
 const BASE = horizontalPlacementWorkplane();

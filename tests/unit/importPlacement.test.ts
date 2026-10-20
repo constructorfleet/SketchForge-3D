@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { importedShapeFromObj } from "@/lib/engine/objImport";
-import { importedShapeFromStl } from "@/lib/engine/stlImport";
+import { importedShapeFromObj } from "@sketchforge/engine/objImport";
+import { importedShapeFromStl } from "@sketchforge/engine/stlImport";
 
 function boxStl(width: number, ySize: number, zSize: number, name = "box") {
   const vertices = [

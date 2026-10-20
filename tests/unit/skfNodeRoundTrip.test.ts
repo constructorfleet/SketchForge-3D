@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { shapeFromRequest } from "@/lib/engine/shapeRequests";
-import { exportSkfProject, importSkfProject } from "@/lib/engine/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { shapeFromRequest } from "@sketchforge/engine/shapeRequests";
+import { exportSkfProject, importSkfProject } from "@sketchforge/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
 
 // The REST API reads and writes .skf packages on the server, with no browser
 // anywhere. This is the check that the format's own code runs under Node.

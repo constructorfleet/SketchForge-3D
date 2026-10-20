@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
-import { DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
 import type { WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 function groupedShape(): WorkplaneShape {

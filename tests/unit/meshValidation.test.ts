@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeMeshTopology } from "@/lib/engine/meshValidation";
+import { analyzeMeshTopology } from "@sketchforge/engine/meshValidation";
 
 describe("analyzeMeshTopology", () => {
   it("recognizes a closed tetrahedron as watertight", () => {

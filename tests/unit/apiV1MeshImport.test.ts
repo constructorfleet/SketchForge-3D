@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as importMesh } from "@/app/api/v1/imports/route";
 import { POST as createProject } from "@/app/api/v1/projects/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
-import { importedMeshFromFile } from "@/lib/engine/meshImport";
-import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { importedMeshFromFile } from "@sketchforge/engine/meshImport";
+import { readProjectDocument } from "@sketchforge/engine/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 
 const TOKEN = "test-token-value";

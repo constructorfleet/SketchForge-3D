@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
-import { serverCadKernel } from "@/lib/engine/serverCadKernel";
-import { EXACT_SOLID_KINDS, exactSolidForShape, UnbuildableShapeError } from "@/lib/engine/cadSolids";
-import { sceneShape } from "@/lib/engine/shapeCatalog";
-import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest } from "@/lib/engine/shapeRequests";
+import { serverCadKernel } from "@sketchforge/engine/serverCadKernel";
+import { EXACT_SOLID_KINDS, exactSolidForShape, UnbuildableShapeError } from "@sketchforge/engine/cadSolids";
+import { sceneShape } from "@sketchforge/engine/shapeCatalog";
+import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest } from "@sketchforge/engine/shapeRequests";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(kind: ShapeKind, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

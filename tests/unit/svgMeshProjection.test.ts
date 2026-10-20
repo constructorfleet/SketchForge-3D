@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import manifoldModule from "manifold-3d";
-import { projectedMeshContours } from "@/lib/engine/svgMeshProjection";
+import { projectedMeshContours } from "@sketchforge/engine/svgMeshProjection";
 
 describe("projectedMeshContours", () => {
   it("projects an open triangle mesh without requiring manifold closure", () => {

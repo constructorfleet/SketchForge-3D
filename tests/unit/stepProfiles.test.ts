@@ -6,7 +6,7 @@ import {
   planTaper,
   polygonRing,
   rectangleRing,
-} from "@/lib/engine/stepProfiles";
+} from "@sketchforge/engine/stepProfiles";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

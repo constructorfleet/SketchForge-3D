@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
+import { callLocalEngineTool } from "./localEngine.mjs";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 
@@ -28,6 +29,7 @@ const baseUrl = process.env.SKETCHFORGE_URL || DEFAULT_BASE_URL;
 const editorTargetSchema = {
   type: "object",
   properties: {
+    projectId: { type: "string", description: "Project id in SKETCHFORGE_PROJECTS_DIR when running the MCP in local mode." },
     editorNumber: { type: "number", description: "The 5-digit SketchForge editor number from sketchforge_list_editors." },
     editorId: { type: "string", description: "Optional internal editor id. Prefer editorNumber for human-directed use." },
     timeoutMs: { type: "number", description: "Command timeout in milliseconds. Defaults to 15000." },
@@ -513,6 +515,9 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
 }
 
 async function callTool(name, args) {
+  if (process.env.SKETCHFORGE_PROJECTS_DIR && name !== "sketchforge_list_macros" && name !== "sketchforge_run_macro") {
+    return callLocalEngineTool(name, args);
+  }
   switch (name) {
     case "sketchforge_list_editors":
       return bridgeGet();

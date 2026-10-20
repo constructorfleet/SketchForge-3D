@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { editorHistoryEntry } from "@/lib/engine/editorHistory";
+import { editorHistoryEntry } from "@sketchforge/engine/editorHistory";
 import * as THREE from "three";
-import { bakedBoxSelectionFrame, bakeCadMetadataForShapeTransform } from "@/lib/engine/cadBakeMetadata";
-import { exportSkfProject, importSkfProject } from "@/lib/engine/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { bakedBoxSelectionFrame, bakeCadMetadataForShapeTransform } from "@sketchforge/engine/cadBakeMetadata";
+import { exportSkfProject, importSkfProject } from "@sketchforge/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function cube(): WorkplaneShape {

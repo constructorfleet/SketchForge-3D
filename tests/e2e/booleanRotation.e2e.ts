@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Matrix4 } from "three";
-import { withCadKernel } from "@/lib/engine/serverCadKernel";
-import { buildGroupFromSelection } from "@/lib/engine/serverShapeBooleans";
-import { unrotatedSolidForShape } from "@/lib/engine/cadSolids";
-import { shapePlacementMatrix } from "@/lib/engine/serverShapeGroups";
-import { sceneShape } from "@/lib/engine/shapeCatalog";
-import { shapeFromRequest } from "@/lib/engine/shapeRequests";
+import { withCadKernel } from "@sketchforge/engine/serverCadKernel";
+import { buildGroupFromSelection } from "@sketchforge/engine/serverShapeBooleans";
+import { unrotatedSolidForShape } from "@sketchforge/engine/cadSolids";
+import { shapePlacementMatrix } from "@sketchforge/engine/serverShapeGroups";
+import { sceneShape } from "@sketchforge/engine/shapeCatalog";
+import { shapeFromRequest } from "@sketchforge/engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 // The first test of `buildGroupFromSelection`, which had none.

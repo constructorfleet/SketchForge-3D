@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { shapeFromRequest, shapeParameterNamesFor, shapeWithRequestedChanges, SHAPE_PARAMETERS } from "@/lib/engine/shapeRequests";
-import { shapeHasTaper, shapeTaperDimensions } from "@/lib/engine/workplaneShapes";
+import { shapeFromRequest, shapeParameterNamesFor, shapeWithRequestedChanges, SHAPE_PARAMETERS } from "@sketchforge/engine/shapeRequests";
+import { shapeHasTaper, shapeTaperDimensions } from "@sketchforge/engine/workplaneShapes";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 /**

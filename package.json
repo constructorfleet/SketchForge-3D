@@ -12,9 +12,9 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "copy:occt": "node scripts/copy-occt-wasm.mjs",
-    "predev": "npm run copy:occt",
+    "predev": "npm run engine:build && npm run copy:occt",
     "dev": "next dev apps/web",
-    "prebuild": "npm run copy:occt",
+    "prebuild": "npm run engine:build && npm run copy:occt",
     "build": "next build apps/web",
     "export": "node scripts/build-static.mjs",
     "verify:static-worker-assets": "node scripts/verify-static-worker-assets.mjs",
@@ -30,7 +30,7 @@
     "client:typecheck": "tsc -p packages/sketchforge-client/tsconfig.tests.json --noEmit",
     "client:test:py": "cd packages/sketchforge-py && PYTHONPATH=src:tests python3 -m unittest discover -s tests -t tests",
     "client:test:py:integration": "cd packages/sketchforge-py && PYTHONPATH=src python3 -m unittest discover -s tests/integration -t tests/integration",
-    "ci": "npm run typecheck && npm run typecheck:tests && npm run client:typecheck && npm run test",
+    "ci": "npm run engine:build && npm run engine:typecheck && npm run typecheck && npm run typecheck:tests && npm run client:typecheck && npm run test",
     "docker:build": "docker build -f deploy/docker/Dockerfile -t sketchforge:local .",
     "docker:run": "docker run --rm -p 3000:3000 -e SKETCHFORGE_SHARED_PROJECTS_DIR=/data/projects -v sketchforge-shared-projects:/data/projects sketchforge:local",
     "docker:up": "docker compose -f deploy/docker/compose.yaml up --build -d",
@@ -39,7 +39,16 @@
     "desktop:web:build": "node apps/desktop/build-web.mjs",
     "desktop:pack": "npm run desktop:web:build && electron-builder --dir --config apps/desktop/electron-builder.yml",
     "desktop:dist": "npm run desktop:web:build && electron-builder --config apps/desktop/electron-builder.yml",
-    "mcp:sketchforge": "node packages/sketchforge-client/mcp/server.mjs"
+    "mcp:sketchforge": "node packages/sketchforge-client/mcp/server.mjs",
+    "engine:build": "npm run build --prefix packages/sketchforge-engine",
+    "engine:typecheck": "npm run typecheck --prefix packages/sketchforge-engine",
+    "preexport": "npm run engine:build",
+    "pretypecheck": "npm run engine:build",
+    "pretypecheck:tests": "npm run engine:build",
+    "pretest": "npm run engine:build",
+    "pretest:e2e": "npm run engine:build",
+    "predesktop:web:build": "npm run engine:build",
+    "premcp:sketchforge": "npm run engine:build"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.8",
@@ -61,7 +70,8 @@
     "three": "^0.184.0",
     "three-bvh-csg": "^0.0.18",
     "three-mesh-bvh": "^0.9.13",
-    "use-intl": "^4.14.9"
+    "use-intl": "^4.14.9",
+    "@sketchforge/engine": "file:packages/sketchforge-engine"
   },
   "devDependencies": {
     "@formatjs/icu-messageformat-parser": "^3.5.21",

@@ -4,7 +4,7 @@ import {
   alignShifts,
   effectiveAlignAnchorId,
   type AlignEntry,
-} from "@/lib/engine/alignShapes";
+} from "@sketchforge/engine/alignShapes";
 
 /**
  * Three objects of three different widths, none of them centred on the origin

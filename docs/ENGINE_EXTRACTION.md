@@ -1,6 +1,8 @@
 # Scoping an extracted geometry engine
 
-Status: design proposal. Nothing here is implemented.
+Status: core extraction and local MCP mode implemented in the current branch. Sections 1–5 and most of 7–8 are the original architecture audit and historical rationale; check the implementation status below for what is now live.
+
+**Implemented:** `packages/sketchforge-engine` owns the geometry and project modules; `apps/web/src/lib/engine` keeps compatibility re-exports; the app imports the package; release version checks include its manifest; and the MCP can operate directly on project directories using `SKETCHFORGE_PROJECTS_DIR`, without a browser, server, or API token. Local MCP supports project operations and SKF/STEP export. UI-only tools and other export formats remain editor-backed. The package is local to this repository and has not been published.
 
 The geometry engine lives inside the Next app, in `apps/web/src/lib`, and is
 reachable from outside only through HTTP route handlers. This document scopes
@@ -667,23 +669,26 @@ pieces of it are outstanding:
   `buildGroupFromSelection` are now two orchestrations of the same exact cut.
   Converging them is PR 4's job, and §1.5 is a bug that lives in that gap.
 
-### 6.6 PR 6 — `packages/sketchforge-engine`, consumed locally
+### 6.6 Engine package — implemented
 
-Move `lib/engine/` to `packages/sketchforge-engine/src/`. The app imports it by
-package name. This is the stage that pays for offline macros, and it is also
-where the packaging constraints bite (§7) — which is exactly why it is sixth and
-not first.
+The engine modules now live in `packages/sketchforge-engine/src/` and build to
+Node ESM with declarations. The web app's old module paths are compatibility
+re-exports, so existing app call sites use the package implementation. The
+package owns the shared shape types and its project store, and supplies distinct
+runtime OCCT loading for Node and the browser. The release configuration stamps
+the engine version alongside the app, client and Python manifests. The engine
+package is not published; §8's licensing discussion still applies.
 
-Add a third `extra-files` entry to `release-please-config.json:8-19` so the new
-`package.json` is version-stamped in lockstep with the other three, and extend
-the manifest check at `release.yml:101-126` to four files. Do **not** add a
-publish step yet.
+### 6.7 Local MCP mode — implemented
 
-### 6.7 PR 7 — offline macro runner (optional, and the actual payoff)
-
-Teach `packages/sketchforge-client/src/cli.ts` a mode that takes a directory or a
-`.skf` and builds against `directoryProjectStore` instead of HTTP. `macroTools.mjs`
-gains an offline flag. A macro now runs with no server and no browser.
+When `SKETCHFORGE_PROJECTS_DIR` is set, project MCP calls run directly through
+the engine package and read/write the configured `.json` and `.skf` files. They
+do not use the HTTP bridge, browser, or API token. The local mode supports
+project reads and edits, shape creation/import, arranging, grouping, booleans,
+edge and face operations, measurements, hollowing, and SKF/STEP export. Macro
+execution, viewport tools, scene validation, and STL/OBJ/3MF/ZIP-kit export are
+not part of this local mode yet. See the client README for setup and the exact
+supported boundary.
 
 ### 6.8 PR 8 — publish (recommend: don't, yet)
 
@@ -808,70 +813,29 @@ dependency graph of its own.
 
 ---
 
-## 9. What this does not fix
+## 9. Remaining boundaries
 
-**The editor-automation MCP tools still need a live app.** I checked every tool
-in `packages/sketchforge-client/mcp/server.mjs:380-422`, and the split is sharper
-than "some tools":
+The package extraction and local project MCP path are implemented. The MCP
+still has two execution modes:
 
-- **19 of 21 tools go through `bridgeCommand`**, which POSTs to
-  `/api/sketchforge-mcp` (`:25`, `:333`) and is answered by a browser tab
-  long-polling for commands (`app/api/sketchforge-mcp/route.ts:81-97`). That
-  includes the obvious ones — `read_scene`, `select_objects`, `capture_image`,
-  `inspect_errors`, `list_editors` — and will always include them: they read or
-  drive a rendered viewport. An engine package cannot help, and should not try.
-- **Only `sketchforge_list_macros` and `sketchforge_run_macro`** (`:418-421`)
-  bypass the bridge.
-- **Worth noting:** nine of those bridge tools *already have a server-side REST
-  equivalent* and still go through the live tab — `boolean_cut` (`POST /booleans`),
-  `group_objects` / `ungroup_objects` (`POST` / `DELETE /groups`),
-  `separate_parts` (`POST /parts`), `list_edges` (`GET /edges`),
-  `apply_edge_treatment` (`POST /treatments`), and `create_shape` /
-  `update_object` / `delete_objects` (`POST` / `PATCH` / `DELETE /shapes`). See
-  `server.mjs:390-414`. Those nine are not blocked by the engine being trapped
-  behind route handlers; they are blocked by the MCP bridge choosing the tab. An
-  engine package would make an offline mode *possible* for them, but the work to
-  get there is in `server.mjs`, not in the engine. This is a real and separable
-  improvement that this document is not scoping.
-- `pattern_objects`, `align_objects`, `distribute_objects` and `import_mesh`
-  have no REST endpoint at all (`docs/REST_API.md` documents projects, shapes,
-  booleans, groups, parts, edges and treatments, and nothing else), so for those
-  the tab is currently the only implementation anywhere. Their arithmetic is
-  already pure and already in `lib/` — `patternShapes.ts` (127),
-  `distributeShapes.ts` (132) — so they are cheap additions to an engine, but
-  they are additions, not extractions.
+- **Local project mode:** set `SKETCHFORGE_PROJECTS_DIR`; project tools use the
+  package directly, with no browser, server, or token. Scene reads allow
+  `shapeIds`, `excludeShapeIds`, `includeRawShapes`, and `includeRawShapeIds`.
+  SKF and STEP exports use the project name by default and can write to
+  `outputPath`.
+- **Editor mode:** without that variable, the existing HTTP bridge continues to
+  target an open editor. Screenshot capture, selection, editor errors, and
+  viewport scene validation remain tied to the editor.
 
-So the offline-macro payoff is narrower than it first appears: it is `run_macro`
-and the `sketchforge-macro` CLI, which today reach the engine only over HTTP.
-That is genuinely worth having — a macro should not need a web server to make a
-bracket — but it is two tools and a CLI, not the MCP surface.
+Local mode currently has a narrower export surface than editor mode: it writes
+SKF and STEP. STL, OBJ, 3MF and ZIP kits still use the editor adapter. Macro
+execution also remains on the existing server path. The extracted package is
+repository-local and unpublished; using local mode from a separately installed
+client package requires a future engine distribution decision.
 
-**The boolean behaviour change has already shipped, in #48, and users will
-notice it.** Exact cuts are not mesh cuts, and the padding no longer being
-applied is visible. This is listed here rather than struck out because the
-consequences are live and someone will report them as regressions:
-
-- A flush pocket now lands at the depth that was asked for. It used to come out
-  0.05 mm deeper on every padded axis and 0.05 mm wider in each direction.
-- A part someone dimensioned around the padded result — by eye, or by measuring
-  the editor's output — changes by 0.1 mm across. Within tolerance for most
-  printing, not for a press fit. Someone with a working press fit will find it
-  stopped working.
-- Previously-broken cuts start working, which is the point, but a project saved
-  with a broken-mesh group does **not** retroactively heal: the group stores its
-  result. Users will have to redo those cuts, and nothing tells them which ones.
-- The preview/commit mismatch got *worse*, not better (§1.3): the preview still
-  pads and still uses a mesh CSG, so it now disagrees with the committed cut in
-  kind as well as size. This is the one piece of #48 worth a prompt follow-up.
-- Whether a cut was exact or fell back to the mesh path is not surfaced anywhere.
-  Two visually identical selections can take different kernels — a mirrored
-  operand silently takes the old path — and the user has no way to tell which
-  they got, or why one pocket is 0.05 mm deeper than its neighbour.
-
-#48 carries a `docs/CHANGELOG.md` entry already. The remaining items above do
-not, and the last two are the ones I would raise with whoever owns that change.
-
-**Not addressed at all:** the three untestable `.tsx` monoliths stay large
-(`SketchForgeEditor.tsx` 11,263 lines; `WorkplaneViewport.tsx` 8,670). PR 1
-removes about 215 lines from one of them. That is a rounding error, and no part
-of this proposal is a plan for those files.
+The package boundary removes the app dependency from the engine source. Some
+support modules were copied into the package during extraction rather than
+being independently published as shared packages, and the app's old paths are
+compatibility shims. The original audit above remains useful for the geometry
+and worker convergence work it identifies, but its pre-extraction module counts
+and proposal language are historical.

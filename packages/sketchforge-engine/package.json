@@ -1,0 +1,46 @@
+{
+  "name": "@sketchforge/engine",
+  "version": "1.5.0",
+  "description": "Portable geometry and project engine for SketchForge.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./support/*": {
+      "types": "./dist/support/*.d.ts",
+      "default": "./dist/support/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "brepjs": "^18.118.0",
+    "fflate": "^0.8.3",
+    "manifold-3d": "^3.5.0",
+    "occt-wasm": "^3.6.1",
+    "three": "^0.184.0",
+    "use-intl": "^4.14.9"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.0",
+    "@types/node": "^22.15.18",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
