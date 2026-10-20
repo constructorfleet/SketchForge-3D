@@ -84,6 +84,10 @@ client.treatments.chamfer(projectId, shapeId, distance, { angle?, edges? }): Pro
 client.faces.list(projectId, shapeId): Promise<FaceSummary[]>
 client.faces.facing(projectId, shapeId, direction): Promise<number[]>
 
+client.measurements.list(projectId, shapeId): Promise<MeasurementSummary[]>
+client.measurements.withRadius(projectId, shapeId): Promise<MeasurementSummary[]>
+client.measurements.between(projectId, from, to): Promise<MeasurementPair>
+
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
 client.shell.tray(projectId, shapeId, thickness, openFaces?): Promise<ShellResult>
@@ -96,6 +100,7 @@ project.get() | delete() | listShapes() | add(shape) | addMany(shapes) | update(
 project.remove(id) | clear() | edges(id) | filletableEdges(id)
 project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance, options?)
 project.faces(id) | facesFacing(id, direction)
+project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 ```
 

@@ -10,6 +10,7 @@ import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Edges } from "./resources/edges.js";
 import { Faces } from "./resources/faces.js";
+import { Measurements } from "./resources/measurements.js";
 import { Projects } from "./resources/projects.js";
 import { Shapes } from "./resources/shapes.js";
 import { Shell } from "./resources/shell.js";
@@ -19,6 +20,9 @@ import type {
   EdgeTreatment,
   FaceDirection,
   FaceSummary,
+  MeasurementEnd,
+  MeasurementPair,
+  MeasurementSummary,
   ProjectDetail,
   ShapePatch,
   ShapeRequest,
@@ -36,6 +40,7 @@ export class SketchForgeClient {
   readonly shapes: Shapes;
   readonly edges: Edges;
   readonly faces: Faces;
+  readonly measurements: Measurements;
   readonly treatments: Treatments;
   readonly shell: Shell;
   private readonly transport: Transport;
@@ -46,6 +51,7 @@ export class SketchForgeClient {
     this.shapes = new Shapes(this.transport);
     this.edges = new Edges(this.transport);
     this.faces = new Faces(this.transport);
+    this.measurements = new Measurements(this.transport);
     this.treatments = new Treatments(this.transport);
     this.shell = new Shell(this.transport);
   }
@@ -148,6 +154,19 @@ export class ProjectHandle {
 
   facesFacing(shapeId: string, direction: FaceDirection): Promise<number[]> {
     return this.client.faces.facing(this.id, shapeId, direction);
+  }
+
+  measurements(shapeId: string): Promise<MeasurementSummary[]> {
+    return this.client.measurements.list(this.id, shapeId);
+  }
+
+  measurementsWithRadius(shapeId: string): Promise<MeasurementSummary[]> {
+    return this.client.measurements.withRadius(this.id, shapeId);
+  }
+
+  /** The distance between two entities, which may be on two different shapes. */
+  measureBetween(from: MeasurementEnd, to: MeasurementEnd): Promise<MeasurementPair> {
+    return this.client.measurements.between(this.id, from, to);
   }
 
   /** Hollows the shape out, sealed unless `openFaces` names faces to leave off. */

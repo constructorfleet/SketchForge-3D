@@ -90,7 +90,14 @@ export type ServerCadShellRequest = {
   openFaces?: ReadonlyArray<number | string>;
 };
 
-function outwardNormal(cad: OcctKernel, face: ShapeHandle) {
+/**
+ * The normal pointing out of the solid at the middle of a face.
+ *
+ * Exported because the measurement endpoint needs the same normal to answer
+ * "what is the angle between these two faces", and a second copy of this would
+ * be free to drift from the one the face listing and the shell request agree on.
+ */
+export function faceOutwardNormal(cad: OcctKernel, face: ShapeHandle) {
   try {
     const bounds = cad.uvBounds(face);
     // `surfaceNormal` already accounts for the face's own orientation, so a
@@ -123,7 +130,7 @@ function reachAlong(centroid: Vec3, direction: Vec3) {
 function faceSummaries(cad: OcctKernel, solid: ShapeHandle): ServerCadFace[] {
   const faces = cad.getSubShapes(solid, "face");
   const described = faces.map((handle, index) => {
-    const normal = outwardNormal(cad, handle);
+    const normal = faceOutwardNormal(cad, handle);
     let surfaceType = "unknown";
     try {
       surfaceType = cad.surfaceType(handle);

@@ -207,6 +207,85 @@ describe("the REST API over HTTP", () => {
     expect((after.body.faces as unknown[]).length).toBeGreaterThan(6);
   });
 
+  it("measures a round post's real radius, and the gap between two shapes", async () => {
+    // Measuring is the same bundling risk as hollowing -- it reaches OCCT's
+    // curve and surface analysis through `serverExternalPackages` -- and it is
+    // also the one capability whose whole value is the number being exact, so
+    // it is worth asking a real server for it rather than only a route handler.
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({
+        shapes: [
+          { kind: "cylinder", width: 15, depth: 15, height: 22, x: -23, z: 9, name: "Post" },
+          { kind: "box", width: 40, depth: 25, height: 10, x: 57, z: 9, name: "Plate" },
+        ],
+      }),
+    });
+    expect(created.status).toBe(201);
+    const [post, plate] = (created.body.shapes as Array<Record<string, any>>).map((shape) => shape.id as string);
+
+    const measured = await api(`/measurements?projectId=${projectId}&shapeId=${post}`);
+    expect(measured.status).toBe(200);
+    const entries = measured.body.measurements as Array<Record<string, any>>;
+
+    // The rim at each end of a 15 mm post: a true circle of radius 7.5, whose
+    // circumference is 2pi(7.5) = 47.1238898038469. A tessellated cylinder
+    // would list straight edges here and no radius at all.
+    const rims = entries.filter((entry) => entry.entity === "edge" && entry.geometryType === "circle");
+    expect(rims).toHaveLength(2);
+    for (const rim of rims) {
+      expect(rim.length).toBeCloseTo(2 * Math.PI * 7.5, 5);
+      expect(rim.radius).toBeCloseTo(7.5, 5);
+      expect(rim.diameter).toBeCloseTo(15, 5);
+      expect(rim.sweepDegrees).toBeCloseTo(360, 5);
+    }
+    // The wall: lateral area 2pi(7.5)(22) = 1036.7255756846319.
+    const wall = entries.find((entry) => entry.entity === "face" && entry.geometryType === "cylinder");
+    expect(wall).toBeDefined();
+    expect(wall!.radius).toBeCloseTo(7.5, 5);
+    expect(wall!.area).toBeCloseTo(2 * Math.PI * 7.5 * 22, 4);
+    // A flat end is a plane, and a plane has no radius -- with the reason said.
+    const end = entries.find((entry) => entry.entity === "face" && entry.geometryType === "plane");
+    expect(end!.radius).toBeNull();
+    expect(end!.radiusUnavailable).toBe("notCurved");
+
+    // The post spans -30.5..-15.5 on X and the plate 37..77, so their nearest
+    // walls are 37 - (-15.5) = 52.5 apart. Their centres are 80 apart, and a
+    // measurement taken between centroids -- or between bounding-box centres --
+    // would say 80. They overlap in Y and share a Z, so the gap is purely in X.
+    const gap = await api(`/measurements?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ from: { shapeId: post }, to: { shapeId: plate } }),
+    });
+    expect(gap.status).toBe(200);
+    expect(gap.body.distance as number).toBeCloseTo(52.5, 4);
+    expect(gap.body.angleDegrees).toBeNull();
+    expect(gap.body.angleUnavailable).toBe("notPlanar");
+
+    // Two faces of the plate that bound its 10 mm thickness, by index.
+    const plateFaces = ((await api(`/measurements?projectId=${projectId}&shapeId=${plate}`))
+      .body.measurements as Array<Record<string, any>>)
+      .filter((entry) => entry.entity === "face" && Math.abs(entry.area - 1000) < 1e-6);
+    expect(plateFaces).toHaveLength(2);
+    const across = await api(`/measurements?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({
+        from: { shapeId: plate, entity: "face", index: plateFaces[0].index },
+        to: { shapeId: plate, entity: "face", index: plateFaces[1].index },
+      }),
+    });
+    expect(across.body.distance as number).toBeCloseTo(10, 5);
+    // Opposite faces: their outward normals point away from each other.
+    expect(across.body.angleDegrees as number).toBeCloseTo(180, 5);
+
+    const refused = await api(`/measurements?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ from: { shapeId: plate, entity: "face", index: 0 }, to: { shapeId: plate, entity: "face" } }),
+    });
+    expect(refused.status).toBe(400);
+    expect(refused.body.code).toBe("invalid_request");
+  });
+
   it("refuses a change naming fields the shape cannot take, and applies none of it", async () => {
     const refused = await api(`/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
       method: "PATCH",

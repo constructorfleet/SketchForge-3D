@@ -90,4 +90,15 @@ export {
   type ServerCadTreatment,
 } from "@/lib/engine/serverCadOperations";
 export { FACE_DIRECTION_NAMES, type ServerCadFace, type ServerCadShellRequest } from "@/lib/engine/serverCadShell";
+export {
+  type MeasurementEndRef,
+  type MeasurementEntityKind,
+  type ServerCadMeasurement,
+  type ServerCadMeasurementPair,
+} from "@/lib/engine/serverCadMeasure";
+export {
+  type AngleUnavailableCode,
+  type MeasurementUnavailableCode,
+  type RadiusUnavailableCode,
+} from "@/lib/engine/cadMeasurements";
 export { exportShapesToStep, type StepExportResult } from "@/lib/engine/stepExport";

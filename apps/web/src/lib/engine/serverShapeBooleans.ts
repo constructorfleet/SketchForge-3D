@@ -82,7 +82,16 @@ function meshTrianglePositions(mesh: MeshData) {
  * looks like on screen. Everything else is built exactly from its parameters
  * and then moved into place.
  */
-function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
+/**
+ * The shape as an exact solid, where the shape actually sits.
+ *
+ * Exported because measuring the distance between two shapes needs the same
+ * placement a boolean between them would use. Both have to be the real one: the
+ * rotation is applied exactly once here (see `localSolidForShape` for the double
+ * rotation this split fixed), and a mirrored shape goes through
+ * `generalTransform` because a reflection is not a rigid placement.
+ */
+export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
   const mesh = worldMeshForShape(shape);
   if (mesh) return solidFromMeshPositions(cad, meshTrianglePositions(mesh));
 
