@@ -54,6 +54,22 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(Math.min(...ys)).toBeCloseTo(0, 5);
   });
 
+  it("lists a turned shape's edges where the caller can see them", async () => {
+    // The listing and the treatment have to be looking at the same solid: an
+    // index is only a name for an edge if both ends agree which solid it is on.
+    // A 40x10 box at a quarter turn has its long edges running along Z, so a
+    // listing taken from the unrotated solid would report them along X and a
+    // caller picking "the long edge at the front" would round a different one.
+    const turned = { ...box({ depth: 10 }), rotation: 90 } as WorkplaneShape;
+
+    const edges = await shapeEdges(turned);
+    const long = edges.filter((edge) => Math.abs(edge.length - 40) < 1e-6);
+
+    expect(long).toHaveLength(4);
+    expect(Math.max(...long.map((edge) => Math.abs(edge.midpoint.z)))).toBeCloseTo(0, 5);
+    expect(Math.max(...long.map((edge) => Math.abs(edge.midpoint.x)))).toBeCloseTo(5, 5);
+  });
+
   it("chamfers only the edges it was asked for", async () => {
     const all = await applyEdgeTreatment(box(), { kind: "chamfer", amount: 2 });
     const one = await applyEdgeTreatment(box(), { kind: "chamfer", amount: 2, edges: [0] });
@@ -135,6 +151,11 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
 
     expect(treated.rotation).toBe(45);
     expect(treated.rotationZ).toBe(10);
+    // And the geometry itself was not turned on top of that. A 40x40 box turned
+    // 45 degrees measures 56.6 across; this result is still 40-ish, because the
+    // rotation belongs to the shape here and is applied once, when drawn.
+    expect(treated.width).toBeLessThan(48);
+    expect(treated.depth).toBeLessThan(48);
   });
 
   it("still works after an operation OCCT threw on", async () => {

@@ -17,7 +17,12 @@
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "@/lib/serverCadKernel";
-import { exactSolidForShape, shapeIsTurned, UnbuildableShapeError } from "@/lib/serverCadSolids";
+import {
+  exactSolidForShape,
+  shapeIsTurned,
+  unrotatedSolidForShape,
+  UnbuildableShapeError,
+} from "@/lib/serverCadSolids";
 import { canonicalizeShape } from "@/lib/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -123,32 +128,78 @@ export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
 }
 
 /**
- * Whether a treated result should keep the shape's rotation or has it baked in.
+ * Whether the shape's geometry has to be turned, or arrives already turned.
  *
- * Exact geometry is built turned the way the shape sits, so the result must not
- * be turned again. Stored geometry -- a previous result's BREP, an imported
- * mesh -- is already in the frame the shape's own rotation applies to.
+ * Stored geometry -- a previous result's BREP, an imported mesh -- is kept in
+ * the frame the shape's own rotation applies *to*, so the rotation lives on the
+ * shape and nothing rebuilds it. A parametric shape has no stored geometry, so
+ * whatever frame its solid is in is a choice made when it is built.
+ *
+ * This is the one predicate the two builders below and
+ * `treatmentBakesRotation` all read, so they cannot disagree about which frame
+ * a solid is in -- which is exactly how they came to disagree before.
  */
-export function treatmentBakesRotation(shape: WorkplaneShape) {
-  if (shape.cadBrep || meshPositionsOf(shape)) return false;
-  return shapeIsTurned(shape);
+function rotationIsRebuilt(shape: WorkplaneShape) {
+  return !shape.cadBrep && !meshPositionsOf(shape);
 }
 
 /**
- * The shape as an exact solid, in its own local frame.
+ * Whether a treated result has the shape's rotation baked into its geometry.
+ *
+ * True exactly when `orientedSolidForShape` applied it -- which is the only
+ * place it is applied on this path. A result that has it baked in must not
+ * carry the rotation as well, or the shape is turned twice.
+ */
+export function treatmentBakesRotation(shape: WorkplaneShape) {
+  return rotationIsRebuilt(shape) && shapeIsTurned(shape);
+}
+
+/**
+ * The shape as an exact solid, in its own local frame -- **unrotated**.
  *
  * A parametric shape is rebuilt from its dimensions rather than its mesh, so
  * its fillet is exact rather than a rounded approximation of a tessellation.
  *
- * Local: centred in X and Z with its base at Y=0, which is the frame every
- * geometry builder in the app produces. A caller that needs the solid where the
- * shape actually sits has to place it.
+ * Local: centred in X and Z with its base at Y=0 and square to the axes, which
+ * is the frame every geometry builder in the app produces. A caller that needs
+ * the solid where the shape actually sits has to place it -- rotation included.
+ *
+ * This is what a boolean wants: `shapePlacementMatrix` carries the shape's
+ * rotation, so a solid that arrived already turned would be turned twice. It
+ * was, until this split: a parametric operand went through
+ * `exactSolidForShape`, which bakes the rotation in, and then through the
+ * placement matrix, which applies it again. A 20x20x12 wedge at yaw 90 came out
+ * with its centre of mass 3.33mm away in each of X and Z -- with the correct
+ * volume and, because its footprint is square, the correct bounding box too.
  */
 export function localSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   if (shape.cadBrep) return solidFromBrep(cad, shape.cadBrep);
 
   const positions = meshPositionsOf(shape);
   if (positions) return solidFromMeshPositions(cad, [...positions]);
+
+  try {
+    return unrotatedSolidForShape(cad, shape);
+  } catch (error) {
+    if (error instanceof UnbuildableShapeError) throw new ServerCadError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * The same solid, turned the way the shape sits in the project.
+ *
+ * What an operation that stores its result as geometry wants -- a fillet, a
+ * chamfer, a hollow -- because the result is stored as a mesh with no rotation
+ * of its own, so a shape treated while turned would otherwise come back
+ * straightened. `treatmentBakesRotation` is the other half of that bargain and
+ * reads the same predicate.
+ *
+ * For stored geometry this is the local solid unchanged: the rotation stays on
+ * the shape, which is where it already was.
+ */
+export function orientedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
+  if (!rotationIsRebuilt(shape)) return localSolidForShape(cad, shape);
 
   try {
     return exactSolidForShape(cad, shape);
@@ -191,7 +242,10 @@ function edgeSummary(cad: OcctKernel, solid: ShapeHandle, handle: ShapeHandle, i
 /** The edges of a shape, in the order a treatment request refers to them by index. */
 export function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
   return withCadKernel((cad) => {
-    const solid = localSolidForShape(cad, shape);
+    // Oriented, not local: the edge a caller names by index has to be the edge
+    // the treatment then rounds, and a turned shape's edge midpoints are only
+    // where the caller sees them once the rotation is applied.
+    const solid = orientedSolidForShape(cad, shape);
     return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, solid, handle, index));
   });
 }
@@ -215,7 +269,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
   }
 
   return withCadKernel((cad) => {
-    const solid = localSolidForShape(cad, shape);
+    const solid = orientedSolidForShape(cad, shape);
     const allEdges = cad.getSubShapes(solid, "edge");
     const requested = treatment.edges;
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
