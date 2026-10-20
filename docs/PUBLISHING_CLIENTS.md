@@ -17,11 +17,13 @@ Releases are driven from `main` by **release-please**, not by a tag typed by han
 
 1. Every merge to `main` updates a standing **release pull request**, which carries the next version number -- worked out from the commit prefixes, so a `feat:` since the last release means a minor bump and a `fix:` a patch -- and the release notes for it. It bumps all three manifests together: the root `package.json`, the TypeScript client's, and the Python client's.
 2. **Merging that pull request is the release.** release-please tags the merge commit `v<version>` and creates the GitHub release.
-3. The same workflow then publishes what the release consists of: it calls `release.yml` (Docker image, npm, PyPI) and dispatches `desktop-release.yml` (installers, attached to the release).
+3. The same workflow then publishes what the release consists of: it dispatches `release.yml` (Docker image, npm, PyPI) and `desktop-release.yml` (installers, attached to the release), passing the version to each.
 
-The publishing is driven from `release-please.yml` rather than from the tag, and that is not a preference. **A tag pushed by a workflow using `GITHUB_TOKEN` does not start another workflow run** -- GitHub suppresses that to avoid recursion -- so no amount of tag-trigger tuning would have worked. `workflow_run` would also bridge the gap, since it fires on another workflow finishing whoever started it; `workflow_call` is used because the caller already knows the version and whether a release happened and can simply pass them, where a `workflow_run` listener would have to re-derive both from an artifact or the API and filter out every run that released nothing.
+The publishing is driven from `release-please.yml` rather than from the tag, and that is not a preference. **A tag pushed by a workflow using `GITHUB_TOKEN` does not start another workflow run** -- GitHub suppresses that to avoid recursion -- so no amount of tag-trigger tuning would have worked. `workflow_run` would also bridge the gap, since it fires on another workflow finishing whoever started it, but a listener would have to re-derive the version and whether a release happened from an artifact or the API and filter out every run that released nothing, where a dispatch simply passes both.
 
-The desktop workflow is dispatched rather than left to its own tag trigger for the same reason. A dispatch *does* start a run, even from `GITHUB_TOKEN`.
+Both are **dispatched**, not called with `uses:`. `release.yml` was a reusable workflow at first, and the PyPI publish failed on every release: PyPI's trusted publishing verifies the OIDC claim of the **top-level** workflow, so the upload arrived identifying itself as `release-please.yml` and was rejected -- "Invalid attestations supplied during upload ... does not match expected Trusted Publisher (release.yml @ ...)". PyPI [does not support reusable workflows](https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github) for trusted publishing at all. A dispatched run is its own top-level run, so the claim matches what is registered on PyPI, and `release.yml` deliberately carries no `workflow_call` trigger so this cannot come back by accident.
+
+The cost of dispatching is that `release-please.yml` finishes without knowing whether the publishing succeeded -- the runs are separate, and the Actions tab is where their results are. The draft release is the gate that matters: it is not published until the artifacts are attached and checked.
 
 So the version number lives in the tree, committed by the release pull request, and the tag only points at it. `release.yml` checks all three manifests equal the tag and **stops before publishing if any disagree** -- which can only happen if a tag was made by hand or a manifest was edited after the release pull request merged.
 
@@ -43,7 +45,7 @@ The release pull request is the gate instead, which is the better place for one:
 
 release-please works out the next version from commit subjects, so they have to be conventional: `feat:` for a minor bump, `fix:` for a patch, `feat!:` or a `BREAKING CHANGE:` footer for a major. Types it does not recognise -- `release:`, which upstream uses -- contribute nothing, and a release with only `chore:` and `refactor:` commits produces no release pull request at all. That is the expected behaviour, not a fault.
 
-Because this repository squash-merges with the **pull request title** as the commit subject (`squash_merge_commit_title: COMMIT_OR_PR_TITLE`), the title is what release-please ends up reading. `.github/workflows/pr-title.yml` fails a pull request whose title is not conventional, for exactly that reason -- the failure it prevents is silent, since a title release-please cannot parse does not error anywhere, it just releases nothing.
+Because this repository squash-merges with the **pull request title** as the commit subject (`squash_merge_commit_title: PR_TITLE`, with the commit messages kept as the body), the title is what release-please ends up reading. `.github/workflows/pr-title.yml` fails a pull request whose title is not conventional, for exactly that reason -- the failure it prevents is silent, since a title release-please cannot parse does not error anywhere, it just releases nothing.
 
 Note also that this repository has **no release tags on the remote**. release-please takes the last released version from `.release-please-manifest.json`, which is why that file matters and why a hand-edited version there would misdirect the next release.
 
@@ -64,6 +66,8 @@ Neither of these can be set up from the repository; both need an account action.
    - Value: the token from step 2.
 
 The package already carries `"publishConfig": { "access": "public" }`, which a scoped package needs or the first publish is refused as private. The workflow also passes `--access public` so the intent is visible in the log.
+
+**The token has to be one that does not need a one-time password.** A classic *Publish* token on an account with two-factor authentication enforced for writes fails the publish with `npm error code EOTP -- This operation requires a one-time password from your authenticator`, which is what happened on the 1.2.0 release: the tarball was built, the provenance statement was signed and logged, and only the upload was refused. A **Granular Access Token** or a classic **Automation** token is exempt from the one-time password, which is the whole point of that type. Regenerate `NPM_TOKEN` as one of those if you see `EOTP`.
 
 Provenance (`--provenance`) needs `id-token: write`, which the workflow has, and a public repository. On a private repository npm rejects the provenance flag; drop that flag to publish without it.
 
@@ -92,7 +96,7 @@ Verified locally: both packages build, their unit tests pass with the same comma
 
 1. **Verify.** Resolves the version from the tag, runs `npm run ci` and the static export build, and checks all three manifests equal it. Nothing is published from a tree that does not pass its own checks: a bad release can only be superseded on npm and PyPI, never withdrawn.
 
-2. **Docker image** to `ghcr.io`, tagged `v<version>`, `<version>`, `<major>.<minor>` and `latest`, for `linux/amd64` and `linux/arm64`. Pushes to `main` also move `latest`, which is pre-existing behaviour and left alone -- a deployment should pin a version tag.
+2. **Docker image** to `ghcr.io`, tagged `v<version>`, `<version>`, `<major>.<minor>` and `latest`, for `linux/amd64` and `linux/arm64`. A release is now the only thing that moves `latest`. `docker.yml` still builds every push to `main`, but publishes it only as the `main` tag and by short SHA -- previously it moved `latest` too, so two workflows fought over that tag and `latest` meant "newest commit" for Docker while meaning "newest release" everywhere else.
 
 3. **npm and PyPI**, in parallel.
 

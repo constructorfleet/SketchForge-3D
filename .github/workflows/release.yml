@@ -14,25 +14,11 @@ run-name: Release ${{ inputs.version || github.ref_name }}
 # already knows the version and whether a release happened, and can pass both;
 # a `workflow_run` listener would have to re-derive them from an uploaded
 # artifact or the API, and filter out every run that produced no release.
+# Deliberately not a reusable workflow. PyPI's trusted publishing verifies the
+# OIDC claim of the top-level workflow, so being called from another workflow
+# makes the publish fail as an unrecognised publisher. release-please.yml
+# dispatches this workflow instead.
 on:
-  workflow_call:
-    inputs:
-      version:
-        description: "Version being released (for example 1.1.0)"
-        required: true
-        type: string
-      publish_docker:
-        type: boolean
-        default: true
-      publish_npm:
-        type: boolean
-        default: true
-      publish_pypi:
-        type: boolean
-        default: true
-    secrets:
-      NPM_TOKEN:
-        required: false
   push:
     tags:
       - "v*.*.*"
@@ -162,9 +148,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A release moves `latest`, which pushes to main also set. That is the
-      # pre-existing behaviour of docker.yml and is left alone here; the
-      # version tags are what a deployment should pin to.
+      # A release is the only thing that moves `latest`; docker.yml publishes
+      # main under the `main` tag and by short SHA. A deployment can follow
+      # `latest` for releases or pin a version tag.
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
