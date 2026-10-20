@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/unit/**/*.test.ts"],
+    include: ["tests/unit/**/*.test.ts", "packages/sketchforge-client/src/**/*.test.ts"],
     // tests/unit/support holds helpers, not tests.
     exclude: ["tests/unit/support/**"],
     setupFiles: ["tests/unit/setupLocales.ts"],

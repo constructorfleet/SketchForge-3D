@@ -26,6 +26,12 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
 # Test and automation output
 coverage/
 test-results/

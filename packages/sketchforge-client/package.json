@@ -1,0 +1,48 @@
+{
+  "name": "@constructorfleet/sketchforge3d",
+  "version": "0.1.0",
+  "description": "Typed client and macro runner for the SketchForge REST API.",
+  "license": "AGPL-3.0-only",
+  "author": {
+    "name": "SketchForge contributors"
+  },
+  "homepage": "https://sketchforge3d.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/constructorfleet/SketchForge-3D.git",
+    "directory": "packages/sketchforge-client"
+  },
+  "keywords": [
+    "sketchforge",
+    "cad",
+    "macro",
+    "client"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "sketchforge-macro": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
