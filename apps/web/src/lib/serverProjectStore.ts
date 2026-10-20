@@ -123,3 +123,19 @@ export async function deleteServerProject(projectId: string) {
   const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
   if (!response.ok && response.status !== 404) throw await serverProjectError(response, "errors.projects.deleteFailed");
 }
+
+/**
+ * Which list is the authority on whether a project exists.
+ *
+ * The dashboard checks a project before opening it, to avoid opening one that
+ * another tab deleted. In browser mode that check reads `localStorage`, which
+ * is the store. In server mode `localStorage` is deliberately empty -- the
+ * server holds the list -- so asking it says every project is gone, and the
+ * check bounces the click back to a dashboard it has just emptied.
+ */
+export function openableProjectIds(
+  mode: "browser" | "server",
+  lists: { stored: ReadonlyArray<{ id: string }>; live: ReadonlyArray<{ id: string }> },
+) {
+  return new Set((mode === "server" ? lists.live : lists.stored).map((project) => project.id));
+}

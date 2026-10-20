@@ -40,6 +40,7 @@ import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type I
 import {
   deleteServerProject,
   fetchServerProjectPackage,
+  openableProjectIds,
   probeServerProjects,
   saveServerProjectMetadata,
   saveServerProjectPackage,
@@ -988,16 +989,23 @@ export default function Home() {
 
   const openEditor = (projectId: string | null, options: { allowMissingFromStorage?: boolean; challengeTutorial?: ChallengeTutorialId | null } = {}) => {
     if (projectId && typeof window !== "undefined" && !options.allowMissingFromStorage) {
+      // Opening checks the project still exists, in case another tab deleted
+      // it. The check has to ask whichever store owns the list: in server mode
+      // `localStorage` is empty by design, so reading it here declared every
+      // project gone and emptied the dashboard on every click.
       const storedProjects = readProjects();
-      const storedProject = storedProjects.find((project) => project.id === projectId);
-      if (!storedProject) {
-        setProjects(storedProjects);
+      const openable = openableProjectIds(projectStorageMode, { stored: storedProjects, live: projects });
+      if (!openable.has(projectId)) {
+        if (projectStorageMode !== "server") setProjects(storedProjects);
         setActiveProjectId(null);
         setView("dashboard");
         window.history.replaceState(null, "", "/");
         return;
       }
-      setProjects(storedProjects.map((project) => (project.id === projectId ? { ...project, updatedAt: Date.now() } : project)));
+      const touch = (list: DashboardProject[]) =>
+        list.map((project) => (project.id === projectId ? { ...project, updatedAt: Date.now() } : project));
+      if (projectStorageMode === "server") setProjects((current) => touch(current));
+      else setProjects(touch(storedProjects));
     } else if (projectId) {
       setProjects((current) => current.map((project) => (project.id === projectId ? { ...project, updatedAt: Date.now() } : project)));
     }
