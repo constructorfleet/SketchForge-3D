@@ -1,6 +1,6 @@
 {
   "name": "@constructorfleet/sketchforge3d",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Typed client and macro runner for the SketchForge REST API.",
   "license": "AGPL-3.0-only",
   "author": {
