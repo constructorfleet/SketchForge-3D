@@ -38,6 +38,10 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
 | `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest. |
 | `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
+| `POST` | `/booleans?projectId=` | Subtracts shapes from shapes. Body: `{ "solidIds": [...], "holeIds": [...] }`. |
+| `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
+| `DELETE` | `/groups?projectId=&shapeId=` | Takes a group apart. |
+| `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
@@ -65,7 +69,7 @@ Per kind:
 
 Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default the editor would have used, so a request need only carry what it cares about.
 
-**Sketch extrusions, fillets, chamfers, and boolean operations are not available here.** Their geometry comes from OCCT, which runs in the editor's worker; the API builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
+**A sketch extrusion is not a kind you can ask for here**: its profile is drawn, not described. Operations whose geometry comes out of the CAD kernel -- fillets, chamfers, and boolean cuts -- have endpoints of their own, below; `POST /shapes` builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
 
 A locked shape answers `409` to a change or delete; send `locked: false` to unlock it.
 
@@ -203,7 +207,58 @@ print(urllib.request.urlopen(request).status)
 PY
 ```
 
-Open the project in the dashboard afterwards; the holes are ordinary shapes marked as holes, so grouping the plate with them cuts them out.
+Open the project in the dashboard afterwards; the holes are ordinary shapes marked as holes, so grouping the plate with them cuts them out -- or ask the server to do it, with the boolean endpoint below.
+
+## Combining shapes: cut, group, separate
+
+A parameterised part is rarely one shape. A bracket is a plate with holes in it, and until the holes are taken out of the plate it is a plate and some cylinders -- which is where a script that can only add shapes runs out of road.
+
+Grouping is how this app subtracts. A group is one shape carrying its members; a member marked `hole: true` is subtracted from the rest when the group is made. So `POST /groups` and `POST /booleans` are one operation with two front doors: the first takes a flat list of ids and reads each shape's own `hole` flag, the second names the two roles explicitly and does not care how the shapes were stored.
+
+```bash
+# Cut: name the solid and the holes, whatever their stored hole flag says
+curl -X POST "$HOST/booleans?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"solidIds":["<plate>"],"holeIds":["<hole 1>","<hole 2>"]}'
+
+# Group: the same thing, from the shapes' own hole flags
+curl -X POST "$HOST/groups?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"ids":["<plate>","<hole 1>"]}'
+
+# Ungroup, and split a cut result into the separate bodies it left behind
+curl -X DELETE "$HOST/groups?projectId=$PROJECT&shapeId=<group>" -H "Authorization: Bearer $TOKEN"
+curl -X POST "$HOST/parts?projectId=$PROJECT&shapeId=<group>" -H "Authorization: Bearer $TOKEN"
+```
+
+Either way the operands leave the project and one group takes their place, carrying them as its children -- so the result opens in the editor as an ordinary group, and ungrouping there gives back the shapes it was made from. `solidIds` and `holeIds` each accept a single id as well as a list.
+
+Every solid named is fused before any hole is taken out, so a hole spanning two touching plates goes through both rather than through whichever was cut first. A group named as an operand is taken apart first and its members become the operands, so cutting into a group cuts the shapes inside it.
+
+### What the cut works from
+
+Shapes are rebuilt as exact geometry by the same builders the fillet endpoint uses, so the kinds listed under "What it can work from" above are the kinds a cut can take; anything else answers `422` naming it. A shape that already carries a mesh -- an import, or anything previously cut or treated -- is cut from that mesh, because the triangles are the only description of it the project has.
+
+The result is stored the way the editor stores a cut: a mesh of the solid, with the operands kept as the group's children. Unlike the editor, the server also stores the exact geometry alongside it, so a fillet or a STEP export of a cut part reads true surfaces rather than triangles.
+
+The editor grows every cutter by 0.05mm before subtracting it, because a mesh CSG resolves two coplanar faces unpredictably. An exact boolean does not need that dodge, so a hole cut here is the size that was asked for -- a flush-bottomed pocket comes out at its stated depth rather than 0.05mm deeper.
+
+### Separating parts
+
+A cut often leaves several pieces -- a bar cut through the middle is two bars -- and until they are separate shapes a script cannot move, colour or export one of them. `POST /parts` splits a shape into the bodies that touch, or takes a plain group back into its members.
+
+A shape built from parameters is one body by construction, so it answers `422` saying so. A multi-glyph text shape is the one case the server gets wrong here: the editor can split it into letters and the server cannot see them, because the glyph outlines come from a font it does not load. Separate those in the editor.
+
+### When it refuses
+
+| Status | When |
+| --- | --- |
+| `400` | No `solidIds`, no `holeIds`, or a shape named in both. |
+| `404` | An id that is not in the project. |
+| `409` | A locked operand, or another write holds the project. |
+| `422` | A kind the server cannot build exactly, or a cut that would leave nothing behind. |
+
+A cut that removes the whole solid is refused and the project is left as it was, rather than the shapes quietly disappearing -- which is what the editor does with the same selection, and is much harder to notice from a script.
 
 ## What a write does to the project
 

@@ -322,7 +322,13 @@ function untransformedSolid(cad: OcctKernel, shape: WorkplaneShape) {
 
   switch (shape.kind) {
     case "box":
-      return cad.makeBox(shapeWidth(shape), shape.height, shapeDepth(shape));
+      // From corners rather than `makeBox`, which builds from the origin
+      // outwards: a box centred like every other kind is what lets a hole be
+      // placed against it.
+      return cad.makeBoxFromCorners(
+        { x: -shapeWidth(shape) / 2, y: 0, z: -shapeDepth(shape) / 2 },
+        { x: shapeWidth(shape) / 2, y: shape.height, z: shapeDepth(shape) / 2 },
+      );
     case "cylinder":
       return cylinderSolid(cad, shape);
     case "cone":

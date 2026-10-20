@@ -29,6 +29,8 @@ async function measure(subject: WorkplaneShape) {
     height: bounds.ymax - bounds.ymin,
     depth: bounds.zmax - bounds.zmin,
     bottom: bounds.ymin,
+    centerX: (bounds.xmin + bounds.xmax) / 2,
+    centerZ: (bounds.zmin + bounds.zmax) / 2,
     faces: cad.getSubShapes(solid, "face").length,
     isSolid: cad.isSolid(solid),
   };
@@ -46,6 +48,21 @@ describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(measured.height).toBeCloseTo(10, 6);
     expect(measured.bottom).toBeCloseTo(0, 6);
     expect(measured.volume).toBeCloseTo(40 * 40 * 10, 3);
+  });
+
+  it("centres every kind it builds on the origin, so one can be placed against another", async () => {
+    // Every builder promises a local frame centred in X and Z. A kind that
+    // breaks that promise still fillets correctly, because the result is
+    // recentred -- but a hole placed against it lands half a shape away, which
+    // is why this is measured at all. The bound is loose rather than exact
+    // because OCCT's box around a curved surface carries a little slack of its
+    // own; it is still two orders of magnitude tighter than a shape built from
+    // a corner instead of its middle.
+    for (const kind of EXACT_SOLID_KINDS) {
+      const measured = await measure(shape(kind, { depth: 20 }));
+      expect(Math.abs(measured.centerX), `${kind} is off-centre in X`).toBeLessThan(0.5);
+      expect(Math.abs(measured.centerZ), `${kind} is off-centre in Z`).toBeLessThan(0.5);
+    }
   });
 
   it("builds a round cylinder as a true cylinder rather than a prism", async () => {
