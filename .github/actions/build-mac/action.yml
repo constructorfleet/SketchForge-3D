@@ -67,18 +67,7 @@ runs:
             export APPLE_API_KEY="$APPLE_API_KEY_INPUT"
           else
             export APPLE_API_KEY="$RUNNER_TEMP/sketchforge-notary-${{ inputs.arch }}.p8"
-            node <<'NODE'
-            const fs = require("node:fs");
-            const input = process.env.APPLE_API_KEY_INPUT || "";
-            const output = process.env.APPLE_API_KEY;
-            const decoded = input.includes("BEGIN PRIVATE KEY")
-              ? input
-              : Buffer.from(input, "base64").toString("utf8");
-            if (!decoded.includes("BEGIN PRIVATE KEY")) {
-              throw new Error("APPLE_API_KEY must be a .p8 path, key contents, or base64-encoded key contents.");
-            }
-            fs.writeFileSync(output, decoded, { mode: 0o600 });
-            NODE
+            node "$GITHUB_ACTION_PATH/write-notary-key.mjs"
           fi
         fi
         npm run desktop:dist -- --publish never --mac --${{ inputs.arch }} \

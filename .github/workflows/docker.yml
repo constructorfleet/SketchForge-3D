@@ -10,6 +10,10 @@ concurrency:
   group: docker-publish-${{ github.ref }}
   cancel-in-progress: true
 
+# `latest` is deliberately not published here. A push to main is not a release,
+# and this workflow used to move `latest` onto it, so `latest` meant "newest
+# commit" for Docker and "newest release" everywhere else. release.yml owns
+# `latest` now; main is available as the `main` tag and by short SHA.
 jobs:
   build:
     timeout-minutes: 30
@@ -39,7 +43,6 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
