@@ -1202,7 +1202,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   return { document, assetById, stateById };
 }
 
-async function defaultSourceImporter(asset: ProjectAsset) {
+export async function importSkfSourceAsset(asset: ProjectAsset) {
   if (asset.sourceFormat === "stl") return importedShapeFromStl(asset.name, exactArrayBuffer(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "obj") return importedShapeFromObj(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "svg") return importedShapeFromSvg(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
@@ -1369,7 +1369,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
   }
   const sourceMeshCache = new Map<string, Promise<NonNullable<WorkplaneShape["importedMesh"]>>>();
   const derivedMeshCache = new Map<string, ReturnType<typeof decodeMeshCache>>();
-  const sourceImporter = options.sourceImporter ?? defaultSourceImporter;
+  const sourceImporter = options.sourceImporter ?? importSkfSourceAsset;
   const resources = new RestoredResourceCache();
   const restoredStates = new Map<string, WorkplaneShape[]>();
   for (const state of document.states) {
