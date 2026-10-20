@@ -1,11 +1,15 @@
 /**
  * Exact solids for stored shapes, server side (upstream issue #55).
  *
- * Node-only. The editor can hand OCCT any shape because it can mesh any shape
- * in the browser; the server has no mesher, so it builds the geometry itself
+ * Written for the server, which has no mesher and so builds the geometry itself
  * from what the project stores. Every shape here is built as true geometry --
  * a round cylinder is a cylinder, not a 96-sided prism -- so a fillet lands on
  * real surfaces rather than on a tessellation of them.
+ *
+ * Despite the name this is not Node-only: nothing here touches the filesystem
+ * or loads a kernel, it only drives the `OcctKernel` it is handed. The CAD
+ * modifier worker builds boolean operands with it in the browser, for the same
+ * reason the server does -- an exact cut needs an exact operand.
  *
  * The profile maths is shared with the STEP exporter (`stepProfiles`), which
  * had to answer exactly the same questions about facets, taper, and yaw.

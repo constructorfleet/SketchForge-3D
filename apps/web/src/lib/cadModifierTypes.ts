@@ -1,4 +1,5 @@
 import type { LocalizedErrorPayload } from "@/i18n/LocalizedError";
+import type { WorkplaneShape } from "@/types/sketchforge";
 
 export type CadModifierKind = "chamfer" | "fillet";
 
@@ -27,12 +28,26 @@ export type CadModifierPrimitivePart = {
   transform?: number[];
 };
 
+/**
+ * An operand the kernel builds from the shape's own parameters.
+ *
+ * The exact boolean path sends these instead of triangles, which is what keeps
+ * a cylinder round and a taper sloped (upstream #118, #111). `transform` is the
+ * rigid move onto the workplane as three row-major rows of (basis, offset); the
+ * shape's rotation is baked in as the solid is built.
+ */
+export type CadModifierExactPart = {
+  shape: WorkplaneShape;
+  transform?: number[];
+};
+
 export type CadModifierMeshPart = {
   positions?: Float32Array;
   indices?: Uint32Array;
   brep?: string;
   brepTransform?: number[];
   primitive?: CadModifierPrimitivePart;
+  exact?: CadModifierExactPart;
   hole: boolean;
 };
 
@@ -57,6 +72,7 @@ export type CadModifierWorkerRequest =
       quality: CadModifierQuality;
       chamferAngle: number;
     }
+  | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
@@ -71,6 +87,17 @@ export type CadModifierWorkerResponse =
       brep: string;
       displayEdges: CadModifierDisplayEdge[];
       components?: CadModifierComponentMesh[];
+    }
+  | {
+      type: "boolean";
+      requestId: number;
+      positions: Float32Array;
+      normals: Float32Array;
+      triangleCount: number;
+      brep: string;
+      /** Volume before and after the holes, so the caller can tell a cut that did nothing. */
+      fusedVolume: number;
+      cutVolume: number;
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);

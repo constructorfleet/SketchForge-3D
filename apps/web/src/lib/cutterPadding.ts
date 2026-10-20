@@ -51,3 +51,21 @@ export function paddedCutterShape(shape: WorkplaneShape): WorkplaneShape {
     taperBottomDepth: padDimension(shape.taperBottomDepth),
   };
 }
+
+/** Which boolean kernel a cutter is being built for. */
+export type BooleanCutterKernel = "mesh" | "exact";
+
+/**
+ * The shape to subtract for a hole, for the kernel that will do the cutting.
+ *
+ * Only the mesh path needs the padding. An exact B-rep cut resolves a coplanar
+ * face by construction rather than by luck, so growing the cutter there buys
+ * nothing and costs accuracy: a pocket asked to stop flush with a face would
+ * come out `CUTTER_PADDING` deeper than it was asked for, and a through hole
+ * would come out `CUTTER_PADDING` wider all round.
+ *
+ * This is the one place that decides, so neither path can drift from the other.
+ */
+export function cutterShapeForBoolean(shape: WorkplaneShape, kernel: BooleanCutterKernel): WorkplaneShape {
+  return kernel === "exact" ? shape : paddedCutterShape(shape);
+}

@@ -104,6 +104,7 @@ import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
 import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticBox, cadModifierPrimitiveForBakedShape } from "@/lib/cadBakeMetadata";
 import { hasOneToOneCadComponentMapping } from "@/lib/cadModifierGroups";
 import {
+  CAD_BOOLEAN_REQUEST_TIMEOUT_MS,
   CAD_MODIFIER_MAX_SHARP_ANGLE,
   CAD_MODIFIER_REQUEST_TIMEOUT_MS,
   cadModifierPrepareTimeoutMs,
@@ -120,6 +121,7 @@ import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeome
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
 import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/booleanPrimitives";
 import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
+import { exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/exactBooleanParts";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
 import { createLocalId } from "@/lib/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
@@ -5200,19 +5202,79 @@ function hasNonZeroRotation(shape: WorkplaneShape) {
   return [rotation, rotationX, rotationZ].some((value) => value > 0.001 && Math.abs(value - 360) > 0.001);
 }
 
+/**
+ * Runs one exact cut on the CAD worker, rejecting if it cannot.
+ *
+ * The worker belongs to the editor component, but every boolean helper here is
+ * module-level, so the component registers its sender rather than five call
+ * sites threading it through. Null until the worker effect has run -- and it
+ * stays null wherever there is no worker at all, which is how the static export
+ * and the desktop build keep cutting with no kernel available.
+ */
+type ExactBooleanCutRunner = (parts: CadModifierMeshPart[], transfer: Transferable[]) => Promise<CadModifierWorkerResponse>;
+
+let exactBooleanCutRunner: ExactBooleanCutRunner | null = null;
+
+/**
+ * The cut done exactly, on true surfaces, or null to let the mesh paths try.
+ *
+ * This is what fixes a negative cylinder leaving a broken mesh (upstream #118)
+ * and a tapered cutter leaving an untapered hole (#111): the operands reach
+ * OCCT as a cylinder and a frustum rather than as ninety-six facets and a box,
+ * and the result keeps its B-rep in `cadBrep` so a later fillet or STEP export
+ * of the cut part reads those surfaces too.
+ *
+ * Every failure returns null rather than throwing. An exact cut is an
+ * improvement on the mesh cut, not a replacement for it: no kernel, a shape it
+ * cannot build, a timeout, or a hole that misses its solid all fall through to
+ * exactly what the editor did before.
+ */
+async function exactBooleanMeshShape(selection: WorkplaneShape[]): Promise<WorkplaneShape | null> {
+  const runner = exactBooleanCutRunner;
+  if (!runner) {
+    return null;
+  }
+
+  const request = exactCutPartsForSelection(selection);
+  if (!request) {
+    return null;
+  }
+
+  try {
+    const response = await runner(request.parts, exactCutRequestTransfer(request.parts));
+    // A hole that never met its solid leaves the solid whole. The mesh paths
+    // treat that as a failed cut rather than a group, and so does this.
+    if (response.type !== "boolean" || response.cutVolume >= response.fusedVolume - 1e-6) {
+      return null;
+    }
+    const group = meshPositionsToGroupShape(selection, request.solids, Array.from(response.positions), "grouped-exact-cut");
+    if (!group || !isUsableBooleanGroup(group, 0, false)) {
+      return null;
+    }
+    return withExactBooleanBrep(group, { normals: response.normals, brep: response.brep });
+  } catch {
+    return null;
+  }
+}
+
 async function buildGroupedShapeFromSelection(groupable: WorkplaneShape[]): Promise<GroupBuildResult> {
   const booleanSelection = expandGroupsForBoolean(groupable);
   const hasSolid = booleanSelection.some((shape) => !shape.hole);
   const hasHole = booleanSelection.some((shape) => shape.hole);
   const hasImportedMesh = booleanSelection.some((shape) => Boolean(shape.importedMesh));
-  const boxBooleanSelection = hasSolid && hasHole ? expandGroupsForBoxBoolean(groupable) : [];
+  // Exact first, for every cut it can describe. The mesh paths below are the
+  // fallback, kept whole because this app also ships as a static export and as
+  // a desktop build, where there may be no worker and no kernel to load.
+  const exactGroup = hasSolid && hasHole ? await exactBooleanMeshShape(booleanSelection) : null;
+  const boxBooleanSelection = hasSolid && hasHole && !exactGroup ? expandGroupsForBoxBoolean(groupable) : [];
   const cleanBoxGroup = canUseBoxBoolean(boxBooleanSelection) ? boxedBooleanMeshShape(boxBooleanSelection) : null;
-  const manifoldCutGroup = hasSolid && hasHole ? await manifoldBooleanMeshShape(booleanSelection, { requireImported: false }) : null;
+  const manifoldCutGroup = hasSolid && hasHole && !exactGroup ? await manifoldBooleanMeshShape(booleanSelection, { requireImported: false }) : null;
   const manifoldImportedMerge = hasImportedMesh && hasSolid && !hasHole ? await manifoldUnionMeshShape(booleanSelection) : null;
-  const exactImportedGroup = hasImportedMesh && hasSolid && hasHole ? manifoldCutGroup ?? importedBooleanMeshShape(booleanSelection) : null;
+  const exactImportedGroup = hasImportedMesh && hasSolid && hasHole && !exactGroup ? manifoldCutGroup ?? importedBooleanMeshShape(booleanSelection) : null;
   const bakedImportedMerge = hasImportedMesh && !(hasSolid && hasHole) ? manifoldImportedMerge ?? mergedMeshShape(booleanSelection) : null;
   const group = hasSolid && hasHole
-    ? cleanBoxGroup ??
+    ? exactGroup ??
+      cleanBoxGroup ??
       exactImportedGroup ??
       (hasImportedMesh
         ? null
@@ -7559,6 +7621,18 @@ export function SketchForgeEditor({
       }
     });
   }, []);
+
+  // Hand the module-level boolean helpers a way to reach the worker. The sender
+  // already restarts the worker and rejects on a timeout, so a kernel that
+  // never loads costs one wait and then falls back to the mesh cut rather than
+  // leaving a group half-made.
+  useEffect(() => {
+    exactBooleanCutRunner = (parts, transfer) =>
+      postCadModifierRequestAsync({ type: "boolean", parts }, transfer, CAD_BOOLEAN_REQUEST_TIMEOUT_MS);
+    return () => {
+      exactBooleanCutRunner = null;
+    };
+  }, [postCadModifierRequestAsync]);
 
   const cancelEdgeModifier = useCallback(() => {
     invalidateCadModifierSession();
