@@ -83,6 +83,8 @@ Per kind:
 
 Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default the editor would have used, so a request need only carry what it cares about.
 
+The same table governs `POST` and `PATCH`: a parameter this table says applies to a kind is applied when the shape is created and when it is changed, and reads the same value either way. (It did not always: `POST` used to drop a parameter unless the kind could not be built without it, so a tapered box asked for in one request came back straight, with a `201`.)
+
 ## Reading a shape back
 
 Everything above can be read as well as set, which is what makes **read a shape, change a number, send it back** actually work. A summary carries the shape's placement and size, the parameters its kind is built from, and two fields that say what it is:
