@@ -30,7 +30,7 @@ docker run -d --name sketchforge --restart unless-stopped \
   -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
   -e SKETCHFORGE_API_TOKEN="$(openssl rand -hex 32)" \
   -v sketchforge-projects:/data/my-projects \
-  ghcr.io/formsmith746/sketchforge-3d:latest
+  ghcr.io/constructorfleet/sketchforge-3d:latest
 ```
 
 Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-SketchForge-Token`. The API has no user model: anyone holding the token can read, change, and delete every project. Treat it as a password and do not expose the port to the internet without TLS in front of it.

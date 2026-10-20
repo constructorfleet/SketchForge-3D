@@ -2,14 +2,14 @@
 
 ## Repository owner
 
-The desktop updater publishes releases for `Formsmith746/SketchForge-3D`.
+The desktop updater publishes releases for `constructorfleet/SketchForge-3D`.
 
 Keep these values in `apps/desktop/electron-builder.yml`:
 
 ```yaml
 publish:
   provider: github
-  owner: Formsmith746
+  owner: constructorfleet
   repo: SketchForge-3D
 ```
 

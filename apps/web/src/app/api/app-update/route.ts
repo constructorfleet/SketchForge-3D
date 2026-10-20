@@ -15,8 +15,8 @@ export const runtime = "nodejs";
 // outright rather than leaving the route out of it.
 export const revalidate = false;
 
-const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/Formsmith746/SketchForge-3D/main/package.json";
-const OFFICIAL_REPO_URL = "https://github.com/Formsmith746/SketchForge-3D.git";
+const DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/constructorfleet/SketchForge-3D/main/package.json";
+const OFFICIAL_REPO_URL = "https://github.com/constructorfleet/SketchForge-3D.git";
 const UPDATE_CACHE_MS = 5 * 60 * 1000;
 const UPDATE_TRIGGER_COOLDOWN_MS = 15 * 1000;
 const execFileAsync = promisify(execFile);

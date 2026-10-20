@@ -16,12 +16,14 @@
 
   <p>
     <a href="LICENSE"><img alt="GNU AGPLv3 license" src="https://img.shields.io/badge/license-AGPLv3-663399"></a>
-    <a href="https://github.com/Formsmith746/SketchForge-3D/stargazers"><img alt="Star SketchForge on GitHub" src="https://img.shields.io/github/stars/Formsmith746/SketchForge-3D?style=flat&logo=github"></a>
+    <a href="https://github.com/constructorfleet/SketchForge-3D/stargazers"><img alt="Star SketchForge on GitHub" src="https://img.shields.io/github/stars/constructorfleet/SketchForge-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor SketchForge on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
     <img alt="Version v1.0.9" src="https://img.shields.io/badge/version-v1.0.9-2563eb">
   </p>
 </div>
+
+> **This is a fork.** SketchForge was created by [Formsmith746](https://github.com/Formsmith746/SketchForge-3D), and this repository carries that work forward with additional features and fixes — exact CAD booleans and fillets, a REST API and MCP bridge, server-side project storage, hollowing, 3MF export and more. Bug reports and feature requests for *this* build belong here; the original project is a better place for anything about upstream SketchForge itself. If you find SketchForge useful, the sponsor link above goes to its original author.
 
 ![SketchForge editor showing a selected model on the workplane](https://sketchforge3d.com/assets/landing/editor-phone-stand.png)
 
@@ -140,7 +142,7 @@ Some macOS virtual machines do not provide hardware WebGL. Launch SketchForge wi
 If you already know Git:
 
 ```bash
-git clone https://github.com/Formsmith746/SketchForge-3D.git
+git clone https://github.com/constructorfleet/SketchForge-3D.git
 cd SketchForge-3D
 ```
 
@@ -193,7 +195,7 @@ docker run -d --name sketchforge --restart unless-stopped \
   -p 3000:3000 \
   -e SKETCHFORGE_SHARED_PROJECTS_DIR=/data/projects \
   -v sketchforge-shared-projects:/data/projects \
-  ghcr.io/formsmith746/sketchforge-3d:latest
+  ghcr.io/constructorfleet/sketchforge-3d:latest
 ```
 
 After running, open this on the same computer:
@@ -215,7 +217,7 @@ docker run -d --name sketchforge --restart unless-stopped \
   -p 3000:3000 \
   -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
   -v sketchforge-projects:/data/my-projects \
-  ghcr.io/formsmith746/sketchforge-3d:latest
+  ghcr.io/constructorfleet/sketchforge-3d:latest
 ```
 
 The directory *replaces* browser storage rather than mirroring it: the dashboard reads its list from the server, autosave writes there, and deleting a project deletes it there. Each project is two files — `<project id>.json` for the dashboard's own record of it and `<project id>.skf` for the geometry — written through a temporary file so an interrupted save cannot leave half a project behind.
