@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import base64
+import os
+import tempfile
 import unittest
 
-from sketchforge3d import SketchForgeApiError, SketchForgeClient, SketchForgeTransportError, chunk
+from sketchforge3d import (
+    Imports,
+    SketchForgeApiError,
+    SketchForgeClient,
+    SketchForgeTransportError,
+    chunk,
+)
 from sketchforge3d._http import Transport, build_url, normalize_base_url
 from sketchforge3d.types import (
     MAX_SHAPES_PER_REQUEST,
@@ -368,6 +377,115 @@ class MeasurementsTests(unittest.TestCase):
             MEASUREMENT_UNAVAILABLE_CODES,
             MEASUREMENT_RADIUS_UNAVAILABLE_CODES + MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
         )
+
+
+class ArrangeTests(unittest.TestCase):
+    def test_sends_the_axis_and_target_and_leaves_an_absent_anchor_out(self) -> None:
+        opener = FakeOpener(
+            {"moved": 2, "axis": "y", "target": "max", "anchorId": None, "shapes": [], "revision": 1}
+        )
+        result = client(opener).align.tops("p1", ["a", "b"])
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/align?projectId=p1")
+        # An anchor sent as null would be a different request from one not
+        # sent: the server reads an absent one as "use the whole selection".
+        self.assertEqual(opener.calls[0].body, {"ids": ["a", "b"], "axis": "y", "target": "max"})
+        self.assertEqual(result.moved, 2)
+        self.assertIsNone(result.anchor_id)
+
+    def test_reports_the_anchor_the_server_actually_used(self) -> None:
+        # A locked shape in the selection cannot move, so it anchors the
+        # alignment whatever was asked for -- and this is the only way a caller
+        # finds that out.
+        opener = FakeOpener(
+            {"moved": 1, "axis": "x", "target": "min", "anchorId": "locked", "shapes": [], "revision": 2}
+        )
+        result = client(opener).align.apply("p1", ["a", "locked"], "x", "min", "a")
+        self.assertEqual(opener.calls[0].body["anchorId"], "a")
+        self.assertEqual(result.anchor_id, "locked")
+
+    def test_leaves_the_axis_out_so_the_server_picks_the_row(self) -> None:
+        opener = FakeOpener({"moved": 1, "axis": "z", "spacing": "centers", "shapes": [], "revision": 3})
+        result = client(opener).distribute.pitch("p1", ["a", "b", "c"])
+        self.assertEqual(opener.calls[0].body, {"ids": ["a", "b", "c"], "spacing": "centers"})
+        self.assertEqual(result.axis, "z")
+
+    def test_sends_a_rows_pitch_and_a_rings_centre(self) -> None:
+        opener = FakeOpener({"created": 3, "kind": "linear", "shapes": [], "revision": 4})
+        api = client(opener)
+
+        api.patterns.row("p1", ["boss"], 4, 25)
+        self.assertEqual(
+            opener.calls[0].body, {"ids": ["boss"], "kind": "linear", "count": 4, "stepX": 25}
+        )
+
+        api.patterns.ring("p1", ["hole"], 6, (0.0, 12.0), rotate_copies=False)
+        self.assertEqual(
+            opener.calls[1].body,
+            {
+                "ids": ["hole"],
+                "kind": "circular",
+                "count": 6,
+                "centerX": 0.0,
+                "centerZ": 12.0,
+                "rotateCopies": False,
+            },
+        )
+
+    def test_keeps_a_zero_step_and_a_false_rotate_which_a_falsy_check_would_drop(self) -> None:
+        # All three of these are meaningful and all three are falsy: a zero
+        # step is a row running purely along the other axis, a zero centre is
+        # the origin, and rotate_copies=False is a vane keeping its heading.
+        opener = FakeOpener({"created": 1, "kind": "circular", "shapes": [], "revision": 5})
+        client(opener).patterns.apply(
+            "p1", ["v"], "circular", 2, step_x=0, center_x=0, rotate_copies=False
+        )
+        self.assertEqual(opener.calls[0].body["stepX"], 0)
+        self.assertEqual(opener.calls[0].body["centerX"], 0)
+        self.assertIs(opener.calls[0].body["rotateCopies"], False)
+
+    def test_binds_the_project_id_through_a_handle(self) -> None:
+        opener = FakeOpener({"created": 2, "kind": "linear", "shapes": [], "revision": 6})
+        result = client(opener).project("p9").row(["boss"], 3, 20)
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/patterns?projectId=p9")
+        self.assertEqual(result.created, 2)
+
+
+class ImportTests(unittest.TestCase):
+    def test_sends_the_bytes_as_base64_under_the_name_that_chooses_the_importer(self) -> None:
+        opener = FakeOpener((201, {"shape": shape_payload("m1"), "triangles": 12, "revision": 7}))
+        result = client(opener).imports.apply("p1", "plate.stl", b"solid")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/imports?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"fileName": "plate.stl", "data": "c29saWQ="})
+        self.assertEqual(result.triangles, 12)
+
+    def test_encodes_bytes_that_are_not_text(self) -> None:
+        # A model file is binary: an STL written by a slicer is, and an encoder
+        # that round-tripped through a string would corrupt it.
+        opener = FakeOpener((201, {"shape": shape_payload("m1"), "triangles": 0, "revision": 8}))
+        payload = bytes(range(256))
+        client(opener).imports.apply("p1", "binary.stl", payload)
+        self.assertEqual(
+            base64.b64decode(opener.calls[0].body["data"]), payload
+        )
+
+    def test_reads_the_name_and_the_bytes_off_a_path(self) -> None:
+        opener = FakeOpener((201, {"shape": shape_payload("m1"), "triangles": 4, "revision": 9}))
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "bracket.stl")
+            with open(path, "wb") as handle:
+                handle.write(b"solid bracket")
+            client(opener).project("p1").import_file(path)
+        # The base name rather than the whole path: the server uses it to
+        # choose the importer and to name the stored asset, and a temporary
+        # directory is not part of either.
+        self.assertEqual(opener.calls[0].body["fileName"], "bracket.stl")
+        self.assertEqual(base64.b64decode(opener.calls[0].body["data"]), b"solid bracket")
+
+    def test_says_which_file_names_the_server_will_even_try(self) -> None:
+        self.assertTrue(Imports.readable("bracket.STL"))
+        self.assertTrue(Imports.readable("logo.svg"))
+        self.assertFalse(Imports.readable("part.step"))
+        self.assertFalse(Imports.readable("notes"))
 
 
 class ShapeSummaryTests(unittest.TestCase):

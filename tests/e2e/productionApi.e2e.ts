@@ -148,6 +148,34 @@ describe("the REST API from a production build", { timeout: 180_000 }, () => {
     expect(response.headers.get("allow")).toBe("GET, OPTIONS");
   });
 
+  it("imports an STL, which pulls three's loaders through a bundled server", async () => {
+    // Same class of failure as the OCCT one below: the import route reaches
+    // `three/examples/jsm/loaders/STLLoader.js`, and a loader that resolves
+    // under vitest can still fail to bundle. Nothing else here imports a model
+    // on the server side.
+    const corners = [[0, 0, 0], [30, 0, 0], [0, 18, 0], [0, 0, 9]];
+    const facets = [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]].map(([a, b, c]) => [
+      "facet normal 0 0 0",
+      "  outer loop",
+      `    vertex ${corners[a].join(" ")}`,
+      `    vertex ${corners[b].join(" ")}`,
+      `    vertex ${corners[c].join(" ")}`,
+      "  endloop",
+      "endfacet",
+    ].join("\n")).join("\n");
+
+    const imported = await api(`/imports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: "wedge.stl",
+        data: Buffer.from(`solid wedge\n${facets}\nendsolid wedge`, "utf8").toString("base64"),
+      }),
+    });
+    expect(imported.status).toBe(201);
+    expect(imported.body.triangles).toBe(4);
+    expect(imported.body.shape).toMatchObject({ width: 30, depth: 18, height: 9 });
+  });
+
   it("hollows a shape, which is the whole OCCT path through a bundled server", async () => {
     // The bundling failure this repo has hit twice -- `createRequire is not a
     // function` from Emscripten glue that `serverExternalPackages` did not

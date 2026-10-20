@@ -12,6 +12,7 @@ import {
   type ShapeRequest,
   type ShapeSummary,
 } from "../types.js";
+import { meshBytesToBase64 } from "./imports.js";
 import { chunk, shapePatchFromSummary } from "./shapes.js";
 
 function client(server: FakeServer) {
@@ -262,6 +263,118 @@ describe("measurements", () => {
     const radiusFieldIsExact: Exactly<MeasurementSummary["radiusUnavailable"], MeasurementRadiusUnavailableCode | null> = true;
     const angleFieldIsExact: Exactly<MeasurementPair["angleUnavailable"], MeasurementAngleUnavailableCode | null> = true;
     expect([radiusFieldIsExact, angleFieldIsExact]).toEqual([true, true]);
+  });
+});
+
+describe("align, distribute and patterns", () => {
+  it("sends the axis and target, and leaves an absent anchor out", async () => {
+    const server = fakeServer({ body: { moved: 2, axis: "y", target: "max", anchorId: null, shapes: [], revision: 1 } });
+
+    await client(server).align.tops("p1", ["a", "b"]);
+
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/align?projectId=p1");
+    // An anchor sent as null would be a different request from one not sent:
+    // the server reads an absent anchor as "use the whole selection's box".
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b"], axis: "y", target: "max" });
+  });
+
+  it("carries an anchor through when there is one", async () => {
+    const server = fakeServer({ body: { moved: 1, axis: "x", target: "center", anchorId: "a", shapes: [], revision: 1 } });
+
+    await client(server).align.centers("p1", ["a", "b"], "x", "a");
+
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b"], axis: "x", target: "center", anchorId: "a" });
+  });
+
+  it("leaves the axis out so the server picks the row the shapes are already in", async () => {
+    const server = fakeServer({ body: { moved: 1, axis: "z", spacing: "centers", shapes: [], revision: 1 } });
+
+    const result = await client(server).distribute.pitch("p1", ["a", "b", "c"]);
+
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b", "c"], spacing: "centers" });
+    expect(result.axis).toBe("z");
+  });
+
+  it("sends a row's pitch and a ring's centre under the server's own names", async () => {
+    const server = fakeServer({ body: { created: 3, kind: "linear", shapes: [], revision: 1 } });
+    const api = client(server);
+
+    await api.patterns.row("p1", ["boss"], 4, 25);
+    expect(server.calls[0]?.body).toEqual({ ids: ["boss"], kind: "linear", count: 4, stepX: 25 });
+
+    await api.patterns.ring("p1", ["hole"], 6, { x: 0, z: 12 }, { rotateCopies: false });
+    expect(server.calls[1]?.body).toEqual({
+      ids: ["hole"],
+      kind: "circular",
+      count: 6,
+      centerX: 0,
+      centerZ: 12,
+      rotateCopies: false,
+    });
+  });
+
+  it("keeps rotateCopies: false, which an omit-if-falsy would have dropped", async () => {
+    // The server's default is `true`, so dropping an explicit `false` would
+    // turn every vane the wrong way and look like the request worked.
+    const server = fakeServer({ body: { created: 1, kind: "circular", shapes: [], revision: 1 } });
+
+    await client(server).patterns.apply("p1", { ids: ["v"], kind: "circular", count: 2, rotateCopies: false });
+
+    expect(server.calls[0]?.body).toMatchObject({ rotateCopies: false });
+  });
+
+  it("keeps a zero step and a zero centre, which the server reads as meaningful", async () => {
+    const server = fakeServer({ body: { created: 1, kind: "linear", shapes: [], revision: 1 } });
+
+    await client(server).patterns.apply("p1", { ids: ["b"], kind: "linear", count: 3, stepX: 0, stepZ: 14 });
+
+    // `stepX: 0` is a row that runs purely along Z, not an absent field.
+    expect(server.calls[0]?.body).toMatchObject({ stepX: 0, stepZ: 14 });
+  });
+});
+
+describe("imports", () => {
+  it("sends the bytes as base64 under the file name that chooses the importer", async () => {
+    const server = fakeServer({ body: { shape: shapeSummary("m1"), triangles: 12, revision: 1 } });
+    const bytes = new Uint8Array([115, 111, 108, 105, 100]);
+
+    await client(server).imports.apply("p1", { fileName: "plate.stl", bytes });
+
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/imports?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ fileName: "plate.stl", data: "c29saWQ=" });
+  });
+
+  it("encodes a whole model file the same way with or without node's Buffer", () => {
+    // Longer than the 0x8000 chunk the browser-side branch works in, and
+    // longer than the argument limit `String.fromCharCode(...bytes)` hits --
+    // which is a stack overflow rather than a wrong answer, so a model file is
+    // exactly the input that finds it. Not every byte value is the same byte:
+    // a buffer of one repeated character would encode identically however the
+    // chunking went wrong.
+    const bytes = new Uint8Array(0x8000 * 2 + 7).map((_, index) => index % 251);
+    const expected = Buffer.from(bytes).toString("base64");
+
+    expect(meshBytesToBase64(bytes)).toBe(expected);
+
+    // And the `btoa` branch a browser-hosted caller takes. Exercised on the
+    // encoder rather than through a request, because the test server's own
+    // `Response` needs `Buffer` too.
+    const global = globalThis as { Buffer?: unknown };
+    const saved = global.Buffer;
+    delete global.Buffer;
+    try {
+      expect(meshBytesToBase64(bytes)).toBe(expected);
+    } finally {
+      global.Buffer = saved;
+    }
+  });
+
+  it("says which file names the server will even try", () => {
+    const api = client(fakeServer({ body: {} }));
+    expect(api.imports.readable("bracket.STL")).toBe(true);
+    expect(api.imports.readable("logo.svg")).toBe(true);
+    expect(api.imports.readable("part.step")).toBe(false);
+    expect(api.imports.readable("notes")).toBe(false);
   });
 });
 

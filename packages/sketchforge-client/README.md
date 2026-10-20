@@ -91,6 +91,19 @@ client.measurements.between(projectId, from, to): Promise<MeasurementPair>
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
 client.shell.tray(projectId, shapeId, thickness, openFaces?): Promise<ShellResult>
+
+client.align.apply(projectId, { ids, axis, target, anchorId? }): Promise<AlignResult>
+client.align.tops(projectId, ids, anchorId?) | bottoms(...) | centers(projectId, ids, axis, anchorId?)
+
+client.distribute.apply(projectId, { ids, axis?, spacing? }): Promise<DistributeResult>
+client.distribute.gaps(projectId, ids, axis?) | pitch(projectId, ids, axis?)
+
+client.patterns.apply(projectId, { ids, kind?, count?, stepX?, stepZ?, centerX?, centerZ?, sweepAngle?, rotateCopies? }): Promise<PatternResult>
+client.patterns.row(projectId, ids, count, stepX, stepZ?): Promise<PatternResult>
+client.patterns.ring(projectId, ids, count, { x, z }, { sweepAngle?, rotateCopies? }?): Promise<PatternResult>
+
+client.imports.apply(projectId, { fileName, bytes, mediaType? }): Promise<MeshImportResult>
+client.imports.readable(fileName): boolean
 ```
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
@@ -102,6 +115,9 @@ project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance
 project.faces(id) | facesFacing(id, direction)
 project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
+project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
+project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)
+project.importMesh({ fileName, bytes })
 ```
 
 Shapes are described as parameters, with a union per kind so a field that belongs to another kind is a compile error:

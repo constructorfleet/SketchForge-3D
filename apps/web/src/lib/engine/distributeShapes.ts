@@ -15,6 +15,10 @@
  *
  * Pure, and in terms of extents rather than shapes, so the editor can feed it
  * mesh bounds and the tests can feed it numbers.
+ *
+ * Under `lib/engine/` because the editor is no longer its only caller: the
+ * `Engine` distributes a stored project's shapes with no browser in the
+ * picture, and it needs the same arithmetic rather than a second copy of it.
  */
 
 export type DistributeSpacing = "gaps" | "centers";

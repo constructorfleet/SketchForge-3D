@@ -8,14 +8,20 @@
 
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
+import { Align, Distribute, Patterns } from "./resources/arrange.js";
 import { Edges } from "./resources/edges.js";
 import { Faces } from "./resources/faces.js";
+import { Imports } from "./resources/imports.js";
 import { Measurements } from "./resources/measurements.js";
 import { Projects } from "./resources/projects.js";
 import { Shapes } from "./resources/shapes.js";
 import { Shell } from "./resources/shell.js";
 import { Treatments } from "./resources/treatments.js";
 import type {
+  AlignRequest,
+  AlignResult,
+  DistributeRequest,
+  DistributeResult,
   EdgeSummary,
   EdgeTreatment,
   FaceDirection,
@@ -23,6 +29,10 @@ import type {
   MeasurementEnd,
   MeasurementPair,
   MeasurementSummary,
+  MeshImportRequest,
+  MeshImportResult,
+  PatternRequest,
+  PatternResult,
   ProjectDetail,
   ShapePatch,
   ShapeRequest,
@@ -43,6 +53,10 @@ export class SketchForgeClient {
   readonly measurements: Measurements;
   readonly treatments: Treatments;
   readonly shell: Shell;
+  readonly align: Align;
+  readonly distribute: Distribute;
+  readonly patterns: Patterns;
+  readonly imports: Imports;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -54,6 +68,10 @@ export class SketchForgeClient {
     this.measurements = new Measurements(this.transport);
     this.treatments = new Treatments(this.transport);
     this.shell = new Shell(this.transport);
+    this.align = new Align(this.transport);
+    this.distribute = new Distribute(this.transport);
+    this.patterns = new Patterns(this.transport);
+    this.imports = new Imports(this.transport);
   }
 
   get apiRoot() {
@@ -180,5 +198,45 @@ export class ProjectHandle {
 
   tray(shapeId: string, thickness: number, openFaces?: ShellRequest["openFaces"]) {
     return this.client.shell.tray(this.id, shapeId, thickness, openFaces);
+  }
+
+  /** Puts one edge or one centre of every named shape on the same coordinate. */
+  align(request: AlignRequest): Promise<AlignResult> {
+    return this.client.align.apply(this.id, request);
+  }
+
+  /** Flush tops, which is the alignment a row of parts on a plate usually wants. */
+  alignTops(ids: readonly string[], anchorId?: string) {
+    return this.client.align.tops(this.id, ids, anchorId);
+  }
+
+  /** Spreads three or more shapes evenly; the outermost two define the span. */
+  distribute(request: DistributeRequest): Promise<DistributeResult> {
+    return this.client.distribute.apply(this.id, request);
+  }
+
+  /** Repeats shapes in a row or around a ring, adding the copies. */
+  pattern(request: PatternRequest): Promise<PatternResult> {
+    return this.client.patterns.apply(this.id, request);
+  }
+
+  /** A row at a centre-to-centre pitch; `count` includes the original. */
+  row(ids: readonly string[], count: number, stepX: number, stepZ?: number) {
+    return this.client.patterns.row(this.id, ids, count, stepX, stepZ);
+  }
+
+  /** A ring about a point, which is how a bolt circle is made. */
+  ring(
+    ids: readonly string[],
+    count: number,
+    center: { x: number; z: number },
+    options?: { sweepAngle?: number; rotateCopies?: boolean },
+  ) {
+    return this.client.patterns.ring(this.id, ids, count, center, options);
+  }
+
+  /** Adds the model a file describes, keeping the file with the project. */
+  importMesh(request: MeshImportRequest): Promise<MeshImportResult> {
+    return this.client.imports.apply(this.id, request);
   }
 }

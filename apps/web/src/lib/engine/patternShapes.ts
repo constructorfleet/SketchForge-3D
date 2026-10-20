@@ -9,6 +9,10 @@
  * Pure, and in terms of placements rather than shapes: the caller owns what a
  * copy of a shape is (ids, meshes, grouped children), and this owns where the
  * copies go. That keeps the arithmetic testable without a scene.
+ *
+ * Under `lib/engine/` because the editor is no longer its only caller: the
+ * `Engine` repeats a stored project's shapes with no browser in the picture,
+ * and it needs the same arithmetic rather than a second copy of it.
  */
 
 export type PatternPlacement = {

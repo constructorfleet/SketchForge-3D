@@ -64,6 +64,19 @@ client.measurements.between(project_id, from_, to) -> MeasurementPair
 client.shell.apply(project_id, shape_id, thickness, open_faces=None) -> ShellResult
 client.shell.hollow(project_id, shape_id, thickness) -> ShellResult
 client.shell.tray(project_id, shape_id, thickness, open_faces=None) -> ShellResult
+
+client.align.apply(project_id, ids, axis, target, anchor_id=None) -> AlignResult
+client.align.tops(project_id, ids, anchor_id=None) | bottoms(...) | centers(project_id, ids, axis, anchor_id=None)
+
+client.distribute.apply(project_id, ids, axis=None, spacing=None) -> DistributeResult
+client.distribute.gaps(project_id, ids, axis=None) | pitch(project_id, ids, axis=None)
+
+client.patterns.apply(project_id, ids, kind=None, count=None, step_x=None, step_z=None, center_x=None, center_z=None, sweep_angle=None, rotate_copies=None) -> PatternResult
+client.patterns.row(project_id, ids, count, step_x, step_z=None) -> PatternResult
+client.patterns.ring(project_id, ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None) -> PatternResult
+
+client.imports.apply(project_id, file_name, data, media_type=None) -> MeshImportResult
+client.imports.file(project_id, path) -> MeshImportResult
 ```
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
@@ -75,6 +88,10 @@ project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges
 project.faces(id) | faces_facing(id, direction)
 project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
+project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None)
+project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
+project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
+project.import_mesh(file_name, data) | import_file(path)
 ```
 
 Requests are plain dicts, because the server takes a bag of parameters; responses are frozen dataclasses with snake_case fields, so `shape.rotation_x` is checked and a typo is an error rather than a `None`. A field this version does not know about is kept in `shape.extra` rather than dropped.

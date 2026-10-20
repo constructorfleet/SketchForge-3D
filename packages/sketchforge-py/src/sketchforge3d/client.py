@@ -8,17 +8,24 @@ in the transport or the handle needs to know about it.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Union
+import base64
+import os
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from ._http import DEFAULT_RETRY_ON_BUSY, DEFAULT_TIMEOUT_SECONDS, Transport
 from .errors import SketchForgeApiError, SketchForgeTransportError
 from .types import (
+    IMPORTABLE_MESH_FORMATS,
     MAX_SHAPES_PER_REQUEST,
+    AlignResult,
+    DistributeResult,
     EdgeSummary,
     FaceSummary,
     MeasurementEnd,
     MeasurementPair,
     MeasurementSummary,
+    MeshImportResult,
+    PatternResult,
     ProjectDetail,
     ProjectSummary,
     ShapePatch,
@@ -343,6 +350,234 @@ class Shell:
         )
 
 
+
+class Align:
+    """Puts one edge or one centre of every named shape on the same coordinate.
+
+    ``ids`` is required. There is no selection on a server, which is the one
+    thing the editor has and the API does not.
+    """
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(
+        self,
+        project_id: str,
+        ids: Sequence[str],
+        axis: str,
+        target: str,
+        anchor_id: Optional[str] = None,
+    ) -> AlignResult:
+        """``axis`` is x/y/z and ``target`` is min/center/max.
+
+        Together they are the editor's own nine alignment handles: ``x`` with
+        ``min`` is its Left, ``y`` with ``max`` its Top. With no anchor the
+        reference is the box around the whole selection.
+        """
+        body: Dict[str, Any] = {"ids": list(ids), "axis": axis, "target": target}
+        # An anchor sent as null is a different request from one not sent: the
+        # server reads an absent one as "use the whole selection's box".
+        if anchor_id is not None:
+            body["anchorId"] = anchor_id
+        payload = self._transport.send(
+            "POST", "/align", {"projectId": project_id}, body, retryable=True
+        ) or {}
+        return AlignResult.from_payload(payload)
+
+    def tops(self, project_id: str, ids: Sequence[str], anchor_id: Optional[str] = None) -> AlignResult:
+        """Flush tops, which is the alignment a row of parts on a plate usually wants."""
+        return self.apply(project_id, ids, "y", "max", anchor_id)
+
+    def bottoms(self, project_id: str, ids: Sequence[str], anchor_id: Optional[str] = None) -> AlignResult:
+        """Seated on one plane: every underside at the same elevation."""
+        return self.apply(project_id, ids, "y", "min", anchor_id)
+
+    def centers(
+        self, project_id: str, ids: Sequence[str], axis: str, anchor_id: Optional[str] = None
+    ) -> AlignResult:
+        """Centred on one another along an axis."""
+        return self.apply(project_id, ids, axis, "center", anchor_id)
+
+
+class Distribute:
+    """Spreads three or more shapes evenly along an axis.
+
+    The outermost two never move: they define the span, which is the one thing
+    the caller has already decided.
+    """
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(
+        self,
+        project_id: str,
+        ids: Sequence[str],
+        axis: Optional[str] = None,
+        spacing: Optional[str] = None,
+    ) -> DistributeResult:
+        """Leave ``axis`` out to use whichever one the shapes are already most spread along."""
+        body: Dict[str, Any] = {"ids": list(ids)}
+        if axis is not None:
+            body["axis"] = axis
+        if spacing is not None:
+            body["spacing"] = spacing
+        payload = self._transport.send(
+            "POST", "/distribute", {"projectId": project_id}, body, retryable=True
+        ) or {}
+        return DistributeResult.from_payload(payload)
+
+    def gaps(self, project_id: str, ids: Sequence[str], axis: Optional[str] = None) -> DistributeResult:
+        """Equal clear space between neighbours: the one for parts of different sizes."""
+        return self.apply(project_id, ids, axis, "gaps")
+
+    def pitch(self, project_id: str, ids: Sequence[str], axis: Optional[str] = None) -> DistributeResult:
+        """Equal centre-to-centre pitch: the one a row of holes wants."""
+        return self.apply(project_id, ids, axis, "centers")
+
+
+class Patterns:
+    """Repeats shapes in a row or around a ring, adding the copies."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(
+        self,
+        project_id: str,
+        ids: Sequence[str],
+        kind: Optional[str] = None,
+        count: Optional[int] = None,
+        step_x: Optional[float] = None,
+        step_z: Optional[float] = None,
+        center_x: Optional[float] = None,
+        center_z: Optional[float] = None,
+        sweep_angle: Optional[float] = None,
+        rotate_copies: Optional[bool] = None,
+    ) -> PatternResult:
+        """``count`` includes the original, so 4 adds 3. From 2 to 200."""
+        body: Dict[str, Any] = {"ids": list(ids)}
+        for key, value in (
+            ("kind", kind),
+            ("count", count),
+            ("stepX", step_x),
+            ("stepZ", step_z),
+            ("centerX", center_x),
+            ("centerZ", center_z),
+            ("sweepAngle", sweep_angle),
+            ("rotateCopies", rotate_copies),
+        ):
+            # Against `if value:` deliberately. A zero step is a row running
+            # purely along the other axis, a zero centre is the origin, and
+            # `rotate_copies=False` is a vane keeping its heading -- all three
+            # are meaningful and all three are falsy.
+            if value is not None:
+                body[key] = value
+        payload = self._transport.send(
+            "POST", "/patterns", {"projectId": project_id}, body, retryable=True
+        ) or {}
+        return PatternResult.from_payload(payload)
+
+    def row(
+        self,
+        project_id: str,
+        ids: Sequence[str],
+        count: int,
+        step_x: float,
+        step_z: Optional[float] = None,
+    ) -> PatternResult:
+        """A row at a centre-to-centre pitch.
+
+        The step is a pitch rather than a gap, because "four at 25mm" is
+        unambiguous and "four with 25mm between them" depends on how wide the
+        shapes are.
+        """
+        return self.apply(project_id, ids, "linear", count, step_x=step_x, step_z=step_z)
+
+    def ring(
+        self,
+        project_id: str,
+        ids: Sequence[str],
+        count: int,
+        center: Tuple[float, float] = (0.0, 0.0),
+        sweep_angle: Optional[float] = None,
+        rotate_copies: Optional[bool] = None,
+    ) -> PatternResult:
+        """A ring about a point, which is how a bolt circle is made.
+
+        A full turn divides by the count, so six land every 60 degrees and the
+        last does not sit on the first. A partial ``sweep_angle`` divides by the
+        gaps instead, putting one copy at each end.
+        """
+        return self.apply(
+            project_id,
+            ids,
+            "circular",
+            count,
+            center_x=center[0],
+            center_z=center[1],
+            sweep_angle=sweep_angle,
+            rotate_copies=rotate_copies,
+        )
+
+
+class Imports:
+    """Adds the model a file describes, and keeps the file with the project.
+
+    The source file is stored as a project asset and the shape points at it,
+    both in one write -- a shape stored without its asset loses its geometry
+    the next time the project is saved.
+    """
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(
+        self,
+        project_id: str,
+        file_name: str,
+        data: bytes,
+        media_type: Optional[str] = None,
+    ) -> MeshImportResult:
+        """``stl``, ``obj`` and ``svg``.
+
+        ``file_name`` is not decoration: it chooses the importer, it names the
+        stored asset, and for an STL it decides which way is up -- a slicer
+        writes Z-up and SketchForge's own older exports are Y-up, recognised by
+        the word in the file header.
+
+        A STEP file is refused with ``unsupported_format``: reading one needs
+        the CAD kernel the editor loads in a browser.
+        """
+        body: Dict[str, Any] = {
+            "fileName": file_name,
+            "data": base64.b64encode(data).decode("ascii"),
+        }
+        if media_type is not None:
+            body["mediaType"] = media_type
+        payload = self._transport.send(
+            "POST", "/imports", {"projectId": project_id}, body, retryable=True
+        ) or {}
+        return MeshImportResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            triangles=int(payload.get("triangles") or 0),
+            revision=int(payload.get("revision") or 0),
+        )
+
+    def file(self, project_id: str, path: Union[str, "os.PathLike[str]"]) -> MeshImportResult:
+        """The same import, reading the bytes and the name off a path."""
+        resolved = os.fspath(path)
+        with open(resolved, "rb") as handle:
+            return self.apply(project_id, os.path.basename(resolved), handle.read())
+
+    @staticmethod
+    def readable(file_name: str) -> bool:
+        """Whether this file's name is one the server will try to read at all."""
+        suffix = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+        return suffix in IMPORTABLE_MESH_FORMATS
+
+
 class SketchForgeClient:
     def __init__(
         self,
@@ -368,6 +603,10 @@ class SketchForgeClient:
         self.measurements = Measurements(self._transport)
         self.treatments = Treatments(self._transport)
         self.shell = Shell(self._transport)
+        self.align = Align(self._transport)
+        self.distribute = Distribute(self._transport)
+        self.patterns = Patterns(self._transport)
+        self.imports = Imports(self._transport)
 
     @property
     def api_root(self) -> str:
@@ -485,3 +724,62 @@ class ProjectHandle:
         open_faces: Optional[Sequence[Union[str, int]]] = None,
     ) -> ShellResult:
         return self._client.shell.tray(self.id, shape_id, thickness, open_faces)
+
+    def align(
+        self,
+        ids: Sequence[str],
+        axis: str,
+        target: str,
+        anchor_id: Optional[str] = None,
+    ) -> AlignResult:
+        """Puts one edge or one centre of every named shape on the same coordinate."""
+        return self._client.align.apply(self.id, ids, axis, target, anchor_id)
+
+    def align_tops(self, ids: Sequence[str], anchor_id: Optional[str] = None) -> AlignResult:
+        """Flush tops, which is the alignment a row of parts on a plate usually wants."""
+        return self._client.align.tops(self.id, ids, anchor_id)
+
+    def distribute(
+        self,
+        ids: Sequence[str],
+        axis: Optional[str] = None,
+        spacing: Optional[str] = None,
+    ) -> DistributeResult:
+        """Spreads three or more shapes evenly; the outermost two define the span."""
+        return self._client.distribute.apply(self.id, ids, axis, spacing)
+
+    def row(
+        self,
+        ids: Sequence[str],
+        count: int,
+        step_x: float,
+        step_z: Optional[float] = None,
+    ) -> PatternResult:
+        """A row at a centre-to-centre pitch; ``count`` includes the original."""
+        return self._client.patterns.row(self.id, ids, count, step_x, step_z)
+
+    def ring(
+        self,
+        ids: Sequence[str],
+        count: int,
+        center: Tuple[float, float] = (0.0, 0.0),
+        sweep_angle: Optional[float] = None,
+        rotate_copies: Optional[bool] = None,
+    ) -> PatternResult:
+        """A ring about a point, which is how a bolt circle is made."""
+        return self._client.patterns.ring(
+            self.id, ids, count, center, sweep_angle, rotate_copies
+        )
+
+    def import_mesh(
+        self,
+        file_name: str,
+        data: bytes,
+        media_type: Optional[str] = None,
+    ) -> MeshImportResult:
+        """Adds the model a file describes, keeping the file with the project."""
+        return self._client.imports.apply(self.id, file_name, data, media_type)
+
+    def import_file(self, path: Union[str, "os.PathLike[str]"]) -> MeshImportResult:
+        """The same import, reading the bytes and the name off a path."""
+        return self._client.imports.file(self.id, path)
