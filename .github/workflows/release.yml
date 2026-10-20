@@ -1,11 +1,38 @@
 name: Release
 run-name: Release ${{ inputs.version || github.ref_name }}
 
-# Publishes the artifacts for a release. The tag and the draft GitHub release
-# are made by release-please when its release pull request is merged; this
-# workflow and desktop-release.yml both trigger on that tag, and neither
-# creates the release itself.
+# Publishes the artifacts for a release: the Docker image and the two client
+# libraries.
+#
+# Called by release-please.yml when a release is created. The tag cannot be the
+# trigger: a tag pushed by a workflow using GITHUB_TOKEN does not start another
+# run, because GitHub suppresses that to avoid recursion. The tag trigger below
+# is kept only for a tag pushed by hand, which does start a run.
+#
+# `workflow_run` would also bridge that gap -- it fires on another workflow
+# finishing, whoever started it. This is called instead because the caller
+# already knows the version and whether a release happened, and can pass both;
+# a `workflow_run` listener would have to re-derive them from an uploaded
+# artifact or the API, and filter out every run that produced no release.
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version being released (for example 1.1.0)"
+        required: true
+        type: string
+      publish_docker:
+        type: boolean
+        default: true
+      publish_npm:
+        type: boolean
+        default: true
+      publish_pypi:
+        type: boolean
+        default: true
+    secrets:
+      NPM_TOKEN:
+        required: false
   push:
     tags:
       - "v*.*.*"
@@ -55,9 +82,8 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           TAG_NAME: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ -n "$INPUT_VERSION" ]; then
             version="${INPUT_VERSION#v}"
           else
             version="${TAG_NAME#v}"
@@ -116,7 +142,7 @@ jobs:
   docker:
     name: Docker image
     needs: verify
-    if: inputs.publish_docker != false
+    if: ${{ inputs.publish_docker == null || inputs.publish_docker }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -165,7 +191,7 @@ jobs:
   npm:
     name: npm client
     needs: verify
-    if: inputs.publish_npm != false
+    if: ${{ inputs.publish_npm == null || inputs.publish_npm }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -197,7 +223,7 @@ jobs:
   pypi:
     name: PyPI client
     needs: verify
-    if: inputs.publish_pypi != false
+    if: ${{ inputs.publish_pypi == null || inputs.publish_pypi }}
     runs-on: ubuntu-latest
     # Trusted publishing: PyPI verifies this workflow's OIDC identity, so there
     # is no API token to store or rotate.
