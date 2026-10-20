@@ -455,6 +455,8 @@ SketchForge includes a local MCP server for AI clients that support MCP tools. I
 
 This is for local development only. Run SketchForge with `npm run dev`; the MCP route is disabled in production builds and Docker/static hosting.
 
+The same server can also run **macros** -- parameterised scripts that build a part through the headless [REST API](docs/REST_API.md) rather than through an editor tab. Set `SKETCHFORGE_MACRO_DIR` to a folder of macro files and `sketchforge_list_macros` and `sketchforge_run_macro` become available; with that variable unset they do nothing. Only files already in that folder can be run, and there is no tool that executes code sent to it, so what an agent can run is exactly what the operator installed. Writing a macro is covered in [`packages/sketchforge-client`](packages/sketchforge-client/README.md) and [`packages/sketchforge-py`](packages/sketchforge-py/README.md).
+
 ### Start SketchForge for MCP
 
 From the SketchForge project folder:

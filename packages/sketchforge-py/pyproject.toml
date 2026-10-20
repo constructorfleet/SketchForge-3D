@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sketchforge3d"
+version = "0.1.0"
+description = "Typed client and macro runner for the SketchForge REST API."
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.9"
+authors = [{ name = "SketchForge contributors" }]
+keywords = ["sketchforge", "cad", "macro", "client"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Graphics :: 3D Modeling",
+  "Typing :: Typed",
+]
+# Deliberately empty: the client uses urllib from the standard library, so it
+# installs anywhere Python does and adds nothing to a macro author's lockfile.
+dependencies = []
+
+[project.urls]
+Homepage = "https://sketchforge3d.com"
+Repository = "https://github.com/constructorfleet/SketchForge-3D"
+
+[project.scripts]
+sketchforge-macro = "sketchforge3d.macro:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sketchforge3d = ["py.typed"]

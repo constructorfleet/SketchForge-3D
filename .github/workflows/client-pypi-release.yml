@@ -1,0 +1,77 @@
+name: Client Release (PyPI)
+run-name: PyPI ${{ inputs.version || github.ref_name }}
+
+on:
+  push:
+    tags:
+      - "client-py-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (must match packages/sketchforge-py/pyproject.toml)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  # Trusted publishing: PyPI verifies this workflow's OIDC token, so there is
+  # no long-lived API token to store or rotate.
+  id-token: write
+
+concurrency:
+  group: client-pypi-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, test and publish sketchforge3d
+    runs-on: ubuntu-latest
+    environment: pypi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # pyproject.toml is the version of record: it is what gets published and
+      # what a reader sees. The tag only points at it, so a disagreement is a
+      # mistake in the tag and the release stops here rather than shipping a
+      # version nobody asked for.
+      - name: Check the tag matches the manifest
+        run: |
+          manifest=$(python -c 'import tomllib,pathlib; print(tomllib.loads(pathlib.Path("packages/sketchforge-py/pyproject.toml").read_text())["project"]["version"])')
+          requested="${{ inputs.version || github.ref_name }}"
+          requested="${requested#client-py-v}"
+          if [ "$manifest" != "$requested" ]; then
+            echo "::error::packages/sketchforge-py/pyproject.toml is $manifest but the release asked for $requested."
+            exit 1
+          fi
+          echo "Publishing $manifest"
+
+      # The package is standard-library only at runtime, and its tests are
+      # unittest, so this is the whole test environment.
+      - name: Unit tests
+        run: PYTHONPATH=src:tests python -m unittest discover -s tests -t tests
+        working-directory: packages/sketchforge-py
+
+      - name: Build the distributions
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+        working-directory: packages/sketchforge-py
+
+      - name: Check the distributions are installable and importable
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install dist/*.whl
+          /tmp/verify/bin/python -c "import sketchforge3d; print(sketchforge3d.__version__)"
+        working-directory: packages/sketchforge-py
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/sketchforge-py/dist

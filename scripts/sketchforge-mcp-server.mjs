@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { listMacros, macroTools, runMacroByName } from "./sketchforgeMacroTools.mjs";
+
 const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const MCP_ROUTE = "/api/sketchforge-mcp";
 const baseUrl = process.env.SKETCHFORGE_URL || DEFAULT_BASE_URL;
@@ -284,6 +286,9 @@ const tools = [
       },
     },
   },
+  // Macros drive the headless REST API rather than an editor tab, and run only
+  // from the directory the operator configured.
+  ...macroTools,
 ];
 
 function bridgeUrl() {
@@ -370,6 +375,10 @@ async function callTool(name, args) {
       return bridgeCommand("inspect_errors", args);
     case "sketchforge_capture_image":
       return bridgeCommand("capture_image", args, 30000);
+    case "sketchforge_list_macros":
+      return listMacros();
+    case "sketchforge_run_macro":
+      return runMacroByName(args);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

@@ -4,6 +4,17 @@ A scripting surface for SketchForge projects (upstream issue [#55](https://githu
 
 It is **headless**: it reads and writes the projects that server-side storage holds, with no browser open anywhere. A dashboard that has the project open picks the change up on its next load, because every write advances the project's revision.
 
+## Client libraries
+
+Two clients wrap everything below, with the macro runner that makes a parameterised part a script you can re-run:
+
+| Library | Install | Docs |
+| --- | --- | --- |
+| TypeScript | `npm install @constructorfleet/sketchforge3d` | [packages/sketchforge-client](../packages/sketchforge-client/README.md) |
+| Python | `pip install sketchforge3d` | [packages/sketchforge-py](../packages/sketchforge-py/README.md) |
+
+Both are thin: everything here is reachable through them, and nothing is only reachable through them. Reach for `curl` for one request and a client for a part.
+
 ## Turning it on
 
 Both of these are required:
@@ -126,10 +137,14 @@ The editor rounds and cuts edges in a browser worker: every client downloads a 2
 
 ```bash
 # Every edge
-curl -X POST "$HOST/projects/$PROJECT/shapes/$SHAPE/treatments"   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"kind":"fillet","amount":3}'
+curl -X POST "$HOST/treatments?projectId=$PROJECT&shapeId=$SHAPE" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"fillet","amount":3}'
 
 # Named edges, by the index the edges endpoint gave them
-curl -X POST "$HOST/projects/$PROJECT/shapes/$SHAPE/treatments"   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"kind":"chamfer","amount":2,"angle":30,"edges":[0,1,2,3]}'
+curl -X POST "$HOST/treatments?projectId=$PROJECT&shapeId=$SHAPE" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"chamfer","amount":2,"angle":30,"edges":[0,1,2,3]}'
 ```
 
 `kind` is `fillet` or `chamfer`; `amount` is the radius or distance in mm; `angle` applies to chamfers (45 degrees, the default, is symmetric); `edges` is a list of indexes, or omitted for all of them.
