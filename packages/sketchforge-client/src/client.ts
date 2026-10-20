@@ -9,17 +9,23 @@
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Edges } from "./resources/edges.js";
+import { Faces } from "./resources/faces.js";
 import { Projects } from "./resources/projects.js";
 import { Shapes } from "./resources/shapes.js";
+import { Shell } from "./resources/shell.js";
 import { Treatments } from "./resources/treatments.js";
 import type {
   EdgeSummary,
   EdgeTreatment,
+  FaceDirection,
+  FaceSummary,
   ProjectDetail,
   ShapePatch,
   ShapeRequest,
   ShapeSummary,
   ShapeWriteResult,
+  ShellRequest,
+  ShellResult,
   TreatmentResult,
 } from "./types.js";
 
@@ -29,7 +35,9 @@ export class SketchForgeClient {
   readonly projects: Projects;
   readonly shapes: Shapes;
   readonly edges: Edges;
+  readonly faces: Faces;
   readonly treatments: Treatments;
+  readonly shell: Shell;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -37,7 +45,9 @@ export class SketchForgeClient {
     this.projects = new Projects(this.transport);
     this.shapes = new Shapes(this.transport);
     this.edges = new Edges(this.transport);
+    this.faces = new Faces(this.transport);
     this.treatments = new Treatments(this.transport);
+    this.shell = new Shell(this.transport);
   }
 
   get apiRoot() {
@@ -130,5 +140,26 @@ export class ProjectHandle {
 
   chamfer(shapeId: string, distance: number, options?: { angle?: number; edges?: readonly number[] }) {
     return this.client.treatments.chamfer(this.id, shapeId, distance, options);
+  }
+
+  faces(shapeId: string): Promise<FaceSummary[]> {
+    return this.client.faces.list(this.id, shapeId);
+  }
+
+  facesFacing(shapeId: string, direction: FaceDirection): Promise<number[]> {
+    return this.client.faces.facing(this.id, shapeId, direction);
+  }
+
+  /** Hollows the shape out, sealed unless `openFaces` names faces to leave off. */
+  shell(shapeId: string, request: ShellRequest): Promise<ShellResult> {
+    return this.client.shell.apply(this.id, shapeId, request);
+  }
+
+  hollow(shapeId: string, thickness: number) {
+    return this.client.shell.hollow(this.id, shapeId, thickness);
+  }
+
+  tray(shapeId: string, thickness: number, openFaces?: ShellRequest["openFaces"]) {
+    return this.client.shell.tray(this.id, shapeId, thickness, openFaces);
   }
 }

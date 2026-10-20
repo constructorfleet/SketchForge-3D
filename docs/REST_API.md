@@ -53,6 +53,8 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
 | `DELETE` | `/groups?projectId=&shapeId=` | Takes a group apart. |
 | `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
+| `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
+| `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
@@ -259,6 +261,85 @@ A shape's rotation is built into the geometry, so a turned shape comes back turn
 A radius or distance that does not fit the geometry answers `422` ("too large for this shape's edges"). This is the common mistake: a 5 mm fillet on a 1 mm plate has nowhere to go. OCCT reports it in milliseconds here rather than grinding, and the project is left exactly as it was.
 
 Stacking treatments works, but OCCT will refuse a second one on edges immediately adjacent to the first -- the surfaces there are already tangent. Treat the edges you want in one request where you can.
+
+## Hollowing a solid: shells and trays
+
+A solid box printed at 20mm cube costs four times the filament of the same box with a 2mm wall, and the same box with its top face left open is a tray. This is the one operation a printed part wants most often, and `POST /shell` is it: OCCT offsets every face inwards by the thickness you give and takes the result away from the original, leaving a wall.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, outward normal, direction. |
+| `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall of `thickness`, leaving `openFaces` off. |
+
+```bash
+# A sealed hollow: a wall all the way round, with the void closed in
+curl -X POST "$HOST/shell?projectId=$PROJECT&shapeId=$SHAPE" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"thickness":2}'
+
+# A tray: the same wall, with the lid left off
+curl -X POST "$HOST/shell?projectId=$PROJECT&shapeId=$SHAPE" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"thickness":2,"openFaces":["top"]}'
+
+# A sleeve: open at both ends, named by index from the face listing
+curl -X POST "$HOST/shell?projectId=$PROJECT&shapeId=$SHAPE" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"thickness":1.6,"openFaces":[2,3]}'
+```
+
+`thickness` is the wall in mm, measured **inwards** from the surface, so the part keeps its outside dimensions: a 20mm cube shelled to 2mm is still 20mm across and weighs 20³ − 16³ = 3904mm³ instead of 8000.
+
+`openFaces` is the faces to leave off, and is omitted or empty for a sealed hollow. A single entry need not be a list: `"openFaces": "top"` is the same request as `["top"]`.
+
+The result keeps its place and its size, and stores the exact geometry alongside the mesh -- so a hollowed part exports to STEP as true surfaces, and a fillet afterwards builds on the real solid rather than on triangles.
+
+### Naming the faces to leave open
+
+Two ways, and they can be mixed in one request.
+
+**By direction.** `top`, `bottom`, `left`, `right`, `front`, `back` -- in the shape's own frame, with `top` towards +Y and `front` towards the viewer, which is the frame the editor's own alignment buttons use. Nobody should have to list a box's faces to find out which one is the lid.
+
+A direction means the **outermost flat face pointing that way**, and only that one. This matters on a part that is already hollow: the floor of its cavity points up as surely as its lid does, and opening the floor instead of the lid looks exactly like nothing happening. A shape with no flat face pointing that way -- a sphere, a cone, a pyramid, a roof -- answers `422` saying so, rather than opening whichever face came closest.
+
+**By index**, from `GET /faces`, which is the only way to name a face no direction describes -- one wall of a hexagonal pot, say:
+
+```json
+{
+  "faces": [
+    { "index": 3, "surfaceType": "plane", "area": 400,
+      "centroid": { "x": 0, "y": 20, "z": 0 },
+      "normal": { "x": 0, "y": 1, "z": 0 }, "facing": "top" }
+  ]
+}
+```
+
+`facing` is `null` for every face a direction does not name, including a curved one and an inner one; `normal` points out of the solid, and is `null` for a surface that cannot report one. The indexes are the ones `POST /shell` refers to, built from the same geometry, so a listing and a request taken together are consistent -- but a shape **changes shape** when it is hollowed, so re-list the faces of a result before naming indexes on it.
+
+### What it can work from
+
+The same exact builders the fillet endpoint uses, so the kinds listed under "What it can work from" above are the kinds a hollow can start from -- with one further limit, which is OCCT's rather than this app's.
+
+| Hollows | Does not |
+| --- | --- |
+| `box`, `cylinder` (round, faceted, or a hex prism), `polygon`, `pyramid`, `roof`, `wedge` | `sphere`, `halfSphere`, `torus`, `cone`, `tube`, `ring`, `roundRoof`, `loft` |
+
+Everything in the right-hand column has an outside that is one continuous curved skin, or a wall OCCT builds as a single B-spline surface. There are no separate faces there to offset inwards, and the kernel refuses them -- at every thickness, and at every reconstruction tolerance it offers. It answers `422` saying that rather than approximating a wall, because a wall that is nearly right is a part that nearly holds water.
+
+Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /booleans`. That is a different operation with a different result -- a boolean cavity has the shape you gave it rather than a constant wall -- but it is the one that works on a sphere.
+
+### When it refuses
+
+| Status | When |
+| --- | --- |
+| `400` | No `thickness`, a thickness of zero or less, a face index out of range, or a direction that is not one of the six. |
+| `404` | No such project, or no such shape in it. |
+| `409` | The shape is locked, or another write holds the project. |
+| `422` | A kind the server cannot build exactly, a kind OCCT will not offset, every face named open, or a wall too thick for the part. |
+
+**A wall thicker than the part fails cleanly, and this took some doing.** Past the thickness that fits, OCCT does not raise an error: depending on the shape and the faces left open it hands back an empty compound, a solid that fails its own validity check while reporting the right bounding box, or -- worst -- the original solid untouched, valid and the right size, having hollowed nothing at all. None of those is distinguishable by extents, so the server weighs the result: hollowing always removes the cavity, and a result that weighs what it started at did nothing. All three answer `422` and the project is left exactly as it was.
+
+Leaving **every** face open is refused too. It would take the walls away rather than hollow anything, and OCCT's answer to it is the original solid, which is the one answer a script cannot tell from success.
 
 ## Example: a plate with a row of holes
 

@@ -13,7 +13,17 @@ Installed as ``sketchforge3d``; imported the same way.
 from __future__ import annotations
 
 from . import layout
-from .client import Edges, ProjectHandle, Projects, Shapes, SketchForgeClient, Treatments, chunk
+from .client import (
+    Edges,
+    Faces,
+    ProjectHandle,
+    Projects,
+    Shapes,
+    Shell,
+    SketchForgeClient,
+    Treatments,
+    chunk,
+)
 from .environment import (
     BASE_URL_ENV,
     DEFAULT_BASE_URL,
@@ -43,6 +53,7 @@ from ._macro import (
     run_stamp,
 )
 from .types import (
+    FACE_DIRECTIONS,
     MAX_SHAPES_PER_REQUEST,
     PARAMETRIC_SHAPE_KINDS,
     SHAPE_DESCRIPTION_FIELDS,
@@ -50,11 +61,14 @@ from .types import (
     SHAPE_PARAMETER_NAMES,
     THREAD_DESIGNATIONS,
     EdgeSummary,
+    FaceSummary,
     ProjectDetail,
     ProjectSummary,
     ShapeSummary,
     ShapeWriteResult,
+    ShellResult,
     TreatmentResult,
+    Vector3,
 )
 
 __version__ = "0.1.0"
@@ -65,6 +79,9 @@ __all__ = [
     "DEFAULT_BASE_URL",
     "Edges",
     "EdgeSummary",
+    "FACE_DIRECTIONS",
+    "Faces",
+    "FaceSummary",
     "MAX_SHAPES_PER_REQUEST",
     "Macro",
     "MacroContext",
@@ -84,6 +101,8 @@ __all__ = [
     "Shapes",
     "ShapeSummary",
     "ShapeWriteResult",
+    "Shell",
+    "ShellResult",
     "SketchForgeApiError",
     "SketchForgeClient",
     "SketchForgeError",
@@ -92,6 +111,7 @@ __all__ = [
     "TOKEN_ENV",
     "TreatmentResult",
     "Treatments",
+    "Vector3",
     "angle_of",
     "centered_offsets",
     "chunk",

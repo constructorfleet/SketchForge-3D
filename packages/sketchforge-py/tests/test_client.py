@@ -177,6 +177,57 @@ class EdgesAndTreatmentsTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].body, {"kind": "chamfer", "amount": 2, "angle": 30, "edges": [0, 1]})
 
 
+class FacesAndShellTests(unittest.TestCase):
+    @staticmethod
+    def _face(index: int, facing):
+        return {
+            "index": index,
+            "surfaceType": "plane",
+            "area": 400,
+            "centroid": {"x": 0, "y": index, "z": 0},
+            "normal": {"x": 0, "y": 1, "z": 0},
+            "facing": facing,
+        }
+
+    def test_reports_the_faces_pointing_a_given_way(self) -> None:
+        opener = FakeOpener({"faces": [self._face(0, "top"), self._face(1, None), self._face(2, "bottom")]})
+        self.assertEqual(client(opener).faces.facing("p1", "s1", "top"), [0])
+        self.assertEqual(
+            opener.calls[0].url, "http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1"
+        )
+
+    def test_reads_a_face_with_no_normal(self) -> None:
+        payload = self._face(0, None)
+        payload["normal"] = None
+        opener = FakeOpener({"faces": [payload]})
+        face = client(opener).faces.list("p1", "s1")[0]
+        self.assertIsNone(face.normal)
+        self.assertIsNone(face.facing)
+        self.assertEqual(face.centroid.y, 0)
+
+    def test_omits_open_faces_entirely_for_a_sealed_hollow(self) -> None:
+        opener = FakeOpener({"shape": shape_payload(), "triangles": 24, "revision": 5})
+        client(opener).shell.hollow("p1", "s1", 2)
+        # A missing list is what the server reads as "seal it"; sending an empty
+        # one would say the same thing by accident rather than on purpose.
+        self.assertEqual(opener.calls[0].body, {"thickness": 2})
+        self.assertEqual(
+            opener.calls[0].url, "http://localhost:3100/api/v1/shell?projectId=p1&shapeId=s1"
+        )
+
+    def test_opens_the_top_by_default_for_a_tray(self) -> None:
+        opener = FakeOpener({"shape": shape_payload(), "triangles": 28, "revision": 6})
+        result = client(opener).shell.tray("p1", "s1", 2)
+        self.assertEqual(opener.calls[0].body, {"thickness": 2, "openFaces": ["top"]})
+        self.assertEqual(result.triangles, 28)
+        self.assertEqual(result.revision, 6)
+
+    def test_takes_indexes_as_well_as_direction_names(self) -> None:
+        opener = FakeOpener({"shape": shape_payload(), "triangles": 28, "revision": 6})
+        client(opener).shell.apply("p1", "s1", 1.5, ["top", 4])
+        self.assertEqual(opener.calls[0].body, {"thickness": 1.5, "openFaces": ["top", 4]})
+
+
 class ShapeSummaryTests(unittest.TestCase):
     def test_collects_the_per_kind_parameters(self) -> None:
         summary = ShapeSummary.from_payload(
