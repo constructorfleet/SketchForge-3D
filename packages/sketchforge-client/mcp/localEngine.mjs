@@ -52,7 +52,7 @@ function stlBytesFromPositions(positions) {
 
 async function readScene(args) {
   const id = requireProjectId(args);
-  const { engine, package: enginePackage } = await getBackend();
+  const { engine } = await getBackend();
   const project = await unwrap(await engine.project(id));
   const allow = Array.isArray(args.shapeIds) ? new Set(args.shapeIds) : null;
   const deny = new Set(Array.isArray(args.excludeShapeIds) ? args.excludeShapeIds : []);
