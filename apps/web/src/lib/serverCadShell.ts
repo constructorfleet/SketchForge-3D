@@ -29,7 +29,7 @@
 
 import type { OcctKernel, ShapeHandle, Vec3 } from "occt-wasm";
 import { withCadKernel } from "@/lib/serverCadKernel";
-import { localSolidForShape, meshedCadResult, ServerCadError, type ServerCadResult } from "@/lib/serverCadOperations";
+import { meshedCadResult, orientedSolidForShape, ServerCadError, type ServerCadResult } from "@/lib/serverCadOperations";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**
@@ -166,7 +166,7 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle): ServerCadFace[] {
 
 /** A shape's faces, numbered as a shell request refers to them by index. */
 export function shapeFaces(shape: WorkplaneShape): Promise<ServerCadFace[]> {
-  return withCadKernel((cad) => faceSummaries(cad, localSolidForShape(cad, shape)));
+  return withCadKernel((cad) => faceSummaries(cad, orientedSolidForShape(cad, shape)));
 }
 
 /**
@@ -330,7 +330,7 @@ export function applyShell(shape: WorkplaneShape, request: ServerCadShellRequest
   }
 
   return withCadKernel((cad) => {
-    const solid = localSolidForShape(cad, shape);
+    const solid = orientedSolidForShape(cad, shape);
     const faces = faceSummaries(cad, solid);
     if (faces.length === 0) throw new ServerCadError("That shape has no faces to hollow out.");
 

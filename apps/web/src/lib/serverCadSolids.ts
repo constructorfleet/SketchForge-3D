@@ -320,8 +320,13 @@ function torusSolid(cad: OcctKernel, shape: WorkplaneShape) {
  *
  * Its own rotation is not applied here; `exactSolidForShape` does that, so a
  * builder only ever has to think about the shape's own form.
+ *
+ * Exported because a caller that places the shape itself -- a boolean, whose
+ * placement matrix already carries the same rotation -- needs the form without
+ * it, and getting that by calling `exactSolidForShape` with the rotation
+ * fields zeroed reads as a trick rather than as an intent.
  */
-function untransformedSolid(cad: OcctKernel, shape: WorkplaneShape) {
+export function unrotatedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   if (shapeHasTaper(shape)) return taperedSolid(cad, shape);
 
   switch (shape.kind) {
@@ -391,7 +396,7 @@ export const EXACT_SOLID_KINDS = [
 const Z_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } } as const;
 
 export function exactSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
-  let solid = untransformedSolid(cad, shape);
+  let solid = unrotatedSolidForShape(cad, shape);
   const yaw = shape.rotation ?? 0;
   const pitch = shape.rotationX ?? 0;
   const roll = shape.rotationZ ?? 0;
