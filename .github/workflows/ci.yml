@@ -31,6 +31,33 @@ jobs:
       - name: Unit tests
         run: npm test
 
+  api-e2e:
+    # Starts a real server and asks it real questions over HTTP. The unit tests
+    # call the route handlers directly, which has twice missed a route that
+    # worked in-process and threw `createRequire is not a function` once Next
+    # had bundled it. Compiling on demand makes this minutes rather than
+    # seconds, so it is deliberately not one of the required checks: it is
+    # signal, not a gate.
+    name: REST API end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: REST API end to end
+        run: npm run test:e2e
+
   static-export:
     # The Cloudflare deploy workflow builds this, and nothing else checked it:
     # the export build was broken for months behind a script that silently did

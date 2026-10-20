@@ -1,4 +1,4 @@
-import { apiContext, apiError, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { createLocalId } from "@/lib/localIds";
 import { horizontalPlacementWorkplane } from "@/lib/placementWorkplane";
@@ -34,9 +34,9 @@ export async function GET(request: Request) {
   const { projectId } = apiTarget(request);
 
   if (new URL(request.url).searchParams.has("projectId")) {
-    if (!projectId) return apiError("Invalid project id.", 400);
+    if (!projectId) return apiErrors.invalidProjectId();
     const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiError("That project is not on the server.", 404);
+    if (!document) return apiErrors.projectNotFound();
     return apiJson({
       project: {
         id: projectId,
@@ -58,9 +58,9 @@ export async function POST(request: Request) {
   if (context.error) return context.error;
 
   const body = await apiJsonBody(request);
-  if (!body) return apiError("Expected a JSON object body.", 400);
+  if (!body) return apiErrors.jsonBodyRequired();
   const requestedName = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
-  if (!requestedName) return apiError("A project name is required.", 400);
+  if (!requestedName) return apiError("A project name is required.", 400, "invalid_request");
 
   // The dashboard's own id shape, so a project made here is indistinguishable
   // from one made in the browser.
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   const now = Date.now();
   const locked = await withProjectLock(context.root, projectId, async () => {
     if (await readProjectMetadata(context.root, projectId)) {
-      return apiError("That project already exists.", 409);
+      return apiError("That project already exists.", 409, "project_exists");
     }
     const metadata: ProjectMetadata = {
       id: projectId,
@@ -88,18 +88,18 @@ export async function POST(request: Request) {
     await writeProjectMetadata(context.root, projectId, metadata);
     return apiJson({ project: projectSummary(projectId, metadata, now, 0) }, 201);
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }
 
 export async function DELETE(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
 
   const locked = await withProjectLock(context.root, projectId, async () => {
     const existed = await deleteProjectFiles(context.root, projectId);
-    return existed ? apiJson({ deleted: true, id: projectId }) : apiError("That project is not on the server.", 404);
+    return existed ? apiJson({ deleted: true, id: projectId }) : apiErrors.projectNotFound();
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

@@ -4,7 +4,7 @@ import unittest
 
 from sketchforge3d import SketchForgeApiError, SketchForgeClient, SketchForgeTransportError, chunk
 from sketchforge3d._http import Transport, build_url, normalize_base_url
-from sketchforge3d.types import MAX_SHAPES_PER_REQUEST
+from sketchforge3d.types import MAX_SHAPES_PER_REQUEST, ShapeSummary
 
 from support import FakeOpener, project_payload, shape_payload
 
@@ -175,6 +175,76 @@ class EdgesAndTreatmentsTests(unittest.TestCase):
         opener = FakeOpener({"shape": shape_payload(), "triangles": 100, "revision": 4})
         client(opener).treatments.chamfer("p1", "s1", 2, angle=30, edges=[0, 1])
         self.assertEqual(opener.calls[0].body, {"kind": "chamfer", "amount": 2, "angle": 30, "edges": [0, 1]})
+
+
+class ShapeSummaryTests(unittest.TestCase):
+    def test_collects_the_per_kind_parameters(self) -> None:
+        summary = ShapeSummary.from_payload(
+            shape_payload(kind="cylinder", requestKind="cylinder", sides=12, bevel=2)
+        )
+        self.assertEqual(summary.request_kind, "cylinder")
+        self.assertEqual(summary.sides, 12)
+        self.assertEqual(summary.parameters, {"sides": 12, "bevel": 2})
+
+    def test_reads_a_sweep_and_the_outline_it_ran_round(self) -> None:
+        revolve = {"startAngle": 0, "sweepAngle": 360, "sides": 64, "quality": 6, "pitch": 1.25, "turns": 4, "coreRadius": 3}
+        summary = ShapeSummary.from_payload(
+            shape_payload(kind="mesh", requestKind="revolve", sketchOperation="revolve", revolve=revolve, profile=[[3, 0], [4, 1], [3, 2]])
+        )
+        self.assertEqual(summary.pitch, 1.25)
+        self.assertEqual(summary.sketch_operation, "revolve")
+        self.assertEqual(summary.profile, [[3.0, 0.0], [4.0, 1.0], [3.0, 2.0]])
+
+    def test_a_shape_with_no_sweep_has_no_pitch(self) -> None:
+        self.assertIsNone(ShapeSummary.from_payload(shape_payload()).pitch)
+
+    def test_as_patch_carries_the_rest_while_one_field_changes(self) -> None:
+        summary = ShapeSummary.from_payload(shape_payload(kind="cylinder", sides=12, bevel=2))
+        patch = summary.as_patch(sides=6)
+        self.assertEqual(patch["sides"], 6)
+        self.assertEqual(patch["bevel"], 2)
+        self.assertEqual(patch["width"], 1)
+
+    def test_as_patch_drops_what_only_describes_the_shape(self) -> None:
+        summary = ShapeSummary.from_payload(
+            shape_payload(requestKind="box", sketchOperation="revolve", groupedCount=2)
+        )
+        patch = summary.as_patch()
+        for field in ("id", "kind", "requestKind", "sketchOperation", "groupedCount"):
+            self.assertNotIn(field, patch)
+
+
+class ErrorCodeTests(unittest.TestCase):
+    def test_tells_a_busy_project_from_a_locked_shape_by_code(self) -> None:
+        opener = FakeOpener((409, {"error": "Hold on.", "code": "shape_locked"}))
+        with self.assertRaises(SketchForgeApiError) as caught:
+            client(opener).shapes.update("p1", "s1", {"x": 1})
+        self.assertTrue(caught.exception.is_shape_locked)
+        self.assertFalse(caught.exception.is_project_busy)
+        # A locked shape is not worth retrying, and the code says so outright.
+        self.assertEqual(len(opener.calls), 1)
+
+    def test_tells_a_missing_project_from_a_missing_shape(self) -> None:
+        opener = FakeOpener((404, {"error": "Gone.", "code": "shape_not_found"}))
+        with self.assertRaises(SketchForgeApiError) as caught:
+            client(opener).shapes.list("p1")
+        self.assertTrue(caught.exception.is_shape_missing)
+        self.assertFalse(caught.exception.is_project_missing)
+        self.assertFalse(caught.exception.looks_disabled)
+
+    def test_names_the_fields_a_change_could_not_be_applied_to(self) -> None:
+        opener = FakeOpener((422, {"error": "cannot take: sides.", "code": "unapplicable_fields", "fields": ["sides"]}))
+        with self.assertRaises(SketchForgeApiError) as caught:
+            client(opener).shapes.update("p1", "s1", {"sides": 6})
+        self.assertTrue(caught.exception.has_unapplicable_fields)
+        self.assertEqual(caught.exception.unapplicable_fields, ["sides"])
+
+    def test_falls_back_to_the_wording_against_a_server_without_codes(self) -> None:
+        opener = FakeOpener((409, {"error": "That project is being changed; try again."}))
+        with self.assertRaises(SketchForgeApiError) as caught:
+            client(opener).shapes.update("p1", "s1", {"x": 1})
+        self.assertIsNone(caught.exception.code)
+        self.assertTrue(caught.exception.is_project_busy)
 
 
 class CheckTests(unittest.TestCase):

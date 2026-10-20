@@ -12,7 +12,7 @@ client built against an older server still round-trips what a newer one sends.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "box",
@@ -86,6 +86,52 @@ def _text(payload: Mapping[str, Any], key: str, default: str = "") -> str:
     return value if isinstance(value, str) else default
 
 
+#: How far round a sweep goes and how fast it rises, as the server reports it.
+RevolveSummary = Mapping[str, float]
+
+#: The per-kind parameters the server both accepts and reports back. Which of
+#: them a shape carries depends on its kind, so they live in ``parameters``
+#: rather than as fields that would be ``None`` on almost every shape.
+SHAPE_PARAMETER_NAMES: Tuple[str, ...] = (
+    "steps",
+    "sides",
+    "bevel",
+    "segments",
+    "topRadius",
+    "baseRadius",
+    "taperTopWidth",
+    "taperTopDepth",
+    "taperBottomWidth",
+    "taperBottomDepth",
+    "teeth",
+    "toothSize",
+    "toothWidth",
+    "centerHoleSize",
+    "gearType",
+    "helixAngle",
+    "loftBottomShape",
+    "loftTopShape",
+    "loftTopWidth",
+    "loftTopDepth",
+    "loftBottomRotation",
+    "loftTopRotation",
+    "loftSegments",
+    "loftLayers",
+    "text",
+    "font",
+)
+
+#: Summary fields that describe a shape rather than set anything on it. The
+#: server accepts and ignores them, so a summary can be sent straight back.
+SHAPE_DESCRIPTION_FIELDS: Tuple[str, ...] = (
+    "id",
+    "kind",
+    "requestKind",
+    "sketchOperation",
+    "groupedCount",
+)
+
+
 @dataclass(frozen=True)
 class ShapeSummary:
     """
@@ -93,7 +139,13 @@ class ShapeSummary:
 
     ``kind`` is the stored kind rather than the requested one: a ``cube`` comes
     back a ``box``, and a ``revolve`` or ``thread`` comes back a ``mesh``,
-    because that is what the project holds.
+    because that is what the project holds. ``request_kind`` is the other half
+    of that -- the kind a ``POST`` would need to build the shape again, which is
+    what tells a thread apart from an imported STL when both store as ``mesh``.
+    It is ``None`` for a shape no request reproduces, such as a boolean cut.
+
+    Every per-kind parameter the server accepts also comes back, under
+    ``parameters``, so a read, a change and a write lose nothing.
     """
 
     id: str
@@ -112,12 +164,22 @@ class ShapeSummary:
     rotation: float
     rotation_x: float
     rotation_z: float
+    request_kind: Optional[str] = None
+    sketch_operation: Optional[str] = None
+    #: The per-kind parameters this shape carries, under the server's own names.
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    #: Present on a revolve or a thread: the sweep that built it.
+    revolve: Optional[Dict[str, Any]] = None
+    #: The outline the sweep ran round, when it was described rather than drawn.
+    profile: Optional[List[List[float]]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
         "id",
         "name",
         "kind",
+        "requestKind",
+        "sketchOperation",
         "color",
         "hole",
         "locked",
@@ -131,14 +193,20 @@ class ShapeSummary:
         "rotation",
         "rotationX",
         "rotationZ",
-    )
+        "revolve",
+        "profile",
+    ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "ShapeSummary":
+        revolve = payload.get("revolve")
+        profile = payload.get("profile")
         return cls(
             id=_text(payload, "id"),
             name=_text(payload, "name"),
             kind=_text(payload, "kind"),
+            request_kind=payload.get("requestKind") if isinstance(payload.get("requestKind"), str) else None,
+            sketch_operation=payload.get("sketchOperation") if isinstance(payload.get("sketchOperation"), str) else None,
             color=_text(payload, "color"),
             hole=bool(payload.get("hole")),
             locked=bool(payload.get("locked")),
@@ -152,17 +220,56 @@ class ShapeSummary:
             rotation=_number(payload, "rotation"),
             rotation_x=_number(payload, "rotationX"),
             rotation_z=_number(payload, "rotationZ"),
+            parameters={name: payload[name] for name in SHAPE_PARAMETER_NAMES if name in payload},
+            revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
+            profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},
         )
 
     @property
     def sides(self) -> Any:
-        return self.extra.get("sides")
+        return self.parameters.get("sides")
+
+    @property
+    def pitch(self) -> Optional[float]:
+        """A thread's axial rise per turn, or ``None`` when this is not a sweep."""
+        return None if self.revolve is None else float(self.revolve.get("pitch", 0.0))
 
     @property
     def grouped_count(self) -> int:
         value = self.extra.get("groupedCount")
         return int(value) if isinstance(value, (int, float)) else 0
+
+    def as_patch(self, **changes: Any) -> Dict[str, Any]:
+        """
+        This shape as the change that would reproduce it, with overrides applied.
+
+        The round trip the API promises, written once: read a shape, call this
+        with the one field in question, and send the result.
+        """
+        patch: Dict[str, Any] = {
+            "name": self.name,
+            "color": self.color,
+            "hole": self.hole,
+            "locked": self.locked,
+            "hidden": self.hidden,
+            "x": self.x,
+            "z": self.z,
+            "elevation": self.elevation,
+            "width": self.width,
+            "depth": self.depth,
+            "height": self.height,
+            "rotation": self.rotation,
+            "rotationX": self.rotation_x,
+            "rotationZ": self.rotation_z,
+            **self.parameters,
+        }
+        if self.revolve is not None:
+            patch["revolve"] = dict(self.revolve)
+        if self.profile is not None:
+            patch["profile"] = [list(point) for point in self.profile]
+        patch.update(changes)
+        return patch
 
 
 @dataclass(frozen=True)

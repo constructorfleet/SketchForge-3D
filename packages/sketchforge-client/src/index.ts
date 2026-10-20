@@ -1,8 +1,8 @@
 export { SketchForgeClient, ProjectHandle, type SketchForgeClientOptions } from "./client.js";
-export { SketchForgeApiError, SketchForgeTransportError, type ApiErrorContext } from "./errors.js";
+export { API_ERROR_CODES, SketchForgeApiError, SketchForgeTransportError, type ApiErrorCode, type ApiErrorContext } from "./errors.js";
 export { Transport, normalizeBaseUrl, buildUrl, type FetchLike, type RequestSpec, type TransportOptions } from "./http.js";
 export { Projects } from "./resources/projects.js";
-export { Shapes, chunk } from "./resources/shapes.js";
+export { Shapes, chunk, shapePatchFromSummary } from "./resources/shapes.js";
 export { Edges } from "./resources/edges.js";
 export { Treatments } from "./resources/treatments.js";
 export {

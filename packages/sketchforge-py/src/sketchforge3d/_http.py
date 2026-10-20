@@ -94,12 +94,14 @@ class Transport:
         except urllib.error.HTTPError as error:
             parsed = _decode(error.read())
             detail = parsed.get("error") if isinstance(parsed, dict) else None
+            code = parsed.get("code") if isinstance(parsed, dict) else None
             raise SketchForgeApiError(
                 method,
                 url,
                 error.code,
                 detail if isinstance(detail, str) else None,
                 parsed,
+                code if isinstance(code, str) else None,
             ) from None
         except urllib.error.URLError as error:
             raise SketchForgeTransportError(method, url, error) from None

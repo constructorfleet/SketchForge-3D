@@ -37,7 +37,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 ## Endpoints
 
-All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "..." }` with a meaningful status.
+All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
 | Method | Path | Does |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `DELETE` | `/projects?projectId=` | Deletes the project and its geometry. |
 | `GET` | `/shapes?projectId=` | The project's shapes. |
 | `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
-| `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest. |
+| `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest; refuses the ones that kind cannot take. |
 | `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
 | `POST` | `/booleans?projectId=` | Subtracts shapes from shapes. Body: `{ "solidIds": [...], "holeIds": [...] }`. |
 | `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
@@ -70,19 +70,86 @@ Per kind:
 
 | Fields | For |
 | --- | --- |
-| `sides` | `cylinder` (6 gives a hex prism), `pyramid` (4 unless you say otherwise), `cone` |
+| `sides` | `cylinder` (6 gives a hex prism), `pyramid` (4 unless you say otherwise), `cone`, `roundRoof` |
 | `bevel` | `tube` and `ring` -- the wall thickness, measured inwards |
-| `topRadius` | `cone` |
+| `topRadius`, `baseRadius` | `cone` |
 | `steps` | `sphere`, `halfSphere` |
 | `text`, `font`, `bevel`, `segments` | `text` |
-| `teeth`, `toothSize`, `toothWidth`, `centerHoleSize`, `helixAngle` | `gear` |
-| `loftBottomShape`, `loftTopShape`, `loftTopWidth`, `loftTopDepth`, `loftBottomRotation`, `loftTopRotation`, `loftSegments`, `loftLayers` | `loft` |
+| `teeth`, `toothSize`, `toothWidth`, `centerHoleSize`, `gearType`, `helixAngle` | `gear`. `gearType` is `spur`, `helical` or `bevel`; `helixAngle` only matters for a helical one. `teeth` is 6-64. |
+| `loftBottomShape`, `loftTopShape`, `loftTopWidth`, `loftTopDepth`, `loftBottomRotation`, `loftTopRotation`, `loftSegments`, `loftLayers` | `loft`. The two shapes are `Oval`, `Rectangle`, `Triangle`, `Pentagon` or `Hexagon` -- capitalised, as the editor names them; anything else quietly takes the default. |
+| `taperTopWidth`, `taperTopDepth`, `taperBottomWidth`, `taperBottomDepth` | every kind but `gear` -- the footprint at each end of the extrusion, which need not match `width` and `depth` |
 
 Dimensions are clamped to 0.01-10000 mm. Anything missing takes the same default the editor would have used, so a request need only carry what it cares about.
 
+## Reading a shape back
+
+Everything above can be read as well as set, which is what makes **read a shape, change a number, send it back** actually work. A summary carries the shape's placement and size, the parameters its kind is built from, and two fields that say what it is:
+
+```json
+{
+  "id": "shape-7f2c", "name": "M8", "kind": "mesh",
+  "requestKind": "revolve", "sketchOperation": "revolve",
+  "color": "#78b96b", "hole": false, "locked": false, "hidden": false,
+  "x": 0, "z": 0, "elevation": 0, "width": 8, "depth": 8, "height": 20,
+  "rotation": 0, "rotationX": 0, "rotationZ": 0,
+  "revolve": { "startAngle": 0, "sweepAngle": 360, "sides": 64, "quality": 6, "pitch": 1.25, "turns": 16, "coreRadius": 3.19 },
+  "profile": [[2.43, 0], [4, 0.625], [2.43, 1.25]]
+}
+```
+
+`kind` is what the project stores, which is what the editor shows: a `cube` is a box whose sides match, and a revolve, a boolean cut and an imported STL are all `mesh`. That meaning is unchanged, because every existing caller already reads it that way.
+
+`requestKind` is the other half: the kind a `POST` would need to build this shape again. A `cube` reads back as `requestKind: "box"`, and a thread or a revolve as `requestKind: "revolve"` -- a thread is a revolve with the outline filled in, so a revolve is what reproduces either. It is **absent** for a shape no request can reproduce: a boolean cut, a group, an imported mesh, a drawn sketch. That absence is how a client tells a thread from an STL, which by `kind` alone it could not.
+
+`sketchOperation` names the operation the geometry came out of, for the shapes that have one -- `revolve` for these.
+
+A revolve also reports `revolve` (the sweep: its pitch, turns, sweep angle, start angle, facets per turn, sampling quality, and the radius of the core it is fused to) and `profile` (the outline it ran round, as `[x, z]` pairs with distances written positive, the way a request writes them). `profile` is omitted when the outline was drawn in the editor rather than described: a drawn profile can be several paths with curve handles, which no flat list of pairs describes, and guessing one would be worse than saying nothing.
+
+## Changing a shape
+
+`PATCH` takes everything a summary reports, including a shape's own summary sent straight back with one number changed. Alongside placement, size and the `hole`, `locked` and `hidden` flags, it takes:
+
+- every parameter the shape's kind is built from, as listed above;
+- for a revolve or a thread, the sweep: `pitch`, `turns`, `startAngle`, `sweepAngle`, `sides`, `quality` and `coreRadius`, either at the top level or nested under `revolve`, and a `profile` to replace the outline;
+- `id`, `kind`, `requestKind`, `sketchOperation` and `groupedCount`, which are accepted and ignored -- they describe the shape rather than set anything on it, so sending a whole summary back is not an error.
+
+Anything else is **refused**, naming what it could not apply:
+
+```json
+{ "error": "A shape of kind \"box\" cannot take: sides.", "code": "unapplicable_fields", "fields": ["sides"] }
+```
+
+That covers a parameter belonging to another kind (`sides` on a box), a sweep setting on a shape with no sweep (`pitch` on a cylinder), and a field this version has never heard of (`sids`). None of it is applied: the request is refused whole, so a typo cannot half-move a shape. Before this, all of it answered `200` having changed nothing, which is the one answer a script cannot tell from success.
+
+**Changing a sweep rebuilds the geometry.** A revolve's pitch, turns and outline *are* its mesh, so changing one sweeps it again on the server -- the same manifold build `POST` uses. The shape keeps its id, name, colour, placement and flags, and keeps any scale it had been resized to, so changing a thread's pitch does not silently resize it. Its height will change, because four turns at a coarser pitch is a taller bolt.
+
+A locked shape answers `409` with `code: "shape_locked"`; send `locked: false` to unlock it.
+
 **A sketch extrusion is not a kind you can ask for here**: its profile is drawn, not described. Operations whose geometry comes out of the CAD kernel -- fillets, chamfers, and boolean cuts -- have endpoints of their own, below; `POST /shapes` builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
 
-A locked shape answers `409` to a change or delete; send `locked: false` to unlock it.
+## Errors
+
+Every error carries a `code` beside its sentence, because the status alone is ambiguous in both directions a client cares about. `404` is a missing project, a missing shape, *or* an API with no token set; `409` is both a project someone else is writing -- retry -- and a locked shape -- do not. Decide on the code; the sentence is for a human reading a log.
+
+| Code | Status | Means |
+| --- | --- | --- |
+| `api_disabled` | 404 | No `SKETCHFORGE_API_TOKEN`, so there is no API at all. |
+| `unauthorized` | 401 | The bearer token is missing or wrong. |
+| `storage_unconfigured` | 503 | A token but no `SKETCHFORGE_PROJECTS_DIR`: nowhere to store a project. |
+| `invalid_project_id` / `invalid_shape_id` | 400 | The id is missing or not a safe id. |
+| `invalid_body` | 400 | The body was not a JSON object. |
+| `invalid_request` | 400 / 422 | A field is missing, malformed, or asks for something this shape has nothing to do. |
+| `project_not_found` / `shape_not_found` | 404 | No such project, or no such shape in it. |
+| `project_exists` | 409 | A project with that id is already there. |
+| `project_busy` | 409 | Another write holds the project's lock. **Retry.** |
+| `shape_locked` | 409 | The shape is locked. Unlock it; retrying will not help. |
+| `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
+| `unapplicable_fields` | 422 | A change named fields the shape cannot take. `fields` lists them. |
+| `too_many_shapes` | 413 | More than 200 shapes in one `POST`. |
+| `geometry_failed` | 422 | The sweep or the boolean could not be built. |
+| `cad_failed` | 4xx / 500 | OCCT refused, or fell over. |
+
+A server from before codes sends only `error`, so a client should keep whatever prose match it had as a fallback. Both bundled client libraries do exactly that.
 
 ## Revolves and threads
 
@@ -126,7 +193,7 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 
 A thread comes with its core: a bolt is the thread standing on its shank, and a tapped hole is the thread plus the hole it is cut into, so neither is useful as a bare helix. The core's radius is the thread's root, is fused into one solid, and appears as **Core radius** in the object panel -- set it to 0 there, or pass `core: false`, for the ribbon on its own (a spring, say).
 
-A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable in the editor's inspector** afterwards.
+A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable afterwards** -- in the editor's inspector, and over this API: a thread reads back with its sweep under `revolve`, and a `PATCH` changing the pitch sweeps it again.
 
 Threads and springs are built by manifold rather than OCCT, so unlike a fillet they need no exact B-Rep -- but for the same reason the fillet endpoints will not treat one: a swept mesh has no analytic surface to blend. Fillet the profile instead, before sweeping it.
 
