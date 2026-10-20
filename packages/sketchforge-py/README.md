@@ -65,6 +65,11 @@ client.shell.apply(project_id, shape_id, thickness, open_faces=None) -> ShellRes
 client.shell.hollow(project_id, shape_id, thickness) -> ShellResult
 client.shell.tray(project_id, shape_id, thickness, open_faces=None) -> ShellResult
 
+client.booleans.cut(project_id, solid_ids, hole_ids) -> BooleanCutResult
+client.groups.group(project_id, ids) -> ShapeOperationResult
+client.groups.ungroup(project_id, shape_id) -> ShapeCollectionResult
+client.parts.separate(project_id, shape_id) -> ShapeCollectionResult
+
 client.align.apply(project_id, ids, axis, target, anchor_id=None) -> AlignResult
 client.align.tops(project_id, ids, anchor_id=None) | bottoms(...) | centers(project_id, ids, axis, anchor_id=None)
 
@@ -88,6 +93,7 @@ project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges
 project.faces(id) | faces_facing(id, direction)
 project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
+project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id)
 project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None)
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
 project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
@@ -156,6 +162,23 @@ SKETCHFORGE_API_TOKEN=... python -m sketchforge3d.macro macros/bolt_plate.py --h
 
 `python -m sketchforge3d`, and the `sketchforge-macro` console script, run the same thing. The context carries everything the macro needs -- `client`, `project`, `params`, `layout`, `log` -- so a macro file imports only `define_macro`.
 
+The CLI takes a file path, and the MCP runner only runs reviewed files from
+`SKETCHFORGE_MACRO_DIR`. A Python program or notebook can define and run a
+macro directly without loading a separate macro file:
+
+```python
+from sketchforge3d import client_from_environment, define_macro, run_macro
+
+
+def build(context):
+    context.project.add({"kind": "box", "width": 60, "depth": 40, "height": 8})
+
+
+macro = define_macro("Bracket", run=build, project="fresh")
+report = run_macro(client_from_environment(), macro)
+print(report.project_id)
+```
+
 ### Project modes, and why there is no default
 
 The second run is what makes a macro useful or dangerous. A script that appends to a project it found doubles the part every time, and nobody notices until they open the project. So the mode is declared and the runner, not the macro body, acts on it:
@@ -183,7 +206,7 @@ A module with a bare `run(context)` function instead of a `MACRO` runs in a `fre
 | `bolt_circle.py` | A flange with N tapped holes on a ring of radius R |
 | `filleted_box.py` | A box from three numbers, with every roundable edge filleted on the server |
 
-Tapped holes are `{"kind": "thread", "hole": True}`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor taps the plate. The API has no grouping endpoint yet, so the macros stop at marked holes.
+Tapped holes are `{"kind": "thread", "hole": True}`: the form is cut wider by a clearance and the shape is marked as a hole. Grouping the hole with the plate cuts it; `project.group([...])` exposes that operation, and `project.cut(...)` supports explicit solid and cutter lists. `project.separate(id)` splits disconnected bodies and `project.ungroup(id)` restores a group's children.
 
 ## Development
 

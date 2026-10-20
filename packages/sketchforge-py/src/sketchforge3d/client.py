@@ -18,6 +18,7 @@ from .types import (
     IMPORTABLE_MESH_FORMATS,
     MAX_SHAPES_PER_REQUEST,
     AlignResult,
+    BooleanCutResult,
     DistributeResult,
     EdgeSummary,
     FaceSummary,
@@ -29,6 +30,8 @@ from .types import (
     ProjectDetail,
     ProjectSummary,
     ShapePatch,
+    ShapeCollectionResult,
+    ShapeOperationResult,
     ShapeRequest,
     ShapeSummary,
     ShapeWriteResult,
@@ -350,6 +353,69 @@ class Shell:
         )
 
 
+class Booleans:
+    """Subtracts one or more cutter shapes from one or more solids."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def cut(
+        self, project_id: str, solid_ids: Sequence[str], hole_ids: Sequence[str]
+    ) -> BooleanCutResult:
+        payload = self._transport.send(
+            "POST",
+            "/booleans",
+            {"projectId": project_id},
+            {"solidIds": list(solid_ids), "holeIds": list(hole_ids)},
+            retryable=True,
+        ) or {}
+        return BooleanCutResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            triangles=int(payload.get("triangles") or 0),
+            revision=int(payload.get("revision") or 0),
+        )
+
+
+class Groups:
+    """Groups shapes, including subtracting members marked as holes."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def group(self, project_id: str, ids: Sequence[str]) -> ShapeOperationResult:
+        payload = self._transport.send(
+            "POST", "/groups", {"projectId": project_id}, {"ids": list(ids)}, retryable=True
+        ) or {}
+        return ShapeOperationResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            revision=int(payload.get("revision") or 0),
+        )
+
+    def ungroup(self, project_id: str, shape_id: str) -> ShapeCollectionResult:
+        payload = self._transport.send(
+            "DELETE", "/groups", {"projectId": project_id, "shapeId": shape_id}, retryable=True
+        ) or {}
+        return ShapeCollectionResult(
+            shapes=[ShapeSummary.from_payload(shape) for shape in payload.get("shapes") or []],
+            revision=int(payload.get("revision") or 0),
+        )
+
+
+class Parts:
+    """Separates a cut or grouped shape into its independent bodies."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def separate(self, project_id: str, shape_id: str) -> ShapeCollectionResult:
+        payload = self._transport.send(
+            "POST", "/parts", {"projectId": project_id, "shapeId": shape_id}, retryable=True
+        ) or {}
+        return ShapeCollectionResult(
+            shapes=[ShapeSummary.from_payload(shape) for shape in payload.get("shapes") or []],
+            revision=int(payload.get("revision") or 0),
+        )
+
 
 class Align:
     """Puts one edge or one centre of every named shape on the same coordinate.
@@ -603,6 +669,9 @@ class SketchForgeClient:
         self.measurements = Measurements(self._transport)
         self.treatments = Treatments(self._transport)
         self.shell = Shell(self._transport)
+        self.booleans = Booleans(self._transport)
+        self.groups = Groups(self._transport)
+        self.parts = Parts(self._transport)
         self.align = Align(self._transport)
         self.distribute = Distribute(self._transport)
         self.patterns = Patterns(self._transport)
@@ -668,6 +737,22 @@ class ProjectHandle:
 
     def clear(self) -> int:
         return self._client.shapes.delete_all(self.id)
+
+    def cut(self, solid_ids: Sequence[str], hole_ids: Sequence[str]) -> BooleanCutResult:
+        """Subtracts the named holes from the named solids."""
+        return self._client.booleans.cut(self.id, solid_ids, hole_ids)
+
+    def group(self, ids: Sequence[str]) -> ShapeOperationResult:
+        """Groups shapes; members marked ``hole=True`` are subtracted."""
+        return self._client.groups.group(self.id, ids)
+
+    def ungroup(self, shape_id: str) -> ShapeCollectionResult:
+        """Restores a group's members as separate project shapes."""
+        return self._client.groups.ungroup(self.id, shape_id)
+
+    def separate(self, shape_id: str) -> ShapeCollectionResult:
+        """Splits a shape into its disconnected bodies."""
+        return self._client.parts.separate(self.id, shape_id)
 
     def edges(self, shape_id: str) -> List[EdgeSummary]:
         return self._client.edges.list(self.id, shape_id)

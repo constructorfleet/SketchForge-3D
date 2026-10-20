@@ -524,6 +524,25 @@ class ShapeWriteResult:
 
 
 @dataclass(frozen=True)
+class ShapeOperationResult:
+    shape: ShapeSummary
+    revision: int
+
+
+@dataclass(frozen=True)
+class BooleanCutResult:
+    shape: ShapeSummary
+    triangles: int
+    revision: int
+
+
+@dataclass(frozen=True)
+class ShapeCollectionResult:
+    shapes: List[ShapeSummary]
+    revision: int
+
+
+@dataclass(frozen=True)
 class TreatmentResult:
     shape: ShapeSummary
     triangles: int
