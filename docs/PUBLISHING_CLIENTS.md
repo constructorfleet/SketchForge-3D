@@ -16,9 +16,12 @@ The clients carry the app's version rather than their own, so a user can reason 
 Releases are driven from `main` by **release-please**, not by a tag typed by hand.
 
 1. Every merge to `main` updates a standing **release pull request**, which carries the next version number -- worked out from the commit prefixes, so a `feat:` since the last release means a minor bump and a `fix:` a patch -- and the release notes for it. It bumps all three manifests together: the root `package.json`, the TypeScript client's, and the Python client's.
-2. **Merging that pull request is the release.** release-please tags the merge commit `v<version>` and creates the GitHub release as a **draft**.
-3. That tag triggers `release.yml` (Docker image, npm, PyPI) and `desktop-release.yml` (installers, attached to the same draft).
-4. Publishing the draft is a human decision, and the last point at which a release can be reconsidered without burning a version number.
+2. **Merging that pull request is the release.** release-please tags the merge commit `v<version>` and creates the GitHub release.
+3. The same workflow then publishes what the release consists of: it calls `release.yml` (Docker image, npm, PyPI) and dispatches `desktop-release.yml` (installers, attached to the release).
+
+The publishing is driven from `release-please.yml` rather than from the tag, and that is not a preference. **A tag pushed by a workflow using `GITHUB_TOKEN` does not start another workflow run** -- GitHub suppresses that to avoid recursion -- so no amount of tag-trigger tuning would have worked. `workflow_run` would also bridge the gap, since it fires on another workflow finishing whoever started it; `workflow_call` is used because the caller already knows the version and whether a release happened and can simply pass them, where a `workflow_run` listener would have to re-derive both from an artifact or the API and filter out every run that released nothing.
+
+The desktop workflow is dispatched rather than left to its own tag trigger for the same reason. A dispatch *does* start a run, even from `GITHUB_TOKEN`.
 
 So the version number lives in the tree, committed by the release pull request, and the tag only points at it. `release.yml` checks all three manifests equal the tag and **stops before publishing if any disagree** -- which can only happen if a tag was made by hand or a manifest was edited after the release pull request merged.
 
@@ -29,6 +32,12 @@ The clients carry the app's version rather than their own, so a user can tell wh
 Before this, a `v*.*.*` tag built only the desktop installers, and the draft release was created by the *desktop* workflow -- so the release existed as a side effect of packaging an Electron app, and a code-signing failure on one platform meant no release at all. The Docker image was published from `main` with no version tag, and the clients had their own separate tags.
 
 Inverting it makes the version change the cause and the artifacts the effect. The release pull request is also a better gate than a tag: it shows the version and the notes before anything is irreversible, and it is reviewable.
+
+### The release is not a draft
+
+It was, in the first version of this, and that was a mistake worth recording: **GitHub does not create the git tag for a draft release.** The tag appears only when the release is published, so a draft release leaves nothing for anything downstream to key on -- `git ls-remote --tags` comes back empty. Combined with the component-prefixed tag name release-please produces when a `package-name` is set without `include-component-in-tag: false`, the first 1.1.0 release produced a draft called `sketchforge-v1.1.0`, no tag at all, and no artifacts.
+
+The release pull request is the gate instead, which is the better place for one: it is reviewable, and nothing is irreversible until it merges.
 
 ### Changelog
 

@@ -4,21 +4,54 @@
     ".": {
       "release-type": "node",
       "package-name": "sketchforge",
-      "draft": true,
       "skip-changelog": true,
       "extra-files": [
-        { "type": "json", "path": "packages/sketchforge-client/package.json", "jsonpath": "$.version" },
-        { "type": "toml", "path": "packages/sketchforge-py/pyproject.toml", "jsonpath": "$.project.version" }
-      ]
+        {
+          "type": "json",
+          "path": "packages/sketchforge-client/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "packages/sketchforge-py/pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ],
+      "include-component-in-tag": false
     }
   },
   "changelog-sections": [
-    { "type": "feat", "section": "Features" },
-    { "type": "fix", "section": "Fixes" },
-    { "type": "perf", "section": "Performance" },
-    { "type": "refactor", "section": "Internal", "hidden": true },
-    { "type": "test", "section": "Tests", "hidden": true },
-    { "type": "chore", "section": "Chores", "hidden": true },
-    { "type": "docs", "section": "Documentation", "hidden": true }
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance"
+    },
+    {
+      "type": "refactor",
+      "section": "Internal",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Chores",
+      "hidden": true
+    },
+    {
+      "type": "docs",
+      "section": "Documentation",
+      "hidden": true
+    }
   ]
 }

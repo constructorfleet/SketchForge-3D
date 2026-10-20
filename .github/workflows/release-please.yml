@@ -2,9 +2,12 @@ name: Release Please
 
 # Versioning is driven from main, not from a tag typed by hand. Every merge
 # updates a standing release pull request that carries the next version number
-# and the release notes for it; merging that pull request is the release, and
-# it is what creates the tag and the draft GitHub release the other release
-# workflows attach to.
+# and the release notes for it; merging that pull request is the release.
+#
+# This workflow then publishes what the release consists of. It has to do the
+# publishing itself -- or call a workflow that does -- because the tag it
+# creates is made with GITHUB_TOKEN, and GitHub does not start a workflow run
+# for a push it made on a workflow's behalf.
 on:
   push:
     branches:
@@ -18,8 +21,54 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Read the released version
+        id: version
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::release-please made the tag $TAG, which is not v<version>. Check include-component-in-tag."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  artifacts:
+    name: Publish
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.release-please.outputs.version }}
+    secrets: inherit
+
+  desktop:
+    name: Desktop installers
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # Dispatched rather than left to its own tag trigger, for the same reason:
+      # the tag release-please pushed will not start it. A dispatch does start a
+      # run, even from GITHUB_TOKEN, and desktop-release.yml already accepts a
+      # version that way.
+      - name: Dispatch the desktop release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: gh workflow run desktop-release.yml -f version="$VERSION"
