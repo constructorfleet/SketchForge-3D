@@ -66,6 +66,10 @@ MAX_DIMENSION = 10_000
 #: One POST may carry at most this many shapes.
 MAX_SHAPES_PER_REQUEST = 200
 
+#: The directions a shell request can name a face by, in the shape's own frame:
+#: centred in X and Z with its base at the bottom, ``front`` towards the viewer.
+FACE_DIRECTIONS: Tuple[str, ...] = ("top", "bottom", "left", "right", "front", "back")
+
 #: A shape as it is asked for: ``{"kind": "cylinder", "width": 8, "sides": 6}``.
 ShapeRequest = Mapping[str, Any]
 
@@ -351,6 +355,53 @@ class EdgeSummary:
 
 
 @dataclass(frozen=True)
+class Vector3:
+    x: float
+    y: float
+    z: float
+
+
+@dataclass(frozen=True)
+class FaceSummary:
+    index: int
+    #: As OCCT names the surface: ``plane``, ``cylinder``, ``bspline``...
+    surface_type: str
+    area: float
+    #: Area-weighted centre, a real point on the face even when it is curved.
+    centroid: Vector3
+    #: The outward normal, or None for a surface that cannot report one.
+    normal: Optional[Vector3]
+    #: The direction name a shell request can open this face by.
+    #:
+    #: Only the outermost flat face pointing a given way takes the name: the
+    #: floor of a hollow part's cavity points up as surely as its lid does, and
+    #: opening the wrong one of those looks like nothing happened.
+    facing: Optional[str]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "FaceSummary":
+        centroid = payload.get("centroid") or {}
+        normal = payload.get("normal")
+        facing = payload.get("facing")
+        return cls(
+            index=int(_number(payload, "index")),
+            surface_type=_text(payload, "surfaceType", "unknown"),
+            area=_number(payload, "area"),
+            centroid=Vector3(
+                x=_number(centroid, "x"),
+                y=_number(centroid, "y"),
+                z=_number(centroid, "z"),
+            ),
+            normal=(
+                Vector3(x=_number(normal, "x"), y=_number(normal, "y"), z=_number(normal, "z"))
+                if isinstance(normal, Mapping)
+                else None
+            ),
+            facing=str(facing) if isinstance(facing, str) else None,
+        )
+
+
+@dataclass(frozen=True)
 class ShapeWriteResult:
     shapes: List[ShapeSummary]
     revision: int
@@ -361,3 +412,7 @@ class TreatmentResult:
     shape: ShapeSummary
     triangles: int
     revision: int
+
+
+#: Hollowing answers with the same three fields a treatment does.
+ShellResult = TreatmentResult

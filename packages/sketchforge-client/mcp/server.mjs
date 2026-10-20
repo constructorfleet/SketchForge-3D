@@ -324,10 +324,81 @@ const tools = [
       },
     },
   },
+  // Hollowing runs on the headless REST API rather than in an editor tab: the
+  // operation is server-side OCCT, and the editor has no action for it yet.
+  {
+    name: "sketchforge_list_faces",
+    description: "List a stored project shape's CAD faces, with the direction name each one can be opened by, so a hollow can leave the right ones off. Works on a project on the server (REST API), not on an open editor tab.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", description: "The server-side project id." },
+        shapeId: { type: "string", description: "The id of the shape to read." },
+      },
+    },
+  },
+  {
+    name: "sketchforge_hollow_shape",
+    description: "Hollow a stored project shape out to a wall of a given thickness, optionally leaving faces open so a box becomes a tray. Exact (OCCT), so the result still exports to STEP and can still be filleted. A sphere, torus, cone or round-walled tube cannot be hollowed at any thickness. Works on a project on the server (REST API), not on an open editor tab.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId", "thickness"],
+      properties: {
+        projectId: { type: "string", description: "The server-side project id." },
+        shapeId: { type: "string", description: "The id of the shape to hollow." },
+        thickness: { type: "number", description: "Wall thickness in mm, measured inwards. Must be well under half the part's smallest span." },
+        openFaces: {
+          type: "array",
+          description: 'Faces to leave open. Direction names ("top", "bottom", "left", "right", "front", "back") or face indexes from sketchforge_list_faces. Omit for a sealed hollow.',
+          items: { type: ["string", "number"] },
+        },
+      },
+    },
+  },
   // Macros drive the headless REST API rather than an editor tab, and run only
   // from the directory the operator configured.
   ...macroTools,
 ];
+
+const API_TOKEN_ENV = "SKETCHFORGE_API_TOKEN";
+
+/**
+ * One request to the headless REST API, as the operator's token.
+ *
+ * The editor bridge cannot serve every tool here: hollowing is a server-side
+ * OCCT operation on a stored project, with no editor tab involved and nothing
+ * to ask one for. The token is the same one the server was started with, and
+ * without it every route answers 404 rather than saying it is switched off.
+ */
+async function restRequest(method, path, { query = {}, body } = {}) {
+  const token = process.env[API_TOKEN_ENV];
+  if (!token) {
+    throw new Error(
+      `${API_TOKEN_ENV} is not set. It is the same token the SketchForge server was started with; without it the REST API answers 404 to everything.`,
+    );
+  }
+  const url = new URL(`/api/v1${path}`, baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    method,
+    headers: { authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    // The sentence is for whoever reads the log; the code is the half a client
+    // can act on, so carry both rather than flattening to a status.
+    throw new Error(
+      payload?.error
+        ? `${payload.error}${payload.code ? ` [${payload.code}]` : ""}`
+        : `SketchForge API returned HTTP ${response.status}`,
+    );
+  }
+  return payload;
+}
 
 function bridgeUrl() {
   return new URL(MCP_ROUTE, baseUrl);
@@ -411,6 +482,16 @@ async function callTool(name, args) {
       return bridgeCommand("list_edges", args, 30000);
     case "sketchforge_apply_edge_treatment":
       return bridgeCommand("apply_edge_treatment", args, 60000);
+    case "sketchforge_list_faces":
+      return restRequest("GET", "/faces", { query: { projectId: args.projectId, shapeId: args.shapeId } });
+    case "sketchforge_hollow_shape":
+      return restRequest("POST", "/shell", {
+        query: { projectId: args.projectId, shapeId: args.shapeId },
+        body: {
+          thickness: args.thickness,
+          ...(args.openFaces === undefined ? {} : { openFaces: args.openFaces }),
+        },
+      });
     case "sketchforge_inspect_errors":
       return bridgeCommand("inspect_errors", args);
     case "sketchforge_capture_image":

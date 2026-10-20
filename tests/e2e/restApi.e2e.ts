@@ -142,6 +142,60 @@ describe("the REST API over HTTP", () => {
     expect(shape.height).toBeGreaterThan(height);
   });
 
+  it("lists a box's faces and hollows it into a tray", async () => {
+    // The route that matters most to get out of the bundle rather than out of
+    // vitest: hollowing loads OCCT through `serverExternalPackages`, and a
+    // handler that imports fine in-process has twice thrown
+    // `createRequire is not a function` once Next bundled it.
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [{ kind: "box", width: 20, depth: 20, height: 20, name: "Pot" }] }),
+    });
+    expect(created.status).toBe(201);
+    const potId = (created.body.shapes as Array<Record<string, any>>)[0].id;
+
+    const faces = await api(`/faces?projectId=${projectId}&shapeId=${potId}`);
+    expect(faces.status).toBe(200);
+    const listed = faces.body.faces as Array<Record<string, any>>;
+    expect(listed).toHaveLength(6);
+    const top = listed.filter((face) => face.facing === "top");
+    expect(top).toHaveLength(1);
+    expect(top[0].centroid.y).toBeCloseTo(20, 5);
+
+    const misnamed = await api(`/shell?projectId=${projectId}&shapeId=${potId}`, {
+      method: "POST",
+      body: JSON.stringify({ thickness: 2, openFaces: ["sideways"] }),
+    });
+    expect(misnamed.status).toBe(400);
+    expect(misnamed.body.code).toBe("cad_failed");
+    expect(misnamed.body.error as string).toMatch(/not a face direction/);
+
+    // Refused first, so the next request also proves the project was left alone.
+    const refused = await api(`/shell?projectId=${projectId}&shapeId=${potId}`, {
+      method: "POST",
+      body: JSON.stringify({ thickness: 12, openFaces: ["top"] }),
+    });
+    expect(refused.status).toBe(422);
+    expect(refused.body.code).toBe("cad_failed");
+
+    const hollowed = await api(`/shell?projectId=${projectId}&shapeId=${potId}`, {
+      method: "POST",
+      body: JSON.stringify({ thickness: 2, openFaces: ["top"] }),
+    });
+    expect(hollowed.status).toBe(200);
+    const shape = hollowed.body.shape as Record<string, any>;
+    expect(shape.id).toBe(potId);
+    expect(shape.kind).toBe("mesh");
+    // Hollowing takes material from the inside, so the outside is unchanged.
+    expect(shape.width).toBeCloseTo(20, 1);
+    expect(shape.height).toBeCloseTo(20, 1);
+    expect(hollowed.body.triangles as number).toBeGreaterThan(0);
+
+    // A tray has an inside: more faces than the six it started with.
+    const after = await api(`/faces?projectId=${projectId}&shapeId=${potId}`);
+    expect((after.body.faces as unknown[]).length).toBeGreaterThan(6);
+  });
+
   it("refuses a change naming fields the shape cannot take, and applies none of it", async () => {
     const refused = await api(`/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
       method: "PATCH",

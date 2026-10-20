@@ -15,12 +15,14 @@ from .errors import SketchForgeApiError, SketchForgeTransportError
 from .types import (
     MAX_SHAPES_PER_REQUEST,
     EdgeSummary,
+    FaceSummary,
     ProjectDetail,
     ProjectSummary,
     ShapePatch,
     ShapeRequest,
     ShapeSummary,
     ShapeWriteResult,
+    ShellResult,
     TreatmentResult,
 )
 
@@ -203,6 +205,83 @@ class Treatments:
         return self.apply(project_id, shape_id, "chamfer", distance, angle=angle, edges=edges)
 
 
+class Faces:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def list(self, project_id: str, shape_id: str) -> List[FaceSummary]:
+        payload = self._transport.send(
+            "GET", "/faces", {"projectId": project_id, "shapeId": shape_id}
+        ) or {}
+        return [FaceSummary.from_payload(entry) for entry in payload.get("faces", [])]
+
+    def facing(self, project_id: str, shape_id: str, direction: str) -> List[int]:
+        """
+        The indexes of the faces pointing a given way, which is usually one.
+
+        A shell request can name the direction itself, so this is for a caller
+        that wants to know what it would get first -- or to find out that this
+        shape has no flat face pointing that way before asking for its lid off.
+        """
+        return [
+            face.index
+            for face in self.list(project_id, shape_id)
+            if face.facing == direction
+        ]
+
+
+class Shell:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(
+        self,
+        project_id: str,
+        shape_id: str,
+        thickness: float,
+        open_faces: Optional[Sequence[Union[str, int]]] = None,
+    ) -> ShellResult:
+        """
+        Hollows a solid out on the server, with OCCT.
+
+        The result is exact, so it still exports to STEP and can still be
+        filleted. Not every shape can be hollowed: a sphere, a torus, a cone
+        and a tube's round wall are each one continuous curved surface, and
+        OCCT refuses to offset them inwards at any thickness.
+        """
+        body: Dict[str, Any] = {"thickness": thickness}
+        if open_faces is not None:
+            body["openFaces"] = list(open_faces)
+        payload = self._transport.send(
+            "POST",
+            "/shell",
+            {"projectId": project_id, "shapeId": shape_id},
+            body,
+            retryable=True,
+        ) or {}
+        return ShellResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            triangles=int(payload.get("triangles") or 0),
+            revision=int(payload.get("revision") or 0),
+        )
+
+    def hollow(self, project_id: str, shape_id: str, thickness: float) -> ShellResult:
+        """A sealed hollow: a wall all the way round, with the void closed in."""
+        return self.apply(project_id, shape_id, thickness)
+
+    def tray(
+        self,
+        project_id: str,
+        shape_id: str,
+        thickness: float,
+        open_faces: Optional[Sequence[Union[str, int]]] = None,
+    ) -> ShellResult:
+        """The usual print: a box with its lid off, which is a tray."""
+        return self.apply(
+            project_id, shape_id, thickness, ["top"] if open_faces is None else open_faces
+        )
+
+
 class SketchForgeClient:
     def __init__(
         self,
@@ -224,7 +303,9 @@ class SketchForgeClient:
         self.projects = Projects(self._transport)
         self.shapes = Shapes(self._transport)
         self.edges = Edges(self._transport)
+        self.faces = Faces(self._transport)
         self.treatments = Treatments(self._transport)
+        self.shell = Shell(self._transport)
 
     @property
     def api_root(self) -> str:
@@ -306,3 +387,29 @@ class ProjectHandle:
         edges: Optional[Sequence[int]] = None,
     ) -> TreatmentResult:
         return self._client.treatments.chamfer(self.id, shape_id, distance, angle, edges)
+
+    def faces(self, shape_id: str) -> List[FaceSummary]:
+        return self._client.faces.list(self.id, shape_id)
+
+    def faces_facing(self, shape_id: str, direction: str) -> List[int]:
+        return self._client.faces.facing(self.id, shape_id, direction)
+
+    def shell(
+        self,
+        shape_id: str,
+        thickness: float,
+        open_faces: Optional[Sequence[Union[str, int]]] = None,
+    ) -> ShellResult:
+        """Hollows the shape out, sealed unless ``open_faces`` names faces to leave off."""
+        return self._client.shell.apply(self.id, shape_id, thickness, open_faces)
+
+    def hollow(self, shape_id: str, thickness: float) -> ShellResult:
+        return self._client.shell.hollow(self.id, shape_id, thickness)
+
+    def tray(
+        self,
+        shape_id: str,
+        thickness: float,
+        open_faces: Optional[Sequence[Union[str, int]]] = None,
+    ) -> ShellResult:
+        return self._client.shell.tray(self.id, shape_id, thickness, open_faces)

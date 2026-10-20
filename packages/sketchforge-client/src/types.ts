@@ -350,7 +350,46 @@ export type EdgeTreatment = {
   edges?: readonly number[];
 };
 
+/**
+ * The directions a shell request can name a face by, in the shape's own frame:
+ * centred in X and Z with its base at the bottom, `front` towards the viewer.
+ */
+export const FACE_DIRECTIONS = ["top", "bottom", "left", "right", "front", "back"] as const;
+
+export type FaceDirection = (typeof FACE_DIRECTIONS)[number];
+
+export type FaceSummary = {
+  index: number;
+  /** As OCCT names the surface: `plane`, `cylinder`, `bspline`, or `unknown`. */
+  surfaceType: string;
+  area: number;
+  /** Area-weighted centre, which is a real point on the face even when curved. */
+  centroid: { x: number; y: number; z: number };
+  /** The outward normal, or null for a surface that cannot report one. */
+  normal: { x: number; y: number; z: number } | null;
+  /**
+   * The direction name this face answers to in a shell request.
+   *
+   * Only the outermost flat face pointing a given way takes the name: the floor
+   * of a hollow part's cavity points up as surely as its lid does, and opening
+   * the wrong one of those looks like nothing happened.
+   */
+  facing: FaceDirection | null;
+};
+
+export type ShellRequest = {
+  /** Wall thickness in mm, measured inwards from the surface. */
+  thickness: number;
+  /**
+   * Faces to leave open, as direction names or as indexes from the face
+   * listing. Omitted or empty seals the hollow in.
+   */
+  openFaces?: readonly (FaceDirection | number)[];
+};
+
 export type ShapeWriteResult = { shapes: ShapeSummary[]; revision: number };
 export type ShapePatchResult = { shape: ShapeSummary; revision: number };
 export type TreatmentResult = { shape: ShapeSummary; triangles: number; revision: number };
+/** The same three fields a treatment answers with; hollowing is one more of them. */
+export type ShellResult = TreatmentResult;
 export type DeleteResult = { deleted: true; id: string; revision?: number };

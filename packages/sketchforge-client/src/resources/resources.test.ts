@@ -117,6 +117,42 @@ describe("edges and treatments", () => {
   });
 });
 
+describe("faces and shell", () => {
+  const face = (index: number, facing: string | null) => ({
+    index,
+    surfaceType: "plane",
+    area: 400,
+    centroid: { x: 0, y: index, z: 0 },
+    normal: { x: 0, y: 1, z: 0 },
+    facing,
+  });
+
+  it("reports the faces pointing a given way, and only the named ones", async () => {
+    const server = fakeServer({ body: { faces: [face(0, "top"), face(1, null), face(2, "bottom")] } });
+    await expect(client(server).faces.facing("p1", "s1", "top")).resolves.toEqual([0]);
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1");
+  });
+
+  it("omits openFaces entirely for a sealed hollow", async () => {
+    const server = fakeServer({ body: { shape: shapeSummary("s1"), triangles: 24, revision: 5 } });
+    await client(server).shell.hollow("p1", "s1", 2);
+    // An empty list is not the same request as no list: the server reads a
+    // missing one as "seal it", and sending `[]` would say the same thing by
+    // accident rather than on purpose.
+    expect(server.calls[0]?.body).toEqual({ thickness: 2 });
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/shell?projectId=p1&shapeId=s1");
+  });
+
+  it("opens the top by default for a tray, and takes indexes as well as names", async () => {
+    const server = fakeServer({ body: { shape: shapeSummary("s1"), triangles: 28, revision: 6 } });
+    await client(server).shell.tray("p1", "s1", 2);
+    expect(server.calls[0]?.body).toEqual({ thickness: 2, openFaces: ["top"] });
+
+    await client(server).shell.apply("p1", "s1", { thickness: 1.5, openFaces: ["top", 4] });
+    expect(server.calls[1]?.body).toEqual({ thickness: 1.5, openFaces: ["top", 4] });
+  });
+});
+
 describe("check", () => {
   it("names the missing server configuration rather than echoing a status", async () => {
     const server = fakeServer({ status: 503, body: { error: "needs server-side project storage" } });

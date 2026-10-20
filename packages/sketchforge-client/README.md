@@ -80,6 +80,13 @@ client.edges.filletableIndexes(projectId, shapeId): Promise<number[]>
 client.treatments.apply(projectId, shapeId, { kind, amount, angle?, edges? }): Promise<TreatmentResult>
 client.treatments.fillet(projectId, shapeId, radius, edges?): Promise<TreatmentResult>
 client.treatments.chamfer(projectId, shapeId, distance, { angle?, edges? }): Promise<TreatmentResult>
+
+client.faces.list(projectId, shapeId): Promise<FaceSummary[]>
+client.faces.facing(projectId, shapeId, direction): Promise<number[]>
+
+client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
+client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
+client.shell.tray(projectId, shapeId, thickness, openFaces?): Promise<ShellResult>
 ```
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
@@ -88,6 +95,8 @@ A `ProjectHandle` is the same surface with the project id bound, which is what a
 project.get() | delete() | listShapes() | add(shape) | addMany(shapes) | update(id, changes)
 project.remove(id) | clear() | edges(id) | filletableEdges(id)
 project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance, options?)
+project.faces(id) | facesFacing(id, direction)
+project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 ```
 
 Shapes are described as parameters, with a union per kind so a field that belongs to another kind is a compile error:

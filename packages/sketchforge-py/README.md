@@ -53,6 +53,13 @@ client.edges.filletable_indexes(project_id, shape_id) -> list[int]
 client.treatments.apply(project_id, shape_id, kind, amount, angle=None, edges=None) -> TreatmentResult
 client.treatments.fillet(project_id, shape_id, radius, edges=None) -> TreatmentResult
 client.treatments.chamfer(project_id, shape_id, distance, angle=None, edges=None) -> TreatmentResult
+
+client.faces.list(project_id, shape_id) -> list[FaceSummary]
+client.faces.facing(project_id, shape_id, direction) -> list[int]
+
+client.shell.apply(project_id, shape_id, thickness, open_faces=None) -> ShellResult
+client.shell.hollow(project_id, shape_id, thickness) -> ShellResult
+client.shell.tray(project_id, shape_id, thickness, open_faces=None) -> ShellResult
 ```
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
@@ -61,6 +68,8 @@ A `ProjectHandle` is the same surface with the project id bound, which is what a
 project.get() | delete() | list_shapes() | add(shape) | add_many(shapes) | update(id, changes)
 project.remove(id) | clear() | edges(id) | filletable_edges(id)
 project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges=None)
+project.faces(id) | faces_facing(id, direction)
+project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
 ```
 
 Requests are plain dicts, because the server takes a bag of parameters; responses are frozen dataclasses with snake_case fields, so `shape.rotation_x` is checked and a typo is an error rather than a `None`. A field this version does not know about is kept in `shape.extra` rather than dropped.
