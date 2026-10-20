@@ -39,6 +39,14 @@ It was, in the first version of this, and that was a mistake worth recording: **
 
 The release pull request is the gate instead, which is the better place for one: it is reviewable, and nothing is irreversible until it merges.
 
+### Conventional commits are required
+
+release-please works out the next version from commit subjects, so they have to be conventional: `feat:` for a minor bump, `fix:` for a patch, `feat!:` or a `BREAKING CHANGE:` footer for a major. Types it does not recognise -- `release:`, which upstream uses -- contribute nothing, and a release with only `chore:` and `refactor:` commits produces no release pull request at all. That is the expected behaviour, not a fault.
+
+Because this repository squash-merges with the **pull request title** as the commit subject (`squash_merge_commit_title: COMMIT_OR_PR_TITLE`), the title is what release-please ends up reading. `.github/workflows/pr-title.yml` fails a pull request whose title is not conventional, for exactly that reason -- the failure it prevents is silent, since a title release-please cannot parse does not error anywhere, it just releases nothing.
+
+Note also that this repository has **no release tags on the remote**. release-please takes the last released version from `.release-please-manifest.json`, which is why that file matters and why a hand-edited version there would misdirect the next release.
+
 ### Changelog
 
 release-please is configured with `skip-changelog`, so it does **not** write `docs/CHANGELOG.md`. That file stays hand-written, because an entry that explains why a change was made is worth more than a list of commit subjects -- and the generated notes on the GitHub release cover the "what changed" need.
