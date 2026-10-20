@@ -338,6 +338,54 @@ const tools = [
       },
     },
   },
+  // Measuring runs on the REST API for the same reason hollowing does: the
+  // numbers come from server-side OCCT's own curve and surface analysis, which
+  // is the only place the exact geometry lives.
+  {
+    name: "sketchforge_measure_shape",
+    description: "Measure every edge and face of a stored project shape from its exact CAD geometry: edge length, the radius and diameter of a circular edge or arc, face area, and a cylindrical face's radius. Exact (OCCT), so a round hole has a real radius rather than the chord length of a facet. A measurement that is not meaningful for the entity -- the radius of a straight edge, of an ellipse, or of a cone whose radius changes along it -- comes back null with a reason in radiusUnavailable. Works on a project on the server (REST API), not on an open editor tab.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", description: "The server-side project id." },
+        shapeId: { type: "string", description: "The id of the shape to measure." },
+      },
+    },
+  },
+  {
+    name: "sketchforge_measure_between",
+    description: "The exact minimum distance between two CAD entities in a stored project, and the angle between them when both are flat faces. Each end names a shape and either the whole solid, or one edge or face by the index the measurement listing gave it. Distance is measured between the real surfaces where the shapes sit, so two round posts 5mm apart at their nearest walls read 5 -- not the gap between their bounding boxes. Works on a project on the server (REST API), not on an open editor tab.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "from", "to"],
+      properties: {
+        projectId: { type: "string", description: "The server-side project id." },
+        from: {
+          type: "object",
+          required: ["shapeId"],
+          properties: {
+            shapeId: { type: "string", description: "The shape this end is part of." },
+            entity: {
+              type: "string",
+              enum: ["shape", "edge", "face"],
+              description: "What to measure to. 'shape' is the whole solid and takes no index; 'edge' and 'face' need one.",
+            },
+            index: { type: "number", description: "Which edge or face, by the index the measurement listing gave it." },
+          },
+        },
+        to: {
+          type: "object",
+          required: ["shapeId"],
+          properties: {
+            shapeId: { type: "string", description: "The shape this end is part of." },
+            entity: { type: "string", enum: ["shape", "edge", "face"] },
+            index: { type: "number" },
+          },
+        },
+      },
+    },
+  },
   {
     name: "sketchforge_hollow_shape",
     description: "Hollow a stored project shape out to a wall of a given thickness, optionally leaving faces open so a box becomes a tray. Exact (OCCT), so the result still exports to STEP and can still be filleted. A sphere, torus, cone or round-walled tube cannot be hollowed at any thickness. Works on a project on the server (REST API), not on an open editor tab.",
@@ -484,6 +532,13 @@ async function callTool(name, args) {
       return bridgeCommand("apply_edge_treatment", args, 60000);
     case "sketchforge_list_faces":
       return restRequest("GET", "/faces", { query: { projectId: args.projectId, shapeId: args.shapeId } });
+    case "sketchforge_measure_shape":
+      return restRequest("GET", "/measurements", { query: { projectId: args.projectId, shapeId: args.shapeId } });
+    case "sketchforge_measure_between":
+      return restRequest("POST", "/measurements", {
+        query: { projectId: args.projectId },
+        body: { from: args.from, to: args.to },
+      });
     case "sketchforge_hollow_shape":
       return restRequest("POST", "/shell", {
         query: { projectId: args.projectId, shapeId: args.shapeId },

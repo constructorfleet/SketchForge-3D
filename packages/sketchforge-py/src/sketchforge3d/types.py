@@ -70,8 +70,46 @@ MAX_SHAPES_PER_REQUEST = 200
 #: centred in X and Z with its base at the bottom, ``front`` towards the viewer.
 FACE_DIRECTIONS: Tuple[str, ...] = ("top", "bottom", "left", "right", "front", "back")
 
+#: The entities a measurement listing reports, one entry each.
+MEASUREMENT_ENTITIES: Tuple[str, ...] = ("edge", "face")
+
+#: What one end of a between-entities measurement may name. ``shape`` is the
+#: whole solid, which is what "how far apart are these two parts" means; the
+#: other two narrow it to one entity of that solid.
+MEASUREMENT_END_ENTITIES: Tuple[str, ...] = ("edge", "face", "shape")
+
+#: Why there is no radius, instead of a guessed number. The first three answer
+#: for an edge and the last four for a face, which is why they are one set: a
+#: caller reads them off ``radius_unavailable`` without having to know which
+#: entity it was looking at.
+MEASUREMENT_RADIUS_UNAVAILABLE_CODES: Tuple[str, ...] = (
+    "notCircular",
+    "ellipseHasNoSingleRadius",
+    "degenerateCurve",
+    "notCurved",
+    "radiusVariesOverSurface",
+    "radiusNotReportedByKernel",
+    "degenerateSurface",
+)
+
+#: Why there is no angle. An angle is only defined between two flat faces.
+MEASUREMENT_ANGLE_UNAVAILABLE_CODES: Tuple[str, ...] = ("notPlanar", "degenerateNormal")
+
+#: Either reason, for a caller that only logs it. The server derives both from
+#: one union of its own, but the two fields draw on disjoint halves of it -- a
+#: radius is never missing because a face was not planar -- so each field
+#: answers from its own set and this is the sum.
+MEASUREMENT_UNAVAILABLE_CODES: Tuple[str, ...] = (
+    MEASUREMENT_RADIUS_UNAVAILABLE_CODES + MEASUREMENT_ANGLE_UNAVAILABLE_CODES
+)
+
 #: A shape as it is asked for: ``{"kind": "cylinder", "width": 8, "sides": 6}``.
 ShapeRequest = Mapping[str, Any]
+
+#: One end of a between-entities measurement:
+#: ``{"shapeId": "s1", "entity": "face", "index": 2}``. A missing ``entity``
+#: means the whole shape, and takes no ``index``.
+MeasurementEnd = Mapping[str, Any]
 
 #: The fields a PATCH may change. Anything else needs a new shape.
 ShapePatch = Mapping[str, Any]
@@ -88,6 +126,18 @@ def _number(payload: Mapping[str, Any], key: str, default: float = 0.0) -> float
 def _text(payload: Mapping[str, Any], key: str, default: str = "") -> str:
     value = payload.get(key, default)
     return value if isinstance(value, str) else default
+
+
+def _optional_number(payload: Mapping[str, Any], key: str) -> Optional[float]:
+    """
+    A number the server reports as ``null`` when it does not apply.
+
+    Distinct from ``_number``, which defaults: a face has no length and a flat
+    one has no radius, and ``0.0`` there would read as a measurement rather
+    than as the absence of one.
+    """
+    value = payload.get(key)
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 #: How far round a sweep goes and how fast it rises, as the server reports it.
@@ -398,6 +448,72 @@ class FaceSummary:
                 else None
             ),
             facing=str(facing) if isinstance(facing, str) else None,
+        )
+
+
+@dataclass(frozen=True)
+class MeasurementSummary:
+    """
+    One edge or face, measured from the exact B-rep rather than the mesh.
+
+    ``index`` is the same index the edge and face listings give the entity, so
+    a measurement and the fillet that follows it name the same thing. The
+    fields that do not apply are ``None`` rather than zero: a face has no
+    length, an edge has no area, and a straight line has no radius -- and a
+    radius of ``0.0`` would read as a measurement rather than the absence of
+    one.
+    """
+
+    entity: str
+    index: int
+    #: As OCCT names it: ``line``, ``circle``, ``ellipse``, ``bspline`` for an
+    #: edge; ``plane``, ``cylinder``, ``sphere``, ``cone``, ``torus`` for a face.
+    geometry_type: str
+    #: Edge length in mm, arcs measured along the curve. None for a face.
+    length: Optional[float]
+    #: Face area in mm^2. None for an edge.
+    area: Optional[float]
+    radius: Optional[float]
+    diameter: Optional[float]
+    #: Degrees a circular edge runs through; a full circle is 360. None otherwise.
+    sweep_degrees: Optional[float]
+    #: Why there is no radius, from ``MEASUREMENT_RADIUS_UNAVAILABLE_CODES``.
+    #: None when one is reported.
+    radius_unavailable: Optional[str]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "MeasurementSummary":
+        unavailable = payload.get("radiusUnavailable")
+        return cls(
+            entity=_text(payload, "entity"),
+            index=int(_number(payload, "index")),
+            geometry_type=_text(payload, "geometryType", "unknown"),
+            length=_optional_number(payload, "length"),
+            area=_optional_number(payload, "area"),
+            radius=_optional_number(payload, "radius"),
+            diameter=_optional_number(payload, "diameter"),
+            sweep_degrees=_optional_number(payload, "sweepDegrees"),
+            radius_unavailable=unavailable if isinstance(unavailable, str) else None,
+        )
+
+
+@dataclass(frozen=True)
+class MeasurementPair:
+    #: Exact minimum distance between the two entities, in mm. Zero when they touch.
+    distance: float
+    #: Angle between two planar faces' outward normals, 0 to 180. None otherwise.
+    angle_degrees: Optional[float]
+    #: Why there is no angle, from ``MEASUREMENT_ANGLE_UNAVAILABLE_CODES``.
+    #: None when one is reported.
+    angle_unavailable: Optional[str]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "MeasurementPair":
+        unavailable = payload.get("angleUnavailable")
+        return cls(
+            distance=_number(payload, "distance"),
+            angle_degrees=_optional_number(payload, "angleDegrees"),
+            angle_unavailable=unavailable if isinstance(unavailable, str) else None,
         )
 
 

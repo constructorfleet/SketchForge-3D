@@ -4,7 +4,13 @@ import unittest
 
 from sketchforge3d import SketchForgeApiError, SketchForgeClient, SketchForgeTransportError, chunk
 from sketchforge3d._http import Transport, build_url, normalize_base_url
-from sketchforge3d.types import MAX_SHAPES_PER_REQUEST, ShapeSummary
+from sketchforge3d.types import (
+    MAX_SHAPES_PER_REQUEST,
+    MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
+    MEASUREMENT_RADIUS_UNAVAILABLE_CODES,
+    MEASUREMENT_UNAVAILABLE_CODES,
+    ShapeSummary,
+)
 
 from support import FakeOpener, project_payload, shape_payload
 
@@ -226,6 +232,142 @@ class FacesAndShellTests(unittest.TestCase):
         opener = FakeOpener({"shape": shape_payload(), "triangles": 28, "revision": 6})
         client(opener).shell.apply("p1", "s1", 1.5, ["top", 4])
         self.assertEqual(opener.calls[0].body, {"thickness": 1.5, "openFaces": ["top", 4]})
+
+
+class MeasurementsTests(unittest.TestCase):
+    @staticmethod
+    def _measurement(**overrides):
+        payload = {
+            "entity": "edge",
+            "index": 0,
+            "geometryType": "line",
+            "length": 10,
+            "area": None,
+            "radius": None,
+            "diameter": None,
+            "sweepDegrees": None,
+            "radiusUnavailable": "notCircular",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_lists_a_shapes_edges_and_faces(self) -> None:
+        opener = FakeOpener(
+            {
+                "measurements": [
+                    self._measurement(),
+                    self._measurement(
+                        entity="face",
+                        index=1,
+                        geometryType="cylinder",
+                        length=None,
+                        area=50,
+                        radius=4,
+                        diameter=8,
+                        radiusUnavailable=None,
+                    ),
+                ]
+            }
+        )
+        measurements = client(opener).measurements.list("p1", "s1")
+        self.assertEqual(
+            opener.calls[0].url,
+            "http://localhost:3100/api/v1/measurements?projectId=p1&shapeId=s1",
+        )
+        self.assertEqual(opener.calls[0].method, "GET")
+        self.assertEqual(measurements[0].entity, "edge")
+        self.assertEqual(measurements[0].geometry_type, "line")
+        self.assertEqual(measurements[0].length, 10.0)
+        self.assertEqual(measurements[0].radius_unavailable, "notCircular")
+        self.assertEqual(measurements[1].area, 50.0)
+        self.assertEqual(measurements[1].diameter, 8.0)
+        self.assertIsNone(measurements[1].radius_unavailable)
+
+    def test_reads_what_does_not_apply_as_none_rather_than_zero(self) -> None:
+        opener = FakeOpener({"measurements": [self._measurement()]})
+        measurement = client(opener).measurements.list("p1", "s1")[0]
+        # A radius of 0.0 would read as a measurement rather than the absence of
+        # one, which is the whole reason the server sends null.
+        self.assertIsNone(measurement.radius)
+        self.assertIsNone(measurement.diameter)
+        self.assertIsNone(measurement.area)
+        self.assertIsNone(measurement.sweep_degrees)
+
+    def test_reports_only_the_entries_carrying_a_radius(self) -> None:
+        opener = FakeOpener(
+            {
+                "measurements": [
+                    self._measurement(),
+                    self._measurement(
+                        index=1, geometryType="circle", radius=3, diameter=6, sweepDegrees=360, radiusUnavailable=None
+                    ),
+                    self._measurement(entity="face", index=2, geometryType="plane", length=None, area=400, radiusUnavailable="notCurved"),
+                ]
+            }
+        )
+        found = client(opener).measurements.with_radius("p1", "s1")
+        self.assertEqual([measurement.index for measurement in found], [1])
+        self.assertEqual(found[0].sweep_degrees, 360.0)
+
+    def test_sends_both_ends_of_a_between_request(self) -> None:
+        opener = FakeOpener({"distance": 12.5, "angleDegrees": 90, "angleUnavailable": None})
+        pair = client(opener).measurements.between(
+            "p1", {"shapeId": "s1", "entity": "face", "index": 2}, {"shapeId": "s2", "entity": "face", "index": 0}
+        )
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/measurements?projectId=p1")
+        self.assertEqual(
+            opener.calls[0].body,
+            {
+                "from": {"shapeId": "s1", "entity": "face", "index": 2},
+                "to": {"shapeId": "s2", "entity": "face", "index": 0},
+            },
+        )
+        self.assertEqual(pair.distance, 12.5)
+        self.assertEqual(pair.angle_degrees, 90.0)
+        self.assertIsNone(pair.angle_unavailable)
+
+    def test_omits_entity_and_index_for_a_whole_shape_end(self) -> None:
+        opener = FakeOpener({"distance": 60, "angleDegrees": None, "angleUnavailable": "notPlanar"})
+        pair = client(opener).measurements.between("p1", {"shapeId": "s1"}, {"shapeId": "s2"})
+        # The server reads a missing entity as the whole shape and refuses an
+        # index alongside it, so neither can be sent as a null.
+        self.assertEqual(opener.calls[0].body, {"from": {"shapeId": "s1"}, "to": {"shapeId": "s2"}})
+        self.assertIsNone(pair.angle_degrees)
+        self.assertEqual(pair.angle_unavailable, "notPlanar")
+
+    def test_binds_the_project_id_through_a_handle(self) -> None:
+        opener = FakeOpener({"measurements": [self._measurement()]})
+        client(opener).project("p9").measurements("s1")
+        self.assertEqual(
+            opener.calls[0].url,
+            "http://localhost:3100/api/v1/measurements?projectId=p9&shapeId=s1",
+        )
+
+    def test_names_the_two_reason_sets_each_field_draws_from(self) -> None:
+        # The server keeps one union for both, but the derivations are disjoint:
+        # a radius is never missing because a face was not planar.
+        self.assertEqual(
+            MEASUREMENT_RADIUS_UNAVAILABLE_CODES,
+            (
+                "notCircular",
+                "ellipseHasNoSingleRadius",
+                "degenerateCurve",
+                "notCurved",
+                "radiusVariesOverSurface",
+                "radiusNotReportedByKernel",
+                "degenerateSurface",
+            ),
+        )
+        self.assertEqual(MEASUREMENT_ANGLE_UNAVAILABLE_CODES, ("notPlanar", "degenerateNormal"))
+        self.assertEqual(
+            set(MEASUREMENT_RADIUS_UNAVAILABLE_CODES) & set(MEASUREMENT_ANGLE_UNAVAILABLE_CODES),
+            set(),
+        )
+        self.assertEqual(
+            MEASUREMENT_UNAVAILABLE_CODES,
+            MEASUREMENT_RADIUS_UNAVAILABLE_CODES + MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
+        )
 
 
 class ShapeSummaryTests(unittest.TestCase):

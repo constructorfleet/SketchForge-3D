@@ -29,6 +29,13 @@ import {
   type ServerCadFace,
   type ServerCadShellRequest,
 } from "@/lib/engine/serverCadShell";
+import {
+  measureBetween as measureBetweenEntities,
+  shapeMeasurements,
+  type MeasurementEndRef,
+  type ServerCadMeasurement,
+  type ServerCadMeasurementPair,
+} from "@/lib/engine/serverCadMeasure";
 import { buildGroupFromSelection } from "@/lib/engine/serverShapeBooleans";
 import { restoreGroupedChildren, separateShapeParts } from "@/lib/engine/serverShapeGroups";
 import { withHoleMode } from "@/lib/engine/workplaneShapes";
@@ -89,6 +96,20 @@ export type Engine = {
   treat(projectId: string, shapeId: string, treatment: ServerCadTreatment): Promise<EngineResult<ShapeWritten>>;
   /** Hollow a shape out, optionally leaving faces open. */
   shell(projectId: string, shapeId: string, request: ServerCadShellRequest): Promise<EngineResult<ShapeWritten>>;
+  /** Every edge and face of a shape, measured from its exact geometry. */
+  measurements(projectId: string, shapeId: string): Promise<EngineResult<ServerCadMeasurement[]>>;
+  /**
+   * The distance between two entities, and the angle between them if both are flat faces.
+   *
+   * The two ends may be different shapes, which is why this takes refs rather
+   * than a `shapeId` -- "how far apart are these two parts" is the measurement
+   * the operation exists for.
+   */
+  measureBetween(
+    projectId: string,
+    from: MeasurementEndRef,
+    to: MeasurementEndRef,
+  ): Promise<EngineResult<ServerCadMeasurementPair>>;
 };
 
 function ok<T>(value: T): EngineResult<T> {
@@ -294,6 +315,32 @@ export function createEngine(store: ProjectStore): Engine {
       if (!found.ok) return found;
       try {
         return ok(await shapeFaces(found.value));
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+    }),
+
+    measurements: (projectId, shapeId) => reading(projectId, async (document) => {
+      const found = oneShape(document, shapeId);
+      if (!found.ok) return found;
+      try {
+        return ok(await shapeMeasurements(found.value));
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+    }),
+
+    measureBetween: (projectId, from, to) => reading(projectId, async (document) => {
+      // Both ends resolve before either is measured, so a request naming one
+      // shape that is not in the project is refused by id rather than half done.
+      const shapes = shapesByIds(document, [from.shapeId, to.shapeId]);
+      if (!shapes.ok) return shapes;
+      const shapeById = (id: string) => shapes.value.find((shape) => shape.id === id) as WorkplaneShape;
+      try {
+        return ok(await measureBetweenEntities(
+          { shape: shapeById(from.shapeId), entity: from.entity, index: from.index },
+          { shape: shapeById(to.shapeId), entity: to.entity, index: to.index },
+        ));
       } catch (error) {
         return failed(cadFailure(error));
       }

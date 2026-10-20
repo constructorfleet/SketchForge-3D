@@ -120,9 +120,13 @@ describe("the REST API from a production build", { timeout: 180_000 }, () => {
   });
 
   it("answers the read-only routes with data rather than a cached 404", async () => {
-    // Both of these answered `404 api_disabled` with `x-nextjs-cache: HIT` from
-    // a built server, whatever the token was, because they export only GET.
-    for (const route of ["edges", "faces"] as const) {
+    // `edges` and `faces` answered `404 api_disabled` with `x-nextjs-cache: HIT`
+    // from a built server, whatever the token was, because they export only GET.
+    // `measurements` escapes by exporting POST as well, which is the accident
+    // every other route in `/api/v1` relies on -- it is in this loop so that
+    // losing the POST handler, or splitting the between-entities measurement
+    // onto a GET-only route of its own, cannot quietly reintroduce the trap.
+    for (const route of ["edges", "faces", "measurements"] as const) {
       const listed = await api(`/${route}?projectId=${projectId}&shapeId=${shapeId}`);
       expect(listed.status, route).toBe(200);
       expect(listed.cache, route).not.toBe("HIT");

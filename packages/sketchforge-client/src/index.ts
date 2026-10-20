@@ -5,6 +5,7 @@ export { Projects } from "./resources/projects.js";
 export { Shapes, chunk, shapePatchFromSummary } from "./resources/shapes.js";
 export { Edges } from "./resources/edges.js";
 export { Faces } from "./resources/faces.js";
+export { Measurements } from "./resources/measurements.js";
 export { Shell } from "./resources/shell.js";
 export { Treatments } from "./resources/treatments.js";
 export {

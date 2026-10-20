@@ -387,6 +387,103 @@ export type ShellRequest = {
   openFaces?: readonly (FaceDirection | number)[];
 };
 
+/** The entities a measurement listing reports, one entry each. */
+export const MEASUREMENT_ENTITIES = ["edge", "face"] as const;
+
+export type MeasurementEntity = (typeof MEASUREMENT_ENTITIES)[number];
+
+/**
+ * What one end of a between-entities measurement names.
+ *
+ * `shape` is the whole solid, which is what "how far apart are these two parts"
+ * means; `edge` and `face` narrow it to one entity of that solid.
+ */
+export const MEASUREMENT_END_ENTITIES = ["edge", "face", "shape"] as const;
+
+export type MeasurementEndEntity = (typeof MEASUREMENT_END_ENTITIES)[number];
+
+/**
+ * Why there is no radius, instead of a guessed number.
+ *
+ * The first three answer for an edge and the last four for a face, which is
+ * why they are one set: a caller reads them off `radiusUnavailable` without
+ * having to know which entity it was looking at.
+ */
+export const MEASUREMENT_RADIUS_UNAVAILABLE_CODES = [
+  "notCircular",
+  "ellipseHasNoSingleRadius",
+  "degenerateCurve",
+  "notCurved",
+  "radiusVariesOverSurface",
+  "radiusNotReportedByKernel",
+  "degenerateSurface",
+] as const;
+
+export type MeasurementRadiusUnavailableCode = (typeof MEASUREMENT_RADIUS_UNAVAILABLE_CODES)[number];
+
+/** Why there is no angle. An angle is only defined between two flat faces. */
+export const MEASUREMENT_ANGLE_UNAVAILABLE_CODES = ["notPlanar", "degenerateNormal"] as const;
+
+export type MeasurementAngleUnavailableCode = (typeof MEASUREMENT_ANGLE_UNAVAILABLE_CODES)[number];
+
+/**
+ * Either reason, for a caller that only logs it.
+ *
+ * The server derives both from one union of its own, but the two fields draw
+ * on disjoint halves of it -- a radius is never missing because a face was not
+ * planar -- so each field is typed to its own half and this is the sum.
+ */
+export type MeasurementUnavailableCode = MeasurementRadiusUnavailableCode | MeasurementAngleUnavailableCode;
+
+/**
+ * One edge or face, measured from the exact B-rep rather than the mesh.
+ *
+ * `index` is the same index the edge and face listings give the entity, so a
+ * measurement and the fillet that follows it name the same thing. The fields
+ * that do not apply are `null` rather than zero: a face has no length, an edge
+ * has no area, and a straight line has no radius -- and a radius of 0 would
+ * read as a measurement rather than as the absence of one.
+ */
+export type MeasurementSummary = {
+  entity: MeasurementEntity;
+  index: number;
+  /** As OCCT names it: `line`, `circle`, `ellipse`, `bspline` for an edge; `plane`, `cylinder`, `sphere`, `cone`, `torus` for a face. */
+  geometryType: string;
+  /** Edge length in mm, arcs measured along the curve. Null for a face. */
+  length: number | null;
+  /** Face area in mm^2. Null for an edge. */
+  area: number | null;
+  radius: number | null;
+  diameter: number | null;
+  /** Degrees a circular edge runs through; a full circle is 360. Null otherwise. */
+  sweepDegrees: number | null;
+  /** Why there is no radius. Null when one is reported. */
+  radiusUnavailable: MeasurementRadiusUnavailableCode | null;
+};
+
+/**
+ * One end of a between-entities measurement.
+ *
+ * The `shapeId` is required on each end rather than shared, because the two
+ * ends may be different shapes -- which is the measurement the route exists
+ * for. An `entity` left out means the whole shape, and takes no `index`.
+ */
+export type MeasurementEnd = {
+  shapeId: string;
+  entity?: MeasurementEndEntity;
+  /** Which edge or face, from the measurement listing. Required for those two. */
+  index?: number;
+};
+
+export type MeasurementPair = {
+  /** Exact minimum distance between the two entities, in mm. Zero when they touch. */
+  distance: number;
+  /** Angle between two planar faces' outward normals, 0 to 180. Null otherwise. */
+  angleDegrees: number | null;
+  /** Why there is no angle. Null when one is reported. */
+  angleUnavailable: MeasurementAngleUnavailableCode | null;
+};
+
 export type ShapeWriteResult = { shapes: ShapeSummary[]; revision: number };
 export type ShapePatchResult = { shape: ShapeSummary; revision: number };
 export type TreatmentResult = { shape: ShapeSummary; triangles: number; revision: number };

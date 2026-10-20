@@ -16,6 +16,9 @@ from .types import (
     MAX_SHAPES_PER_REQUEST,
     EdgeSummary,
     FaceSummary,
+    MeasurementEnd,
+    MeasurementPair,
+    MeasurementSummary,
     ProjectDetail,
     ProjectSummary,
     ShapePatch,
@@ -230,6 +233,64 @@ class Faces:
         ]
 
 
+def _measurement_end(end: MeasurementEnd) -> Dict[str, Any]:
+    """
+    One end of a between-entities request, as the server wants it.
+
+    An absent ``entity`` and an absent ``index`` are left out rather than sent
+    as null: the server reads a missing ``entity`` as the whole shape, and
+    refuses an ``index`` alongside it.
+    """
+    body: Dict[str, Any] = {"shapeId": end.get("shapeId")}
+    for key in ("entity", "index"):
+        if end.get(key) is not None:
+            body[key] = end[key]
+    return body
+
+
+class Measurements:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def list(self, project_id: str, shape_id: str) -> List[MeasurementSummary]:
+        """Every edge and face, measured, numbered as the edge and face listings number them."""
+        payload = self._transport.send(
+            "GET", "/measurements", {"projectId": project_id, "shapeId": shape_id}
+        ) or {}
+        return [MeasurementSummary.from_payload(entry) for entry in payload.get("measurements", [])]
+
+    def between(self, project_id: str, from_: MeasurementEnd, to: MeasurementEnd) -> MeasurementPair:
+        """
+        The distance between two entities, and the angle if both are flat faces.
+
+        The ends may be on different shapes, and either may be a whole shape, so
+        this answers both "how deep is that pocket" and "how far apart are those
+        two parts". The distance is measured between the real surfaces, so two
+        cylinders 5mm apart at their nearest walls read 5.
+        """
+        payload = self._transport.send(
+            "POST",
+            "/measurements",
+            {"projectId": project_id},
+            {"from": _measurement_end(from_), "to": _measurement_end(to)},
+        ) or {}
+        return MeasurementPair.from_payload(payload)
+
+    def with_radius(self, project_id: str, shape_id: str) -> List[MeasurementSummary]:
+        """
+        The entries that carry a radius, which is how a caller finds the bores.
+
+        Most entities of a shape have none -- a flat face and a straight edge
+        both answer with a reason instead -- so filtering on the reported radius
+        is what a caller wanting the round features has to do anyway.
+        """
+        return [
+            measurement
+            for measurement in self.list(project_id, shape_id)
+            if measurement.radius is not None
+        ]
+
+
 class Shell:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
@@ -304,6 +365,7 @@ class SketchForgeClient:
         self.shapes = Shapes(self._transport)
         self.edges = Edges(self._transport)
         self.faces = Faces(self._transport)
+        self.measurements = Measurements(self._transport)
         self.treatments = Treatments(self._transport)
         self.shell = Shell(self._transport)
 
@@ -393,6 +455,16 @@ class ProjectHandle:
 
     def faces_facing(self, shape_id: str, direction: str) -> List[int]:
         return self._client.faces.facing(self.id, shape_id, direction)
+
+    def measurements(self, shape_id: str) -> List[MeasurementSummary]:
+        return self._client.measurements.list(self.id, shape_id)
+
+    def measurements_with_radius(self, shape_id: str) -> List[MeasurementSummary]:
+        return self._client.measurements.with_radius(self.id, shape_id)
+
+    def measure_between(self, from_: MeasurementEnd, to: MeasurementEnd) -> MeasurementPair:
+        """The distance between two entities, which may be on two different shapes."""
+        return self._client.measurements.between(self.id, from_, to)
 
     def shell(
         self,

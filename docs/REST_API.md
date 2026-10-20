@@ -55,6 +55,8 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
+| `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
+| `POST` | `/measurements?projectId=` | The distance between two entities, and the angle if both are flat faces. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
@@ -351,6 +353,81 @@ Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /bool
 **A wall thicker than the part fails cleanly, and this took some doing.** Past the thickness that fits, OCCT does not raise an error: depending on the shape and the faces left open it hands back an empty compound, a solid that fails its own validity check while reporting the right bounding box, or -- worst -- the original solid untouched, valid and the right size, having hollowed nothing at all. None of those is distinguishable by extents, so the server weighs the result: hollowing always removes the cavity, and a result that weighs what it started at did nothing. All three answer `422` and the project is left exactly as it was.
 
 Leaving **every** face open is refused too. It would take the walls away rather than hollow anything, and OCCT's answer to it is the original solid, which is the one answer a script cannot tell from success.
+
+## Measuring real geometry
+
+Every number here comes from OCCT's own curve and surface analysis, not from the triangles the editor draws. That distinction is the point of the endpoint rather than a detail of it: a tessellated cylinder has no radius at all, only facets, so a measurement read off the mesh is out by the chord error of whatever quality setting happened to be in force -- and wrong in exactly the cases somebody reaches for a measuring tool. The same class of quiet error cost this project a sphere whose volume was 0.0427% off, found in #57.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| `GET` | `/measurements?projectId=&shapeId=` | Every edge and face of the shape, measured. |
+| `POST` | `/measurements?projectId=` | The distance between two entities, and their angle when both are flat faces. |
+
+The indexes are the same ones `GET /edges` and `GET /faces` give, built from the same geometry, so a listing and a measurement taken together are consistent -- and so is a fillet afterwards that names the same edge.
+
+### What a shape measures
+
+```json
+{
+  "measurements": [
+    { "entity": "edge", "index": 0, "geometryType": "circle", "length": 47.1238898038469,
+      "area": null, "radius": 7.5, "diameter": 15, "sweepDegrees": 360, "radiusUnavailable": null },
+    { "entity": "edge", "index": 1, "geometryType": "line", "length": 22,
+      "area": null, "radius": null, "diameter": null, "sweepDegrees": null, "radiusUnavailable": "notCircular" },
+    { "entity": "face", "index": 0, "geometryType": "cylinder", "length": null,
+      "area": 1036.7255756846319, "radius": 7.5, "diameter": 15, "sweepDegrees": null, "radiusUnavailable": null }
+  ]
+}
+```
+
+`length` is the edge measured along its own curve, so a 90-degree arc of radius 7.5 reads 11.78 rather than the 10.6 of the straight line between its ends. `area` is the real surface area of the face, which for a curved one is not the area of anything you could compute from its corners. `sweepDegrees` says how far round a circular edge runs: 360 for a whole circle, 180 for the meridian seam of a sphere, and whatever the arc actually is otherwise.
+
+A radius is reported where the geometry has one and the kernel will say what it is:
+
+- **A circular edge or arc**, from its arc length over the angle it sweeps. Exact for both: a full circle is `length / 2pi` and an arc is `length / sweep`. This is the measurement the feature is mostly about -- the diameter of a bore, the radius of a rounded corner -- and it works whatever the edge belongs to.
+- **A cylindrical face**, from the kernel's own cylinder accessor.
+
+Everything else says why not, in `radiusUnavailable`, rather than returning a number:
+
+| `radiusUnavailable` | For | Why |
+| --- | --- | --- |
+| `notCircular` | A straight edge, a spline, a parabola | There is no radius to report. |
+| `ellipseHasNoSingleRadius` | An elliptical edge | It has two semi-axes. `length / sweep` on one would silently report something between them: plausible, wrong, and impossible to notice. |
+| `notCurved` | A planar face | A plane has no radius. |
+| `radiusVariesOverSurface` | A conical, toroidal or spline face | A cone is wide at one end and narrow at the other, so whatever point was sampled would be reported as *the* radius; a torus has a tube radius and a ring radius with no way to say which was meant. |
+| `radiusNotReportedByKernel` | A spherical face | The geometry does have one radius -- this kernel build has no accessor that gives it reliably. Measure the circular edge bounding it instead. |
+| `degenerateCurve` / `degenerateSurface` | A seam of zero length, a range running backwards | The derivation would divide by zero or go negative. |
+
+That last one is worth the honesty. `surfaceCurvature` looks like the obvious way to get a sphere's radius, and it is not: measured on a sphere of radius 13 and a cylinder of radius 7.5, the four fields it returns do not match their names consistently between the two. On the sphere `min` is -1/13, a principal curvature, while `max` is 1/169, which is the Gaussian; on the cylinder `min` is -1/15, which is the mean, while `mean` is -1/7.5, which is the principal. A radius taken from any one field is right for one of those surfaces and exactly a factor of two wrong for the other. A `null` with a reason beats that.
+
+### The distance between two things
+
+Each end names a shape and what part of it to measure from -- the whole solid, or one edge or face by index:
+
+```jsonc
+// How far apart are these two parts, at their nearest walls?
+{ "from": { "shapeId": "post" }, "to": { "shapeId": "plate" } }
+
+// How thick is the plate, between the two faces that bound it?
+{ "from": { "shapeId": "plate", "entity": "face", "index": 2 },
+  "to":   { "shapeId": "plate", "entity": "face", "index": 4 } }
+
+// How far is this rim above that face?
+{ "from": { "shapeId": "post", "entity": "edge", "index": 0 },
+  "to":   { "shapeId": "plate", "entity": "face", "index": 2 } }
+```
+
+`entity` defaults to `shape` and takes no index; `edge` and `face` each need a whole, non-negative one. The answer:
+
+```json
+{ "distance": 52.5, "angleDegrees": null, "angleUnavailable": "notPlanar" }
+```
+
+`distance` is OCCT's own minimum-distance solver, so it measures the real surfaces where the shapes actually sit. Two round posts 5 mm apart at their nearest walls read 5 -- not the gap between their bounding boxes, and not the 80 mm between their centres. Touching reads 0.
+
+`angleDegrees` is the angle between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
+
+Naming an index the shape does not have is a `422` with `cad_failed`, and the message says how many there were: a script that has not re-listed after changing the shape finds out rather than measuring the wrong face. A shape **changes shape** when it is hollowed or filleted, so re-measure a result before naming indexes on it.
 
 ## Example: a plate with a row of holes
 

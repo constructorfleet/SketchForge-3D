@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
 import { fakeServer, type FakeServer } from "../testing.js";
-import { MAX_SHAPES_PER_REQUEST, type ShapeRequest, type ShapeSummary } from "../types.js";
+import {
+  MAX_SHAPES_PER_REQUEST,
+  MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
+  MEASUREMENT_RADIUS_UNAVAILABLE_CODES,
+  type MeasurementAngleUnavailableCode,
+  type MeasurementPair,
+  type MeasurementRadiusUnavailableCode,
+  type MeasurementSummary,
+  type ShapeRequest,
+  type ShapeSummary,
+} from "../types.js";
 import { chunk, shapePatchFromSummary } from "./shapes.js";
 
 function client(server: FakeServer) {
@@ -150,6 +160,108 @@ describe("faces and shell", () => {
 
     await client(server).shell.apply("p1", "s1", { thickness: 1.5, openFaces: ["top", 4] });
     expect(server.calls[1]?.body).toEqual({ thickness: 1.5, openFaces: ["top", 4] });
+  });
+});
+
+describe("measurements", () => {
+  const measurement = (overrides: Partial<MeasurementSummary>): MeasurementSummary => ({
+    entity: "edge",
+    index: 0,
+    geometryType: "line",
+    length: 10,
+    area: null,
+    radius: null,
+    diameter: null,
+    sweepDegrees: null,
+    radiusUnavailable: "notCircular",
+    ...overrides,
+  });
+
+  it("unwraps the listing and keeps what does not apply as null", async () => {
+    const server = fakeServer({
+      body: {
+        measurements: [
+          measurement({}),
+          measurement({ entity: "face", index: 1, geometryType: "cylinder", length: null, area: 50, radius: 4, diameter: 8, radiusUnavailable: null }),
+        ],
+      },
+    });
+    const measurements = await client(server).measurements.list("p1", "s1");
+    expect(server.calls[0]?.method).toBe("GET");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/measurements?projectId=p1&shapeId=s1");
+    expect(measurements[0]).toMatchObject({ entity: "edge", length: 10, area: null, radiusUnavailable: "notCircular" });
+    expect(measurements[1]).toMatchObject({ entity: "face", length: null, area: 50, diameter: 8 });
+  });
+
+  it("reports only the entries that carry a radius", async () => {
+    const server = fakeServer({
+      body: {
+        measurements: [
+          measurement({ index: 0 }),
+          measurement({ index: 1, geometryType: "circle", radius: 3, diameter: 6, sweepDegrees: 360, radiusUnavailable: null }),
+          measurement({ entity: "face", index: 2, geometryType: "plane", length: null, area: 400, radiusUnavailable: "notCurved" }),
+        ],
+      },
+    });
+    // A radius of 0 would read as a measurement, so the absence of one is the
+    // null and not the number; filtering on it is what picks out the bores.
+    await expect(client(server).measurements.withRadius("p1", "s1")).resolves.toMatchObject([{ index: 1, radius: 3 }]);
+  });
+
+  it("sends both ends of a between request, with no shapeId in the query", async () => {
+    const server = fakeServer({ body: { distance: 12.5, angleDegrees: 90, angleUnavailable: null } });
+    const pair = await client(server).measurements.between("p1", { shapeId: "s1", entity: "face", index: 2 }, { shapeId: "s2", entity: "face", index: 0 });
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/measurements?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({
+      from: { shapeId: "s1", entity: "face", index: 2 },
+      to: { shapeId: "s2", entity: "face", index: 0 },
+    });
+    expect(pair).toEqual({ distance: 12.5, angleDegrees: 90, angleUnavailable: null });
+  });
+
+  it("omits entity and index for a whole-shape end, which the server refuses an index with", async () => {
+    // Typed as the pair rather than left loose, so the reason codes this field
+    // accepts are checked here as well as carried through.
+    const apart: MeasurementPair = { distance: 60, angleDegrees: null, angleUnavailable: "notPlanar" };
+    const server = fakeServer({ body: apart });
+    const pair = await client(server).measurements.between("p1", { shapeId: "s1" }, { shapeId: "s2" });
+    expect(server.calls[0]?.body).toEqual({ from: { shapeId: "s1" }, to: { shapeId: "s2" } });
+    expect(pair).toEqual(apart);
+  });
+
+  it("binds the project id through a handle", async () => {
+    const server = fakeServer({ body: { measurements: [measurement({})] } });
+    await client(server).project("p9").measurements("s1");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/measurements?projectId=p9&shapeId=s1");
+  });
+
+  it("names the two reason sets the server actually draws each field from", () => {
+    // The server keeps one union for both, but the derivations are disjoint: a
+    // radius is never missing because a face was not planar. Typing each field
+    // to its own half is only right while these lists stay as they are.
+    expect(MEASUREMENT_RADIUS_UNAVAILABLE_CODES).toEqual([
+      "notCircular",
+      "ellipseHasNoSingleRadius",
+      "degenerateCurve",
+      "notCurved",
+      "radiusVariesOverSurface",
+      "radiusNotReportedByKernel",
+      "degenerateSurface",
+    ]);
+    expect(MEASUREMENT_ANGLE_UNAVAILABLE_CODES).toEqual(["notPlanar", "degenerateNormal"]);
+    const overlap = MEASUREMENT_RADIUS_UNAVAILABLE_CODES.filter((code) =>
+      (MEASUREMENT_ANGLE_UNAVAILABLE_CODES as readonly string[]).includes(code),
+    );
+    expect(overlap).toEqual([]);
+
+    // Which set each field draws from, pinned at the type level: a field
+    // widened to accept both sets still accepts every value a test could
+    // assign it, so only tsc can tell that it was widened.
+    type Exactly<Narrow, Wide> = [Narrow] extends [Wide] ? ([Wide] extends [Narrow] ? true : never) : never;
+    const radiusFieldIsExact: Exactly<MeasurementSummary["radiusUnavailable"], MeasurementRadiusUnavailableCode | null> = true;
+    const angleFieldIsExact: Exactly<MeasurementPair["angleUnavailable"], MeasurementAngleUnavailableCode | null> = true;
+    expect([radiusFieldIsExact, angleFieldIsExact]).toEqual([true, true]);
   });
 });
 
