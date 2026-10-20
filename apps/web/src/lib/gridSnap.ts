@@ -23,25 +23,43 @@ export type GridFootprintBounds = {
   maxZ: number;
 };
 
-function nearestVisibleGridLine(value: number, workspaceSize: number, step: number) {
-  const gridOrigin = -workspaceSize / 2;
-  return gridOrigin + Math.round((value - gridOrigin) / step) * step;
-}
-
+/**
+ * Move a shape so its footprint sits on the grid.
+ *
+ * Upstream issue #117: this used to be two kinds of local.
+ *
+ * The lattice was anchored on the near edge of the workplane (`-width/2` on X,
+ * `-depth/2` on Z), so a plate whose span was not a whole number of grid blocks
+ * snapped onto lines that passed through neither the world origin nor the lines
+ * a pointer drag or an arrow key snap to — and, because width and depth are set
+ * separately, the X and Z lattices could be offset differently from one another,
+ * which skews a square shape off square with the grid. The lattice now runs
+ * through the world origin at multiples of the step, the same lattice
+ * `snapToGrid` gives everything else and the same lines the workplane draws.
+ *
+ * The *reference point* was local too: whichever of the footprint's two edges
+ * happened to lie nearest a line was the one placed on it. Which edge that is
+ * depends on the shape's size, so two shapes of different sizes came to rest on
+ * two different lattices and would not line up with each other. One edge now
+ * always decides it — the near corner, `(minX, minZ)` — moved to its *nearest*
+ * line, so a snap still never shifts a shape by more than half a block.
+ *
+ * `bounds` is the shape's world-space, axis-aligned footprint as the caller
+ * measures it, so a rotated shape is snapped by its rotated bounding box rather
+ * than by any one of its corners, and a footprint that is not centred on the
+ * shape's origin is snapped by the footprint rather than by the origin.
+ */
 export function snapShapeFootprintToVisibleGrid(
   shape: WorkplaneShape,
   bounds: GridFootprintBounds,
   workspace: WorkplaneWorkspaceSettings,
 ) {
+  if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minZ)) return shape;
   const step = visibleGridStep(workspace);
-  const xOffsets = [bounds.minX, bounds.maxX].map((value) => nearestVisibleGridLine(value, workspace.width, step) - value);
-  const zOffsets = [bounds.minZ, bounds.maxZ].map((value) => nearestVisibleGridLine(value, workspace.depth, step) - value);
-  const deltaX = xOffsets.reduce((best, value) => Math.abs(value) < Math.abs(best) ? value : best);
-  const deltaZ = zOffsets.reduce((best, value) => Math.abs(value) < Math.abs(best) ? value : best);
   return {
     ...shape,
-    x: cleanCoordinate(shape.x + deltaX),
-    z: cleanCoordinate(shape.z + deltaZ),
+    x: cleanCoordinate(shape.x + gridAlignedDelta(bounds.minX, 0, step)),
+    z: cleanCoordinate(shape.z + gridAlignedDelta(bounds.minZ, 0, step)),
   };
 }
 

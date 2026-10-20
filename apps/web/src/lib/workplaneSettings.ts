@@ -1,5 +1,6 @@
 import type { GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomization, ShapeCustomizationMap, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 import { normalizeScaleForUnits } from "@/lib/measurementUnits";
+import { DEFAULT_CAMERA_PROJECTION, normalizeCameraProjection } from "@/lib/cameraProjection";
 import { DEFAULT_WORKPLANE_GRID_COLOR } from "@/lib/workplaneGrid";
 
 export const DEFAULT_SNAP_GRID: GridSize = "1.0 mm";
@@ -25,6 +26,7 @@ export const DEFAULT_WORKPLANE_WORKSPACE: WorkplaneWorkspaceSettings = {
   cruiseShapes: true,
   selectBeforeMove: false,
   zoomSpeed: 5,
+  cameraProjection: DEFAULT_CAMERA_PROJECTION,
   units: "Metric (Default)",
   scale: "1:1 (millimeters)",
   accuracy: 2,
@@ -192,6 +194,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     cruiseShapes: booleanOrDefault(candidate.cruiseShapes, fallback.cruiseShapes),
     selectBeforeMove: booleanOrDefault(candidate.selectBeforeMove, fallback.selectBeforeMove),
     zoomSpeed: numberOrDefault(candidate.zoomSpeed, fallback.zoomSpeed),
+    cameraProjection: normalizeCameraProjection(candidate.cameraProjection, fallback.cameraProjection),
     units,
     scale: normalizeScaleForUnits(units, stringOrDefault(candidate.scale, fallback.scale)),
     accuracy: accuracyOrDefault(candidate.accuracy, fallback.accuracy),

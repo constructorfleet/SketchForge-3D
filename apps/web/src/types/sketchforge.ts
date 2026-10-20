@@ -1,3 +1,5 @@
+import type { CameraProjection } from "@/lib/cameraProjection";
+
 export type ShapeKind =
   | "box"
   | "cylinder"
@@ -90,6 +92,8 @@ export type WorkplaneWorkspaceSettings = {
   cruiseShapes: boolean;
   selectBeforeMove: boolean;
   zoomSpeed: number;
+  /** Projection the viewport camera uses. See lib/cameraProjection.ts. */
+  cameraProjection: CameraProjection;
   units: string;
   scale: string;
   accuracy: MeasurementAccuracy;

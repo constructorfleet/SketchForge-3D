@@ -12,10 +12,50 @@ describe("workplane grid geometry", () => {
     expect(coordinates.at(-1)).toBe(95);
   });
 
-  it("keeps the final interior line for custom spacing", () => {
+  // Upstream issue #117: the lattice used to start at the near plate edge, so a
+  // plate that is not a whole number of blocks across drew no line through the
+  // origin at all and disagreed with where a snap put a shape.
+  it("anchors custom spacing on the world origin rather than the plate edge", () => {
     const coordinates = interiorWorkplaneGridCoordinates(200, 30).map(({ coordinate }) => coordinate);
 
-    expect(coordinates).toEqual([-70, -40, -10, 20, 50, 80]);
+    expect(coordinates).toEqual([-90, -60, -30, 0, 30, 60, 90]);
+  });
+
+  it("draws every line a whole number of blocks from the origin, whatever the plate measures", () => {
+    for (const span of [200, 203, 187, 97.5, 2000]) {
+      for (const step of [1, 5, 8, 10, 30]) {
+        for (const { coordinate } of interiorWorkplaneGridCoordinates(span, step)) {
+          expect(coordinate / step, `span=${span} step=${step} at=${coordinate}`)
+            .toBeCloseTo(Math.round(coordinate / step), 9);
+          expect(Math.abs(coordinate)).toBeLessThan(span / 2);
+        }
+      }
+    }
+  });
+
+  it("keeps the origin as an axis line on an odd plate", () => {
+    const coordinates = interiorWorkplaneGridCoordinates(203, 10).map(({ coordinate }) => coordinate);
+
+    expect(coordinates).toContain(0);
+    expect(coordinates.at(0)).toBe(-100);
+    expect(coordinates.at(-1)).toBe(100);
+  });
+
+  it("numbers lines by their distance from the origin, so major lines do not slide when the plate is resized", () => {
+    const narrow = interiorWorkplaneGridCoordinates(100, 5);
+    const wide = interiorWorkplaneGridCoordinates(200, 5);
+    const majorOf = (entries: typeof narrow) =>
+      entries.filter(({ index }) => index % WORKPLANE_MAJOR_GRID_INTERVAL === 0).map(({ coordinate }) => coordinate);
+
+    expect(majorOf(narrow).every((coordinate) => majorOf(wide).includes(coordinate))).toBe(true);
+    expect(majorOf(narrow)).toContain(0);
+    expect(majorOf(narrow)).toContain(25);
+
+    // A step that does not divide the half span is where counting from the first
+    // drawn line and counting from the origin come apart: counted from the edge
+    // the major lines would land on -48, -8 and 32 instead.
+    const brick = interiorWorkplaneGridCoordinates(100, 8);
+    expect(majorOf(brick)).toEqual([-40, 0, 40]);
   });
 
   it("uses one elevation for grid and border lines", () => {
