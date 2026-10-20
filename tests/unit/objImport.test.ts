@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importedShapeFromObj } from "@/lib/engine/objImport";
+import { importedShapeFromObj } from "@sketchforge/engine/objImport";
 
 describe("importedShapeFromObj", () => {
   it("imports triangulated OBJ geometry as a SketchForge mesh", () => {

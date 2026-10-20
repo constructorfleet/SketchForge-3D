@@ -1,6 +1,6 @@
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { sketchForgeToZUp } from "@/lib/engine/meshCoordinates";
+import { sketchForgeToZUp } from "@sketchforge/engine/meshCoordinates";
 import { meshVolumeCentroid, meshVolumeMm3 } from "@/lib/materialPresets";
 import {
   THREE_MF_CONTENT_TYPES_PATH,

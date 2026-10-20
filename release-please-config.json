@@ -8,6 +8,11 @@
       "extra-files": [
         {
           "type": "json",
+          "path": "packages/sketchforge-engine/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": "packages/sketchforge-client/package.json",
           "jsonpath": "$.version"
         },

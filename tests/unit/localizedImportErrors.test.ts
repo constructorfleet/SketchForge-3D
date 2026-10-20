@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { LocalizedError } from "@/i18n/LocalizedError";
 import { translatorFor, errorText } from "@/i18n/translator";
-import { importedShapeFromObj } from "@/lib/engine/objImport";
-import { importSkfProject } from "@/lib/engine/skfProject";
-import { importedShapeFromStl } from "@/lib/engine/stlImport";
-import { validateClosedSolidTriangleSoup } from "@/lib/engine/svgImport";
+import { importedShapeFromObj } from "@sketchforge/engine/objImport";
+import { importSkfProject } from "@sketchforge/engine/skfProject";
+import { importedShapeFromStl } from "@sketchforge/engine/stlImport";
+import { validateClosedSolidTriangleSoup } from "@sketchforge/engine/svgImport";
 
 const ru = translatorFor("ru");
 

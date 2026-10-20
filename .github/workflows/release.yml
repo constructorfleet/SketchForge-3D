@@ -104,6 +104,7 @@ jobs:
         run: |
           root=$(node -p "require('./package.json').version")
           client=$(node -p "require('./packages/sketchforge-client/package.json').version")
+          engine=$(node -p "require('./packages/sketchforge-engine/package.json').version")
           python3 - <<'PY' > /tmp/py-version
           import pathlib, re
           text = pathlib.Path("packages/sketchforge-py/pyproject.toml").read_text()
@@ -111,7 +112,7 @@ jobs:
           PY
           py=$(cat /tmp/py-version)
           fail=0
-          for pair in "root:$root" "client:$client" "python:$py"; do
+          for pair in "root:$root" "client:$client" "engine:$engine" "python:$py"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ "$value" != "$VERSION" ]; then
               echo "::error::$name manifest is $value but the release is $VERSION"
@@ -123,7 +124,7 @@ jobs:
           # edited after it. Publishing a version that is not in the tree is
           # worse than stopping.
           [ "$fail" = "0" ] || exit 1
-          echo "All three manifests are $VERSION"
+          echo "All four manifests are $VERSION"
 
   docker:
     name: Docker image

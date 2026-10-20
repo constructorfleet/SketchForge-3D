@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasOneToOneCadComponentMapping } from "@/lib/engine/cadModifierGroups";
+import { hasOneToOneCadComponentMapping } from "@sketchforge/engine/cadModifierGroups";
 
 describe("grouped CAD modifier component tracking", () => {
   it("tracks grouped children only when every source still has one distinct CAD component", () => {

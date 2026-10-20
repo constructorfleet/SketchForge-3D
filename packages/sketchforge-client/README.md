@@ -220,3 +220,15 @@ SKETCHFORGE_API_TOKEN=test-token SKETCHFORGE_URL=http://127.0.0.1:3100 npm run t
 ## Publishing
 
 See [docs/PUBLISHING_CLIENTS.md](../../docs/PUBLISHING_CLIENTS.md) for what has to be configured on npm before the release workflow can publish this package.
+
+### Local MCP mode (repository checkout)
+
+The editor MCP can also run directly against project files, with no browser, HTTP server, or API token. This mode uses the extracted engine package from a SketchForge checkout and reads projects from `SKETCHFORGE_PROJECTS_DIR`:
+
+```bash
+SKETCHFORGE_PROJECTS_DIR="$HOME/SketchForgeProjects" npm run mcp:sketchforge
+```
+
+The directory uses the same `<projectId>.json` and `<projectId>.skf` files as server-side project storage. In local mode, pass `projectId` to project tools. `sketchforge_read_scene` and `sketchforge_list_objects` accept `shapeIds`, `excludeShapeIds`, `includeRawShapes`, and `includeRawShapeIds`, so a large imported reference mesh can stay out of the response. SKF and STEP exports can write to `outputPath`; the project name supplies the default filename.
+
+Local mode covers project reads and edits, shape creation/import, arranging, grouping, booleans, edge and face operations, measurements, hollowing, and SKF/STEP export. Viewport actions such as screenshots, editor selection, and editor error inspection still require an open editor. STL, OBJ, 3MF, ZIP-kit export and scene validation still use the editor adapter. The published MCP bridge remains the HTTP/editor mode; local mode currently requires the repository checkout because the engine package is not published separately.

@@ -6,7 +6,7 @@ import {
   faceRadius,
   planarFaceAngle,
   type MeasurementResult,
-} from "@/lib/engine/cadMeasurements";
+} from "@sketchforge/engine/cadMeasurements";
 
 /** Asserts the measurement was taken and hands back the numbers, so a refusal fails here rather than reading as `false`. */
 function taken<T>(result: MeasurementResult<T>) {

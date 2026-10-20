@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sketchForgeToZUp, zUpToSketchForge } from "@/lib/engine/meshCoordinates";
+import { sketchForgeToZUp, zUpToSketchForge } from "@sketchforge/engine/meshCoordinates";
 
 describe("mesh coordinate conventions", () => {
   it("maps slicer Z-up coordinates to SketchForge Y-up and back", () => {

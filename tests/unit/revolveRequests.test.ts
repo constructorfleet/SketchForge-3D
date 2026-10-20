@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
-import { buildSketchRevolveMesh } from "@/lib/engine/sketchRevolve";
+import { buildSketchRevolveMesh } from "@sketchforge/engine/sketchRevolve";
 import {
   MAX_PROFILE_POINTS,
   metricThreadOutline,
@@ -8,7 +8,7 @@ import {
   profileFromOutline,
   resolveThreadRequest,
   revolvedShapeFromRequest,
-} from "@/lib/engine/revolveRequests";
+} from "@sketchforge/engine/revolveRequests";
 
 /** Signed volume of a triangle soup, by the divergence theorem. */
 function meshVolume(positions: number[]) {
