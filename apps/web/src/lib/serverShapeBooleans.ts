@@ -18,7 +18,7 @@
 import type { Matrix4 } from "three";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "@/lib/serverCadKernel";
-import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError } from "@/lib/serverCadOperations";
+import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "@/lib/serverCadOperations";
 import { UnbuildableShapeError } from "@/lib/serverCadSolids";
 import { createLocalId } from "@/lib/localIds";
 import type { MeshData } from "@/lib/meshTransform";
@@ -33,7 +33,24 @@ import {
 } from "@/lib/serverShapeGroups";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
-export type GroupBuildOutcome = { group: WorkplaneShape } | { error: string; status: number };
+export type GroupBuildOutcome =
+  | {
+    group: WorkplaneShape;
+    /**
+     * Set when no hole met the solid, so the "cut" removed nothing and the
+     * group holds the solid whole.
+     *
+     * Reported rather than refused here, because this function's job is
+     * geometry and the decision is the caller's: the HTTP routes turn it into
+     * a refusal, matching the editor -- whose own comment is "the mesh paths
+     * treat that as a failed cut rather than a group, and so does this" --
+     * while a test can use a hole that deliberately misses to observe where
+     * the placed solid lands, which is how the rotation regression in #54 is
+     * measured.
+     */
+    cutRemovedNothing?: boolean;
+  }
+  | { error: string; status: number };
 
 /** OCCT takes an affine transform as three row-major rows of (basis, offset); THREE stores its matrix by column. */
 function rowMajorTransform(matrix: Matrix4) {
@@ -97,11 +114,25 @@ function singleSolid(cad: OcctKernel, shape: ShapeHandle) {
  * spanning two touching plates goes through both, rather than through whichever
  * one happened to be cut first.
  */
-function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[]) {
+type CutOutcome = {
+  cut: ShapeHandle;
+  /** Volume of everything fused together, before any hole was taken out. */
+  fusedVolume: number;
+  /** Volume left afterwards. Equal to `fusedVolume` when no hole met the solid. */
+  cutVolume: number;
+};
+
+function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[]): CutOutcome {
   const solidHandles = solids.map((shape) => placedSolidForShape(cad, shape));
   const holeHandles = holes.map((shape) => placedSolidForShape(cad, shape));
-  const fused = solidHandles.length === 1 ? solidHandles[0] : cad.fuseAll(solidHandles);
-  return singleSolid(cad, cad.cutAll(singleSolid(cad, fused), holeHandles));
+  const fused = singleSolid(cad, solidHandles.length === 1 ? solidHandles[0] : cad.fuseAll(solidHandles));
+  // Measured, because `cutAll` returns the solid untouched when nothing met it
+  // and says nothing about having done so. The worker path has reported these
+  // two volumes since it was written; this one did not, so a hole that missed
+  // was stored and answered as a successful cut.
+  const fusedVolume = cad.getVolume(fused);
+  const cut = singleSolid(cad, cad.cutAll(fused, holeHandles));
+  return { cut, fusedVolume, cutVolume: cad.getVolume(cut) };
 }
 
 /**
@@ -127,10 +158,21 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
   let result;
   try {
     result = await withCadKernel((cad) => {
-      const cut = cutSolids(cad, solids, holes);
+      const { cut, fusedVolume, cutVolume } = cutSolids(cad, solids, holes);
+      // Asked before the result is stored, not after. The exact geometry goes
+      // into `cadBrep`, which a later fillet or a STEP export reads, so storing
+      // something the kernel calls invalid defers the failure to whoever opens
+      // the project next. Unlike a cut that removed nothing, there is no caller
+      // this is useful to, so it is refused here rather than reported.
+      if (!cadResultIsValid(cad, cut)) {
+        throw new ServerCadError("That cut produced geometry the kernel reports as invalid.");
+      }
+      // Measured with the same threshold the editor uses, so the two agree
+      // about what counts as a cut.
+      const removedNothing = cutVolume >= fusedVolume - 1e-6;
       const meshed = meshedCadResult(cad, cut);
       const bounds = boundsForPositions(meshed.positions);
-      if (!bounds) return { meshed, brep: null };
+      if (!bounds) return { meshed, brep: null, removedNothing };
       // The exact geometry is stored in the result's own frame, the way a
       // treated shape stores it, so a later fillet or a STEP export of the cut
       // reads from true surfaces rather than from the triangles.
@@ -140,7 +182,7 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
         -bounds.minY,
         -(bounds.minZ + bounds.maxZ) / 2,
       );
-      return { meshed, brep: cad.toBREP(centered) };
+      return { meshed, brep: cad.toBREP(centered), removedNothing };
     });
   } catch (error) {
     if (error instanceof ServerCadError) return { error: error.message, status: error.status };
@@ -174,5 +216,6 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
       groupedBaseHeight: group.height,
       groupedShapes: operands.map((shape) => shapeAsGroupChild(shape, group.x, group.z, group.elevation ?? 0)),
     },
+    ...(result.removedNothing ? { cutRemovedNothing: true } : {}),
   };
 }

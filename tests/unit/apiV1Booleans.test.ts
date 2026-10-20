@@ -412,3 +412,44 @@ describe("REST API v1 boolean cut", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     expect(await storedShapes(projectId)).toHaveLength(1);
   });
 });
+
+describe("a cut that does not cut", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  environmentHooks("sketchforge-api-noop-cut-");
+  it("refuses a hole that misses the solid instead of answering with the solid unchanged", async () => {
+    // `cutAll` hands back the solid untouched when nothing met it, and says
+    // nothing about having done so. Answering 200 with an unchanged "Group" is
+    // the one reply a script cannot tell from success.
+    const project = await makeProject("Missing hole");
+    const [plate] = await addShapes(project, [
+      { kind: "box", width: 40, depth: 40, height: 10, x: 0, z: 0 },
+    ]);
+    const [stray] = await addShapes(project, [
+      { kind: "cylinder", width: 6, depth: 6, height: 30, x: 500, z: 500, hole: true },
+    ]);
+
+    const response = await cut(project, { solidIds: [plate], holeIds: [stray] });
+
+    expect(response.status).toBe(422);
+    const payload = await response.json() as { error: string; code?: string };
+    expect(payload.error).toMatch(/nothing to cut|do not meet|meet the solid/i);
+
+    // And the project is left as it was, rather than carrying a group that is
+    // really just the plate.
+    const stored = await storedShapes(project);
+    expect(stored).toHaveLength(2);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("still cuts when the hole does meet the solid", async () => {
+    const project = await makeProject("Real hole");
+    const [plate] = await addShapes(project, [
+      { kind: "box", width: 40, depth: 40, height: 10, x: 0, z: 0 },
+    ]);
+    const [bore] = await addShapes(project, [
+      { kind: "cylinder", width: 10, depth: 10, height: 30, x: 0, z: 0, hole: true },
+    ]);
+
+    const response = await cut(project, { solidIds: [plate], holeIds: [bore] });
+
+    expect(response.status).toBe(201);
+  }, CAD_TEST_TIMEOUT_MS);
+});
