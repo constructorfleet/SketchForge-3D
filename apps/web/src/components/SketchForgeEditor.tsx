@@ -53,6 +53,7 @@ import {
   ToolbarDistributeCentersIcon,
   ToolbarDistributeGapsIcon,
   ToolbarDistributeIcon,
+  ToolbarPatternIcon,
   ToolbarThreadIcon,
   ToolbarChamferIcon,
   ToolbarCaretDownIcon,
@@ -133,6 +134,15 @@ import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPoint
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
 import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarShapeAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
+import {
+  circularPatternPlacements,
+  linearPatternPlacements,
+  MAX_PATTERN_COUNT,
+  MIN_PATTERN_COUNT,
+  suggestedLinearStep,
+  type CircularPatternRequest,
+  type LinearPatternRequest,
+} from "@/lib/patternShapes";
 import { threadSizesInSeries } from "@/lib/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
@@ -271,6 +281,10 @@ declare global {
 
 const POINT_TOLERANCE = 0.0001;
 const MIN_SHAPE_DIMENSION = 0.01;
+
+type PatternRequest =
+  | ({ kind: "linear" } & LinearPatternRequest)
+  | ({ kind: "circular" } & Partial<CircularPatternRequest> & { count: number });
 /** Kept in step with `.thread-catalog` in globals.css, which positions from these. */
 const THREAD_CATALOG_WIDTH = 300;
 const THREAD_CATALOG_MAX_HEIGHT = 420;
@@ -5886,6 +5900,11 @@ export function SketchForgeEditor({
   const selectedShapes = useMemo(() => shapes.filter((shape) => selectedIds.includes(shape.id)), [selectedIds, shapes]);
   const selectedShape = selectedShapes.at(-1) ?? null;
   const hasSelection = selectedShapes.length > 0;
+  const selectionFootprintExtent = useMemo(() => {
+    if (selectedShapes.length === 0) return 0;
+    const bounds = boundsForShapes(selectedShapes);
+    return Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
+  }, [selectedShapes]);
   const modifierAvailableEdgeIds = useMemo(
     () => edgeModifier ? edgeModifier.edges.filter((edge) => selectableCadModifierEdge(edge, edgeModifier.sharpAngle)).map((edge) => edge.id) : [],
     [edgeModifier?.edges, edgeModifier?.sharpAngle],
@@ -7236,6 +7255,51 @@ export function SketchForgeEditor({
     commitShapes([...shapes, ...duplicates], duplicates.map((shape) => shape.id), notice((t) => t("editor.notice.duplicated", { count: duplicates.length })));
   }, [commitShapes, hasSelection, selectedShapes, shapes, t]);
 
+  /**
+   * Repeat the selection in a row or a ring.
+   *
+   * Distribute spaces objects that already exist; this is how they come to
+   * exist. The copies are clones with fresh ids, placed by `patternShapes`,
+   * and they land selected so the whole pattern can be moved as one -- or
+   * undone in a single step, since one request is one history entry however
+   * many copies it made.
+   */
+  const patternSelected = useCallback((request: PatternRequest) => {
+    if (!hasSelection) {
+      setNotice(notice((t) => t("editor.notice.selectShapeFirst")));
+      return;
+    }
+    const bounds = boundsForShapes(selectedShapes);
+    const origin = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      z: (bounds.minZ + bounds.maxZ) / 2,
+    };
+    const placements = request.kind === "linear"
+      ? linearPatternPlacements(request)
+      : circularPatternPlacements({ ...request, centerX: request.centerX ?? 0, centerZ: request.centerZ ?? 0 }, origin);
+    if (placements.length === 0) {
+      setNotice(notice((t) => t(request.kind === "linear" ? "editor.notice.patternNeedsStep" : "editor.notice.patternNeedsSweep")));
+      return;
+    }
+
+    const copies = placements.flatMap((placement) => selectedShapes.map((shape) => {
+      const clone = cloneWorkplaneShapeTreeWithFreshIds(shape, "pattern");
+      // The copy turns about the ring's centre, so its own rotation gains the
+      // same angle the placement did.
+      return canonicalizeShape({
+        ...clone,
+        x: cleanNearZero(Number((clone.x + placement.dx).toFixed(4))),
+        z: cleanNearZero(Number((clone.z + placement.dz).toFixed(4))),
+        rotation: placement.rotation === 0 ? clone.rotation : cleanRotationDegrees(clone.rotation + placement.rotation),
+      });
+    }));
+    commitShapes(
+      [...shapes, ...copies],
+      copies.map((shape) => shape.id),
+      notice((t) => t("editor.notice.patterned", { count: copies.length })),
+    );
+  }, [commitShapes, hasSelection, selectedShapes, shapes]);
+
   const copySelected = useCallback(() => {
     if (!hasSelection) {
       setNotice(notice((t) => t("editor.notice.selectShapeFirst")));
@@ -8396,6 +8460,50 @@ export function SketchForgeEditor({
         return { object: mcpShapeSummary(updated) };
       }
 
+      if (command.action === "pattern_objects") {
+        const kind = params.kind === "circular" ? "circular" : "linear";
+        const requestedIds = mcpStringArray(params.ids);
+        const ids = requestedIds.length ? requestedIds : selectedIdsRef.current;
+        const sources = currentShapes().filter((shape) => ids.includes(shape.id));
+        if (sources.length === 0) throw new Error("Select at least one object to repeat");
+
+        const bounds = boundsForShapes(sources);
+        const origin = { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
+        const count = mcpNumber(params.count, 4);
+        const placements = kind === "linear"
+          ? linearPatternPlacements({ count, stepX: mcpNumber(params.stepX, 0), stepZ: mcpNumber(params.stepZ, 0) })
+          : circularPatternPlacements({
+            count,
+            centerX: mcpNumber(params.centerX, 0),
+            centerZ: mcpNumber(params.centerZ, 0),
+            sweepAngle: mcpNumber(params.sweepAngle, 360),
+            rotateCopies: params.rotateCopies !== false,
+          }, origin);
+        if (placements.length === 0) {
+          throw new Error(kind === "linear"
+            ? "A row needs a stepX or stepZ, or every copy lands on the original"
+            : "A ring needs a sweepAngle other than zero");
+        }
+
+        const copies = placements.flatMap((placement) => sources.map((shape) => {
+          const clone = cloneWorkplaneShapeTreeWithFreshIds(shape, "pattern");
+          return canonicalizeShape({
+            ...clone,
+            x: cleanNearZero(Number((clone.x + placement.dx).toFixed(4))),
+            z: cleanNearZero(Number((clone.z + placement.dz).toFixed(4))),
+            rotation: placement.rotation === 0 ? clone.rotation : cleanRotationDegrees(clone.rotation + placement.rotation),
+          });
+        }));
+        const copyIds = copies.map((shape) => shape.id);
+        commitShapes([...currentShapes(), ...copies], copyIds, notice((t) => t("editor.notice.patterned", { count: copies.length })));
+        return {
+          created: copies.length,
+          kind,
+          selectedIds: copyIds,
+          objects: copies.map(mcpShapeSummary),
+        };
+      }
+
       if (command.action === "distribute_objects") {
         const spacing = params.spacing === "centers" ? "centers" : "gaps";
         const requestedIds = mcpStringArray(params.ids);
@@ -9411,6 +9519,7 @@ export function SketchForgeEditor({
         hasClipboard={clipboard.length > 0 || systemClipboardSupported}
         hasSelection={hasSelection}
         selectionCount={selectedIds.length}
+        selectionExtent={selectionFootprintExtent}
         hiddenShapeCount={shapes.filter((shape) => shape.hidden).length}
         selectionHidden={hasSelection && selectedShapes.every((shape) => shape.hidden)}
         alignMode={alignMode}
@@ -9446,6 +9555,7 @@ export function SketchForgeEditor({
         onDelete={deleteSelected}
         onDuplicate={duplicateSelected}
         onCenterOnWorkplane={centerSelectionOnWorkplane}
+        onPattern={patternSelected}
         onDistributeGaps={() => distributeSelection("gaps")}
         onDistributeCenters={() => distributeSelection("centers")}
         onDropToWorkplane={dropSelectedToWorkplane}
@@ -9743,6 +9853,7 @@ function SecondaryToolbar({
   hasClipboard,
   hasSelection,
   selectionCount,
+  selectionExtent,
   hiddenShapeCount,
   selectionHidden,
   mirrorMode,
@@ -9768,6 +9879,7 @@ function SecondaryToolbar({
   onDelete,
   onDuplicate,
   onCenterOnWorkplane,
+  onPattern,
   onDistributeGaps,
   onDistributeCenters,
   onDropToWorkplane,
@@ -9804,6 +9916,8 @@ function SecondaryToolbar({
   hasSelection: boolean;
   /** How many objects are selected: distributing needs at least three. */
   selectionCount: number;
+  /** Widest side of the selection, as a first guess at a row's spacing. */
+  selectionExtent: number;
   hiddenShapeCount: number;
   selectionHidden: boolean;
   mirrorMode: boolean;
@@ -9829,6 +9943,7 @@ function SecondaryToolbar({
   onDelete: () => void;
   onDuplicate: () => void;
   onCenterOnWorkplane: () => void;
+  onPattern: (request: PatternRequest) => void;
   onDistributeGaps: () => void;
   onDistributeCenters: () => void;
   onDropToWorkplane: () => void;
@@ -9853,6 +9968,17 @@ function SecondaryToolbar({
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const [distributeOpen, setDistributeOpen] = useState(false);
+  const [patternOpen, setPatternOpen] = useState(false);
+  const [patternPosition, setPatternPosition] = useState({ top: 0, left: 0 });
+  const [patternKind, setPatternKind] = useState<"linear" | "circular">("linear");
+  const [patternCount, setPatternCount] = useState(4);
+  const [patternStepX, setPatternStepX] = useState(25);
+  const [patternStepZ, setPatternStepZ] = useState(0);
+  const [patternCenterX, setPatternCenterX] = useState(0);
+  const [patternCenterZ, setPatternCenterZ] = useState(0);
+  const [patternSweep, setPatternSweep] = useState(360);
+  const [patternRotate, setPatternRotate] = useState(true);
+  const patternTriggerRef = useRef<HTMLDivElement>(null);
   const [threadCatalogOpen, setThreadCatalogOpen] = useState(false);
   const [threadCatalogPosition, setThreadCatalogPosition] = useState({ top: 0, left: 0 });
   const threadCatalogTriggerRef = useRef<HTMLButtonElement>(null);
@@ -9971,6 +10097,52 @@ function SecondaryToolbar({
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
   }, [visibilityOpen]);
+  useEffect(() => {
+    if (!patternOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!patternTriggerRef.current?.contains(event.target as Node)) setPatternOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPatternOpen(false);
+    };
+    const closeOnViewportChange = () => setPatternOpen(false);
+    window.addEventListener("pointerdown", closeOnPointerDown);
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [patternOpen]);
+
+  const patternSuggestedStep = selectionExtent > 0 ? suggestedLinearStep(selectionExtent) : 0;
+
+  const togglePatternPanel = () => {
+    if (patternOpen) {
+      setPatternOpen(false);
+      return;
+    }
+    const bounds = patternTriggerRef.current?.getBoundingClientRect();
+    if (bounds) {
+      const gutter = 12;
+      const width = Math.min(284, Math.max(0, window.innerWidth - gutter * 2));
+      setPatternPosition({
+        top: bounds.bottom + 8,
+        left: Math.max(gutter, Math.min(bounds.left + bounds.width / 2 - width / 2, window.innerWidth - width - gutter)),
+      });
+    }
+    // The selection's own size is a better first guess at a row's spacing than
+    // a fixed number: a 5mm boss and a 200mm plate want different steps.
+    if (patternSuggestedStep > 0) setPatternStepX((step) => (step === 0 ? patternSuggestedStep : step));
+    setDistributeOpen(false);
+    setVisibilityOpen(false);
+    setShapesOpen(false);
+    setPatternOpen(true);
+  };
+
   useEffect(() => {
     if (!distributeOpen) return;
     const closeOnPointerDown = (event: PointerEvent) => {
@@ -10379,6 +10551,105 @@ function SecondaryToolbar({
               diverge once the sizes differ, which is impossible to tell from
               two icons but easy to read as two named choices.
             */}
+            <div className="toolbar-menu-anchor" ref={patternTriggerRef}>
+              <button
+                className={`toolbar-icon ${hasSelection ? "" : "disabled"} ${patternOpen ? "active" : ""}`}
+                type="button"
+                aria-label={t("editor.toolbar.pattern")}
+                title={t("editor.toolbar.patternHint")}
+                aria-haspopup="dialog"
+                aria-expanded={patternOpen}
+                disabled={!hasSelection}
+                onClick={togglePatternPanel}
+              >
+                <ToolbarPatternIcon />
+              </button>
+              {patternOpen ? (
+                <div className="pattern-panel" role="dialog" aria-label={t("editor.toolbar.pattern")} style={patternPosition}>
+                  <div className="pattern-panel-modes" role="group">
+                    <button
+                      className={patternKind === "linear" ? "active" : ""}
+                      type="button"
+                      aria-pressed={patternKind === "linear"}
+                      onClick={() => setPatternKind("linear")}
+                    >
+                      <strong>{t("editor.toolbar.patternLinear")}</strong>
+                      <small>{t("editor.toolbar.patternLinearHint")}</small>
+                    </button>
+                    <button
+                      className={patternKind === "circular" ? "active" : ""}
+                      type="button"
+                      aria-pressed={patternKind === "circular"}
+                      onClick={() => setPatternKind("circular")}
+                    >
+                      <strong>{t("editor.toolbar.patternCircular")}</strong>
+                      <small>{t("editor.toolbar.patternCircularHint")}</small>
+                    </button>
+                  </div>
+                  <label className="pattern-panel-field">
+                    <span>{t("editor.toolbar.patternCount")}</span>
+                    <input
+                      type="number"
+                      min={MIN_PATTERN_COUNT}
+                      max={MAX_PATTERN_COUNT}
+                      step={1}
+                      value={patternCount}
+                      onChange={(event) => setPatternCount(Number(event.currentTarget.value))}
+                    />
+                  </label>
+                  {patternKind === "linear" ? (
+                    <>
+                      <label className="pattern-panel-field">
+                        <span>{t("editor.toolbar.patternStepX")}</span>
+                        <input type="number" step={0.5} value={patternStepX} onChange={(event) => setPatternStepX(Number(event.currentTarget.value))} />
+                      </label>
+                      <label className="pattern-panel-field">
+                        <span>{t("editor.toolbar.patternStepZ")}</span>
+                        <input type="number" step={0.5} value={patternStepZ} onChange={(event) => setPatternStepZ(Number(event.currentTarget.value))} />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label className="pattern-panel-field">
+                        <span>{t("editor.toolbar.patternCenterX")}</span>
+                        <input type="number" step={0.5} value={patternCenterX} onChange={(event) => setPatternCenterX(Number(event.currentTarget.value))} />
+                      </label>
+                      <label className="pattern-panel-field">
+                        <span>{t("editor.toolbar.patternCenterZ")}</span>
+                        <input type="number" step={0.5} value={patternCenterZ} onChange={(event) => setPatternCenterZ(Number(event.currentTarget.value))} />
+                      </label>
+                      <label className="pattern-panel-field">
+                        <span>{t("editor.toolbar.patternSweep")}</span>
+                        <input type="number" step={5} min={-360} max={360} value={patternSweep} onChange={(event) => setPatternSweep(Number(event.currentTarget.value))} />
+                      </label>
+                      <label className="pattern-panel-check">
+                        <input type="checkbox" checked={patternRotate} onChange={(event) => setPatternRotate(event.currentTarget.checked)} />
+                        <span>{t("editor.toolbar.patternRotate")}</span>
+                      </label>
+                    </>
+                  )}
+                  <button
+                    className="pattern-panel-apply"
+                    type="button"
+                    onClick={() => {
+                      setPatternOpen(false);
+                      onPattern(patternKind === "linear"
+                        ? { kind: "linear", count: patternCount, stepX: patternStepX, stepZ: patternStepZ }
+                        : {
+                          kind: "circular",
+                          count: patternCount,
+                          centerX: patternCenterX,
+                          centerZ: patternCenterZ,
+                          sweepAngle: patternSweep,
+                          rotateCopies: patternRotate,
+                        });
+                    }}
+                  >
+                    {t("editor.toolbar.patternApply")}
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className="toolbar-menu-anchor" ref={distributeMenuRef}>
               <button
                 className={`toolbar-icon ${canDistribute ? "" : "disabled"} ${distributeOpen ? "active" : ""}`}

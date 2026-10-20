@@ -101,7 +101,8 @@ function solidFromBrep(cad: OcctKernel, brep: string) {
   throw new ServerCadError("The stored exact geometry for that shape could not be read.");
 }
 
-function solidFromMesh(cad: OcctKernel, positions: number[]) {
+/** A solid sewn from a flat list of triangle corners, which is how a stored mesh arrives. */
+export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
   const imported = cad.importStl(asciiStlFromPositions(positions));
   let shape = cad.fixShape(imported);
   if (isValidSolid(cad, shape)) return shape;
@@ -134,16 +135,20 @@ export function treatmentBakesRotation(shape: WorkplaneShape) {
 }
 
 /**
- * The shape as an exact solid.
+ * The shape as an exact solid, in its own local frame.
  *
  * A parametric shape is rebuilt from its dimensions rather than its mesh, so
  * its fillet is exact rather than a rounded approximation of a tessellation.
+ *
+ * Local: centred in X and Z with its base at Y=0, which is the frame every
+ * geometry builder in the app produces. A caller that needs the solid where the
+ * shape actually sits has to place it.
  */
-function solidForShape(cad: OcctKernel, shape: WorkplaneShape) {
+export function localSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   if (shape.cadBrep) return solidFromBrep(cad, shape.cadBrep);
 
   const positions = meshPositionsOf(shape);
-  if (positions) return solidFromMesh(cad, [...positions]);
+  if (positions) return solidFromMeshPositions(cad, [...positions]);
 
   try {
     return exactSolidForShape(cad, shape);
@@ -186,7 +191,7 @@ function edgeSummary(cad: OcctKernel, solid: ShapeHandle, handle: ShapeHandle, i
 /** The edges of a shape, in the order a treatment request refers to them by index. */
 export function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
   return withCadKernel((cad) => {
-    const solid = solidForShape(cad, shape);
+    const solid = localSolidForShape(cad, shape);
     return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, solid, handle, index));
   });
 }
@@ -210,7 +215,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
   }
 
   return withCadKernel((cad) => {
-    const solid = solidForShape(cad, shape);
+    const solid = localSolidForShape(cad, shape);
     const allEdges = cad.getSubShapes(solid, "edge");
     const requested = treatment.edges;
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
@@ -258,23 +263,28 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
     const treatedSolids = cad.getSubShapes(treated, "solid");
     const result = treatedSolids.length === 1 ? treatedSolids[0] : treated;
 
-    const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
-    // The editor stores a flat triangle list, not an indexed mesh, so the
-    // indices are expanded here rather than carried.
-    const positions: number[] = [];
-    const normals: number[] = [];
-    for (const vertex of mesh.indices) {
-      const offset = vertex * 3;
-      positions.push(mesh.positions[offset], mesh.positions[offset + 1], mesh.positions[offset + 2]);
-      normals.push(mesh.normals[offset], mesh.normals[offset + 1], mesh.normals[offset + 2]);
-    }
-    return {
-      brep: cad.toBREP(result),
-      positions,
-      normals: normals.length === positions.length ? normals : null,
-      triangleCount: mesh.triangleCount,
-    };
+    return meshedCadResult(cad, result);
   });
+}
+
+/** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */
+export function meshedCadResult(cad: OcctKernel, result: ShapeHandle): ServerCadResult {
+  const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
+  // The editor stores a flat triangle list, not an indexed mesh, so the
+  // indices are expanded here rather than carried.
+  const positions: number[] = [];
+  const normals: number[] = [];
+  for (const vertex of mesh.indices) {
+    const offset = vertex * 3;
+    positions.push(mesh.positions[offset], mesh.positions[offset + 1], mesh.positions[offset + 2]);
+    normals.push(mesh.normals[offset], mesh.normals[offset + 1], mesh.normals[offset + 2]);
+  }
+  return {
+    brep: cad.toBREP(result),
+    positions,
+    normals: normals.length === positions.length ? normals : null,
+    triangleCount: mesh.triangleCount,
+  };
 }
 
 

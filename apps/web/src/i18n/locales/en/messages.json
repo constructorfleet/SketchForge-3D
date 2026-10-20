@@ -295,7 +295,10 @@
       "distributeNeedsSpread": "Move the objects apart before distributing them",
       "distributeBlocked": "Unlock the objects between the outer two before distributing",
       "distributeAlreadyEven": "Those objects are already evenly spaced",
-      "distributed": "Distributed {count, plural, one {# object} other {# objects}} along {axis}"
+      "distributed": "Distributed {count, plural, one {# object} other {# objects}} along {axis}",
+      "patternNeedsStep": "Set a spacing before repeating, or the copies land on the original",
+      "patternNeedsSweep": "Set an angle to spread the copies around",
+      "patterned": "Repeated the selection into {count, plural, one {# copy} other {# copies}}"
     },
     "workplane": {
       "toolActive": "Workplane tool: click a face or empty grid; hold Shift to reverse",
@@ -612,7 +615,21 @@
       "threadSeries": {
         "metric": "Metric (ISO coarse)",
         "unified": "Imperial (UNC)"
-      }
+      },
+      "pattern": "Repeat",
+      "patternHint": "Repeat the selection in a row or around a ring",
+      "patternLinear": "In a row",
+      "patternLinearHint": "Copies spaced along X and Z",
+      "patternCircular": "Around a ring",
+      "patternCircularHint": "Copies turned about a centre point",
+      "patternCount": "Copies",
+      "patternStepX": "Step X",
+      "patternStepZ": "Step Z",
+      "patternCenterX": "Centre X",
+      "patternCenterZ": "Centre Z",
+      "patternSweep": "Sweep",
+      "patternRotate": "Turn copies to follow the ring",
+      "patternApply": "Repeat"
     },
     "panel": {
       "import": "Import",

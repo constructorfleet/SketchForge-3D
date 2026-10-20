@@ -76,3 +76,18 @@ export async function apiJsonBody(request: Request) {
     return null;
   }
 }
+
+/**
+ * A list of shape ids from a request body field, or null when it is malformed.
+ *
+ * One id on its own is a list of one: an operation over a set of shapes reads
+ * better as `holeIds: "x"` when there is a single hole, and a script building
+ * the list up has no reason to special-case its length.
+ */
+export function apiShapeIds(value: unknown): string[] | null {
+  const entries = typeof value === "string" ? [value] : value;
+  if (!Array.isArray(entries)) return null;
+  if (!entries.every((entry) => typeof entry === "string" && entry.trim())) return null;
+  const ids = (entries as string[]).map((entry) => entry.trim());
+  return new Set(ids).size === ids.length ? ids : null;
+}
