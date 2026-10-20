@@ -4,6 +4,7 @@ import { Check, Circle as CircleIcon, CloudUpload, Download, Eye, FolderOpen, He
 import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { zipSync } from "fflate";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
 import * as THREE from "three";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
@@ -124,6 +125,7 @@ import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
 import { meshVolumeMm3 } from "@/lib/materialPresets";
+import { analyzeMeshTopology } from "@/lib/engine/meshValidation";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
@@ -2978,6 +2980,15 @@ function positionsBoundaryEdges(positions: number[], tolerance = 0.0005) {
     addBoundaryEdge(edges, c, a, tolerance);
   }
   return Array.from(edges.values()).filter((edge) => edge.count === 1);
+}
+
+function mcpBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
+  return btoa(binary);
 }
 
 function meshDataPositions(mesh: MeshData) {
@@ -8157,6 +8168,103 @@ export function SketchForgeEditor({
 
       if (command.action === "list_objects") {
         return { objects: currentShapes().map(mcpShapeSummary) };
+      }
+
+      if (command.action === "validate_scene") {
+        const requestedIds = mcpStringArray(params.shapeIds);
+        const excludedIds = new Set(mcpStringArray(params.excludeShapeIds));
+        const shapesToCheck = currentShapes().filter((shape) => (!requestedIds.length || requestedIds.includes(shape.id)) && !excludedIds.has(shape.id) && !shape.hidden && !shape.hole);
+        const topology = shapesToCheck.map((shape) => {
+          const mesh = meshForShape(shape);
+          return { id: shape.id, name: shape.name, ...analyzeMeshTopology(mesh.vertices, mesh.faces) };
+        });
+        const clearances = [] as Array<{ fromId: string; toId: string; lowerBound: number; overlappingBounds: boolean }>;
+        const intersectionCandidates: Array<{ left: WorkplaneShape; right: WorkplaneShape }> = [];
+        for (let left = 0; left < shapesToCheck.length; left += 1) {
+          const a = meshAabb(shapesToCheck[left]);
+          for (let right = left + 1; right < shapesToCheck.length; right += 1) {
+            const b = meshAabb(shapesToCheck[right]);
+            const gaps = [Math.max(0, b.minX - a.maxX, a.minX - b.maxX), Math.max(0, b.minY - a.maxY, a.minY - b.maxY), Math.max(0, b.minZ - a.maxZ, a.minZ - b.maxZ)];
+            const lowerBound = Math.hypot(...gaps);
+            clearances.push({ fromId: shapesToCheck[left].id, toId: shapesToCheck[right].id, lowerBound, overlappingBounds: gaps.every((gap) => gap === 0) });
+            if (gaps.every((gap) => gap === 0)) intersectionCandidates.push({ left: shapesToCheck[left], right: shapesToCheck[right] });
+          }
+        }
+        const intersections: Array<{ fromId: string; toId: string; volume: number; intersects: boolean } | { fromId: string; toId: string; error: string }> = [];
+        if (intersectionCandidates.length > 0) {
+          const runtime = await getManifoldRuntime();
+          for (const { left, right } of intersectionCandidates) {
+            const created: ManifoldSolid[] = [];
+            try {
+              const leftSolid = shapeToManifoldSolid(runtime, left, created);
+              const rightSolid = shapeToManifoldSolid(runtime, right, created);
+              if (!leftSolid || !rightSolid) throw new Error("Could not convert both objects to closed solids");
+              const overlap = leftSolid.intersect(rightSolid);
+              created.push(overlap);
+              const status = overlap.status();
+              if (status !== "NoError") throw new Error(`Manifold status ${status}`);
+              const volume = Math.max(0, overlap.volume());
+              intersections.push({ fromId: left.id, toId: right.id, volume, intersects: volume > 1e-6 });
+            } catch (error) {
+              intersections.push({ fromId: left.id, toId: right.id, error: error instanceof Error ? error.message : String(error) });
+            } finally {
+              Array.from(new Set(created)).forEach(disposeManifold);
+            }
+          }
+        }
+        return { objectsChecked: shapesToCheck.length, topology, clearances, intersections, clearanceMethod: "AABB lower bound; use sketchforge_measure_between on stored exact CAD entities for exact surface distance.", intersectionMethod: "Manifold intersection volume for overlapping AABB pairs; failures are reported per pair." };
+      }
+
+      if (command.action === "export_scene") {
+        const requestedIds = mcpStringArray(params.shapeIds);
+        const source = requestedIds.length ? currentShapes().filter((shape) => requestedIds.includes(shape.id)) : selectedIdsRef.current.length ? currentShapes().filter((shape) => selectedIdsRef.current.includes(shape.id)) : currentShapes();
+        const exportable = source.filter((shape) => !shape.hole && !shape.hidden);
+        if (!exportable.length) throw new Error("No visible solid objects to export");
+        const meshes = exportable.map(meshForShape);
+        const format = params.format;
+        let bytes: Uint8Array;
+        let mimeType: string;
+        const basename = mcpString(params.name, projectName).replace(/[\\/:*?"<>|]+/g, "-").trim() || "SketchForge";
+        const packageProject = async () => {
+          const exportedHistory = editorHistoryForExport(historyRef.current, historyIndexRef.current, "unlimited");
+          return exportSkfProject({
+            projectId: projectInfoRef.current.projectId,
+            projectName,
+            createdAt: projectCreatedAt,
+            modifiedAt: projectModifiedAt,
+            shapes: shapesRef.current,
+            history: exportedHistory.entries,
+            historyIndex: exportedHistory.index,
+            assets: projectAssetsRef.current,
+            workspace: workspaceSettingsRef.current,
+            snapGrid,
+            placementElevation,
+            placementWorkplane,
+            sketchPlacementWorkplane: placementWorkplane,
+          });
+        };
+        if (format === "stl") {
+          bytes = new Uint8Array(exportMeshesToStl(meshes));
+          mimeType = "model/stl";
+        } else if (format === "obj") {
+          bytes = new TextEncoder().encode(exportMeshesToObj(meshes));
+          mimeType = "text/plain";
+        } else if (format === "3mf") {
+          const colored = meshes.map((mesh, index) => ({ ...mesh, color: exportable[index].color }));
+          bytes = await exportMeshesTo3mf(colored);
+          mimeType = "model/3mf";
+        } else if (format === "skf") {
+          bytes = await packageProject();
+          mimeType = SKF_MEDIA_TYPE;
+        } else if (format === "zip") {
+          const stl = new Uint8Array(exportMeshesToStl(meshes));
+          const skf = await packageProject();
+          bytes = zipSync({ [`${basename}.stl`]: stl, [`${basename}.skf`]: skf });
+          mimeType = "application/zip";
+        } else {
+          throw new Error("format must be stl, obj, 3mf, skf, or zip");
+        }
+        return { filename: `${basename}.${format}`, mimeType, bytes: bytes.byteLength, shapeCount: format === "skf" ? shapesRef.current.length : exportable.length, base64: mcpBase64(bytes) };
       }
 
       if (command.action === "select_objects") {

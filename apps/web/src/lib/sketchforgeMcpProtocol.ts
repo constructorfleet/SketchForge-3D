@@ -90,7 +90,9 @@ export type SketchForgeMcpCommandName =
   | "list_edges"
   | "apply_edge_treatment"
   | "inspect_errors"
-  | "capture_image";
+  | "capture_image"
+  | "export_scene"
+  | "validate_scene";
 
 export type SketchForgeMcpCommand = {
   id: string;

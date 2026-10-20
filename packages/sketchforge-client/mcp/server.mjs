@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
@@ -332,6 +332,16 @@ const tools = [
       },
     },
   },
+  {
+    name: "sketchforge_export_scene",
+    description: "Export selected solid objects or the whole scene as STL, OBJ, 3MF, SKF, or a ZIP kit. Set outputPath to save directly on the MCP host and avoid returning large base64 data. Use shapeIds to keep a reference mesh out of the mesh export.",
+    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "skf", "zip"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+  },
+  {
+    name: "sketchforge_validate_scene",
+    description: "Check triangle mesh topology and pairwise clearance bounds for scene objects. Clearance values are conservative AABB lower bounds, not exact surface distances.",
+    inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
+  },
   // Hollowing runs on the headless REST API rather than in an editor tab: the
   // operation is server-side OCCT, and the editor has no action for it yet.
   {
@@ -561,6 +571,17 @@ async function callTool(name, args) {
       return bridgeCommand("inspect_errors", args);
     case "sketchforge_capture_image":
       return bridgeCommand("capture_image", args, 30000);
+    case "sketchforge_export_scene": {
+      const artifact = await bridgeCommand("export_scene", args, 60000);
+      if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+        const destination = path.resolve(args.outputPath);
+        writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
+        return { filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount, savedTo: destination };
+      }
+      return artifact;
+    }
+    case "sketchforge_validate_scene":
+      return bridgeCommand("validate_scene", args, 60000);
     case "sketchforge_list_macros":
       return listMacros();
     case "sketchforge_run_macro":
