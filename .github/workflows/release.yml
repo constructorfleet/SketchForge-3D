@@ -33,7 +33,11 @@ on:
         type: boolean
         default: true
       publish_npm:
-        description: "Publish @constructorfleet/sketchforge3d"
+        description: "Publish @constructorfleet/sketchforge3d to npm"
+        type: boolean
+        default: true
+      publish_engine:
+        description: "Publish @sketchforge/engine to npm"
         type: boolean
         default: true
       publish_pypi:
@@ -105,6 +109,7 @@ jobs:
           root=$(node -p "require('./package.json').version")
           client=$(node -p "require('./packages/sketchforge-client/package.json').version")
           engine=$(node -p "require('./packages/sketchforge-engine/package.json').version")
+          engine_dependency=$(node -p "require('./packages/sketchforge-client/package.json').dependencies['@sketchforge/engine']")
           python3 - <<'PY' > /tmp/py-version
           import pathlib, re
           text = pathlib.Path("packages/sketchforge-py/pyproject.toml").read_text()
@@ -112,7 +117,7 @@ jobs:
           PY
           py=$(cat /tmp/py-version)
           fail=0
-          for pair in "root:$root" "client:$client" "engine:$engine" "python:$py"; do
+          for pair in "root:$root" "client:$client" "engine:$engine" "python:$py" "client engine dependency:$engine_dependency"; do
             name="${pair%%:*}"; value="${pair#*:}"
             if [ "$value" != "$VERSION" ]; then
               echo "::error::$name manifest is $value but the release is $VERSION"
@@ -176,9 +181,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=sketchforge-docker
 
   npm:
-    name: npm client
+    name: npm packages
     needs: verify
-    if: ${{ inputs.publish_npm == null || inputs.publish_npm }}
+    if: ${{ (inputs.publish_npm == null || inputs.publish_npm) || (inputs.publish_engine == null || inputs.publish_engine) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -199,9 +204,17 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run client:build
+        run: npm run engine:build && npm run client:build
 
-      - name: Publish
+      - name: Publish engine
+        if: ${{ inputs.publish_engine == null || inputs.publish_engine }}
+        working-directory: packages/sketchforge-engine
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish client
+        if: ${{ inputs.publish_npm == null || inputs.publish_npm }}
         working-directory: packages/sketchforge-client
         run: npm publish --provenance --access public
         env:

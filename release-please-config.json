@@ -17,6 +17,11 @@
           "jsonpath": "$.version"
         },
         {
+          "type": "json",
+          "path": "packages/sketchforge-client/package.json",
+          "jsonpath": "$['dependencies']['@sketchforge/engine']"
+        },
+        {
           "type": "toml",
           "path": "packages/sketchforge-py/pyproject.toml",
           "jsonpath": "$.project.version"
