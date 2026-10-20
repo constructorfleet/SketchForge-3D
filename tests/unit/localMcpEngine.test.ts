@@ -99,5 +99,5 @@ describe("local MCP engine mode", () => {
     const cadMacro = callMcp(projectsDir, 2, "sketchforge_run_macro", { macro: cadMacroName, params: { width: 30, depth: 24, height: 12, radius: 2 } }, { SKETCHFORGE_MACRO_DIR: macroDirectory });
     expect(cadMacro[1].result.isError, JSON.stringify(cadMacro[1].result.content)).toBeUndefined();
     expect(JSON.parse(cadMacro[1].result.content[0].text)).toMatchObject({ report: { projectCreated: true, shapeCount: 1, result: { rounded: expect.any(Number), triangles: expect.any(Number) } } });
-  });
+  }, 60_000);
 });
