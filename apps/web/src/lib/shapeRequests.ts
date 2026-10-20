@@ -20,7 +20,7 @@ import {
   normalizeGearToothSize,
   normalizeGearToothWidth,
   normalizeGearType,
-} from "@/lib/gearGeometry";
+} from "@/lib/gearProfile";
 import {
   DEFAULT_LOFT_BOTTOM_SHAPE,
   DEFAULT_LOFT_LAYERS,
@@ -31,7 +31,7 @@ import {
   normalizeLoftSegments,
   normalizeLoftShape,
   normalizeLoftTopSize,
-} from "@/lib/loftGeometry";
+} from "@/lib/loftProfile";
 import { sceneShape } from "@/lib/shapeCatalog";
 import { canonicalizeShape, shapeDepth, shapeWidth } from "@/lib/workplaneShapes";
 import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
