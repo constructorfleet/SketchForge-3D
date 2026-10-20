@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sphereTessellation } from "@/lib/sphereTessellation";
+import { sphereTessellation } from "@/lib/engine/sphereTessellation";
 
 describe("sphere tessellation", () => {
   it("uses the visible sphere Steps value for both rendering and boolean operands", () => {

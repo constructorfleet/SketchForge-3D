@@ -21,7 +21,7 @@ import {
   shapeCorners,
   shapePoint,
   smootherstep,
-} from "@/lib/loftProfile";
+} from "@/lib/engine/loftProfile";
 import type { LoftProfileShape } from "@/types/sketchforge";
 
 export type LoftGeometryOptions = {

@@ -1,9 +1,9 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
-import { applyShell } from "@/lib/serverCadShell";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { withProjectLock } from "@/lib/engine/serverProjectFiles";
+import { shapeWithCadResult, ServerCadError } from "@/lib/engine/serverCadOperations";
+import { applyShell } from "@/lib/engine/serverCadShell";
 
 export const runtime = "nodejs";
 export const revalidate = false;

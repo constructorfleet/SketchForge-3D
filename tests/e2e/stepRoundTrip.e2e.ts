@@ -22,13 +22,13 @@ vi.mock("@/lib/brepKernel", async () => {
 });
 
 let brep: typeof import("brepjs");
-let exportShapesToStep: typeof import("@/lib/stepExport").exportShapesToStep;
-let importedShapeFromStep: typeof import("@/lib/stepImport").importedShapeFromStep;
+let exportShapesToStep: typeof import("@/lib/engine/stepExport").exportShapesToStep;
+let importedShapeFromStep: typeof import("@/lib/engine/stepImport").importedShapeFromStep;
 
 beforeAll(async () => {
   brep = await import("brepjs");
-  ({ exportShapesToStep } = await import("@/lib/stepExport"));
-  ({ importedShapeFromStep } = await import("@/lib/stepImport"));
+  ({ exportShapesToStep } = await import("@/lib/engine/stepExport"));
+  ({ importedShapeFromStep } = await import("@/lib/engine/stepImport"));
   // Warm the kernel via the mocked loader so brepjs has a registered kernel for
   // the re-import assertions below.
   const { loadBrepWithOcct } = await import("@/lib/brepKernel");

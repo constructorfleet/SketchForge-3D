@@ -14,7 +14,7 @@
  * `cutterShapeForBoolean` is the one place that picks between them.
  */
 
-import { shapeDepth, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeHasTaper, shapeWidth } from "@/lib/workplaneShapes";
+import { shapeDepth, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeHasTaper, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**

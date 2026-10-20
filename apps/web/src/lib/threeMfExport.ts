@@ -17,7 +17,7 @@
  * therefore depends on an extension namespace.
  */
 import { zip } from "fflate";
-import { sketchForgeToZUp, type MeshPoint } from "@/lib/meshCoordinates";
+import { sketchForgeToZUp, type MeshPoint } from "@/lib/engine/meshCoordinates";
 
 export type ThreeMfExportMesh = {
   name: string;

@@ -34,9 +34,9 @@ import {
   loftProfileShapeLabel,
   loftSettings,
 } from "@/lib/loftGeometry";
-import { MAX_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
-import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/workplaneSettings";
-import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
+import { MAX_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "@/lib/engine/sketchRevolve";
+import { MAX_HIGH_RESOLUTION_SIDES } from "@/lib/engine/workplaneSettings";
+import { resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { GearType, LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
 export const MIN_SHAPE_SIZE = 0.01;

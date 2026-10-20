@@ -1,9 +1,9 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { buildGroupFromSelection } from "@/lib/serverShapeBooleans";
-import { withHoleMode } from "@/lib/workplaneShapes";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { withProjectLock } from "@/lib/engine/serverProjectFiles";
+import { buildGroupFromSelection } from "@/lib/engine/serverShapeBooleans";
+import { withHoleMode } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export const runtime = "nodejs";

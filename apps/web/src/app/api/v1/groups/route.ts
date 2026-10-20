@@ -1,9 +1,9 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { buildGroupFromSelection } from "@/lib/serverShapeBooleans";
-import { restoreGroupedChildren } from "@/lib/serverShapeGroups";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { withProjectLock } from "@/lib/engine/serverProjectFiles";
+import { buildGroupFromSelection } from "@/lib/engine/serverShapeBooleans";
+import { restoreGroupedChildren } from "@/lib/engine/serverShapeGroups";
 
 export const runtime = "nodejs";
 export const revalidate = false;

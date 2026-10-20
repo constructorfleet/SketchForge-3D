@@ -4,7 +4,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
-import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/skfProject";
+import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 
 export const runtime = "nodejs";
 export const revalidate = false;

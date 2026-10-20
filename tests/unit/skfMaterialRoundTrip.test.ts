@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { editorHistoryEntry } from "@/lib/editorHistory";
-import { exportSkfProject, importSkfProject, type SkfProjectDocumentV1, type SkfProjectExportInput } from "@/lib/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@/lib/workplaneSettings";
-import { workplaneShapesEqual } from "@/lib/workplaneShapes";
+import { editorHistoryEntry } from "@/lib/engine/editorHistory";
+import { exportSkfProject, importSkfProject, type SkfProjectDocumentV1, type SkfProjectExportInput } from "@/lib/engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeWorkspaceSettings } from "@/lib/engine/workplaneSettings";
+import { workplaneShapesEqual } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {

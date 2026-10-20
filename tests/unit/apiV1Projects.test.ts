@@ -8,7 +8,7 @@ import { GET as edges } from "@/app/api/v1/edges/route";
 import { POST as treatments } from "@/app/api/v1/treatments/route";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 
 const TOKEN = "test-token-value";

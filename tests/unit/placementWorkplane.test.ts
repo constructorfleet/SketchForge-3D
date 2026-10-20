@@ -7,7 +7,7 @@ import {
   placementWorkplanePoint,
   snapPlacementWorkplaneOrigin,
   translationToWorkplane,
-} from "@/lib/placementWorkplane";
+} from "@/lib/engine/placementWorkplane";
 
 describe("placement workplanes", () => {
   it("round-trips coordinates on an oriented surface", () => {

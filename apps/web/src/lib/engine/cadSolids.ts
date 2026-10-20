@@ -1,15 +1,18 @@
 /**
- * Exact solids for stored shapes, server side (upstream issue #55).
+ * Exact solids for stored shapes (upstream issue #55).
  *
- * Written for the server, which has no mesher and so builds the geometry itself
- * from what the project stores. Every shape here is built as true geometry --
- * a round cylinder is a cylinder, not a 96-sided prism -- so a fillet lands on
- * real surfaces rather than on a tessellation of them.
+ * Written first for the server, which has no mesher and so builds the geometry
+ * itself from what the project stores. Every shape here is built as true
+ * geometry -- a round cylinder is a cylinder, not a 96-sided prism -- so a
+ * fillet lands on real surfaces rather than on a tessellation of them.
  *
- * Despite the name this is not Node-only: nothing here touches the filesystem
- * or loads a kernel, it only drives the `OcctKernel` it is handed. The CAD
+ * This was `serverCadSolids.ts` until the engine moved under `lib/engine/`, and
+ * the prefix had been wrong since #48: nothing here touches the filesystem or
+ * loads a kernel, it only drives the `OcctKernel` it is handed. The CAD
  * modifier worker builds boolean operands with it in the browser, for the same
- * reason the server does -- an exact cut needs an exact operand.
+ * reason the server does -- an exact cut needs an exact operand. Taking the
+ * kernel as an argument is what lets one module serve both, and it is the house
+ * style for everything under `lib/engine/`.
  *
  * The profile maths is shared with the STEP exporter (`stepProfiles`), which
  * had to answer exactly the same questions about facets, taper, and yaw.
@@ -22,16 +25,16 @@ import {
   isPolygonLoftShape,
   normalizeLoftShape,
   normalizeLoftTopSize,
-} from "@/lib/loftProfile";
+} from "@/lib/engine/loftProfile";
 import {
   isFacetedCylinder,
   planTaper,
   polygonRing,
   rectangleRing,
   type ProfilePoint,
-} from "@/lib/stepProfiles";
-import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
-import { shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/workplaneShapes";
+} from "@/lib/engine/stepProfiles";
+import { regularPolygonFootprintScale } from "@/lib/engine/regularPolygonFootprint";
+import { shapeDepth, shapeHasTaper, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
 const CIRCULAR_EPSILON = 0.0005;

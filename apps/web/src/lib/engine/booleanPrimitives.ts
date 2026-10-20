@@ -1,4 +1,4 @@
-import { normalizeDegrees, shapeHasTaper } from "@/lib/workplaneShapes";
+import { normalizeDegrees, shapeHasTaper } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function straightAngle(value: number) {

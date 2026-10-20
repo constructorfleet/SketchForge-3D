@@ -1,4 +1,4 @@
-import { createLocalId } from "@/lib/localIds";
+import { createLocalId } from "@/lib/engine/localIds";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export function normalizeDegrees(value: number) {

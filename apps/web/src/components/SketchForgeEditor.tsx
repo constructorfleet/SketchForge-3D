@@ -25,7 +25,7 @@ import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { manifoldModuleSource } from "@/generated/manifoldModuleSource";
 import { manifoldWasmBase64 } from "@/generated/manifoldWasmBase64";
-import { sphereTessellation } from "@/lib/sphereTessellation";
+import { sphereTessellation } from "@/lib/engine/sphereTessellation";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import {
   createLoftGeometry,
@@ -45,8 +45,8 @@ import {
   resolveThreadRequest,
   revolvedShapeFromRequest,
   type ThreadRequest,
-} from "@/lib/revolveRequests";
-import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, type PrimitiveGeometryOptions } from "@/lib/primitiveGeometry";
+} from "@/lib/engine/revolveRequests";
+import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, type PrimitiveGeometryOptions } from "@/lib/engine/primitiveGeometry";
 import {
   ToolbarAlignIcon,
   ToolbarCenterOnWorkplaneIcon,
@@ -99,10 +99,10 @@ import {
   shapeWidth,
   withHoleMode,
   workplaneShapesEqual,
-} from "@/lib/workplaneShapes";
+} from "@/lib/engine/workplaneShapes";
 import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
-import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticBox, cadModifierPrimitiveForBakedShape } from "@/lib/cadBakeMetadata";
-import { hasOneToOneCadComponentMapping } from "@/lib/cadModifierGroups";
+import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticBox, cadModifierPrimitiveForBakedShape } from "@/lib/engine/cadBakeMetadata";
+import { hasOneToOneCadComponentMapping } from "@/lib/engine/cadModifierGroups";
 import {
   CAD_BOOLEAN_REQUEST_TIMEOUT_MS,
   CAD_MODIFIER_MAX_SHARP_ANGLE,
@@ -115,28 +115,28 @@ import {
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
-import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/engine/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
-import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/booleanPrimitives";
-import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/cutterPadding";
-import { exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/exactBooleanParts";
-import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
-import { createLocalId } from "@/lib/localIds";
+import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/engine/booleanPrimitives";
+import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/engine/cutterPadding";
+import { exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/engine/exactBooleanParts";
+import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
+import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
 import { meshVolumeMm3 } from "@/lib/materialPresets";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
-import { importedShapeFromObj } from "@/lib/objImport";
-import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/projectAssets";
+import { importedShapeFromObj } from "@/lib/engine/objImport";
+import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { findSketchOutlineIntersection } from "@/lib/sketchProfileValidation";
 import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
-import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
-import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/skfProject";
-import { makeShapeFromAsset, sceneShape, toolbarShapeAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
+import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/engine/sketchRevolve";
+import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
+import { makeShapeFromAsset, sceneShape, toolbarShapeAssets, type ToolbarShapeAsset } from "@/lib/engine/shapeCatalog";
 import {
   circularPatternPlacements,
   linearPatternPlacements,
@@ -146,16 +146,16 @@ import {
   type CircularPatternRequest,
   type LinearPatternRequest,
 } from "@/lib/patternShapes";
-import { threadSizesInSeries } from "@/lib/threadCatalog";
+import { threadSizesInSeries } from "@/lib/engine/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import { importExtensionSupported } from "@/lib/importExtensions";
-import { importedShapeFromStl } from "@/lib/stlImport";
+import { importedShapeFromStl } from "@/lib/engine/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf } from "@/lib/threeMfExport";
-import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/svgImport";
+import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
-import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
+import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import {
   normalizePlacementWorkplane,
   placementPatchForNewShape,
@@ -165,7 +165,7 @@ import {
   translationToWorkplane,
   type PlacementPoint,
   type PlacementWorkplane,
-} from "@/lib/placementWorkplane";
+} from "@/lib/engine/placementWorkplane";
 import { DEFAULT_CAMERA_ORIENTATION, type CameraOrientation } from "@/lib/screenAlignedNudge";
 import { placeSketchExtrusion } from "@/lib/sketchPlacement";
 import {
@@ -8952,7 +8952,7 @@ export function SketchForgeEditor({
     setStepExporting(true);
     setNotice(notice((t) => t("editor.export.buildingBrep")));
     try {
-      const { exportShapesToStep } = await import("@/lib/stepExport");
+      const { exportShapesToStep } = await import("@/lib/engine/stepExport");
       const { blob, exportedCount, skipped } = await exportShapesToStep(sourceShapes);
       const text = await blob.text();
       const result = await downloadTextFile(projectExportFileName(exportName, "step"), text, "application/step");
@@ -9114,7 +9114,7 @@ export function SketchForgeEditor({
         const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
         let nextShape: WorkplaneShape;
         if (isStep) {
-          const { importedShapeFromStep } = await import("@/lib/stepImport");
+          const { importedShapeFromStep } = await import("@/lib/engine/stepImport");
           nextShape = await importedShapeFromStep(file.name, buffer);
         } else if (isObj) {
           nextShape = importedShapeFromObj(file.name, new TextDecoder().decode(bytes));

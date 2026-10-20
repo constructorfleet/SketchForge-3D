@@ -1,7 +1,7 @@
 import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
 import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
-import { readProjectDocument } from "@/lib/serverProjectDocument";
-import { shapeEdges, ServerCadError } from "@/lib/serverCadOperations";
+import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { shapeEdges, ServerCadError } from "@/lib/engine/serverCadOperations";
 
 export const runtime = "nodejs";
 export const revalidate = false;

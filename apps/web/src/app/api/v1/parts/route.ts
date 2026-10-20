@@ -1,8 +1,8 @@
 import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
-import { withProjectLock } from "@/lib/serverProjectFiles";
-import { separateShapeParts } from "@/lib/serverShapeGroups";
+import { readProjectDocument, writeProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { withProjectLock } from "@/lib/engine/serverProjectFiles";
+import { separateShapeParts } from "@/lib/engine/serverShapeGroups";
 
 export const runtime = "nodejs";
 export const revalidate = false;

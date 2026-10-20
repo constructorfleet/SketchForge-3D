@@ -2,8 +2,8 @@ import {
   placementPatchForNewShape,
   placementWorkplanePoint,
   type PlacementWorkplane,
-} from "@/lib/placementWorkplane";
-import { canonicalizeShape } from "@/lib/workplaneShapes";
+} from "@/lib/engine/placementWorkplane";
+import { canonicalizeShape } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export function placeSketchExtrusion(

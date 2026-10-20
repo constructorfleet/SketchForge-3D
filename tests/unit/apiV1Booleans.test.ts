@@ -9,7 +9,7 @@ import { DELETE as ungroup, POST as group } from "@/app/api/v1/groups/route";
 import { POST as separateParts } from "@/app/api/v1/parts/route";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
-import { readProjectDocument } from "@/lib/serverProjectDocument";
+import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 
 const TOKEN = "test-token-value";

@@ -1,4 +1,4 @@
-import { sketchForgeToZUp, type MeshPoint } from "@/lib/meshCoordinates";
+import { sketchForgeToZUp, type MeshPoint } from "@/lib/engine/meshCoordinates";
 import { LocalizedError } from "@/i18n/LocalizedError";
 
 export type StlExportMesh = {

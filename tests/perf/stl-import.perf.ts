@@ -174,7 +174,7 @@ function printReport(rows: BenchRow[]) {
 describe("STL performance benchmark", () => {
   it("measures import and local-first persistence costs", async () => {
     const rows: BenchRow[] = [];
-    const stlModule = await measure(rows, "startup", "load STL import module", 1, {}, () => import("@/lib/stlImport"));
+    const stlModule = await measure(rows, "startup", "load STL import module", 1, {}, () => import("@/lib/engine/stlImport"));
     const importedShapeFromStl = stlModule.importedShapeFromStl as ImportedShapeFromStl;
 
     for (const workload of SYNTHETIC_WORKLOADS) {

@@ -33,20 +33,20 @@ vi.mock("@/lib/brepKernel", async () => {
 });
 
 let brep: typeof import("brepjs");
-let exportShapesToStep: typeof import("@/lib/stepExport").exportShapesToStep;
-let applyShell: typeof import("@/lib/serverCadShell").applyShell;
-let applyEdgeTreatment: typeof import("@/lib/serverCadOperations").applyEdgeTreatment;
-let shapeWithCadResult: typeof import("@/lib/serverCadOperations").shapeWithCadResult;
-let shapeFromRequest: typeof import("@/lib/shapeRequests").shapeFromRequest;
-let sceneShape: typeof import("@/lib/shapeCatalog").sceneShape;
+let exportShapesToStep: typeof import("@/lib/engine/stepExport").exportShapesToStep;
+let applyShell: typeof import("@/lib/engine/serverCadShell").applyShell;
+let applyEdgeTreatment: typeof import("@/lib/engine/serverCadOperations").applyEdgeTreatment;
+let shapeWithCadResult: typeof import("@/lib/engine/serverCadOperations").shapeWithCadResult;
+let shapeFromRequest: typeof import("@/lib/engine/shapeRequests").shapeFromRequest;
+let sceneShape: typeof import("@/lib/engine/shapeCatalog").sceneShape;
 
 beforeAll(async () => {
   brep = await import("brepjs");
-  ({ exportShapesToStep } = await import("@/lib/stepExport"));
-  ({ applyShell } = await import("@/lib/serverCadShell"));
-  ({ applyEdgeTreatment, shapeWithCadResult } = await import("@/lib/serverCadOperations"));
-  ({ shapeFromRequest } = await import("@/lib/shapeRequests"));
-  ({ sceneShape } = await import("@/lib/shapeCatalog"));
+  ({ exportShapesToStep } = await import("@/lib/engine/stepExport"));
+  ({ applyShell } = await import("@/lib/engine/serverCadShell"));
+  ({ applyEdgeTreatment, shapeWithCadResult } = await import("@/lib/engine/serverCadOperations"));
+  ({ shapeFromRequest } = await import("@/lib/engine/shapeRequests"));
+  ({ sceneShape } = await import("@/lib/engine/shapeCatalog"));
   const { loadBrepWithOcct } = await import("@/lib/brepKernel");
   await loadBrepWithOcct();
 });

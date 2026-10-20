@@ -8,8 +8,8 @@
  * again here: a parameter the API can set is a parameter it reports.
  */
 
-import { isRevolveShape, outlineFromProfile } from "@/lib/revolveRequests";
-import { isRequestableShapeKind, shapeParameterNamesFor } from "@/lib/shapeRequests";
+import { isRevolveShape, outlineFromProfile } from "@/lib/engine/revolveRequests";
+import { isRequestableShapeKind, shapeParameterNamesFor } from "@/lib/engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 /**

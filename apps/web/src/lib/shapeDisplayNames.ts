@@ -1,5 +1,5 @@
 import type { MessageKey, Translator } from "@/i18n";
-import { toolbarShapeAssets } from "@/lib/shapeCatalog";
+import { toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
 
 // Default names the editor gives new objects. They are saved into projects in English; the UI shows them in
 // the current language until the user renames the object.

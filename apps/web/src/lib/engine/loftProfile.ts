@@ -4,7 +4,7 @@
  * The pure half of the loft: what a stored shape's loft fields mean once the
  * missing and out-of-range ones have been settled, and where a ring vertex sits
  * on each end's cross-section. Nothing here imports `three`, so the server-side
- * CAD graph can reach the normalizers it needs -- `serverCadSolids` builds a
+ * CAD graph can reach the normalizers it needs -- `cadSolids` builds a
  * loft as an exact solid and asks the same questions about shape, rotation and
  * top size that the mesh builder does -- without dragging a mesh builder and a
  * React-adjacent `@/i18n` type import in behind it.
@@ -13,7 +13,7 @@
  * plus the one display-label helper that genuinely needs the translator.
  */
 
-import { cleanRotationDegrees } from "@/lib/workplaneShapes";
+import { cleanRotationDegrees } from "@/lib/engine/workplaneShapes";
 import type { LoftProfileShape, WorkplaneShape } from "@/types/sketchforge";
 
 export const LOFT_PROFILE_SHAPES: LoftProfileShape[] = ["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"];

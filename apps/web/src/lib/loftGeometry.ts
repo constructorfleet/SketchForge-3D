@@ -2,11 +2,11 @@
  * The loft, both halves, plus its one display label.
  *
  * This file used to hold the profile maths and the mesh builder together, which
- * meant anything wanting a normalizer -- `serverCadSolids` builds a loft as an
+ * meant anything wanting a normalizer -- `cadSolids` builds a loft as an
  * exact solid and needs the same answers -- also took `three` and the `@/i18n`
  * type import below. The maths now lives in `loftProfile` (no `three`) and the
  * builder in `loftMesh`; this is the editor-facing barrel, so no call site had
- * to move. Kernel-side callers should import `@/lib/loftProfile` directly, and
+ * to move. Kernel-side callers should import `@/lib/engine/loftProfile` directly, and
  * must not import this file: `@/i18n` re-exports `useTranslations` and so pulls
  * React.
  */
@@ -14,7 +14,7 @@
 import type { MessageKey, Translator } from "@/i18n";
 import type { LoftProfileShape } from "@/types/sketchforge";
 
-export * from "@/lib/loftProfile";
+export * from "@/lib/engine/loftProfile";
 export * from "@/lib/loftMesh";
 
 /** Display text for a loft cross-section, keyed on the value saved in projects. */

@@ -25,11 +25,11 @@ import {
   cutPreviewCutterScale,
   cutPreviewCutterShape,
   cutterShapeForBoolean,
-} from "@/lib/cutterPadding";
-import { exactSolidForShape } from "@/lib/serverCadSolids";
-import { serverCadKernel } from "@/lib/serverCadKernel";
-import { sceneShape } from "@/lib/shapeCatalog";
-import { shapeDepth, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
+} from "@/lib/engine/cutterPadding";
+import { exactSolidForShape } from "@/lib/engine/cadSolids";
+import { serverCadKernel } from "@/lib/engine/serverCadKernel";
+import { sceneShape } from "@/lib/engine/shapeCatalog";
+import { shapeDepth, shapeTaperDimensions, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> & Pick<WorkplaneShape, "kind">): WorkplaneShape {

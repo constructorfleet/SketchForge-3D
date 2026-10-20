@@ -20,7 +20,7 @@ import { NameplateTutorialPanel } from "@/components/workplane/NameplateTutorial
 import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettingsModal";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
-import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
+import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/engine/cadBakeMetadata";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
@@ -37,18 +37,18 @@ import {
   snapPlacementWorkplaneOrigin,
   type PlacementPoint,
   type PlacementWorkplane,
-} from "@/lib/placementWorkplane";
+} from "@/lib/engine/placementWorkplane";
 import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
 import { appendTypedCharacter, backspaceTypedEntry, typedEntryValue } from "@/lib/numericEntry";
 import { orbitDirection, orbitFromDrag, type CameraOrbit } from "@/lib/viewCubeOrbit";
-import { cutPreviewCutterScale, cutterShapeForBoolean } from "@/lib/cutterPadding";
-import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, putGeometryOnBase } from "@/lib/primitiveGeometry";
+import { cutPreviewCutterScale, cutterShapeForBoolean } from "@/lib/engine/cutterPadding";
+import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, putGeometryOnBase } from "@/lib/engine/primitiveGeometry";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
-import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationSyncDecision } from "@/lib/workplaneSettings";
+import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationSyncDecision } from "@/lib/engine/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
-import { cleanNearZero, cleanRotationDegrees, fallbackSolidColor, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/workplaneShapes";
-import { sphereTessellation } from "@/lib/sphereTessellation";
+import { cleanNearZero, cleanRotationDegrees, fallbackSolidColor, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/engine/workplaneShapes";
+import { sphereTessellation } from "@/lib/engine/sphereTessellation";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import type { SketchForgeMcpViewFace } from "@/lib/sketchforgeMcpProtocol";
 import {

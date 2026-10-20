@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
-import { serverCadKernel } from "@/lib/serverCadKernel";
-import { applyEdgeTreatment, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/serverCadOperations";
-import { sceneShape } from "@/lib/shapeCatalog";
-import { shapeFromRequest } from "@/lib/shapeRequests";
+import { serverCadKernel } from "@/lib/engine/serverCadKernel";
+import { applyEdgeTreatment, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@/lib/engine/serverCadOperations";
+import { sceneShape } from "@/lib/engine/shapeCatalog";
+import { shapeFromRequest } from "@/lib/engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(overrides: Record<string, unknown> = {}) {

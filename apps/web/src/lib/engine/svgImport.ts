@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import type { MessageParams } from "@/i18n/locales";
 import { LocalizedError, type ErrorKey } from "@/i18n/LocalizedError";
-import { createLocalId } from "@/lib/localIds";
+import { createLocalId } from "@/lib/engine/localIds";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 export const MAX_SVG_BYTES = 2 * 1024 * 1024;

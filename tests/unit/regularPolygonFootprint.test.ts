@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
+import { regularPolygonFootprintScale } from "@/lib/engine/regularPolygonFootprint";
 
 function scaledFootprintBounds(width: number, depth: number, sides: number) {
   const count = Math.max(3, Math.round(sides));

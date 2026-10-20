@@ -4,7 +4,7 @@ import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
-import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/exactBooleanSolids";
+import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/engine/exactBooleanSolids";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;

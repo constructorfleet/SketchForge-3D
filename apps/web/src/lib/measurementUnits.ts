@@ -1,4 +1,7 @@
-import type { MessageKey, Translator } from "@/i18n";
+// React-free i18n entry points only: `@/i18n` re-exports `useTranslations`, and
+// `lib/engine/workplaneSettings` reaches this module for its normalizers.
+import type { MessageKey } from "@/i18n/locales";
+import type { Translator } from "@/i18n/translator";
 import type { GridSize, MeasurementAccuracy, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 const MILLIMETERS_PER_INCH = 25.4;

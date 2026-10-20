@@ -20,9 +20,9 @@ const srcRoot = path.join(repoRoot, "apps/web/src");
 
 /** Entry points whose whole `@/` closure must stay free of the renderer and of React. */
 const ENTRY_POINTS = [
-  "apps/web/src/lib/serverCadSolids.ts",
-  "apps/web/src/lib/loftProfile.ts",
-  "apps/web/src/lib/gearProfile.ts",
+  "apps/web/src/lib/engine/cadSolids.ts",
+  "apps/web/src/lib/engine/loftProfile.ts",
+  "apps/web/src/lib/engine/gearProfile.ts",
 ];
 
 const FORBIDDEN: Array<{ label: string; matches: (specifier: string) => boolean }> = [
@@ -111,7 +111,7 @@ describe("the server-side CAD graph keeps the renderer and React out", () => {
     // The split is only load-bearing in one direction: a mesh builder may use the profile maths,
     // but the profile half must not reach back into the mesh half.
     for (const half of ["loftProfile", "gearProfile"]) {
-      const closure = closureOf(path.join(srcRoot, `lib/${half}.ts`));
+      const closure = closureOf(path.join(srcRoot, `lib/engine/${half}.ts`));
       const files = [...closure.keys()].map((file) => path.basename(file));
       expect(files).not.toContain("loftMesh.ts");
       expect(files).not.toContain("gearMesh.ts");

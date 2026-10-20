@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CUTTER_PADDING, paddedCutterShape } from "@/lib/cutterPadding";
-import { shapeDepth, shapeTaperDimensions, shapeWidth } from "@/lib/workplaneShapes";
+import { CUTTER_PADDING, paddedCutterShape } from "@/lib/engine/cutterPadding";
+import { shapeDepth, shapeTaperDimensions, shapeWidth } from "@/lib/engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
