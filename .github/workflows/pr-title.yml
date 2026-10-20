@@ -1,0 +1,50 @@
+name: Pull request title
+
+# The title is the commit subject when a pull request is squash-merged, and
+# release-please reads commit subjects to decide the next version. A title it
+# cannot parse fails nothing and releases nothing: the change just does not
+# count. This is the only place that mistake is visible before it matters.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: Conventional commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check the title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node scripts/check-conventional-title.mjs
+
+      # Only a warning: these subjects reach main solely if the pull request is
+      # merged with a merge commit rather than squashed, and the right fix is
+      # usually to squash rather than to rewrite history.
+      - name: Note any commits that would not count
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json commits --jq '.commits[].messageHeadline' > /tmp/subjects
+          strays=0
+          while IFS= read -r subject; do
+            [ -z "$subject" ] && continue
+            if ! node scripts/check-conventional-title.mjs "$subject" >/dev/null 2>&1; then
+              echo "::warning title=Commit subject::$subject"
+              strays=$((strays + 1))
+            fi
+          done < /tmp/subjects
+          if [ "$strays" -gt 0 ]; then
+            echo "$strays commit subject(s) are not conventional. They only reach main if this is merged with a merge commit; squash-merging uses the title instead."
+          else
+            echo "Every commit subject is conventional too."
+          fi
