@@ -155,6 +155,25 @@ const tools = [
     },
   },
   {
+    name: "sketchforge_pattern_objects",
+    description: "Repeat SketchForge objects in a row or around a ring, the way the editor's Repeat panel does. Makes the copies; sketchforge_distribute_objects only re-spaces objects that already exist.",
+    inputSchema: {
+      ...editorTargetSchema,
+      properties: {
+        ...editorTargetSchema.properties,
+        ids: { type: "array", items: { type: "string" }, description: "Object ids to repeat. If omitted, uses the current selection." },
+        kind: { type: "string", enum: ["linear", "circular"], description: "linear=a row; circular=a ring about a centre. Default linear." },
+        count: { type: "number", description: "Total copies including the original, so 4 adds 3 (2-200). Default 4." },
+        stepX: { type: "number", description: "For kind linear: centre-to-centre step along X in mm. This is a pitch, not a gap." },
+        stepZ: { type: "number", description: "For kind linear: centre-to-centre step along Z in mm." },
+        centerX: { type: "number", description: "For kind circular: X of the point to turn about." },
+        centerZ: { type: "number", description: "For kind circular: Z of the point to turn about." },
+        sweepAngle: { type: "number", description: "For kind circular: how far round to spread the copies, in degrees. 360 divides evenly so the last does not land on the first; a partial sweep puts one copy at each end. Default 360." },
+        rotateCopies: { type: "boolean", description: "For kind circular: whether each copy turns to follow the ring (default true). A spoke or vane needs it; a bolt hole does not." },
+      },
+    },
+  },
+  {
     name: "sketchforge_distribute_objects",
     description: "Spread three or more SketchForge objects evenly along an axis, the way the editor's Distribute buttons do. The outermost two keep their places and define the span.",
     inputSchema: {
@@ -354,6 +373,8 @@ async function callTool(name, args) {
       return bridgeCommand("align_objects", args);
     case "sketchforge_distribute_objects":
       return bridgeCommand("distribute_objects", args);
+    case "sketchforge_pattern_objects":
+      return bridgeCommand("pattern_objects", args);
     case "sketchforge_group_objects":
       return bridgeCommand("group_objects", args, 30000);
     case "sketchforge_ungroup_objects":

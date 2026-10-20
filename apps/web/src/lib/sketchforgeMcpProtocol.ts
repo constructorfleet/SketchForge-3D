@@ -81,6 +81,7 @@ export type SketchForgeMcpCommandName =
   | "update_object"
   | "align_objects"
   | "distribute_objects"
+  | "pattern_objects"
   | "group_objects"
   | "ungroup_objects"
   | "boolean_cut"
