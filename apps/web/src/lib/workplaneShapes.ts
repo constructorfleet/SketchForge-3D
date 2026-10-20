@@ -230,6 +230,7 @@ export function canonicalizeShape(shape: WorkplaneShape): WorkplaneShape {
       // A project saved before helical revolves existed has neither field.
       pitch: shape.sketchRevolve.pitch ?? 0,
       turns: shape.sketchRevolve.turns ?? 1,
+      coreRadius: shape.sketchRevolve.coreRadius ?? 0,
     };
     if (Object.keys(shape.sketchRevolve).every((key) => key in next.sketchRevolve!)) next.sketchRevolve = shape.sketchRevolve;
   }

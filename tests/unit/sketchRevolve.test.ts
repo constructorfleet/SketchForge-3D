@@ -111,6 +111,7 @@ describe("sketch revolve", () => {
       quality: 1,
       pitch: 0,
       turns: 1,
+      coreRadius: 0,
     });
   });
 

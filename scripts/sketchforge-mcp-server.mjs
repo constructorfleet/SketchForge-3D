@@ -61,7 +61,7 @@ const tools = [
   },
   {
     name: "sketchforge_create_shape",
-    description: "Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or thread in SketchForge.",
+    description: "Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or standard screw thread in SketchForge.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["kind"],
@@ -75,7 +75,11 @@ const tools = [
         },
         pitch: { type: "number", description: "For kind revolve/thread: axial rise per turn in mm. 0 is a plain revolve; negative is a left-hand thread." },
         turns: { type: "number", description: "For kind revolve/thread: how many full turns to sweep (default 8 for a thread)." },
-        diameter: { type: "number", description: "For kind thread: outside diameter in mm (default 8, i.e. M8). The 60-degree ISO profile follows from this and the pitch." },
+        size: { type: "string", description: 'For kind thread: a catalog designation that carries its own pitch -- "M2" to "M20" metric coarse, or "#4-40" to "1/2-13" imperial UNC. Default M8.' },
+        diameter: { type: "number", description: "For kind thread: outside diameter in mm, for a size the catalog does not list. The 60-degree ISO profile follows from this and the pitch." },
+        length: { type: "number", description: "For kind thread: how long the thread should be in mm, instead of giving turns." },
+        hole: { type: "boolean", description: "For kind thread: cut the form wider by a clearance so a bolt of that size fits, and mark the shape as a hole so grouping it with a solid taps that solid." },
+        clearance: { type: "number", description: "For kind thread with hole: how much wider to cut, per side, in mm (default 0.2 for printed parts)." },
         startAngle: { type: "number", description: "For kind revolve: rotation the sweep starts at, in degrees." },
         sweepAngle: { type: "number", description: "For kind revolve with no pitch: how far round to revolve, in degrees (±360)." },
         name: { type: "string" },

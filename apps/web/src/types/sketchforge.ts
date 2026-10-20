@@ -165,6 +165,14 @@ export type SketchRevolveSettings = {
   pitch: number;
   /** Full turns to sweep when `pitch` is set; `sweepAngle` governs a plain revolve. */
   turns: number;
+  /**
+   * Radius of a solid core the sweep is fused to, or 0 for none.
+   *
+   * A thread on its own is a floating helical ribbon. A bolt is that ribbon
+   * around a shank, and a tapped hole is the ribbon plus the drilled hole it
+   * cuts -- in both cases the core is part of the feature, not an extra.
+   */
+  coreRadius: number;
 };
 
 export type EdgeTreatmentFeature = {

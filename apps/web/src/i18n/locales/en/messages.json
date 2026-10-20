@@ -31,7 +31,8 @@
       "polygon": "Polygon",
       "icosahedron": "Icosahedron",
       "mesh": "Mesh",
-      "loft": "Loft"
+      "loft": "Loft",
+      "thread": "Thread"
     },
     "shapeName": {
       "cube": "Cube",
@@ -598,7 +599,20 @@
       "distribute": "Distribute",
       "distributeGapsHint": "Same clear space between objects",
       "distributeCentersHint": "Same distance centre to centre",
-      "distributeHelp": "The same for objects of one size; they differ once the sizes do. The outer two stay put."
+      "distributeHelp": "The same for objects of one size; they differ once the sizes do. The outer two stay put.",
+      "threadHint": "Drop a standard screw thread, as a solid rod or a tapped hole",
+      "threadCatalog": "Thread sizes",
+      "threadForm": "Solid or hole",
+      "threadSolid": "Solid",
+      "threadHole": "Hole",
+      "threadSolidHint": "A threaded rod at the size's own diameter.",
+      "threadHoleHint": "Cut 0.2 mm wider so a bolt of that size fits. Group it with a solid to tap the hole.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Coarse pitch {pitch} mm",
+      "threadSeries": {
+        "metric": "Metric (ISO coarse)",
+        "unified": "Imperial (UNC)"
+      }
     },
     "panel": {
       "import": "Import",
@@ -892,7 +906,8 @@
       "rotationY": "Turn Y",
       "rotationZ": "Tilt Z",
       "pitch": "Pitch",
-      "turns": "Turns"
+      "turns": "Turns",
+      "core": "Core radius"
     },
     "inspector": {
       "label": "{name} shape settings",

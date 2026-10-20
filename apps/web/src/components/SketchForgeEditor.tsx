@@ -40,7 +40,13 @@ import {
   normalizeLoftTopSize,
 } from "@/lib/loftGeometry";
 import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/distributeShapes";
-import { metricThreadOutline, parseRevolveRequest, revolvedShapeFromRequest } from "@/lib/revolveRequests";
+import {
+  metricThreadOutline,
+  parseRevolveRequest,
+  resolveThreadRequest,
+  revolvedShapeFromRequest,
+  type ThreadRequest,
+} from "@/lib/revolveRequests";
 import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
 import {
   ToolbarAlignIcon,
@@ -48,6 +54,7 @@ import {
   ToolbarDistributeCentersIcon,
   ToolbarDistributeGapsIcon,
   ToolbarDistributeIcon,
+  ToolbarThreadIcon,
   ToolbarChamferIcon,
   ToolbarCaretDownIcon,
   ToolbarCopyIcon,
@@ -127,6 +134,7 @@ import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPoint
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/sketchRevolve";
 import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarShapeAssets, type ToolbarShapeAsset } from "@/lib/shapeCatalog";
+import { threadSizesInSeries } from "@/lib/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import { importExtensionSupported } from "@/lib/importExtensions";
@@ -264,6 +272,9 @@ declare global {
 
 const POINT_TOLERANCE = 0.0001;
 const MIN_SHAPE_DIMENSION = 0.01;
+/** Kept in step with `.thread-catalog` in globals.css, which positions from these. */
+const THREAD_CATALOG_WIDTH = 300;
+const THREAD_CATALOG_MAX_HEIGHT = 420;
 const MAX_SKETCH_HISTORY_ENTRIES = 100;
 const MODEL_DIMENSION_PRECISION = 3;
 const IMPORTED_EXACT_BOOLEAN_TRIANGLE_LIMIT = 150000;
@@ -7009,6 +7020,50 @@ export function SketchForgeEditor({
     };
   }, []);
 
+  /**
+   * Drop a ready-made thread on the workplane.
+   *
+   * A thread is a revolve with a pitch, and until now the only way to one was
+   * to sketch a sixty-degree V by hand and then find Pitch in the object
+   * panel -- which is not a discoverable path to the most asked-for threaded
+   * part. This drops an M8 and leaves every parameter editable, including the
+   * pitch and the number of turns, because the shape keeps its profile.
+   */
+  const addThread = useCallback(async (request: ThreadRequest = {}, point?: PlacementPoint) => {
+    const resolved = resolveThreadRequest(request);
+    if ("error" in resolved) {
+      setNotice(notice(() => resolved.error));
+      return;
+    }
+    const parsed = parseRevolveRequest({
+      profile: resolved.profile,
+      pitch: resolved.pitch,
+      turns: resolved.turns,
+      coreRadius: resolved.coreRadius,
+    });
+    if (!parsed.ok) {
+      setNotice(notice((t) => t("editor.sketch.cannotRevolve")));
+      return;
+    }
+    try {
+      const runtime = await getManifoldRuntime();
+      const thread = revolvedShapeFromRequest(runtime, parsed, {
+        // The name carries the size, because a scene with three threads in it
+        // is unreadable if they are all called "Thread".
+        name: resolved.hole ? `${resolved.designation} hole` : resolved.designation,
+        color: resolved.hole ? "#6f7f8d" : "#8c94a3",
+        hole: resolved.hole,
+      });
+      const placed = {
+        ...thread,
+        ...placementPatchForNewShape(thread, placementWorkplane, point ?? placementWorkplane.origin),
+      };
+      commitShapes([...shapes, placed], placed.id, notice((t) => t("editor.notice.shapeAdded", { name: placed.name })));
+    } catch (error) {
+      setNotice(notice((t) => errorText(t, error, "editor.sketch.cannotRevolve")));
+    }
+  }, [commitShapes, placementWorkplane, shapes]);
+
   const addShape = useCallback(
     (asset: ShapeAsset, point?: PlacementPoint) => {
       const shape = makeShapeFromAsset(asset, undefined, workspaceSettingsRef.current.shapeCustomizations[asset.kind]);
@@ -8157,20 +8212,25 @@ export function SketchForgeEditor({
         if (rawKind === "revolve" || rawKind === "thread") {
           // Threads and springs are described by an outline and a pitch, not by
           // width and height, so they take the same shorthand the REST API does.
-          const parsed = parseRevolveRequest(
-            rawKind === "thread"
-              ? {
-                ...params,
-                profile: params.profile ?? metricThreadOutline(mcpNumber(params.diameter, 8), Math.abs(mcpNumber(params.pitch, 1.25)) || 1.25),
-                pitch: mcpNumber(params.pitch, 1.25),
-                turns: mcpNumber(params.turns, 8),
-              }
-              : params,
-          );
+          let revolveRequest: Record<string, unknown> = params;
+          let threadName: string | null = null;
+          if (rawKind === "thread" && !params.profile) {
+            const resolvedThread = resolveThreadRequest(params);
+            if ("error" in resolvedThread) throw new Error(resolvedThread.error);
+            threadName = resolvedThread.hole ? `${resolvedThread.designation} hole` : resolvedThread.designation;
+            revolveRequest = {
+              ...params,
+              profile: resolvedThread.profile,
+              pitch: resolvedThread.pitch,
+              turns: resolvedThread.turns,
+              coreRadius: resolvedThread.coreRadius,
+            };
+          }
+          const parsed = parseRevolveRequest(revolveRequest);
           if (!parsed.ok) throw new Error(parsed.error);
           const runtime = await getManifoldRuntime();
           const revolved = revolvedShapeFromRequest(runtime, parsed, {
-            name: mcpString(params.name, rawKind === "thread" ? "Thread" : "Revolve"),
+            name: mcpString(params.name, threadName ?? (rawKind === "thread" ? "Thread" : "Revolve")),
             color: mcpString(params.color, "#78b96b"),
             x,
             z,
@@ -9410,6 +9470,11 @@ export function SketchForgeEditor({
           setTopPanel(null);
           setMenuOpen(false);
         }}
+        onAddThread={(request) => {
+          void addThread(request);
+          setTopPanel(null);
+          setMenuOpen(false);
+        }}
       />
       <div className="editor-body">
         {toolbarMode === "sketch" && sketchActive ? (
@@ -9720,6 +9785,7 @@ function SecondaryToolbar({
   onUndo,
   onTopPanel,
   onAddShape,
+  onAddThread,
 }: {
   toolbarMode: ToolbarMode;
   projectName: string;
@@ -9780,6 +9846,7 @@ function SecondaryToolbar({
   onUndo: () => void;
   onTopPanel: (panel: TopPanel) => void;
   onAddShape: (shape: ShapeAsset) => void;
+  onAddThread: (request: ThreadRequest) => void;
 }) {
   const t = useTranslations();
   const [shapesOpen, setShapesOpen] = useState(false);
@@ -9787,6 +9854,13 @@ function SecondaryToolbar({
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const [distributeOpen, setDistributeOpen] = useState(false);
+  const [threadCatalogOpen, setThreadCatalogOpen] = useState(false);
+  const [threadCatalogPosition, setThreadCatalogPosition] = useState({ top: 0, left: 0 });
+  const threadCatalogTriggerRef = useRef<HTMLButtonElement>(null);
+  const shapeMenuDropdownRef = useRef<HTMLDivElement>(null);
+  // Remembered across openings: someone tapping a row of holes wants the next
+  // size to be a hole too.
+  const [threadAsHole, setThreadAsHole] = useState(false);
   const [distributeMenuPosition, setDistributeMenuPosition] = useState({ top: 0, left: 0 });
   const shapesMenuRef = useRef<HTMLDivElement>(null);
   const sketchCreateMenuRef = useRef<HTMLDivElement>(null);
@@ -9858,6 +9932,11 @@ function SecondaryToolbar({
     if (sketchActive) setSketchCreateOpen(false);
     else setShapesOpen(false);
   }, [sketchActive]);
+  useEffect(() => {
+    if (shapesOpen) return;
+    setThreadCatalogOpen(false);
+  }, [shapesOpen]);
+
   useEffect(() => {
     if (!shapesOpen) return;
     const closeOnPointerDown = (event: PointerEvent) => {
@@ -10064,7 +10143,7 @@ function SecondaryToolbar({
             </button>
           </div>
           {shapesOpen ? (
-            <div className="shape-menu-dropdown">
+            <div className="shape-menu-dropdown" ref={shapeMenuDropdownRef}>
               <div className="shape-menu-title">{t("editor.toolbar.basicShapes")}</div>
               <div className="shape-menu-list">
                 {toolbarShapeAssets.map((shape) => (
@@ -10130,7 +10209,104 @@ function SecondaryToolbar({
                     <span>{t(`common.shape.${shape.kind}`)}</span>
                   </button>
                 ))}
+                {/*
+                  Not one of the shape assets: a thread is a revolve with a
+                  pitch, so it is built rather than instanced, and its icon is
+                  drawn rather than an image. It opens a catalog instead of
+                  dropping something, because the size is the whole point and
+                  guessing one would be worse than asking.
+                */}
+                <button
+                  className={`shape-menu-item ${threadCatalogOpen ? "active" : ""}`}
+                  type="button"
+                  draggable={false}
+                  aria-haspopup="menu"
+                  aria-expanded={threadCatalogOpen}
+                  title={t("editor.toolbar.threadHint")}
+                  ref={threadCatalogTriggerRef}
+                  onClick={() => {
+                    if (threadCatalogOpen) {
+                      setThreadCatalogOpen(false);
+                      return;
+                    }
+                    // A flyout beside the shape list, not a panel under it.
+                    // The Thread item sits near the bottom of a tall dropdown,
+                    // so anything opening downwards from it falls off the
+                    // screen -- and the dropdown clips its own overflow, so it
+                    // cannot simply flow inside either.
+                    const menu = shapeMenuDropdownRef.current?.getBoundingClientRect();
+                    const trigger = threadCatalogTriggerRef.current?.getBoundingClientRect();
+                    const anchor = menu ?? trigger;
+                    if (anchor) {
+                      const gutter = 12;
+                      const gap = 8;
+                      const width = Math.min(THREAD_CATALOG_WIDTH, Math.max(0, window.innerWidth - gutter * 2));
+                      const height = Math.min(THREAD_CATALOG_MAX_HEIGHT, Math.max(0, window.innerHeight - gutter * 2));
+                      // To the right if it fits, otherwise to the left of the
+                      // list rather than over it.
+                      const toRight = anchor.right + gap + width + gutter <= window.innerWidth;
+                      setThreadCatalogPosition({
+                        top: Math.max(gutter, Math.min(anchor.top, window.innerHeight - height - gutter)),
+                        left: toRight
+                          ? anchor.right + gap
+                          : Math.max(gutter, anchor.left - gap - width),
+                      });
+                    }
+                    setThreadCatalogOpen(true);
+                  }}
+                >
+                  <ToolbarThreadIcon className="shape-menu-drawn-icon" />
+                  <span>{t("common.shape.thread")}</span>
+                </button>
               </div>
+              {threadCatalogOpen ? (
+                <div className="thread-catalog" role="menu" aria-label={t("editor.toolbar.threadCatalog")} style={threadCatalogPosition}>
+                  <div className="thread-catalog-modes" role="group" aria-label={t("editor.toolbar.threadForm")}>
+                    <button
+                      className={threadAsHole ? "" : "active"}
+                      type="button"
+                      aria-pressed={!threadAsHole}
+                      onClick={() => setThreadAsHole(false)}
+                    >
+                      {t("editor.toolbar.threadSolid")}
+                    </button>
+                    <button
+                      className={threadAsHole ? "active" : ""}
+                      type="button"
+                      aria-pressed={threadAsHole}
+                      onClick={() => setThreadAsHole(true)}
+                    >
+                      {t("editor.toolbar.threadHole")}
+                    </button>
+                  </div>
+                  <div className="thread-catalog-help">
+                    {t(threadAsHole ? "editor.toolbar.threadHoleHint" : "editor.toolbar.threadSolidHint")}
+                  </div>
+                  {(["metric", "unified"] as const).map((series) => (
+                    <div className="thread-catalog-series" key={series}>
+                      <div className="thread-catalog-series-title">{t(`editor.toolbar.threadSeries.${series}`)}</div>
+                      <div className="thread-catalog-sizes">
+                        {threadSizesInSeries(series).map((size) => (
+                          <button
+                            key={size.designation}
+                            type="button"
+                            role="menuitem"
+                            title={t("editor.toolbar.threadSizeHint", { pitch: size.pitch })}
+                            onClick={() => {
+                              setThreadCatalogOpen(false);
+                              setShapesOpen(false);
+                              onAddThread({ size: size.designation, hole: threadAsHole });
+                            }}
+                          >
+                            <strong>{size.designation}</strong>
+                            <small>{t("editor.toolbar.threadPitch", { pitch: size.pitch })}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

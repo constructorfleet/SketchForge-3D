@@ -74,6 +74,7 @@ export type ShapePropertyId =
   | "sweep"
   | "pitch"
   | "turns"
+  | "core"
   | "topRadius"
   | "baseRadius"
   | "thickness"
@@ -133,9 +134,9 @@ export type ShapePropertyConfig = RangePropertyConfig | TextPropertyConfig | Sel
 export type ShapeInspectorUpdateOptions = { resizeAxis?: "width" | "depth" | "height" };
 export type ShapeInspectorUpdate = (patch: Partial<WorkplaneShape>, options?: ShapeInspectorUpdateOptions) => void;
 
-export const LENGTH_UNIT_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "toothSize", "toothWidth", "centerHole", "topLength", "topWidth", "bottomLength", "bottomWidth", "positionX", "positionY", "positionZ", "pitch"];
+export const LENGTH_UNIT_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "bevel", "topRadius", "baseRadius", "thickness", "toothSize", "toothWidth", "centerHole", "topLength", "topWidth", "bottomLength", "bottomWidth", "positionX", "positionY", "positionZ", "pitch", "core"];
 /** Typed values may exceed the slider maximum (the slider still clamps). */
-export const ABOVE_SLIDER_MAX_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "topLength", "topWidth", "bottomLength", "bottomWidth", "toothWidth", "positionX", "positionY", "positionZ", "pitch", "turns"];
+export const ABOVE_SLIDER_MAX_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "topLength", "topWidth", "bottomLength", "bottomWidth", "toothWidth", "positionX", "positionY", "positionZ", "pitch", "turns", "core"];
 
 export function propertyUsesLengthUnit(id: ShapePropertyId) {
   return LENGTH_UNIT_PROPERTIES.includes(id);
@@ -198,6 +199,7 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
       { id: "sweep", value: settings.sweepAngle, min: -360, max: 360, step: 1, onChange: (sweepAngle) => updateRevolve({ sweepAngle }) },
       { id: "pitch", value: settings.pitch, min: -20, max: 20, step: 0.1, onChange: (pitch) => updateRevolve({ pitch }) },
       { id: "turns", value: settings.turns, min: 0.1, max: MAX_REVOLVE_TURNS, step: 0.1, onChange: (turns) => updateRevolve({ turns }) },
+      { id: "core", value: settings.coreRadius, min: 0, max: 80, step: 0.05, onChange: (coreRadius) => updateRevolve({ coreRadius }) },
       { id: "sides", value: settings.sides, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => updateRevolve({ sides }) },
       { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
       { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
