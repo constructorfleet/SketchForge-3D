@@ -76,6 +76,25 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # A dispatched run checks out the default branch, so re-running an old
+      # version would build whatever main says now and label it with that
+      # version. Prefer the released tag when it is there, and fall back to the
+      # checked-out commit when it is not -- which is the dispatch-before-tag
+      # case the "Ensure release tag exists" step below exists for.
+      - name: Check out the released tag
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          git fetch --tags --force
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            git checkout --detach "refs/tags/$TAG"
+            echo "Building $TAG ($(git rev-parse --short HEAD))."
+          else
+            echo "No $TAG tag yet; building $(git rev-parse --short HEAD)."
+          fi
+
       - name: Set package version
         id: package
         shell: bash
@@ -154,6 +173,25 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      # A dispatched run checks out the default branch, so re-running an old
+      # version would build whatever main says now and label it with that
+      # version. Prefer the released tag when it is there, and fall back to the
+      # checked-out commit when it is not -- which is the dispatch-before-tag
+      # case the "Ensure release tag exists" step below exists for.
+      - name: Check out the released tag
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          git fetch --tags --force
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            git checkout --detach "refs/tags/$TAG"
+            echo "Building $TAG ($(git rev-parse --short HEAD))."
+          else
+            echo "No $TAG tag yet; building $(git rev-parse --short HEAD)."
+          fi
+
       - name: Normalize package version
         id: package
         shell: bash
@@ -164,23 +202,23 @@ jobs:
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # Only to give a dispatched run something to attach to when no tag exists.
+      # It used to fail when the tag pointed somewhere other than the dispatch
+      # commit, which is now the normal case for re-running an old version: the
+      # step above has deliberately checked that tag out.
       - name: Ensure release tag exists
         if: github.event_name == 'workflow_dispatch'
         env:
           TAG: ${{ steps.version.outputs.tag }}
-          SOURCE_SHA: ${{ github.sha }}
         run: |
           git fetch --tags --force
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            tag_sha=$(git rev-list -n 1 "$TAG")
-            source_sha=$(git rev-parse "$SOURCE_SHA^{commit}")
-            if [[ "$tag_sha" != "$source_sha" ]]; then
-              echo "$TAG already points to $tag_sha instead of $source_sha." >&2
-              exit 1
-            fi
+            echo "$TAG is already on the remote, at $(git rev-list -n 1 "$TAG")."
           else
-            git tag "$TAG" "$SOURCE_SHA"
+            sha=$(git rev-parse HEAD)
+            git tag "$TAG" "$sha"
             git push origin "$TAG"
+            echo "Created $TAG at $sha."
           fi
 
       - name: Download Windows artifacts
@@ -245,7 +283,15 @@ jobs:
           }
           NODE
 
-      - name: Create draft release
+      # This workflow no longer owns the release: release-please creates it when
+      # the release pull request merges, and creates it *published*, because
+      # GitHub does not make the git tag for a draft. So finding a published
+      # release here is the normal case, not a conflict -- this step used to
+      # refuse it, which meant every build succeeded and no installer was ever
+      # attached. It only creates one when nothing is there, which is the
+      # workflow_dispatch path for a tag that has no release.
+      - name: Ensure the release exists
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -254,16 +300,14 @@ jobs:
           existing=$(gh release view "$TAG" --json isDraft 2>/dev/null || true)
           if [ -n "$existing" ]; then
             is_draft=$(jq -r '.isDraft' <<< "$existing")
-            if [ "$is_draft" != "true" ]; then
-              echo "Release $TAG is already published. Refusing to replace it." >&2
-              exit 1
-            fi
-            echo "Using existing draft release $TAG."
+            echo "Attaching to the existing release $TAG (draft=$is_draft)."
           else
             gh release create "$TAG" --draft --verify-tag \
               --title "SketchForge $VERSION" \
               --notes "SketchForge desktop $VERSION"
+            is_draft=true
           fi
+          echo "was_draft=$is_draft" >> "$GITHUB_OUTPUT"
 
       - name: Upload desktop packages
         env:
@@ -290,8 +334,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
-          assets=$(gh release view "$TAG" --json isDraft,assets)
-          test "$(jq -r '.isDraft' <<< "$assets")" = "true"
+          assets=$(gh release view "$TAG" --json assets)
           names=$(jq -r '.assets[].name' <<< "$assets")
           suffix=""
           if [[ -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" || -z "$APPLE_API_KEY" || -z "$APPLE_API_KEY_ID" || -z "$APPLE_API_ISSUER" ]]; then
@@ -322,6 +365,9 @@ jobs:
             exit 1
           fi
 
+      # Idempotent: a release-please release is already published, and marking it
+      # latest again changes nothing. A draft this workflow created itself is
+      # published here, once its assets have been verified.
       - name: Publish release as latest
         env:
           GH_TOKEN: ${{ github.token }}
