@@ -1,10 +1,19 @@
-# Copy this server block into your Codex config.toml and replace the script
-# path with the absolute path to your SketchForge checkout.
+# Copy this server block into your Codex config.toml.
 #
-# Windows paths can use forward slashes:
-# C:/Users/you/Desktop/SketchForge-3D/scripts/sketchforge-mcp-server.mjs
+# The bridge ships in the published client package, so there is no path to fill
+# in and nothing to build. Point SKETCHFORGE_URL at your SketchForge if it is
+# not on the default port.
 
 [mcp_servers.sketchforge]
-command = "node"
-args = ["/absolute/path/to/SketchForge-3D/scripts/sketchforge-mcp-server.mjs"]
+command = "npx"
+args = ["-y", "-p", "@constructorfleet/sketchforge3d", "sketchforge-mcp"]
 startup_timeout_sec = 20
+
+[mcp_servers.sketchforge.env]
+SKETCHFORGE_URL = "http://127.0.0.1:3000"
+
+# From a checkout, to run the bridge in the tree instead of the published one:
+#
+# [mcp_servers.sketchforge]
+# command = "node"
+# args = ["/absolute/path/to/SketchForge-3D/packages/sketchforge-client/mcp/server.mjs"]

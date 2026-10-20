@@ -39,7 +39,7 @@
     "desktop:web:build": "node apps/desktop/build-web.mjs",
     "desktop:pack": "npm run desktop:web:build && electron-builder --dir --config apps/desktop/electron-builder.yml",
     "desktop:dist": "npm run desktop:web:build && electron-builder --config apps/desktop/electron-builder.yml",
-    "mcp:sketchforge": "node scripts/sketchforge-mcp-server.mjs"
+    "mcp:sketchforge": "node packages/sketchforge-client/mcp/server.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.8",

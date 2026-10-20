@@ -28,8 +28,14 @@ const MAX_OUTPUT_BYTES = 64 * 1024;
 /** Macros are scripts for the two runners this repo ships; nothing else is executable. */
 const RUNNABLE_EXTENSIONS = new Set([".mjs", ".js", ".py"]);
 
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = path.resolve(scriptDirectory, "..");
+// Installed from npm, this module sits at <package>/mcp, so the JavaScript
+// macro runner it spawns is its own package's `dist/cli.js` -- the same path it
+// has in a checkout. The Python package only exists in a checkout; without it,
+// a Python macro runs against a pip-installed `sketchforge3d`, which is what
+// anyone running this from npx will have.
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const clientPackageRoot = path.resolve(moduleDirectory, "..");
+const bundledPythonSource = path.resolve(clientPackageRoot, "..", "sketchforge-py", "src");
 
 export class MacroToolError extends Error {}
 
@@ -82,7 +88,7 @@ export async function listMacros(environment = process.env) {
 function javascriptRunner(environment) {
   const configured = environment.SKETCHFORGE_MACRO_RUNNER_JS;
   if (configured) return configured;
-  const bundled = path.join(repositoryRoot, "packages", "sketchforge-client", "dist", "cli.js");
+  const bundled = path.join(clientPackageRoot, "dist", "cli.js");
   if (existsSync(bundled)) return bundled;
   throw new MacroToolError(
     "No JavaScript macro runner was found. Build it with `npm run build --prefix packages/sketchforge-client`, " +
@@ -93,9 +99,8 @@ function javascriptRunner(environment) {
 function runnerFor(macroName, environment) {
   if (path.extname(macroName).toLowerCase() === ".py") {
     const python = environment.SKETCHFORGE_MACRO_PYTHON || "python3";
-    const packaged = path.join(repositoryRoot, "packages", "sketchforge-py", "src");
-    const pythonPath = existsSync(packaged)
-      ? [packaged, environment.PYTHONPATH].filter(Boolean).join(path.delimiter)
+    const pythonPath = existsSync(bundledPythonSource)
+      ? [bundledPythonSource, environment.PYTHONPATH].filter(Boolean).join(path.delimiter)
       : environment.PYTHONPATH;
     return {
       command: python,

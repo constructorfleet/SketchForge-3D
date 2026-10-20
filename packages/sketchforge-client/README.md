@@ -8,6 +8,32 @@ npm install @constructorfleet/sketchforge3d
 
 The API is headless -- it reads and writes projects in server-side storage with no browser open -- so a macro is a build script for a design, the way a Makefile is for a binary.
 
+## The MCP bridge
+
+This package also carries the SketchForge MCP server, so an LLM client can drive
+an open editor without a clone or a build:
+
+```json
+{
+  "mcpServers": {
+    "sketchforge": {
+      "command": "npx",
+      "args": ["-y", "-p", "@constructorfleet/sketchforge3d", "sketchforge-mcp"],
+      "env": { "SKETCHFORGE_URL": "http://127.0.0.1:3000" }
+    }
+  }
+}
+```
+
+It speaks stdio JSON-RPC and talks to a running SketchForge over HTTP, so that
+app has to be running with an editor tab open (`/?editor=1`). `SKETCHFORGE_URL`
+defaults to `http://127.0.0.1:3000`.
+
+Two of its tools run *macros* -- the scripts this package's runner executes --
+and only files already sitting in `SKETCHFORGE_MACRO_DIR`. There is deliberately
+no tool that accepts code to run. A Python macro needs `sketchforge3d` installed
+from PyPI, since only a checkout carries the Python source.
+
 ## Connecting
 
 ```ts
