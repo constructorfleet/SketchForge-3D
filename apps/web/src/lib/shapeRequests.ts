@@ -290,28 +290,56 @@ export function shapeFromRequest(request: ShapeRequest, defaults: { elevation?: 
   const given = <Key extends ShapeParameterName>(name: Key) =>
     (request[name] === undefined ? {} : always(name)) as Partial<Pick<WorkplaneShape, Key>>;
 
+  /**
+   * Every parameter this kind is built from that the request actually named.
+   *
+   * The branches below name the parameters a kind cannot do without, which is
+   * right for a parameter with no sensible absence and wrong for one the caller
+   * asked for: `POST { kind: "box", taperTopWidth: 2 }` built a straight box
+   * and answered 201, because no branch mentions taper even though the table
+   * says all four taper fields apply to every kind but `gear`. `PATCH` applied
+   * them all along, by looping over this same table -- so create and patch
+   * disagreed about what a box is, and the only way to find out was to create
+   * one and then patch it.
+   *
+   * Driven by the table so a parameter added there works on create without
+   * anyone remembering to touch a branch.
+   */
+  const requested = () => {
+    const applied: Partial<WorkplaneShape> = {};
+    for (const name of shapeParameterNamesFor(kind)) {
+      if (request[name] === undefined) continue;
+      Object.assign(applied, always(name));
+    }
+    return applied;
+  };
+
+  /**
+   * `extras` last: a kind's mandatory parameters keep their defaults when the
+   * request is silent, and read the same value as `requested` when it is not.
+   */
+  const build = (extras: Partial<WorkplaneShape> = {}) =>
+    canonicalizeShape(sceneShape({ ...base, ...requested(), ...extras }));
+
   if (kind === "cylinder") {
-    return canonicalizeShape(sceneShape({ ...base, ...always("sides") }));
+    return build(always("sides"));
   }
 
   if (kind === "pyramid" || kind === "polygon") {
     // A pyramid takes a facet count the way a cylinder does; `polygon` is
     // always the editor's six-sided prism, so its count is not a parameter.
-    return canonicalizeShape(sceneShape({
-      ...base,
-      ...(kind === "pyramid" ? always("sides", 4) : {}),
-    }));
+    return build(kind === "pyramid" ? always("sides", 4) : {});
   }
 
   if (kind === "tube" || kind === "ring") {
     // `bevel` carries the wall thickness for these two.
-    return canonicalizeShape(sceneShape({ ...base, ...always("bevel") }));
+    return build(always("bevel"));
   }
 
   if (kind === "cone") {
     // The base radius is written out rather than left to the geometry's own
     // half-the-width fallback, so a cone read back says what it is standing on.
-    return canonicalizeShape(sceneShape({ ...base, ...always("topRadius"), ...always("baseRadius"), ...given("sides") }));
+    return build({ ...always("topRadius"), ...always("baseRadius"), ...given("sides") });
   }
 
   if (kind === "gear") {
@@ -321,35 +349,32 @@ export function shapeFromRequest(request: ShapeRequest, defaults: { elevation?: 
     const teeth = readShapeParameter("teeth", request.teeth, context, undefined);
     const toothSize = readShapeParameter("toothSize", request.toothSize, { ...context, teeth }, undefined);
     const gearContext = { ...context, teeth, toothSize };
-    return canonicalizeShape(sceneShape({
-      ...base,
-      teeth,
+    return build({
+            teeth,
       toothSize,
       toothWidth: readShapeParameter("toothWidth", request.toothWidth, gearContext, undefined),
       centerHoleSize: readShapeParameter("centerHoleSize", request.centerHoleSize, gearContext, undefined),
       gearType: readShapeParameter("gearType", request.gearType, gearContext, undefined),
       helixAngle: readShapeParameter("helixAngle", request.helixAngle, gearContext, undefined),
-    }));
+    });
   }
 
   if (kind === "halfSphere" || kind === "sphere") {
-    return canonicalizeShape(sceneShape({ ...base, ...given("steps") }));
+    return build(given("steps"));
   }
 
   if (kind === "text") {
-    return canonicalizeShape(sceneShape({
-      ...base,
-      ...always("text"),
+    return build({
+            ...always("text"),
       ...always("font"),
       ...always("bevel"),
       ...always("segments"),
-    }));
+    });
   }
 
   if (kind === "loft") {
-    return canonicalizeShape(sceneShape({
-      ...base,
-      ...always("loftBottomShape"),
+    return build({
+            ...always("loftBottomShape"),
       ...always("loftTopShape"),
       ...always("loftTopWidth"),
       ...always("loftTopDepth"),
@@ -357,10 +382,10 @@ export function shapeFromRequest(request: ShapeRequest, defaults: { elevation?: 
       ...always("loftTopRotation"),
       ...always("loftSegments"),
       ...always("loftLayers"),
-    }));
+    });
   }
 
-  return canonicalizeShape(sceneShape(base));
+  return build();
 }
 
 /**
