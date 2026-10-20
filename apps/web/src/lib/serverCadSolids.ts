@@ -22,7 +22,7 @@ import {
   isPolygonLoftShape,
   normalizeLoftShape,
   normalizeLoftTopSize,
-} from "@/lib/loftGeometry";
+} from "@/lib/loftProfile";
 import {
   isFacetedCylinder,
   planTaper,
