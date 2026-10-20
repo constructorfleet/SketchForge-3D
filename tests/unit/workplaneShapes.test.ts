@@ -25,7 +25,7 @@ import {
   shapeWidth,
   withHoleMode,
   workplaneShapesEqual,
-} from "@sketchforge/engine/workplaneShapes";
+} from "@constructorfleet/sketchforge-engine/workplaneShapes";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return {

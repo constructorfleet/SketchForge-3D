@@ -38,8 +38,8 @@ import {
   createWedgeGeometry,
   putGeometryOnBase,
   type PrimitiveGeometryOptions,
-} from "@sketchforge/engine/primitiveGeometry";
-import { regularPolygonFootprintScale } from "@sketchforge/engine/regularPolygonFootprint";
+} from "@constructorfleet/sketchforge-engine/primitiveGeometry";
+import { regularPolygonFootprintScale } from "@constructorfleet/sketchforge-engine/regularPolygonFootprint";
 import { measureMesh, meshExtents } from "./support/meshMeasure";
 
 const W = 41;

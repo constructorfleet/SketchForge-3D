@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("the extracted engine package", () => {
   it("exposes a Node entry point and does not resolve through the web app", async () => {
-    const run = spawnSync(process.execPath, ["--input-type=module", "-e", "import('@sketchforge/engine').then(engine => console.log(JSON.stringify({ createEngine: typeof engine.createEngine, directoryProjectStore: typeof engine.directoryProjectStore, importSkfProject: typeof engine.importSkfProject })))"], {
+    const run = spawnSync(process.execPath, ["--input-type=module", "-e", "import('@constructorfleet/sketchforge-engine').then(engine => console.log(JSON.stringify({ createEngine: typeof engine.createEngine, directoryProjectStore: typeof engine.directoryProjectStore, importSkfProject: typeof engine.importSkfProject })))"], {
       cwd: path.resolve(__dirname, "../.."),
       encoding: "utf8",
     });

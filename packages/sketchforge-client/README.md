@@ -10,8 +10,9 @@ The API is headless -- it reads and writes projects in server-side storage with 
 
 ## The MCP bridge
 
-This package also carries the SketchForge MCP server, so an LLM client can drive
-an open editor without a clone or a build:
+This package also carries the SketchForge MCP server. It works against local
+project files by default; an LLM can pass a `url` on an individual tool call to
+target a running SketchForge server instead:
 
 ```json
 {
@@ -19,15 +20,18 @@ an open editor without a clone or a build:
     "sketchforge": {
       "command": "npx",
       "args": ["-y", "-p", "@constructorfleet/sketchforge3d", "sketchforge-mcp"],
-      "env": { "SKETCHFORGE_URL": "http://127.0.0.1:3000" }
+      "env": { "SKETCHFORGE_PROJECTS_DIR": "/path/to/SketchForgeProjects" }
     }
   }
 }
 ```
 
-It speaks stdio JSON-RPC and talks to a running SketchForge over HTTP, so that
-app has to be running with an editor tab open (`/?editor=1`). `SKETCHFORGE_URL`
-defaults to `http://127.0.0.1:3000`.
+It speaks stdio JSON-RPC. Without `url`, project and geometry tools use the
+local engine and `SKETCHFORGE_PROJECTS_DIR`, with no browser, HTTP server, or
+API token. Pass `url: "http://127.0.0.1:3000"` to a tool call to use a running
+server; editor tools then require an open editor tab (`/?editor=1`). Remote
+REST operations also require `SKETCHFORGE_API_TOKEN` in the MCP process
+environment.
 
 Two of its tools run *macros* -- the scripts this package's runner executes --
 and only files already sitting in `SKETCHFORGE_MACRO_DIR`. There is deliberately
@@ -221,9 +225,9 @@ SKETCHFORGE_API_TOKEN=test-token SKETCHFORGE_URL=http://127.0.0.1:3100 npm run t
 
 See [docs/PUBLISHING_CLIENTS.md](../../docs/PUBLISHING_CLIENTS.md) for what has to be configured on npm before the release workflow can publish this package.
 
-### Local MCP mode (repository checkout)
+### Local MCP mode
 
-The editor MCP can also run directly against project files, with no browser, HTTP server, or API token. This mode uses the extracted engine package from a SketchForge checkout and reads projects from `SKETCHFORGE_PROJECTS_DIR`:
+The MCP uses the extracted engine package directly against project files, with no browser, HTTP server, or API token. Set `SKETCHFORGE_PROJECTS_DIR` to the directory containing `<projectId>.json` and `<projectId>.skf` files:
 
 ```bash
 SKETCHFORGE_PROJECTS_DIR="$HOME/SketchForgeProjects" npm run mcp:sketchforge
@@ -231,4 +235,4 @@ SKETCHFORGE_PROJECTS_DIR="$HOME/SketchForgeProjects" npm run mcp:sketchforge
 
 The directory uses the same `<projectId>.json` and `<projectId>.skf` files as server-side project storage. In local mode, pass `projectId` to project tools. `sketchforge_read_scene` and `sketchforge_list_objects` accept `shapeIds`, `excludeShapeIds`, `includeRawShapes`, and `includeRawShapeIds`, so a large imported reference mesh can stay out of the response. STL, OBJ, 3MF, ZIP-kit, SKF, and STEP exports can write to `outputPath`; the project name supplies the default filename.
 
-Local mode covers project reads and edits, shape creation/import, arranging, mirroring, grouping, booleans, edge and face operations, measurements, hollowing, mesh and STEP exports, scene topology, clearance and intersection checks, and JavaScript macros. Image capture renders a headless model view from stored geometry; it does not capture editor chrome or the live viewport camera. Local mode uses the published `@sketchforge/engine` package and needs only Node.js plus local project files; project and geometry calls do not contact the browser, editor, HTTP server, or API. The npm MCP client and engine are published together by the release workflow. Editor discovery and editor error inspection still require an open editor. Python macros still use the HTTP adapter.
+Local mode covers project reads and edits, shape creation/import, arranging, mirroring, grouping, booleans, edge and face operations, measurements, hollowing, mesh and STEP exports, scene topology, clearance and intersection checks, and JavaScript macros. Image capture renders a headless model view from stored geometry; it does not capture editor chrome or the live viewport camera. The npm MCP client and `@constructorfleet/sketchforge-engine` are published together by the release workflow. Editor discovery and editor error inspection require a URL and open editor. Python macros require a URL and the HTTP adapter.

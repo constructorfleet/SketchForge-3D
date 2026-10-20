@@ -8,7 +8,7 @@ import { POST as patternShapesRoute } from "@/app/api/v1/patterns/route";
 import { POST as createProject } from "@/app/api/v1/projects/route";
 import { PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
-import { readProjectDocument } from "@sketchforge/engine/serverProjectDocument";
+import { readProjectDocument } from "@constructorfleet/sketchforge-engine/serverProjectDocument";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 import type { WorkplaneShape } from "@/types/sketchforge";
 

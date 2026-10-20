@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { importedShapeFromStepOnKernel } from "@sketchforge/engine/stepImportKernel";
-import { withCadKernel } from "@sketchforge/engine/serverCadKernel";
+import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 
 /**
  * STEP import on the kernel, against files built here rather than a fixture:

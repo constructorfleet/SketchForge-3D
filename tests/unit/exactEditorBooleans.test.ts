@@ -20,13 +20,13 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { paddedCutterShape } from "@sketchforge/engine/cutterPadding";
-import { exactCutPartsForSelection, shapeHasExactBooleanSolid } from "@sketchforge/engine/exactBooleanParts";
-import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@sketchforge/engine/exactBooleanSolids";
-import { serverCadKernel } from "@sketchforge/engine/serverCadKernel";
-import { sceneShape } from "@sketchforge/engine/shapeCatalog";
-import { ROUND_CYLINDER_SIDES, polygonRing } from "@sketchforge/engine/stepProfiles";
-import { shapeOverallFootprintDimensions } from "@sketchforge/engine/workplaneShapes";
+import { paddedCutterShape } from "@constructorfleet/sketchforge-engine/cutterPadding";
+import { exactCutPartsForSelection, shapeHasExactBooleanSolid } from "@constructorfleet/sketchforge-engine/exactBooleanParts";
+import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@constructorfleet/sketchforge-engine/exactBooleanSolids";
+import { serverCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
+import { ROUND_CYLINDER_SIDES, polygonRing } from "@constructorfleet/sketchforge-engine/stepProfiles";
+import { shapeOverallFootprintDimensions } from "@constructorfleet/sketchforge-engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const PLATE_WIDTH = 40;

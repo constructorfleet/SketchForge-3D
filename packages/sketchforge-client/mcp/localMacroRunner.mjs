@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { directoryProjectStore, createEngine } from "@sketchforge/engine";
+import { directoryProjectStore, createEngine } from "@constructorfleet/sketchforge-engine";
 import { macroFromModule, runMacro } from "../dist/index.js";
 
 const root = process.env.SKETCHFORGE_PROJECTS_DIR;

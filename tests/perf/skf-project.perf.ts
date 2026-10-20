@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { editorHistoryEntry } from "@sketchforge/engine/editorHistory";
-import { exportSkfProject, importSkfProject, type SkfProjectDocumentV1, type SkfProjectExportInput } from "@sketchforge/engine/skfProject";
-import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@sketchforge/engine/workplaneSettings";
+import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { exportSkfProject, importSkfProject, type SkfProjectDocumentV1, type SkfProjectExportInput } from "@constructorfleet/sketchforge-engine/skfProject";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 it("benchmarks autosave after loading a large project with duplicated V1 edges", async () => {

@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 import { callLocalEngineTool } from "./localEngine.mjs";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 
 /**
  * The version this bridge reports is the package's, read at startup rather than
@@ -24,11 +23,10 @@ const version = (() => {
   }
 })();
 const MCP_ROUTE = "/api/sketchforge-mcp";
-const baseUrl = process.env.SKETCHFORGE_URL || DEFAULT_BASE_URL;
-
 const editorTargetSchema = {
   type: "object",
   properties: {
+    url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
     projectId: { type: "string", description: "Project id in SKETCHFORGE_PROJECTS_DIR when running the MCP in local mode." },
     editorNumber: { type: "number", description: "The 5-digit SketchForge editor number from sketchforge_list_editors." },
     editorId: { type: "string", description: "Optional internal editor id. Prefer editorNumber for human-directed use." },
@@ -40,11 +38,11 @@ const tools = [
   {
     name: "sketchforge_list_editors",
     description: "List SketchForge editor tabs that are currently open and heartbeating, including editorNumber and projectName.",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: { ...editorTargetSchema, properties: { url: editorTargetSchema.properties.url } },
   },
   {
     name: "sketchforge_read_scene",
-    description: "Read the current scene, selection, workspace units, and exact object dimensions from an open SketchForge editor.",
+    description: "Read the current scene and exact object dimensions from local project files by default, or from an editor when a server url is supplied.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
@@ -58,7 +56,7 @@ const tools = [
   },
   {
     name: "sketchforge_list_objects",
-    description: "List all current objects available in the editor with exact dimensions, position, rotation, and object ids.",
+    description: "List all objects in the local project by default, or in the editor when a server url is supplied, with exact dimensions, position, rotation, and object ids.",
     inputSchema: editorTargetSchema,
   },
   {
@@ -344,30 +342,29 @@ const tools = [
     description: "Check triangle topology, conservative AABB clearance bounds, and exact Manifold intersection volumes for overlapping scene objects.",
     inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
   },
-  // Hollowing runs on the headless REST API rather than in an editor tab: the
-  // operation is server-side OCCT, and the editor has no action for it yet.
+  // CAD operations use the local engine by default and the server API when a URL is supplied.
   {
     name: "sketchforge_list_faces",
-    description: "List a stored project shape's CAD faces, with the direction name each one can be opened by, so a hollow can leave the right ones off. Works on a project on the server (REST API), not on an open editor tab.",
+    description: "List a stored project shape's CAD faces, with the direction name each one can be opened by, so a hollow can leave the right ones off. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "shapeId"],
       properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
         projectId: { type: "string", description: "The server-side project id." },
         shapeId: { type: "string", description: "The id of the shape to read." },
       },
     },
   },
-  // Measuring runs on the REST API for the same reason hollowing does: the
-  // numbers come from server-side OCCT's own curve and surface analysis, which
-  // is the only place the exact geometry lives.
+  // Measuring uses exact CAD geometry in either the local engine or server API.
   {
     name: "sketchforge_measure_shape",
-    description: "Measure every edge and face of a stored project shape from its exact CAD geometry: edge length, the radius and diameter of a circular edge or arc, face area, and a cylindrical face's radius. Exact (OCCT), so a round hole has a real radius rather than the chord length of a facet. A measurement that is not meaningful for the entity -- the radius of a straight edge, of an ellipse, or of a cone whose radius changes along it -- comes back null with a reason in radiusUnavailable. Works on a project on the server (REST API), not on an open editor tab.",
+    description: "Measure every edge and face of a stored project shape from its exact CAD geometry: edge length, the radius and diameter of a circular edge or arc, face area, and a cylindrical face's radius. Exact (OCCT), so a round hole has a real radius rather than the chord length of a facet. A measurement that is not meaningful for the entity -- the radius of a straight edge, of an ellipse, or of a cone whose radius changes along it -- comes back null with a reason in radiusUnavailable. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "shapeId"],
       properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
         projectId: { type: "string", description: "The server-side project id." },
         shapeId: { type: "string", description: "The id of the shape to measure." },
       },
@@ -375,11 +372,12 @@ const tools = [
   },
   {
     name: "sketchforge_measure_between",
-    description: "The exact minimum distance between two CAD entities in a stored project, and the angle between them when both are flat faces. Each end names a shape and either the whole solid, or one edge or face by the index the measurement listing gave it. Distance is measured between the real surfaces where the shapes sit, so two round posts 5mm apart at their nearest walls read 5 -- not the gap between their bounding boxes. Works on a project on the server (REST API), not on an open editor tab.",
+    description: "The exact minimum distance between two CAD entities in a stored project, and the angle between them when both are flat faces. Each end names a shape and either the whole solid, or one edge or face by the index the measurement listing gave it. Distance is measured between the real surfaces where the shapes sit, so two round posts 5mm apart at their nearest walls read 5 -- not the gap between their bounding boxes. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "from", "to"],
       properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
         projectId: { type: "string", description: "The server-side project id." },
         from: {
           type: "object",
@@ -408,11 +406,12 @@ const tools = [
   },
   {
     name: "sketchforge_hollow_shape",
-    description: "Hollow a stored project shape out to a wall of a given thickness, optionally leaving faces open so a box becomes a tray. Exact (OCCT), so the result still exports to STEP and can still be filleted. A sphere, torus, cone or round-walled tube cannot be hollowed at any thickness. Works on a project on the server (REST API), not on an open editor tab.",
+    description: "Hollow a stored project shape out to a wall of a given thickness, optionally leaving faces open so a box becomes a tray. Exact (OCCT), so the result still exports to STEP and can still be filleted. A sphere, torus, cone or round-walled tube cannot be hollowed at any thickness. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "shapeId", "thickness"],
       properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
         projectId: { type: "string", description: "The server-side project id." },
         shapeId: { type: "string", description: "The id of the shape to hollow." },
         thickness: { type: "number", description: "Wall thickness in mm, measured inwards. Must be well under half the part's smallest span." },
@@ -424,8 +423,7 @@ const tools = [
       },
     },
   },
-  // Macros drive the headless REST API rather than an editor tab, and run only
-  // from the directory the operator configured.
+  // Macros run only from the directory the operator configured.
   ...macroTools,
 ];
 
@@ -439,7 +437,7 @@ const API_TOKEN_ENV = "SKETCHFORGE_API_TOKEN";
  * to ask one for. The token is the same one the server was started with, and
  * without it every route answers 404 rather than saying it is switched off.
  */
-async function restRequest(method, path, { query = {}, body } = {}) {
+async function restRequest(method, path, { query = {}, body, baseUrl } = {}) {
   const token = process.env[API_TOKEN_ENV];
   if (!token) {
     throw new Error(
@@ -468,12 +466,12 @@ async function restRequest(method, path, { query = {}, body } = {}) {
   return payload;
 }
 
-function bridgeUrl() {
+function bridgeUrl(baseUrl) {
   return new URL(MCP_ROUTE, baseUrl);
 }
 
-async function bridgeGet() {
-  const response = await fetch(bridgeUrl());
+async function bridgeGet(baseUrl) {
+  const response = await fetch(bridgeUrl(baseUrl));
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(payload?.error || `SketchForge bridge returned HTTP ${response.status}`);
@@ -481,13 +479,13 @@ async function bridgeGet() {
   return payload;
 }
 
-async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
-  const { editorNumber, editorId, timeoutMs, ...params } = args || {};
+async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000, baseUrl) {
+  const { editorNumber, editorId, timeoutMs, url, ...params } = args || {};
   let targetNumber = typeof editorNumber === "number" ? editorNumber : undefined;
   let targetId = typeof editorId === "string" ? editorId : undefined;
 
   if (!targetNumber && !targetId) {
-    const { editors = [] } = await bridgeGet();
+    const { editors = [] } = await bridgeGet(baseUrl);
     if (editors.length === 1) {
       targetNumber = editors[0].editorNumber;
     } else {
@@ -495,7 +493,7 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
     }
   }
 
-  const response = await fetch(bridgeUrl(), {
+  const response = await fetch(bridgeUrl(baseUrl), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -514,57 +512,53 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000) {
   return payload.data;
 }
 
-async function callTool(name, args) {
-  if (process.env.SKETCHFORGE_PROJECTS_DIR) {
-    if (name === "sketchforge_list_macros") return listMacros();
-    if (name === "sketchforge_run_macro") return runMacroByName(args);
-    return callLocalEngineTool(name, args);
-  }
+async function callRemoteTool(name, args, baseUrl) {
   switch (name) {
     case "sketchforge_list_editors":
-      return bridgeGet();
+      return bridgeGet(baseUrl);
     case "sketchforge_read_scene":
-      return bridgeCommand("get_scene", args);
+      return bridgeCommand("get_scene", args, 15000, baseUrl);
     case "sketchforge_list_objects":
-      return bridgeCommand("list_objects", args);
+      return bridgeCommand("list_objects", args, 15000, baseUrl);
     case "sketchforge_select_objects":
-      return bridgeCommand("select_objects", args);
+      return bridgeCommand("select_objects", args, 15000, baseUrl);
     case "sketchforge_mirror_objects":
-      return bridgeCommand("mirror_objects", args);
+      return bridgeCommand("mirror_objects", args, 15000, baseUrl);
     case "sketchforge_delete_objects":
-      return bridgeCommand("delete_objects", args);
+      return bridgeCommand("delete_objects", args, 15000, baseUrl);
     case "sketchforge_create_shape":
-      return bridgeCommand("create_shape", args);
+      return bridgeCommand("create_shape", args, 15000, baseUrl);
     case "sketchforge_import_mesh":
-      return bridgeCommand("import_mesh", args, 60000);
+      return bridgeCommand("import_mesh", args, 60000, baseUrl);
     case "sketchforge_update_object":
-      return bridgeCommand("update_object", args);
+      return bridgeCommand("update_object", args, 15000, baseUrl);
     case "sketchforge_align_objects":
-      return bridgeCommand("align_objects", args);
+      return bridgeCommand("align_objects", args, 15000, baseUrl);
     case "sketchforge_distribute_objects":
-      return bridgeCommand("distribute_objects", args);
+      return bridgeCommand("distribute_objects", args, 15000, baseUrl);
     case "sketchforge_pattern_objects":
-      return bridgeCommand("pattern_objects", args);
+      return bridgeCommand("pattern_objects", args, 15000, baseUrl);
     case "sketchforge_group_objects":
-      return bridgeCommand("group_objects", args, 30000);
+      return bridgeCommand("group_objects", args, 30000, baseUrl);
     case "sketchforge_ungroup_objects":
-      return bridgeCommand("ungroup_objects", args);
+      return bridgeCommand("ungroup_objects", args, 15000, baseUrl);
     case "sketchforge_boolean_cut":
-      return bridgeCommand("boolean_cut", args, 45000);
+      return bridgeCommand("boolean_cut", args, 45000, baseUrl);
     case "sketchforge_separate_parts":
-      return bridgeCommand("separate_parts", args);
+      return bridgeCommand("separate_parts", args, 15000, baseUrl);
     case "sketchforge_list_edges":
-      return bridgeCommand("list_edges", args, 30000);
+      return bridgeCommand("list_edges", args, 30000, baseUrl);
     case "sketchforge_apply_edge_treatment":
-      return bridgeCommand("apply_edge_treatment", args, 60000);
+      return bridgeCommand("apply_edge_treatment", args, 60000, baseUrl);
     case "sketchforge_list_faces":
-      return restRequest("GET", "/faces", { query: { projectId: args.projectId, shapeId: args.shapeId } });
+      return restRequest("GET", "/faces", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_measure_shape":
-      return restRequest("GET", "/measurements", { query: { projectId: args.projectId, shapeId: args.shapeId } });
+      return restRequest("GET", "/measurements", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_measure_between":
       return restRequest("POST", "/measurements", {
         query: { projectId: args.projectId },
         body: { from: args.from, to: args.to },
+        baseUrl,
       });
     case "sketchforge_hollow_shape":
       return restRequest("POST", "/shell", {
@@ -573,13 +567,14 @@ async function callTool(name, args) {
           thickness: args.thickness,
           ...(args.openFaces === undefined ? {} : { openFaces: args.openFaces }),
         },
+        baseUrl,
       });
     case "sketchforge_inspect_errors":
-      return bridgeCommand("inspect_errors", args);
+      return bridgeCommand("inspect_errors", args, 15000, baseUrl);
     case "sketchforge_capture_image":
-      return bridgeCommand("capture_image", args, 30000);
+      return bridgeCommand("capture_image", args, 30000, baseUrl);
     case "sketchforge_export_scene": {
-      const artifact = await bridgeCommand("export_scene", args, 60000);
+      const artifact = await bridgeCommand("export_scene", args, 60000, baseUrl);
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
         const destination = path.resolve(args.outputPath);
         writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
@@ -588,14 +583,37 @@ async function callTool(name, args) {
       return artifact;
     }
     case "sketchforge_validate_scene":
-      return bridgeCommand("validate_scene", args, 60000);
+      return bridgeCommand("validate_scene", args, 60000, baseUrl);
     case "sketchforge_list_macros":
       return listMacros();
     case "sketchforge_run_macro":
-      return runMacroByName(args);
+      return runMacroByName(args, { environment: { ...process.env, SKETCHFORGE_URL: baseUrl } });
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+}
+
+function normalizedServerUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("url must be an absolute http:// or https:// SketchForge server URL.");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+    throw new Error("url must be an absolute http:// or https:// SketchForge server URL without embedded credentials.");
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+async function callTool(name, args = {}) {
+  const { url, ...toolArgs } = args || {};
+  if (typeof url === "string" && url.trim()) {
+    return callRemoteTool(name, toolArgs, normalizedServerUrl(url.trim()));
+  }
+  if (name === "sketchforge_list_macros") return listMacros();
+  if (name === "sketchforge_run_macro") return runMacroByName(toolArgs);
+  return callLocalEngineTool(name, toolArgs);
 }
 
 function textContent(value) {

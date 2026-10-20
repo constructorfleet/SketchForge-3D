@@ -71,7 +71,7 @@
     "three-bvh-csg": "^0.0.18",
     "three-mesh-bvh": "^0.9.13",
     "use-intl": "^4.14.9",
-    "@sketchforge/engine": "file:packages/sketchforge-engine"
+    "@constructorfleet/sketchforge-engine": "file:packages/sketchforge-engine"
   },
   "devDependencies": {
     "@formatjs/icu-messageformat-parser": "^3.5.21",

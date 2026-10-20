@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { meshProjectShapes } from "@sketchforge/engine";
-import { shapeFromRequest } from "@sketchforge/engine/shapeRequests";
-import type { WorkplaneShape } from "@sketchforge/engine/domain/sketchforge";
+import { meshProjectShapes } from "@constructorfleet/sketchforge-engine";
+import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
+import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 describe("headless project mesh generation", () => {
   it("meshes a placed box as world-space triangles", async () => {

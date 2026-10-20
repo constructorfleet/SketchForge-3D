@@ -9,7 +9,7 @@ let selectedObjectIds = [];
 async function getBackend() {
   if (!projectsDir) throw new Error("Set SKETCHFORGE_PROJECTS_DIR to a directory containing SketchForge project files.");
   if (!backend) {
-    enginePackagePromise ??= import("@sketchforge/engine");
+    enginePackagePromise ??= import("@constructorfleet/sketchforge-engine");
     const { createEngine, directoryProjectStore } = await enginePackagePromise;
     const store = directoryProjectStore(projectsDir);
     backend = { store, engine: createEngine(store), package: await enginePackagePromise };

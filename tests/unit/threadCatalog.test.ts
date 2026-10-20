@@ -7,7 +7,7 @@ import {
   threadSize,
   threadSizesInSeries,
   threadTurnsForLength,
-} from "@sketchforge/engine/threadCatalog";
+} from "@constructorfleet/sketchforge-engine/threadCatalog";
 
 describe("thread catalog", () => {
   it("knows the coarse pitch for each metric size", () => {

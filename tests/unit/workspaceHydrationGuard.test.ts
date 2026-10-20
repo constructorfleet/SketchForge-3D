@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceHydrationSyncDecision } from "@sketchforge/engine/workplaneSettings";
+import { workspaceHydrationSyncDecision } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 
 /**
  * Models the two effects in WorkplaneViewport that share

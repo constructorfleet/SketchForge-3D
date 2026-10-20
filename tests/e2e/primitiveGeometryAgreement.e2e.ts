@@ -38,11 +38,11 @@ import {
   createRoundRoofGeometry,
   createTorusGeometry,
   createWedgeGeometry,
-} from "@sketchforge/engine/primitiveGeometry";
-import { withCadKernel } from "@sketchforge/engine/serverCadKernel";
-import { exactSolidForShape } from "@sketchforge/engine/cadSolids";
-import { sceneShape } from "@sketchforge/engine/shapeCatalog";
-import { shapeDepth, shapeWidth } from "@sketchforge/engine/workplaneShapes";
+} from "@constructorfleet/sketchforge-engine/primitiveGeometry";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { exactSolidForShape } from "@constructorfleet/sketchforge-engine/cadSolids";
+import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
+import { shapeDepth, shapeWidth } from "@constructorfleet/sketchforge-engine/workplaneShapes";
 import type { WorkplaneShape } from "@/types/sketchforge";
 import type * as THREE from "three";
 import { measureMesh } from "../unit/support/meshMeasure";

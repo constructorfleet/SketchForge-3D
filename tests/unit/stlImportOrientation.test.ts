@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importedShapeFromStl } from "@sketchforge/engine/stlImport";
+import { importedShapeFromStl } from "@constructorfleet/sketchforge-engine/stlImport";
 
 function boxStl(width: number, ySize: number, zSize: number, name = "box") {
   const vertices = [

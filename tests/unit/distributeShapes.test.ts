@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { distributeShifts, widestDistributeAxis, type DistributeEntry } from "@sketchforge/engine/distributeShapes";
+import { distributeShifts, widestDistributeAxis, type DistributeEntry } from "@constructorfleet/sketchforge-engine/distributeShapes";
 
 /** An object of `width`, centred at `at`. */
 function at(id: string, position: number, width = 10, locked = false): DistributeEntry {

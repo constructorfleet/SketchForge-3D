@@ -9,7 +9,7 @@ import {
   MAX_REVOLVE_TURNS,
   normalizeSketchRevolveSettings,
   sketchProfileToRevolvePolygons,
-} from "@sketchforge/engine/sketchRevolve";
+} from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import type { SketchProfile } from "@/types/sketchforge";
 
 function rectangleProfile(innerRadius = 5, outerRadius = 10, height = 20): SketchProfile {

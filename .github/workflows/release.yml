@@ -37,7 +37,7 @@ on:
         type: boolean
         default: true
       publish_engine:
-        description: "Publish @sketchforge/engine to npm"
+        description: "Publish @constructorfleet/sketchforge-engine to npm"
         type: boolean
         default: true
       publish_pypi:
@@ -109,7 +109,7 @@ jobs:
           root=$(node -p "require('./package.json').version")
           client=$(node -p "require('./packages/sketchforge-client/package.json').version")
           engine=$(node -p "require('./packages/sketchforge-engine/package.json').version")
-          engine_dependency=$(node -p "require('./packages/sketchforge-client/package.json').dependencies['@sketchforge/engine']")
+          engine_dependency=$(node -p "require('./packages/sketchforge-client/package.json').dependencies['@constructorfleet/sketchforge-engine']")
           python3 - <<'PY' > /tmp/py-version
           import pathlib, re
           text = pathlib.Path("packages/sketchforge-py/pyproject.toml").read_text()

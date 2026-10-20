@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { translatorFor } from "@/i18n/translator";
-import { toolbarShapeAssets } from "@sketchforge/engine/shapeCatalog";
+import { toolbarShapeAssets } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 
 const en = translatorFor("en");

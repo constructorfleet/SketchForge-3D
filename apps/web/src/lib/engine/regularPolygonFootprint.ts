@@ -1,1 +1,1 @@
-export * from "@sketchforge/engine/regularPolygonFootprint";
+export * from "@constructorfleet/sketchforge-engine/regularPolygonFootprint";

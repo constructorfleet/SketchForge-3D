@@ -19,7 +19,7 @@
     "client"
   ],
   "dependencies": {
-    "@sketchforge/engine": "1.6.0",
+    "@constructorfleet/sketchforge-engine": "1.6.0",
     "fflate": "^0.8.3",
     "sharp": "^0.35.5"
   },

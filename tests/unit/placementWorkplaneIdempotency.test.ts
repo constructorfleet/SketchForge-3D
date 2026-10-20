@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { horizontalPlacementWorkplane, normalizePlacementWorkplane, placementWorkplaneFromSurface } from "@sketchforge/engine/placementWorkplane";
+import { horizontalPlacementWorkplane, normalizePlacementWorkplane, placementWorkplaneFromSurface } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 
 /**
  * The dashboard persists projects by re-serialising them and writing the result
