@@ -183,6 +183,23 @@ export function ToolbarDropToWorkplaneIcon() {
   return <ToolbarCommandImage file="toolbar-drop-workplane.png" className="toolbar-user-art-icon" />;
 }
 
+/** Repeat: one block and the copies that follow it. */
+export function ToolbarPatternIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={["toolbar-vector-art-icon", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <rect x="5" y="5" width="15" height="15" rx="2" fill="#d0cdcd" stroke="currentColor" strokeWidth="2.6" />
+      <rect x="28" y="7" width="13" height="13" rx="2" fill="#efeded" stroke="currentColor" strokeWidth="2.2" />
+      <rect x="6" y="28" width="13" height="13" rx="2" fill="#efeded" stroke="currentColor" strokeWidth="2.2" />
+      <rect x="28" y="28" width="13" height="13" rx="2" fill="#efeded" stroke="currentColor" strokeWidth="2.2" />
+    </svg>
+  );
+}
+
 /** A threaded rod: a cylinder with a helix wrapped round it. */
 export function ToolbarThreadIcon({ className, ...props }: IconProps) {
   return (
