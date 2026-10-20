@@ -75,6 +75,7 @@ export type SketchForgeMcpCommandName =
   | "get_scene"
   | "list_objects"
   | "select_objects"
+  | "mirror_objects"
   | "delete_objects"
   | "create_shape"
   | "import_mesh"

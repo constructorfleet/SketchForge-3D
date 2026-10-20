@@ -48,6 +48,9 @@ const tools = [
       properties: {
         ...editorTargetSchema.properties,
         includeRawShapes: { type: "boolean", description: "Include raw WorkplaneShape JSON. Can be large for imported meshes." },
+        shapeIds: { type: "array", items: { type: "string" }, description: "Limit the response to these object ids (including rawShapes)." },
+        excludeShapeIds: { type: "array", items: { type: "string" }, description: "Omit these object ids, useful for large reference meshes." },
+        includeRawShapeIds: { type: "array", items: { type: "string" }, description: "Include raw geometry only for these ids; takes precedence over includeRawShapes." },
       },
     },
   },
@@ -67,6 +70,11 @@ const tools = [
         ids: { type: "array", items: { type: "string" } },
       },
     },
+  },
+  {
+    name: "sketchforge_mirror_objects",
+    description: "Mirror objects across the center plane of their combined bounds, using the editor's mirror behavior.",
+    inputSchema: { ...editorTargetSchema, required: ["axis"], properties: { ...editorTargetSchema.properties, ids: { type: "array", items: { type: "string" }, description: "Object ids; defaults to the current selection." }, axis: { type: "string", enum: ["x", "y", "z"] } } },
   },
   {
     name: "sketchforge_delete_objects",
@@ -91,7 +99,7 @@ const tools = [
         kind: { type: "string", enum: ["box", "cube", "cylinder", "sketch", "loft", "revolve", "thread"] },
         profile: {
           type: "array",
-          description: "For kind revolve: the closed outline to revolve, as [x, z] pairs. x is the distance from the axis, z runs along it. A triangle makes a thread, a rectangle a tube, a polygon a spring.",
+          description: "For kind sketch: a closed 2D outline to extrude, as [x, z] pairs. For kind revolve: the closed outline to revolve, where x is distance from axis and z runs along it.",
           items: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
         },
         pitch: { type: "number", description: "For kind revolve/thread: axial rise per turn in mm. 0 is a plain revolve; negative is a left-hand thread." },
@@ -504,6 +512,8 @@ async function callTool(name, args) {
       return bridgeCommand("list_objects", args);
     case "sketchforge_select_objects":
       return bridgeCommand("select_objects", args);
+    case "sketchforge_mirror_objects":
+      return bridgeCommand("mirror_objects", args);
     case "sketchforge_delete_objects":
       return bridgeCommand("delete_objects", args);
     case "sketchforge_create_shape":

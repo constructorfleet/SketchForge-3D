@@ -8123,9 +8123,14 @@ export function SketchForgeEditor({
     );
   }, [commitShapes, selectedShape, selectedShapes.length, shapes, t]);
 
-  const mcpSceneSnapshot = useCallback((includeRawShapes = false): SketchForgeMcpSceneSummary & { rawShapes?: WorkplaneShape[] } => {
+  const mcpSceneSnapshot = useCallback((params: Record<string, unknown> = {}): SketchForgeMcpSceneSummary & { rawShapes?: WorkplaneShape[] } => {
     const projectInfo = projectInfoRef.current;
-    const currentShapes = shapesRef.current;
+    const requestedIds = mcpStringArray(params.shapeIds);
+    const excludedIds = new Set(mcpStringArray(params.excludeShapeIds));
+    const allowedIds = requestedIds.length ? new Set(requestedIds) : null;
+    const currentShapes = shapesRef.current.filter((shape) => (!allowedIds || allowedIds.has(shape.id)) && !excludedIds.has(shape.id));
+    const rawIds = Array.isArray(params.includeRawShapeIds) ? new Set(mcpStringArray(params.includeRawShapeIds)) : null;
+    const includeAllRaw = params.includeRawShapes === true && rawIds === null;
     return {
       projectId: projectInfo.projectId,
       projectName: projectInfo.projectName,
@@ -8135,7 +8140,7 @@ export function SketchForgeEditor({
       workspace: workspaceSettingsRef.current,
       snap: initialSnap ?? null,
       shapes: currentShapes.map(mcpShapeSummary),
-      ...(includeRawShapes ? { rawShapes: currentShapes.map((shape) => canonicalizeShape(shape)) } : {}),
+      ...(includeAllRaw || rawIds ? { rawShapes: currentShapes.filter((shape) => includeAllRaw || rawIds?.has(shape.id)).map((shape) => canonicalizeShape(shape)) } : {}),
     };
   }, [initialSnap]);
 
@@ -8147,7 +8152,7 @@ export function SketchForgeEditor({
     try {
       lastMcpErrorRef.current = null;
       if (command.action === "get_scene") {
-        return mcpSceneSnapshot(params.includeRawShapes === true);
+        return mcpSceneSnapshot(params);
       }
 
       if (command.action === "list_objects") {
@@ -8161,6 +8166,19 @@ export function SketchForgeEditor({
         selectedIdsRef.current = validIds;
         setNotice(notice((t) => validIds.length ? t("editor.mcp.selected", { count: validIds.length }) : t("editor.mcp.selectionCleared")));
         return { selectedIds: validIds, objects: currentShapes().filter((shape) => validIds.includes(shape.id)).map(mcpShapeSummary) };
+      }
+
+      if (command.action === "mirror_objects") {
+        const axis = params.axis === "x" || params.axis === "y" || params.axis === "z" ? params.axis : null;
+        if (!axis) throw new Error("mirror_objects requires axis x, y, or z");
+        const requestedIds = mcpStringArray(params.ids);
+        const ids = requestedIds.length ? requestedIds : selectedIdsRef.current;
+        const selected = currentShapes().filter((shape) => ids.includes(shape.id));
+        if (!selected.length) throw new Error("Provide object ids or select objects to mirror");
+        const { nextShapes, moved } = mirroredShapesForSelection(currentShapes(), ids, selected, axis);
+        if (!moved) throw new Error("All selected objects are locked");
+        commitShapes(nextShapes, ids, notice((t) => t("editor.mirror.mirrored", { count: moved, axis: t(`editor.mirror.axis.${axis}`) })));
+        return { moved, axis, selectedIds: ids, objects: nextShapes.filter((shape) => ids.includes(shape.id)).map(mcpShapeSummary) };
       }
 
       if (command.action === "delete_objects") {
@@ -8218,7 +8236,14 @@ export function SketchForgeEditor({
           return { object: mcpShapeSummary(revolved) };
         }
         if (kind === "sketch") {
-          const profile = defaultMcpSketchProfile(width, depth);
+          const profilePoints = Array.isArray(params.profile) ? params.profile : null;
+          if (profilePoints && (profilePoints.length < 3 || profilePoints.some((point) => !Array.isArray(point) || point.length !== 2 || point.some((value) => typeof value !== "number" || !Number.isFinite(value))))) {
+            throw new Error("Sketch profile must contain at least three finite [x, z] points");
+          }
+          const profile = profilePoints ? (() => {
+            const points = profilePoints.map(([px, pz]: number[]) => ({ id: createLocalId("mcp-profile-point"), x: px, z: pz, mode: "corner" as const }));
+            return { points, segments: points.map((point, index) => ({ id: createLocalId("mcp-profile-segment"), startId: point.id, endId: points[(index + 1) % points.length].id, kind: "line" as const })), images: [] };
+          })() : defaultMcpSketchProfile(width, depth);
           const extruded = await cadShapeFromSketchProfile(profile, height);
           shape = canonicalizeShape({
             ...extruded,
