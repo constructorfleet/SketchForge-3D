@@ -1,7 +1,7 @@
 import type { MessageParams } from "@/i18n/locales";
 import type { ErrorKey } from "@/i18n/LocalizedError";
 
-export const OFFICIAL_UPDATE_GUIDE_URL = "https://github.com/Formsmith746/SketchForge-3D#update-sketchforge-later";
+export const OFFICIAL_UPDATE_GUIDE_URL = "https://github.com/constructorfleet/SketchForge-3D#update-sketchforge-later";
 
 export type AppUpdateStatus = {
   currentVersion: string;

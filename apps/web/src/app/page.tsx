@@ -159,7 +159,10 @@ const ACTIVE_CHALLENGE_TUTORIAL_STORAGE_KEY = "sketchForge.activeChallengeTutori
 const DISMISSED_UPDATE_VERSION_STORAGE_KEY = "sketchForge.dismissedUpdateVersion";
 const PROJECT_ACCENTS: DashboardProject["accent"][] = ["cyan", "green", "gold", "red"];
 const STATIC_EXPORT_BUILD = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
-const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/Formsmith746/SketchForge-3D";
+// The corresponding source of *this* build, which is what the AGPL asks a
+// network user be offered -- not the project this was forked from, whose code
+// is not what is running. Overridable for anyone running their own fork.
+const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/constructorfleet/SketchForge-3D";
 const EDITOR_SKELETON_MIN_DURATION_MS = 320;
 const knownProjectResourceKeys = new Map<string, Set<string>>();
 

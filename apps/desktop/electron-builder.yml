@@ -7,7 +7,7 @@ directories:
 
 publish:
   provider: github
-  owner: Formsmith746
+  owner: constructorfleet
   repo: SketchForge-3D
   releaseType: release
 

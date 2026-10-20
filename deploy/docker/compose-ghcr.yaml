@@ -1,6 +1,6 @@
 services:
   sketchforge:
-    image: ghcr.io/formsmith746/sketchforge-3d:latest
+    image: ghcr.io/constructorfleet/sketchforge-3d:latest
     ports:
       - "${SKETCHFORGE_PORT:-3000}:3000"
     environment:
