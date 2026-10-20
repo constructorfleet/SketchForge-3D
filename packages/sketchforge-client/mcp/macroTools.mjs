@@ -227,11 +227,12 @@ export const macroTools = [
   {
     name: "sketchforge_run_macro",
     description:
-      "Run one installed macro by name, against the headless REST API. Parameters are the macro's own declared parameters. Only files already present in SKETCHFORGE_MACRO_DIR can be run; code cannot be passed in.",
+      "Run one installed macro by name, offline by default or against an optional SketchForge server URL. Parameters are the macro's own declared parameters. Only files already present in SKETCHFORGE_MACRO_DIR can be run; code cannot be passed in.",
     inputSchema: {
       type: "object",
       required: ["macro"],
       properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to run against local project files." },
         macro: { type: "string", description: "A file name from sketchforge_list_macros." },
         params: {
           type: "object",
