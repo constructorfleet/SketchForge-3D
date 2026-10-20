@@ -46,7 +46,7 @@ import {
   revolvedShapeFromRequest,
   type ThreadRequest,
 } from "@/lib/revolveRequests";
-import { regularPolygonFootprintScale } from "@/lib/regularPolygonFootprint";
+import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, type PrimitiveGeometryOptions } from "@/lib/primitiveGeometry";
 import {
   ToolbarAlignIcon,
   ToolbarCenterOnWorkplaneIcon,
@@ -1963,185 +1963,16 @@ function bufferGeometryToMeshData(name: string, geometry: THREE.BufferGeometry):
   return { name, vertices, faces };
 }
 
-function createBooleanRoofGeometry(width: number, height: number, depth: number) {
-  const w = width / 2;
-  const d = depth / 2;
-  const vertices = new Float32Array([
-    -w, 0, -d, w, 0, -d, 0, height, -d,
-    -w, 0, d, w, 0, d, 0, height, d,
-  ]);
-  const indices = [
-    0, 2, 1,
-    3, 4, 5,
-    0, 1, 4, 0, 4, 3,
-    0, 3, 5, 0, 5, 2,
-    1, 2, 5, 1, 5, 4,
-  ];
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  return geometry;
-}
-
-function createBooleanWedgeGeometry(width: number, height: number, depth: number) {
-  const w = width / 2;
-  const d = depth / 2;
-  const vertices = new Float32Array([
-    -w, 0, -d, w, 0, -d, w, height, -d,
-    -w, 0, d, w, 0, d, w, height, d,
-  ]);
-  const indices = [
-    0, 2, 1,
-    3, 4, 5,
-    0, 1, 4, 0, 4, 3,
-    1, 2, 5, 1, 5, 4,
-    0, 3, 5, 0, 5, 2,
-  ];
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  return geometry;
-}
-
-function createBooleanPyramidGeometry(width: number, height: number, depth: number, sides = 4) {
-  const count = Math.max(3, Math.round(sides));
-  if (count !== 4) {
-    const footprintScale = regularPolygonFootprintScale(width, depth, count);
-    const geometry = new THREE.ConeGeometry(1, height, count);
-    geometry.scale(footprintScale.x, 1, footprintScale.z);
-    geometry.translate(footprintScale.offsetX, height / 2, footprintScale.offsetZ);
-    return geometry;
-  }
-
-  const w = width / 2;
-  const d = depth / 2;
-  const vertices = new Float32Array([
-    -w, 0, -d, w, 0, -d, w, 0, d, -w, 0, d,
-    0, height, 0,
-  ]);
-  const indices = [
-    0, 1, 2, 0, 2, 3,
-    0, 4, 1,
-    1, 4, 2,
-    2, 4, 3,
-    3, 4, 0,
-  ];
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  return geometry;
-}
-
-function createBooleanRoundRoofGeometry(width: number, height: number, depth: number, sides = 64) {
-  const radius = width / 2;
-  const segments = Math.max(4, Math.round(sides));
-  const shape = new THREE.Shape();
-  shape.moveTo(-radius, 0);
-  shape.absarc(0, 0, radius, Math.PI, 0, true);
-  shape.lineTo(-radius, 0);
-  shape.closePath();
-
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, steps: 1, curveSegments: segments });
-  geometry.translate(0, 0, -depth / 2);
-  geometry.scale(1, height / Math.max(0.001, radius), 1);
-  return geometry;
-}
-
-function createBooleanHalfSphereGeometry(width: number, height: number, depth: number, steps = 32) {
-  const lon = Math.max(8, Math.round(steps) * 2);
-  const lat = Math.max(4, Math.round(steps / 2));
-  const rx = width / 2;
-  const rz = depth / 2;
-  const positions: number[] = [];
-  const point = (latIndex: number, lonIndex: number): Vec3 => {
-    const theta = (latIndex / lat) * (Math.PI / 2);
-    const phi = ((lonIndex % lon) / lon) * Math.PI * 2;
-    const ring = Math.sin(theta);
-    return [Math.cos(phi) * rx * ring, Math.cos(theta) * height, Math.sin(phi) * rz * ring];
-  };
-  const addTri = (a: Vec3, b: Vec3, c: Vec3) => positions.push(...a, ...b, ...c);
-
-  const top: Vec3 = [0, height, 0];
-  for (let xStep = 0; xStep < lon; xStep += 1) {
-    addTri(top, point(1, xStep + 1), point(1, xStep));
-  }
-
-  for (let yStep = 1; yStep < lat; yStep += 1) {
-    for (let xStep = 0; xStep < lon; xStep += 1) {
-      const next = xStep + 1;
-      const a = point(yStep, xStep);
-      const b = point(yStep, next);
-      const c = point(yStep + 1, next);
-      const d = point(yStep + 1, xStep);
-      addTri(a, c, d);
-      addTri(a, b, c);
-    }
-  }
-
-  const bottomCenter: Vec3 = [0, 0, 0];
-  const capPoint = (lonIndex: number): Vec3 => {
-    const phi = ((lonIndex % lon) / lon) * Math.PI * 2;
-    return [Math.cos(phi) * rx, 0, Math.sin(phi) * rz];
-  };
-  for (let xStep = 0; xStep < lon; xStep += 1) {
-    addTri(bottomCenter, capPoint(xStep), capPoint(xStep + 1));
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function createBooleanTorusGeometry(width: number, height: number, depth: number) {
-  const tubeRadius = Math.max(0.1, height / 2);
-  const majorRadius = Math.max(0.2, Math.min(width, depth) / 2 - tubeRadius);
-  const geometry = new THREE.TorusGeometry(majorRadius, tubeRadius, 36, 144);
-  geometry.rotateX(Math.PI / 2);
-  const outerDiameter = (majorRadius + tubeRadius) * 2;
-  geometry.scale(width / Math.max(0.001, outerDiameter), 1, depth / Math.max(0.001, outerDiameter));
-  return geometry;
-}
-
-function createBooleanHollowCylinderGeometry(width: number, height: number, depth: number, thickness: number, segments = 96) {
-  const outerX = width / 2;
-  const outerZ = depth / 2;
-  const safeThickness = clampNumber(thickness, 0.1, Math.max(0.1, Math.min(outerX, outerZ) - 0.1));
-  const innerX = Math.max(0.1, outerX - safeThickness);
-  const innerZ = Math.max(0.1, outerZ - safeThickness);
-  const count = Math.max(12, Math.round(segments));
-  const positions: number[] = [];
-  const point = (rx: number, rz: number, y: number, index: number): Vec3 => {
-    const angle = (index / count) * Math.PI * 2;
-    return [Math.cos(angle) * rx, y, Math.sin(angle) * rz];
-  };
-  const addTri = (a: Vec3, b: Vec3, c: Vec3) => positions.push(...a, ...b, ...c);
-  const addQuad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3) => {
-    addTri(a, b, c);
-    addTri(a, c, d);
-  };
-
-  for (let index = 0; index < count; index += 1) {
-    const next = index + 1;
-    const ob0 = point(outerX, outerZ, 0, index);
-    const ob1 = point(outerX, outerZ, 0, next);
-    const ot0 = point(outerX, outerZ, height, index);
-    const ot1 = point(outerX, outerZ, height, next);
-    const ib0 = point(innerX, innerZ, 0, index);
-    const ib1 = point(innerX, innerZ, 0, next);
-    const it0 = point(innerX, innerZ, height, index);
-    const it1 = point(innerX, innerZ, height, next);
-
-    addQuad(ob0, ot0, ot1, ob1);
-    addQuad(ib1, it1, it0, ib0);
-    addQuad(ot0, it0, it1, ot1);
-    addQuad(ob0, ob1, ib1, ib0);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  return geometry;
-}
+/**
+ * How this path wants its primitives, which is not how the viewport wants them.
+ *
+ * The index buffer stays because `bufferGeometryToMeshData` flattens on its own
+ * terms, and the dome's normals are averaged rather than analytic. Both were
+ * what the second copy of these builders did, and both are preserved rather
+ * than reconciled: which dome shading is right is a separate question from
+ * whether there should be two of these builders.
+ */
+const BOOLEAN_PRIMITIVE_OPTIONS: PrimitiveGeometryOptions = { indexed: true, halfSphereNormals: "computed" };
 
 function createBooleanTextGeometry(shape: WorkplaneShape) {
   const text = (shape.text ?? "TEXT").trim() || " ";
@@ -2208,23 +2039,23 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
       break;
     }
     case "pyramid":
-      geometry = createBooleanPyramidGeometry(width, height, depth, shape.sides ?? 4);
+      geometry = createPyramidGeometry(width, height, depth, shape.sides ?? 4, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "roof":
-      geometry = createBooleanRoofGeometry(width, height, depth);
+      geometry = createRoofGeometry(width, height, depth, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "roundRoof":
-      geometry = createBooleanRoundRoofGeometry(width, height, depth, shape.sides ?? 64);
+      geometry = createRoundRoofGeometry(width, height, depth, shape.sides ?? 64, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "halfSphere":
-      geometry = createBooleanHalfSphereGeometry(width, height, depth, shape.steps ?? 32);
+      geometry = createHalfSphereGeometry(width, height, depth, shape.steps ?? 32, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "torus":
-      geometry = createBooleanTorusGeometry(width, height, depth);
+      geometry = createTorusGeometry(width, height, depth, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "ring":
     case "tube":
-      geometry = createBooleanHollowCylinderGeometry(width, height, depth, shape.bevel ?? 4, 144);
+      geometry = createHollowCylinderGeometry(width, height, depth, shape.bevel ?? 4, 144);
       break;
     case "gear":
       geometry = createGearGeometry({
@@ -2256,7 +2087,7 @@ function geometryMeshForShape(shape: WorkplaneShape): MeshData | null {
       });
       break;
     case "wedge":
-      geometry = createBooleanWedgeGeometry(width, height, depth);
+      geometry = createWedgeGeometry(width, height, depth, BOOLEAN_PRIMITIVE_OPTIONS);
       break;
     case "polygon":
       geometry = new THREE.CylinderGeometry(1, 1, height, 6);
