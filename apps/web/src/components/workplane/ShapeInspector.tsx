@@ -4,6 +4,15 @@ import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
 import { normalizeGearType } from "@/lib/gearGeometry";
+import {
+  MATERIAL_PRESETS,
+  formatMaterialNumber,
+  materialLabel,
+  materialPreset,
+  materialPricePerKg,
+  shapeMaterialEstimate,
+  type MaterialId,
+} from "@/lib/materialPresets";
 import { unitLabel, useTranslations } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
@@ -89,6 +98,8 @@ export function ShapeInspector({
   canSeparateParts = false,
   onSeparateParts,
   onInteractionActiveChange,
+  volumeMm3,
+  onMaterialPriceChange,
 }: {
   shape: WorkplaneShape;
   snap: GridSize;
@@ -101,6 +112,9 @@ export function ShapeInspector({
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
+  /** Solid volume of this shape in mm3; absent when nothing has been measured. */
+  volumeMm3?: number;
+  onMaterialPriceChange?: (materialId: MaterialId, pricePerKg: number) => void;
 }) {
   const t = useTranslations();
   const solidColor = shape.color;
@@ -132,6 +146,7 @@ export function ShapeInspector({
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(false);
+  const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
 
@@ -281,6 +296,31 @@ export function ShapeInspector({
               />
             ) : null}
             <ShapePropertyRows properties={primaryProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+          </div>
+        ) : null}
+      </div>
+      <div className={`property-card ${materialOpen ? "" : "collapsed"}`}>
+        <button
+          className="property-card-header"
+          type="button"
+          aria-expanded={materialOpen}
+          aria-controls={`material-${shape.id}`}
+          onClick={() => setMaterialOpen((open) => !open)}
+        >
+          <span>{t("panels.material.title")}</span>
+          <ChevronUp className={materialOpen ? "" : "collapsed"} size={25} strokeWidth={2.8} />
+        </button>
+        {materialOpen ? (
+          <div className="property-list" id={`material-${shape.id}`}>
+            <MaterialProperties
+              shape={shape}
+              workspace={workspace}
+              volumeMm3={volumeMm3}
+              disabled={locked}
+              onUpdate={onUpdate}
+              onMaterialPriceChange={onMaterialPriceChange}
+              onInteractionActiveChange={onInteractionActiveChange}
+            />
           </div>
         ) : null}
       </div>
@@ -547,6 +587,113 @@ function SelectProperty({ label, value, options, optionLabel, disabled, onChange
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * Material chooser plus the weight and cost it implies.
+ *
+ * All of the arithmetic is in lib/materialPresets; this only renders it. A
+ * hole has no weight of its own and says so, and a shape whose volume has not
+ * been measured shows the material without numbers rather than a wrong zero.
+ */
+function MaterialProperties({
+  shape,
+  workspace,
+  volumeMm3,
+  disabled,
+  onUpdate,
+  onMaterialPriceChange,
+  onInteractionActiveChange,
+}: {
+  shape: WorkplaneShape;
+  workspace: WorkplaneWorkspaceSettings;
+  volumeMm3?: number;
+  disabled?: boolean;
+  onUpdate: ShapeInspectorUpdate;
+  onMaterialPriceChange?: (materialId: MaterialId, pricePerKg: number) => void;
+  onInteractionActiveChange?: (active: boolean) => void;
+}) {
+  const t = useTranslations();
+  const preset = materialPreset(shape.material);
+  const prices = workspace.materialPricesPerKg;
+  const pricePerKg = preset ? materialPricePerKg(preset.id, prices) : 0;
+  const estimate = volumeMm3 === undefined ? undefined : shapeMaterialEstimate(shape, volumeMm3, prices);
+  const [priceDraft, setPriceDraft] = useState<string | null>(null);
+  const commitPrice = () => {
+    if (priceDraft !== null && preset && onMaterialPriceChange) {
+      const parsed = Number.parseFloat(priceDraft.replace(",", "."));
+      if (Number.isFinite(parsed) && parsed >= 0) onMaterialPriceChange(preset.id, parsed);
+    }
+    setPriceDraft(null);
+    onInteractionActiveChange?.(false);
+  };
+
+  return (
+    <>
+      <label className="select-property">
+        <span>{t("panels.material.label")}</span>
+        <select
+          value={shape.material ?? ""}
+          disabled={disabled}
+          onChange={(event) => {
+            const next = event.currentTarget.value;
+            onUpdate({ material: next === "" ? undefined : next });
+          }}
+        >
+          <option value="">{t("panels.material.none")}</option>
+          {shape.material && !preset ? <option value={shape.material}>{shape.material}</option> : null}
+          {MATERIAL_PRESETS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {materialLabel(t, option.id)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {preset ? (
+        <label className="select-property material-price-property">
+          <span>{t("panels.material.pricePerKg")}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            aria-label={t("panels.material.pricePerKgLabel")}
+            value={priceDraft ?? formatMaterialNumber(pricePerKg, 2)}
+            disabled={disabled || !onMaterialPriceChange}
+            onFocus={() => {
+              onInteractionActiveChange?.(true);
+              setPriceDraft(formatMaterialNumber(pricePerKg, 2));
+            }}
+            onChange={(event) => setPriceDraft(event.currentTarget.value)}
+            onBlur={commitPrice}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+              else if (event.key === "Escape") setPriceDraft(null);
+            }}
+          />
+        </label>
+      ) : null}
+      {preset && shape.hole ? <p className="material-readout-hint">{t("panels.material.holeHint")}</p> : null}
+      {estimate ? (
+        <dl className="material-readout">
+          <div>
+            <dt>{t("panels.material.volume")}</dt>
+            <dd>{t("panels.material.cubicCentimeters", { volume: formatMaterialNumber(estimate.volumeCm3, 2) })}</dd>
+          </div>
+          <div>
+            <dt>{t("panels.material.weight")}</dt>
+            <dd>{t("panels.material.grams", { grams: formatMaterialNumber(estimate.grams, 2) })}</dd>
+          </div>
+          <div>
+            <dt>{t("panels.material.cost")}</dt>
+            <dd>{formatMaterialNumber(estimate.cost, 2)}</dd>
+          </div>
+          <div>
+            <dt>{t("panels.material.title")}</dt>
+            <dd>{t("panels.material.density", { density: formatMaterialNumber(estimate.density, 2) })}</dd>
+          </div>
+        </dl>
+      ) : null}
+    </>
   );
 }
 

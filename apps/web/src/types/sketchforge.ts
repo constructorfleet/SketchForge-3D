@@ -99,6 +99,11 @@ export type WorkplaneWorkspaceSettings = {
   accuracy: MeasurementAccuracy;
   historyLimit: HistoryRetentionLimit;
   shapeCustomizations: ShapeCustomizationMap;
+  /**
+   * Price per kilogram per material preset id, overriding the preset default.
+   * Only materials the user has repriced appear here.
+   */
+  materialPricesPerKg: Record<string, number>;
 };
 
 export type AlignAxis = "x" | "y" | "z";
@@ -234,6 +239,12 @@ export type WorkplaneShape = {
   name: string;
   kind: ShapeKind;
   color: string;
+  /**
+   * Chosen material preset id (see lib/materialPresets). Absent means none was
+   * chosen, which is what every project written before materials existed says.
+   * A value this build does not recognise is kept as-is rather than coerced.
+   */
+  material?: string;
   hole?: boolean;
   x: number;
   z: number;

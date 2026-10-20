@@ -653,6 +653,10 @@
           "description": "3D print mesh",
           "note": "Best for slicers and 3D printing. Geometry is exported as a triangulated mesh."
         },
+        "3mf": {
+          "description": "3D print package",
+          "note": "What modern slicers prefer: millimeter units, one named object per shape with its own placement, and shape colors."
+        },
         "obj": {
           "description": "Universal 3D mesh",
           "note": "A broadly compatible mesh format for modeling, rendering, and interchange."
@@ -954,6 +958,30 @@
       },
       "gearType": "Gear Type",
       "placement": "Placement"
+    },
+    "material": {
+      "title": "Material",
+      "label": "Shape material",
+      "none": "None",
+      "pricePerKg": "Price per kg",
+      "pricePerKgLabel": "Material price per kilogram",
+      "weight": "Weight",
+      "cost": "Cost",
+      "volume": "Volume",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm\u00b3",
+      "holeHint": "A hole removes material, so it has no weight of its own.",
+      "name": {
+        "pla": "PLA",
+        "petg": "PETG",
+        "abs": "ABS",
+        "asa": "ASA",
+        "tpu": "TPU",
+        "pa12": "Nylon (PA12)",
+        "pc": "Polycarbonate",
+        "resin": "Resin"
+      },
+      "density": "{density} g/cm\u00b3"
     },
     "edgeModifier": {
       "title": {

@@ -124,6 +124,7 @@ import { transformMesh, type MeshData, type Vec3 } from "@/lib/meshTransform";
 import { createLocalId } from "@/lib/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
+import { meshVolumeMm3 } from "@/lib/materialPresets";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
@@ -149,6 +150,7 @@ import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { importedShapeFromStl } from "@/lib/stlImport";
 import { exportMeshesToStl } from "@/lib/stlExport";
+import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
@@ -180,7 +182,7 @@ import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset,
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
 type TopPanel = "import" | "export" | "profile" | "settings" | null;
-type ExportFormat = "stl" | "obj" | "step" | "svg" | "skf";
+type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "skf";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
@@ -5922,6 +5924,14 @@ export function SketchForgeEditor({
     () => selectedShapes.length === 1 && Boolean(selectedShape && separablePartCount(selectedShape) > 1),
     [selectedShape, selectedShapes.length],
   );
+  // The inspector's material readout needs a volume, and the export mesh is
+  // the only place a volume exists for every shape kind. Tessellating is not
+  // free, so it is done for the one selected shape and only while a material
+  // is actually chosen.
+  const selectedShapeVolumeMm3 = useMemo(() => {
+    if (!selectedShape || !selectedShape.material || selectedShape.hole) return undefined;
+    return meshVolumeMm3(meshForShape(selectedShape));
+  }, [selectedShape]);
   const toggleModifierEdge = useCallback((id: number, singleEdge = false) => {
     setEdgeModifier((current) => {
       if (!current || current.busy) return current;
@@ -9002,6 +9012,17 @@ export function SketchForgeEditor({
       return;
     }
     const meshes = exportable.map(meshForShape);
+    if (format === "3mf") {
+      const colored = meshes.map((mesh, index) => ({ ...mesh, color: exportable[index].color }));
+      void exportMeshesTo3mf(colored)
+        .then((bytes) => {
+          const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+          return downloadBlobFile(projectExportFileName(exportName, "3mf"), new Blob([buffer], { type: "model/3mf" }));
+        })
+        .then((result) => finishNotice("3MF", result))
+        .catch((error: unknown) => failNotice("3MF", error));
+      return;
+    }
     if (format === "stl") {
       const blob = new Blob([exportMeshesToStl(meshes)], { type: "model/stl" });
       void downloadBlobFile(projectExportFileName(exportName, "stl"), blob)
@@ -9665,6 +9686,7 @@ export function SketchForgeEditor({
           onCameraOrientationChange={rememberCameraOrientation}
           onEditSketch={beginSketchEdit}
           canSeparateParts={canSeparateSelectedParts}
+          selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}
           onUpdateShape={updateShape}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
@@ -11069,7 +11091,7 @@ function TopActionPanel({
               </span>
             </div>
             <div className="export-format-slider" data-format={exportFormat} role="radiogroup" aria-label={t("editor.panel.exportFormat")}>
-              {(["stl", "obj", "step", "svg", "skf"] as const).map((format) => (
+              {(["stl", "3mf", "obj", "step", "svg", "skf"] as const).map((format) => (
                 <button
                   key={format}
                   type="button"

@@ -970,6 +970,10 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   const kind = stringValue(definition.kind, `${label}.kind`);
   if (!SHAPE_KINDS.has(kind)) throw new LocalizedError("errors.skf.unknownShapeKind", { label, kind });
   stringValue(definition.color, `${label}.color`);
+  // Materials came later, so a project written before them has no field at
+  // all; a value from a build with more presets than this one stays a string
+  // and is simply not priced.
+  if (definition.material !== undefined) stringValue(definition.material, `${label}.material`);
   ["x", "z", "size", "width", "depth", "height", "rotation"].forEach((field) => finiteNumber(definition[field], `${label}.${field}`));
   if ((definition.width as number) <= 0 || (definition.depth as number) <= 0 || (definition.height as number) <= 0) {
     throw new LocalizedError("errors.skf.nonPositiveDimensions", { label });
