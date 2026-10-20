@@ -1,0 +1,237 @@
+name: Release
+run-name: Release ${{ inputs.version || github.ref_name }}
+
+# Publishes the artifacts for a release. The tag and the draft GitHub release
+# are made by release-please when its release pull request is merged; this
+# workflow and desktop-release.yml both trigger on that tag, and neither
+# creates the release itself.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (for example 1.1.0)"
+        required: true
+        type: string
+      publish_docker:
+        description: "Publish the Docker image"
+        type: boolean
+        default: true
+      publish_npm:
+        description: "Publish @constructorfleet/sketchforge3d"
+        type: boolean
+        default: true
+      publish_pypi:
+        description: "Publish sketchforge3d"
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the version
+        id: resolve
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          TAG_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            version="${INPUT_VERSION#v}"
+          else
+            version="${TAG_NAME#v}"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Not a release version: $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Nothing is published from a tree that does not pass its own checks: a
+      # bad release cannot be unpublished from npm or PyPI, only superseded.
+      - name: Typecheck and test
+        run: npm run ci
+
+      - name: Build the static export
+        run: npm run export
+
+      - name: Check the manifests match the tag
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          root=$(node -p "require('./package.json').version")
+          client=$(node -p "require('./packages/sketchforge-client/package.json').version")
+          python3 - <<'PY' > /tmp/py-version
+          import pathlib, re
+          text = pathlib.Path("packages/sketchforge-py/pyproject.toml").read_text()
+          print(re.search(r'(?m)^version = "(.*)"$', text).group(1))
+          PY
+          py=$(cat /tmp/py-version)
+          fail=0
+          for pair in "root:$root" "client:$client" "python:$py"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            if [ "$value" != "$VERSION" ]; then
+              echo "::error::$name manifest is $value but the release is $VERSION"
+              fail=1
+            fi
+          done
+          # release-please commits all three in its release pull request, so a
+          # disagreement here means the tag was made by hand or a manifest was
+          # edited after it. Publishing a version that is not in the tree is
+          # worse than stopping.
+          [ "$fail" = "0" ] || exit 1
+          echo "All three manifests are $VERSION"
+
+  docker:
+    name: Docker image
+    needs: verify
+    if: inputs.publish_docker != false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release moves `latest`, which pushes to main also set. That is the
+      # pre-existing behaviour of docker.yml and is left alone here; the
+      # version tags are what a deployment should pin to.
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ needs.verify.outputs.tag }}
+            type=raw,value=${{ needs.verify.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.verify.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=sketchforge-docker
+          cache-to: type=gha,mode=max,scope=sketchforge-docker
+
+  npm:
+    name: npm client
+    needs: verify
+    if: inputs.publish_npm != false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # npm provenance is signed with the workflow's OIDC identity.
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run client:build
+
+      - name: Publish
+        working-directory: packages/sketchforge-client
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  pypi:
+    name: PyPI client
+    needs: verify
+    if: inputs.publish_pypi != false
+    runs-on: ubuntu-latest
+    # Trusted publishing: PyPI verifies this workflow's OIDC identity, so there
+    # is no API token to store or rotate.
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        working-directory: packages/sketchforge-py
+        run: PYTHONPATH=src:tests python -m unittest discover -s tests -t tests
+
+      - name: Build the distributions
+        working-directory: packages/sketchforge-py
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Check the distributions install and import
+        working-directory: packages/sketchforge-py
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install dist/*.whl
+          /tmp/verify/bin/python -c "import sketchforge3d; print(sketchforge3d.__version__)"
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/sketchforge-py/dist

@@ -1,0 +1,25 @@
+name: Release Please
+
+# Versioning is driven from main, not from a tag typed by hand. Every merge
+# updates a standing release pull request that carries the next version number
+# and the release notes for it; merging that pull request is the release, and
+# it is what creates the tag and the draft GitHub release the other release
+# workflows attach to.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
