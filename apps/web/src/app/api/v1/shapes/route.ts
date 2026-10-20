@@ -2,7 +2,7 @@ import { apiContext, apiError, apiJson, apiJsonBody, apiTarget } from "@/lib/api
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { withProjectLock } from "@/lib/serverProjectFiles";
-import { metricThreadOutline, parseRevolveRequest, revolvedShapeFromRequest } from "@/lib/revolveRequests";
+import { parseRevolveRequest, resolveThreadRequest, revolvedShapeFromRequest } from "@/lib/revolveRequests";
 import { serverManifoldRuntime } from "@/lib/serverManifoldRuntime";
 import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest, shapeWithRequestedChanges } from "@/lib/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -15,18 +15,25 @@ const MAX_SHAPES_PER_REQUEST = 200;
 /**
  * `kind: "thread"` is `kind: "revolve"` with the outline filled in.
  *
- * An ISO metric thread's profile follows from its diameter and pitch, so
- * asking for an M8 should not mean working out a 60-degree V by hand. The
- * pitch doubles as the revolve's pitch, which is what makes it a thread.
+ * A size from the catalog carries its own pitch, so "M8" is enough; an
+ * explicit diameter and pitch still work for anything unlisted. `hole: true`
+ * cuts the form wider by a clearance so a bolt of that size fits, and marks
+ * the shape as a hole for the boolean to subtract.
  */
-function withMetricThreadOutline(request: Record<string, unknown>) {
-  const diameter = typeof request.diameter === "number" ? request.diameter : 8;
-  const pitch = typeof request.pitch === "number" && request.pitch !== 0 ? request.pitch : 1.25;
+function resolvedThreadRequest(request: Record<string, unknown>): { request: Record<string, unknown>; error?: undefined } | { error: string; request?: undefined } {
+  if (request.profile) return { request };
+  const resolved = resolveThreadRequest(request);
+  if ("error" in resolved) return { error: resolved.error };
   return {
-    ...request,
-    profile: request.profile ?? metricThreadOutline(diameter, Math.abs(pitch)),
-    pitch,
-    turns: request.turns ?? 8,
+    request: {
+      ...request,
+      profile: resolved.profile,
+      pitch: resolved.pitch,
+      turns: resolved.turns,
+      coreRadius: resolved.coreRadius,
+      hole: resolved.hole,
+      name: typeof request.name === "string" ? request.name : (resolved.hole ? `${resolved.designation} hole` : resolved.designation),
+    },
   };
 }
 
@@ -73,20 +80,24 @@ export async function POST(request: Request) {
     // dimensions, and it is built by manifold rather than from parameters --
     // which is what makes threads and springs possible here at all.
     if (request.kind === "revolve" || request.kind === "thread") {
-      const parsed = parseRevolveRequest(
-        request.kind === "thread" ? withMetricThreadOutline(request) : request,
-      );
+      let revolveRequest = request;
+      if (request.kind === "thread") {
+        const resolved = resolvedThreadRequest(request);
+        if (!resolved.request) return apiError(`Shape ${index}: ${resolved.error}`, 400);
+        revolveRequest = resolved.request;
+      }
+      const parsed = parseRevolveRequest(revolveRequest);
       if (!parsed.ok) return apiError(`Shape ${index}: ${parsed.error}`, 400);
       try {
         const runtime = await serverManifoldRuntime();
         built.push(revolvedShapeFromRequest(runtime, parsed, {
-          name: typeof request.name === "string" ? request.name : undefined,
+          name: typeof revolveRequest.name === "string" ? revolveRequest.name : undefined,
           color: typeof request.color === "string" ? request.color : undefined,
           x: typeof request.x === "number" ? request.x : undefined,
           z: typeof request.z === "number" ? request.z : undefined,
           elevation: typeof request.elevation === "number" ? request.elevation : undefined,
           rotation: typeof request.rotation === "number" ? request.rotation : undefined,
-          hole: request.hole === true,
+          hole: revolveRequest.hole === true,
         }));
       } catch (error) {
         return apiError(

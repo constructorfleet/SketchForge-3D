@@ -74,10 +74,15 @@ A locked shape answers `409` to a change or delete; send `locked: false` to unlo
 A revolve is described by an outline rather than by dimensions, so it has its own two kinds. This is the one shape nobody wants to place by hand: a thread's profile is three points and its pitch is a number from a table.
 
 ```bash
-# An M8 bolt thread: the 60-degree ISO profile follows from diameter and pitch
+# A standard size: "M8" carries its own pitch, and length beats counting turns
 curl -X POST "$HOST/shapes?projectId=$PROJECT" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"kind":"thread","diameter":8,"pitch":1.25,"turns":10,"name":"M8"}'
+  -d '{"kind":"thread","size":"M8","length":20}'
+
+# The tapped hole for that bolt: cut wider so it fits, and marked as a hole
+curl -X POST "$HOST/shapes?projectId=$PROJECT" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"thread","size":"M8","length":10,"hole":true}'
 
 # A spring of square wire: any closed outline, swept along a helix
 curl -X POST "$HOST/shapes?projectId=$PROJECT" \
@@ -97,7 +102,14 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | `turns` | How many full turns to sweep (0.1–20). |
 | `startAngle` | Rotation the sweep starts at. |
 | `sweepAngle` | How far round to revolve when there is no pitch (±360). |
-| `diameter` | `thread` only: outside diameter, default 8 (an M8). With `pitch`, it gives the ISO 60-degree profile. |
+| `size` | `thread` only: a catalog designation that carries its own pitch. Metric coarse `M2`–`M20`, imperial UNC `#4-40`–`1/2-13`. Default `M8`. An unknown size is refused with the list of known ones. |
+| `diameter` | `thread` only: outside diameter, for a size the catalog does not list. With `pitch`, it gives the ISO 60-degree profile. |
+| `length` | `thread` only: how long the thread should be, instead of counting turns. |
+| `hole` | `thread` only: cut the form wider by a clearance so a bolt of that size fits, and mark the shape as a hole -- so grouping it with a solid taps that solid. |
+| `clearance` | `thread` with `hole`: how much wider to cut, per side (default 0.2mm, a starting point for FDM). |
+| `core` | `thread` only: `false` leaves the bare helix with no shank or drilled hole. On by default, because a thread without its core is a floating ribbon rather than a bolt or a tapped hole. |
+
+A thread comes with its core: a bolt is the thread standing on its shank, and a tapped hole is the thread plus the hole it is cut into, so neither is useful as a bare helix. The core's radius is the thread's root, is fused into one solid, and appears as **Core radius** in the object panel -- set it to 0 there, or pass `core: false`, for the ribbon on its own (a spring, say).
 
 A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable in the editor's inspector** afterwards.
 

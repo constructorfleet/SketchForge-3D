@@ -1,12 +1,24 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
+import { buildSketchRevolveMesh } from "@/lib/sketchRevolve";
 import {
   MAX_PROFILE_POINTS,
   metricThreadOutline,
   parseRevolveRequest,
   profileFromOutline,
+  resolveThreadRequest,
   revolvedShapeFromRequest,
 } from "@/lib/revolveRequests";
+
+/** Signed volume of a triangle soup, by the divergence theorem. */
+function meshVolume(positions: number[]) {
+  let total = 0;
+  for (let index = 0; index + 8 < positions.length; index += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(index, index + 9);
+    total += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+  }
+  return Math.abs(total);
+}
 
 describe("revolve requests", () => {
   it("turns an outline into a closed sketch profile", () => {
@@ -84,6 +96,64 @@ describe("building a revolve request", () => {
     expect(shape.sketchRevolve).toMatchObject({ pitch: 1.25, turns: 6 });
     expect(shape.sketchProfile?.points).toHaveLength(3);
     expect(shape.importedMesh?.triangleCount).toBeGreaterThan(100);
+  });
+
+  it("builds a bolt as one solid: a shank with the thread standing on it", () => {
+    const parsed = parseRevolveRequest({
+      ...resolveThreadRequest({ size: "M8", turns: 6 }) as Record<string, unknown>,
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const shape = revolvedShapeFromRequest(runtime, parsed, { name: "M8" });
+
+    // A bare helix of this thread is about 60mm3; the shank it stands on is
+    // several times that, so a rod that is only the ribbon is unmistakable.
+    const bareHelix = parseRevolveRequest({
+      ...resolveThreadRequest({ size: "M8", turns: 6, core: false }) as Record<string, unknown>,
+    });
+    if (!bareHelix.ok) throw new Error("expected the bare helix to parse");
+    const ribbon = revolvedShapeFromRequest(runtime, bareHelix, {});
+
+    expect(shape.importedMesh!.triangleCount).toBeGreaterThan(0);
+    expect(meshVolume(shape.importedMesh!.positions)).toBeGreaterThan(meshVolume(ribbon.importedMesh!.positions) * 3);
+    // Both are the same outside diameter: the core fills the middle, it does
+    // not make the thread bigger.
+    expect(shape.width).toBeCloseTo(ribbon.width, 1);
+  });
+
+  it("fuses the core into one solid rather than leaving slivers", () => {
+    // A thread root sitting exactly on the core's surface shares a face with
+    // it, and the union comes back watertight but with hundreds of handles.
+    // The outline is sunk into the core to avoid that, and genus is how it
+    // shows: a bolt is one lump with no tunnels through it.
+    const resolved = resolveThreadRequest({ size: "M8", turns: 4 });
+    if ("error" in resolved) throw new Error(resolved.error);
+    const parsed = parseRevolveRequest({ ...resolved } as Record<string, unknown>);
+    if (!parsed.ok) throw new Error("expected the thread to parse");
+
+    const mesh = buildSketchRevolveMesh(runtime, parsed.profile, parsed.settings);
+
+    // A bolt is one lump with no tunnels through it.
+    expect(mesh.genus).toBe(0);
+    expect(mesh.triangleCount).toBeGreaterThan(500);
+  });
+
+  it("gives a hole the same core, which is the drill it cuts", () => {
+    const solid = resolveThreadRequest({ size: "M8", turns: 4 });
+    const hole = resolveThreadRequest({ size: "M8", turns: 4, hole: true });
+    if ("error" in solid || "error" in hole) throw new Error("expected both to resolve");
+
+    expect(solid.coreRadius).toBeGreaterThan(0);
+    // The hole's form is cut wider, so its drill is wider by the same amount.
+    expect(hole.coreRadius).toBeCloseTo(solid.coreRadius + 0.2, 6);
+  });
+
+  it("leaves the bare helix when the core is declined", () => {
+    const resolved = resolveThreadRequest({ size: "M8", core: false });
+    if ("error" in resolved) throw new Error(resolved.error);
+
+    expect(resolved.coreRadius).toBe(0);
   });
 
   it("names a plain revolve differently from a thread", () => {

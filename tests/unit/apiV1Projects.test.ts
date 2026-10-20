@@ -158,6 +158,48 @@ describe("REST API v1", () => {
     expect(thread?.sketchRevolve).toMatchObject({ pitch: 1.25, turns: 6 });
   });
 
+  it("creates a thread from a catalog size, which carries its own pitch", async () => {
+    const projectId = await makeProject();
+
+    const created = await addShape(projectId, { kind: "thread", size: "M6", length: 12 });
+
+    expect(created.status).toBe(201);
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const thread = document?.shapes[0];
+    // M6 is 1mm coarse pitch, so 12mm of thread is 12 turns, and the name says
+    // which size it is rather than just "Thread".
+    expect(thread?.name).toBe("M6");
+    expect(thread?.sketchRevolve?.pitch).toBe(1);
+    expect(thread?.sketchRevolve?.turns).toBe(12);
+    expect(thread?.width).toBeCloseTo(6, 0);
+  });
+
+  it("cuts a tapped hole wider than the bolt, and marks it as a hole", async () => {
+    const projectId = await makeProject();
+
+    await addShape(projectId, { kind: "thread", size: "M8", turns: 4 });
+    await addShape(projectId, { kind: "thread", size: "M8", turns: 4, hole: true });
+
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const solid = document?.shapes.find((shape) => shape.name === "M8");
+    const hole = document?.shapes.find((shape) => shape.name === "M8 hole");
+
+    expect(hole?.hole).toBe(true);
+    expect(solid?.hole).toBeFalsy();
+    // 0.2mm of clearance on each side, so the bolt fits.
+    expect(hole!.width).toBeGreaterThan(solid!.width);
+    expect(hole!.width - solid!.width).toBeCloseTo(0.4, 1);
+  });
+
+  it("names the sizes it knows when given one it does not", async () => {
+    const projectId = await makeProject();
+
+    const created = await addShape(projectId, { kind: "thread", size: "M7" });
+
+    expect(created.status).toBe(400);
+    expect(created.payload.error).toContain("M8");
+  });
+
   it("creates a revolve from an outline, with or without a pitch", async () => {
     const projectId = await makeProject();
     const outline = [[4, 0], [6, 0], [6, 3], [4, 3]];

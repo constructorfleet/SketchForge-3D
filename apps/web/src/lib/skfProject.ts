@@ -989,7 +989,7 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     ["startAngle", "sweepAngle", "sides", "quality"].forEach((field) => finiteNumber(settings[field], `${label}.sketchRevolve.${field}`));
     // Helical revolves came later, so a project written before them has
     // neither field and must still read.
-    ["pitch", "turns"].forEach((field) => {
+    ["pitch", "turns", "coreRadius"].forEach((field) => {
       if (settings[field] !== undefined) finiteNumber(settings[field], `${label}.sketchRevolve.${field}`);
     });
   }

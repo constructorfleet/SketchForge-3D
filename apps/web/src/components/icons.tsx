@@ -183,6 +183,27 @@ export function ToolbarDropToWorkplaneIcon() {
   return <ToolbarCommandImage file="toolbar-drop-workplane.png" className="toolbar-user-art-icon" />;
 }
 
+/** A threaded rod: a cylinder with a helix wrapped round it. */
+export function ToolbarThreadIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={["toolbar-vector-art-icon", className].filter(Boolean).join(" ")}
+      {...props}
+    >
+      <rect x="14" y="5" width="20" height="38" rx="2" fill="#efeded" stroke="currentColor" strokeWidth="2.6" />
+      <path
+        d="M14 11h20M14 18h20M14 25h20M14 32h20M14 39h20"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        transform="skewY(-9)"
+      />
+    </svg>
+  );
+}
+
 /**
  * The trigger for the Distribute menu: three blocks spread across a span.
  *

@@ -10,6 +10,7 @@ export const DEFAULT_SKETCH_REVOLVE_SETTINGS: SketchRevolveSettings = {
   quality: 6,
   pitch: 0,
   turns: 1,
+  coreRadius: 0,
 };
 
 export const MAX_REVOLVE_TURNS = 20;
@@ -37,6 +38,14 @@ export type SketchRevolveMesh = {
   depth: number;
   height: number;
   triangleCount: number;
+  /**
+   * Handles through the solid: 0 for a bolt, 1 for a ring.
+   *
+   * Carried because it is the cheapest way to catch a union that technically
+   * closed but came back as a mass of slivers -- a threaded rod fused to its
+   * core wrongly reports hundreds of these.
+   */
+  genus: number;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -60,6 +69,7 @@ export function normalizeSketchRevolveSettings(settings?: Partial<SketchRevolveS
     // geometry is both exact and cheaper.
     pitch: Math.abs(pitch) < 1e-6 ? 0 : pitch,
     turns: clamp(finiteOr(settings?.turns, DEFAULT_SKETCH_REVOLVE_SETTINGS.turns), 0.1, MAX_REVOLVE_TURNS),
+    coreRadius: Math.max(0, finiteOr(settings?.coreRadius, DEFAULT_SKETCH_REVOLVE_SETTINGS.coreRadius)),
   };
 }
 
@@ -302,7 +312,22 @@ function helicalRevolveSolid(
   }
 
   const mesh = new runtime.Mesh({ numProp: 3, vertProperties, triVerts: triangles });
-  return runtime.Manifold.ofMesh(mesh);
+  const sweep = runtime.Manifold.ofMesh(mesh);
+  if (settings.coreRadius <= 0) return sweep;
+
+  // Fuse the sweep to a core spanning it. The caller is expected to have sunk
+  // the profile's inner edge slightly into this radius: a thread whose root
+  // sits exactly on the core's surface shares a face with it, and the union
+  // comes back riddled with slivers -- watertight, but hundreds of handles
+  // where a bolt should have none.
+  const bounds = sweep.boundingBox();
+  const height = Math.max(1e-4, bounds.max[2] - bounds.min[2]);
+  const core = runtime.Manifold.cylinder(height, settings.coreRadius, settings.coreRadius, settings.sides, false)
+    .translate([0, 0, bounds.min[2]]);
+  const fused = sweep.add(core);
+  core.delete();
+  sweep.delete();
+  return fused;
 }
 
 export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: SketchProfile, requestedSettings?: Partial<SketchRevolveSettings>): SketchRevolveMesh {
@@ -382,5 +407,6 @@ function meshFromManifold(solid: InstanceType<ManifoldToplevel["Manifold"]>): Sk
       depth: Math.max(0.01, maxZ - minZ),
       height: Math.max(0.01, maxY - minY),
       triangleCount: Math.floor(positions.length / 9),
+      genus: solid.genus(),
     };
 }

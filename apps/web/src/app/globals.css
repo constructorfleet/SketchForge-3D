@@ -2277,6 +2277,111 @@ button {
  * element's bounding rect, and an element that generates no box has none to
  * measure.
  */
+/*
+ * The thread catalog sits inside the shapes dropdown rather than floating:
+ * picking a size is a second step of the same choice, and a panel that
+ * followed the pointer would cover the sizes it is listing.
+ */
+.thread-catalog {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  width: min(300px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+  padding: 9px;
+  overflow-y: auto;
+  gap: 8px;
+  color: #263f56;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #c9d8e3;
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(29, 48, 66, 0.22);
+  backdrop-filter: blur(12px);
+}
+
+.thread-catalog-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.thread-catalog-modes button {
+  padding: 6px 8px;
+  color: #3c5f78;
+  font-size: 11px;
+  font-weight: 800;
+  background: #f1f6f9;
+  border: 1px solid #cfdde6;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.thread-catalog-modes button.active {
+  color: #10405c;
+  background: #d8eef8;
+  border-color: #8fc4db;
+}
+
+.thread-catalog-help {
+  color: #5d7284;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.thread-catalog-series-title {
+  margin-bottom: 4px;
+  color: #607589;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.thread-catalog-sizes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 5px;
+}
+
+.thread-catalog-sizes button {
+  display: grid;
+  padding: 5px 4px;
+  gap: 1px;
+  color: #263f56;
+  background: #fff;
+  border: 1px solid #d5e2ea;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.thread-catalog-sizes button:hover,
+.thread-catalog-sizes button:focus-visible {
+  background: #eaf6fc;
+  border-color: #9acfe2;
+  outline: none;
+}
+
+.thread-catalog-sizes strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.thread-catalog-sizes small {
+  color: #6b8296;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* The Thread item's icon is drawn rather than an image, so it needs the size
+   the <img> siblings get from their own intrinsic dimensions. */
+.shape-menu-drawn-icon {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+}
+
 .toolbar-menu-anchor {
   display: inline-flex;
   align-items: center;
@@ -7439,6 +7544,43 @@ html[data-theme="dark"] .visibility-dropdown-action:disabled {
   color: #8398a6;
   background: #192832;
   border-color: #334753;
+}
+
+html[data-theme="dark"] .thread-catalog {
+  color: #d4e3ed;
+  background: rgba(20, 31, 40, 0.97);
+  border-color: #3a4d5b;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34);
+}
+
+html[data-theme="dark"] .thread-catalog-modes button {
+  color: #cfe0ea;
+  background: #1d2e38;
+  border-color: #3a5564;
+}
+
+html[data-theme="dark"] .thread-catalog-modes button.active {
+  color: #ecf9ff;
+  background: #2b4857;
+  border-color: #51788b;
+}
+
+html[data-theme="dark"] .thread-catalog-help,
+html[data-theme="dark"] .thread-catalog-series-title,
+html[data-theme="dark"] .thread-catalog-sizes small {
+  color: #9eb2bf;
+}
+
+html[data-theme="dark"] .thread-catalog-sizes button {
+  color: #d9e7f0;
+  background: #1b2b35;
+  border-color: #374d5b;
+}
+
+html[data-theme="dark"] .thread-catalog-sizes button:hover,
+html[data-theme="dark"] .thread-catalog-sizes button:focus-visible {
+  background: #294653;
+  border-color: #4b7385;
 }
 
 html[data-theme="dark"] .distribute-dropdown {
