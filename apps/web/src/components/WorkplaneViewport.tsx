@@ -47,7 +47,7 @@ import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
 import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationSyncDecision } from "@/lib/engine/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
-import { cleanNearZero, cleanRotationDegrees, fallbackSolidColor, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/engine/workplaneShapes";
+import { cleanNearZero, cleanRotationDegrees, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/engine/workplaneShapes";
 import { sphereTessellation } from "@/lib/engine/sphereTessellation";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import type { SketchForgeMcpViewFace } from "@/lib/sketchforgeMcpProtocol";

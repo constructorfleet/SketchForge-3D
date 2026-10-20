@@ -86,7 +86,6 @@ import {
   cloneWorkplaneShapeTreeWithFreshIds,
   cleanNearZero,
   cleanRotationDegrees,
-  fallbackSolidColor,
   meshYawDegrees,
   mirrorSign,
   normalizeDegrees,
@@ -136,7 +135,7 @@ import { findSketchOutlineIntersection } from "@/lib/sketchProfileValidation";
 import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/engine/sketchRevolve";
 import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
-import { makeShapeFromAsset, sceneShape, toolbarShapeAssets, type ToolbarShapeAsset } from "@/lib/engine/shapeCatalog";
+import { makeShapeFromAsset, sceneShape, toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
 import {
   circularPatternPlacements,
   linearPatternPlacements,
