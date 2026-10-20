@@ -395,7 +395,7 @@ export function shapeFromRequest(request: ShapeRequest, defaults: { elevation?: 
  */
 export const SHAPE_CHANGE_FIELDS = [
   "name", "color", "x", "z", "elevation", "width", "depth", "height", "size",
-  "rotation", "rotationX", "rotationZ", "hole", "locked", "hidden",
+  "rotation", "rotationX", "rotationZ", "mirrorX", "mirrorY", "mirrorZ", "hole", "locked", "hidden",
 ] as const;
 
 /**
@@ -449,6 +449,9 @@ export function shapeWithRequestedChanges(shape: WorkplaneShape, request: ShapeR
   if (request.rotation !== undefined) next.rotation = finiteNumber(request.rotation, shape.rotation);
   if (request.rotationX !== undefined) next.rotationX = finiteNumber(request.rotationX, shape.rotationX ?? 0);
   if (request.rotationZ !== undefined) next.rotationZ = finiteNumber(request.rotationZ, shape.rotationZ ?? 0);
+  if (request.mirrorX !== undefined) next.mirrorX = request.mirrorX === true;
+  if (request.mirrorY !== undefined) next.mirrorY = request.mirrorY === true;
+  if (request.mirrorZ !== undefined) next.mirrorZ = request.mirrorZ === true;
   if (request.hole !== undefined) next.hole = request.hole === true;
   if (request.locked !== undefined) next.locked = request.locked === true;
   if (request.hidden !== undefined) next.hidden = request.hidden === true;
