@@ -142,7 +142,10 @@ export class Transport {
           : typeof parsed === "string"
             ? parsed
             : undefined;
-      throw new SketchForgeApiError({ method: spec.method, url, status: response.status, detail, body: parsed });
+      const code = parsed && typeof parsed === "object" && typeof (parsed as { code?: unknown }).code === "string"
+        ? (parsed as { code: string }).code
+        : undefined;
+      throw new SketchForgeApiError({ method: spec.method, url, status: response.status, detail, code, body: parsed });
     }
 
     return parsed as Result;

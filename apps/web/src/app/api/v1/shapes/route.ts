@@ -1,11 +1,19 @@
-import { apiContext, apiError, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { withProjectLock } from "@/lib/serverProjectFiles";
-import { parseRevolveRequest, resolveThreadRequest, revolvedShapeFromRequest } from "@/lib/revolveRequests";
+import {
+  isRevolveShape,
+  outlineFromProfile,
+  parseRevolveRequest,
+  rebuiltRevolveShape,
+  resolveThreadRequest,
+  revolvedShapeFromRequest,
+} from "@/lib/revolveRequests";
 import { serverManifoldRuntime } from "@/lib/serverManifoldRuntime";
 import { REQUESTABLE_SHAPE_KINDS, shapeFromRequest, shapeWithRequestedChanges } from "@/lib/shapeRequests";
-import type { WorkplaneShape } from "@/types/sketchforge";
+import { normalizeSketchRevolveSettings } from "@/lib/sketchRevolve";
+import type { SketchRevolveSettings, WorkplaneShape } from "@/types/sketchforge";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -37,14 +45,45 @@ function resolvedThreadRequest(request: Record<string, unknown>): { request: Rec
   };
 }
 
+/**
+ * The settings a change names, over the ones a revolve already has.
+ *
+ * `sides` means the sweep's angular resolution here, not a facet count, which
+ * is why a revolve's settings are read apart from the per-kind parameters: the
+ * stored kind is `mesh`, and a mesh has no facets to count.
+ */
+const REVOLVE_SETTING_NAMES = ["startAngle", "sweepAngle", "sides", "quality", "pitch", "turns", "coreRadius"] as const;
+
+/**
+ * The change fields that can only mean a sweep.
+ *
+ * `sides` is left out because it is also a prism's facet count, and a cylinder
+ * naming it is asking about facets, not about a helix it does not have.
+ */
+const REVOLVE_ONLY_FIELDS = ["startAngle", "sweepAngle", "quality", "pitch", "turns", "coreRadius", "revolve", "profile", "outline"] as const;
+
+const REVOLVE_CHANGE_FIELDS = [...REVOLVE_SETTING_NAMES, "revolve", "profile", "outline"] as const;
+
+function requestedRevolveSettings(existing: SketchRevolveSettings, body: Record<string, unknown>): SketchRevolveSettings {
+  const nested = body.revolve && typeof body.revolve === "object" && !Array.isArray(body.revolve)
+    ? (body.revolve as Record<string, unknown>)
+    : {};
+  const requested: Record<string, unknown> = { ...existing };
+  for (const name of REVOLVE_SETTING_NAMES) {
+    const value = nested[name] ?? body[name];
+    if (value !== undefined) requested[name] = value;
+  }
+  return normalizeSketchRevolveSettings(requested as Partial<SketchRevolveSettings>);
+}
+
 export async function GET(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
 
   const document = await readProjectDocument(context.root, projectId);
-  if (!document) return apiError("That project is not on the server.", 404);
+  if (!document) return apiErrors.projectNotFound();
   return apiJson({ shapes: document.shapes.map(apiShapeSummary) });
 }
 
@@ -59,20 +98,20 @@ export async function POST(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
-  if (!body) return apiError("Expected a JSON object body.", 400);
+  if (!body) return apiErrors.jsonBodyRequired();
   const requested = Array.isArray(body.shapes) ? body.shapes : [body];
-  if (requested.length === 0) return apiError("No shapes were given.", 400);
+  if (requested.length === 0) return apiError("No shapes were given.", 400, "invalid_request");
   if (requested.length > MAX_SHAPES_PER_REQUEST) {
-    return apiError(`A request can add at most ${MAX_SHAPES_PER_REQUEST} shapes.`, 413);
+    return apiError(`A request can add at most ${MAX_SHAPES_PER_REQUEST} shapes.`, 413, "too_many_shapes");
   }
 
   const built: WorkplaneShape[] = [];
   for (const [index, entry] of requested.entries()) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      return apiError(`Shape ${index} is not an object.`, 400);
+      return apiError(`Shape ${index} is not an object.`, 400, "invalid_request");
     }
     const request = entry as Record<string, unknown>;
 
@@ -83,11 +122,11 @@ export async function POST(request: Request) {
       let revolveRequest = request;
       if (request.kind === "thread") {
         const resolved = resolvedThreadRequest(request);
-        if (!resolved.request) return apiError(`Shape ${index}: ${resolved.error}`, 400);
+        if (!resolved.request) return apiError(`Shape ${index}: ${resolved.error}`, 400, "invalid_request");
         revolveRequest = resolved.request;
       }
       const parsed = parseRevolveRequest(revolveRequest);
-      if (!parsed.ok) return apiError(`Shape ${index}: ${parsed.error}`, 400);
+      if (!parsed.ok) return apiError(`Shape ${index}: ${parsed.error}`, 400, "invalid_request");
       try {
         const runtime = await serverManifoldRuntime();
         built.push(revolvedShapeFromRequest(runtime, parsed, {
@@ -103,6 +142,7 @@ export async function POST(request: Request) {
         return apiError(
           `Shape ${index}: ${error instanceof Error ? error.message : "the revolve could not be built"}.`,
           422,
+          "geometry_failed",
         );
       }
       continue;
@@ -113,6 +153,7 @@ export async function POST(request: Request) {
       return apiError(
         `Shape ${index} has an unsupported kind. The API can build: ${REQUESTABLE_SHAPE_KINDS.join(", ")}, revolve, thread.`,
         422,
+        "unsupported_kind",
       );
     }
     built.push(shape);
@@ -120,57 +161,119 @@ export async function POST(request: Request) {
 
   const locked = await withProjectLock(context.root, projectId, async () => {
     const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiError("That project is not on the server.", 404);
+    if (!document) return apiErrors.projectNotFound();
     const written = await writeProjectDocument(context.root, projectId, document, [...document.shapes, ...built]);
     return apiJson({ shapes: built.map(apiShapeSummary), revision: written.revision }, 201);
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }
 
+/**
+ * Change a shape.
+ *
+ * Everything the shape summary reports can be sent back, which is the whole
+ * point of reporting it. For a revolve or a thread that means the sweep itself:
+ * a pitch, a turn count or a new outline is geometry rather than a property, so
+ * the mesh is swept again here -- manifold runs under Node, and refusing to
+ * rebuild would leave a thread's pitch readable but not writable, which is the
+ * asymmetry this endpoint had in the first place.
+ */
 export async function PATCH(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
-  if (!shapeId) return apiError("A shapeId is required.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
+  if (!shapeId) return apiErrors.shapeIdRequired();
 
   const body = await apiJsonBody(request);
-  if (!body) return apiError("Expected a JSON object body.", 400);
+  if (!body) return apiErrors.jsonBodyRequired();
 
   const locked = await withProjectLock(context.root, projectId, async () => {
     const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiError("That project is not on the server.", 404);
+    if (!document) return apiErrors.projectNotFound();
     const existing = document.shapes.find((shape) => shape.id === shapeId);
-    if (!existing) return apiError("That shape is not in the project.", 404);
+    if (!existing) return apiErrors.shapeNotFound();
     if (existing.locked && body.locked !== false) {
-      return apiError("That shape is locked. Send locked: false to change it.", 409);
+      return apiErrors.shapeLocked("That shape is locked. Send locked: false to change it.");
     }
 
-    const updated = shapeWithRequestedChanges(existing, body);
-    const shapes = document.shapes.map((shape) => (shape.id === shapeId ? updated : shape));
+    const sweptShape = isRevolveShape(existing);
+    const misplaced = REVOLVE_ONLY_FIELDS.filter((field) => body[field] !== undefined);
+    if (!sweptShape && misplaced.length > 0) {
+      return apiError(
+        `A shape of kind "${existing.kind}" has no sweep to change: ${misplaced.join(", ")}.`,
+        422,
+        "unapplicable_fields",
+        { fields: misplaced },
+      );
+    }
+
+    const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => body[field] !== undefined) : [];
+    let swept = existing;
+    if (revolveChanges.length > 0 && sweptShape) {
+      const outline = body.profile ?? body.outline ?? outlineFromProfile(existing.sketchProfile!);
+      if (!outline) {
+        return apiError(
+          "That revolve's outline was drawn rather than described, so the sweep cannot be rebuilt from it. Send a profile to replace it.",
+          422,
+          "unapplicable_fields",
+          { fields: revolveChanges },
+        );
+      }
+      const parsed = parseRevolveRequest({ profile: outline });
+      if (!parsed.ok) return apiError(parsed.error, 400, "invalid_request");
+      try {
+        const runtime = await serverManifoldRuntime();
+        swept = rebuiltRevolveShape(runtime, existing, {
+          profile: parsed.profile,
+          settings: requestedRevolveSettings(existing.sketchRevolve!, body),
+        });
+      } catch (error) {
+        return apiError(
+          `${error instanceof Error ? error.message : "The revolve could not be rebuilt"}.`,
+          422,
+          "geometry_failed",
+        );
+      }
+    }
+
+    const sweepFields: readonly string[] = sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS;
+    const changed = shapeWithRequestedChanges(swept, Object.fromEntries(
+      Object.entries(body).filter(([field]) => !sweepFields.includes(field)),
+    ));
+    if (!changed.ok) {
+      return apiError(
+        `A shape of kind "${existing.kind}" cannot take: ${changed.unapplicable.join(", ")}.`,
+        422,
+        "unapplicable_fields",
+        { fields: changed.unapplicable },
+      );
+    }
+
+    const shapes = document.shapes.map((shape) => (shape.id === shapeId ? changed.shape : shape));
     const written = await writeProjectDocument(context.root, projectId, document, shapes);
-    return apiJson({ shape: apiShapeSummary(updated), revision: written.revision });
+    return apiJson({ shape: apiShapeSummary(changed.shape), revision: written.revision });
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }
 
 export async function DELETE(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
-  if (!shapeId) return apiError("A shapeId is required.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
+  if (!shapeId) return apiErrors.shapeIdRequired();
 
   const locked = await withProjectLock(context.root, projectId, async () => {
     const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiError("That project is not on the server.", 404);
+    if (!document) return apiErrors.projectNotFound();
     const existing = document.shapes.find((shape) => shape.id === shapeId);
-    if (!existing) return apiError("That shape is not in the project.", 404);
-    if (existing.locked) return apiError("That shape is locked.", 409);
+    if (!existing) return apiErrors.shapeNotFound();
+    if (existing.locked) return apiErrors.shapeLocked();
 
     const shapes = document.shapes.filter((shape) => shape.id !== shapeId);
     const written = await writeProjectDocument(context.root, projectId, document, shapes);
     return apiJson({ deleted: true, id: shapeId, revision: written.revision });
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

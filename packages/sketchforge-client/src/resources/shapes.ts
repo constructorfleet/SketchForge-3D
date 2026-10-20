@@ -9,6 +9,31 @@ import {
   type ShapeWriteResult,
 } from "../types.js";
 
+/**
+ * The fields of a summary that describe a shape rather than set anything on it.
+ *
+ * The server accepts and ignores these, so sending a summary straight back is
+ * not an error -- but dropping them keeps a patch to what it actually changes,
+ * which is what a caller reads in a log.
+ */
+const DESCRIPTION_FIELDS = ["id", "kind", "requestKind", "sketchOperation", "groupedCount"] as const;
+
+/**
+ * A summary turned back into the change that would reproduce it.
+ *
+ * The round trip the API promises, written once: read a shape, hand it to this,
+ * override the one field in question, and send it. A revolve's sweep comes back
+ * nested under `revolve`, which is where the server also accepts it.
+ */
+export function shapePatchFromSummary(summary: ShapeSummary, changes: ShapePatch = {}): ShapePatch {
+  const patch: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(summary)) {
+    if ((DESCRIPTION_FIELDS as readonly string[]).includes(field)) continue;
+    if (value !== undefined) patch[field] = value;
+  }
+  return { ...(patch as ShapePatch), ...changes };
+}
+
 /** Lists split into runs no longer than the server accepts in one write. */
 export function chunk<Item>(items: readonly Item[], size: number): Item[][] {
   if (size < 1) throw new Error("A chunk size must be at least 1.");

@@ -27,7 +27,8 @@ import {
   threadSize,
   threadTurnsForLength,
 } from "@/lib/threadCatalog";
-import type { SketchProfile, SketchRevolveSettings } from "@/types/sketchforge";
+import { canonicalizeShape } from "@/lib/workplaneShapes";
+import type { SketchProfile, SketchRevolveSettings, WorkplaneShape } from "@/types/sketchforge";
 
 /** Turns to sweep when a request says neither turns nor a length. */
 export const DEFAULT_THREAD_TURNS = 8;
@@ -68,6 +69,33 @@ export function profileFromOutline(points: RevolveRequestPoint[]): SketchProfile
     })),
     images: [],
   };
+}
+
+/**
+ * The outline a stored profile came from, or null when it was not written here.
+ *
+ * `profileFromOutline` builds a single closed ring whose segments follow its
+ * points, so recognising that shape is enough to hand the outline back in the
+ * form it arrived in -- mirrored to the positive distances a request writes.
+ * A profile drawn in the editor can be several paths, can carry curve handles,
+ * and need not be in point order; reporting nothing is honest there, where
+ * reordering its points would be a guess dressed up as the original.
+ */
+export function outlineFromProfile(profile: SketchProfile): RevolveRequestPoint[] | null {
+  const points = profile.points;
+  if (points.length < MIN_PROFILE_POINTS || profile.segments.length !== points.length) return null;
+  const closedRing = profile.segments.every((segment, index) =>
+    segment.kind === "line"
+    && segment.startId === points[index].id
+    && segment.endId === points[(index + 1) % points.length].id);
+  if (!closedRing) return null;
+  if (points.some((point) => point.handleIn || point.handleOut)) return null;
+  return points.map(({ x, z }): RevolveRequestPoint => [Math.abs(x), z]);
+}
+
+/** Whether a shape is a revolve or a thread rather than any other mesh. */
+export function isRevolveShape(shape: WorkplaneShape) {
+  return shape.sketchOperation === "revolve" && Boolean(shape.sketchProfile) && Boolean(shape.sketchRevolve);
 }
 
 /**
@@ -238,5 +266,53 @@ export function revolvedShapeFromRequest(
     sketchProfile: parsed.profile,
     sketchOperation: "revolve",
     sketchRevolve: parsed.settings,
+  });
+}
+
+/**
+ * An existing revolve swept again with changed settings, keeping its identity.
+ *
+ * A revolve's pitch, turns and outline are its geometry rather than a property
+ * of it, so changing one means sweeping the mesh again -- there is nothing to
+ * edit in place. What survives is everything that is not geometry: the shape's
+ * id, so references to it still resolve, and its placement, name and flags.
+ *
+ * The scale survives too. A revolve resized after it was made carries a ratio
+ * between its mesh's natural size and the size it is drawn at, and a fresh
+ * sweep is at natural size; dropping the ratio would silently resize a thread
+ * whose pitch was the only thing asked about.
+ */
+export function rebuiltRevolveShape(
+  runtime: ManifoldToplevel,
+  shape: WorkplaneShape,
+  parsed: { profile: SketchProfile; settings: SketchRevolveSettings },
+): WorkplaneShape {
+  const rebuilt = revolvedShapeFromRequest(runtime, parsed, {
+    name: shape.name,
+    color: shape.color,
+    x: shape.x,
+    z: shape.z,
+    elevation: shape.elevation,
+    hole: shape.hole,
+    rotation: shape.rotation,
+  });
+  const previous = shape.importedMesh;
+  const scale = (drawn: number, base: number | undefined) => (base && base > 0 ? drawn / base : 1);
+  const widthScale = scale(shape.width, previous?.baseWidth);
+  const depthScale = scale(shape.depth, previous?.baseDepth);
+  const heightScale = scale(shape.height, previous?.baseHeight);
+  const width = Math.max(0.01, rebuilt.width * widthScale);
+  const depth = Math.max(0.01, rebuilt.depth * depthScale);
+  return canonicalizeShape({
+    ...rebuilt,
+    id: shape.id,
+    width,
+    depth,
+    height: Math.max(0.01, rebuilt.height * heightScale),
+    size: Math.max(width, depth),
+    rotationX: shape.rotationX,
+    rotationZ: shape.rotationZ,
+    locked: shape.locked,
+    hidden: shape.hidden,
   });
 }

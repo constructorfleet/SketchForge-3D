@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
 import { fakeServer, type FakeServer } from "../testing.js";
-import { MAX_SHAPES_PER_REQUEST, type ShapeRequest } from "../types.js";
-import { chunk } from "./shapes.js";
+import { MAX_SHAPES_PER_REQUEST, type ShapeRequest, type ShapeSummary } from "../types.js";
+import { chunk, shapePatchFromSummary } from "./shapes.js";
 
 function client(server: FakeServer) {
   return new SketchForgeClient({ baseUrl: "http://localhost:3100", token: "t", fetch: server.fetch });
@@ -126,5 +126,31 @@ describe("check", () => {
   it("counts the projects when the API is working", async () => {
     const server = fakeServer({ body: { projects: [{ id: "p1", name: "a", shapes: 0, revision: 0, updatedAt: 0, packageBytes: 0 }] } });
     await expect(client(server).check()).resolves.toEqual({ ok: true, projects: 1 });
+  });
+});
+
+describe("shapePatchFromSummary", () => {
+  it("carries every parameter through, so a change to one keeps the rest", () => {
+    const summary: ShapeSummary = { ...shapeSummary("s1"), kind: "cylinder", requestKind: "cylinder", sides: 12, bevel: 2 };
+    expect(shapePatchFromSummary(summary, { sides: 6 })).toMatchObject({ sides: 6, bevel: 2, width: 1, name: "s1" });
+  });
+
+  it("drops what describes the shape rather than setting anything on it", () => {
+    const summary: ShapeSummary = { ...shapeSummary("s1"), requestKind: "box", sketchOperation: "revolve", groupedCount: 2 };
+    const patch = shapePatchFromSummary(summary);
+    expect(patch).not.toHaveProperty("id");
+    expect(patch).not.toHaveProperty("kind");
+    expect(patch).not.toHaveProperty("requestKind");
+    expect(patch).not.toHaveProperty("sketchOperation");
+    expect(patch).not.toHaveProperty("groupedCount");
+  });
+
+  it("keeps a sweep nested where the server accepts it", () => {
+    const revolve = { startAngle: 0, sweepAngle: 360, sides: 64, quality: 6, pitch: 1.25, turns: 4, coreRadius: 3 };
+    const summary: ShapeSummary = { ...shapeSummary("s1"), kind: "mesh", requestKind: "revolve", revolve, profile: [[3, 0], [4, 1], [3, 2]] };
+    expect(shapePatchFromSummary(summary, { revolve: { ...revolve, pitch: 2 } })).toMatchObject({
+      revolve: { pitch: 2, turns: 4 },
+      profile: [[3, 0], [4, 1], [3, 2]],
+    });
   });
 });

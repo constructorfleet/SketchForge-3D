@@ -1,4 +1,4 @@
-import { apiContext, apiError, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { readProjectDocument, writeProjectDocument } from "@/lib/serverProjectDocument";
 import { withProjectLock } from "@/lib/serverProjectFiles";
@@ -21,24 +21,24 @@ export async function POST(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400);
+  if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
-  if (!body) return apiError("Expected a JSON object body.", 400);
+  if (!body) return apiErrors.jsonBodyRequired();
   const solidIds = apiShapeIds(body.solidIds ?? body.solids);
   const holeIds = apiShapeIds(body.holeIds ?? body.holes);
-  if (!solidIds?.length) return apiError("Send solidIds: the ids of the shapes to cut from.", 400);
-  if (!holeIds?.length) return apiError("Send holeIds: the ids of the shapes to subtract.", 400);
+  if (!solidIds?.length) return apiError("Send solidIds: the ids of the shapes to cut from.", 400, "invalid_request");
+  if (!holeIds?.length) return apiError("Send holeIds: the ids of the shapes to subtract.", 400, "invalid_request");
   const both = solidIds.filter((id) => holeIds.includes(id));
-  if (both.length > 0) return apiError(`A shape cannot be both a solid and a hole: ${both.join(", ")}.`, 400);
+  if (both.length > 0) return apiError(`A shape cannot be both a solid and a hole: ${both.join(", ")}.`, 400, "invalid_request");
 
   const locked = await withProjectLock(context.root, projectId, async () => {
     const document = await readProjectDocument(context.root, projectId);
-    if (!document) return apiError("That project is not on the server.", 404);
+    if (!document) return apiErrors.projectNotFound();
 
     const byId = new Map(document.shapes.map((shape) => [shape.id, shape]));
     const missing = [...solidIds, ...holeIds].filter((id) => !byId.has(id));
-    if (missing.length > 0) return apiError(`Not in the project: ${missing.join(", ")}.`, 404);
+    if (missing.length > 0) return apiErrors.shapesNotFound(missing);
 
     const holes = new Set(holeIds);
     const operandIds = new Set([...solidIds, ...holeIds]);
@@ -49,11 +49,11 @@ export async function POST(request: Request) {
       .map((shape) => withHoleMode(shape, holes.has(shape.id)));
     const immovable = operands.filter((shape) => shape.locked);
     if (immovable.length > 0) {
-      return apiError(`Unlock every operand first; these are locked: ${immovable.map((shape) => shape.id).join(", ")}.`, 409);
+      return apiErrors.shapeLocked(`Unlock every operand first; these are locked: ${immovable.map((shape) => shape.id).join(", ")}.`);
     }
 
     const outcome = await buildGroupFromSelection(operands);
-    if ("error" in outcome) return apiError(outcome.error, outcome.status);
+    if ("error" in outcome) return apiError(outcome.error, outcome.status, "geometry_failed");
 
     const shapes = [...document.shapes.filter((shape) => !operandIds.has(shape.id)), outcome.group];
     const written = await writeProjectDocument(context.root, projectId, document, shapes);
@@ -63,5 +63,5 @@ export async function POST(request: Request) {
       revision: written.revision,
     }, 201);
   });
-  return locked.busy ? apiError("That project is being changed; try again.", 409) : locked.result;
+  return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

@@ -109,3 +109,59 @@ describe("Transport", () => {
     await expect(failing.send({ method: "GET", path: "/projects" })).rejects.toBeInstanceOf(SketchForgeTransportError);
   });
 });
+
+/** The error a request was expected to fail with. */
+async function refusal(promise: Promise<unknown>) {
+  try {
+    await promise;
+  } catch (caught) {
+    return caught as SketchForgeApiError;
+  }
+  throw new Error("That request was expected to be refused.");
+}
+
+/**
+ * The code is what makes a status actionable. Both 409s look alike by status,
+ * and only one of them is worth retrying.
+ */
+describe("error codes", () => {
+  it("tells a busy project from a locked shape by code, not by wording", async () => {
+    const busy = fakeServer(
+      { status: 409, body: { error: "Hold on.", code: "project_busy" } },
+      { status: 201, body: { revision: 9 } },
+    );
+    await expect(transport(busy).send<{ revision: number }>({ method: "POST", path: "/shapes", retryable: true }))
+      .resolves.toMatchObject({ revision: 9 });
+
+    const locked = fakeServer({ status: 409, body: { error: "Hold on.", code: "shape_locked" } });
+    const error = await refusal(transport(locked).send({ method: "PATCH", path: "/shapes", retryable: true }));
+    expect(error.isShapeLocked).toBe(true);
+    expect(error.isProjectBusy).toBe(false);
+    expect(locked.calls).toHaveLength(1);
+  });
+
+  it("tells a missing project from a missing shape, which share a status", async () => {
+    const server = fakeServer({ status: 404, body: { error: "Gone.", code: "shape_not_found" } });
+    const error = await refusal(transport(server).send({ method: "GET", path: "/shapes" }));
+    expect(error.isShapeMissing).toBe(true);
+    expect(error.isProjectMissing).toBe(false);
+    expect(error.looksDisabled).toBe(false);
+  });
+
+  it("names the fields a change could not be applied to", async () => {
+    const server = fakeServer({
+      status: 422,
+      body: { error: 'A shape of kind "box" cannot take: sides.', code: "unapplicable_fields", fields: ["sides"] },
+    });
+    const error = await refusal(transport(server).send({ method: "PATCH", path: "/shapes" }));
+    expect(error.hasUnapplicableFields).toBe(true);
+    expect(error.unapplicableFields).toEqual(["sides"]);
+  });
+
+  it("falls back to the wording against a server from before codes", async () => {
+    const server = fakeServer({ status: 409, body: { error: "That project is being changed; try again." } });
+    const error = await refusal(transport(server).send({ method: "PATCH", path: "/shapes" }));
+    expect(error.code).toBeUndefined();
+    expect(error.isProjectBusy).toBe(true);
+  });
+});

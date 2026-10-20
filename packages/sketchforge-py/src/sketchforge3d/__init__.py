@@ -23,6 +23,7 @@ from .environment import (
     target_project_from_environment,
 )
 from .errors import (
+    API_ERROR_CODES,
     MissingConfigurationError,
     SketchForgeApiError,
     SketchForgeError,
@@ -44,7 +45,9 @@ from ._macro import (
 from .types import (
     MAX_SHAPES_PER_REQUEST,
     PARAMETRIC_SHAPE_KINDS,
+    SHAPE_DESCRIPTION_FIELDS,
     SHAPE_KINDS,
+    SHAPE_PARAMETER_NAMES,
     THREAD_DESIGNATIONS,
     EdgeSummary,
     ProjectDetail,
@@ -57,6 +60,7 @@ from .types import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "API_ERROR_CODES",
     "BASE_URL_ENV",
     "DEFAULT_BASE_URL",
     "Edges",
@@ -74,7 +78,9 @@ __all__ = [
     "ProjectHandle",
     "ProjectSummary",
     "Projects",
+    "SHAPE_DESCRIPTION_FIELDS",
     "SHAPE_KINDS",
+    "SHAPE_PARAMETER_NAMES",
     "Shapes",
     "ShapeSummary",
     "ShapeWriteResult",

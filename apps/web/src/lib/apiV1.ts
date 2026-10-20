@@ -14,9 +14,57 @@ import { SERVER_PROJECTS_ENV, safeServerProjectId } from "@/lib/serverProjectSto
 
 export const API_V1_PREFIX = "/api/v1";
 
-export function apiError(message: string, status: number, extra?: Record<string, unknown>) {
-  return NextResponse.json({ error: message, ...extra }, { status, headers: { "Cache-Control": "no-store" } });
+/**
+ * The machine-readable half of an error, alongside the sentence.
+ *
+ * A status code is too coarse to act on here. `404` covers a missing project, a
+ * missing shape and an API that is switched off entirely; `409` covers both "the
+ * project is busy, retry" and "that shape is locked, do not retry". Without a
+ * code a client has to match on the prose, which makes every wording change a
+ * breaking one -- and both client libraries were doing exactly that.
+ */
+export const API_ERROR_CODES = [
+  "api_disabled",
+  "unauthorized",
+  "storage_unconfigured",
+  "invalid_project_id",
+  "invalid_shape_id",
+  "invalid_body",
+  "invalid_request",
+  "project_not_found",
+  "project_exists",
+  "project_busy",
+  "shape_not_found",
+  "shape_locked",
+  "unsupported_kind",
+  "unapplicable_fields",
+  "too_many_shapes",
+  "geometry_failed",
+  "cad_failed",
+] as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+
+export function apiError(message: string, status: number, code: ApiErrorCode, extra?: Record<string, unknown>) {
+  return NextResponse.json({ error: message, code, ...extra }, { status, headers: { "Cache-Control": "no-store" } });
 }
+
+/**
+ * The refusals every route repeats.
+ *
+ * Named rather than written out at each of the forty-odd places they are
+ * returned, so that a code and its sentence cannot drift apart between routes.
+ */
+export const apiErrors = {
+  invalidProjectId: () => apiError("Invalid project id.", 400, "invalid_project_id"),
+  shapeIdRequired: () => apiError("A shapeId is required.", 400, "invalid_shape_id"),
+  jsonBodyRequired: () => apiError("Expected a JSON object body.", 400, "invalid_body"),
+  projectNotFound: () => apiError("That project is not on the server.", 404, "project_not_found"),
+  projectBusy: () => apiError("That project is being changed; try again.", 409, "project_busy"),
+  shapeNotFound: () => apiError("That shape is not in the project.", 404, "shape_not_found"),
+  shapesNotFound: (ids: readonly string[]) => apiError(`Not in the project: ${ids.join(", ")}.`, 404, "shape_not_found"),
+  shapeLocked: (message = "That shape is locked.") => apiError(message, 409, "shape_locked"),
+};
 
 export function apiJson(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -32,19 +80,19 @@ export function apiJson(body: unknown, status = 200) {
 export async function apiContext(request: Request) {
   const authorization = authorizeApiRequest(request);
   if (authorization === "disabled") {
-    return { error: apiError(`The REST API is disabled. Set ${API_TOKEN_ENV} to enable it.`, 404) };
+    return { error: apiError(`The REST API is disabled. Set ${API_TOKEN_ENV} to enable it.`, 404, "api_disabled") };
   }
   if (authorization === "unauthorized") {
     return {
       error: NextResponse.json(
-        { error: "A valid bearer token is required." },
+        { error: "A valid bearer token is required.", code: "unauthorized" satisfies ApiErrorCode },
         { status: 401, headers: { "Cache-Control": "no-store", "WWW-Authenticate": 'Bearer realm="SketchForge"' } },
       ),
     };
   }
   const root = await ensureProjectsDirectory();
   if (!root) {
-    return { error: apiError(`The REST API needs server-side project storage. Set ${SERVER_PROJECTS_ENV}.`, 503) };
+    return { error: apiError(`The REST API needs server-side project storage. Set ${SERVER_PROJECTS_ENV}.`, 503, "storage_unconfigured") };
   }
   return { root };
 }

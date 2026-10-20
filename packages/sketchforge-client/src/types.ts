@@ -89,14 +89,27 @@ export type ShapeDimensions = {
   size?: number;
 };
 
-export type LoftProfileShape = "square" | "circle" | "triangle" | "hexagon";
+export type LoftProfileShape = "Oval" | "Rectangle" | "Triangle" | "Pentagon" | "Hexagon";
+
+/**
+ * The taper every kind but `gear` carries: the footprint at each end of the
+ * extrusion, which need not match the shape's own width and depth.
+ */
+export type TaperFields = {
+  taperTopWidth?: number;
+  taperTopDepth?: number;
+  taperBottomWidth?: number;
+  taperBottomDepth?: number;
+};
+
+export type GearKindType = "spur" | "helical" | "bevel";
 
 type KindFields = {
   box: unknown;
   cube: unknown;
   /** `sides` under 96 is a prism rather than a cylinder; 6 gives a hex bar. */
   cylinder: { sides?: number };
-  cone: { sides?: number; topRadius?: number };
+  cone: { sides?: number; topRadius?: number; baseRadius?: number };
   sphere: { steps?: number };
   halfSphere: { steps?: number };
   torus: unknown;
@@ -125,14 +138,26 @@ type KindFields = {
     toothSize?: number;
     toothWidth?: number;
     centerHoleSize?: number;
+    gearType?: GearKindType;
     helixAngle?: number;
   };
 };
 
+/** Every per-kind parameter, for a context that does not know the kind yet. */
+export type AnyKindFields = {
+  [Kind in ParametricShapeKind]: KindFields[Kind] extends object ? KindFields[Kind] : Record<never, never>;
+}[ParametricShapeKind] extends infer Union
+  ? Partial<UnionToIntersection<Union>>
+  : never;
+
+type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends
+  (value: infer Intersection) => void ? Intersection : never;
+
 export type ParametricShapeRequest = {
   [Kind in ParametricShapeKind]: { kind: Kind } & ShapePlacement &
     ShapeDimensions &
-    (KindFields[Kind] extends object ? KindFields[Kind] : Record<never, never>);
+    (KindFields[Kind] extends object ? KindFields[Kind] : Record<never, never>) &
+    (Kind extends "gear" ? Record<never, never> : TaperFields);
 }[ParametricShapeKind];
 
 /** A point of a revolve outline: `[distance from the axis, position along it]`. */
@@ -175,24 +200,64 @@ export type ThreadShapeRequest = {
 
 export type ShapeRequest = ParametricShapeRequest | RevolveShapeRequest | ThreadShapeRequest;
 
-/** The fields a PATCH may change. Anything else needs a new shape. */
+/**
+ * The fields a PATCH may change.
+ *
+ * Everything a summary reports is here, which is the point: a shape can be read,
+ * one number changed, and the whole thing sent back. The kind is not in the type
+ * -- a summary reports it as a plain string, so there is nothing to narrow on --
+ * which means this is wider than any one shape accepts. The server refuses what
+ * the shape's kind has no use for, naming the fields in `fields` on a
+ * `422 unapplicable_fields`, rather than ignoring them as it used to.
+ */
 export type ShapePatch = ShapePlacement &
-  Pick<ShapeDimensions, "width" | "depth" | "height"> & {
+  ShapeDimensions &
+  AnyKindFields &
+  TaperFields &
+  RevolveSettings & {
     locked?: boolean;
     hidden?: boolean;
+    /** Replaces a revolve's outline; the sweep is rebuilt on the server. */
+    profile?: readonly ProfilePoint[];
+    /** The sweep's settings as one object, for a caller that keeps them together. */
+    revolve?: RevolveSettings;
   };
+
+/** How far round a sweep goes, and how fast it rises, as the server reports it. */
+export type RevolveSummary = {
+  startAngle: number;
+  sweepAngle: number;
+  /** Facets per full turn of the sweep, not a prism's side count. */
+  sides: number;
+  /** How finely a curved profile is sampled, 1 to 10. */
+  quality: number;
+  pitch: number;
+  turns: number;
+  coreRadius: number;
+};
+
+/** The operation a shape's geometry came out of, for the ones that have one. */
+export type SketchOperation = "extrude" | "revolve" | "loft" | "sweep";
 
 /**
  * A shape as the server reports it.
  *
  * `kind` is the stored kind rather than the requested one: a `cube` comes back
  * as a `box`, and a `revolve` or `thread` as a `mesh`, because that is what the
- * project holds.
+ * project holds. `requestKind` is the other half of that -- the kind a `POST`
+ * would need to build the shape again, which is what tells a thread apart from
+ * an imported STL when both store as `mesh`. It is absent for a shape no request
+ * can reproduce, such as a boolean cut.
+ *
+ * Every per-kind parameter the server accepts also comes back, so a read,
+ * change and write loses nothing; which ones are present depends on the kind.
  */
 export type ShapeSummary = {
   id: string;
   name: string;
   kind: string;
+  requestKind?: ShapeKind;
+  sketchOperation?: SketchOperation;
   color: string;
   hole: boolean;
   locked: boolean;
@@ -206,10 +271,39 @@ export type ShapeSummary = {
   rotation: number;
   rotationX: number;
   rotationZ: number;
+  steps?: number;
   sides?: number;
+  bevel?: number;
+  segments?: number;
+  topRadius?: number;
+  baseRadius?: number;
+  teeth?: number;
+  toothSize?: number;
+  toothWidth?: number;
+  centerHoleSize?: number;
+  gearType?: GearKindType;
+  helixAngle?: number;
+  loftBottomShape?: LoftProfileShape;
+  loftTopShape?: LoftProfileShape;
+  loftTopWidth?: number;
+  loftTopDepth?: number;
+  loftBottomRotation?: number;
+  loftTopRotation?: number;
+  loftSegments?: number;
+  loftLayers?: number;
   text?: string;
+  font?: string;
+  /** Present on a revolve or a thread: the sweep that built it. */
+  revolve?: RevolveSummary;
+  /**
+   * The outline the sweep ran round, when it was described rather than drawn.
+   *
+   * A profile drawn in the editor can be several paths with curve handles, which
+   * no list of `[x, z]` pairs describes, so it is omitted rather than flattened.
+   */
+  profile?: ProfilePoint[];
   groupedCount?: number;
-};
+} & TaperFields;
 
 export type ProjectSummary = {
   id: string;

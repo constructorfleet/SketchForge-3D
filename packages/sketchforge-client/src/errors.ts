@@ -1,11 +1,41 @@
 /** Errors the API answers with, kept distinguishable so a macro can react to them. */
 
+/**
+ * The server's machine-readable reason, which a status code is too coarse to
+ * carry: `404` is a missing project, a missing shape or an API that is switched
+ * off, and `409` is both a busy project worth retrying and a locked shape that
+ * never will be.
+ */
+export const API_ERROR_CODES = [
+  "api_disabled",
+  "unauthorized",
+  "storage_unconfigured",
+  "invalid_project_id",
+  "invalid_shape_id",
+  "invalid_body",
+  "invalid_request",
+  "project_not_found",
+  "project_exists",
+  "project_busy",
+  "shape_not_found",
+  "shape_locked",
+  "unsupported_kind",
+  "unapplicable_fields",
+  "too_many_shapes",
+  "geometry_failed",
+  "cad_failed",
+] as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+
 export type ApiErrorContext = {
   method: string;
   url: string;
   status: number;
   /** The server's `error` string, when it sent one. */
   detail?: string;
+  /** The server's `code`, absent against a server older than codes. */
+  code?: string;
   body?: unknown;
 };
 
@@ -14,6 +44,7 @@ export class SketchForgeApiError extends Error {
   readonly url: string;
   readonly status: number;
   readonly detail: string | undefined;
+  readonly code: string | undefined;
   readonly body: unknown;
 
   constructor(context: ApiErrorContext) {
@@ -23,16 +54,28 @@ export class SketchForgeApiError extends Error {
     this.url = context.url;
     this.status = context.status;
     this.detail = context.detail;
+    this.code = context.code;
     this.body = context.body;
   }
 
   /**
+   * Whether the server gave this reason.
+   *
+   * The prose match is the fallback for a server from before codes existed, and
+   * is deliberately kept: a client that only read `code` would treat every error
+   * from such a server as unrecognised.
+   */
+  private is(code: ApiErrorCode, status: number, prose: RegExp) {
+    if (this.code) return this.code === code;
+    return this.status === status && prose.test(this.detail ?? "");
+  }
+
+  /**
    * The API answers 404 for every route when `SKETCHFORGE_API_TOKEN` is unset,
-   * which is indistinguishable from a missing project by status alone -- so a
-   * 404 on the project list is the one that means "the API is switched off".
+   * which is indistinguishable from a missing project by status alone.
    */
   get looksDisabled() {
-    return this.status === 404 && /disabled/i.test(this.detail ?? "");
+    return this.is("api_disabled", 404, /disabled/i);
   }
 
   /** The server has a token but no project directory, so it can store nothing. */
@@ -42,7 +85,37 @@ export class SketchForgeApiError extends Error {
 
   /** Another write holds the project's lock. Retrying is the right response. */
   get isProjectBusy() {
-    return this.status === 409 && /being changed/i.test(this.detail ?? "");
+    return this.is("project_busy", 409, /being changed/i);
+  }
+
+  /** That shape is locked. Retrying will not help; unlock it first. */
+  get isShapeLocked() {
+    return this.is("shape_locked", 409, /locked/i);
+  }
+
+  /** No such project on the server. */
+  get isProjectMissing() {
+    return this.is("project_not_found", 404, /project is not on the server/i);
+  }
+
+  /** No such shape in the project. */
+  get isShapeMissing() {
+    return this.is("shape_not_found", 404, /not in the project/i);
+  }
+
+  /**
+   * The change named fields the shape's kind has no use for.
+   *
+   * `unapplicableFields` lists them, which is the whole reason this is an error
+   * rather than a silent no-op.
+   */
+  get hasUnapplicableFields() {
+    return this.is("unapplicable_fields", 422, /cannot take|no sweep to change/i);
+  }
+
+  get unapplicableFields(): string[] {
+    const fields = (this.body as { fields?: unknown } | undefined)?.fields;
+    return Array.isArray(fields) ? fields.filter((field): field is string => typeof field === "string") : [];
   }
 }
 
