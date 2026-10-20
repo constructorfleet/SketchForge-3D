@@ -41,6 +41,7 @@ import {
 import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
 import { appendTypedCharacter, backspaceTypedEntry, typedEntryValue } from "@/lib/numericEntry";
 import { orbitDirection, orbitFromDrag, type CameraOrbit } from "@/lib/viewCubeOrbit";
+import { cutPreviewCutterScale, cutterShapeForBoolean } from "@/lib/cutterPadding";
 import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, putGeometryOnBase } from "@/lib/primitiveGeometry";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
@@ -106,7 +107,6 @@ const MAX_CAMERA_DISTANCE = 4200;
 const CAMERA_HOME = new THREE.Vector3(118, 96, 118);
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
 const MIN_SHAPE_SIZE = 0.01;
-const CUT_PREVIEW_PADDING = 0.01;
 const MIN_ELEVATION = -180;
 const MAX_ELEVATION = 220;
 const CAMERA_MIN_TARGET_Y = -70;
@@ -6437,15 +6437,14 @@ function cutPreviewActualIntersectionGeometry(state: ThreeState, solid: Workplan
     return null;
   }
 
-  // Equal-height cylinders have coplanar caps. Feeding those surfaces directly
-  // to three-bvh-csg can turn a few hundred input triangles into hundreds of
-  // thousands of preview triangles. A tiny local expansion preserves the
-  // visible cut while keeping the preview topology bounded.
-  const holeScale = new THREE.Matrix4().makeScale(
-    (shapeWidth(hole) + CUT_PREVIEW_PADDING * 2) / Math.max(MIN_SHAPE_SIZE, shapeWidth(hole)),
-    (hole.height + CUT_PREVIEW_PADDING * 2) / Math.max(MIN_SHAPE_SIZE, hole.height),
-    (shapeDepth(hole) + CUT_PREVIEW_PADDING * 2) / Math.max(MIN_SHAPE_SIZE, shapeDepth(hole)),
-  );
+  // The highlight is of the hole as drawn -- which is what the exact cut now
+  // removes -- grown only by the separation this evaluator needs. Coplanar caps
+  // fed to three-bvh-csg directly do not merely blow the triangle count up:
+  // measured on a flush blind pocket they stop it coming back at all. The
+  // decision and the measurement both live in `cutterPadding`, beside the cut's
+  // own allowance, so the preview and the cut cannot drift apart again.
+  const previewScale = cutPreviewCutterScale(cutterShapeForBoolean(hole, "preview"));
+  const holeScale = new THREE.Matrix4().makeScale(previewScale.x, previewScale.y, previewScale.z);
   const paddedHoleMatrix = holeBrush.matrix.clone().multiply(holeScale);
   holeBrush.matrix.copy(paddedHoleMatrix);
   holeBrush.matrixWorld.copy(paddedHoleMatrix);
