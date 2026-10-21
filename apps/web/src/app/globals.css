@@ -5444,6 +5444,56 @@ button {
   font-weight: 750;
 }
 
+.surface-appearance-controls {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #dbe4eb;
+}
+
+.surface-appearance-title {
+  color: #31465d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.surface-appearance-controls p {
+  margin: -5px 0 1px;
+  color: #718296;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.surface-appearance-controls select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  color: #31465d;
+  background: #f4f8fb;
+  border: 1px solid #d3dfe8;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.surface-appearance-range {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  color: #586a7d;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.surface-appearance-range input {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: #168fb5;
+}
+
 .color-value {
   color: #718296;
   font-size: 12px;
@@ -7903,8 +7953,24 @@ html[data-theme="dark"] .shape-mini-tools {
 }
 
 html[data-theme="dark"] .property-card-header,
-html[data-theme="dark"] .color-card-header {
+html[data-theme="dark"] .color-card-header,
+html[data-theme="dark"] .surface-appearance-title {
   color: #d8e6ef;
+}
+
+html[data-theme="dark"] .surface-appearance-controls {
+  border-color: #344956;
+}
+
+html[data-theme="dark"] .surface-appearance-controls p,
+html[data-theme="dark"] .surface-appearance-range {
+  color: #afc3d0;
+}
+
+html[data-theme="dark"] .surface-appearance-controls select {
+  color: #d2e1eb;
+  background: #0f1921;
+  border-color: #3a4e5c;
 }
 
 html[data-theme="dark"] .gear-type-property,

@@ -1,5 +1,5 @@
 import { createLocalId } from "./localIds.js";
-import type { WorkplaneShape } from "./domain/sketchforge.js";
+import type { ShapeAppearance, WorkplaneShape } from "./domain/sketchforge.js";
 
 export function normalizeDegrees(value: number) {
   return ((value % 360) + 360) % 360;
@@ -252,6 +252,7 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.kind === b.kind &&
     a.color === b.color &&
     a.material === b.material &&
+    shapeAppearancesEqual(a.appearance, b.appearance) &&
     a.hole === b.hole &&
     a.x === b.x &&
     a.z === b.z &&
@@ -317,6 +318,15 @@ export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
     a.locked === b.locked &&
     a.hidden === b.hidden
   );
+}
+
+function shapeAppearancesEqual(a?: ShapeAppearance, b?: ShapeAppearance) {
+  return a === b || Boolean(a && b
+    && a.presetId === b.presetId
+    && a.baseColor === b.baseColor
+    && a.roughness === b.roughness
+    && a.metalness === b.metalness
+    && a.sheen === b.sheen);
 }
 
 export function serializeShapesForSync(shapes: WorkplaneShape[]) {

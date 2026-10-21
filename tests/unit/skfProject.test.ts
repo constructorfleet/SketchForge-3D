@@ -123,6 +123,30 @@ describe("SketchForge .skf project packages", () => {
     expect(history).toHaveLength(80);
   });
 
+  it("round-trips general surface appearance independently of print material", async () => {
+    const appearance = {
+      presetId: "fabric",
+      baseColor: "#b98254",
+      roughness: 0.91,
+      metalness: 0.03,
+      sheen: 0.36,
+    };
+    const part = shape("box", "chair-seat", { material: "pla", appearance });
+    const restored = await importSkfProject(await exportSkfProject(input([part])));
+
+    expect(restored.shapes[0].appearance).toEqual(appearance);
+    expect(restored.shapes[0].material).toBe("pla");
+  });
+
+  it("rejects out-of-range saved surface parameters", async () => {
+    const bytes = await exportSkfProject(input([shape("box", "invalid-appearance")]));
+    const invalid = mutateProject(bytes, (document) => {
+      document.states[0].nodes[0].definition.appearance = { roughness: 1.2 };
+    });
+
+    await expect(importSkfProject(invalid)).rejects.toThrow(/appearance\.roughness/);
+  });
+
   it("encodes shared geometry once across a long transform history and subsequent saves", async () => {
     const points = Array.from({ length: 30_000 }, (_, index) => Math.sin(index));
     const resource = shape("mesh", "shared-geometry", {
