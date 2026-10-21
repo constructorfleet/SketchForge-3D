@@ -39,6 +39,10 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
+### Contract validation
+
+The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The seven project and shape CRUD operations above carry request metadata and status-specific response schemas; their handlers validate response JSON and return `500 internal_error` for unexpected exceptions or malformed responses. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. `GET` and `POST /measurements` also have request/response validators. Other registry entries remain inventory-only and are not runtime schema-validated yet.
+
 | Method | Path | Does |
 | --- | --- | --- |
 | `GET` | `/projects` | Lists projects: id, name, shape count, revision. |

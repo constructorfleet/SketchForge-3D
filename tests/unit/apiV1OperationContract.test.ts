@@ -33,7 +33,7 @@ describe("REST API v1 operation contract", () => {
     expectTypeOf<CreateProjectBody["schema"]>().toEqualTypeOf<{
       type: "object";
       required: readonly ["name"];
-      name: { type: "string"; minLength: 1; maxLength: 80 };
+      properties: { name: { type: "string"; minimumLength: 1; maximumLength: 80 } };
     }>();
   });
 
@@ -49,12 +49,12 @@ describe("REST API v1 operation contract", () => {
       .toMatchObject({
         operationId: "createProject",
         auth: "bearer",
-        responses: [201, 400, 401, 404, 409, 503],
+        responses: [201, 400, 401, 404, 409, 500, 503],
         requestBody: {
           contentType: "application/json",
           required: true,
           normalization: ["trim", "truncate:80"],
-          schema: { type: "object", required: ["name"], name: { type: "string", minLength: 1, maxLength: 80 } },
+          schema: { type: "object", required: ["name"], properties: { name: { type: "string", minimumLength: 1, maximumLength: 80 } } },
         },
       });
   });
@@ -65,6 +65,38 @@ describe("REST API v1 operation contract", () => {
     expect(parseCreateProjectRequest({ name: " " })).toBeNull();
     expect(parseCreateProjectRequest({ name: 4 })).toBeNull();
     expect(parseCreateProjectRequest({ name: "x".repeat(90) })?.name).toHaveLength(80);
+  });
+
+  it("declares schemas and runtime validators for all project and shape CRUD operations", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const keys = ["GET /api/v1/projects", "POST /api/v1/projects", "DELETE /api/v1/projects", "GET /api/v1/shapes", "POST /api/v1/shapes", "PATCH /api/v1/shapes", "DELETE /api/v1/shapes"];
+    for (const key of keys) {
+      const item = API_V1_OPERATIONS.find((candidate) => `${candidate.method} ${candidate.path}` === key)!;
+      expect(item.auth).toBe("bearer");
+      expect(item.responses?.length).toBeGreaterThan(1);
+      expect(item.responseSchemas).toBeDefined();
+      for (const status of item.responses ?? []) expect((item.responseSchemas as Record<number, unknown> | undefined)?.[status]).toBeDefined();
+      expect(contract.validateApiV1Response(key, 401, { error: "Unauthorized", code: "unauthorized" })).toBe(true);
+      expect(contract.validateApiV1Response(key, 401, { error: "Unauthorized" })).toBe(false);
+      expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+    }
+    expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { kind: "box" })).toBe(true);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { width: 2 })).toBe(false);
+    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: [] })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: "many" })).toBe(false);
+    expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=../bad&shapeId=a"))).toMatchObject({ ok: false, invalid: ["projectId"] });
+    expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=p&shapeId=%20"))).toMatchObject({ ok: false, invalid: ["shapeId"] });
+  });
+
+  it("converts unexpected exceptions and malformed response bodies into internal_error", async () => {
+    const { withApiV1Contract } = await import("@/lib/apiV1OperationContract");
+    const request = new Request("https://example.test/api/v1/projects");
+    const malformed = withApiV1Contract("GET /api/v1/projects", async () => Response.json({ projects: "bad" }));
+    const thrown = withApiV1Contract("GET /api/v1/projects", async () => { throw new Error("private detail"); });
+    for (const response of [await malformed(request), await thrown(request)]) {
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+    }
   });
 
   it("declares and parses the verified GET /faces query and response contract", async () => {

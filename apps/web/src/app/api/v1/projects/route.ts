@@ -12,7 +12,7 @@ import {
   type ProjectMetadata,
 } from "@/lib/engine/serverProjectFiles";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
-import { parseCreateProjectRequest } from "@/lib/apiV1OperationContract";
+import { parseCreateProjectRequest, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -29,7 +29,7 @@ function projectSummary(projectId: string, metadata: ProjectMetadata, updatedAt:
 }
 
 /** The project list, or one project with its shapes when given `projectId`. */
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   return apiJson({ projects: records.map((record) => projectSummary(record.projectId, record.metadata, record.updatedAt, record.packageBytes)) });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   return locked.busy ? apiErrors.projectBusy() : locked.result;
 }
 
-export async function DELETE(request: Request) {
+async function deleteHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -105,3 +105,9 @@ export async function DELETE(request: Request) {
   });
   return locked.busy ? apiErrors.projectBusy() : locked.result;
 }
+
+export const GET = withApiV1Contract("GET /api/v1/projects", getHandler);
+
+export const POST = withApiV1Contract("POST /api/v1/projects", postHandler);
+
+export const DELETE = withApiV1Contract("DELETE /api/v1/projects", deleteHandler);

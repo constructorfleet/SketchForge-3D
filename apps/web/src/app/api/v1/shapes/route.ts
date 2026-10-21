@@ -1,7 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
-import { parseShapePatchRequest } from "@/lib/apiV1OperationContract";
+import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -11,7 +11,7 @@ const MAX_SHAPES_PER_REQUEST = 200;
 /** A change refusing a locked shape says how to unlock it in the same call. */
 const LOCKED_FOR_CHANGE = "That shape is locked. Send locked: false to change it.";
 
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
  * the engine takes a list of requests and has no opinion on whether the body
  * that carried them was shaped like a list.
  */
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -55,6 +55,9 @@ export async function POST(request: Request) {
       return apiError(`Shape ${index} is not an object.`, 400, "invalid_request");
     }
   }
+  if (!validateApiV1RequestBody("POST /api/v1/shapes", body)) {
+    return apiError('Each shape request must include a "kind".', 400, "invalid_request");
+  }
 
   const added = await apiEngine(context.root).addShapes(projectId, requested as Record<string, unknown>[]);
   if (!added.ok) return apiEngineError(added.failure);
@@ -71,7 +74,7 @@ export async function POST(request: Request) {
  * would leave a thread's pitch readable but not writable, which is the
  * asymmetry this endpoint had in the first place.
  */
-export async function PATCH(request: Request) {
+async function patchHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
@@ -94,7 +97,7 @@ export async function PATCH(request: Request) {
   return apiJson({ shape: apiShapeSummary(changed.value.shape), revision: changed.value.revision });
 }
 
-export async function DELETE(request: Request) {
+async function deleteHandler(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
@@ -105,3 +108,11 @@ export async function DELETE(request: Request) {
   if (!removed.ok) return apiEngineError(removed.failure, { oneShape: true });
   return apiJson({ deleted: true, id: removed.value.id, revision: removed.value.revision });
 }
+
+export const GET = withApiV1Contract("GET /api/v1/shapes", getHandler);
+
+export const POST = withApiV1Contract("POST /api/v1/shapes", postHandler);
+
+export const PATCH = withApiV1Contract("PATCH /api/v1/shapes", patchHandler);
+
+export const DELETE = withApiV1Contract("DELETE /api/v1/shapes", deleteHandler);
