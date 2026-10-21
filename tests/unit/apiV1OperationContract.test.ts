@@ -33,7 +33,7 @@ describe("REST API v1 operation contract", () => {
     expectTypeOf<CreateProjectBody["schema"]>().toEqualTypeOf<{
       type: "object";
       required: readonly ["name"];
-      name: { type: "string"; minLength: 1; maxLength: 80 };
+      properties: { name: { type: "string"; minimumLength: 1; maximumLength: 80 } };
     }>();
   });
 
@@ -49,12 +49,12 @@ describe("REST API v1 operation contract", () => {
       .toMatchObject({
         operationId: "createProject",
         auth: "bearer",
-        responses: [201, 400, 401, 404, 409, 503],
+        responses: [201, 400, 401, 404, 409, 500, 503],
         requestBody: {
           contentType: "application/json",
           required: true,
           normalization: ["trim", "truncate:80"],
-          schema: { type: "object", required: ["name"], name: { type: "string", minLength: 1, maxLength: 80 } },
+          schema: { type: "object", required: ["name"], properties: { name: { type: "string", minimumLength: 1, maximumLength: 80 } } },
         },
       });
   });
@@ -65,6 +65,38 @@ describe("REST API v1 operation contract", () => {
     expect(parseCreateProjectRequest({ name: " " })).toBeNull();
     expect(parseCreateProjectRequest({ name: 4 })).toBeNull();
     expect(parseCreateProjectRequest({ name: "x".repeat(90) })?.name).toHaveLength(80);
+  });
+
+  it("declares schemas and runtime validators for all project and shape CRUD operations", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const keys = ["GET /api/v1/projects", "POST /api/v1/projects", "DELETE /api/v1/projects", "GET /api/v1/shapes", "POST /api/v1/shapes", "PATCH /api/v1/shapes", "DELETE /api/v1/shapes"];
+    for (const key of keys) {
+      const item = API_V1_OPERATIONS.find((candidate) => `${candidate.method} ${candidate.path}` === key)!;
+      expect(item.auth).toBe("bearer");
+      expect(item.responses?.length).toBeGreaterThan(1);
+      expect(item.responseSchemas).toBeDefined();
+      for (const status of item.responses ?? []) expect((item.responseSchemas as Record<number, unknown> | undefined)?.[status]).toBeDefined();
+      expect(contract.validateApiV1Response(key, 401, { error: "Unauthorized", code: "unauthorized" })).toBe(true);
+      expect(contract.validateApiV1Response(key, 401, { error: "Unauthorized" })).toBe(false);
+      expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+    }
+    expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { kind: "box" })).toBe(true);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { width: 2 })).toBe(false);
+    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: [] })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: "many" })).toBe(false);
+    expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=../bad&shapeId=a"))).toMatchObject({ ok: false, invalid: ["projectId"] });
+    expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=p&shapeId=%20"))).toMatchObject({ ok: false, invalid: ["shapeId"] });
+  });
+
+  it("converts unexpected exceptions and malformed response bodies into internal_error", async () => {
+    const { withApiV1Contract } = await import("@/lib/apiV1OperationContract");
+    const request = new Request("https://example.test/api/v1/projects");
+    const malformed = withApiV1Contract("GET /api/v1/projects", async () => Response.json({ projects: "bad" }));
+    const thrown = withApiV1Contract("GET /api/v1/projects", async () => { throw new Error("private detail"); });
+    for (const response of [await malformed(request), await thrown(request)]) {
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+    }
   });
 
   it("declares and parses the verified GET /faces query and response contract", async () => {
@@ -128,6 +160,97 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, centerOfMass: { x: 0, y: Number.NaN, z: 0 } } })).toBeNull();
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, bbox: { ...properties.bbox, xmax: Infinity } } })).toBeNull();
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { source: "step", precision: "exact" } } })).toBeNull();
+  });
+
+  it("declares and validates GET /measurements against every edge and face result", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/measurements");
+    expect(operation).toMatchObject({
+      operationId: "listMeasurements",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      response: {
+        required: ["measurements"],
+        schema: {
+          type: "object",
+          required: ["measurements"],
+          properties: {
+            measurements: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
+                properties: {
+                  entity: { type: "string", enum: ["edge", "face"] },
+                  index: { type: "integer" },
+                  geometryType: { type: "string" },
+                  length: { type: "number", nullable: true },
+                  area: { type: "number", nullable: true },
+                  radius: { type: "number", nullable: true },
+                  diameter: { type: "number", nullable: true },
+                  sweepDegrees: { type: "number", nullable: true },
+                  radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const measurements = [
+      { entity: "edge", index: 0, geometryType: "circle", length: 2, area: null, radius: 1, diameter: 2, sweepDegrees: 360, radiusUnavailable: null },
+      { entity: "face", index: 0, geometryType: "plane", length: null, area: 6, radius: null, diameter: null, sweepDegrees: null, radiusUnavailable: "notCurved" },
+    ];
+    expect(contract.parseMeasurementsResponse({ measurements })).toEqual({ measurements });
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[0], entity: "vertex" }] })).toBeNull();
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[1], radiusUnavailable: "unknown" }] })).toBeNull();
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[0], area: "6" }] })).toBeNull();
+  });
+
+  it("declares and validates POST /measurements between-entity requests and results", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "POST" && route === "/api/v1/measurements");
+    expect(operation).toMatchObject({
+      operationId: "measureEntities",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId"] },
+      requestBody: {
+        contentType: "application/json",
+        required: true,
+        schema: {
+          type: "object",
+          required: ["from", "to"],
+          properties: {
+            from: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+            to: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+          },
+        },
+      },
+      response: {
+        required: ["distance", "angleDegrees", "angleUnavailable"],
+        schema: {
+          type: "object",
+          required: ["distance", "angleDegrees", "angleUnavailable"],
+          properties: {
+            distance: { type: "number", minimum: 0 },
+            angleDegrees: { type: "number", nullable: true, minimum: 0, maximum: 180 },
+            angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
+          },
+        },
+      },
+    });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: " block-a " }, to: { shapeId: "block-b", entity: "face", index: 2 } }))
+      .toEqual({ ok: true, from: { shapeId: "block-a", entity: "shape" }, to: { shapeId: "block-b", entity: "face", index: 2 } });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: "a", entity: "edge" }, to: { shapeId: "b" } }))
+      .toMatchObject({ ok: false, side: "from" });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: "a", entity: "vertex", index: 0 }, to: { shapeId: "b" } }))
+      .toMatchObject({ ok: false, side: "from" });
+    expect(contract.parseMeasureBetweenResponse({ distance: 12, angleDegrees: null, angleUnavailable: "notPlanar" }))
+      .toEqual({ distance: 12, angleDegrees: null, angleUnavailable: "notPlanar" });
+    expect(contract.parseMeasureBetweenResponse({ distance: Number.NaN, angleDegrees: null, angleUnavailable: "notPlanar" })).toBeNull();
+    expect(contract.parseMeasureBetweenResponse({ distance: 12, angleDegrees: 90, angleUnavailable: "degenerateNormal" })).toBeNull();
   });
 
   it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {

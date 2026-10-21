@@ -39,6 +39,10 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
+### Contract validation
+
+The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The seven project and shape CRUD operations above carry request metadata and status-specific response schemas; their handlers validate response JSON and return `500 internal_error` for unexpected exceptions or malformed responses. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. `GET` and `POST /measurements` also have request/response validators. Other registry entries remain inventory-only and are not runtime schema-validated yet.
+
 | Method | Path | Does |
 | --- | --- | --- |
 | `GET` | `/projects` | Lists projects: id, name, shape count, revision. |
@@ -396,6 +400,8 @@ Every number here comes from OCCT's own curve and surface analysis, not from the
 
 The indexes are the same ones `GET /edges` and `GET /faces` give, built from the same geometry, so a listing and a measurement taken together are consistent -- and so is a fillet afterwards that names the same edge.
 
+For `GET /measurements`, `projectId` and `shapeId` are required. `index` is the zero-based edge or face index for that shape. `length`, `area`, `radius`, and `diameter` are in millimeters, square millimeters, millimeters, and millimeters respectively; `sweepDegrees` is in degrees. Fields that do not apply to an entity are present as `null`. When no radius is available, `radiusUnavailable` is either `null` (a radius was measured) or one of the documented reason codes. The route can return `400` for invalid query values, `401` for failed authentication, `404` for disabled API or missing project/shape, `409` when another operation holds the project, `422` when the CAD kernel refuses the geometry, `500` for other kernel or response-validation failures, and `503` when server storage is unavailable.
+
 ### What a shape measures
 
 ```json
@@ -448,15 +454,17 @@ Each end names a shape and what part of it to measure from -- the whole solid, o
   "to":   { "shapeId": "plate", "entity": "face", "index": 2 } }
 ```
 
-`entity` defaults to `shape` and takes no index; `edge` and `face` each need a whole, non-negative one. The answer:
+`POST /measurements?projectId=` requires a project id and a JSON object containing both `from` and `to`. Each end requires its own `shapeId`; `entity` defaults to `shape` and accepts `shape`, `edge`, or `face`. A `shape` measures the whole solid and takes no index; an `edge` or `face` requires a non-negative integer index. Invalid bodies or end references return `400`; a missing project, shape, or disabled API returns `404`; a busy project returns `409`; a missing edge/face index returns `422`; kernel or response-validation failures return `500`; unavailable storage returns `503`; failed authentication returns `401`.
+
+The answer:
 
 ```json
 { "distance": 52.5, "angleDegrees": null, "angleUnavailable": "notPlanar" }
 ```
 
-`distance` is OCCT's own minimum-distance solver, so it measures the real surfaces where the shapes actually sit. Two round posts 5 mm apart at their nearest walls read 5 -- not the gap between their bounding boxes, and not the 80 mm between their centres. Touching reads 0.
+`distance` is OCCT's own minimum-distance solver in millimeters, so it measures the real surfaces where the shapes actually sit. Two round posts 5 mm apart at their nearest walls read 5 -- not the gap between their bounding boxes, and not the 80 mm between their centres. Touching reads 0.
 
-`angleDegrees` is the angle between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
+`angleDegrees` is the angle in degrees between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
 
 Naming an index the shape does not have is a `422` with `cad_failed`, and the message says how many there were: a script that has not re-listed after changing the shape finds out rather than measuring the wrong face. A shape **changes shape** when it is hollowed or filleted, so re-measure a result before naming indexes on it.
 

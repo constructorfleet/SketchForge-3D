@@ -7,10 +7,23 @@
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
 export type ApiV1FieldSchema = {
-  type: "number" | "boolean" | "string" | "object";
+  type: "number" | "integer" | "boolean" | "string" | "object" | "array";
+  nullable?: true;
   required?: readonly string[];
   enum?: readonly string[];
+  default?: string;
+  minimum?: number;
+  maximum?: number;
+  minimumLength?: number;
+  maximumLength?: number;
+  pattern?: string;
+  minItems?: number;
+  maxItems?: number;
+  oneOf?: readonly ApiV1FieldSchema[];
+  additionalProperties?: boolean | ApiV1FieldSchema;
+  description?: string;
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
+  items?: ApiV1FieldSchema;
 };
 
 export type ApiV1Operation = {
@@ -20,9 +33,10 @@ export type ApiV1Operation = {
   auth: "bearer" | "none";
   /** Populated only for routes whose response set has been verified. */
   responses?: readonly number[];
+  responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
   query?: {
     required: readonly string[];
-    properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; maxLength?: number }>>;
+    properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; minLength?: number; maxLength?: number }>>;
   };
   response?: {
     required: readonly string[];
@@ -34,25 +48,32 @@ export type ApiV1Operation = {
     provenance?: { source: readonly string[]; precision: readonly string[] };
     schema?: ApiV1FieldSchema;
   };
-  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
+  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody | ApiV1MeasureBetweenRequestBody | { contentType: "application/json"; required: true; schema: ApiV1FieldSchema };
 };
 
 export type ApiV1CreateProjectRequestBody = {
   contentType: "application/json";
   required: true;
   normalization: readonly ["trim", "truncate:80"];
-  schema: { type: "object"; required: readonly ["name"]; name: { type: "string"; minLength: 1; maxLength: 80 } };
+  schema: { type: "object"; required: readonly ["name"]; properties: { name: { type: "string"; minimumLength: 1; maximumLength: 80 } } };
 };
 
 export type ApiV1ShapePatchRequestBody = {
   contentType: "application/json";
   required: true;
+  schema?: ApiV1FieldSchema;
   faceColors: {
     type: "object";
     keyKinds: readonly ["stable-face-id", "legacy-numeric-index"];
     keyPattern: string;
     colorPattern: string;
   };
+};
+
+export type ApiV1MeasureBetweenRequestBody = {
+  contentType: "application/json";
+  required: true;
+  schema: ApiV1FieldSchema;
 };
 
 const operation = (
@@ -68,8 +89,99 @@ const createProjectRequestBody = {
   contentType: "application/json",
   required: true,
   normalization: ["trim", "truncate:80"],
-  schema: { type: "object", required: ["name"], name: { type: "string", minLength: 1, maxLength: 80 } },
+  schema: { type: "object", required: ["name"], properties: { name: { type: "string", minimumLength: 1, maximumLength: 80 } } },
 } as const;
+
+const str = { type: "string" } as const;
+const num = { type: "number" } as const;
+const int = { type: "integer" } as const;
+const projectSummary = { type: "object", required: ["id", "name", "shapes", "revision", "updatedAt", "packageBytes"], properties: { id: str, name: str, shapes: int, revision: num, updatedAt: num, packageBytes: int } } as const;
+const shapeSummary = { type: "object", required: ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"], properties: { id: str, name: str, kind: str, requestKind: str, sketchOperation: str, color: str, faceIds: { type: "array", items: str }, faceColors: { type: "object", additionalProperties: str }, hole: { type: "boolean" }, locked: { type: "boolean" }, hidden: { type: "boolean" }, x: num, z: num, elevation: num, width: num, depth: num, height: num, rotation: num, rotationX: num, rotationZ: num, groupedCount: int, revolve: { type: "object", additionalProperties: true }, profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } } } } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
+const projectDetail = { type: "object", required: ["project"], properties: { project: { type: "object", required: ["id", "name", "createdAt", "snapGrid", "workspace", "shapes"], properties: { id: str, name: str, createdAt: num, snapGrid: str, workspace: { type: "object", additionalProperties: true }, shapes: { type: "array", items: shapeSummary } } } } } as const;
+const projectList = { type: "object", required: ["projects"], properties: { projects: { type: "array", items: projectSummary } } } as const;
+const shapesList = { type: "object", required: ["shapes"], properties: { shapes: { type: "array", items: shapeSummary } } } as const;
+const projectQuery = { required: ["projectId"], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } } } as const;
+const shapeQuery = { required: ["projectId", "shapeId"], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 }, shapeId: { type: "string", trim: true, minLength: 1 } } } as const;
+const json = (schema: ApiV1FieldSchema) => ({ contentType: "application/json" as const, required: true as const, schema });
+const commonErrors = [400, 401, 404, 409, 500, 503] as const;
+const projectOperations = [
+  { ...operation("GET", "/api/v1/projects", "listProjectsOrGetProject", [200, ...commonErrors]), query: { required: [], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } } }, responseSchemas: { 200: { type: "object", oneOf: [projectList, projectDetail] }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("POST", "/api/v1/projects", "createProject", [201, ...commonErrors], createProjectRequestBody), responseSchemas: { 201: { type: "object", required: ["project"], properties: { project: projectSummary } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("DELETE", "/api/v1/projects", "deleteProject", [200, ...commonErrors]), query: projectQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id"], properties: { deleted: { type: "boolean" }, id: str } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+] as const satisfies readonly ApiV1Operation[];
+
+export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): boolean {
+  if (schema.oneOf) return schema.oneOf.some((candidate) => validateApiV1Schema(value, candidate));
+  if (schema.nullable && value === null) return true;
+  if (schema.type === "array") return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.items || value.every((item) => validateApiV1Schema(item, schema.items!)));
+  if (schema.type === "object") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const object = value as Record<string, unknown>;
+    if (schema.required?.some((name) => !(name in object))) return false;
+    if (Object.entries(schema.properties ?? {}).some(([name, child]) => name in object && !validateApiV1Schema(object[name], child))) return false;
+    if (schema.additionalProperties === false && Object.keys(object).some((name) => !(name in (schema.properties ?? {})))) return false;
+    if (typeof schema.additionalProperties === "object" && Object.entries(object).some(([name, child]) => !(name in (schema.properties ?? {})) && !validateApiV1Schema(child, schema.additionalProperties as ApiV1FieldSchema))) return false;
+    return true;
+  }
+  if (schema.type === "string") return typeof value === "string" && (!schema.enum || schema.enum.includes(value)) && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
+  if (schema.type === "boolean") return typeof value === "boolean";
+  if (schema.type === "number" || schema.type === "integer") return typeof value === "number" && Number.isFinite(value) && (schema.type !== "integer" || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum);
+  return false;
+}
+
+export function validateApiV1RequestBody(key: string, value: unknown): boolean {
+  const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
+  const body = operation?.requestBody;
+  if (!body || !value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (key === "POST /api/v1/projects") return Boolean(parseCreateProjectRequest(value as Record<string, unknown>));
+  if (key === "PATCH /api/v1/shapes") return parseShapePatchRequest(value as Record<string, unknown>).ok;
+  if ("schema" in body && body.schema) return validateApiV1Schema(value, body.schema as ApiV1FieldSchema);
+  return true;
+}
+
+export function parseApiV1Query(key: string, request: Request): { ok: true; values: Record<string, string> } | { ok: false; invalid: string[] } {
+  const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
+  if (!operation?.query) return { ok: true, values: {} };
+  const params = new URL(request.url).searchParams;
+  const values: Record<string, string> = {};
+  const invalid: string[] = [];
+  for (const name of operation.query.required) if (!params.has(name)) invalid.push(name);
+  for (const [name, rule] of Object.entries(operation.query.properties)) {
+    if (!params.has(name)) continue;
+    const raw = params.get(name) ?? "";
+    const normalized = rule.trim ? raw.trim() : raw;
+    if ((rule.minLength !== undefined && normalized.length < rule.minLength) || (rule.maxLength !== undefined && normalized.length > rule.maxLength) || (rule.pattern && !new RegExp(rule.pattern).test(normalized))) invalid.push(name);
+    else values[name] = normalized;
+  }
+  return invalid.length ? { ok: false, invalid } : { ok: true, values };
+}
+
+export function validateApiV1Response(key: string, status: number, body: unknown): boolean {
+  const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
+  const schema = (operation?.responseSchemas as Readonly<Record<number, ApiV1FieldSchema>> | undefined)?.[status];
+  return Boolean(schema && validateApiV1Schema(body, schema));
+}
+
+export function withApiV1Contract(key: string, handler: (request: Request) => Promise<Response>) {
+  return async (request: Request): Promise<Response> => {
+    try {
+      const response = await handler(request);
+      const body = await response.clone().json().catch(() => null);
+      if (!validateApiV1Response(key, response.status, body)) return Response.json({ error: "The API handler returned a response outside its contract.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+      return response;
+    } catch {
+      return Response.json({ error: "The request could not be completed.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    }
+  };
+}
+const shapeRequest = { type: "object", required: ["kind"], properties: { kind: str }, additionalProperties: true } as const;
+const shapeOperations = [
+  { ...operation("GET", "/api/v1/shapes", "listShapes", [200, ...commonErrors]), query: projectQuery, responseSchemas: { 200: shapesList, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("POST", "/api/v1/shapes", "createShapes", [201, ...commonErrors, 413, 422]), query: projectQuery, requestBody: json({ type: "object", oneOf: [shapeRequest, { type: "object", required: ["shapes"], properties: { shapes: { type: "array", minItems: 1, maxItems: 200, items: shapeRequest } }, additionalProperties: false }] }), responseSchemas: { 201: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 413: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]), query: shapeQuery, requestBody: json({ type: "object", additionalProperties: true }), responseSchemas: { 200: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("DELETE", "/api/v1/shapes", "deleteShape", [200, ...commonErrors]), query: shapeQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+] as const satisfies readonly ApiV1Operation[];
 
 export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/align", "alignShapes"),
@@ -101,14 +213,77 @@ export const API_V1_OPERATIONS = [
   operation("DELETE", "/api/v1/groups", "ungroupShape"),
   operation("POST", "/api/v1/imports", "importGeometry"),
   operation("POST", "/api/v1/interference", "analyzeInterference"),
-  operation("GET", "/api/v1/measurements", "listMeasurements"),
-  operation("POST", "/api/v1/measurements", "measureEntities"),
+  {
+    ...operation("GET", "/api/v1/measurements", "listMeasurements", [200, 400, 401, 404, 409, 422, 500, 503]),
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true },
+      },
+    },
+    response: {
+      required: ["measurements"],
+      schema: {
+        type: "object",
+        required: ["measurements"],
+        properties: {
+          measurements: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
+              properties: {
+                entity: { type: "string", enum: ["edge", "face"] },
+                index: { type: "integer" },
+                geometryType: { type: "string" },
+                length: { type: "number", nullable: true },
+                area: { type: "number", nullable: true },
+                radius: { type: "number", nullable: true },
+                diameter: { type: "number", nullable: true },
+                sweepDegrees: { type: "number", nullable: true },
+                radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    ...operation("POST", "/api/v1/measurements", "measureEntities", [200, 400, 401, 404, 409, 422, 500, 503], {
+      contentType: "application/json",
+      required: true,
+      schema: {
+        type: "object",
+        required: ["from", "to"],
+        properties: {
+          from: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+          to: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+        },
+      },
+    }),
+    query: {
+      required: ["projectId"],
+      properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } },
+    },
+    response: {
+      required: ["distance", "angleDegrees", "angleUnavailable"],
+      schema: {
+        type: "object",
+        required: ["distance", "angleDegrees", "angleUnavailable"],
+        properties: {
+          distance: { type: "number", minimum: 0 },
+          angleDegrees: { type: "number", nullable: true, minimum: 0, maximum: 180 },
+          angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
+        },
+      },
+    },
+  },
   operation("POST", "/api/v1/mirrors", "mirrorShapes"),
   operation("POST", "/api/v1/parts", "splitParts"),
   operation("POST", "/api/v1/patterns", "patternShapes"),
-  operation("GET", "/api/v1/projects", "listProjectsOrGetProject"),
-  operation("POST", "/api/v1/projects", "createProject", [201, 400, 401, 404, 409, 503], createProjectRequestBody),
-  operation("DELETE", "/api/v1/projects", "deleteProject"),
+  ...projectOperations,
   {
     ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 409, 500, 503]),
     query: {
@@ -138,29 +313,9 @@ export const API_V1_OPERATIONS = [
     },
   },
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
-  operation("GET", "/api/v1/shapes", "listShapes"),
-  operation("POST", "/api/v1/shapes", "createShapes"),
-  {
-    ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]),
-    query: {
-      required: ["projectId", "shapeId"],
-      properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true },
-      },
-    },
-    requestBody: {
-      contentType: "application/json",
-      required: true,
-      faceColors: {
-        type: "object",
-        keyKinds: ["stable-face-id", "legacy-numeric-index"],
-        keyPattern: "^(?:[0-9]+|face_[^\\s]+)$",
-        colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$",
-      },
-    },
-  },
-  operation("DELETE", "/api/v1/shapes", "deleteShape"),
+  ...shapeOperations.slice(0, 2),
+  { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
+  shapeOperations[3],
   operation("POST", "/api/v1/shell", "shellShape"),
   operation("GET", "/api/v1/thickness", "estimateThickness"),
   operation("OPTIONS", "/api/v1/thickness", "thicknessRouteOptions", [204], undefined, "none"),
@@ -256,6 +411,87 @@ export function parseShapePropertiesResponse(value: unknown): ShapePropertiesRes
   if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
   if (!(precision === "exact" || precision === "tessellated")) return null;
   return value as ShapePropertiesResponse;
+}
+
+export type MeasurementsResponse = {
+  measurements: Array<{
+    entity: "edge" | "face";
+    index: number;
+    geometryType: string;
+    length: number | null;
+    area: number | null;
+    radius: number | null;
+    diameter: number | null;
+    sweepDegrees: number | null;
+    radiusUnavailable: "notCircular" | "ellipseHasNoSingleRadius" | "degenerateCurve" | "notCurved" | "radiusVariesOverSurface" | "radiusNotReportedByKernel" | "degenerateSurface" | null;
+  }>;
+};
+
+/** Validate every required entry field and nullable measurement value. */
+export function parseMeasurementsResponse(value: unknown): MeasurementsResponse | null {
+  if (!value || typeof value !== "object" || !Array.isArray((value as { measurements?: unknown }).measurements)) return null;
+  const unavailableCodes = new Set(["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"]);
+  for (const measurement of (value as { measurements: unknown[] }).measurements) {
+    if (!measurement || typeof measurement !== "object") return null;
+    const entry = measurement as Record<string, unknown>;
+    if (!(entry.entity === "edge" || entry.entity === "face")) return null;
+    if (!Number.isInteger(entry.index) || (entry.index as number) < 0 || typeof entry.geometryType !== "string") return null;
+    for (const key of ["length", "area", "radius", "diameter", "sweepDegrees"]) {
+      const field = entry[key];
+      if (!(field === null || (typeof field === "number" && Number.isFinite(field)))) return null;
+    }
+    if (!(entry.radiusUnavailable === null || (typeof entry.radiusUnavailable === "string" && unavailableCodes.has(entry.radiusUnavailable)))) return null;
+  }
+  return value as MeasurementsResponse;
+}
+
+type ParsedMeasurementEnd = { shapeId: string; entity: "shape" | "edge" | "face"; index?: number };
+
+export type MeasureBetweenRequestResult =
+  | { ok: true; from: ParsedMeasurementEnd; to: ParsedMeasurementEnd }
+  | { ok: false; side: "from" | "to"; error: string };
+
+/** Apply the route's defaults and validation to both endpoints of a measurement request. */
+export function parseMeasureBetweenRequest(body: Record<string, unknown>): MeasureBetweenRequestResult {
+  const parseEnd = (value: unknown): ParsedMeasurementEnd | string => {
+    if (!value || typeof value !== "object") return "must be an object with a shapeId.";
+    const candidate = value as Record<string, unknown>;
+    const shapeId = typeof candidate.shapeId === "string" ? candidate.shapeId.trim() : "";
+    if (!shapeId) return "needs a shapeId.";
+    const requested = candidate.entity === undefined ? "shape" : candidate.entity;
+    if (!(requested === "shape" || requested === "edge" || requested === "face")) {
+      return `has an entity of ${JSON.stringify(requested)}; it must be one of edge, face, shape.`;
+    }
+    if (requested === "shape") return { shapeId, entity: requested };
+    const index = candidate.index;
+    if (typeof index !== "number" || !Number.isInteger(index) || index < 0) {
+      return `needs a whole, non-negative index to name which ${requested} to measure.`;
+    }
+    return { shapeId, entity: requested, index };
+  };
+
+  const from = parseEnd(body.from);
+  if (typeof from === "string") return { ok: false, side: "from", error: from };
+  const to = parseEnd(body.to);
+  if (typeof to === "string") return { ok: false, side: "to", error: to };
+  return { ok: true, from, to };
+}
+
+export type MeasureBetweenResponse = {
+  distance: number;
+  angleDegrees: number | null;
+  angleUnavailable: "notPlanar" | "degenerateNormal" | null;
+};
+
+/** Validate the measured distance and its optional planar-face angle result. */
+export function parseMeasureBetweenResponse(value: unknown): MeasureBetweenResponse | null {
+  if (!value || typeof value !== "object") return null;
+  const result = value as Record<string, unknown>;
+  if (typeof result.distance !== "number" || !Number.isFinite(result.distance) || result.distance < 0) return null;
+  if (!(result.angleDegrees === null || (typeof result.angleDegrees === "number" && Number.isFinite(result.angleDegrees) && result.angleDegrees >= 0 && result.angleDegrees <= 180))) return null;
+  if (!(result.angleUnavailable === null || result.angleUnavailable === "notPlanar" || result.angleUnavailable === "degenerateNormal")) return null;
+  if ((result.angleDegrees === null) === (result.angleUnavailable === null)) return null;
+  return value as MeasureBetweenResponse;
 }
 
 
