@@ -6,7 +6,9 @@
  * exposes port 3000 should not find a write API there by surprise.
  */
 
-export const API_TOKEN_ENV = "SKETCHFORGE_API_TOKEN";
+import { operatorSettingName } from "@constructorfleet/sketchforge-engine/support/lib/operatorConfiguration";
+
+export const API_TOKEN_ENV = operatorSettingName("SKETCHFORGE_API_TOKEN");
 
 export function configuredApiToken() {
   const token = process.env[API_TOKEN_ENV]?.trim();

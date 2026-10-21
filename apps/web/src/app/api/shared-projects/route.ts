@@ -5,11 +5,12 @@ import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
 import { inspectSkfProjectPackage, SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
+import { operatorSettingName } from "@constructorfleet/sketchforge-engine/support/lib/operatorConfiguration";
 
 export const runtime = "nodejs";
 export const revalidate = false;
 
-const SHARED_PROJECTS_ENV = "SKETCHFORGE_SHARED_PROJECTS_DIR";
+const SHARED_PROJECTS_ENV = operatorSettingName("SKETCHFORGE_SHARED_PROJECTS_DIR");
 const SHARED_THUMBNAILS_DIR = ".thumbnails";
 const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
