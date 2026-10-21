@@ -257,7 +257,8 @@ and behavioral smoke checks are incomplete.
 
 - Add coverage rules for every public route, exported symbol, config key, format, and example.
 - Add a recurring link check for external links as a non-blocking report; internal broken links stay blocking.
-- **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. Redirect coverage and a release process check remain outstanding.
+- **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. PR #134 adds redirect coverage for legacy public paths.
+- This slice adds a release process guide and checks release metadata consistency. Broader coverage rules remain outstanding.
 - Remove superseded manually maintained tables and duplicate code blocks.
 
 ## 10. Acceptance criteria

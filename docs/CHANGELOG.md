@@ -9,6 +9,10 @@
   property results before returning a success response; the REST reference now
   states the units for volume, area, center of mass, and bounds.
 
+### Documentation
+
+- Document the Release Please workflow and verify package release versions and publish dispatches in `docs:check`.
+
 - Merged PR #116 added the VitePress documentation site with repository-derived
   GitHub Pages base path, built-in local search, canonical Markdown staging,
   local link and source-include checks, local preview, and PR build/default-
