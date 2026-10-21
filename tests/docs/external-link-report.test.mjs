@@ -81,9 +81,9 @@ test("internal broken links still fail the required docs check", async (t) => {
 test("external reporting runs separately from blocking docs checks and uploads an advisory artifact", async () => {
   const packageJson = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
   const workflow = await readFile(path.join(repository, ".github/workflows/docs-external-links.yml"), "utf8");
-  assert.match(packageJson.scripts["docs:check"], /node scripts\/docs-check\.mjs/);
-  assert.doesNotMatch(packageJson.scripts["docs:check"], /node scripts\/docs\/external-link-report\.mjs/);
-  assert.match(packageJson.scripts["docs:check"], /tests\/docs\/external-link-report\.test\.mjs/);
+  assert.match(packageJson.scripts["docs:verify"], /node scripts\/docs-check\.mjs/);
+  assert.doesNotMatch(packageJson.scripts["docs:verify"], /node scripts\/docs\/external-link-report\.mjs/);
+  assert.match(packageJson.scripts["docs:verify"], /tests\/docs\/external-link-report\.test\.mjs/);
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /continue-on-error: true/);
   assert.match(workflow, /external-documentation-link-report/);

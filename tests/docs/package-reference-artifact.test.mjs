@@ -27,11 +27,13 @@ test("package references are generated into the staged Pages source tree", async
 
   assert.ok(staging >= 0, "docs:stage must stage source docs before generating references");
   assert.ok(references > staging, "package references must be generated after docs staging");
-  assert.ok(!scripts["docs:check"].includes("generate-package-references.mjs --check"),
+  assert.ok(!scripts["docs:verify"].includes("generate-package-references.mjs --check"),
     "docs:check must not require generated reference markdown diffs to be committed");
-  assert.ok(scripts["docs:check"].indexOf("npm run docs:stage") < scripts["docs:check"].indexOf("node scripts/docs-check.mjs"),
+  assert.ok(scripts["docs:generate"].indexOf("npm run docs:stage") >= 0,
     "docs:check must stage generated pages before validating source links");
-  assert.ok(scripts["docs:build"].includes("tests/docs/package-reference-artifact.test.mjs"),
+  assert.ok(scripts["docs:verify"].includes("node scripts/docs-check.mjs"),
+    "docs:verify must validate links after docs:check generation");
+  assert.ok(scripts["docs:site-build"].includes("tests/docs/package-reference-artifact.test.mjs"),
     "docs:build must verify the Pages artifact includes generated package references");
 });
 
@@ -74,6 +76,6 @@ test("the CI reference job validates staged generated pages instead of git diffs
 
 test("docs build runs the artifact assertion after VitePress emits Pages output", async () => {
   const { scripts } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-  const build = scripts["docs:build"];
+  const build = scripts["docs:site-build"];
   assert.ok(build.indexOf("vitepress build .docs-site") < build.indexOf("package-reference-artifact.test.mjs"));
 });

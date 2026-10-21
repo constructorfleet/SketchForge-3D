@@ -1,0 +1,104 @@
+name: Commit generated documentation
+
+on:
+  workflow_run:
+    workflows: ["Documentation site"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  commit-generated-docs:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out the trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Verify the completed docs run and identify its current PR
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          run=$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID")
+          test "$(jq -r '.event' <<< "$run")" = pull_request
+          test "$(jq -r '.repository.full_name' <<< "$run")" = "$REPOSITORY"
+          test "$(jq -r '.head_repository.full_name' <<< "$run")" = "$REPOSITORY"
+          test "$(jq -r '.name' <<< "$run")" = "Documentation site"
+          pr_number=$(jq -r '.pull_requests | if length == 1 then .[0].number else empty end' <<< "$run")
+          test -n "$pr_number"
+          pr=$(gh api "repos/$REPOSITORY/pulls/$pr_number")
+          test "$(jq -r '.state' <<< "$pr")" = open
+          test "$(jq -r '.base.repo.full_name' <<< "$pr")" = "$REPOSITORY"
+          test "$(jq -r '.head.repo.full_name' <<< "$pr")" = "$REPOSITORY"
+          head_sha=$(jq -r '.head.sha' <<< "$pr")
+          base_sha=$(jq -r '.base.sha' <<< "$pr")
+          base_ref=$(jq -r '.base.ref' <<< "$pr")
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          branch=$(jq -r '.head.ref' <<< "$pr")
+          test "$base_ref" = "$default_branch"
+          test "$branch" != "$default_branch"
+          source_pr=$(jq -c '.pull_requests[0]' <<< "$run")
+          test "$(jq -r '.head.sha' <<< "$source_pr")" = "$head_sha"
+          test "$(jq -r '.base.sha' <<< "$source_pr")" = "$base_sha"
+          if ! [[ "$branch" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || [[ "$branch" == *..* || "$branch" == */ || "$branch" == *. || "$branch" == *.lock ]]; then
+            echo "Unsupported target branch ref: $branch" >&2
+            exit 1
+          fi
+          jobs=$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100")
+          # A successful generator is sufficient for refreshing allowlisted output; later
+          # validation failures remain visible on the source and rerun PR checks.
+          generator_result=$(jq -r '[.jobs[].steps[]? | select(.name == "Generate documentation") | .conclusion] | first // "missing"' <<< "$jobs")
+          if [[ "$generator_result" != success ]]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Generated docs auto-commit skipped: generation step result is $generator_result." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          files=$(gh api --paginate "repos/$REPOSITORY/pulls/$pr_number/files?per_page=100" --jq '.[].filename')
+          if grep -qE '^\.github/(workflows|actions)/' <<< "$files"; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Generated docs auto-commit skipped because this PR changes workflow or local action control files." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+          echo "pull_request=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Download generated documentation as untrusted data
+        if: steps.source.outputs.eligible == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-generated-files
+          path: generated-docs-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate artifact and commit only allowlisted files
+        if: steps.source.outputs.eligible == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          EXPECTED_REPO: ${{ github.repository }}
+          EXPECTED_PULL_REQUEST: ${{ steps.source.outputs.pull_request }}
+          EXPECTED_HEAD_SHA: ${{ steps.source.outputs.head_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.source.outputs.base_sha }}
+          EXPECTED_DEFAULT_BRANCH: ${{ steps.source.outputs.default_branch }}
+          EXPECTED_BRANCH: ${{ steps.source.outputs.branch }}
+          DOCS_SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          ARTIFACT_DIR: generated-docs-artifact
+        run: node scripts/docs/commit-generated-docs.mjs

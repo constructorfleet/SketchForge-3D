@@ -18,6 +18,6 @@ test("Python API entries link to their defining source lines", async () => {
 
 test("Python documentation checks run the package and examples through mypy", async () => {
   const { scripts } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-  assert.ok(scripts["docs:check"].includes("mypy"), "docs:check must run Python static checking");
-  assert.ok(scripts["docs:check"].includes("cd packages/sketchforge-py && python3 -m mypy src examples"));
+  assert.ok(scripts["docs:verify"].includes("mypy"), "docs:verify must run Python static checking");
+  assert.ok(scripts["docs:verify"].includes("cd packages/sketchforge-py && python3 -m mypy src examples"));
 });
