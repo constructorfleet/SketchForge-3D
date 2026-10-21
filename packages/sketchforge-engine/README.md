@@ -51,6 +51,12 @@ The main entry point exports these API areas:
 
 See the [generated TypeScript API reference](https://constructorfleet.github.io/SketchForge-3D/docs/reference/typescript-engine) for every symbol and declaration. The reference links back to this usage guide. Related documentation: [REST API](https://constructorfleet.github.io/SketchForge-3D/docs/REST_API), [project format](https://constructorfleet.github.io/SketchForge-3D/docs/SKF_PROJECT_FORMAT), and [TypeScript client](https://constructorfleet.github.io/SketchForge-3D/docs/packages/typescript-client).
 
+## Editing a sketch-backed feature
+
+Sketch extrusions, revolves, and sweeps expose a stable `sketchSourceId` on the generated shape. Pass that ID to `engine.changeShape(projectId, sketchSourceId, { sketchProfile })` to rebuild the feature. When the output is nested inside a baked boolean group, the engine updates the sketch output and recomputes its boolean ancestors from their retained operands before writing the project. The edit is atomic: invalid profiles or a failed dependent rebuild leave the stored project unchanged.
+
+This recomputation currently covers a sketch-backed sweep nested under boolean groups. Drafts and other downstream operations remain baked, and a general-purpose feature graph is not yet available. `.skf` export preserves the updated sketch profile and recomputed boolean result.
+
 ## Limitations
 
 - The package does not provide the SketchForge web UI, HTTP routes, authentication, or a remote project client. Use the [TypeScript client](https://www.npmjs.com/package/@constructorfleet/sketchforge-client) for the REST API.

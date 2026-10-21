@@ -74,6 +74,7 @@ import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separate
 import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
+import { findSketchOutput, recomputeSketchOutput } from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
@@ -705,7 +706,7 @@ export function createEngine(store: ProjectStore): Engine {
       // output keeps its own stable object ID; SKF export derives the source
       // node from the synchronized profile on that output.
       const sourceOutputs = !byOutputId.ok && changes.sketchProfile !== undefined
-        ? document.shapes.filter((shape) => shape.sketchSourceId === shapeId)
+        ? findSketchOutput(document.shapes, shapeId)
         : [];
       const sourceSketchTarget = !byOutputId.ok && sourceOutputs.length === 1;
       const found = byOutputId.ok
@@ -889,6 +890,18 @@ export function createEngine(store: ProjectStore): Engine {
         }
       }
 
+      if (sourceSketchTarget) {
+        const recomputed = await recomputeSketchOutput(document.shapes, shapeId, updatedShape);
+        if (!recomputed.ok) {
+          return failed({
+            reason: "sweep_failed",
+            message: recomputed.message ?? (recomputed.reason === "dependency_ambiguous"
+              ? "The sketch source has multiple dependent outputs."
+              : "The sketch source has no dependent output."),
+          });
+        }
+        return ok({ shape: recomputed.updated, revision: await writeShapes(projectId, document, recomputed.shapes) });
+      }
       const shapes = document.shapes.map((shape) => (shape.id === existing.id ? updatedShape : shape));
       return ok({ shape: updatedShape, revision: await writeShapes(projectId, document, shapes) });
     }),

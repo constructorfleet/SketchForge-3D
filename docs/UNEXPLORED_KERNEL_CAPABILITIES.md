@@ -89,15 +89,16 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 ### 1. Dependency-ordered parametric recomputation
 
-Sketch extrusion, revolve, and sweep each persist their source sketch and
-operation parameters. Their `.skf` feature records currently have no upstream
-feature dependencies, and changing one operation does not recompute downstream
-booleans, drafts, or other operations. Draft prism and face draft also produce
-baked results rather than editable feature nodes. A dependency-ordered feature
-graph with deterministic recompute and failure propagation is the highest-value
-foundation: it would let later operations remain attached to their inputs
-instead of becoming disconnected geometry. This should precede expanding the
-number of editable downstream operations.
+Sketch extrusion, revolve, and sweep persist source sketches and operation
+parameters; `.skf` also records dependency links for sketch outputs and boolean
+groups. Runtime recomputation is still narrow: editing a sketch-backed sweep
+now rebuilds it inside retained boolean groups, bottom-up, and writes the
+updated result atomically. Invalid sketches or failed dependent booleans leave
+the project unchanged. Extrusion/revolve descendants, drafts, and other
+operation types do not yet recompute, and draft prism/face draft remain baked
+rather than editable feature nodes. A general dependency-ordered graph with
+consistent failure propagation remains the highest-value foundation before
+expanding editable downstream operations.
 
 ### 2. Broader and editable drafting
 
