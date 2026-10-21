@@ -50,3 +50,13 @@ client, translation, and capability documents.
 The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
 checks merged in PR #128; STEP color guidance merged in PR #119.
+
+## Newly identified documentation gaps
+
+- The publishing-clients version table still prints the generic phrase “the
+  release version”; display a concrete version derived from package metadata and
+  guard it with a documentation test.
+- Add useful cross-links among task guides, package pages, and generated API
+  references, with checks that the important reader paths remain connected.
+- Expand the engine package README and generated TypeScript engine reference
+  into a practical npm listing and API guide, and verify the package contents.

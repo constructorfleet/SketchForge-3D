@@ -86,6 +86,10 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /sketch-constraint degree-of-freedom estimate \(#146\).*merged/i);
   assert.match(spec, /six-operation generated OpenAPI slice \(#144\).*merged/i);
   assert.match(spec, /Open PR #151 adds runtime-backed OpenAPI coverage.*7 operations.*25 still omitted/i);
+  assert.match(spec, /Open PR #154 adds built-site accessibility coverage/i);
+  assert.match(spec, /Publishing clients version row.*“the release version”/i);
+  assert.match(spec, /Cross-links between documentation and references/i);
+  assert.match(spec, /Engine npm listing and generated reference/i);
   assert.match(spec, /Open PR #153 adds a bounded deterministic least-squares sketch constraint solve/i);
   assert.match(spec, /PR #147's STEP component-color import support has merged/i);
   assert.match(spec, /stable face identity in the Python client \(#145\).*merged/i);
