@@ -1,0 +1,40 @@
+name: External documentation links
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/docs/external-link-report.mjs"
+      - ".github/workflows/docs-external-links.yml"
+  schedule:
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Report external documentation link availability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check external links and write advisory report
+        id: external-links
+        continue-on-error: true
+        run: node scripts/docs/external-link-report.mjs --report "$RUNNER_TEMP/external-link-report.json"
+      - name: Upload external link report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-documentation-link-report
+          path: |
+            ${{ runner.temp }}/external-link-report.json
+            ${{ runner.temp }}/external-link-report.md
+          if-no-files-found: warn
+          retention-days: 14
