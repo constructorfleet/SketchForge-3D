@@ -9368,6 +9368,17 @@ html[data-theme="dark"] .nameplate-fillet-coachmark {
   white-space: nowrap;
 }
 
+.scene-row-rename-input {
+  min-width: 0;
+  padding: 3px 5px;
+  flex: 1;
+  color: #28516d;
+  font: inherit;
+  background: #fff;
+  border: 1px solid #69a9c9;
+  border-radius: 4px;
+}
+
 .scene-row-count,
 .scene-row-tag {
   flex: 0 0 auto;
@@ -9444,6 +9455,12 @@ html[data-theme="dark"] .scene-inspector {
 
 html[data-theme="dark"] .scene-row-name {
   color: #d3e1ea;
+}
+
+html[data-theme="dark"] .scene-row-rename-input {
+  color: #d3e1ea;
+  background: #17252f;
+  border-color: #4c819b;
 }
 
 html[data-theme="dark"] .scene-inspector-summary,

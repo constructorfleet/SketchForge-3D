@@ -30,6 +30,24 @@ function importedShape(): WorkplaneShape {
 }
 
 describe("project shape persistence resources", () => {
+  it("preserves edited shape and group names through project persistence", () => {
+    const shape = { ...importedShape(), name: "Base plate" };
+    const group: WorkplaneShape = {
+      ...shape,
+      id: "group-1",
+      name: "Mounting assembly",
+      importedMesh: undefined,
+      groupedShapes: [{ ...shape, id: "mesh-1" }],
+      groupOperation: "group",
+    };
+
+    const compact = compactProjectShapeState([group], []);
+    const restored = hydrateProjectShapeState(compact.shapes, compact.history, compact.resources);
+
+    expect(restored.shapes[0]?.name).toBe("Mounting assembly");
+    expect(restored.shapes[0]?.groupedShapes?.[0]?.name).toBe("Base plate");
+  });
+
   it("preserves a newer live cache entry when an older IndexedDB read finishes late", () => {
     const live = { revision: 20, shapes: [importedShape()] };
     const staleLoaded = { revision: 30, shapes: [] as WorkplaneShape[] };

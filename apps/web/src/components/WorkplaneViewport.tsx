@@ -5610,6 +5610,7 @@ export function WorkplaneViewport({
           onSelectRow={(id, additive) => onSelectShape(id, additive ? "toggle" : "replace")}
           onToggleHidden={onSetShapeHidden}
           onToggleLocked={onSetShapeLocked}
+          onRename={(id, name) => onUpdateShape(id, { name })}
           onDelete={onDeleteShapeById}
           onGroup={onGroupShapes}
           onUngroup={onUngroupShapes}
