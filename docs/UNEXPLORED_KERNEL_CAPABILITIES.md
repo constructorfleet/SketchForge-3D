@@ -13,8 +13,9 @@ These are implemented and should not be filed as missing features:
 - Interference checking is available through the engine and REST API, with an
   AABB candidate prefilter and bounded pair count; wall thickness is available
   as a sampled estimate with its sampling method disclosed.
-- STEP assemblies can be exploded into separate solids, subject to limits of
-  200 solids and 8 MiB of source data.
+- STEP assemblies can be exploded into separate solids, preserving product
+  names and available XCAF colors, subject to limits of 200 solids and 8 MiB of
+  source data. Assembly hierarchy is still flattened.
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section DXF
   exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
@@ -38,14 +39,15 @@ arbitrary 3D paths or face-associated editable features. Keep geometry
 rebuild/refusal behavior consistent across the editor, Engine, REST API, and MCP
 surfaces that support the operation.
 
-### 2. STEP assembly names, colors, and hierarchy
+### 2. STEP assembly hierarchy and color verification
 
-Explosion currently creates numbered children and inherits the parent
-appearance. It does not preserve component names, per-component colors, or the
-STEP assembly hierarchy. The operation also refuses sources above 200 solids or
-8 MiB. Use STEP/XCAF labels to map names and colors to solids; treat nested
-assembly structure as a separate format decision if it cannot be represented by
-the existing groups without loss.
+Explosion now preserves XCAF product names and the per-component colors
+available from the STEP reader, with inherited color fallback. The installed
+kernel fixture does not round-trip explicit XCAF colors, so the positive color
+path still needs verification with a representative real STEP file. The
+operation refuses sources above 200 solids or 8 MiB. Nested assembly hierarchy
+is still flattened into independent parts; representing it losslessly needs a
+project-model decision.
 
 ### 3. Face-color preview and stable identity
 

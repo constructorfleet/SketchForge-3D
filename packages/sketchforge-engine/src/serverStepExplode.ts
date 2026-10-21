@@ -1,7 +1,7 @@
 /** Split a retained STEP source into positioned, independently editable solids. Node-only. */
 
 import * as THREE from "three";
-import type { ShapeHandle } from "occt-wasm";
+import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
@@ -14,6 +14,53 @@ const X_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } } 
 
 function boundsOf(cad: Parameters<Parameters<typeof withCadKernel>[0]>[0], shape: ShapeHandle) {
   return cad.getBoundingBox(shape, false);
+}
+
+type ComponentMetadata = { name?: string; color?: string };
+
+function shapeKey(cad: OcctKernel, shape: ShapeHandle) {
+  const bounds = boundsOf(cad, shape);
+  const values = [
+    cad.getVolume(shape), bounds.xmin, bounds.ymin, bounds.zmin,
+    bounds.xmax, bounds.ymax, bounds.zmax,
+  ];
+  return values.map((value) => value.toFixed(5)).join(":");
+}
+
+function colorHex(color: [number, number, number]) {
+  return `#${color.map((channel) => Math.round(Math.max(0, Math.min(1, channel)) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Read XCAF instance labels and associate leaf component metadata with its exact solid. */
+function stepComponentMetadata(cad: OcctKernel, step: string) {
+  const metadataBySolid = new Map<string, ComponentMetadata[]>();
+  const document = cad.importXCAFFromSTEP(step);
+  try {
+    const visit = (label: LabelTag, inheritedColor?: string) => {
+      const info = document.getLabelInfo(label);
+      const color = info.hasColor ? colorHex(info.color) : inheritedColor;
+      const children = document.getChildren(label);
+      if (children.length) {
+        for (const child of children) visit(child, color);
+        return;
+      }
+      if (info.isAssembly || !info.shapeHandle) return;
+      const solids = cad.getSubShapes(info.shapeHandle, "solid");
+      for (const solid of solids) {
+        const key = shapeKey(cad, solid);
+        const metadata = metadataBySolid.get(key) ?? [];
+        metadata.push({
+          ...(info.name.trim() && !/^\d+$/.test(info.name.trim()) ? { name: info.name.trim() } : {}),
+          ...(color ? { color } : {}),
+        });
+        metadataBySolid.set(key, metadata);
+      }
+    };
+    for (const root of document.getRoots()) visit(root);
+  } finally {
+    document.close();
+  }
+  return metadataBySolid;
 }
 
 /** Turn a STEP-imported mesh shape into one exact mesh/B-rep-backed shape per solid. */
@@ -44,8 +91,10 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     ));
     const mirrors = new THREE.Vector3(shape.mirrorX ? -1 : 1, shape.mirrorY ? -1 : 1, shape.mirrorZ ? -1 : 1);
     const parentCenter = new THREE.Vector3(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
+    const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
 
     return solids.map((solid, index) => {
+      const metadata = componentMetadata.get(shapeKey(cad, solid))?.shift();
       const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
       const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
       const bounds = boundsOf(cad, positioned);
@@ -61,9 +110,9 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
         positions.push(mesh.positions[vertex]!, mesh.positions[vertex + 1]!, mesh.positions[vertex + 2]!);
         if (mesh.normals.length === mesh.positions.length) normals.push(mesh.normals[vertex]!, mesh.normals[vertex + 1]!, mesh.normals[vertex + 2]!);
       }
-      const child = importedShapeFromTriangleSoup(`${shape.name} ${index + 1}`, positions, normals.length ? normals : undefined, "step");
+      const child = importedShapeFromTriangleSoup(metadata?.name ?? `${shape.name} ${index + 1}`, positions, normals.length ? normals : undefined, "step");
       const offset = new THREE.Vector3(partX, partY - shape.height / 2, partZ).multiply(mirrors).applyMatrix4(rotation).add(parentCenter);
-      child.color = shape.color;
+      child.color = metadata?.color ?? shape.color;
       child.material = shape.material;
       child.appearance = shape.appearance;
       child.hole = shape.hole;

@@ -11,6 +11,29 @@ import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engi
 import type { ProjectAsset } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("preserves STEP product names when exploding a multi-product STEP file", async () => {
+    const step = await withCadKernel((cad) => {
+      const document = cad.createXCAFDocument();
+      try {
+        const first = cad.makeBox(10, 8, 6);
+        const second = cad.translate(cad.makeBox(5, 4, 3), 20, 0, 0);
+        document.addShape(first, { name: "Red Housing", color: [0.8, 0.1, 0.2] });
+        document.addShape(second, { name: "Blue Pin", color: [0.1, 0.2, 0.9] });
+        return document.exportSTEP();
+      } finally {
+        document.close();
+      }
+    });
+    const bytes = new TextEncoder().encode(step);
+    const source: ProjectAsset = { id: "source", name: "named.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
+    const imported = await importedShapeFromStepOnKernel(source.name, step);
+    imported.shape.importedMesh!.assetId = source.id;
+
+    const parts = await explodeStepAssembly(imported.shape, source);
+
+    expect(parts.map((part) => part.name).sort()).toEqual(["Blue Pin", "Red Housing"]);
+  });
+
   it("returns separately positioned solids with exact BREP geometry", async () => {
     const step = await withCadKernel((cad) => {
       const first = cad.makeBox(10, 8, 6);
