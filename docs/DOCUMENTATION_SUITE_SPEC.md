@@ -1,6 +1,6 @@
 # Documentation suite specification
 
-**Status (2026-10-21):** The site is deployed after PR #116. Package/example references merged in PR #118; stable-face `GET /faces` contract merged in PR #120; operator configuration reference merged in PR #121; and `.skf` reference merged in PR #123. MCP reference PR #122, STEP documentation PR #119, and `PATCH faceColors` contract PR #125 remain open and are not shipped. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
+**Status (2026-10-21):** The site is deployed after PR #116. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), and static provenance (#126) have merged. STEP documentation PR #119 and deterministic reference-generator wiring PR #128 remain open. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
@@ -223,12 +223,12 @@ Deliver the suite in small steps while retaining current published docs until re
 - [x] Configure the repository Pages publishing source as GitHub Actions and verify the first published deployment. The first deployment succeeded after PR #116 merged.
 
 Phase 1 established and deployed the site shell. Package references and
-executable examples (#118), the stable-face `GET /faces` contract (#120),
-operator configuration (#121), and project-format reference (#123) have merged.
-The initial REST inventory and shape and CLI references have also merged. MCP
-reference (#122), STEP docs (#119), and `PATCH faceColors` contract (#125) are
-open. Full API schemas/OpenAPI and the remaining accessibility and behavioral
-smoke checks are incomplete.
+executable examples (#118), stable-face `GET /faces` and `PATCH faceColors`
+contracts (#120, #125), operator configuration (#121), project-format
+reference (#123), MCP reference/navigation (#122), and source provenance (#126)
+have merged. STEP docs (#119) and deterministic generator-hook integration
+(#128) remain open. Full API schemas/OpenAPI and the remaining accessibility
+and behavioral smoke checks are incomplete.
 
 ### Phase 2: generate package and example documentation
 
@@ -240,7 +240,7 @@ smoke checks are incomplete.
 ### Phase 3: make the REST reference authoritative
 
 - **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract or OpenAPI source.
-- **Merged PR #120:** stable application-owned IDs are included in `GET /faces`; the `PATCH faceColors` contract remains under review in PR #125.
+- **Merged PRs #120 and #125:** stable application-owned IDs are included in `GET /faces` and are the persisted `faceColors` keys for `PATCH /shapes`. The operation inventory still lacks complete schemas for the rest of the REST surface.
 - Define the typed operation contract and migrate routes incrementally.
 - Generate OpenAPI and REST pages from that contract.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
@@ -248,7 +248,7 @@ smoke checks are incomplete.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
-- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), and `.skf` format (PR #123) references. MCP is in open PR #122; STEP documentation is in open PR #119. Broader workflow guides remain outstanding.
+- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), and MCP schemas/navigation (PR #122). STEP documentation is in open PR #119. Generator hooks for deterministic format/config/MCP drift checks are in open PR #128. Broader workflow guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
@@ -257,7 +257,7 @@ smoke checks are incomplete.
 
 - Add coverage rules for every public route, exported symbol, config key, format, and example.
 - Add a recurring link check for external links as a non-blocking report; internal broken links stay blocking.
-- Add source links, version/revision stamps, redirects, and a release process check.
+- **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. Redirect coverage and a release process check remain outstanding.
 - Remove superseded manually maintained tables and duplicate code blocks.
 
 ## 10. Acceptance criteria
