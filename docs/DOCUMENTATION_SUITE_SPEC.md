@@ -1,23 +1,28 @@
 # Documentation suite specification
 
-**Status (2026-10-21, verified at `39ab478`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), API reference sources (#139), face-based drafting (#140), and the REST measurement listing (#137) have merged. Open documentation work includes PR #141 (built-site browser smoke coverage). Full REST schemas/OpenAPI, broader end-to-end examples, and complete accessibility acceptance remain in progress. PR #141 adds the first real-browser built-site smoke checks for keyboard navigation, mobile layout, landmarks/headings, and local search.
+**Status (2026-10-21, verified at `4b5bb78`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), API reference sources (#139), face-based drafting (#140), and the REST measurement listing (#137) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), and the six-operation generated OpenAPI slice (#144) have also merged. PR #147's STEP component-color import support has merged. Open PR #145 adds Python stable-face identity parity. The editor quick-start is implemented on branch `docs/editor-quickstart` and is not yet merged; broader workflow guides and the full accessibility audit remain outstanding. The global sketch solver and editable feature history remain open.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
-## Repository baseline (verified at `39ab478`, 2026-10-21)
+## Repository baseline (verified at `4b5bb78`, 2026-10-21)
 
 The current default branch builds a static VitePress site under
 `/SketchForge-3D/`, with local search, canonical Markdown staging, local link
 and include checks, generated package/CLI/shape/configuration/format/MCP
 references, deterministic reference drift checks, a local preview command,
 and a GitHub Pages workflow. The first GitHub Pages deployment after PR #116 merged succeeded.
-PR #134 added lower-case compatibility routes. The Pages API's initial 404
-was a temporary setup blocker, not current status. The app's
+PR #134 added lower-case compatibility routes. Merged PR #141 added built-site browser
+checks for keyboard navigation, focus, landmarks, headings, mobile navigation,
+search, and 390px overflow. PR #143 added a separate recurring external-link
+report that uploads advisory JSON and Markdown artifacts; external failures do
+not fail the required local docs check or site build. The Pages API's initial
+404 was a temporary setup blocker, not current status. The app's
 `scripts/build-static.mjs` remains separate and builds SketchForge for
-Cloudflare Workers. Existing built-site tests check static output and provenance. PR #141 adds a
-real browser smoke test for keyboard navigation, visible focus, landmarks and
-headings, mobile navigation, local search, and layout overflow at 390px.
+Cloudflare Workers. Existing built-site tests check static output and provenance.
+Merged PR #141 adds a real browser smoke test for keyboard navigation, visible
+focus, landmarks and headings, mobile navigation, local search, and layout
+overflow at 390px.
 
 The migration starts with useful maintained sources already in place:
 `README.md`, `docs/REST_API.md`, `docs/SKF_PROJECT_FORMAT.md`,
@@ -234,9 +239,9 @@ contracts (#120, #125), operator configuration (#121), project-format
 reference (#123), MCP reference/navigation (#122), source provenance (#126),
 STEP color guidance (#119), and lower-case compatibility routes (#134) have
 merged. Deterministic generator-hook integration (#128) has also merged.
-Full API schemas/OpenAPI and remaining accessibility and behavioral smoke
-checks are incomplete; this branch adds an initial browser smoke slice, not a
-complete accessibility audit.
+The initial browser smoke slice is merged, but a complete accessibility audit
+and broader workflow smoke checks remain incomplete. External-link reporting is
+merged as an advisory workflow; local link and include failures remain blocking.
 
 The built-site browser test uses the pinned Playwright dependency. On a local
 checkout, install its Chromium binary with `npm run docs:browser:install`
@@ -247,6 +252,7 @@ its Ubuntu system dependencies before running the build.
 
 - **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
 - **Merged PR #136:** adds Python static type checking and symbol-level source links. PR #137 adds the complete REST measurement listing contract, #139 adds API reference source links, and #140 adds face-based drafting documentation.
+- **Open PR #145:** adds stable face IDs, face-color fields, and a source-backed example to the Python client. The package example CI is the live-server verification seam.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
 - Reuse package README content for package registries and the site from a shared source or generated subset.
 
@@ -254,7 +260,7 @@ its Ubuntu system dependencies before running the build.
 
 - **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract; the generated OpenAPI currently covers only operations with faithful schemas.
 - **Merged PRs #120 and #125:** stable application-owned IDs are included in `GET /faces` and are the persisted `faceColors` keys for `PATCH /shapes`. The operation inventory still lacks complete schemas for the rest of the REST surface.
-- **This slice:** `docs/openapi-v1.json` is generated from the runtime operation registry and currently documents six project/shape CRUD operations whose request/query/status schemas can be represented accurately. The document enumerates omitted operations with reasons; this partial output does not make the REST reference authoritative for the whole API.
+- **Merged PR #144:** `docs/openapi-v1.json` is generated from the runtime operation registry and documents six project/shape CRUD operations whose request/query/status schemas can be represented accurately. The document enumerates 26 of 32 registered operations as omitted, with reasons; this partial output does not make the REST reference authoritative for the whole API.
 - Define the typed operation contract and migrate routes incrementally.
 - Expand the generated OpenAPI coverage as operation metadata becomes a faithful description of runtime validation and response behavior; generate endpoint pages from the same source.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
@@ -263,6 +269,7 @@ its Ubuntu system dependencies before running the build.
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
 - **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), MCP schemas/navigation (PR #122), and STEP color guidance (PR #119). Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
+- The tested package-example guide is merged. The editor quick-start covering a first model through save/export is implemented on branch `docs/editor-quickstart` and not yet merged; broader task guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
@@ -270,9 +277,10 @@ its Ubuntu system dependencies before running the build.
 ### Phase 5: close the stale-content loop
 
 - Add coverage rules for every public route, exported symbol, config key, format, and example.
-- Add a recurring link check for external links as a non-blocking report; internal broken links stay blocking.
+- **Merged PR #143:** adds scheduled, pull-request, and manual external-link reporting with downloadable JSON/Markdown artifacts. Remote failures are advisory; internal broken links stay blocking in `docs:check`.
+- The recurring report checks the outbound links separately from the deterministic site build. A recent 144-link run recorded one GitHub 404 and two standards-site 403 responses; these are report data, not build failures.
 - **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. PR #134 adds redirect coverage for legacy public paths.
-- This slice adds a release process guide and checks release metadata consistency. Broader coverage rules remain outstanding.
+- Merged PR #132 adds a release-process guide and checks release metadata consistency. Coverage rules for every route, export, configuration key, format, and example remain outstanding.
 - Remove superseded manually maintained tables and duplicate code blocks.
 
 ## 10. Acceptance criteria
@@ -282,11 +290,11 @@ The suite is ready for general use when all of these are true:
 1. A clean checkout can build and preview the docs without secrets or production connectivity.
 2. A default-branch merge deploys the built site to GitHub Pages at the configured canonical URL.
 3. The site loads all assets and deep links under the repository path prefix.
-4. Public API route coverage is complete and the generated OpenAPI/reference is tested against the running route behavior.
+4. Public API route coverage is complete and the generated OpenAPI/reference is tested against the running route behavior. Merged PR #144 covers six schema-backed operations and records 26 omitted operations, so this criterion is not yet met.
 5. TypeScript, Python, engine, configuration, and format references are generated from authoritative source inputs.
 6. Every runnable code example in the site is sourced from a repository file and typechecked or executed in CI.
 7. CI fails on missing source includes, broken internal links, undocumented public configuration, unregistered public routes, example failures, or generated-reference drift.
-8. Search, keyboard navigation, responsive behavior, and accessibility basics are smoke-checked on the built artifact. This branch covers local search, skip navigation, visible focus, mobile menu keyboard operation, landmarks/headings, and overflow at 390px; contrast, alt text, and broader workflow checks remain open.
+8. Search, keyboard navigation, responsive behavior, and accessibility basics are smoke-checked on the built artifact. Merged PR #141 covers local search, skip navigation, visible focus, mobile menu keyboard operation, landmarks/headings, and overflow at 390px; contrast, alt text, and broader workflow checks remain open.
 9. Existing public documentation links either resolve to the new site or have intentional redirects/compatibility pages. Lower-case compatibility paths merged in PR #134; the full historical inbound-link inventory remains to be audited.
 10. Maintainers can identify the source file and owning page from a generated-reference check failure.
 
