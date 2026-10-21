@@ -120,6 +120,12 @@ The available per-kind types are `BoxShapeRequest`, `CubeShapeRequest`,
 `GearShapeRequest`, `RevolveShapeRequest`, and `ThreadShapeRequest`.
 `ShapeSpec` is their union, and `RequestableShapeKind` names the supported kind
 values. These are static typing aids; they do not validate requests at runtime.
+`SketchSweepShapeRequest` is also in `ShapeSpec`; its `profile` contains closed
+section path(s), one open spine, and optional explicit workplane frames. The
+server-built result keeps the original sketch in `ShapeSummary.sketch_profile`.
+`SketchSweepShapeRequest` is also in `ShapeSpec`; its `profile` contains closed
+section path(s), one open spine, and optional explicit workplane frames. The
+server-built result keeps the original sketch in `ShapeSummary.sketch_profile`.
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
 

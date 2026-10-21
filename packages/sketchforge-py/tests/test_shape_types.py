@@ -18,6 +18,7 @@ class ShapeRequestTypeTests(unittest.TestCase):
         self.assertIn("loftTopShape", sketchforge3d.types.LoftShapeRequest.__optional_keys__)
         self.assertIn("profile", sketchforge3d.types.RevolveShapeRequest.__required_keys__)
         self.assertIn("clearance", sketchforge3d.types.ThreadShapeRequest.__optional_keys__)
+        self.assertIn("profile", sketchforge3d.types.SketchSweepShapeRequest.__required_keys__)
 
     def test_request_union_covers_all_supported_create_kinds(self):
         self.assertEqual(
@@ -25,11 +26,22 @@ class ShapeRequestTypeTests(unittest.TestCase):
             (
                 "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus",
                 "tube", "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge",
-                "icosahedron", "text", "loft", "gear", "revolve", "thread",
+                "icosahedron", "text", "loft", "gear", "revolve", "thread", "sketchSweep",
             ),
         )
         self.assertEqual(sketchforge3d.types.ShapeRequest, sketchforge3d.types.Mapping[str, sketchforge3d.types.Any])
         self.assertIsNotNone(get_type_hints(sketchforge3d.Shapes.create))
+
+    def test_sketch_profile_is_a_named_shape_summary_field(self):
+        summary = sketchforge3d.ShapeSummary.from_payload({
+            "id": "s1", "name": "Sweep", "kind": "mesh", "color": "#d41721",
+            "hole": False, "locked": False, "hidden": False, "x": 0, "z": 0,
+            "elevation": 0, "width": 2, "depth": 2, "height": 10,
+            "rotation": 0, "rotationX": 0, "rotationZ": 0,
+            "sketchOperation": "sweep", "sketchProfile": {"points": [], "segments": []},
+        })
+        self.assertEqual(summary.sketch_profile, {"points": [], "segments": []})
+        self.assertNotIn("sketchProfile", summary.extra)
 
 
 if __name__ == "__main__":

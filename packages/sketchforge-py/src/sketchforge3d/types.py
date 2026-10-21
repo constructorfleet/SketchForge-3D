@@ -35,7 +35,7 @@ PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "gear",
 )
 
-SHAPE_KINDS: Tuple[str, ...] = PARAMETRIC_SHAPE_KINDS + ("revolve", "thread")
+SHAPE_KINDS: Tuple[str, ...] = PARAMETRIC_SHAPE_KINDS + ("revolve", "thread", "sketchSweep")
 
 # Kinds accepted by the shape creation endpoint. Callers get useful editor
 # completion from the Literal; the runtime tuple is derived from it. Neither
@@ -43,7 +43,7 @@ SHAPE_KINDS: Tuple[str, ...] = PARAMETRIC_SHAPE_KINDS + ("revolve", "thread")
 RequestableShapeKind = Literal[
     "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus", "tube",
     "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge", "icosahedron",
-    "text", "loft", "gear", "revolve", "thread",
+    "text", "loft", "gear", "revolve", "thread", "sketchSweep",
 ]
 REQUESTABLE_SHAPE_KINDS: Tuple[RequestableShapeKind, ...] = get_args(RequestableShapeKind)
 
@@ -235,12 +235,42 @@ class ThreadShapeRequest(_ThreadShapeRequestBase, total=False):
     revolve: Mapping[str, Any]
 
 
+class SketchSweepPoint(TypedDict, total=False):
+    id: str
+    x: float
+    z: float
+    sweepDepth: float
+    sweepRole: Literal["section", "spine"]
+    handleIn: Mapping[str, float]
+    handleOut: Mapping[str, float]
+    mode: Literal["corner", "smooth", "split"]
+
+
+class SketchSweepSegment(TypedDict, total=False):
+    id: str
+    startId: str
+    endId: str
+    kind: Literal["line", "bezier", "smooth"]
+
+
+class SketchSweepProfile(TypedDict, total=False):
+    points: Sequence[SketchSweepPoint]
+    segments: Sequence[SketchSweepSegment]
+    constraints: Sequence[Mapping[str, Any]]
+    sweepFrames: Mapping[str, Any]
+
+
+class SketchSweepShapeRequest(_ShapePlacement):
+    kind: Literal["sketchSweep"]
+    profile: SketchSweepProfile
+
+
 ShapeSpec = Union[
     BoxShapeRequest, CubeShapeRequest, CylinderShapeRequest, ConeShapeRequest,
     SphereShapeRequest, HalfSphereShapeRequest, TorusShapeRequest, TubeShapeRequest,
     RingShapeRequest, PolygonShapeRequest, PyramidShapeRequest, RoofShapeRequest,
     RoundRoofShapeRequest, WedgeShapeRequest, IcosahedronShapeRequest, TextShapeRequest,
-    LoftShapeRequest, GearShapeRequest, RevolveShapeRequest, ThreadShapeRequest,
+    LoftShapeRequest, GearShapeRequest, RevolveShapeRequest, ThreadShapeRequest, SketchSweepShapeRequest,
 ]
 
 THREAD_DESIGNATIONS: Tuple[str, ...] = (
@@ -443,6 +473,7 @@ class ShapeSummary:
     rotation_z: float
     request_kind: Optional[str] = None
     sketch_operation: Optional[str] = None
+    sketch_profile: Optional[Dict[str, Any]] = None
     #: The per-kind parameters this shape carries, under the server's own names.
     parameters: Dict[str, Any] = field(default_factory=dict)
     #: Present on a revolve or a thread: the sweep that built it.
@@ -463,6 +494,7 @@ class ShapeSummary:
         "kind",
         "requestKind",
         "sketchOperation",
+        "sketchProfile",
         "color",
         "hole",
         "locked",
@@ -492,6 +524,7 @@ class ShapeSummary:
             kind=_text(payload, "kind"),
             request_kind=payload.get("requestKind") if isinstance(payload.get("requestKind"), str) else None,
             sketch_operation=payload.get("sketchOperation") if isinstance(payload.get("sketchOperation"), str) else None,
+            sketch_profile=dict(payload["sketchProfile"]) if isinstance(payload.get("sketchProfile"), Mapping) else None,
             color=_text(payload, "color"),
             hole=bool(payload.get("hole")),
             locked=bool(payload.get("locked")),

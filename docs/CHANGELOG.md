@@ -7,6 +7,7 @@
   receive fresh IDs without inherited colors. 3MF export now converts OCCT face
   group index ranges to triangle ranges correctly, so color assignments on any
   face are attached to their triangles.
+- The REST API and TypeScript/Python clients can create sketch sweeps from closed section paths and one open spine. The server builds and persists the OCCT solid and retains the editable sketch profile in shape summaries; profile editing through PATCH is not supported yet.
 
 - The Python client can now read and use stable face identity, which it could not. `GET /faces` has reported an app-owned `id` for each face since face colours stopped being keyed by position, and the Python `FaceSummary` dropped it on the floor -- so a Python caller could see only the `index`, which the kernel reorders after any operation, and had no way to learn the id a colour has to be keyed by. `FaceSummary.id` now carries it, `faces.ids_facing(...)` answers with ids where `faces.facing(...)` answers with indexes, and a `ShapeSummary` reports `face_ids` and `face_colors` as fields rather than leaving them in `extra`. Numeric colour keys from a project saved before stable identity are kept as they are, because the server still accepts them.
 

@@ -71,6 +71,25 @@ describe("shapes", () => {
     expect(server.calls[0]?.body).toEqual({ kind: "box", width: 10 });
   });
 
+  it("sends a closed section and open spine as a retained sketch sweep", async () => {
+    const profile = {
+      points: [
+        { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+        { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+        { id: "p0", x: 0, z: 0 }, { id: "p1", x: 10, z: 0 },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        { id: "spine", startId: "p0", endId: "p1" },
+      ],
+    };
+    const request: ShapeRequest = { kind: "sketchSweep", profile };
+    const server = fakeServer({ status: 201, body: { shapes: [{ ...shapeSummary("s1"), sketchOperation: "sweep", sketchProfile: profile }], revision: 4 } });
+    await expect(client(server).shapes.create("p1", request)).resolves.toMatchObject({ sketchOperation: "sweep", sketchProfile: profile });
+    expect(server.calls[0]?.body).toEqual(request);
+  });
+
   it("sends a batch as one request under the server's limit", async () => {
     const server = fakeServer({ status: 201, body: { shapes: [shapeSummary("s1")], revision: 3 } });
     const shapes: ShapeRequest[] = Array.from({ length: 5 }, () => ({ kind: "cylinder", width: 8 }));
