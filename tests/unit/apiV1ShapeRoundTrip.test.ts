@@ -195,6 +195,31 @@ describe("REST API shape round trip", () => {
     expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(widerProfile);
   });
 
+  it("recomputes a sweep when its persisted source sketch is edited", async () => {
+    const projectId = await makeProject();
+    const originalProfile = sweepProfile();
+    const sweep = await addShape(projectId, { kind: "sketchSweep", name: "Source driven", profile: originalProfile, x: 12, z: -4 });
+    const editedProfile = sweepProfile(2, 1, 10);
+
+    const rebuilt = await patch(projectId, String(sweep.sketchSourceId), { sketchProfile: editedProfile });
+
+    expect(rebuilt.status, JSON.stringify(rebuilt.payload)).toBe(200);
+    expect(rebuilt.payload.shape).toMatchObject({
+      id: sweep.id,
+      sketchSourceId: sweep.sketchSourceId,
+      sketchProfile: editedProfile,
+      x: 12,
+      z: -4,
+    });
+    expect(rebuilt.payload.shape!.width as number).toBeGreaterThan(sweep.width as number);
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(editedProfile);
+
+    const rejected = await patch(projectId, String(sweep.sketchSourceId), { sketchProfile: { points: [], segments: [] } });
+    expect(rejected.status).toBe(400);
+    expect(rejected.payload.code).toBe("invalid_request");
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(editedProfile);
+  });
+
   it("preserves resize ratios when rebuilding an edited sweep profile", async () => {
     const projectId = await makeProject();
     const initialProfile = sweepProfile();

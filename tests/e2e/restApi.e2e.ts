@@ -206,6 +206,43 @@ describe("the REST API over HTTP", () => {
     expect(shape.height).toBeGreaterThan(height);
   });
 
+  it("rebuilds a sketch sweep when PATCH targets its persisted source sketch", async () => {
+    const profile = {
+      points: [
+        { id: "a", x: -1, z: -1, sweepRole: "section" }, { id: "b", x: 1, z: -1, sweepRole: "section" },
+        { id: "c", x: 1, z: 1, sweepRole: "section" }, { id: "d", x: -1, z: 1, sweepRole: "section" },
+        { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        { id: "spine", startId: "p0", endId: "p1" },
+      ],
+    };
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "sketchSweep", name: "Source edit", profile }),
+    });
+    expect(created.status).toBe(201);
+    const [sweep] = created.body.shapes as Array<Record<string, any>>;
+    const editedProfile = {
+      ...profile,
+      points: profile.points.map((point) => point.sweepRole === "section" ? { ...point, x: point.x * 2 } : point),
+    };
+
+    const patched = await api(`/shapes?projectId=${projectId}&shapeId=${encodeURIComponent(sweep.sketchSourceId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sketchProfile: editedProfile }),
+    });
+
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200);
+    const rebuilt = patched.body.shape as Record<string, any>;
+    expect(rebuilt).toMatchObject({ id: sweep.id, sketchSourceId: sweep.sketchSourceId, sketchProfile: editedProfile });
+    expect(rebuilt.width).toBeGreaterThan(sweep.width);
+    const listed = await api(`/shapes?projectId=${projectId}`);
+    expect((listed.body.shapes as Array<Record<string, any>>).find((shape) => shape.id === sweep.id)?.sketchProfile).toEqual(editedProfile);
+  });
+
   it("lists a box's faces and hollows it into a tray", async () => {
     // The route that matters most to get out of the bundle rather than out of
     // vitest: hollowing loads OCCT through `serverExternalPackages`, and a
