@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { editorHistoryEntry, editorHistoryForAutosave, editorHistoryForExport } from "@constructorfleet/sketchforge-engine/editorHistory";
 import { placementWorkplaneFromSurface } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/projectAssets";
 import * as projectAssets from "@constructorfleet/sketchforge-engine/projectAssets";
@@ -99,6 +99,28 @@ describe("SketchForge .skf project packages", () => {
       (doc.editor.workspace as Record<string, unknown>).cameraProjection = "isometric";
     });
     expect((await importSkfProject(corrupt)).workspace.cameraProjection).toBe("perspective");
+  });
+
+  it("round-trips bounded autosave history while keeping explicit export depth independent", async () => {
+    const history = Array.from({ length: 80 }, (_, x) => editorHistoryEntry([shape("box", "box-1", { x })], ["box-1"]));
+    const activeIndex = 60;
+    const autosaveHistory = editorHistoryForAutosave(history, activeIndex);
+    const bytes = await exportSkfProject(input(history[activeIndex].shapes, {
+      history: autosaveHistory.entries,
+      historyIndex: autosaveHistory.index,
+    }));
+
+    const restored = await importSkfProject(bytes);
+    expect(restored.history).toHaveLength(31);
+    expect(restored.historyIndex).toBe(30);
+    expect(restored.history[0].shapes[0].x).toBe(30);
+    expect(restored.history[restored.historyIndex].shapes[0].x).toBe(60);
+    expect(restored.shapes[0].x).toBe(60);
+    const explicitExportHistory = editorHistoryForExport(history, activeIndex, 50);
+    expect(explicitExportHistory.entries).toHaveLength(51);
+    expect(explicitExportHistory.index).toBe(50);
+    expect(explicitExportHistory.entries.at(-1)?.shapes[0].x).toBe(60);
+    expect(history).toHaveLength(80);
   });
 
   it("encodes shared geometry once across a long transform history and subsequent saves", async () => {

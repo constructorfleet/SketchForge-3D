@@ -1176,13 +1176,13 @@ entry (`apps/web/src/lib/keyboardMovement.ts`); and added the benchmark at
 rounds — `570b810`, `677aa98`, `12ffe15` — and the latest-wins coalescing queue
 (`apps/web/src/lib/saveQueue.ts:24`) are also already banked.
 
-**The remainder is one loop.** `exportSkfProject` (`skfProject.ts:797`) walks
-every history entry and calls `serializeState(stateId, entry.shapes, …)` for each
-(`:812-821`), deduplicating by fingerprint but fully serialising every *distinct*
-state — so a save is still O(distinct states × scene size) in node graphs, which
-is the part resource interning cannot reach. Depth is bounded by
-`MAX_EDITOR_HISTORY_ENTRIES = 5000` (`editorHistory.ts:4`), and `"unlimited"`
-resolves to 4,999 retained actions (`:282-284`).
+**The serializer still has one loop.** `exportSkfProject` (`skfProject.ts:797`)
+walks every requested history entry and calls `serializeState(stateId,
+entry.shapes, …)` for each (`:812-821`), deduplicating by fingerprint but fully
+serialising every *distinct* state. This remains O(distinct requested states ×
+scene size) in node graphs, which resource interning cannot reach. Depth is
+bounded by `MAX_EDITOR_HISTORY_ENTRIES = 5000` (`editorHistory.ts:4`), and
+`"unlimited"` resolves to 4,999 retained actions (`:282-284`).
 
 Two things sharpen the brief's framing of the fix:
 
@@ -1194,12 +1194,14 @@ Two things sharpen the brief's framing of the fix:
   `docs/SKF_PROJECT_FORMAT.md:52` already frames depth as an export *choice*
   (Unlimited / 100 / 50 / 30). **Incremental** state storage is the one that
   needs a bump, because states are whole graphs today (`:29, :40`).
-- **The lever may already be in reach.** `exportSkfProject` takes no history
-  limit: it calls `liveEditorHistoryState(…)` with the default `"unlimited"`
-  (`:798`), and shallowing is done by the caller via `editorHistoryForExport(…)`
-  (`SketchForgeEditor.tsx:9125`). So "autosave writes a shallower history than an
-  explicit export does" is a caller-side change, not a format change — worth
-  trying before the incremental design.
+- **Autosave now sends a shallow history request.** The browser autosave caller
+  applies `editorHistoryForAutosave` before calling `exportSkfProject`, retaining
+  up to 30 actions around the active index. The `.skf` v2 format and reader need
+  no change; live editor history remains intact, and explicit `.skf` export
+  continues to use its selected depth through `editorHistoryForExport`
+  (`SketchForgeEditor.tsx:9125`). An explicitly unlimited export can still
+  serialize every retained state; incremental state storage would address that
+  separate case.
 
 **Two things in this document touch it.** §5.2's explode turns one shape into
 potentially thousands, in a format that stores a graph per retained state — so

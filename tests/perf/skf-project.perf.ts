@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { editorHistoryEntry, editorHistoryForAutosave } from "@constructorfleet/sketchforge-engine/editorHistory";
 import { exportSkfProject, importSkfProject, type SkfProjectDocumentV1, type SkfProjectExportInput } from "@constructorfleet/sketchforge-engine/skfProject";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -91,12 +91,28 @@ it("benchmarks autosave of a wide scene with a deep history", async () => {
     shapes: [...active.shapes], history, historyIndex: historyDepth - 1, assets: [],
     workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0, compressionLevel: 1,
   };
+  const autosaveHistory = editorHistoryForAutosave(history, historyDepth - 1);
+  const autosaveInput: SkfProjectExportInput = {
+    ...input,
+    history: autosaveHistory.entries,
+    historyIndex: autosaveHistory.index,
+  };
   const rows: Array<Record<string, string | number>> = [];
+  let autosavePackage: Uint8Array = new Uint8Array();
   for (const pass of ["First autosave", "Repeated autosave"]) {
     const start = performance.now();
-    const saved = await exportSkfProject(input);
+    const saved = await exportSkfProject(autosaveInput);
     rows.push({ step: pass, elapsedMs: Math.round(performance.now() - start), archiveBytes: saved.length });
+    autosavePackage = saved;
   }
+  const explicitStart = performance.now();
+  const explicitPackage = await exportSkfProject(input);
+  rows.push({ step: "Explicit unlimited export", elapsedMs: Math.round(performance.now() - explicitStart), archiveBytes: explicitPackage.length });
   console.table(rows);
   expect(rows[0].archiveBytes).toBeGreaterThan(0);
+  const restoredAutosave = await importSkfProject(autosavePackage);
+  expect(restoredAutosave.history).toHaveLength(31);
+  expect(restoredAutosave.historyIndex).toBe(30);
+  expect(restoredAutosave.shapes[0].x).toBe(active.shapes[0].x);
+  expect((await importSkfProject(explicitPackage)).history).toHaveLength(historyDepth);
 });

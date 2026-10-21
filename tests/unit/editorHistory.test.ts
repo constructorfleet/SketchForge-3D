@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForAutosave, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@constructorfleet/sketchforge-engine/editorHistory";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -189,6 +189,31 @@ describe("editor history snapshots", () => {
     expect(restored.entries[restored.index].shapes[0].x).toBe(5);
     expect(restored.entries[0].shapes[0].x).toBe(0);
     expect(restored.entries[2].shapes[0].x).toBe(10);
+  });
+
+  it("keeps autosave history shallow and aligned with the active state", () => {
+    const entries = Array.from({ length: 80 }, (_, x) => editorHistoryEntry([box({ x })], []));
+
+    const autosave = editorHistoryForAutosave(entries, 60);
+
+    expect(autosave.entries).toHaveLength(31);
+    expect(autosave.index).toBe(30);
+    expect(autosave.entries[0].shapes[0].x).toBe(30);
+    expect(autosave.entries[autosave.index].shapes[0].x).toBe(60);
+    expect(autosave.entries.at(-1)?.shapes[0].x).toBe(60);
+    expect(entries).toHaveLength(80);
+    expect(entries[79].shapes[0].x).toBe(79);
+  });
+
+  it("retains redo states when they fit inside the autosave history window", () => {
+    const entries = Array.from({ length: 80 }, (_, x) => editorHistoryEntry([box({ x })], []));
+
+    const autosave = editorHistoryForAutosave(entries, 5);
+
+    expect(autosave.entries).toHaveLength(31);
+    expect(autosave.index).toBe(5);
+    expect(autosave.entries[autosave.index].shapes[0].x).toBe(5);
+    expect(autosave.entries[autosave.index + 1].shapes[0].x).toBe(6);
   });
 
   it("restores only the configured number of saved actions without losing the active state", () => {
