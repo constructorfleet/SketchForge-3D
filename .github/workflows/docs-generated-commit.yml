@@ -57,6 +57,8 @@ jobs:
             exit 1
           fi
           jobs=$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?per_page=100")
+          # A successful generator is sufficient for refreshing allowlisted output; later
+          # validation failures remain visible on the source and rerun PR checks.
           generator_result=$(jq -r '[.jobs[].steps[]? | select(.name == "Generate documentation") | .conclusion] | first // "missing"' <<< "$jobs")
           if [[ "$generator_result" != success ]]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
