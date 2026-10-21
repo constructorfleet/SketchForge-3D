@@ -671,8 +671,35 @@ export function createEngine(store: ProjectStore): Engine {
       // The sweep's own fields are already applied, so they are kept out of the
       // per-kind pass -- which would refuse them, the stored kind being `mesh`.
       const sweepFields: readonly string[] = sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS;
-      const changed = shapeWithRequestedChanges(swept, Object.fromEntries(
+      let requestedChanges = Object.fromEntries(
         Object.entries(changes).filter(([field]) => !sweepFields.includes(field)),
+      );
+      let changeBase = swept;
+      if (changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {
+        const colors = changes.faceColors as Record<string, unknown>;
+        if (Object.keys(colors).some((key) => !/^\d+$/.test(key))) {
+          try {
+            const faces = await shapeFaces(existing);
+            const faceIds = existing.faceIds ?? faces.map((face) => face.id);
+            const known = new Set(faceIds);
+            if (Object.keys(colors).some((key) => !/^\d+$/.test(key) && !known.has(key))) {
+              return failed({ reason: "invalid_shape_request", message: "A face color references an unknown face ID." });
+            }
+            changeBase = { ...swept, faceIds };
+            requestedChanges = {
+              ...requestedChanges,
+              faceColors: Object.fromEntries(Object.entries(colors).map(([key, color]) => [
+                /^\d+$/.test(key) ? (faceIds[Number(key)] ?? key) : key,
+                color,
+              ])),
+            };
+          } catch (error) {
+            return failed(cadFailure(error));
+          }
+        }
+      }
+      const changed = shapeWithRequestedChanges(changeBase, Object.fromEntries(
+        Object.entries(requestedChanges),
       ));
       if (!changed.ok) {
         return failed({

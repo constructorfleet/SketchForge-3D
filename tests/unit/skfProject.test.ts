@@ -72,6 +72,15 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it("round-trips stable face IDs and ID-keyed colors", async () => {
+    const part = shape("box", "face-id-roundtrip", {
+      faceIds: ["face_face-id-roundtrip_0", "face_face-id-roundtrip_1"],
+      faceColors: { "face_face-id-roundtrip_1": "#ff0000" },
+    });
+    const restored = await importSkfProject(await exportSkfProject(input([part])));
+    expect(restored.shapes[0]).toMatchObject({ faceIds: part.faceIds, faceColors: part.faceColors });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

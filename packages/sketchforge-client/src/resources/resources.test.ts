@@ -130,6 +130,7 @@ describe("edges and treatments", () => {
 
 describe("faces and shell", () => {
   const face = (index: number, facing: string | null) => ({
+    id: `face_${index}`,
     index,
     surfaceType: "plane",
     area: 400,

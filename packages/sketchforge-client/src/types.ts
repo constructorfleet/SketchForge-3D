@@ -224,7 +224,8 @@ export type ShapePatch = ShapePlacement &
   AnyKindFields &
   TaperFields &
   RevolveSettings & {
-    faceColors?: Record<number, string>;
+    /** Colors keyed by stable face ID; numeric keys remain accepted for older projects. */
+    faceColors?: Record<string, string>;
     locked?: boolean;
     hidden?: boolean;
     /** Replaces a revolve's outline; the sweep is rebuilt on the server. */
@@ -269,7 +270,8 @@ export type ShapeSummary = {
   requestKind?: ShapeKind;
   sketchOperation?: SketchOperation;
   color: string;
-  faceColors?: Record<number, string>;
+  faceIds?: string[];
+  faceColors?: Record<string, string>;
   hole: boolean;
   locked: boolean;
   hidden: boolean;
@@ -370,6 +372,8 @@ export const FACE_DIRECTIONS = ["top", "bottom", "left", "right", "front", "back
 export type FaceDirection = (typeof FACE_DIRECTIONS)[number];
 
 export type FaceSummary = {
+  /** Stable, project-persisted identity for this face. */
+  id: string;
   index: number;
   /** As OCCT names the surface: `plane`, `cylinder`, `bspline`, or `unknown`. */
   surfaceType: string;

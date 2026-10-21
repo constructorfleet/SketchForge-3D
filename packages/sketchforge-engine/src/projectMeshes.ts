@@ -40,7 +40,10 @@ export async function meshProjectShapes(shapes: readonly WorkplaneShape[]): Prom
           const start = tessellation.faceGroups[group]!;
           const count = tessellation.faceGroups[group + 1]!;
           const index = faceIndexByHash.get(tessellation.faceGroups[group + 2]!);
-          const color = index === undefined ? undefined : shape.faceColors[index];
+          const faceId = index === undefined ? undefined : shape.faceIds?.[index];
+          const color = index === undefined
+            ? undefined
+            : (faceId ? shape.faceColors[faceId] : undefined) ?? shape.faceColors[index];
           if (!color) continue;
           for (let triangle = start; triangle < start + count; triangle += 1) triangleColors[triangle] = color;
         }

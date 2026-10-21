@@ -87,6 +87,12 @@ describe("creating a shape applies what the request asked for", () => {
     if (resized.ok) expect(resized.shape).not.toHaveProperty("faceColors");
   });
 
+  it("accepts app-owned face IDs and persists colors against those IDs", () => {
+    const box = { ...created({ kind: "box", width: 20, depth: 20, height: 20 }), faceIds: ["face_a", "face_b"] };
+    const painted = shapeWithRequestedChanges(box, { faceColors: { face_b: "#ff0000" } });
+    expect(painted).toMatchObject({ ok: true, shape: { faceIds: ["face_a", "face_b"], faceColors: { face_b: "#ff0000" } } });
+  });
+
   it("rejects malformed per-face color maps", () => {
     const box = created({ kind: "box", width: 20, depth: 20, height: 20 });
     expect(shapeWithRequestedChanges(box, { faceColors: { "-1": "red" } })).toMatchObject({ ok: false, unapplicable: ["faceColors"] });

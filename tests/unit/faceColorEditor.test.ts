@@ -14,4 +14,12 @@ describe("updateFaceColor", () => {
     expect(updateFaceColor({ 1: "#112233" }, -1, "#aabbcc")).toEqual({ 1: "#112233" });
     expect(updateFaceColor({ 1: "#112233" }, 1.5, "#aabbcc")).toEqual({ 1: "#112233" });
   });
+
+  it("sets and removes colors by stable face ID", () => {
+    expect(updateFaceColor({ face_old: "#112233" }, "face_new", "#aabbcc")).toEqual({
+      face_old: "#112233",
+      face_new: "#aabbcc",
+    });
+    expect(updateFaceColor({ face_new: "#aabbcc" }, "face_new", null)).toEqual({});
+  });
 });
