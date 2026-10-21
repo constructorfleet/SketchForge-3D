@@ -44,6 +44,7 @@ const config = defineConfig({
         items: [
           { text: "Overview", link: "/" },
           { text: "Editor quick start", link: "/docs/guides/editor-quickstart" },
+          { text: "Face drafting", link: "/docs/guides/face-drafting" },
           { text: "REST API", link: "/docs/REST_API" },
           { text: ".skf project format", link: "/docs/SKF_PROJECT_FORMAT" },
           { text: "Publishing clients", link: "/docs/PUBLISHING_CLIENTS" },
