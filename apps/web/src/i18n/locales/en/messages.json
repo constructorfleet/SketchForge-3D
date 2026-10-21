@@ -959,7 +959,15 @@
         "helix": "Helix"
       },
       "gearType": "Gear Type",
-      "placement": "Placement"
+      "placement": "Placement",
+      "faceColors": {
+        "title": "Face colors",
+        "hint": "Face indexes are positional. Geometry edits can change them and clear these colors. Use GET /faces to find indexes. Colors are included in 3MF export; the viewport does not preview them yet.",
+        "index": "CAD face index",
+        "add": "Add face color",
+        "remove": "Remove color for face {index}",
+        "empty": "No face colors assigned."
+      }
     },
     "appearance": {
       "title": "Surface appearance",

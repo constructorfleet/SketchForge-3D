@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The shape inspector can assign and remove colors by the CAD face indexes returned from `GET /faces`. These positional assignments persist with the shape and feed the existing per-triangle 3MF export. The inspector calls out that geometry edits can invalidate the indexes; the viewport does not preview face colors yet.
+
 - Align, distribute, repeat and import are now operations rather than buttons. `POST /api/v1/align`, `/distribute`, `/patterns` and `/imports` join the API, and all four are on the `Engine`, which means a macro with no server and no browser can reach them too. Align and distribute were editor-only because their arithmetic lived inside `SketchForgeEditor.tsx` with the overlay that drives them; repeat and import were editor-only because nothing had asked for them anywhere else. A script could place a row of bosses to four decimal places and could not ask for their tops to be flush, which is a strange shape for a capability to have.
 
   The MCP bridge has offered all four since it was written, by driving a live editor tab. It is still doing that; this is the half of the work that has to exist before it can stop.

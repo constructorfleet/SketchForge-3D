@@ -47,13 +47,14 @@ STEP assembly hierarchy. The operation also refuses sources above 200 solids or
 assembly structure as a separate format decision if it cannot be represented by
 the existing groups without loss.
 
-### 3. Editor workflow for face colors
+### 3. Face-color preview and stable identity
 
-Face colors can be set through the API and exported to 3MF, but there is no
-face-picking/color-assignment workflow in the editor. A first UI increment can
-use the existing face list and current face indexes, while clearly signaling
-that geometry edits invalidate those assignments. A future persistent face
-identity model would be needed to retain colors reliably through topology
+The shape inspector now lets users add and remove face colors by the positional
+indexes returned from `GET /faces`; the API persists them and 3MF exports them
+per triangle. The viewport still does not preview those assignments because
+its rendered triangles are not mapped to CAD face indexes. Geometry edits can
+also invalidate positional indexes. A future persistent face identity model
+and viewport mapping would make colors previewable and robust through topology
 changes.
 
 ### 4. Geometric sketch constraints and a parametric feature tree

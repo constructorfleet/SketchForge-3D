@@ -5653,6 +5653,35 @@ button {
   gap: 17px;
 }
 
+.face-color-card .property-card-header {
+  cursor: default;
+}
+
+.face-color-card .property-list > p {
+  margin: 0;
+  color: #586a7d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.face-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #586a7d;
+  font-size: 13px;
+}
+
+.face-color-row button {
+  min-width: 30px;
+  min-height: 30px;
+  color: #586a7d;
+  background: #f6f9fb;
+  border: 1px solid #cbd7e0;
+  border-radius: 6px;
+}
+
 .gear-type-property {
   display: grid;
   gap: 8px;

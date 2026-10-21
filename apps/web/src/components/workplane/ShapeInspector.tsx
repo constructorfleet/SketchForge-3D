@@ -17,6 +17,7 @@ import {
 import { unitLabel, useTranslations, type MessageKey } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
+import { updateFaceColor } from "@/lib/faceColorEditor";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -156,6 +157,7 @@ export function ShapeInspector({
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(false);
+  const [faceColorIndex, setFaceColorIndex] = useState("0");
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
@@ -319,6 +321,45 @@ export function ShapeInspector({
             ))}
           </div>
         </div>
+      ) : null}
+
+      {shape.cadBrep || shape.importedMesh?.brepStep ? (
+        <section className="property-card face-color-card" aria-label={t("panels.inspector.faceColors.title")}>
+          <div className="property-card-header">
+            <span>{t("panels.inspector.faceColors.title")}</span>
+          </div>
+          <div className="property-list">
+            <p>{t("panels.inspector.faceColors.hint")}</p>
+            <label>
+              <span>{t("panels.inspector.faceColors.index")}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={faceColorIndex}
+                disabled={locked}
+                onChange={(event) => setFaceColorIndex(event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              <input
+                type="color"
+                aria-label={t("panels.inspector.faceColors.title")}
+                disabled={locked || faceColorIndex.trim() === "" || !Number.isInteger(Number(faceColorIndex)) || Number(faceColorIndex) < 0}
+                value={shape.faceColors?.[Number(faceColorIndex)] ?? solidColor}
+                onChange={(event) => onUpdate({ faceColors: updateFaceColor(shape.faceColors, Number(faceColorIndex), event.currentTarget.value) })}
+              />
+              <span>{t("panels.inspector.faceColors.add")}</span>
+            </label>
+            {Object.entries(shape.faceColors ?? {}).length ? Object.entries(shape.faceColors ?? {}).sort(([a], [b]) => Number(a) - Number(b)).map(([index, color]) => (
+              <div className="face-color-row" key={index}>
+                <span>{t("panels.inspector.faceColors.index")}: {index}</span>
+                <span className="color-value">{color.toUpperCase()}</span>
+                <button type="button" disabled={locked} aria-label={t("panels.inspector.faceColors.remove", { index })} onClick={() => onUpdate({ faceColors: updateFaceColor(shape.faceColors, Number(index), null) })}>×</button>
+              </div>
+            )) : <p>{t("panels.inspector.faceColors.empty")}</p>}
+          </div>
+        </section>
       ) : null}
 
       {shape.sketchProfile && onEditSketch ? (
