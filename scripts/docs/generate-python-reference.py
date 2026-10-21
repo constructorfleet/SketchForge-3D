@@ -62,4 +62,8 @@ for name in sorted(package.__all__):
     if doc:
         lines.extend([doc.splitlines()[0], ""])
 
-pathlib.Path(sys.argv[1]).write_text("\n".join(lines), encoding="utf-8")
+markdown = "\n".join(lines)
+if "--stdout" in sys.argv:
+    sys.stdout.write(markdown)
+else:
+    pathlib.Path(sys.argv[1]).write_text(markdown, encoding="utf-8")
