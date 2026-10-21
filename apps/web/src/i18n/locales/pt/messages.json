@@ -787,7 +787,7 @@
       "sweepSectionStage": "Etapa 1 de 2 · Seção no plano selecionado",
       "sweepSectionHelp": "Desenhe e feche uma seção centralizada na origem (0,0) do plano selecionado. Ao fechar, a vista muda para o plano ortogonal derivado para o caminho.",
       "sweepSpineStage": "Etapa 2 de 2 · Caminho no plano ortogonal",
-      "sweepSpineHelp": "Desenhe um caminho aberto no plano ortogonal começando na origem da seção (0,0). A seção fica perpendicular à direção inicial do caminho.",
+      "sweepSpineHelp": "Desenhe um caminho aberto a partir da origem da seção (0,0). Comece em direção à direita da tela (ao longo da normal da seção) e depois curve o caminho conforme necessário.",
       "sweepSectionPlane": "Editar seção · plano selecionado",
       "sweepSpinePlane": "Desenhar caminho · plano ortogonal"
     }

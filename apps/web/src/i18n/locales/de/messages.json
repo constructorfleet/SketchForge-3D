@@ -787,7 +787,7 @@
       "sweepSectionStage": "Schritt 1 von 2 · Querschnitt auf ausgewählter Ebene",
       "sweepSectionHelp": "Zeichne und schließe einen am Ursprung (0,0) der ausgewählten Ebene zentrierten Querschnitt. Danach wechselt die Ansicht zur daraus abgeleiteten orthogonalen Ebene für den Pfad.",
       "sweepSpineStage": "Schritt 2 von 2 · Pfad auf orthogonaler Ebene",
-      "sweepSpineHelp": "Zeichne einen offenen Pfad auf der orthogonalen Ebene ab dem Querschnittursprung (0,0). Der Querschnitt wird senkrecht zur anfänglichen Pfadrichtung ausgerichtet.",
+      "sweepSpineHelp": "Zeichne einen offenen Pfad ab dem Querschnittursprung (0,0). Beginne nach rechts auf dem Bildschirm (entlang der Querschnittsnormale) und biege den Pfad danach nach Bedarf.",
       "sweepSectionPlane": "Querschnitt bearbeiten · ausgewählte Ebene",
       "sweepSpinePlane": "Pfad zeichnen · orthogonale Ebene"
     }

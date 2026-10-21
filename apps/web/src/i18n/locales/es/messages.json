@@ -787,7 +787,7 @@
       "sweepSectionStage": "Paso 1 de 2 · Sección en el plano seleccionado",
       "sweepSectionHelp": "Dibuja y cierra una sección centrada en el origen (0,0) del plano seleccionado. Al cerrarla, se cambia al plano ortogonal derivado para la trayectoria.",
       "sweepSpineStage": "Paso 2 de 2 · Trayectoria en el plano ortogonal",
-      "sweepSpineHelp": "Dibuja una trayectoria abierta en el plano ortogonal desde el origen de la sección (0,0). La sección se orienta perpendicularmente a la dirección inicial.",
+      "sweepSpineHelp": "Dibuja una trayectoria abierta desde el origen de la sección (0,0). Empieza hacia la derecha de la pantalla (en la dirección normal de la sección) y luego curva la trayectoria según sea necesario.",
       "sweepSectionPlane": "Editar sección · plano seleccionado",
       "sweepSpinePlane": "Dibujar trayectoria · plano ortogonal"
     }

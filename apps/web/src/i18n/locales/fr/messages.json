@@ -787,7 +787,7 @@
       "sweepSectionStage": "Étape 1 sur 2 · Section sur le plan sélectionné",
       "sweepSectionHelp": "Dessinez et fermez une section centrée sur l’origine (0,0) du plan sélectionné. La fermeture passe au plan orthogonal qui en dérive pour le chemin.",
       "sweepSpineStage": "Étape 2 sur 2 · Chemin sur le plan orthogonal",
-      "sweepSpineHelp": "Dessinez un chemin ouvert sur le plan orthogonal en partant de l’origine de la section (0,0). La section est orientée perpendiculairement à la direction initiale.",
+      "sweepSpineHelp": "Dessinez un chemin ouvert depuis l’origine de la section (0,0). Commencez vers la droite de l’écran (dans la direction de la normale à la section), puis faites tourner le chemin selon vos besoins.",
       "sweepSectionPlane": "Modifier la section · plan sélectionné",
       "sweepSpinePlane": "Dessiner le chemin · plan orthogonal"
     }
