@@ -21,20 +21,24 @@ describe("solveSketchConstraints", () => {
 
   it("keeps coincident points together when one point is dragged", () => {
     const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 5, z: 6 }, { id: "b", x: 10, z: 0 }], constraints: [{ id: "c", kind: "coincident", pointIds: ["a", "b"] }] }), ["a"]);
-    expect(result.profile.points.map(({ x, z }) => [x, z])).toEqual([[5, 6], [5, 6]]);
+    expect(result.profile.points[0]?.x).toBe(5);
+    expect(result.profile.points[0]?.z).toBe(6);
+    expect(result.profile.points[1]?.x).toBeCloseTo(5, 8);
+    expect(result.profile.points[1]?.z).toBeCloseTo(6, 8);
     expect(result.unsatisfiedConstraintIds).toEqual([]);
   });
 
   it("keeps a segment horizontal while anchoring its dragged endpoint", () => {
     const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 4 }], constraints: [{ id: "h", kind: "horizontal", segmentId: "line" }] }), ["b"]);
-    expect(result.profile.points.map((point) => point.z)).toEqual([4, 4]);
+    expect(result.profile.points[0]?.z).toBeCloseTo(4, 8);
+    expect(result.profile.points[1]?.z).toBe(4);
     expect(result.profile.points[1]?.x).toBe(10);
     expect(result.unsatisfiedConstraintIds).toEqual([]);
   });
 
   it("keeps a segment vertical while anchoring its dragged endpoint", () => {
     const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 4 }], constraints: [{ id: "v", kind: "vertical", segmentId: "line" }] }), ["b"]);
-    expect(result.profile.points.map((point) => point.x)).toEqual([10, 10]);
+    expect(result.profile.points.map((point) => point.x)).toEqual([expect.closeTo(10, 8), 10]);
     expect(result.profile.points[1]?.z).toBe(4);
     expect(result.unsatisfiedConstraintIds).toEqual([]);
   });
@@ -49,6 +53,171 @@ describe("solveSketchConstraints", () => {
     const result = solveSketchConstraints(profile({ constraints: [{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 5 }] }), ["a", "b"]);
     expect(result.unsatisfiedConstraintIds).toEqual(["d"]);
     expect(result.profile.points.map((point) => point.x)).toEqual([0, 10]);
+  });
+
+  it("solves a fixed distance from degenerate coincident starting geometry", () => {
+    const result = solveSketchConstraints(profile({
+      points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 0, z: 0 }],
+      constraints: [{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 5 }],
+    }), ["a"]);
+
+    expect(result.profile.points[0]).toMatchObject({ x: 0, z: 0 });
+    expect(Math.hypot(result.profile.points[1]!.x, result.profile.points[1]!.z)).toBeCloseTo(5, 5);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+  });
+
+  it("satisfies redundant dependent constraints and identifies incompatible dependent distances", () => {
+    const redundant = solveSketchConstraints(profile({
+      constraints: [
+        { id: "join-1", kind: "coincident", pointIds: ["a", "b"] },
+        { id: "join-2", kind: "coincident", pointIds: ["a", "b"] },
+      ],
+    }), ["a"]);
+    expect(redundant.unsatisfiedConstraintIds).toEqual([]);
+    expect(redundant.profile.points[1]?.x).toBeCloseTo(0, 8);
+    expect(redundant.profile.points[1]?.z).toBeCloseTo(0, 8);
+
+    const incompatible = solveSketchConstraints(profile({
+      constraints: [
+        { id: "short", kind: "distance", pointIds: ["a", "b"], valueMm: 4 },
+        { id: "long", kind: "distance", pointIds: ["a", "b"], valueMm: 6 },
+      ],
+    }), ["a", "b"]);
+    expect(incompatible.unsatisfiedConstraintIds).toEqual(["short", "long"]);
+    expect(incompatible.profile.points.map(({ x, z }) => [x, z])).toEqual([[0, 0], [10, 0]]);
+  });
+
+  it("solves a coupled nearly-collinear triangle while keeping the dragged vertex fixed", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 0, z: 0 },
+        { id: "b", x: 3, z: 0 },
+        { id: "c", x: 4, z: 0 },
+      ],
+      segments: [],
+      constraints: [
+        { id: "ab", kind: "distance", pointIds: ["a", "b"], valueMm: 3 },
+        { id: "bc", kind: "distance", pointIds: ["b", "c"], valueMm: 4 },
+        { id: "ca", kind: "distance", pointIds: ["c", "a"], valueMm: 6.99 },
+      ],
+    }), ["a"]);
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(result.profile.points[0]).toMatchObject({ x: 0, z: 0 });
+    expect(Math.hypot(result.profile.points[1]!.x - result.profile.points[0]!.x, result.profile.points[1]!.z - result.profile.points[0]!.z)).toBeCloseTo(3, 5);
+    expect(Math.hypot(result.profile.points[2]!.x - result.profile.points[1]!.x, result.profile.points[2]!.z - result.profile.points[1]!.z)).toBeCloseTo(4, 5);
+    expect(Math.hypot(result.profile.points[2]!.x - result.profile.points[0]!.x, result.profile.points[2]!.z - result.profile.points[0]!.z)).toBeCloseTo(6.99, 5);
+  });
+
+  it("handles collinear singularity in a constraint component without moving unrelated geometry", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 0, z: 0 },
+        { id: "b", x: 3, z: 0 },
+        { id: "c", x: 4, z: 0 },
+        { id: "unrelated", x: 2, z: 20 },
+      ],
+      segments: [],
+      constraints: [
+        { id: "ab", kind: "distance", pointIds: ["a", "b"], valueMm: 3 },
+        { id: "bc", kind: "distance", pointIds: ["b", "c"], valueMm: 4 },
+        { id: "ca", kind: "distance", pointIds: ["c", "a"], valueMm: 6.99 },
+      ],
+    }), ["a"]);
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(result.profile.points[3]).toMatchObject({ x: 2, z: 20 });
+  });
+
+  it("moves Bezier handles with their solved point and preserves its 3D sweep depth", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 5, z: 6 },
+        { id: "b", x: 10, z: 0, sweepRole: "spine", sweepDepth: -3, handleIn: { x: 8, z: -2 }, handleOut: { x: 12, z: 2 } },
+      ],
+      constraints: [{ id: "c", kind: "coincident", pointIds: ["a", "b"] }],
+    }), ["a"]);
+
+    expect(result.profile.points[1]?.x).toBeCloseTo(5, 8);
+    expect(result.profile.points[1]?.z).toBeCloseTo(6, 8);
+    expect(result.profile.points[1]?.sweepDepth).toBe(-3);
+    expect(result.profile.points[1]?.handleIn?.x).toBeCloseTo(3, 8);
+    expect(result.profile.points[1]?.handleIn?.z).toBeCloseTo(4, 8);
+    expect(result.profile.points[1]?.handleOut?.x).toBeCloseTo(7, 8);
+    expect(result.profile.points[1]?.handleOut?.z).toBeCloseTo(8, 8);
+  });
+
+  it("solves the same coupled system deterministically", () => {
+    const source = profile({
+      points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 3, z: 0 }, { id: "c", x: 4, z: 0 }],
+      segments: [],
+      constraints: [
+        { id: "ab", kind: "distance", pointIds: ["a", "b"], valueMm: 3 },
+        { id: "bc", kind: "distance", pointIds: ["b", "c"], valueMm: 4 },
+        { id: "ca", kind: "distance", pointIds: ["c", "a"], valueMm: 6.99 },
+      ],
+    });
+    expect(solveSketchConstraints(source, ["a"])).toEqual(solveSketchConstraints(source, ["a"]));
+  });
+
+  it("solves a mixed cyclic rectangle system with coincidence, axis, and distance relations", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 0, z: 0 },
+        { id: "b", x: 4, z: 1 },
+        { id: "c", x: 4, z: 3 },
+        { id: "d", x: 1, z: 3 },
+        { id: "e", x: 8, z: 6 },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" },
+        { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" },
+        { id: "da", startId: "d", endId: "a" },
+      ],
+      constraints: [
+        { id: "join-eb", kind: "coincident", pointIds: ["e", "b"] },
+        { id: "horizontal-ab", kind: "horizontal", segmentId: "ab" },
+        { id: "vertical-bc", kind: "vertical", segmentId: "bc" },
+        { id: "horizontal-cd", kind: "horizontal", segmentId: "cd" },
+        { id: "vertical-da", kind: "vertical", segmentId: "da" },
+        { id: "width-ab", kind: "distance", pointIds: ["a", "b"], valueMm: 4 },
+        { id: "height-bc", kind: "distance", pointIds: ["b", "c"], valueMm: 3 },
+        { id: "width-cd", kind: "distance", pointIds: ["c", "d"], valueMm: 4 },
+        { id: "height-da", kind: "distance", pointIds: ["d", "a"], valueMm: 3 },
+      ],
+    }), ["a"]);
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(result.profile.points[0]).toMatchObject({ x: 0, z: 0 });
+    for (const point of result.profile.points.slice(1)) {
+      expect(Number.isFinite(point.x) && Number.isFinite(point.z)).toBe(true);
+    }
+    expect(result.profile.points[1]?.z).toBeCloseTo(0, 5);
+    expect(result.profile.points[2]?.x).toBeCloseTo(4, 5);
+    expect(result.profile.points[3]?.z).toBeCloseTo(3, 5);
+    expect(result.profile.points[3]?.x).toBeCloseTo(0, 5);
+    expect(result.profile.points[4]?.x).toBeCloseTo(4, 5);
+    expect(result.profile.points[4]?.z).toBeCloseTo(0, 5);
+  });
+
+  it("solves a larger connected distance system within bounded iteration limits", () => {
+    const points = Array.from({ length: 30 }, (_, index) => ({ id: `p${index}`, x: index * 2, z: 0 }));
+    const constraints = points.slice(1).map((point, index) => ({
+      id: `d${index}`,
+      kind: "distance" as const,
+      pointIds: [`p${index}`, point.id] as [string, string],
+      valueMm: 1,
+    }));
+    const result = solveSketchConstraints(profile({ points, segments: [], constraints }), ["p0"]);
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(result.profile.points[0]).toMatchObject({ x: 0, z: 0 });
+    for (let index = 1; index < result.profile.points.length; index += 1) {
+      const previous = result.profile.points[index - 1]!;
+      const current = result.profile.points[index]!;
+      expect(Math.hypot(current.x - previous.x, current.z - previous.z)).toBeCloseTo(1, 5);
+    }
   });
 });
 

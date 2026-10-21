@@ -8,6 +8,8 @@
 
 - The sketch constraint inspector now shows an estimated local degree-of-freedom count from the supported equations' Jacobian rank. Redundant equations are counted once; degenerate zero-length distance geometry is labeled indeterminate. The estimate includes free Bezier handle and sweep-depth parameters and does not imply a global solve.
 
+- Sketch point drags now solve connected coincidence, horizontal/vertical, and fixed-distance constraints together with a bounded damped least-squares iteration. Dragged points stay anchored, Bezier handles translate with their points, and sweep depths remain intact. Unsatisfied constraints are still reported when an iteration cap or singular geometry prevents convergence.
+
 - Regular STEP imports preserve available component colors on the combined mesh. The editor preview and `.skf` projects use stable face IDs for those assignments. Color extraction is limited to imports up to 200 solids and 8 MiB; ambiguous or unavailable component colors keep the shape's default color.
 
 - Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and local CAD +Z pull axis, reports incompatible selections, and replaces the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured support currently covers specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.

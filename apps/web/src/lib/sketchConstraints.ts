@@ -1,8 +1,11 @@
 import type { SketchConstraint, SketchPoint, SketchProfile } from "@/types/sketchforge";
 
 const CONSTRAINT_TOLERANCE_MM = 1e-5;
-const PROJECTION_PASSES = 32;
 const DEGENERATE_DISTANCE_DIRECTION = { x: 1, z: 0 };
+const MAX_GLOBAL_ITERATIONS = 40;
+const MAX_CG_ITERATIONS = 48;
+const INITIAL_DAMPING = 1e-3;
+const SOLVER_CONVERGENCE_TOLERANCE_MM = 1e-8;
 
 export type SketchConstraintSolveResult = {
   profile: SketchProfile;
@@ -50,64 +53,6 @@ function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, st
   return first && second ? [first, second] as const : null;
 }
 
-function projectCoincident(constraint: Extract<SketchConstraint, { kind: "coincident" }>, points: Map<string, SketchPoint>, anchors: Set<string>) {
-  const pair = pointPair(constraint, points);
-  if (!pair) return;
-  const [first, second] = pair;
-  const firstAnchored = anchors.has(first.id);
-  const secondAnchored = anchors.has(second.id);
-  if (firstAnchored && secondAnchored) return;
-  const x = firstAnchored ? first.x : secondAnchored ? second.x : (first.x + second.x) / 2;
-  const z = firstAnchored ? first.z : secondAnchored ? second.z : (first.z + second.z) / 2;
-  if (!firstAnchored) points.set(first.id, movePoint(first, x, z));
-  if (!secondAnchored) points.set(second.id, movePoint(second, x, z));
-}
-
-function projectAxis(constraint: Extract<SketchConstraint, { kind: "horizontal" | "vertical" }>, profile: SketchProfile, points: Map<string, SketchPoint>, anchors: Set<string>) {
-  const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
-  if (!segment) return;
-  const first = points.get(segment.startId);
-  const second = points.get(segment.endId);
-  if (!first || !second) return;
-  const axis = constraint.kind === "horizontal" ? "z" : "x";
-  const firstAnchored = anchors.has(first.id);
-  const secondAnchored = anchors.has(second.id);
-  if (firstAnchored && secondAnchored) return;
-  const target = firstAnchored ? first[axis] : secondAnchored ? second[axis] : (first[axis] + second[axis]) / 2;
-  if (!firstAnchored) points.set(first.id, movePoint(first, axis === "x" ? target : first.x, axis === "z" ? target : first.z));
-  if (!secondAnchored) points.set(second.id, movePoint(second, axis === "x" ? target : second.x, axis === "z" ? target : second.z));
-}
-
-function projectDistance(constraint: Extract<SketchConstraint, { kind: "distance" }>, points: Map<string, SketchPoint>, anchors: Set<string>) {
-  const pair = pointPair(constraint, points);
-  if (!pair) return;
-  const [first, second] = pair;
-  const firstAnchored = anchors.has(first.id);
-  const secondAnchored = anchors.has(second.id);
-  if (firstAnchored && secondAnchored) return;
-
-  let dx = second.x - first.x;
-  let dz = second.z - first.z;
-  let current = Math.hypot(dx, dz);
-  if (current <= CONSTRAINT_TOLERANCE_MM) {
-    dx = DEGENERATE_DISTANCE_DIRECTION.x;
-    dz = DEGENERATE_DISTANCE_DIRECTION.z;
-    current = 1;
-  }
-  const ux = dx / current;
-  const uz = dz / current;
-  if (firstAnchored) {
-    points.set(second.id, movePoint(second, first.x + ux * constraint.valueMm, first.z + uz * constraint.valueMm));
-  } else if (secondAnchored) {
-    points.set(first.id, movePoint(first, second.x - ux * constraint.valueMm, second.z - uz * constraint.valueMm));
-  } else {
-    const centerX = (first.x + second.x) / 2;
-    const centerZ = (first.z + second.z) / 2;
-    points.set(first.id, movePoint(first, centerX - ux * constraint.valueMm / 2, centerZ - uz * constraint.valueMm / 2));
-    points.set(second.id, movePoint(second, centerX + ux * constraint.valueMm / 2, centerZ + uz * constraint.valueMm / 2));
-  }
-}
-
 function residual(constraint: SketchConstraint, profile: SketchProfile, points: Map<string, SketchPoint>) {
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
@@ -121,24 +66,293 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
   return constraint.kind === "coincident" ? distance(first, second) : Math.abs(distance(first, second) - constraint.valueMm);
 }
 
-/** Project positional constraints in stable list order while keeping dragged points fixed. */
+type JacobianTerm = { index: number; coefficient: number };
+type ConstraintEquation = { value: number; terms: JacobianTerm[] };
+
+function equationRows(
+  constraints: SketchConstraint[],
+  profile: SketchProfile,
+  points: Map<string, SketchPoint>,
+  variableIndex: Map<string, number>,
+): ConstraintEquation[] {
+  const equations: ConstraintEquation[] = [];
+  const add = (value: number, terms: Array<{ pointId: string; coordinate: 0 | 1; coefficient: number }>) => {
+    equations.push({
+      value,
+      terms: terms.flatMap(({ pointId, coordinate, coefficient }) => {
+        const base = variableIndex.get(pointId);
+        return base === undefined ? [] : [{ index: base + coordinate, coefficient }];
+      }),
+    });
+  };
+
+  for (const constraint of constraints) {
+    if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
+      const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
+      const first = segment && points.get(segment.startId);
+      const second = segment && points.get(segment.endId);
+      if (!first || !second) continue;
+      const coordinate = constraint.kind === "horizontal" ? 1 : 0;
+      add(first[coordinate === 1 ? "z" : "x"] - second[coordinate === 1 ? "z" : "x"], [
+        { pointId: first.id, coordinate, coefficient: 1 },
+        { pointId: second.id, coordinate, coefficient: -1 },
+      ]);
+      continue;
+    }
+
+    const pair = pointPair(constraint, points);
+    if (!pair) continue;
+    const [first, second] = pair;
+    const dx = second.x - first.x;
+    const dz = second.z - first.z;
+    if (constraint.kind === "coincident") {
+      add(first.x - second.x, [
+        { pointId: first.id, coordinate: 0, coefficient: 1 },
+        { pointId: second.id, coordinate: 0, coefficient: -1 },
+      ]);
+      add(first.z - second.z, [
+        { pointId: first.id, coordinate: 1, coefficient: 1 },
+        { pointId: second.id, coordinate: 1, coefficient: -1 },
+      ]);
+      continue;
+    }
+
+    const length = Math.hypot(dx, dz);
+    const unitX = length <= CONSTRAINT_TOLERANCE_MM ? DEGENERATE_DISTANCE_DIRECTION.x : dx / length;
+    const unitZ = length <= CONSTRAINT_TOLERANCE_MM ? DEGENERATE_DISTANCE_DIRECTION.z : dz / length;
+    add(length - constraint.valueMm, [
+      { pointId: first.id, coordinate: 0, coefficient: -unitX },
+      { pointId: first.id, coordinate: 1, coefficient: -unitZ },
+      { pointId: second.id, coordinate: 0, coefficient: unitX },
+      { pointId: second.id, coordinate: 1, coefficient: unitZ },
+    ]);
+  }
+  return equations;
+}
+
+function objective(equations: ConstraintEquation[]) {
+  return equations.reduce((sum, equation) => sum + equation.value * equation.value, 0);
+}
+
+function multiplyNormalMatrix(equations: ConstraintEquation[], vector: number[], damping: number) {
+  const output = vector.map((value) => damping * value);
+  for (const equation of equations) {
+    const projection = equation.terms.reduce((sum, term) => sum + term.coefficient * vector[term.index]!, 0);
+    for (const term of equation.terms) output[term.index] += term.coefficient * projection;
+  }
+  return output;
+}
+
+function solveNormalSystem(equations: ConstraintEquation[], variableCount: number, damping: number) {
+  const right = Array(variableCount).fill(0) as number[];
+  for (const equation of equations) {
+    for (const term of equation.terms) right[term.index] -= term.coefficient * equation.value;
+  }
+  const solution = Array(variableCount).fill(0) as number[];
+  const residualVector = [...right];
+  const direction = [...right];
+  let residualSquared = residualVector.reduce((sum, value) => sum + value * value, 0);
+  const target = Math.max(1, Math.sqrt(residualSquared)) * 1e-8;
+
+  for (let iteration = 0; iteration < Math.min(MAX_CG_ITERATIONS, Math.max(16, variableCount * 2)) && Math.sqrt(residualSquared) > target; iteration += 1) {
+    const product = multiplyNormalMatrix(equations, direction, damping);
+    const denominator = direction.reduce((sum, value, index) => sum + value * product[index]!, 0);
+    if (!Number.isFinite(denominator) || denominator <= 1e-20) break;
+    const step = residualSquared / denominator;
+    for (let index = 0; index < variableCount; index += 1) {
+      solution[index] += step * direction[index]!;
+      residualVector[index] -= step * product[index]!;
+    }
+    const nextSquared = residualVector.reduce((sum, value) => sum + value * value, 0);
+    if (!Number.isFinite(nextSquared)) break;
+    const ratio = nextSquared / Math.max(residualSquared, 1e-30);
+    for (let index = 0; index < variableCount; index += 1) {
+      direction[index] = residualVector[index]! + ratio * direction[index]!;
+    }
+    residualSquared = nextSquared;
+  }
+  return solution;
+}
+
+function applyStep(points: Map<string, SketchPoint>, variableIndex: Map<string, number>, step: number[]) {
+  const result = new Map(points);
+  for (const [pointId, base] of variableIndex) {
+    const point = result.get(pointId);
+    if (!point) continue;
+    const dx = Math.max(-1000, Math.min(1000, step[base]!));
+    const dz = Math.max(-1000, Math.min(1000, step[base + 1]!));
+    result.set(pointId, movePoint(point, point.x + dx, point.z + dz));
+  }
+  return result;
+}
+
+function breakCollinearDistanceDegeneracy(
+  constraints: SketchConstraint[],
+  profile: SketchProfile,
+  points: Map<string, SketchPoint>,
+  variableIndex: Map<string, number>,
+) {
+  const unsatisfiedDistances = constraints.filter((constraint) => constraint.kind === "distance"
+    && residual(constraint, profile, points) > CONSTRAINT_TOLERANCE_MM);
+  if (!unsatisfiedDistances.length) return null;
+
+  const neighbors = new Map<string, Set<string>>();
+  const connect = (firstId: string, secondId: string) => {
+    if (!neighbors.has(firstId)) neighbors.set(firstId, new Set());
+    if (!neighbors.has(secondId)) neighbors.set(secondId, new Set());
+    neighbors.get(firstId)!.add(secondId);
+    neighbors.get(secondId)!.add(firstId);
+  };
+  for (const constraint of constraints) {
+    if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
+      const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
+      if (segment) connect(segment.startId, segment.endId);
+    } else {
+      connect(constraint.pointIds[0], constraint.pointIds[1]);
+    }
+  }
+  const componentIds = new Set<string>();
+  const pending = unsatisfiedDistances.flatMap((constraint) => constraint.kind === "distance" ? [...constraint.pointIds] : []);
+  while (pending.length) {
+    const pointId = pending.pop()!;
+    if (componentIds.has(pointId)) continue;
+    componentIds.add(pointId);
+    pending.push(...(neighbors.get(pointId) ?? []));
+  }
+  const componentPoints = profile.points.filter(({ id }) => componentIds.has(id));
+  if (componentPoints.length < 3) return null;
+
+  let farthestPair: [SketchPoint, SketchPoint] | null = null;
+  let largestDistance = 0;
+  for (let firstIndex = 0; firstIndex < componentPoints.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < componentPoints.length; secondIndex += 1) {
+      const first = points.get(componentPoints[firstIndex]!.id)!;
+      const second = points.get(componentPoints[secondIndex]!.id)!;
+      const length = distance(first, second);
+      if (length > largestDistance) {
+        largestDistance = length;
+        farthestPair = [first, second];
+      }
+    }
+  }
+  if (!farthestPair) return null;
+  const [axisStart, axisEnd] = farthestPair;
+  const axisX = (axisEnd.x - axisStart.x) / largestDistance;
+  const axisZ = (axisEnd.z - axisStart.z) / largestDistance;
+  const maxDeviation = componentPoints.reduce((max, point) => {
+    const current = points.get(point.id)!;
+    const cross = Math.abs((current.x - axisStart.x) * axisZ - (current.z - axisStart.z) * axisX);
+    return Math.max(max, cross);
+  }, 0);
+  if (maxDeviation > Math.max(1, largestDistance) * 1e-10) return null;
+
+  const pointToPerturb = [...componentPoints].reverse().find((point) => variableIndex.has(point.id));
+  if (!pointToPerturb) return null;
+  const current = points.get(pointToPerturb.id)!;
+  const epsilon = Math.max(1e-3, largestDistance * 1e-4);
+  const next = new Map(points);
+  next.set(pointToPerturb.id, movePoint(current, current.x - axisZ * epsilon, current.z + axisX * epsilon));
+  return next;
+}
+
+/** Solve supported positional constraints together with a bounded damped least-squares iteration. */
 export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds: readonly string[] = []): SketchConstraintSolveResult {
   const constraints = profile.constraints ?? [];
   if (!constraints.length) return { profile, unsatisfiedConstraintIds: [] };
-  const points = new Map(profile.points.map((point) => [point.id, point]));
   const anchors = new Set(anchoredPointIds);
+  const constrainedPointIds = new Set(constraints.flatMap((constraint) => {
+    if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
+      const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
+      return segment ? [segment.startId, segment.endId] : [];
+    }
+    return constraint.pointIds;
+  }));
+  const variableIndex = new Map<string, number>();
+  for (const point of profile.points) {
+    if (!anchors.has(point.id) && constrainedPointIds.has(point.id)) variableIndex.set(point.id, variableIndex.size * 2);
+  }
+  const variableCount = variableIndex.size * 2;
+  let points = new Map(profile.points.map((point) => [point.id, point]));
+  let damping = INITIAL_DAMPING;
+  let currentEquations = equationRows(constraints, profile, points, variableIndex);
+  let currentObjective = objective(currentEquations);
+  let bestPoints = points;
+  let bestObjective = currentObjective;
+  let seededCollinearGeometry = false;
 
-  for (let pass = 0; pass < PROJECTION_PASSES; pass += 1) {
-    for (const constraint of constraints) {
-      if (constraint.kind === "coincident") projectCoincident(constraint, points, anchors);
-      else if (constraint.kind === "horizontal" || constraint.kind === "vertical") projectAxis(constraint, profile, points, anchors);
-      else projectDistance(constraint, points, anchors);
+  for (let iteration = 0; iteration < MAX_GLOBAL_ITERATIONS && variableCount > 0; iteration += 1) {
+    if (currentEquations.every(({ value }) => Math.abs(value) <= SOLVER_CONVERGENCE_TOLERANCE_MM)) break;
+    const step = solveNormalSystem(currentEquations, variableCount, damping);
+    const maxStep = Math.max(0, ...step.map(Math.abs));
+    if (!Number.isFinite(maxStep) || maxStep < 1e-12) break;
+
+    let accepted: { points: Map<string, SketchPoint>; equations: ConstraintEquation[]; objective: number } | null = null;
+    for (const scale of [1, 0.5, 0.25, 0.125, 0.0625]) {
+      const candidateStep = step.map((value) => value * scale);
+      const candidatePoints = applyStep(points, variableIndex, candidateStep);
+      const candidateEquations = equationRows(constraints, profile, candidatePoints, variableIndex);
+      const candidateObjective = objective(candidateEquations);
+      if (Number.isFinite(candidateObjective) && candidateObjective < currentObjective - Math.max(1e-16, currentObjective * 1e-12)) {
+        accepted = { points: candidatePoints, equations: candidateEquations, objective: candidateObjective };
+        break;
+      }
+    }
+
+    if (!accepted) {
+      if (!seededCollinearGeometry) {
+        const seeded = breakCollinearDistanceDegeneracy(constraints, profile, points, variableIndex);
+        if (seeded) {
+          points = seeded;
+          currentEquations = equationRows(constraints, profile, points, variableIndex);
+          currentObjective = objective(currentEquations);
+          if (currentObjective < bestObjective) {
+            bestPoints = points;
+            bestObjective = currentObjective;
+          }
+          damping = INITIAL_DAMPING;
+          seededCollinearGeometry = true;
+          continue;
+        }
+      }
+      damping *= 10;
+      if (damping > 1e8) break;
+      continue;
+    }
+
+    const previousObjective = currentObjective;
+    points = accepted.points;
+    currentEquations = accepted.equations;
+    currentObjective = accepted.objective;
+    if (currentObjective < bestObjective) {
+      bestPoints = points;
+      bestObjective = currentObjective;
+    }
+    damping = Math.max(1e-9, damping * 0.3);
+
+    const residualAboveTolerance = currentEquations.some(({ value }) => Math.abs(value) > CONSTRAINT_TOLERANCE_MM);
+    const relativeProgress = (previousObjective - currentObjective) / Math.max(previousObjective, 1e-30);
+    if (!seededCollinearGeometry && residualAboveTolerance && relativeProgress < 1e-5) {
+      const seeded = breakCollinearDistanceDegeneracy(constraints, profile, points, variableIndex);
+      if (seeded) {
+        points = seeded;
+        currentEquations = equationRows(constraints, profile, points, variableIndex);
+        currentObjective = objective(currentEquations);
+        if (currentObjective < bestObjective) {
+          bestPoints = points;
+          bestObjective = currentObjective;
+        }
+        damping = INITIAL_DAMPING;
+        seededCollinearGeometry = true;
+      }
     }
   }
 
-  const solved = { ...profile, points: profile.points.map((point) => points.get(point.id) ?? point) };
+  const solved = { ...profile, points: profile.points.map((point) => bestPoints.get(point.id) ?? point) };
   const unsatisfiedConstraintIds = constraints
-    .filter((constraint) => residual(constraint, solved, points) > CONSTRAINT_TOLERANCE_MM)
+    .filter((constraint) => {
+      const error = residual(constraint, solved, bestPoints);
+      return !Number.isFinite(error) || error > CONSTRAINT_TOLERANCE_MM;
+    })
     .map((constraint) => constraint.id);
   return { profile: solved, unsatisfiedConstraintIds };
 }
