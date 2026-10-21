@@ -731,6 +731,44 @@ class MeasurementPair:
 
 
 @dataclass(frozen=True)
+class InterferencePair:
+    a: Mapping[str, str]
+    b: Mapping[str, str]
+    gap: float
+    overlap_volume: float
+    precision: Literal["exact", "tessellated"]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "InterferencePair":
+        return cls(
+            a={"id": _text(payload.get("a", {}), "id"), "name": _text(payload.get("a", {}), "name")},
+            b={"id": _text(payload.get("b", {}), "id"), "name": _text(payload.get("b", {}), "name")},
+            gap=_number(payload, "gap"),
+            overlap_volume=_number(payload, "overlapVolume"),
+            precision="tessellated" if _text(payload, "precision") == "tessellated" else "exact",
+        )
+
+
+@dataclass(frozen=True)
+class InterferenceReport:
+    shapes_checked: int
+    candidate_pairs_checked: int
+    clearance: float
+    method: str
+    pairs: List[InterferencePair]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "InterferenceReport":
+        return cls(
+            shapes_checked=int(_number(payload, "shapesChecked")),
+            candidate_pairs_checked=int(_number(payload, "candidatePairsChecked")),
+            clearance=_number(payload, "clearance"),
+            method=_text(payload, "method"),
+            pairs=[InterferencePair.from_payload(pair) for pair in payload.get("pairs", []) if isinstance(pair, Mapping)],
+        )
+
+
+@dataclass(frozen=True)
 class ShapeGeometryProvenance:
     source: Literal["parametric", "brep", "mesh"]
     precision: Literal["exact", "tessellated"]

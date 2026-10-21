@@ -24,6 +24,8 @@ export {
   type ShapesWritten,
 } from "./engine.js";
 export type { ServerCadShapeProperties, ShapeGeometryProvenance } from "./serverCadProperties.js";
+export { MAX_INTERFERENCE_CANDIDATES, MAX_INTERFERENCE_SHAPES } from "./serverCadInterference.js";
+export type { InterferencePair, InterferenceReport, InterferenceRequest, InterferenceRefusal } from "./serverCadInterference.js";
 
 // --- arranging what is already there -----------------------------------------
 //

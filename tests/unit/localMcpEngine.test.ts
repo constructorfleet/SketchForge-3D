@@ -79,6 +79,20 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(read[1].result.content[0].text)).toMatchObject({ volume: 120, area: 148, provenance: { source: "parametric", precision: "exact" } });
   }, 60_000);
 
+  it("checks exact interference locally without returning geometry arrays", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const first = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box", name: "A", width: 2, depth: 2, height: 2 });
+    const second = callMcp(projectsDir, 3, "sketchforge_create_shape", { projectId: "case", kind: "box", name: "B", width: 2, depth: 2, height: 2, x: 3 });
+    const ids = [first, second].map((result) => JSON.parse(result[1].result.content[0].text).shapes[0].id);
+    const report = callMcp(projectsDir, 4, "sketchforge_check_interference", { projectId: "case", ids, clearance: 1 });
+    expect(report[1].result.isError).toBeUndefined();
+    expect(JSON.parse(report[1].result.content[0].text).pairs).toEqual([
+      { a: { id: ids[0], name: "A" }, b: { id: ids[1], name: "B" }, gap: 1, overlapVolume: 0, precision: "exact" },
+    ]);
+  }, 60_000);
+
   it("imports an SKF package as a new local project", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);

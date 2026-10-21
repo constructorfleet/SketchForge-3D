@@ -61,6 +61,7 @@ client.measurements.list(project_id, shape_id) -> list[MeasurementSummary]
 client.measurements.with_radius(project_id, shape_id) -> list[MeasurementSummary]
 client.measurements.between(project_id, from_, to) -> MeasurementPair
 client.properties.get(project_id, shape_id) -> ShapeProperties
+client.interference.check(project_id, ids=None, clearance=None) -> InterferenceReport
 
 client.shell.apply(project_id, shape_id, thickness, open_faces=None) -> ShellResult
 client.shell.hollow(project_id, shape_id, thickness) -> ShellResult
@@ -119,7 +120,7 @@ project.get() | delete() | list_shapes() | add(shape) | add_many(shapes) | updat
 project.remove(id) | clear() | edges(id) | filletable_edges(id)
 project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges=None)
 project.faces(id) | faces_facing(id, direction)
-project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to) | properties_of(id)
+project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to) | properties_of(id) | check_interference(ids=None, clearance=None)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
 project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id)
 project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None)

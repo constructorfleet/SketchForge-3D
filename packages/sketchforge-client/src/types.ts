@@ -500,6 +500,23 @@ export type ShapeProperties = {
   provenance: ShapeGeometryProvenance;
 };
 
+/** Exact surface-gap and penetration report for selected visible solids. */
+export type InterferenceReport = {
+  shapesChecked: number;
+  candidatePairsChecked: number;
+  clearance: number;
+  method: "OCCT exact distance and common volume; AABB candidate prefilter";
+  pairs: Array<{
+    a: { id: string; name: string };
+    b: { id: string; name: string };
+    gap: number;
+    overlapVolume: number;
+    precision: "exact" | "tessellated";
+  }>;
+};
+
+export type InterferenceRequest = { ids?: readonly string[]; clearance?: number };
+
 export const ALIGN_AXES = ["x", "y", "z"] as const;
 
 /** `x` is left/right, `z` front/back, `y` bottom/top. */
