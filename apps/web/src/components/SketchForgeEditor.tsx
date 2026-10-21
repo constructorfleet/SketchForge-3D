@@ -181,6 +181,7 @@ import {
 } from "@/lib/sketchforgeMcpProtocol";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
+import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent } from "@/lib/draftFaceEditor";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
@@ -7616,6 +7617,36 @@ export function SketchForgeEditor({
     }
   }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
 
+  const applyDraftFaceToSelection = useCallback(async (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z") => {
+    const source = selectedShape;
+    const request = source && draftFaceRequestForShape(source, faceIndex, angle, pullDirection);
+    if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.draftFace.applying")));
+    try {
+      const response = await postCadModifierRequestAsync({ type: "draft-face", ...request }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      if (response.type === "error") {
+        setNotice(notice((translate) => errorText(translate, errorFromPayload(response), "errors.cadModifier.invalidResult")));
+        return;
+      }
+      if (response.type !== "draft-face") throw new Error("The CAD worker did not return a drafted face solid");
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
+      const drafted = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep);
+      if (!drafted) throw new Error("The face draft did not produce a usable solid");
+      const faceMetadata = draftFaceResultMetadata(source.id, response.faceCount);
+      if (!faceMetadata) throw new Error("The face draft did not return a valid face count");
+      commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? {
+        ...drafted,
+        ...faceMetadata,
+      } : shape), [source.id], notice((translate) => translate("panels.inspector.draftFace.applied")));
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
+
   // Hand the module-level boolean helpers a way to reach the worker. The sender
   // already restarts the worker and rejects on a timeout, so a kernel that
   // never loads costs one wait and then falls back to the mesh cut rather than
@@ -9898,6 +9929,7 @@ export function SketchForgeEditor({
           onCameraViewChange={rememberCameraView}
           onEditSketch={beginSketchEdit}
           onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
+          onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}

@@ -19,6 +19,7 @@ import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
 import { updateFaceColor } from "@/lib/faceColorEditor";
 import { draftPrismControlForShape, draftPrismRequestForShape, isDraftPrismAngle } from "@/lib/draftPrismEditor";
+import { draftFaceRequestForShape, isDraftFaceAngle } from "@/lib/draftFaceEditor";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -107,6 +108,7 @@ export function ShapeInspector({
   onSnapOpenChange,
   onEditSketch,
   onApplyDraftPrism,
+  onApplyDraftFace,
   canSeparateParts = false,
   onSeparateParts,
   onInteractionActiveChange,
@@ -122,6 +124,7 @@ export function ShapeInspector({
   onSnapOpenChange: Dispatch<SetStateAction<boolean>>;
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
+  onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z") => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -163,6 +166,9 @@ export function ShapeInspector({
   const [colorOpen, setColorOpen] = useState(false);
   const [draftAngle, setDraftAngle] = useState("5");
   const [drafting, setDrafting] = useState(false);
+  const [draftFaceIndex, setDraftFaceIndex] = useState("0");
+  const [draftFaceAngle, setDraftFaceAngle] = useState("5");
+  const [draftFaceApplying, setDraftFaceApplying] = useState(false);
   const [faceColorIndex, setFaceColorIndex] = useState("0");
   const selectedFaceIndex = Number(faceColorIndex);
   const selectedFaceKey = shape.faceIds?.[selectedFaceIndex] ?? selectedFaceIndex;
@@ -420,6 +426,39 @@ export function ShapeInspector({
               }}
             >
               <span>{t(drafting ? "panels.inspector.draftPrism.applying" : "panels.inspector.draftPrism.apply")}</span>
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {shape.cadBrep && shape.cadBrepFrame && onApplyDraftFace ? (
+        <section className="property-card draft-face-card" aria-label={t("panels.inspector.draftFace.title")}>
+          <div className="property-card-header"><span>{t("panels.inspector.draftFace.title")}</span></div>
+          <div className="property-list">
+            <p>{t("panels.inspector.draftFace.hint")}</p>
+            <label>
+              <span>{t("panels.inspector.draftFace.index")}</span>
+              <input type="number" min="0" max={shape.faceIds?.length ? shape.faceIds.length - 1 : undefined} step="1"
+                value={draftFaceIndex} disabled={locked || draftFaceApplying}
+                onChange={(event) => setDraftFaceIndex(event.currentTarget.value)} />
+            </label>
+            <p>{t("panels.inspector.draftFace.axis")}</p>
+            <label>
+              <span>{t("panels.inspector.draftFace.angle")}</span>
+              <input type="number" min="-44.9" max="44.9" step="0.1" value={draftFaceAngle}
+                disabled={locked || draftFaceApplying} onChange={(event) => setDraftFaceAngle(event.currentTarget.value)} />
+            </label>
+            <button className="inspector-action-button" type="button"
+              disabled={locked || draftFaceApplying || !draftFaceRequestForShape(shape, Number(draftFaceIndex), Number(draftFaceAngle), "z")}
+              onClick={async () => {
+                const faceIndex = Number(draftFaceIndex);
+                const angle = Number(draftFaceAngle);
+                if (!Number.isInteger(faceIndex) || !isDraftFaceAngle(angle)) return;
+                setDraftFaceApplying(true);
+                try { await onApplyDraftFace(faceIndex, angle, "z"); }
+                finally { setDraftFaceApplying(false); }
+              }}>
+              <span>{t(draftFaceApplying ? "panels.inspector.draftFace.applying" : "panels.inspector.draftFace.apply")}</span>
             </button>
           </div>
         </section>
