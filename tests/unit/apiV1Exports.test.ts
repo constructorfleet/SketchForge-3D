@@ -176,6 +176,19 @@ describe("REST API v1 project exports", () => {
     expect(svg).toContain("<path");
   }, 90_000);
 
+  it("exports section contours as a DXF polyline file", async () => {
+    const projectId = await makeProject();
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}&download=1`, {
+      method: "POST",
+      body: JSON.stringify({ format: "dxf", section: { plane: "xy", offset: 2 } }),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/dxf");
+    const dxf = await response.text();
+    expect(dxf).toContain("LWPOLYLINE");
+    expect(dxf).toContain("\n0\nEOF\n");
+  }, 90_000);
+
   it("validates section parameters and keeps them separate from projection views", async () => {
     const projectId = await makeProject();
     const invalidPlane = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {

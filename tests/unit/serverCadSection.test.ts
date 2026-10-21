@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
-import { sectionShapesToSvg } from "@constructorfleet/sketchforge-engine/serverCadSection";
+import { sectionShapesToDxf, sectionShapesToSvg } from "@constructorfleet/sketchforge-engine/serverCadSection";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(request: Record<string, unknown>) {
@@ -25,6 +25,17 @@ describe("section drawings from stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }
     expect(Math.max(...coordinates.map(([u]) => u))).toBe(10);
     expect(Math.min(...coordinates.map(([, v]) => v))).toBe(-5);
     expect(Math.max(...coordinates.map(([, v]) => v))).toBe(5);
+  });
+
+  it("exports the same section contour as millimetre-space DXF polylines", async () => {
+    const dxf = await sectionShapesToDxf(
+      [shape({ kind: "box", width: 20, depth: 10, height: 4 })],
+      { plane: "xy", offset: 2 },
+    );
+    expect(dxf).toContain("LWPOLYLINE");
+    expect(dxf).toContain("\n10\n-10\n20\n-5\n");
+    expect(dxf).toContain("\n10\n10\n20\n5\n");
+    expect(dxf.endsWith("0\nEOF\n")).toBe(true);
   });
 
   it("refuses a plane that misses the selected scene", async () => {

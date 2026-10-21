@@ -1,7 +1,7 @@
 /** Exact-kernel section contours for one bounded, named axis plane. Node-only. */
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { renderSectionSvg, SECTION_PLANES, type SectionDrawing, type SectionPlane } from "./cadSection.js";
+import { renderSectionDxf, renderSectionSvg, SECTION_PLANES, type SectionDrawing, type SectionPlane } from "./cadSection.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
@@ -93,7 +93,7 @@ function sampledContours(cad: OcctKernel, section: ShapeHandle, plane: SectionPl
 }
 
 /** Cut the visible stored solids by a bounded plane and return scale-readable SVG contours. */
-export async function sectionShapesToSvg(shapes: readonly WorkplaneShape[], options: SectionOptions): Promise<string> {
+async function sectionShapesToDrawing(shapes: readonly WorkplaneShape[], options: SectionOptions): Promise<{ drawing: SectionDrawing; bounds: { minU: number; maxU: number; minV: number; maxV: number } }> {
   validateRequest(shapes, options);
   const visible = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
   if (!visible.length) return Promise.reject(new ServerCadError("No visible solid objects to section.", 422));
@@ -130,9 +130,19 @@ export async function sectionShapesToSvg(shapes: readonly WorkplaneShape[], opti
     const contours = sampledContours(cad, section, options.plane, Math.max(diagonal * 0.002, 1e-4));
     if (!contours.length) throw new ServerCadError("The requested section plane produced no contours.", 422);
     const drawing: SectionDrawing = { plane: options.plane, offset: options.offset, contours };
-    return renderSectionSvg(drawing, {
+    return { drawing, bounds: {
       minU: uBounds.min, maxU: uBounds.max,
       minV: vBounds.min, maxV: vBounds.max,
-    });
+    } };
   });
+}
+
+export async function sectionShapesToSvg(shapes: readonly WorkplaneShape[], options: SectionOptions): Promise<string> {
+  const result = await sectionShapesToDrawing(shapes, options);
+  return renderSectionSvg(result.drawing, result.bounds);
+}
+
+export async function sectionShapesToDxf(shapes: readonly WorkplaneShape[], options: SectionOptions): Promise<string> {
+  const { drawing } = await sectionShapesToDrawing(shapes, options);
+  return renderSectionDxf(drawing);
 }
