@@ -119,7 +119,7 @@ export type SkfProjectDocumentV1 = {
     entries: Array<{ stateId: string; selectedObjectIds: string[] }>;
     index: number;
   };
-  sketches: Array<{ id: string; nodeId: string; objectId: string; operation?: SketchOperation; extrusionDepth: number; revolve?: SketchRevolveSettings }>;
+  sketches: Array<{ id: string; nodeId: string; objectId: string; sourceNodeId?: string; sourceObjectId?: string; operation?: SketchOperation; extrusionDepth: number; revolve?: SketchRevolveSettings }>;
   features: SkfFeatureV1[];
   groups: Array<{ id: string; nodeId: string; objectId: string; memberNodeIds: string[]; operation: string }>;
   workplanes: Array<{ id: string; kind: "base" | "offset"; elevation: number }>;
@@ -569,6 +569,14 @@ async function serializeShapeNode(
       ...(sketchProfile.constraints?.length ? { constraints: sketchProfile.constraints } : {}),
       ...(images.length ? { images } : {}),
     };
+    // Older saved shapes have no explicit source ID. Give them a stable
+    // identity derived from the output object when they are next packaged.
+    const hasSketchExtrusionSource = shape.sketchOperation === "extrude"
+      || (shape.sketchOperation === undefined && shape.kind !== "sketch");
+    if (shape.sketchSourceId || hasSketchExtrusionSource) {
+      definition.sketchSourceId = shape.sketchSourceId ?? `sketch/${safeNodeToken(shape.id)}`;
+      definition.sketchSourceNodeId = `${nodeId}/source-sketch`;
+    }
   }
 
   let importedReference: SkfImportedMeshReferenceV1 | undefined;
@@ -604,6 +612,27 @@ async function serializeShapeNode(
   let cadBrepAssetId: string | undefined;
   if (cadBrep) cadBrepAssetId = (await builder.addText("brep", cadBrep, "application/vnd.sketchforge.brep")).id;
   const cadDisplayEdgesAssetId = cadDisplayEdges ? (await builder.addDisplayEdges(cadDisplayEdges)).id : undefined;
+
+  const sourceSketchId = typeof definition.sketchSourceId === "string" ? definition.sketchSourceId : undefined;
+  if (sourceSketchId && definition.sketchSourceNodeId && definition.sketchProfile) {
+    nodes.push({
+      nodeId: `${nodeId}/source-sketch`,
+      objectId: sourceSketchId,
+      objectType: "sketch",
+      workplaneId: "base",
+      definition: {
+        ...definition,
+        id: sourceSketchId,
+        name: `${shape.name} sketch`,
+        kind: "sketch",
+        sketchOperation: undefined,
+        sketchRevolve: undefined,
+        sketchSourceId: undefined,
+        sketchSourceNodeId: undefined,
+        sketchSourceOfObjectId: shape.id,
+      },
+    });
+  }
 
   const groupedShapeNodeIds: string[] = [];
   for (const child of groupedShapes ?? []) {
@@ -689,24 +718,33 @@ function activeProjectIndexes(state: SkfStateV1) {
     if (!node) return;
     (node.groupedShapeNodeIds ?? []).forEach(visit);
     let previous: string | undefined;
-    if (node.definition.sketchProfile) {
+    if (node.definition.sketchProfile && typeof node.definition.sketchSourceOfObjectId !== "string") {
       const operation = (node.definition.sketchOperation as SketchOperation | undefined) ?? "extrude";
+      const sourceSketchId = typeof node.definition.sketchSourceId === "string"
+        ? node.definition.sketchSourceId
+        : `sketch/${safeNodeToken(node.objectId)}`;
       const featureType = operation === "revolve" ? "sketch-revolve" : operation === "sweep" ? "sketch-sweep" : "sketch-extrusion";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${featureType}`;
+      const hasSourceDependency = node.definition.sketchOperation === "extrude"
+        || (node.definition.sketchOperation === undefined && node.definition.kind !== "sketch");
       features.push({
         id: featureId,
         type: featureType,
         outputObjectId: node.objectId,
-        inputObjectIds: [],
+        inputObjectIds: hasSourceDependency ? [sourceSketchId] : [],
         dependsOnFeatureIds: [],
         parameters: operation === "revolve"
           ? { ...(node.definition.sketchRevolve as Record<string, unknown> | undefined), axis: "vertical-sketch-axis", mode: "create" }
           : operation === "sweep" ? { mode: "create" } : { depth: node.definition.height, direction: "positive-y", mode: "create" },
       });
       sketches.push({
-        id: `sketch/${safeNodeToken(node.objectId)}`,
+        id: typeof node.definition.sketchSourceId === "string" ? sourceSketchId : `sketch/${safeNodeToken(node.objectId)}`,
         nodeId: node.nodeId,
         objectId: node.objectId,
+        ...(typeof node.definition.sketchSourceNodeId === "string" ? {
+          sourceNodeId: node.definition.sketchSourceNodeId,
+          sourceObjectId: sourceSketchId,
+        } : {}),
         operation,
         extrusionDepth: operation === "extrude" ? Number(node.definition.height) : 0,
         ...(operation === "revolve" && node.definition.sketchRevolve ? { revolve: node.definition.sketchRevolve as SketchRevolveSettings } : {}),
@@ -1067,6 +1105,9 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     throw new LocalizedError("errors.skf.inlinePackageFields", { label });
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
+  if (definition.sketchSourceId !== undefined) stringValue(definition.sketchSourceId, `${label}.sketchSourceId`);
+  if (definition.sketchSourceNodeId !== undefined) stringValue(definition.sketchSourceNodeId, `${label}.sketchSourceNodeId`);
+  if (definition.sketchSourceOfObjectId !== undefined) stringValue(definition.sketchSourceOfObjectId, `${label}.sketchSourceOfObjectId`);
   if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve" && definition.sketchOperation !== "sweep") {
     throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.sketchOperation` });
   }
@@ -1260,6 +1301,33 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
     stateById.set(stateId, state);
   }
   if (!stateById.has(document.sceneStateId)) throw new LocalizedError("errors.skf.sceneStateMissing");
+  // Source sketches are persisted graph nodes, but are not rendered scene
+  // shapes. Include their IDs when validating feature input references.
+  if (Array.isArray(document.sketches)) {
+    for (const [index, sketch] of document.sketches.entries()) {
+      const record = objectRecord(sketch, `sketches[${index}]`);
+      activeObjectIds.add(stringValue(record.id, `sketches[${index}].id`));
+      if (record.sourceNodeId === undefined && record.sourceObjectId === undefined) continue;
+      const sourceObjectId = stringValue(record.sourceObjectId, `sketches[${index}].sourceObjectId`);
+      const sourceNodeId = stringValue(record.sourceNodeId, `sketches[${index}].sourceNodeId`);
+      const sourceNode = stateById.get(document.sceneStateId)?.nodes.find((node) => node.nodeId === sourceNodeId);
+      const outputNode = stateById.get(document.sceneStateId)?.nodes.find((node) => node.nodeId === record.nodeId);
+      const sourceDefinition = sourceNode?.definition;
+      const outputDefinition = outputNode?.definition;
+      if (
+        record.id !== sourceObjectId
+        || sourceNode?.objectId !== sourceObjectId
+        || sourceDefinition?.sketchSourceOfObjectId !== record.objectId
+        || outputDefinition?.sketchSourceId !== sourceObjectId
+        || outputDefinition?.sketchSourceNodeId !== sourceNodeId
+      ) {
+        throw new LocalizedError("errors.skf.featureMissingInput", {
+          id: `sketch/${index}`,
+          objectId: sourceObjectId,
+        });
+      }
+    }
+  }
   if (!Number.isInteger(document.history.index) || document.history.index < 0 || document.history.index >= document.history.entries.length) {
     throw new LocalizedError("errors.skf.historyIndexInvalid");
   }

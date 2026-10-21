@@ -69,6 +69,13 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
     assert.equal(await page.getByRole("textbox", { name: "Project name" }).inputValue(), "Quick-start block");
 
     await page.getByRole("button", { name: "Sketch extrusion", exact: true }).click();
+    await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
+    await page.getByRole("button", { name: "Finish sketch", exact: true }).waitFor({ state: "visible" });
+    await page.screenshot({ path: "docs/screenshots/parametric-extrusion-edit-sketch.png" });
+    await page.getByRole("button", { name: "Finish sketch", exact: true }).click();
+    await page.getByRole("status").getByText("Sketch updated", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+    await page.screenshot({ path: "docs/screenshots/parametric-extrusion-rebuilt-solid.png" });
+
     await page.getByRole("button", { name: "Center view on selection" }).click();
     await page.mouse.click(160, 170);
     await page.screenshot({ path: "docs/screenshots/editor-quickstart-solid.png" });
