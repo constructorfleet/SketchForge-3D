@@ -9,8 +9,10 @@ in the transport or the handle needs to know about it.
 from __future__ import annotations
 
 import base64
+import json
 import os
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+import urllib.parse
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, overload
 
 from ._http import DEFAULT_RETRY_ON_BUSY, DEFAULT_TIMEOUT_SECONDS, Transport
 from .errors import SketchForgeApiError, SketchForgeTransportError
@@ -35,6 +37,7 @@ from .types import (
     ShapeCollectionResult,
     ShapeOperationResult,
     ShapeRequest,
+    ShapeSpec,
     ShapeSummary,
     ShapeWriteResult,
     ShellResult,
@@ -88,6 +91,12 @@ class Shapes:
         payload = self._transport.send("GET", "/shapes", {"projectId": project_id}) or {}
         return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])]
 
+    @overload
+    def create(self, project_id: str, shape: ShapeSpec) -> ShapeSummary: pass
+
+    @overload
+    def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary: pass
+
     def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary:
         payload = self._transport.send(
             "POST", "/shapes", {"projectId": project_id}, dict(shape), retryable=True
@@ -96,6 +105,12 @@ class Shapes:
         if not created:
             raise SketchForgeApiError("POST", "/shapes", 500, "the server returned no shape")
         return ShapeSummary.from_payload(created[0])
+
+    @overload
+    def create_many(self, project_id: str, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: pass
+
+    @overload
+    def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: pass
 
     def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         """
@@ -634,10 +649,31 @@ class Imports:
         )
 
     def file(self, project_id: str, path: Union[str, "os.PathLike[str]"]) -> MeshImportResult:
-        """The same import, reading the bytes and the name off a path."""
+        """Multipart upload of a path, avoiding base64 and JSON expansion."""
         resolved = os.fspath(path)
         with open(resolved, "rb") as handle:
-            return self.apply(project_id, os.path.basename(resolved), handle.read())
+            data = handle.read()
+        file_name = os.path.basename(resolved)
+        media_type = {
+            "stl": "model/stl",
+            "obj": "model/obj",
+            "svg": "image/svg+xml",
+        }.get(file_name.rsplit(".", 1)[-1].lower())
+        payload = self._transport.send_multipart(
+            "POST",
+            "/imports",
+            {"projectId": project_id},
+            {"fileName": file_name},
+            file_name,
+            data,
+            media_type,
+            retryable=True,
+        ) or {}
+        return MeshImportResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            triangles=int(payload.get("triangles") or 0),
+            revision=int(payload.get("revision") or 0),
+        )
 
     @staticmethod
     def readable(file_name: str) -> bool:
@@ -685,10 +721,29 @@ class Exports:
         shape_ids: Optional[Sequence[str]] = None,
         name: Optional[str] = None,
     ) -> ExportResult:
-        result = self.export(project_id, format, shape_ids, name)
-        with open(path, "wb") as handle:
-            handle.write(result.data)
-        return result
+        body: Dict[str, Any] = {"format": format}
+        if shape_ids is not None:
+            body["shapeIds"] = list(shape_ids)
+        if name is not None:
+            body["name"] = name
+        headers = self._transport.download_to_file(
+            "POST",
+            "/exports",
+            {"projectId": project_id, "download": 1},
+            body,
+            os.fspath(path),
+        )
+        metadata_raw = urllib.parse.unquote(headers.get("x-sketchforge-metadata", ""))
+        metadata = json.loads(metadata_raw) if metadata_raw else {}
+        return ExportResult(
+            format=str(metadata.get("format") or format),
+            filename=str(metadata.get("filename") or os.path.basename(os.fspath(path))),
+            mime_type=str(metadata.get("mimeType") or headers.get("content-type") or "application/octet-stream"),
+            data=b"",
+            shape_count=int(metadata.get("shapeCount") or 0),
+            exported_count=(int(metadata["exportedCount"]) if isinstance(metadata.get("exportedCount"), (int, float)) else None),
+            skipped=list(metadata.get("skipped") or []),
+        )
 
 
 class SketchForgeClient:
@@ -771,8 +826,20 @@ class ProjectHandle:
     def list_shapes(self) -> List[ShapeSummary]:
         return self._client.shapes.list(self.id)
 
+    @overload
+    def add(self, shape: ShapeSpec) -> ShapeSummary: pass
+
+    @overload
+    def add(self, shape: ShapeRequest) -> ShapeSummary: pass
+
     def add(self, shape: ShapeRequest) -> ShapeSummary:
         return self._client.shapes.create(self.id, shape)
+
+    @overload
+    def add_many(self, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: pass
+
+    @overload
+    def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: pass
 
     def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         return self._client.shapes.create_many(self.id, shapes)

@@ -9,6 +9,8 @@ through ``query`` and no resource builds a path by hand.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -92,21 +94,111 @@ class Transport:
             with self._opener.open(request, timeout=self._timeout) as response:
                 return _decode(response.read())
         except urllib.error.HTTPError as error:
-            parsed = _decode(error.read())
-            detail = parsed.get("error") if isinstance(parsed, dict) else None
-            code = parsed.get("code") if isinstance(parsed, dict) else None
-            raise SketchForgeApiError(
-                method,
-                url,
-                error.code,
-                detail if isinstance(detail, str) else None,
-                parsed,
-                code if isinstance(code, str) else None,
-            ) from None
+            _raise_http_error(method, url, error)
         except urllib.error.URLError as error:
             raise SketchForgeTransportError(method, url, error) from None
         except OSError as error:
             raise SketchForgeTransportError(method, url, error) from None
+
+    def send_multipart(
+        self,
+        method: str,
+        path: str,
+        query: Optional[Mapping[str, Any]],
+        fields: Mapping[str, str],
+        file_name: str,
+        file_data: bytes,
+        media_type: Optional[str] = None,
+        retryable: bool = False,
+    ) -> Any:
+        """Send a buffered multipart request without base64 or JSON expansion."""
+        import uuid
+
+        boundary = "sketchforge-" + uuid.uuid4().hex
+        chunks = []
+        for name, value in fields.items():
+            chunks.extend((
+                f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n".encode(),
+                value.encode("utf-8"), b"\r\n",
+            ))
+        safe_name = file_name.replace("\\", "_").replace('"', "_").replace("\r", "_").replace("\n", "_")
+        content_type = media_type or "application/octet-stream"
+        chunks.extend((
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{safe_name}\"\r\nContent-Type: {content_type}\r\n\r\n".encode(),
+            file_data, b"\r\n", f"--{boundary}--\r\n".encode(),
+        ))
+        url = build_url(self.api_root, path, query)
+        headers = dict(self._headers)
+        headers["Authorization"] = "Bearer " + self._token
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+        request = urllib.request.Request(url, data=b"".join(chunks), headers=headers, method=method)
+        attempts = self._retry_on_busy + 1 if retryable else 1
+        for attempt in range(1, attempts + 1):
+            try:
+                with self._opener.open(request, timeout=self._timeout) as response:
+                    return _decode(response.read())
+            except urllib.error.HTTPError as error:
+                try:
+                    _raise_http_error(method, url, error)
+                except SketchForgeApiError as api_error:
+                    if not api_error.is_project_busy or attempt == attempts:
+                        raise
+                    time.sleep(_BUSY_RETRY_BASE_SECONDS * attempt)
+            except urllib.error.URLError as error:
+                raise SketchForgeTransportError(method, url, error) from None
+            except OSError as error:
+                raise SketchForgeTransportError(method, url, error) from None
+        raise AssertionError("unreachable")
+
+    def download_to_file(
+        self,
+        method: str,
+        path: str,
+        query: Optional[Mapping[str, Any]],
+        body: Optional[Any],
+        destination: str,
+    ) -> Mapping[str, str]:
+        """Stream a response to a temporary sibling, replacing destination on success."""
+        url = build_url(self.api_root, path, query)
+        headers: Dict[str, str] = dict(self._headers)
+        headers["Authorization"] = "Bearer " + self._token
+        headers["Accept"] = "application/octet-stream, application/json"
+        payload = json.dumps(body).encode("utf-8") if body is not None else None
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(url, data=payload, headers=headers, method=method)
+        destination = os.fspath(destination)
+        directory = os.path.dirname(os.path.abspath(destination))
+        fd, temporary = tempfile.mkstemp(prefix=".sketchforge-", dir=directory)
+        try:
+            try:
+                with self._opener.open(request, timeout=self._timeout) as response, os.fdopen(fd, "wb") as output:
+                    while True:
+                        block = response.read(64 * 1024)
+                        if not block:
+                            break
+                        output.write(block)
+                    output.flush()
+                    os.fsync(output.fileno())
+                    response_headers = {key.lower(): value for key, value in response.headers.items()}
+            except urllib.error.HTTPError as error:
+                os.close(fd)
+                _raise_http_error(method, url, error)
+            os.replace(temporary, destination)
+            return response_headers
+        except (urllib.error.URLError, OSError) as error:
+            try:
+                os.close(fd)
+            except OSError:
+                # The file descriptor may already have been closed by fdopen.
+                pass
+            if isinstance(error, urllib.error.URLError):
+                raise SketchForgeTransportError(method, url, error) from None
+            raise
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
 
 def _decode(raw: bytes) -> Any:
@@ -117,3 +209,20 @@ def _decode(raw: bytes) -> Any:
         return json.loads(text)
     except ValueError:
         return text
+
+
+def _raise_http_error(method: str, url: str, error: urllib.error.HTTPError) -> None:
+    try:
+        parsed = _decode(error.read())
+    finally:
+        error.close()
+    detail = parsed.get("error") if isinstance(parsed, dict) else None
+    code = parsed.get("code") if isinstance(parsed, dict) else None
+    raise SketchForgeApiError(
+        method,
+        url,
+        error.code,
+        detail if isinstance(detail, str) else None,
+        parsed,
+        code if isinstance(code, str) else None,
+    ) from None

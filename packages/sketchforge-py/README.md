@@ -87,6 +87,30 @@ client.exports.export(project_id, format, shape_ids=None, name=None) -> ExportRe
 client.exports.file(project_id, format, path, shape_ids=None, name=None) -> ExportResult
 ```
 
+Shape requests remain ordinary mappings, so existing macros can keep passing
+plain dictionaries and can include fields added by newer server versions. For
+editor completion and static checking, the package also exports opt-in typed
+request definitions for every parameter-created shape kind:
+
+```python
+from sketchforge3d import BoxShapeRequest, GearShapeRequest
+
+plate: BoxShapeRequest = {"kind": "box", "name": "Plate", "width": 60, "depth": 40, "height": 8}
+gear: GearShapeRequest = {"kind": "gear", "teeth": 24, "toothSize": 1.5}
+project.add(plate)
+project.add(gear)
+```
+
+The available per-kind types are `BoxShapeRequest`, `CubeShapeRequest`,
+`CylinderShapeRequest`, `ConeShapeRequest`, `SphereShapeRequest`,
+`HalfSphereShapeRequest`, `TorusShapeRequest`, `TubeShapeRequest`,
+`RingShapeRequest`, `PolygonShapeRequest`, `PyramidShapeRequest`,
+`RoofShapeRequest`, `RoundRoofShapeRequest`, `WedgeShapeRequest`,
+`IcosahedronShapeRequest`, `TextShapeRequest`, `LoftShapeRequest`,
+`GearShapeRequest`, `RevolveShapeRequest`, and `ThreadShapeRequest`.
+`ShapeSpec` is their union, and `RequestableShapeKind` names the supported kind
+values. These are static typing aids; they do not validate requests at runtime.
+
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
 
 ```python
@@ -104,9 +128,14 @@ project.import_mesh(file_name, data) | import_file(path)
 project.export(format, shape_ids=None, name=None) | export_file(format, path, shape_ids=None, name=None)
 ```
 
-Exports return artifact metadata and bytes. Supported formats are `stl`, `obj`,
-`3mf`, `step`, `skf`, and `zip`; use `export_file` to save directly to a local
-path. STEP reports the exact solids it exported and shapes it skipped.
+`import_file` uploads multipart form data, avoiding base64 expansion; `import_mesh`
+continues to accept bytes and uses the JSON API. Exports support `stl`, `obj`,
+`3mf`, `step`, `skf`, and `zip`. `export` returns artifact metadata and bytes;
+`export_file` streams the artifact to a local path and returns the same metadata
+with `data=b""`, so large downloads do not also stay resident in Python memory.
+The download response carries all result metadata, including STEP's skipped
+shapes, in a response header; very large skip lists may exceed proxy header
+limits. STEP reports the exact solids it exported and shapes it skipped.
 
 Requests are plain dicts, because the server takes a bag of parameters; responses are frozen dataclasses with snake_case fields, so `shape.rotation_x` is checked and a typo is an error rather than a `None`. A field this version does not know about is kept in `shape.extra` rather than dropped.
 

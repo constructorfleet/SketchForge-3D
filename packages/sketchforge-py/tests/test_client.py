@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import base64
+import io
+import json
 import os
 import tempfile
 import unittest
+import urllib.error
 
 from sketchforge3d import (
     BooleanCutResult,
@@ -25,6 +28,67 @@ from sketchforge3d.types import (
 )
 
 from support import FakeOpener, project_payload, shape_payload
+
+
+class RawResponse(io.BytesIO):
+    def __init__(self, payload: bytes, headers: dict[str, str]) -> None:
+        super().__init__(payload)
+        self.headers = headers
+        self.read_sizes = []
+
+    def read(self, size=-1):
+        self.read_sizes.append(size)
+        return super().read(size)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+
+class TransferOpener:
+    def __init__(self, payload: bytes = b"", headers: dict[str, str] | None = None) -> None:
+        self.payload = payload
+        self.headers = headers or {}
+        self.request = None
+        self.response = None
+
+    def open(self, request, timeout=None):
+        self.request = request
+        self.response = RawResponse(self.payload, self.headers)
+        return self.response
+
+
+class FailingDownloadOpener:
+    def open(self, request, timeout=None):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            422,
+            "geometry failed",
+            {},
+            io.BytesIO(b'{"error":"geometry failed","code":"geometry_failed"}'),
+        )
+
+
+class BusyThenSuccessOpener:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def open(self, request, timeout=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise urllib.error.HTTPError(
+                request.full_url,
+                409,
+                "project busy",
+                {},
+                io.BytesIO(b'{"error":"That project is being changed; try again."}'),
+            )
+        return RawResponse(
+            json.dumps({"shape": shape_payload("m1"), "triangles": 4, "revision": 9}).encode(),
+            {},
+        )
 
 
 def client(opener: FakeOpener) -> SketchForgeClient:
@@ -258,14 +322,41 @@ class ExportsTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].body, {"format": "stl", "shapeIds": ["s1", "s2"], "name": "Bracket"})
 
     def test_writes_export_bytes_to_a_file(self) -> None:
-        opener = FakeOpener({"format": "obj", "filename": "Part.obj", "mimeType": "text/plain", "base64": "b2Jq", "shapeCount": 1})
+        artifact = bytes(range(256)) * 600
+        opener = TransferOpener(
+            artifact,
+            {
+                "Content-Type": "text/plain",
+                "Content-Disposition": 'attachment; filename="Part.obj"',
+                "X-SketchForge-Metadata": "%7B%22format%22%3A%22obj%22%2C%22filename%22%3A%22Part.obj%22%2C%22mimeType%22%3A%22text%2Fplain%22%2C%22shapeCount%22%3A1%7D",
+            },
+        )
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "part.obj")
             result = client(opener).project("p1").export_file("obj", path)
             with open(path, "rb") as handle:
-                self.assertEqual(handle.read(), b"obj")
+                self.assertEqual(handle.read(), artifact)
         self.assertEqual(result.filename, "Part.obj")
-        self.assertEqual(opener.calls[0].body, {"format": "obj"})
+        self.assertEqual(result.data, b"")
+        self.assertEqual(opener.request.get_method(), "POST")
+        self.assertIn("download=1", opener.request.full_url)
+        self.assertEqual(json.loads(opener.request.data), {"format": "obj"})
+        self.assertGreater(len(opener.response.read_sizes), 2)
+        self.assertTrue(all(size == 64 * 1024 for size in opener.response.read_sizes))
+        self.assertTrue(opener.response.closed)
+
+    def test_failed_download_preserves_existing_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "part.obj")
+            with open(path, "wb") as handle:
+                handle.write(b"previous artifact")
+
+            with self.assertRaises(SketchForgeApiError):
+                client(FailingDownloadOpener()).project("p1").export_file("obj", path)
+
+            with open(path, "rb") as handle:
+                self.assertEqual(handle.read(), b"previous artifact")
+            self.assertEqual(os.listdir(directory), ["part.obj"])
 
 
 class EdgesAndTreatmentsTests(unittest.TestCase):
@@ -573,7 +664,7 @@ class ImportTests(unittest.TestCase):
         )
 
     def test_reads_the_name_and_the_bytes_off_a_path(self) -> None:
-        opener = FakeOpener((201, {"shape": shape_payload("m1"), "triangles": 4, "revision": 9}))
+        opener = TransferOpener(json.dumps({"shape": shape_payload("m1"), "triangles": 4, "revision": 9}).encode())
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "bracket.stl")
             with open(path, "wb") as handle:
@@ -582,8 +673,24 @@ class ImportTests(unittest.TestCase):
         # The base name rather than the whole path: the server uses it to
         # choose the importer and to name the stored asset, and a temporary
         # directory is not part of either.
-        self.assertEqual(opener.calls[0].body["fileName"], "bracket.stl")
-        self.assertEqual(base64.b64decode(opener.calls[0].body["data"]), b"solid bracket")
+        content_type = opener.request.get_header("Content-type")
+        self.assertIn("multipart/form-data; boundary=", content_type)
+        boundary = content_type.split("boundary=", 1)[1]
+        self.assertIn(b'name="fileName"\r\n\r\nbracket.stl', opener.request.data)
+        self.assertIn(b'name="file"; filename="bracket.stl"', opener.request.data)
+        self.assertIn(b"Content-Type: model/stl", opener.request.data)
+        self.assertIn(b"solid bracket", opener.request.data)
+        self.assertTrue(opener.request.data.endswith(("--" + boundary + "--\r\n").encode()))
+
+    def test_retries_a_multipart_upload_when_the_project_is_busy(self) -> None:
+        opener = BusyThenSuccessOpener()
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "bracket.stl")
+            with open(path, "wb") as handle:
+                handle.write(b"solid bracket")
+            result = client(opener).project("p1").import_file(path)
+        self.assertEqual(result.shape.id, "m1")
+        self.assertEqual(opener.calls, 2)
 
     def test_says_which_file_names_the_server_will_even_try(self) -> None:
         self.assertTrue(Imports.readable("bracket.STL"))
