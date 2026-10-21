@@ -785,7 +785,7 @@
       "sweepSpineLabel": "Dráha",
       "sweepPlaneHint": "Nakreslete profil na vybrané pracovní rovině a potom přepněte na kolmou rovinu odvozenou z ní a nakreslete dráhu. Výsledný profil je orientován kolmo k počátečnímu směru dráhy.",
       "sweepSectionStage": "Krok 1 ze 2 · Profil na vybrané rovině",
-      "sweepSectionHelp": "Nakreslete a uzavřete profil se středem v počátku (0,0) vybrané roviny. Po uzavření se přepne na kolmou rovinu odvozenou z této pracovní roviny.",
+      "sweepSectionHelp": "Nakreslete a uzavřete jeden nebo více profilů se středem v počátku (0,0) vybrané roviny. Po každém uzavření se přepne na kolmou rovinu dráhy. Vraťte se na rovinu profilu, chcete-li přidat další, a po dokončení přepněte na rovinu dráhy.",
       "sweepSpineStage": "Krok 2 ze 2 · Dráha na kolmé rovině",
       "sweepSpineAxes": "Na této rovině odpovídá směr doprava na obrazovce {right} a směr nahoru {up}.",
       "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí ke směru doprava na obrazovce, aby profil zůstal kolmý k počáteční tečně; další ohyby jsou volné.",
@@ -1181,7 +1181,7 @@
       "noClosedProfile": "Nebyl nalezen žádný uzavřený profil. Nakreslete alespoň jednu uzavřenou čáru a zkontrolujte, že nemá části s nulovým obsahem.",
       "invalidTopology": "Z náčrtu se nepodařilo vytvořit platné těleso (chyba OpenCascade)",
       "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso",
-      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje přesně jednu uzavřenou oblast a jednu otevřenou dráhu.",
+      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje alespoň jednu uzavřenou oblast a přesně jednu otevřenou dráhu.",
       "sweepSpineDirection": "První úsek osy musí vést doprava po obrazovce, kolmo k rovině řezu. První úsek překreslete."
     },
     "skf": {

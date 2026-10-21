@@ -785,7 +785,7 @@
       "sweepSpineLabel": "Trayectoria",
       "sweepPlaneHint": "Dibuja la sección en el plano de trabajo seleccionado y después cambia al plano ortogonal derivado para la trayectoria. La sección final se orienta perpendicularmente a la dirección inicial de la trayectoria.",
       "sweepSectionStage": "Paso 1 de 2 · Sección en el plano seleccionado",
-      "sweepSectionHelp": "Dibuja y cierra una sección centrada en el origen (0,0) del plano seleccionado. Al cerrarla, se cambia al plano ortogonal derivado para la trayectoria.",
+      "sweepSectionHelp": "Dibuja y cierra uno o más contornos centrados en el origen (0,0) del plano seleccionado. Cada cierre cambia al plano ortogonal de la trayectoria. Vuelve al plano de sección para añadir más contornos y cambia al plano de la trayectoria cuando termines.",
       "sweepSpineStage": "Paso 2 de 2 · Trayectoria en el plano ortogonal",
       "sweepSpineAxes": "En este plano, la derecha de la pantalla sigue {right} y la parte superior sigue {up}.",
       "sweepSpineHelp": "Inicia la trayectoria en el origen de la sección (0,0). El primer segmento se ajusta hacia la derecha de la pantalla para mantener la sección perpendicular a la tangente inicial; los siguientes giros quedan libres.",
@@ -1181,7 +1181,7 @@
       "noClosedProfile": "No se encontró ningún perfil cerrado. Dibuja al menos una línea cerrada y comprueba que no tenga partes de área cero.",
       "invalidTopology": "No se pudo crear un sólido correcto a partir del boceto (error de OpenCascade)",
       "buildFailed": "No se pudo crear el sólido a partir de este boceto",
-      "sweepNeedsSectionAndSpine": "Un barrido plano necesita exactamente un contorno cerrado y una trayectoria abierta.",
+      "sweepNeedsSectionAndSpine": "Un barrido plano necesita uno o más contornos cerrados y exactamente una trayectoria abierta.",
       "sweepSpineDirection": "El primer segmento de la trayectoria debe ir hacia la derecha de la pantalla, perpendicular al plano de la sección. Vuelve a dibujar ese segmento."
     },
     "skf": {

@@ -785,7 +785,7 @@
       "sweepSpineLabel": "Trajetória",
       "sweepPlaneHint": "Desenhe a seção no plano de trabalho selecionado e depois mude para o plano ortogonal derivado para traçar o caminho. A seção final fica perpendicular à direção inicial do caminho.",
       "sweepSectionStage": "Etapa 1 de 2 · Seção no plano selecionado",
-      "sweepSectionHelp": "Desenhe e feche uma seção centralizada na origem (0,0) do plano selecionado. Ao fechar, a vista muda para o plano ortogonal derivado para o caminho.",
+      "sweepSectionHelp": "Desenhe e feche um ou mais contornos centralizados na origem (0,0) do plano selecionado. Cada fechamento muda para o plano ortogonal do caminho. Volte ao plano da seção para adicionar outros e mude para o plano do caminho quando terminar.",
       "sweepSpineStage": "Etapa 2 de 2 · Caminho no plano ortogonal",
       "sweepSpineAxes": "Neste plano, a direita da tela segue {right} e a parte superior segue {up}.",
       "sweepSpineHelp": "Comece o caminho na origem da seção (0,0). O primeiro segmento se ajusta à direita da tela para manter a seção perpendicular à tangente inicial; as curvas seguintes ficam livres.",
@@ -1181,7 +1181,7 @@
       "noClosedProfile": "Nenhum perfil fechado encontrado. Desenhe pelo menos uma linha fechada e verifique se ela não tem partes de área zero.",
       "invalidTopology": "O módulo OpenCascade gerou um esboço inválido",
       "buildFailed": "O módulo CAD não conseguiu construir este esboço",
-      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de exatamente uma seção fechada e um caminho aberto.",
+      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de uma ou mais seções fechadas e exatamente um caminho aberto.",
       "sweepSpineDirection": "O primeiro segmento do percurso deve seguir para a direita no ecrã, perpendicular ao plano da secção. Desenhe esse segmento novamente."
     },
     "skf": {

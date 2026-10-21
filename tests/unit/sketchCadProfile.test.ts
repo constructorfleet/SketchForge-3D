@@ -43,19 +43,33 @@ describe("OCCT sketch profile preparation", () => {
       points: [...section.points, ...spine.points],
       segments: [...section.segments, ...spine.segments],
     });
-    expect(result.section.closed).toBe(true);
-    expect(result.section.steps).toHaveLength(4);
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0]!.outer.closed).toBe(true);
+    expect(result.sections[0]!.outer.steps).toHaveLength(4);
     expect(result.spine.closed).toBe(false);
     expect(result.spine.steps.map(({ segment }) => segment.kind).sort()).toEqual(["bezier", "line"]);
   });
 
-  it("rejects sweep profiles without exactly one section and one spine", () => {
+  it("requires at least one section loop and exactly one spine", () => {
     const section = rectangle("section", 0, 0, 2, 3);
     expect(() => cadSketchSweepPaths(profile(section))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
     const open = rectangle("open", 5, 0, 4, 4);
     open.segments.pop();
     expect(() => cadSketchSweepPaths(profile(open))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
-    expect(() => cadSketchSweepPaths(profile(section, rectangle("second", 8, 0, 2, 3), open))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
+    const secondOpen = rectangle("second-open", 15, 0, 2, 3);
+    secondOpen.segments.pop();
+    expect(() => cadSketchSweepPaths(profile(section, open, secondOpen))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
+  });
+
+  it("groups nested section loops as one swept region with holes", () => {
+    const outer = rectangle("outer", 0, 0, 20, 20);
+    const hole = rectangle("hole", 5, 5, 4, 4);
+    const spine = rectangle("spine", 30, 0, 10, 4);
+    spine.segments.pop();
+    const result = cadSketchSweepPaths(profile(outer, hole, spine));
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0]!.holes).toHaveLength(1);
+    expect(result.spine.closed).toBe(false);
   });
 
   it("orders a closed loop even when its segments arrive out of order", () => {

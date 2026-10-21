@@ -883,7 +883,7 @@
       "sweepSpineLabel": "Spine",
       "sweepPlaneHint": "Draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The finished section is oriented perpendicular to the spine’s initial direction.",
       "sweepSectionStage": "Step 1 of 2 · Section on selected plane",
-      "sweepSectionHelp": "Draw and close one section loop centered at the selected plane origin (0,0). Closing it switches to the orthogonal plane derived from this workplane for the spine.",
+      "sweepSectionHelp": "Draw and close one or more section loops centered at the selected plane origin (0,0). Each closure switches to the orthogonal spine plane. Return to the section plane to add more loops, then switch to the spine plane when done.",
       "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
       "sweepSpineAxes": "On this plane, screen-right follows {right} and screen-up follows {up}.",
       "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent; later bends are free.",
@@ -1384,7 +1384,7 @@
       "noClosedProfile": "No closed profile found. Draw at least one closed loop and ensure it has no degenerate (zero-area) geometry.",
       "invalidTopology": "OpenCascade produced invalid sketch topology",
       "buildFailed": "The CAD kernel could not build this sketch",
-      "sweepNeedsSectionAndSpine": "A planar sweep needs exactly one closed section loop and one open spine.",
+      "sweepNeedsSectionAndSpine": "A planar sweep needs one or more closed section loops and exactly one open spine.",
       "sweepSpineDirection": "The first spine segment must follow screen-right, perpendicular to the section plane. Redraw that first segment."
     },
     "skf": {

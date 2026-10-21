@@ -43,6 +43,56 @@ function cross(a: { x: number; y: number; z: number }, b: { x: number; y: number
 }
 
 describe("planar sketch sweep (real OCCT kernel)", () => {
+  it("sweeps an enclosed section loop as a through hole", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }]);
+    const holePoints = [
+      { id: "h0", x: -0.5, z: -0.5, sweepRole: "section" as const },
+      { id: "h1", x: 0.5, z: -0.5, sweepRole: "section" as const },
+      { id: "h2", x: 0.5, z: 0.5, sweepRole: "section" as const },
+      { id: "h3", x: -0.5, z: 0.5, sweepRole: "section" as const },
+    ];
+    profile.points.push(...holePoints);
+    profile.segments.push(...holePoints.map((point, index) => ({
+      id: `hole-${index}`, kind: "line" as const, startId: point.id, endId: holePoints[(index + 1) % holePoints.length]!.id,
+    })));
+    try {
+      const solid = buildCadSketchSweep(cad, profile);
+      expect(cad.isValid(solid)).toBe(true);
+      expect(cad.isSolid(solid)).toBe(true);
+      // 2x2 section minus a 1x1 hole, swept 10 mm.
+      expect(cad.getVolume(solid)).toBeCloseTo(30, 3);
+    } finally {
+      cad.releaseAll();
+    }
+  });
+
+  it("sweeps disjoint section loops into separate solids along one spine", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }]);
+    const islandPoints = [
+      { id: "i0", x: 3, z: -1, sweepRole: "section" as const },
+      { id: "i1", x: 5, z: -1, sweepRole: "section" as const },
+      { id: "i2", x: 5, z: 1, sweepRole: "section" as const },
+      { id: "i3", x: 3, z: 1, sweepRole: "section" as const },
+    ];
+    profile.points.push(...islandPoints);
+    profile.segments.push(...islandPoints.map((point, index) => ({
+      id: `island-${index}`, kind: "line" as const, startId: point.id, endId: islandPoints[(index + 1) % islandPoints.length]!.id,
+    })));
+    try {
+      const solids = buildCadSketchSweep(cad, profile);
+      expect(cad.isValid(solids)).toBe(true);
+      expect(cad.isCompound(solids)).toBe(true);
+      expect(cad.getSubShapes(solids, "solid")).toHaveLength(2);
+      expect(cad.getVolume(solids)).toBeCloseTo(80, 3);
+    } finally {
+      cad.releaseAll();
+    }
+  });
+
   it.each([
     ["straight spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }]],
     ["bent spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }]],
