@@ -80,11 +80,17 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /MCP schemas\/navigation \(#122\)/i);
   assert.match(spec, /static provenance \(#126\)/i);
   assert.match(spec, /deterministic reference-generator wiring \(#128\)/i);
-  assert.match(spec, /verified at `b831290`/i);
+  assert.match(spec, /verified at `3dc11df`/i);
   assert.match(spec, /built-site accessibility smoke checks \(#141\).*merged/i);
   assert.match(spec, /external-link availability report \(#143\).*merged/i);
   assert.match(spec, /sketch-constraint degree-of-freedom estimate \(#146\).*merged/i);
   assert.match(spec, /six-operation generated OpenAPI slice \(#144\).*merged/i);
+  assert.match(spec, /Open PR #151 adds runtime-backed OpenAPI coverage.*7 operations.*25 still omitted/i);
+  assert.match(spec, /Open PR #154 adds built-site accessibility coverage/i);
+  assert.match(spec, /Publishing clients version row.*“the release version”/i);
+  assert.match(spec, /Cross-links between documentation and references/i);
+  assert.match(spec, /Engine npm listing and generated reference/i);
+  assert.match(spec, /Open PR #153 adds a bounded deterministic least-squares sketch constraint solve/i);
   assert.match(spec, /PR #147's STEP component-color import support has merged/i);
   assert.match(spec, /stable face identity in the Python client \(#145\).*merged/i);
   assert.match(spec, /STEP color guidance \(#119\)/i);
@@ -94,7 +100,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /Remote failures are advisory; internal broken links stay blocking/i);
   assert.match(spec, /REST reference authoritative for the whole API/i);
   assert.match(spec, /Merged PR #144 covers six schema-backed operations and records 26 omitted operations/i);
-  assert.match(capabilities, /refreshed against `main` at `b831290`/i);
+  assert.match(capabilities, /refreshed against `main` at `3dc11df`/i);
   assert.match(capabilities, /PR #147\s+preserved STEP component colors/i);
   assert.doesNotMatch(spec, /before the first deployment|first published deployment.*not verified|Pages publishing source.*not changed/i);
 
@@ -120,12 +126,13 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(migration, /deterministic reference-generator\s+checks merged in PR #128/i);
   assert.match(migration, /site version\/revision stamps and pinned source links merged in\s+PR #126/i);
   assert.match(migration, /PR #144 added generated OpenAPI for\s+six schema-backed CRUD operations/i);
+  assert.match(migration, /Open PR #151 adds runtime-backed `GET \/faces` query and response coverage/i);
   assert.match(migration, /STEP component-color\s+import support merged in PR #147/i);
   assert.match(migration, /face identity parity \(#145\) have merged/i);
   assert.match(migration, /browser smoke checks merged in PR #141/i);
   assert.match(migration, /external-link report merged in PR #143/i);
-  assert.match(spec, /editor quick-start is implemented on branch `docs\/editor-quickstart` and is not yet merged/i);
-  assert.match(migration, /editor quick-start[\s\S]*?implemented on branch `docs\/editor-quickstart` and\s+not yet merged/i);
+  assert.match(spec, /Open PR #150 adds the tested editor quick-start/i);
+  assert.match(migration, /Open PR #150 adds a tested editor\s+quick-start/i);
   assert.match(migration, /broader task guides remain outstanding/i);
   assert.doesNotMatch(migration, /still needs to be set|before the first deployment|could not be confirmed/i);
 });

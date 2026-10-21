@@ -1,11 +1,11 @@
 # Documentation suite specification
 
-**Status (2026-10-21, verified at `b831290`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), stable face identity in the Python client (#145), API reference sources (#139), face-based drafting (#140), and the REST measurement listing (#137) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), and the six-operation generated OpenAPI slice (#144) have also merged. PR #147's STEP component-color import support has merged. The editor quick-start is implemented on branch `docs/editor-quickstart` and is not yet merged; broader workflow guides and the full accessibility audit remain outstanding. The global sketch solver and editable feature history remain open.
+**Status (2026-10-21, verified at `3dc11df`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), stable face identity in the Python client (#145), API reference sources (#139), face-based drafting (#140), and the REST measurement listing (#137) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), and the six-operation generated OpenAPI slice (#144) have also merged. PR #147's STEP component-color import support has merged. Open PR #150 adds the tested editor quick-start with browser acceptance and screenshots. Open PR #151 adds runtime-backed OpenAPI coverage for `GET /faces` (7 operations documented, 25 still omitted). Open PR #153 adds a bounded deterministic least-squares sketch constraint solve; it handles supported coupled constraints but does not provide a symbolic or global guarantee. Open PR #154 adds built-site accessibility coverage for contrast, alt text, accessible search naming, reduced motion, and 320px reflow. The three documentation gaps recorded below remain unimplemented. Broader workflow guides and editable feature history remain open.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
-## Repository baseline (verified at `b831290`, 2026-10-21)
+## Repository baseline (verified at `3dc11df`, 2026-10-21)
 
 The current default branch builds a static VitePress site under
 `/SketchForge-3D/`, with local search, canonical Markdown staging, local link
@@ -261,6 +261,7 @@ its Ubuntu system dependencies before running the build.
 - **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract; the generated OpenAPI currently covers only operations with faithful schemas.
 - **Merged PRs #120 and #125:** stable application-owned IDs are included in `GET /faces` and are the persisted `faceColors` keys for `PATCH /shapes`. The operation inventory still lacks complete schemas for the rest of the REST surface.
 - **Merged PR #144:** `docs/openapi-v1.json` is generated from the runtime operation registry and documents six project/shape CRUD operations whose request/query/status schemas can be represented accurately. The document enumerates 26 of 32 registered operations as omitted, with reasons; this partial output does not make the REST reference authoritative for the whole API.
+- **Open PR #151:** adds runtime-backed query and response validation for `GET /faces`; the generated document covers seven operations and lists 25 of 32 registered operations as omitted with reasons. Full REST reference coverage remains outstanding.
 - Define the typed operation contract and migrate routes incrementally.
 - Expand the generated OpenAPI coverage as operation metadata becomes a faithful description of runtime validation and response behavior; generate endpoint pages from the same source.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
@@ -269,7 +270,7 @@ its Ubuntu system dependencies before running the build.
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
 - **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), MCP schemas/navigation (PR #122), and STEP color guidance (PR #119). Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
-- The tested package-example guide is merged. The editor quick-start covering a first model through save/export is implemented on branch `docs/editor-quickstart` and not yet merged; broader task guides remain outstanding.
+- The tested package-example guide is merged. Open PR #150 adds the editor quick-start covering a first model through save/export, with browser acceptance and screenshots; broader task guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
@@ -282,6 +283,12 @@ its Ubuntu system dependencies before running the build.
 - **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. PR #134 adds redirect coverage for legacy public paths.
 - Merged PR #132 adds a release-process guide and checks release metadata consistency. Coverage rules for every route, export, configuration key, format, and example remain outstanding.
 - Remove superseded manually maintained tables and duplicate code blocks.
+
+### Newly identified documentation gaps (2026-10-21)
+
+- **Publishing clients version row:** `docs/PUBLISHING_CLIENTS.md` says “the release version” in its table instead of displaying the version represented by the package manifests. Populate the table from the release/package source of truth and guard it against blank or generic values.
+- **Cross-links between documentation and references:** related task guides, package pages, API references, and generated symbol references do not consistently link to one another. Audit for missing links and add useful, tested paths in both directions where readers need them.
+- **Engine npm listing and generated reference:** `packages/sketchforge-engine/README.md` has only a short package description, and `docs/reference/typescript-engine.md` is a declaration dump with only a README link. Expand the npm-facing README with installation, supported runtime, package purpose, and runnable usage; make the generated engine page lead with that guide and connect exported APIs to relevant concepts. Verify packed npm contents.
 
 ## 10. Acceptance criteria
 
