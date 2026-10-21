@@ -10,6 +10,11 @@ These are implemented and should not be filed as missing features:
 
 - Exact B-rep volume, surface area, centre of mass, and bounds are available
   through shape properties. Mesh-backed imports report tessellated precision.
+- Edge and face measurements, plus minimum distances and planar-face angles
+  between entities, are exposed through `/measurements` and the TypeScript and
+  Python clients. Values use the kernel representation; mesh imports remain
+  limited to their tessellated geometry, and undefined measurements include a
+  reason.
 - Interference checking is available through the engine and REST API, with an
   AABB candidate prefilter and bounded pair count; wall thickness is available
   as a sampled estimate with its sampling method disclosed.
@@ -38,8 +43,8 @@ These are implemented and should not be filed as missing features:
   server kernel, so STEP imports can reopen from server-backed storage.
 
 Relevant implementation seams include `serverCadProperties.ts`,
-`serverCadInterference.ts`, `serverCadThickness.ts`, `serverStepExplode.ts`,
-`serverCadProjection.ts`, and `serverCadSection.ts` in
+`serverCadMeasure.ts`, `serverCadInterference.ts`, `serverCadThickness.ts`,
+`serverStepExplode.ts`, `serverCadProjection.ts`, and `serverCadSection.ts` in
 `packages/sketchforge-engine/src/`.
 
 ## Remaining gaps
