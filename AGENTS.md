@@ -15,6 +15,7 @@ These instructions apply to all work in this repository. Follow more specific in
 - Before opening a PR, inspect the branch diff and confirm the branch is based on current target-branch work. Include a clear summary, relevant issue links, test and manual verification results, and screenshots or recordings for UI changes when useful.
 - After opening a PR, monitor it through merge or an explicit handoff. Check for merge conflicts, review feedback, and all required CI/check results. Resolve conflicts and failing checks, push the correction, and recheck the updated PR. Do not report the work as complete while checks are pending or failing; state any blocker plainly if it cannot be resolved.
 - Do not merge a PR unless the user or repository workflow has authorized merging.
+- Always include screenshots when your change involves the UI.
 
 ## Roadmap and documentation
 
