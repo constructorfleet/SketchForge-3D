@@ -79,108 +79,28 @@ async function exportScene(args) {
   const document = await store.read(id);
   if (!document) throw new Error(`Project not found: ${id}`);
   const requestedIds = Array.isArray(args.shapeIds) && args.shapeIds.length ? args.shapeIds : selectedObjectIds;
-  const shapes = requestedIds.length ? document.shapes.filter((shape) => requestedIds.includes(shape.id)) : document.shapes;
-  if (args.format === "skf") {
-    const bytes = await enginePackage.exportSkfProject({
-      projectId: id, projectName: document.projectName, createdAt: document.createdAt, modifiedAt: Date.now(),
-      shapes, history: document.history, historyIndex: document.historyIndex, assets: document.assets,
-      workspace: document.workspace, snapGrid: document.snapGrid, placementElevation: document.placementElevation,
-      placementWorkplane: document.placementWorkplane, sketchPlacementWorkplane: document.sketchPlacementWorkplane,
-    });
-    const artifact = { filename: `${args.name || document.projectName}.skf`, mimeType: "application/vnd.sketchforge.project+zip", bytes: bytes.byteLength, shapeCount: shapes.length, base64: Buffer.from(bytes).toString("base64") };
-    if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-      const destination = path.resolve(args.outputPath);
-      writeFileSync(destination, bytes);
-      return { ...artifact, base64: undefined, savedTo: destination };
-    }
-    return artifact;
-  }
-  if (args.format === "step") {
-    const result = await enginePackage.exportShapesToStep(shapes.filter((shape) => shape.hidden !== true));
-    const artifact = { filename: `${args.name || document.projectName}.step`, mimeType: "model/step", bytes: result.blob.size, exportedCount: result.exportedCount, skipped: result.skipped, base64: Buffer.from(await result.blob.arrayBuffer()).toString("base64") };
-    if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-      const destination = path.resolve(args.outputPath);
-      writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
-      return { ...artifact, base64: undefined, savedTo: destination };
-    }
-    return artifact;
-  }
-  if (["stl", "obj", "3mf", "zip"].includes(args.format)) {
-    const visible = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
-    if (!visible.length) throw new Error("No visible solid objects to export.");
-    const meshes = await enginePackage.meshProjectShapes(visible);
-    const bytes = await exportMeshFormat(args.format, meshes, document, enginePackage);
-    const extensions = args.format === "zip" ? "zip" : args.format;
-    const mimeType = { stl: "model/stl", obj: "text/plain", "3mf": "model/3mf", zip: "application/zip" }[args.format];
-    const filename = `${args.name || document.projectName}.${extensions}`;
-    const artifact = { filename, mimeType, bytes: bytes.byteLength, shapeCount: meshes.length, base64: Buffer.from(bytes).toString("base64") };
-    if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-      const destination = path.resolve(args.outputPath);
-      writeFileSync(destination, bytes);
-      return { ...artifact, base64: undefined, savedTo: destination };
-    }
-    return artifact;
-  }
-  throw new Error(`Unsupported export format in local mode: ${args.format}`);
-}
-
-function meshBytesAsStl(meshes) {
-  const triangles = meshes.reduce((sum, mesh) => sum + mesh.faces.length, 0);
-  const bytes = new Uint8Array(84 + triangles * 50);
-  bytes.set(new TextEncoder().encode("SketchForge binary STL"));
-  const view = new DataView(bytes.buffer);
-  view.setUint32(80, triangles, true);
-  let offset = 84;
-  for (const mesh of meshes) for (const [ia, ib, ic] of mesh.faces) {
-    const points = [mesh.vertices[ia], mesh.vertices[ib], mesh.vertices[ic]].map(([x, y, z]) => [x, -z, y]);
-    const [a, b, c] = points;
-    const u = b.map((v, i) => v - a[i]);
-    const w = c.map((v, i) => v - a[i]);
-    let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
-    const length = Math.hypot(...n) || 1;
-    n = n.map((v) => v / length);
-    for (const value of [...n, ...a, ...b, ...c]) { view.setFloat32(offset, value, true); offset += 4; }
-    view.setUint16(offset, 0, true); offset += 2;
-  }
-  return bytes;
-}
-
-function meshBytesAsObj(meshes) {
-  const lines = ["# SketchForge OBJ export"];
-  let index = 1;
-  for (const mesh of meshes) {
-    lines.push(`o ${mesh.name.replace(/\\s+/g, "_")}`);
-    for (const [x, y, z] of mesh.vertices) lines.push(`v ${x} ${y} ${z}`);
-    for (const [a, b, c] of mesh.faces) lines.push(`f ${a + index} ${b + index} ${c + index}`);
-    index += mesh.vertices.length;
-  }
-  return new TextEncoder().encode(lines.join("\n"));
-}
-
-async function exportMeshFormat(format, meshes, document, enginePackage) {
-  if (format === "stl") return meshBytesAsStl(meshes);
-  if (format === "obj") return meshBytesAsObj(meshes);
-  const stl = meshBytesAsStl(meshes);
-  const { zipSync, strToU8 } = await import("fflate");
-  if (format === "zip") {
-    const skf = await enginePackage.exportSkfProject({
-      projectId: document.projectId, projectName: document.projectName, createdAt: document.createdAt,
-      modifiedAt: Date.now(), shapes: document.shapes, history: document.history, historyIndex: document.historyIndex,
-      assets: document.assets, workspace: document.workspace, snapGrid: document.snapGrid,
-      placementElevation: document.placementElevation, placementWorkplane: document.placementWorkplane,
-      sketchPlacementWorkplane: document.sketchPlacementWorkplane,
-    });
-    return zipSync({ [`${document.projectName}.stl`]: stl, [`${document.projectName}.skf`]: skf });
-  }
-  const xmlEscape = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
-  const vertices = meshes.map((mesh, i) => `<object id="${i + 1}" type="model" name="${xmlEscape(mesh.name)}"><mesh><vertices>${mesh.vertices.map(([x,y,z]) => `<vertex x="${x}" y="${-z}" z="${y}"/>`).join("")}</vertices><triangles>${mesh.faces.map(([v1,v2,v3]) => `<triangle v1="${v1}" v2="${v2}" v3="${v3}"/>`).join("")}</triangles></mesh></object>`).join("");
-  const buildItems = meshes.map((_, i) => `<item objectid="${i + 1}"/>`).join("");
-  const model = `<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>${vertices}</resources><build>${buildItems}</build></model>`;
-  return zipSync({
-    "[Content_Types].xml": strToU8('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>'),
-    "_rels/.rels": strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
-    "3D/3dmodel.model": strToU8(model),
+  const artifact = await enginePackage.exportProjectScene(document, {
+    format: args.format,
+    shapeIds: requestedIds.length ? requestedIds : undefined,
+    name: args.name,
   });
+  const bytes = artifact.data;
+  const response = {
+    format: artifact.format,
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    bytes: bytes.byteLength,
+    shapeCount: artifact.shapeCount,
+    ...(artifact.exportedCount === undefined ? {} : { exportedCount: artifact.exportedCount }),
+    ...(artifact.skipped === undefined ? {} : { skipped: artifact.skipped }),
+    base64: Buffer.from(bytes).toString("base64"),
+  };
+  if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+    const destination = path.resolve(args.outputPath);
+    writeFileSync(destination, bytes);
+    return { ...response, base64: undefined, savedTo: destination };
+  }
+  return response;
 }
 
 async function validateScene(args) {

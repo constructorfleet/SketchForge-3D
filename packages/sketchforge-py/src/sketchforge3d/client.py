@@ -21,6 +21,8 @@ from .types import (
     BooleanCutResult,
     DistributeResult,
     EdgeSummary,
+    ExportFormat,
+    ExportResult,
     FaceSummary,
     MeasurementEnd,
     MeasurementPair,
@@ -644,6 +646,51 @@ class Imports:
         return suffix in IMPORTABLE_MESH_FORMATS
 
 
+class Exports:
+    """Exports a server-stored project or selected shapes to a local file format."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def export(
+        self,
+        project_id: str,
+        format: ExportFormat,
+        shape_ids: Optional[Sequence[str]] = None,
+        name: Optional[str] = None,
+    ) -> ExportResult:
+        body: Dict[str, Any] = {"format": format}
+        if shape_ids is not None:
+            body["shapeIds"] = list(shape_ids)
+        if name is not None:
+            body["name"] = name
+        payload = self._transport.send(
+            "POST", "/exports", {"projectId": project_id}, body, retryable=False
+        ) or {}
+        return ExportResult(
+            format=str(payload.get("format") or format),
+            filename=str(payload.get("filename") or "export"),
+            mime_type=str(payload.get("mimeType") or "application/octet-stream"),
+            data=base64.b64decode(payload.get("base64") or "", validate=True),
+            shape_count=int(payload.get("shapeCount") or 0),
+            exported_count=(int(payload["exportedCount"]) if isinstance(payload.get("exportedCount"), (int, float)) else None),
+            skipped=list(payload.get("skipped") or []),
+        )
+
+    def file(
+        self,
+        project_id: str,
+        format: ExportFormat,
+        path: Union[str, "os.PathLike[str]"],
+        shape_ids: Optional[Sequence[str]] = None,
+        name: Optional[str] = None,
+    ) -> ExportResult:
+        result = self.export(project_id, format, shape_ids, name)
+        with open(path, "wb") as handle:
+            handle.write(result.data)
+        return result
+
+
 class SketchForgeClient:
     def __init__(
         self,
@@ -676,6 +723,7 @@ class SketchForgeClient:
         self.distribute = Distribute(self._transport)
         self.patterns = Patterns(self._transport)
         self.imports = Imports(self._transport)
+        self.exports = Exports(self._transport)
 
     @property
     def api_root(self) -> str:
@@ -737,6 +785,25 @@ class ProjectHandle:
 
     def clear(self) -> int:
         return self._client.shapes.delete_all(self.id)
+
+    def export(
+        self,
+        format: ExportFormat,
+        shape_ids: Optional[Sequence[str]] = None,
+        name: Optional[str] = None,
+    ) -> ExportResult:
+        """Returns an exported scene artifact as bytes."""
+        return self._client.exports.export(self.id, format, shape_ids, name)
+
+    def export_file(
+        self,
+        format: ExportFormat,
+        path: Union[str, "os.PathLike[str]"],
+        shape_ids: Optional[Sequence[str]] = None,
+        name: Optional[str] = None,
+    ) -> ExportResult:
+        """Exports a scene and writes its bytes to a local path."""
+        return self._client.exports.file(self.id, format, path, shape_ids, name)
 
     def cut(self, solid_ids: Sequence[str], hole_ids: Sequence[str]) -> BooleanCutResult:
         """Subtracts the named holes from the named solids."""

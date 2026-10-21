@@ -57,6 +57,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
 | `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
+| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF or a ZIP kit. |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
@@ -557,6 +558,30 @@ The source file is kept on the project as an asset and the shape points at it, b
 | `422` | The format is right and the file is not -- truncated, empty, or no geometry in it. `code: "geometry_failed"`. |
 
 An SVG needs an XML parser the Node runtime does not provide, so a server without one answers `422` saying so rather than failing somewhere inside a loader. Export the drawing as STL or OBJ for now.
+
+## Exporting a project
+
+```json
+// POST /exports?projectId=...
+{ "format": "3mf", "shapeIds": ["plate", "bosses"], "name": "bracket" }
+```
+
+`shapeIds` and `name` are optional. The formats are `stl`, `obj`, `3mf`, `step`,
+`skf`, and `zip`. The response includes the filename, MIME type, byte count,
+shape count, and base64-encoded `base64` content, so a client can write the
+artifact locally. A ZIP kit contains an STL and the editable SKF project. An
+SKF export includes the project and its source assets. STEP export preserves
+exact solids and reports `exportedCount` and `skipped` shapes; only geometry
+with an exact B-rep mapping is exported.
+
+```json
+{ "format": "3mf", "filename": "bracket.3mf", "mimeType": "model/3mf",
+  "bytes": 2048, "shapeCount": 2, "base64": "..." }
+```
+
+Unknown format names answer `400` with `code: "unsupported_format"`. A
+requested shape id outside the project answers `404`; a project with no
+exportable solid geometry answers `422` with `code: "geometry_failed"`.
 
 ## Example: a plate with a row of holes
 

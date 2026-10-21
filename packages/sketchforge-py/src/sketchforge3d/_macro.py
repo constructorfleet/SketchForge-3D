@@ -25,6 +25,7 @@ accepts code over a socket.
 
 from __future__ import annotations
 
+import ast
 import argparse
 import datetime as _datetime
 import importlib.util
@@ -287,6 +288,66 @@ def load_macro_file(path: str) -> Macro:
     return macro_from_module(module, stem)
 
 
+def describe_macro_file(path: str) -> Dict[str, Any]:
+    """Read a macro's literal metadata without importing or executing its code."""
+    absolute = os.path.abspath(path)
+    if not os.path.isfile(absolute):
+        raise SketchForgeError(f"No macro file at {absolute}.")
+    try:
+        with open(absolute, "r", encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=absolute)
+    except (OSError, SyntaxError) as error:
+        raise SketchForgeError(f"Could not inspect {absolute}: {error}.") from None
+
+    fallback_name = os.path.splitext(os.path.basename(absolute))[0]
+    assignment = next(
+        (
+            statement.value
+            for statement in tree.body
+            if isinstance(statement, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id in ("MACRO", "macro") for target in statement.targets)
+            and isinstance(statement.value, ast.Call)
+            and isinstance(statement.value.func, ast.Name)
+            and statement.value.func.id == "define_macro"
+        ),
+        None,
+    )
+    if assignment is None:
+        if any(isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name == "run" for statement in tree.body):
+            return {"name": fallback_name, "description": "", "project": {"mode": "fresh"}, "params": {}}
+        raise SketchForgeError(f"{fallback_name} does not declare MACRO = define_macro(...) or run(context).")
+
+    keywords = {keyword.arg: keyword.value for keyword in assignment.keywords if keyword.arg}
+
+    def literal(node: Optional[ast.AST], default: Any) -> Any:
+        if node is None:
+            return default
+        try:
+            return ast.literal_eval(node)
+        except (ValueError, TypeError):
+            return default
+
+    name = literal(keywords.get("name"), literal(assignment.args[0] if assignment.args else None, fallback_name))
+    description = literal(keywords.get("description"), "")
+    params = literal(keywords.get("params"), {})
+    if not isinstance(params, dict) or not all(isinstance(key, str) for key in params):
+        params = {}
+    project = literal(keywords.get("project"), "fresh")
+    if isinstance(project, (list, tuple)):
+        mode = str(project[0]) if project else "fresh"
+        project = {"mode": mode, **({"name": project[1]} if len(project) > 1 and isinstance(project[1], str) else {})}
+    elif isinstance(project, str):
+        project = {"mode": project}
+    else:
+        project = {"mode": "fresh"}
+    return {
+        "name": name if isinstance(name, str) else fallback_name,
+        "description": description if isinstance(description, str) else "",
+        "project": project,
+        "params": params,
+    }
+
+
 def parse_parameters(pairs: Sequence[str]) -> Dict[str, str]:
     """``--count=5`` style overrides, as argparse leaves them."""
     parsed: Dict[str, str] = {}
@@ -334,11 +395,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ),
     )
     parser.add_argument("file", help="the macro file to run")
+    parser.add_argument("--describe", action="store_true", help="show macro metadata without running it")
     parser.add_argument("--project", dest="project_id", help="the project for a target macro")
     parser.add_argument("--json", action="store_true", help="print the run report as JSON")
     parsed, extra = parser.parse_known_args(list(argv) if argv is not None else sys.argv[1:])
 
     try:
+        if parsed.describe:
+            print(json.dumps(describe_macro_file(parsed.file), indent=2) if parsed.json else describe_macro_file(parsed.file))
+            return 0
         overrides = parse_parameters(extra)
         macro = load_macro_file(parsed.file)
         client = client_from_environment()

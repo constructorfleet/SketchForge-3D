@@ -7,6 +7,7 @@ import unittest
 
 from sketchforge3d import (
     BooleanCutResult,
+    ExportResult,
     Imports,
     SketchForgeApiError,
     SketchForgeClient,
@@ -229,6 +230,42 @@ class BooleanAndGroupingTests(unittest.TestCase):
         self.assertEqual([shape.id for shape in project.ungroup("group").shapes], ["plate", "bore"])
         self.assertEqual([shape.id for shape in project.separate("group").shapes], ["left", "right"])
         self.assertEqual(project.cut(["plate"], ["bore"]).shape.id, "cut")
+
+
+class ExportsTests(unittest.TestCase):
+    def test_decodes_an_export_and_preserves_metadata(self) -> None:
+        opener = FakeOpener({
+            "format": "stl",
+            "filename": "Bracket.stl",
+            "mimeType": "model/stl",
+            "bytes": 4,
+            "shapeCount": 2,
+            "base64": "AQIDBA==",
+            "exportedCount": 2,
+            "skipped": [],
+        })
+
+        result = client(opener).exports.export("p1", "stl", ["s1", "s2"], name="Bracket")
+
+        self.assertIsInstance(result, ExportResult)
+        self.assertEqual(result.data, bytes([1, 2, 3, 4]))
+        self.assertEqual(result.filename, "Bracket.stl")
+        self.assertEqual(result.mime_type, "model/stl")
+        self.assertEqual(result.shape_count, 2)
+        self.assertEqual(result.exported_count, 2)
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/exports?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"format": "stl", "shapeIds": ["s1", "s2"], "name": "Bracket"})
+
+    def test_writes_export_bytes_to_a_file(self) -> None:
+        opener = FakeOpener({"format": "obj", "filename": "Part.obj", "mimeType": "text/plain", "base64": "b2Jq", "shapeCount": 1})
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "part.obj")
+            result = client(opener).project("p1").export_file("obj", path)
+            with open(path, "rb") as handle:
+                self.assertEqual(handle.read(), b"obj")
+        self.assertEqual(result.filename, "Part.obj")
+        self.assertEqual(opener.calls[0].body, {"format": "obj"})
 
 
 class EdgesAndTreatmentsTests(unittest.TestCase):

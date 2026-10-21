@@ -82,6 +82,9 @@ client.patterns.ring(project_id, ids, count, center=(0, 0), sweep_angle=None, ro
 
 client.imports.apply(project_id, file_name, data, media_type=None) -> MeshImportResult
 client.imports.file(project_id, path) -> MeshImportResult
+
+client.exports.export(project_id, format, shape_ids=None, name=None) -> ExportResult
+client.exports.file(project_id, format, path, shape_ids=None, name=None) -> ExportResult
 ```
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
@@ -98,7 +101,12 @@ project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=Non
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
 project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
 project.import_mesh(file_name, data) | import_file(path)
+project.export(format, shape_ids=None, name=None) | export_file(format, path, shape_ids=None, name=None)
 ```
+
+Exports return artifact metadata and bytes. Supported formats are `stl`, `obj`,
+`3mf`, `step`, `skf`, and `zip`; use `export_file` to save directly to a local
+path. STEP reports the exact solids it exported and shapes it skipped.
 
 Requests are plain dicts, because the server takes a bag of parameters; responses are frozen dataclasses with snake_case fields, so `shape.rotation_x` is checked and a typo is an error rather than a `None`. A field this version does not know about is kept in `shape.extra` rather than dropped.
 
@@ -161,6 +169,12 @@ SKETCHFORGE_API_TOKEN=... python -m sketchforge3d.macro macros/bolt_plate.py --h
 ```
 
 `python -m sketchforge3d`, and the `sketchforge-macro` console script, run the same thing. The context carries everything the macro needs -- `client`, `project`, `params`, `layout`, `log` -- so a macro file imports only `define_macro`.
+
+Inspect a macro's declared parameters and project mode without running its code:
+
+```bash
+python -m sketchforge3d.macro macros/bolt_plate.py --describe --json
+```
 
 The CLI takes a file path, and the MCP runner only runs reviewed files from
 `SKETCHFORGE_MACRO_DIR`. A Python program or notebook can define and run a

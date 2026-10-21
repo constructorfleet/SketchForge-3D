@@ -12,7 +12,7 @@ client built against an older server still round-trips what a newer one sends.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
 
 PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "box",
@@ -113,6 +113,8 @@ MeasurementEnd = Mapping[str, Any]
 
 #: The fields a PATCH may change. Anything else needs a new shape.
 ShapePatch = Mapping[str, Any]
+
+ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip"]
 
 #: ``[distance from the axis, position along it]``.
 ProfilePoint = Sequence[float]
@@ -540,6 +542,17 @@ class BooleanCutResult:
 class ShapeCollectionResult:
     shapes: List[ShapeSummary]
     revision: int
+
+
+@dataclass(frozen=True)
+class ExportResult:
+    format: ExportFormat
+    filename: str
+    mime_type: str
+    data: bytes
+    shape_count: int
+    exported_count: Optional[int] = None
+    skipped: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
