@@ -743,7 +743,8 @@
         "smooth": "Wygładź",
         "smoothTitle": "Zmień w punkt gładki",
         "split": "Rozdziel",
-        "splitTitle": "Rozdziel uchwyty"
+        "splitTitle": "Rozdziel uchwyty",
+        "sweepDepth": "Głębokość 3D (mm)"
       },
       "notice": {
         "shapeMoved": "Przesunięto kształt szkicu",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Narysuj i zamknij co najmniej jeden przekrój ze środkiem w początku układu (0,0) wybranej płaszczyzny. Po każdym zamknięciu widok przełącza się na prostopadłą płaszczyznę ścieżki. Wróć do płaszczyzny przekroju, aby dodać kolejne, a po zakończeniu przełącz się na płaszczyznę ścieżki.",
       "sweepSpineStage": "Etap 2 z 2 · Ścieżka na płaszczyźnie ortogonalnej",
       "sweepSpineAxes": "Na tej płaszczyźnie kierunek w prawo na ekranie to {right}, a w górę to {up}.",
-      "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się do kierunku w prawo na ekranie, aby przekrój pozostał prostopadły do początkowej stycznej; kolejne zakręty są swobodne.",
+      "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się w prawo, aby przekrój pozostał prostopadły do początkowej stycznej. Wybierz punkt ścieżki i ustaw głębokość 3D (mm), aby przesunąć go poza tę płaszczyznę.",
       "sweepSectionPlane": "Edytuj przekrój · wybrana płaszczyzna",
       "sweepSpinePlane": "Rysuj ścieżkę · płaszczyzna ortogonalna"
     }

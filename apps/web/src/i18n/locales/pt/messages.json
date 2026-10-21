@@ -743,7 +743,8 @@
         "smooth": "Suave",
         "smoothTitle": "Transformar em ponto suave",
         "split": "Separar",
-        "splitTitle": "Separar as alças"
+        "splitTitle": "Separar as alças",
+        "sweepDepth": "Profundidade 3D (mm)"
       },
       "notice": {
         "shapeMoved": "Forma do esboço movida",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Desenhe e feche um ou mais contornos centralizados na origem (0,0) do plano selecionado. Cada fechamento muda para o plano ortogonal do caminho. Volte ao plano da seção para adicionar outros e mude para o plano do caminho quando terminar.",
       "sweepSpineStage": "Etapa 2 de 2 · Caminho no plano ortogonal",
       "sweepSpineAxes": "Neste plano, a direita da tela segue {right} e a parte superior segue {up}.",
-      "sweepSpineHelp": "Comece o caminho na origem da seção (0,0). O primeiro segmento se ajusta à direita da tela para manter a seção perpendicular à tangente inicial; as curvas seguintes ficam livres.",
+      "sweepSpineHelp": "Comece o caminho na origem da seção (0,0). O primeiro segmento se ajusta à direita para manter a seção perpendicular à tangente inicial. Selecione um ponto do caminho e defina a profundidade 3D (mm) para movê-lo para fora deste plano.",
       "sweepSectionPlane": "Editar seção · plano selecionado",
       "sweepSpinePlane": "Desenhar caminho · plano ortogonal"
     }

@@ -743,7 +743,8 @@
         "smooth": "Glatt",
         "smoothTitle": "Punkt glatt machen",
         "split": "Trennen",
-        "splitTitle": "Ziehpunkte trennen"
+        "splitTitle": "Ziehpunkte trennen",
+        "sweepDepth": "3D-Tiefe (mm)"
       },
       "notice": {
         "shapeMoved": "Form in der Skizze verschoben",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Zeichne und schließe einen oder mehrere Querschnitte mit Mittelpunkt am Ursprung (0,0) der ausgewählten Ebene. Nach jedem Abschluss wechselt die Ansicht zur orthogonalen Pfadebene. Kehre zur Querschnittsebene zurück, um weitere Konturen hinzuzufügen, und wechsle danach zur Pfadebene.",
       "sweepSpineStage": "Schritt 2 von 2 · Pfad auf orthogonaler Ebene",
       "sweepSpineAxes": "Auf dieser Ebene zeigt der Bildschirm nach rechts entlang {right} und nach oben entlang {up}.",
-      "sweepSpineHelp": "Der Pfad beginnt im Profilursprung (0,0). Das erste Segment rastet in Bildschirmrichtung rechts ein, damit der Querschnitt senkrecht zur anfänglichen Tangente bleibt; spätere Biegungen sind frei.",
+      "sweepSpineHelp": "Der Pfad beginnt im Profilursprung (0,0). Das erste Segment rastet rechts ein, damit der Querschnitt senkrecht zur anfänglichen Tangente bleibt. Wähle einen Pfadpunkt und lege eine 3D-Tiefe (mm) fest, um ihn aus dieser Ebene zu bewegen.",
       "sweepSectionPlane": "Querschnitt bearbeiten · ausgewählte Ebene",
       "sweepSpinePlane": "Pfad zeichnen · orthogonale Ebene"
     }

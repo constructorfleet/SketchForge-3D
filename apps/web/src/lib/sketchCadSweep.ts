@@ -4,13 +4,18 @@ import type { SketchPoint, SketchSweepFrame } from "@/types/sketchforge";
 import { deriveSketchSweepFrames, sketchSweepSpinePointInSection } from "@constructorfleet/sketchforge-engine/sketchSweepFrames";
 import { LocalizedError } from "@/i18n/LocalizedError";
 
-function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z">) => Vec3 = (point) => ({ x: point.x, y: 0, z: point.z })) {
+function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z" | "sweepDepth">) => Vec3 = (point) => ({ x: point.x, y: 0, z: point.z })) {
   const edges = path.steps.map(({ segment, from, to }) => {
     const forward = segment.startId === from.id;
     const first = forward ? from.handleOut : from.handleIn;
     const second = forward ? to.handleIn : to.handleOut;
     if (segment.kind !== "line" && first && second) {
-      return cad.makeBezierEdge([map(from), map(first), map(second), map(to)]);
+      return cad.makeBezierEdge([
+        map(from),
+        map({ ...first, sweepDepth: from.sweepDepth }),
+        map({ ...second, sweepDepth: to.sweepDepth }),
+        map(to),
+      ]);
     }
     return cad.makeLineEdge(map(from), map(to));
   });
@@ -26,7 +31,10 @@ export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof 
     zAxis: { x: 0, y: 0, z: 1 },
   };
   const frames = profile.sweepFrames ?? deriveSketchSweepFrames(defaultSection);
-  const spineInOrthogonalPlane = (point: Pick<SketchPoint, "x" | "z">): Vec3 => sketchSweepSpinePointInSection(frames, point);
+  const spineInOrthogonalPlane = (point: Pick<SketchPoint, "x" | "z" | "sweepDepth">): Vec3 => {
+    const position = sketchSweepSpinePointInSection(frames, point);
+    return { ...position, z: position.z + (point.sweepDepth ?? 0) };
+  };
   const spine = orientedSpine(rawSpine, spineInOrthogonalPlane);
   // The builder returns geometry in the section frame's canonical coordinates.
   // The editor applies the selected workplane transform once after meshing.
@@ -57,8 +65,8 @@ function orientedSpine(
   if (forwardAligned && reverseAligned) {
     const forwardStart = path.steps[0]!.from;
     const reverseStart = reversed.steps[0]!.from;
-    const forwardDistance = forwardStart.x ** 2 + forwardStart.z ** 2;
-    const reverseDistance = reverseStart.x ** 2 + reverseStart.z ** 2;
+    const forwardDistance = forwardStart.x ** 2 + forwardStart.z ** 2 + (forwardStart.sweepDepth ?? 0) ** 2;
+    const reverseDistance = reverseStart.x ** 2 + reverseStart.z ** 2 + (reverseStart.sweepDepth ?? 0) ** 2;
     return reverseDistance < forwardDistance ? reversed : path;
   }
   return reverseAligned ? reversed : path;
