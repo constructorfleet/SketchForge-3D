@@ -3,6 +3,9 @@ import { cadBrepTransformForShape } from "@/lib/engine/cadBakeMetadata";
 import { createLocalId } from "@/lib/engine/localIds";
 import { projectShapesFingerprint } from "@/lib/engine/editorHistory";
 
+export const DRAFT_FACE_PULL_AXES = ["x", "y", "z"] as const;
+export type DraftFacePullAxis = typeof DRAFT_FACE_PULL_AXES[number];
+
 export function isDraftFaceAngle(angle: number) {
   return Number.isFinite(angle) && angle !== 0 && Math.abs(angle) < 45;
 }
@@ -27,6 +30,18 @@ export function draftFaceRequestForShape(
     pullDirection,
     ...(transform ? { brepTransform: transform } : {}),
   };
+}
+
+export async function applyDraftFaceSelection(
+  shape: WorkplaneShape,
+  faceIndex: number,
+  angle: number,
+  pullDirection: DraftFacePullAxis,
+  onApply: (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void,
+) {
+  if (!draftFaceRequestForShape(shape, faceIndex, angle, pullDirection)) return false;
+  await onApply(faceIndex, angle, pullDirection);
+  return true;
 }
 
 export function draftFaceResultMetadata(shapeId: string, faceCount: number) {
