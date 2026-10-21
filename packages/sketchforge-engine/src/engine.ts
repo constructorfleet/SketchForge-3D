@@ -72,11 +72,13 @@ import {
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
 import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separateShapeParts } from "./serverShapeGroups.js";
 import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
+import { createLocalId } from "./localIds.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
   shapeFromRequest,
   shapeWithRequestedChanges,
+  SHAPE_PARAMETERS,
   type ShapeRequest,
 } from "./shapeRequests.js";
 import {
@@ -88,6 +90,60 @@ import {
 } from "./workplaneShapes.js";
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
+
+/**
+ * Carry face metadata across a parameter edit only when a face has a unique
+ * surface-and-normal counterpart on both sides. This deliberately leaves
+ * repeated coplanar or otherwise ambiguous faces unmatched.
+ */
+async function preserveUnambiguousFaceMetadata(
+  previous: WorkplaneShape,
+  next: WorkplaneShape,
+): Promise<WorkplaneShape> {
+  if (!previous.faceIds?.length && !previous.faceColors) return next;
+  const before = await shapeFaces(previous);
+  const after = await shapeFaces(next);
+  const signature = (face: ServerCadFace) => face.normal
+    ? `${face.surfaceType}:${Math.round(face.normal.x * 1000)}:${Math.round(face.normal.y * 1000)}:${Math.round(face.normal.z * 1000)}:${face.facing ?? "interior"}`
+    : undefined;
+  const beforeBySignature = new Map<string, ServerCadFace[]>();
+  const afterBySignature = new Map<string, ServerCadFace[]>();
+  for (const face of before) {
+    const key = signature(face);
+    if (key) beforeBySignature.set(key, [...(beforeBySignature.get(key) ?? []), face]);
+  }
+  for (const face of after) {
+    const key = signature(face);
+    if (key) afterBySignature.set(key, [...(afterBySignature.get(key) ?? []), face]);
+  }
+
+  const ids = after.map((face) => {
+    const key = signature(face);
+    const oldMatches = key ? beforeBySignature.get(key) ?? [] : [];
+    const newMatches = key ? afterBySignature.get(key) ?? [] : [];
+    if (oldMatches.length === 1 && newMatches.length === 1) return oldMatches[0]!.id;
+    return `face_${createLocalId(`${next.id}-${face.index}`)}`;
+  });
+  const mappedColors: Record<string, string> = {};
+  for (const [key, color] of Object.entries(previous.faceColors ?? {})) {
+    const oldIndex = /^\d+$/.test(key) ? Number(key) : -1;
+    const oldFace = oldIndex >= 0
+      ? before[oldIndex]
+      : before.find((face) => face.id === key);
+    if (!oldFace) continue;
+    const oldKey = signature(oldFace);
+    const oldMatches = oldKey ? beforeBySignature.get(oldKey) ?? [] : [];
+    const newMatches = oldKey ? afterBySignature.get(oldKey) ?? [] : [];
+    if (oldMatches.length !== 1 || newMatches.length !== 1) continue;
+    const matched = newMatches[0]!;
+    mappedColors[ids[matched.index]!] = color;
+  }
+  return canonicalizeShape({
+    ...next,
+    faceIds: ids,
+    faceColors: Object.keys(mappedColors).length ? mappedColors : undefined,
+  });
+}
 
 /**
  * Why an operation did not happen.
@@ -710,8 +766,22 @@ export function createEngine(store: ProjectStore): Engine {
         });
       }
 
-      const shapes = document.shapes.map((shape) => (shape.id === shapeId ? changed.shape : shape));
-      return ok({ shape: changed.shape, revision: await writeShapes(projectId, document, shapes) });
+      const geometryFields = ["width", "depth", "height", "size", ...Object.keys(SHAPE_PARAMETERS)];
+      const geometryChanged = geometryFields.some((field) =>
+        JSON.stringify((existing as unknown as Record<string, unknown>)[field])
+        !== JSON.stringify((changed.shape as unknown as Record<string, unknown>)[field]),
+      );
+      let updatedShape = changed.shape;
+      if (geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
+        try {
+          updatedShape = await preserveUnambiguousFaceMetadata(existing, changed.shape);
+        } catch (error) {
+          return failed(cadFailure(error));
+        }
+      }
+
+      const shapes = document.shapes.map((shape) => (shape.id === shapeId ? updatedShape : shape));
+      return ok({ shape: updatedShape, revision: await writeShapes(projectId, document, shapes) });
     }),
 
     removeShape: (projectId, shapeId) => mutating(projectId, async (document) => {

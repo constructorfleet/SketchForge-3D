@@ -8,6 +8,7 @@ import { POST as createShapes } from "@/app/api/v1/shapes/route";
 import { POST as exportProject } from "@/app/api/v1/exports/route";
 import { PATCH as changeShape } from "@/app/api/v1/shapes/route";
 import { GET as listShapes } from "@/app/api/v1/shapes/route";
+import { GET as listFaces } from "@/app/api/v1/faces/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 
@@ -212,20 +213,41 @@ describe("REST API v1 project exports", () => {
     expect(outOfRange.status).toBe(400);
   });
 
-  it("exports stored face colors as 3MF per-triangle materials", async () => {
+  it("exports ID-keyed face colors after a parameter edit in the complete 3MF scene", async () => {
     const projectId = await makeProject();
     const listed = await listShapes(authorized(`/api/v1/shapes?projectId=${projectId}`));
     const [{ id: shapeId }] = (await listed.json() as { shapes: Array<{ id: string }> }).shapes;
+    const added = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "sphere", name: "Scene companion", size: 6 }),
+    }));
+    expect(added.status).toBe(201);
+    const facesResponse = await listFaces(authorized(`/api/v1/faces?projectId=${projectId}&shapeId=${shapeId}`));
+    const faces = (await facesResponse.json() as {
+      faces: Array<{ id: string; normal: { x: number; y: number; z: number } | null }>;
+    }).faces;
+    const topFace = faces.find((face) => face.normal?.y === 1)!;
     const changed = await changeShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
-      method: "PATCH", body: JSON.stringify({ faceColors: { 0: "#ff0000" } }),
+      method: "PATCH", body: JSON.stringify({ faceColors: { [topFace.id]: "#ff0000" } }),
     }));
     expect(changed.status).toBe(200);
-    expect(await changed.json()).toMatchObject({ shape: { faceColors: { 0: "#ff0000" } } });
+    const resized = await changeShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "PATCH", body: JSON.stringify({ width: 30 }),
+    }));
+    expect(resized.status).toBe(200);
+
+    const persisted = await listShapes(authorized(`/api/v1/shapes?projectId=${projectId}`));
+    const storedShapes = (await persisted.json() as { shapes: Array<{ id: string; faceIds?: string[]; faceColors?: Record<string, string> }> }).shapes;
+    const edited = storedShapes.find((shape) => shape.id === shapeId)!;
+    expect(edited.faceIds).toContain(topFace.id);
+    expect(edited.faceColors).toEqual({ [topFace.id]: "#ff0000" });
+
     const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
       method: "POST", body: JSON.stringify({ format: "3mf" }),
     }));
     expect(response.status).toBe(200);
-    const artifact = await response.json() as { base64: string };
+    const artifact = await response.json() as { base64: string; shapeCount: number };
+    expect(artifact.shapeCount).toBe(2);
     const model = new TextDecoder().decode(unzipSync(Buffer.from(artifact.base64, "base64"))["3D/3dmodel.model"]);
     expect(model).toContain('displaycolor="#ff0000FF"');
     expect(model).toMatch(/pid="\d+" p1="0" p2="0" p3="0"/);

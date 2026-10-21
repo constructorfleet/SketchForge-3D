@@ -37,8 +37,10 @@ export async function meshProjectShapes(shapes: readonly WorkplaneShape[]): Prom
         const faceIndexByHash = new Map(facesInOrder.map((face, index) => [cad.hashCode(face, 2_147_483_647), index]));
         triangleColors = Array(tessellation.triangleCount).fill(null);
         for (let group = 0; group + 2 < tessellation.faceGroups.length; group += 3) {
-          const start = tessellation.faceGroups[group]!;
-          const count = tessellation.faceGroups[group + 1]!;
+          // OCCT reports face-group ranges in mesh index units (three entries
+          // per triangle), while this export array is indexed by triangle.
+          const start = tessellation.faceGroups[group]! / 3;
+          const count = tessellation.faceGroups[group + 1]! / 3;
           const index = faceIndexByHash.get(tessellation.faceGroups[group + 2]!);
           const faceId = index === undefined ? undefined : shape.faceIds?.[index];
           const color = index === undefined
