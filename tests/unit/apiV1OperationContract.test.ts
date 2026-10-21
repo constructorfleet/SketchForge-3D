@@ -28,6 +28,28 @@ function sourceOperations() {
 type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
 
 describe("REST API v1 operation contract", () => {
+  it("declares nested STEP product hierarchy in project shape summaries", () => {
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/shapes");
+    expect((operation?.responseSchemas as Record<number, unknown> | undefined)?.[200]).toMatchObject({
+      properties: {
+        shapes: {
+          items: {
+            properties: {
+              stepAssembly: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["name", "children"],
+                  properties: { name: { type: "string" }, children: { type: "array" } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it("keeps create-project normalization and schema required in the contract type", () => {
     expectTypeOf<CreateProjectBody["normalization"]>().toEqualTypeOf<readonly ["trim", "truncate:80"]>();
     expectTypeOf<CreateProjectBody["schema"]>().toEqualTypeOf<{

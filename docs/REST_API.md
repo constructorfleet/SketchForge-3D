@@ -51,7 +51,7 @@ The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists
 | `GET` | `/projects?projectId=` | One project with its shapes and settings. |
 | `POST` | `/projects` | Creates an empty project. Body: `{ "name": "Bracket" }`. |
 | `DELETE` | `/projects?projectId=` | Deletes the project and its geometry. |
-| `GET` | `/shapes?projectId=` | The project's shapes. |
+| `GET` | `/shapes?projectId=` | The project's shapes, including optional `stepAssembly` product hierarchy metadata for qualifying STEP imports. |
 | `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
 | `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest; refuses the ones that kind cannot take. |
 | `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
@@ -92,6 +92,8 @@ The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` re
 `kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`, plus `revolve`, `thread` and `sketchSweep` (below). A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. `mesh`, `sketch`, and `scribble` remain unavailable as raw kinds because they need supplied geometry or an editor drawing.
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
+
+`stepAssembly` on a shape summary is an optional tree of STEP product names and direct children. It is metadata only: imported geometry remains one combined mesh, so these product nodes are not independently editable shapes. Extraction is bounded to STEP inputs up to 200 solids and 8 MiB, 2,000 hierarchy nodes, and depth 32; absent or unsupported hierarchy data leaves the field out.
 
 `GET /faces?projectId=&shapeId=` returns a positional `index` for compatibility and an app-owned `id` for each face. Use the `id` as the key in `faceColors` when updating a shape, for example `{ "faceColors": { "face_…": "#ff0000" } }`; numeric index keys remain accepted for existing callers. Face IDs are persisted with the shape and colors. Across a shape-parameter edit, the engine retains an ID and its color only when the face has a unique counterpart with the same surface type and outward normal on both sides. Treatment operations use their own geometric matching. Generated or ambiguous faces receive new IDs and do not inherit a color. Face colors are previewed on B-rep-backed geometry and included in 3MF per-triangle material assignments.
 

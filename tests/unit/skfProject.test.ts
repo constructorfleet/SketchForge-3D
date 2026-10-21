@@ -132,6 +132,17 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.shapes[0]).toMatchObject({ faceIds: part.faceIds, faceColors: part.faceColors });
   });
 
+  it("round-trips imported STEP assembly names and their parent-child tree", async () => {
+    const stepAssembly = [{
+      name: "MainAssembly",
+      children: [{ name: "SensorPack", children: [{ name: "SensorLeft", children: [] }] }],
+    }];
+    const imported = shape("mesh", "step-tree", { stepAssembly });
+    const restored = await importSkfProject(await exportSkfProject(input([imported])));
+
+    expect(restored.shapes[0]?.stepAssembly).toEqual(stepAssembly);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

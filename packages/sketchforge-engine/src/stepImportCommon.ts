@@ -34,15 +34,7 @@ function meshBounds(positions: number[]) {
   return { minX, minY, minZ, maxX, maxZ };
 }
 
-function componentColorsByFace(cad: OcctKernel, stepText: string, solids: ShapeHandle[], faces: ShapeHandle[]) {
-  // XCAF import and its GLB fallback are intentionally bounded. The regular
-  // mesh import still accepts larger files, where building a second colored
-  // representation can multiply the tessellation cost substantially.
-  if (solids.length > EXACT_GEOMETRY_LIMITS.solids || new TextEncoder().encode(stepText).byteLength > EXACT_GEOMETRY_LIMITS.sourceBytes) {
-    return new Map<number, string>();
-  }
-
-  const metadataBySolid = stepComponentMetadata(cad, stepText);
+function componentColorsByFace(cad: OcctKernel, metadataBySolid: Map<string, { color?: string }[]>, solids: ShapeHandle[], faces: ShapeHandle[]) {
   const colorsBySolid = new Map<string, string>();
   for (const [key, candidates] of metadataBySolid) {
     const colors = [...new Set(candidates.map(({ color }) => color).filter((color): color is string => Boolean(color)))];
@@ -106,7 +98,13 @@ export async function importedShapeFromStepWithKernel(cad: OcctKernel, fileName:
 
   const shape = importedShapeFromTriangleSoup(fileName, positions, hasNormals ? normals : undefined, "step");
   if (shape.importedMesh && faceGroups.length) shape.importedMesh.faceGroups = faceGroups;
-  const colorsByFace = componentColorsByFace(cad, stepText, solids, faces);
+  const stepMetadataIsWithinBudget = solids.length <= EXACT_GEOMETRY_LIMITS.solids
+    && new TextEncoder().encode(stepText).byteLength <= EXACT_GEOMETRY_LIMITS.sourceBytes;
+  const componentMetadata = stepMetadataIsWithinBudget ? stepComponentMetadata(cad, stepText) : undefined;
+  const colorsByFace = componentMetadata
+    ? componentColorsByFace(cad, componentMetadata.bySolid, solids, faces)
+    : new Map<number, string>();
+  if (componentMetadata?.assembly) shape.stepAssembly = componentMetadata.assembly;
   if (colorsByFace.size) {
     shape.faceIds = faces.map((_, index) => `face_${createLocalId(`${shape.id}-face-${index}`)}`);
     shape.faceColors = Object.fromEntries([...colorsByFace].map(([index, color]) => [shape.faceIds![index]!, color]));

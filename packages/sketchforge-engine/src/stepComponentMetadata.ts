@@ -1,8 +1,13 @@
 /** Component labels and colors shared by regular STEP import and assembly explosion. */
 import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
 import { componentColorsFromGlb } from "./stepGlbColors.js";
+import { stepAssemblyHierarchyFromGlb, type StepAssemblyNode } from "./stepAssemblyHierarchy.js";
 
 export type StepComponentMetadata = { name?: string; color?: string };
+export type StepComponentMetadataResult = {
+  bySolid: Map<string, StepComponentMetadata[]>;
+  assembly?: StepAssemblyNode[];
+};
 
 export function stepShapeKey(cad: OcctKernel, shape: ShapeHandle) {
   const bounds = cad.getBoundingBox(shape, false);
@@ -19,10 +24,13 @@ function colorHex(color: [number, number, number]) {
 export function stepComponentMetadata(cad: OcctKernel, step: string) {
   const metadataBySolid = new Map<string, StepComponentMetadata[]>();
   const document = cad.importXCAFFromSTEP(step);
+  let assembly: StepAssemblyNode[] | undefined;
   try {
     let colorsByName = new Map<string, { count: number; color?: string }>();
     try {
-      colorsByName = componentColorsFromGlb(document.exportGLTF());
+      const glb = document.exportGLTF();
+      colorsByName = componentColorsFromGlb(glb);
+      assembly = stepAssemblyHierarchyFromGlb(glb, step);
     } catch {
       // XCAF label data remains usable when the optional color view cannot be exported.
     }
@@ -70,5 +78,5 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
   } finally {
     document.close();
   }
-  return metadataBySolid;
+  return { bySolid: metadataBySolid, ...(assembly ? { assembly } : {}) } satisfies StepComponentMetadataResult;
 }

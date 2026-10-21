@@ -65,6 +65,12 @@ describe("projects", () => {
 });
 
 describe("shapes", () => {
+  it("keeps STEP assembly hierarchy in summaries without echoing it into patches", () => {
+    const stepAssembly = [{ name: "MainAssembly", children: [{ name: "Sensors", children: [{ name: "SensorLeft", children: [] }] }] }];
+    const summary: ShapeSummary = { ...shapeSummary("s1"), stepAssembly };
+    expect(shapePatchFromSummary(summary)).not.toHaveProperty("stepAssembly");
+  });
+
   it("returns the created shape rather than the envelope", async () => {
     const server = fakeServer({ status: 201, body: { shapes: [shapeSummary("s1")], revision: 3 } });
     await expect(client(server).shapes.create("p1", { kind: "box", width: 10 })).resolves.toMatchObject({ id: "s1" });

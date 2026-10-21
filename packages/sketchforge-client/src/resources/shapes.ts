@@ -16,7 +16,7 @@ import {
  * not an error -- but dropping them keeps a patch to what it actually changes,
  * which is what a caller reads in a log.
  */
-const DESCRIPTION_FIELDS = ["id", "kind", "requestKind", "sketchOperation", "groupedCount"] as const;
+const DESCRIPTION_FIELDS = ["id", "kind", "requestKind", "sketchOperation", "groupedCount", "stepAssembly"] as const;
 
 /**
  * A summary turned back into the change that would reproduce it.
