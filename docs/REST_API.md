@@ -53,6 +53,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
 | `DELETE` | `/groups?projectId=&shapeId=` | Takes a group apart. |
 | `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
+| `POST` | `/mirrors?projectId=` | Mirrors selected shapes across a principal plane. |
 | `POST` | `/align?projectId=` | Lines shapes up on one coordinate. Body: `{ "ids": [...], "axis": "y", "target": "max" }`. |
 | `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
@@ -60,6 +61,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF. |
 | `POST` | `/explode?projectId=&shapeId=` | Splits a retained STEP assembly into separately positioned exact solids, preserving STEP product names and XCAF colors where present (up to 200 solids and 8 MiB source). |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
+| `GET` | `/edges?projectId=&shapeId=` | Lists edges by their current numeric index, with geometric measurements and filletability. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 | `POST` | `/draft-prism?projectId=&shapeId=` | Rebuilds a retained straight sketch extrusion with a draft angle. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
@@ -67,8 +69,13 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
 | `GET` | `/thickness?projectId=&shapeId=` | Sampled estimate of the minimum distance between opposing surfaces. |
 | `POST` | `/interference?projectId=` | Exact shape-to-shape gaps and overlap volumes within a requested clearance; capped at 128 shapes and 512 AABB candidates. |
+| `POST` | `/treatments?projectId=&shapeId=` | Applies a CAD treatment such as fillet or chamfer to a shape. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
+
+### Contract coverage
+
+The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` registers every currently exported `/api/v1` route method. A test compares that inventory with the route handlers so adding a public method without registering it fails CI. The inventory records method, path, operation ID, and auth mode; the four read-only `OPTIONS` methods are unauthenticated 204 responses, while API operations require bearer authentication. The `POST /projects` operation is the first migrated request contract: its required JSON body, name normalization, and response status set are declared there and the handler uses its validator. Other routes still need request and response schemas and verified status sets before an OpenAPI document can be generated honestly; this inventory is not itself an OpenAPI specification.
 
 ## Describing a shape
 

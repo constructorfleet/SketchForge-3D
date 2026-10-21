@@ -12,6 +12,7 @@ import {
   type ProjectMetadata,
 } from "@/lib/engine/serverProjectFiles";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
+import { parseCreateProjectRequest } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -59,8 +60,9 @@ export async function POST(request: Request) {
 
   const body = await apiJsonBody(request);
   if (!body) return apiErrors.jsonBodyRequired();
-  const requestedName = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
-  if (!requestedName) return apiError("A project name is required.", 400, "invalid_request");
+  const parsed = parseCreateProjectRequest(body);
+  if (!parsed) return apiError("A project name is required.", 400, "invalid_request");
+  const requestedName = parsed.name;
 
   // The dashboard's own id shape, so a project made here is indistinguishable
   // from one made in the browser.
