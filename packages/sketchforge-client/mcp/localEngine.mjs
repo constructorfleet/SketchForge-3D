@@ -37,6 +37,50 @@ function objectSummary(shape) {
   return { id, name, kind, x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, color, hole, locked, ...(group ? { group } : {}), ...(features ? { features } : {}) };
 }
 
+function compactMutationValue(value) {
+  if (Array.isArray(value)) return value.map(compactMutationValue);
+  if (!value || typeof value !== "object") return value;
+
+  const isShape = typeof value.id === "string" && typeof value.kind === "string";
+  const result = {};
+  for (const [key, field] of Object.entries(value)) {
+    if (isShape && ["cadBrep", "cadDisplayEdges"].includes(key)) continue;
+    if (isShape && key === "importedMesh" && field && typeof field === "object") {
+      const { positions, normals, brepStep, ...metadata } = field;
+      result.importedMesh = {
+        ...compactMutationValue(metadata),
+        ...(Array.isArray(positions) ? { positionCount: positions.length } : {}),
+        ...(Array.isArray(normals) ? { normalCount: normals.length } : {}),
+        ...(brepStep === undefined ? {} : { hasBrepStep: true }),
+      };
+      continue;
+    }
+    result[key] = compactMutationValue(field);
+  }
+  if (isShape) {
+    if (typeof value.cadBrep === "string") result.hasCadBrep = true;
+    if (Array.isArray(value.cadDisplayEdges)) result.cadDisplayEdgeCount = value.cadDisplayEdges.length;
+  }
+  return result;
+}
+
+const MUTATION_TOOLS = new Set([
+  "sketchforge_create_shape",
+  "sketchforge_import_mesh",
+  "sketchforge_update_object",
+  "sketchforge_delete_objects",
+  "sketchforge_align_objects",
+  "sketchforge_distribute_objects",
+  "sketchforge_pattern_objects",
+  "sketchforge_group_objects",
+  "sketchforge_ungroup_objects",
+  "sketchforge_boolean_cut",
+  "sketchforge_separate_parts",
+  "sketchforge_apply_edge_treatment",
+  "sketchforge_hollow_shape",
+  "sketchforge_mirror_objects",
+]);
+
 function stlBytesFromPositions(positions) {
   if (!Array.isArray(positions) || positions.length === 0 || positions.length % 9 !== 0 || !positions.every(Number.isFinite)) {
     throw new Error("positions must contain finite XYZ coordinates for one or more complete triangles.");
@@ -222,7 +266,7 @@ async function captureScene(args) {
   return { face, view, bytesApprox: png.byteLength, dataUrl: `data:image/png;base64,${png.toString("base64")}` };
 }
 
-export async function callLocalEngineTool(name, args = {}) {
+async function callLocalEngineToolRaw(name, args = {}) {
   if (["sketchforge_list_editors", "sketchforge_inspect_errors"].includes(name)) {
     throw new Error(`${name} needs an open SketchForge editor and is unavailable in local mode.`);
   }
@@ -373,4 +417,9 @@ export async function callLocalEngineTool(name, args = {}) {
     default:
       throw new Error(`${name} needs an open SketchForge editor and is unavailable in local mode.`);
   }
+}
+
+export async function callLocalEngineTool(name, args = {}) {
+  const result = await callLocalEngineToolRaw(name, args);
+  return MUTATION_TOOLS.has(name) ? compactMutationValue(result) : result;
 }
