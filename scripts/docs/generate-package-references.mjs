@@ -41,16 +41,31 @@ function formatTypeScriptReference(entry, packageName, packagePath, sourcePath) 
   return lines.join("\n");
 }
 
-await mkdir(outputDir, { recursive: true });
+const generated = new Map();
 for (const [pkg, stem] of [["sketchforge-client", "typescript-client"], ["sketchforge-engine", "typescript-engine"]]) {
   const entry = path.join(root, "packages", pkg, "dist/index.d.ts");
   const markdown = formatTypeScriptReference(entry, pkg === "sketchforge-client" ? "TypeScript client" : "Engine", `packages/${pkg}`, `packages/${pkg}/dist/index.d.ts`);
-  await writeFile(path.join(outputDir, `${stem}.md`), markdown);
+  generated.set(`${stem}.md`, markdown);
 }
 
-const pythonResult = spawnSync("python3", [path.join(root, "scripts/docs/generate-python-reference.py"), path.join(outputDir, "python-client.md")], { cwd: root, encoding: "utf8" });
+const pythonResult = spawnSync("python3", [path.join(root, "scripts/docs/generate-python-reference.py"), "--stdout"], { cwd: root, encoding: "utf8" });
 if (pythonResult.status !== 0) throw new Error(pythonResult.stderr || "Python reference generation failed");
+generated.set("python-client.md", pythonResult.stdout);
 
 const docs = await readFile(path.join(root, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
 if (!docs.includes("### Phase 2: generate package and example documentation")) throw new Error("Documentation suite Phase 2 heading is missing");
-console.log("Generated package references in docs/reference/");
+
+const check = process.argv.includes("--check");
+if (!check) await mkdir(outputDir, { recursive: true });
+for (const [filename, markdown] of generated) {
+  const outputPath = path.join(outputDir, filename);
+  if (check) {
+    const current = await readFile(outputPath, "utf8").catch(() => "");
+    if (current !== markdown) {
+      throw new Error(`${path.relative(root, outputPath)} is missing or stale; run node scripts/docs/generate-package-references.mjs`);
+    }
+  } else {
+    await writeFile(outputPath, markdown);
+  }
+}
+console.log(`${check ? "Checked" : "Generated"} package references in docs/reference/`);
