@@ -21,12 +21,13 @@ These are implemented and should not be filed as missing features:
 - STEP imports can expose bounded product names and nested `stepAssembly`
   hierarchy metadata in shape summaries. Extraction is limited to inputs up to
   200 solids and 8 MiB, with at most 2,000 hierarchy nodes and depth 32.
-  `POST /explode` produces independently selectable top-level solids. When a
-  solid can be associated unambiguously, it retains `stepComponent` source
-  occurrence identity and root-to-component ancestry, which survives `.skf`
-  round trips. Ambiguous associations omit ancestry rather than guessing.
-  Exploded parts remain top-level project shapes; arbitrary nested groups and
-  source assembly transforms are not reconstructed as editable project groups.
+  `POST /explode` rebuilds nested editable project groups when every exact
+  solid maps unambiguously to a source occurrence using the imported GLB
+  geometry and source hierarchy. Otherwise it falls back to independently
+  selectable flat solids. Leaf solids retain project-space placement,
+  `stepComponent` occurrence identity, and root-to-component ancestry through
+  `.skf` round trips. Native STEP transform editing and hierarchy-preserving
+  STEP export are not implemented.
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section
   DXF exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
@@ -105,6 +106,11 @@ rather than editable feature nodes. A general dependency-ordered graph with
 consistent failure propagation remains the highest-value foundation before
 expanding editable downstream operations.
 
+Open PR [#215](https://github.com/constructorfleet/SketchForge-3D/pull/215)
+adds one bounded descendant case: editing a persisted sweep recomputes retained
+boolean ancestors in order and rejects partial or ineffective updates. It does
+not provide a general dependency graph or recomputation for other operations.
+
 ### 2. Broader and editable drafting
 
 Face drafting is selectable along local X, Y, or Z, but verification covers
@@ -120,13 +126,13 @@ editable draft history depends on the feature-recompute work in gap 1.
 The engine retains source occurrence IDs and ancestry on exploded solids when
 association is unambiguous, and persists that metadata through `.skf`. The
 identifiers describe a particular STEP source and may change when the source
-file or product structure changes. Exploded parts are top-level project shapes:
-nested assembly groups, arbitrary source transforms, and hierarchy-preserving
-editing/export are not implemented. Some source trees also cannot be
-associated reliably with imported solids, so those solids have no
-`stepComponent` ancestry. Full assembly editing depends on representing nested
-groups and transforms in the project model; improving identity matching alone
-does not provide that behavior.
+file or product structure changes. `POST /explode` now reconstructs nested
+editable project groups when every exact solid can be uniquely associated with
+an occurrence using the imported GLB geometry and source hierarchy. If any
+solid cannot be mapped unambiguously, it returns flat solids rather than a
+partial hierarchy. Native STEP transform editing and hierarchy-preserving STEP
+export remain unsupported. Full assembly editing still needs more robust
+association across exporters and broader STEP fixtures.
 
 ### 4. Stable face identity across arbitrary topology changes
 
@@ -137,6 +143,12 @@ contract. Split, merged, generated, or otherwise ambiguous faces receive new
 IDs without inherited assignments. General identity across arbitrary topology
 edits remains unsupported.
 
+PR [#206](https://github.com/constructorfleet/SketchForge-3D/pull/206) is open
+to preserve IDs for uniquely occurring analytic curved faces after supported
+parameter edits. That narrower case does not establish identity across
+arbitrary split, merge, or generated-face changes, so it is not counted as
+shipped here.
+
 ### 5. Broader sketch constraints and globally determined solutions
 
 The solver supports coincident, horizontal, vertical, and fixed-distance
@@ -146,6 +158,11 @@ every nonlinear or second-order dependency, or remove the two global
 translation freedoms. Degenerate zero-length distance geometry has no
 determinate degree-of-freedom report. Additional constraint types and a solver
 that can robustly determine global placement remain open.
+
+PR [#207](https://github.com/constructorfleet/SketchForge-3D/pull/207) is open
+with perpendicular segment constraints, including persistence and local
+degree-of-freedom reporting. The broader constraint and global-solution limits
+above remain after that slice.
 
 ## Verification baseline
 
