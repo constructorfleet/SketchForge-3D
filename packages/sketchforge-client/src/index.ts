@@ -9,6 +9,7 @@ export { Faces } from "./resources/faces.js";
 export { Imports } from "./resources/imports.js";
 export { Interference } from "./resources/interference.js";
 export { Measurements } from "./resources/measurements.js";
+export { Mirrors } from "./resources/mirrors.js";
 export { Properties } from "./resources/properties.js";
 export { Drawings } from "./resources/drawings.js";
 export { Shell } from "./resources/shell.js";

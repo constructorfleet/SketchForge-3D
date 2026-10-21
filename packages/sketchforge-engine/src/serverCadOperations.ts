@@ -22,6 +22,7 @@ import {
   shapeIsTurned,
   unrotatedSolidForShape,
   UnbuildableShapeError,
+  EXACT_SOLID_KINDS,
 } from "./cadSolids.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
@@ -273,6 +274,93 @@ export type ServerCadResult = {
   normals: number[] | null;
   triangleCount: number;
 };
+
+/**
+ * Reflect a parameter-built solid across a world-space axis plane and store the
+ * reflected result as exact BREP with a matching display mesh. Existing
+ * `mirrorX/Y/Z` flags are applied to the source first, so the operation removes
+ * those flags while preserving the rendered result. The mirror plane passes
+ * through `pivot` on the chosen world axis; callers use the selected bounds
+ * midpoint, matching the editor's object-mirror convention.
+ *
+ * Exact source contract: parameter-built solids only. Imported meshes, groups,
+ * and already baked BREP are refused rather than silently round-tripped through
+ * triangles. The output has its world position baked into its normalized local
+ * BREP and resets rotation and mirror flags.
+ */
+export function applyBakedMirror(shape: WorkplaneShape, axis: "x" | "y" | "z", pivot: number): Promise<WorkplaneShape> {
+  if (!EXACT_SOLID_KINDS.includes(shape.kind as typeof EXACT_SOLID_KINDS[number])
+    || shape.importedMesh || shape.cadBrep || shape.groupedShapes?.length) {
+    return Promise.reject(new ServerCadError("Baked mirror requires exact parameter geometry; imported meshes, groups, and previously treated shapes are not supported yet."));
+  }
+  if (!Number.isFinite(pivot)) {
+    return Promise.reject(new ServerCadError("The mirror plane must have a finite coordinate.", 400));
+  }
+
+  return withCadKernel((cad) => {
+    let solid: ShapeHandle;
+    try {
+      solid = unrotatedSolidForShape(cad, shape);
+    } catch (error) {
+      if (error instanceof UnbuildableShapeError) throw new ServerCadError(error.message);
+      throw error;
+    }
+
+    const centerY = shape.height / 2;
+    if (shape.mirrorX) solid = cad.mirror(solid, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 });
+    if (shape.mirrorY) solid = cad.mirror(solid, { x: 0, y: centerY, z: 0 }, { x: 0, y: 1, z: 0 });
+    if (shape.mirrorZ) solid = cad.mirror(solid, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+
+    const center = { x: 0, y: centerY, z: 0 };
+    const angle = (degrees: number) => degrees * Math.PI / 180;
+    if (shape.rotationZ) solid = cad.rotate(solid, { point: center, direction: { x: 0, y: 0, z: 1 } }, angle(shape.rotationZ));
+    if (shape.rotation) solid = cad.rotate(solid, { point: center, direction: { x: 0, y: 1, z: 0 } }, angle(shape.rotation));
+    if (shape.rotationX) solid = cad.rotate(solid, { point: center, direction: { x: 1, y: 0, z: 0 } }, angle(shape.rotationX));
+    solid = cad.translate(solid, shape.x, shape.elevation ?? 0, shape.z);
+
+    const point = { x: axis === "x" ? pivot : 0, y: axis === "y" ? pivot : 0, z: axis === "z" ? pivot : 0 };
+    const normal = { x: axis === "x" ? 1 : 0, y: axis === "y" ? 1 : 0, z: axis === "z" ? 1 : 0 };
+    const reflected = cad.mirror(solid, point, normal);
+    if (!cadResultIsValid(cad, reflected)) throw new ServerCadError("The reflected exact solid is not valid.");
+
+    const worldMesh = cad.meshShape(reflected, { linearDeflection: MESH_DEFLECTION });
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let minZ = Number.POSITIVE_INFINITY;
+    let maxZ = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < worldMesh.positions.length; index += 3) {
+      minX = Math.min(minX, worldMesh.positions[index]);
+      maxX = Math.max(maxX, worldMesh.positions[index]);
+      minY = Math.min(minY, worldMesh.positions[index + 1]);
+      maxY = Math.max(maxY, worldMesh.positions[index + 1]);
+      minZ = Math.min(minZ, worldMesh.positions[index + 2]);
+      maxZ = Math.max(maxZ, worldMesh.positions[index + 2]);
+    }
+    if (![minX, maxX, minY, maxY, minZ, maxZ].every(Number.isFinite)) {
+      throw new ServerCadError("The reflected solid produced no usable geometry.");
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const localSolid = cad.translate(reflected, -centerX, -minY, -centerZ);
+    const result = meshedCadResult(cad, localSolid);
+    const normalized = shapeWithCadResult(shape, result);
+    return canonicalizeShape({
+        ...normalized,
+        x: centerX,
+        z: centerZ,
+        elevation: minY,
+        rotation: 0,
+        rotationX: 0,
+        rotationZ: 0,
+        mirrorX: undefined,
+        mirrorY: undefined,
+        mirrorZ: undefined,
+      });
+  });
+}
 
 /**
  * Apply a fillet or chamfer and return the exact result with a mesh of it.

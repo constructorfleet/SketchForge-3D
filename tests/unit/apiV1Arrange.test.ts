@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as alignShapesRoute } from "@/app/api/v1/align/route";
+import { POST as bakedMirrorRoute } from "@/app/api/v1/mirrors/route";
 import { POST as distributeShapesRoute } from "@/app/api/v1/distribute/route";
 import { POST as patternShapesRoute } from "@/app/api/v1/patterns/route";
 import { POST as createProject } from "@/app/api/v1/projects/route";
@@ -99,6 +100,31 @@ function distribute(projectId: string, body: Record<string, unknown>) {
 function pattern(projectId: string, body: Record<string, unknown>) {
   return patternShapesRoute(authorized(`/api/v1/patterns?projectId=${projectId}`, body));
 }
+
+describe("POST /mirrors", () => {
+  it("mirrors selected exact shapes and persists a BREP without mirror flags", async () => {
+    const projectId = await makeProject();
+    const [left, right] = await addShapes(projectId, [
+      { kind: "wedge", width: 30, depth: 18, height: 12, x: -20, mirrorX: true },
+      { kind: "wedge", width: 30, depth: 18, height: 12, x: 20 },
+    ]);
+    const response = await bakedMirrorRoute(authorized(`/api/v1/mirrors?projectId=${projectId}`, { ids: [left, right], axis: "x" }));
+    const payload = await response.json() as { moved: number; axis: string; revision: number };
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ moved: 2, axis: "x" });
+    expect(Number.isFinite(payload.revision)).toBe(true);
+    for (const id of [left, right]) {
+      const shape = await stored(projectId, id);
+      expect(shape.kind).toBe("mesh");
+      expect(shape.cadBrep).toContain("CASCADE Topology");
+      expect(shape.mirrorX ?? false).toBe(false);
+      expect(shape.mirrorY ?? false).toBe(false);
+      expect(shape.mirrorZ ?? false).toBe(false);
+      expect(shape.rotation).toBe(0);
+    }
+  });
+});
 
 describe("POST /align", () => {
   it("brings every left edge onto the leftmost one", async () => {

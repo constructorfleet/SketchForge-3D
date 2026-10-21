@@ -62,6 +62,7 @@ client.measurements.with_radius(project_id, shape_id) -> list[MeasurementSummary
 client.measurements.between(project_id, from_, to) -> MeasurementPair
 client.properties.get(project_id, shape_id) -> ShapeProperties
 client.interference.check(project_id, ids=None, clearance=None) -> InterferenceReport
+client.mirrors.bake(project_id, ids, axis) -> BakedMirrorResult
 
 client.shell.apply(project_id, shape_id, thickness, open_faces=None) -> ShellResult
 client.shell.hollow(project_id, shape_id, thickness) -> ShellResult
@@ -92,6 +93,8 @@ client.exports.file(project_id, format, path, shape_ids=None, name=None, view=No
 For an SVG section drawing, set `section={"plane": "xy", "offset": 3}` instead
 of `view`. The supported planes are `xy`, `xz`, and `yz` in drawing coordinates;
 the plane must intersect the selected shapes.
+
+Baked mirror reflects exact parameter-built solids across their selected bounds midpoint and stores exact BREP. Imported meshes, groups, and previously treated shapes are refused rather than silently tessellated.
 
 Shape requests remain ordinary mappings, so existing macros can keep passing
 plain dictionaries and can include fields added by newer server versions. For
@@ -127,7 +130,7 @@ project.faces(id) | faces_facing(id, direction)
 project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to) | properties_of(id) | check_interference(ids=None, clearance=None)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
 project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id)
-project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None)
+project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None) | mirror_baked(ids, axis)
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
 project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
 project.import_mesh(file_name, data) | import_file(path)

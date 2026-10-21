@@ -671,6 +671,14 @@ class ArrangeTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].body, {"ids": ["a", "b", "c"], "spacing": "centers"})
         self.assertEqual(result.axis, "z")
 
+    def test_bakes_an_exact_mirror_via_the_mirrors_route(self) -> None:
+        opener = FakeOpener({"moved": 2, "axis": "x", "shapes": [], "revision": 4})
+        result = client(opener).project("p1").mirror_baked(["a", "b"], "x")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/mirrors?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"ids": ["a", "b"], "axis": "x"})
+        self.assertEqual(result.moved, 2)
+        self.assertEqual(result.axis, "x")
+
     def test_sends_a_rows_pitch_and_a_rings_centre(self) -> None:
         opener = FakeOpener({"created": 3, "kind": "linear", "shapes": [], "revision": 4})
         api = client(opener)
