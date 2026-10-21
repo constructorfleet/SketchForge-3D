@@ -87,7 +87,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /six-operation generated OpenAPI slice \(#144\).*merged/i);
   assert.match(spec, /PR #147's STEP component-color import support has merged/i);
   assert.match(spec, /open PR #145.*Python stable-face identity parity/i);
-  assert.match(spec, /PR #145.*head is stale \(`fc10ea9`\).*conflicts with `main`.*branch is at `1feb9da`.*needs rebasing/i);
+  assert.match(spec, /PR #145.*rebased onto `d045fe8`.*reports it mergeable.*hosted checks are still running/i);
   assert.match(spec, /STEP color guidance \(#119\)/i);
   assert.match(spec, /merged in PR #112/i);
   assert.match(spec, /PR #115/i);
@@ -122,7 +122,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(migration, /site version\/revision stamps and pinned source links merged in\s+PR #126/i);
   assert.match(migration, /PR #144 added generated OpenAPI for\s+six schema-backed CRUD operations/i);
   assert.match(migration, /STEP component-color\s+import support merged in PR #147/i);
-  assert.match(migration, /head is stale \(`fc10ea9`\) and\s+conflicts with `main`; the pushed branch is at `1feb9da` and needs rebasing/i);
+  assert.match(migration, /PR #145[\s\S]*?rebased onto `d045fe8`[\s\S]*?reports\s+it mergeable.*local checks pass/i);
   assert.match(migration, /browser smoke checks merged in PR #141/i);
   assert.match(migration, /external-link report merged in PR #143/i);
   assert.match(spec, /editor quick-start is implemented on branch `docs\/editor-quickstart` and is not yet merged/i);
