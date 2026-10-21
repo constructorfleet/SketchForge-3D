@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -14,7 +14,7 @@ const headSha = "a".repeat(40);
 const baseSha = "b".repeat(40);
 const newSha = "c".repeat(40);
 
-async function withWriter({ staleBranch = false } = {}, callback) {
+async function withWriter({ staleBranch = false, closedPullRequest = false, advancedPullRequest = false, runConclusion = "success" } = {}, callback) {
   const artifactDir = await mkdtemp(path.join(os.tmpdir(), "sketchforge-generated-docs-writer-"));
   for (const relative of GENERATED_DOC_PATHS) {
     const target = path.join(artifactDir, relative);
@@ -40,7 +40,7 @@ async function withWriter({ staleBranch = false } = {}, callback) {
     let result = {};
     if (pathname === "actions/runs/123") {
       result = {
-        event: "pull_request", name: "Documentation site",
+        event: "pull_request", name: "Documentation site", conclusion: runConclusion,
         repository: { full_name: "constructorfleet/SketchForge-3D" },
         head_repository: { full_name: "constructorfleet/SketchForge-3D" },
         pull_requests: [{ number: 42, head: { sha: headSha }, base: { sha: baseSha } }],
@@ -51,9 +51,9 @@ async function withWriter({ staleBranch = false } = {}, callback) {
       result = [];
     } else if (pathname === "pulls/42") {
       result = {
-        state: "open", title: "docs: refresh references",
+        state: closedPullRequest ? "closed" : "open", title: "docs: refresh references",
         base: { sha: baseSha, ref: "main", repo: { full_name: "constructorfleet/SketchForge-3D" } },
-        head: { sha: headSha, ref: "feature/docs", repo: { full_name: "constructorfleet/SketchForge-3D" } },
+        head: { sha: advancedPullRequest ? "9".repeat(40) : headSha, ref: "feature/docs", repo: { full_name: "constructorfleet/SketchForge-3D" } },
       };
     } else if (pathname === "git/ref/heads/feature/docs" && requests.filter((entry) => entry.pathname === pathname).length === 1) {
       result = { object: { sha: staleBranch ? "d".repeat(40) : headSha } };
@@ -87,7 +87,7 @@ async function withWriter({ staleBranch = false } = {}, callback) {
 
 const execFileAsync = promisify(execFile);
 
-async function runWriter({ artifactDir, apiUrl }) {
+async function runWriter({ artifactDir, apiUrl, summaryPath }) {
   try {
     const result = await execFileAsync(process.execPath, [path.join(root, "scripts/docs/commit-generated-docs.mjs")], {
       cwd: root,
@@ -103,6 +103,7 @@ async function runWriter({ artifactDir, apiUrl }) {
       EXPECTED_BRANCH: "feature/docs",
       DOCS_SOURCE_RUN_ID: "123",
       ARTIFACT_DIR: artifactDir,
+      ...(summaryPath ? { GITHUB_STEP_SUMMARY: summaryPath } : {}),
       },
     });
     return { status: 0, stdout: result.stdout, stderr: result.stderr };
@@ -128,12 +129,45 @@ test("trusted docs writer commits only allowlisted files and dispatches checks f
   });
 });
 
-test("trusted docs writer rejects a branch that advanced after generation", async () => {
+test("trusted docs writer treats a branch that advanced after generation as a successful no-op", async () => {
   await withWriter({ staleBranch: true }, async ({ artifactDir, requests, apiUrl }) => {
     const result = await runWriter({ artifactDir, apiUrl });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /branch advanced/);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /skipped.*branch.*advanced/i);
     assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname === "git/blobs"), false);
+    assert.equal(requests.some(({ pathname }) => pathname.startsWith("actions/workflows/")), false);
+  });
+});
+
+test("trusted docs writer treats a closed PR as a successful no-op", async () => {
+  await withWriter({ closedPullRequest: true }, async ({ artifactDir, requests, apiUrl }) => {
+    const summaryPath = path.join(artifactDir, "summary.md");
+    await writeFile(summaryPath, "");
+    const result = await runWriter({ artifactDir, apiUrl, summaryPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /skipped.*closed/i);
+    assert.match(await readFile(summaryPath, "utf8"), /pull request #42 is closed/);
+    assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname.startsWith("git/")), false);
+    assert.equal(requests.some(({ pathname }) => pathname.startsWith("actions/workflows/")), false);
+  });
+});
+
+test("trusted docs writer treats a PR that advanced after generation as a successful no-op", async () => {
+  await withWriter({ advancedPullRequest: true }, async ({ artifactDir, requests, apiUrl }) => {
+    const result = await runWriter({ artifactDir, apiUrl });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /skipped.*advanced/i);
+    assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname.startsWith("git/")), false);
+    assert.equal(requests.some(({ pathname }) => pathname.startsWith("actions/workflows/")), false);
+  });
+});
+
+test("trusted docs writer skips outputs from a docs workflow that failed validation", async () => {
+  await withWriter({ runConclusion: "failure" }, async ({ artifactDir, requests, apiUrl }) => {
+    const result = await runWriter({ artifactDir, apiUrl });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /skipped.*workflow.*failure/i);
+    assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname.startsWith("git/")), false);
     assert.equal(requests.some(({ pathname }) => pathname.startsWith("actions/workflows/")), false);
   });
 });

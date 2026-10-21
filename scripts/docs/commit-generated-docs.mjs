@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { isRepositoryFullName, validateGeneratedDocsArtifact } from "./validate-generated-docs-artifact.mjs";
 
 const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
@@ -54,6 +54,12 @@ async function changedControlFiles(repo, pullRequestNumber) {
   return changed.filter((filename) => filename.startsWith(".github/workflows/") || filename.startsWith(".github/actions/"));
 }
 
+async function skip(message) {
+  const summary = `Generated docs auto-commit skipped: ${message}`;
+  console.log(summary);
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+}
+
 async function main() {
   assertEnvironment();
   const repo = process.env.EXPECTED_REPO;
@@ -65,14 +71,16 @@ async function main() {
     headSha: process.env.EXPECTED_HEAD_SHA,
     baseSha: process.env.EXPECTED_BASE_SHA,
   };
-  const files = await validateGeneratedDocsArtifact(expected);
-
   const sourceRun = await apiRequest(repo, `actions/runs/${process.env.DOCS_SOURCE_RUN_ID}`);
   if (sourceRun.event !== "pull_request" || sourceRun.name !== "Documentation site") {
     throw new Error("Source workflow run is not a Documentation site pull request run");
   }
   if (sourceRun.repository?.full_name !== repo || sourceRun.head_repository?.full_name !== repo) {
     throw new Error("Generated output is not from a same-repository pull request run");
+  }
+  if (sourceRun.conclusion !== "success") {
+    await skip(`documentation site workflow concluded ${sourceRun.conclusion ?? "unknown"}.`);
+    return;
   }
   const linkedPullRequest = sourceRun.pull_requests?.find(({ number }) => number === pullRequestNumber);
   if (!linkedPullRequest || linkedPullRequest.head?.sha !== expected.headSha || linkedPullRequest.base?.sha !== expected.baseSha) {
@@ -83,15 +91,24 @@ async function main() {
   if (generationStep?.conclusion !== "success") throw new Error("Documentation generation did not complete successfully");
 
   const pullRequest = await apiRequest(repo, `pulls/${pullRequestNumber}`);
-  if (pullRequest.state !== "open" || pullRequest.base?.repo?.full_name !== repo || pullRequest.head?.repo?.full_name !== repo) {
-    throw new Error("Target pull request is closed or is not from this repository");
+  if (pullRequest.state !== "open") {
+    await skip(`pull request #${pullRequestNumber} is closed or no longer open.`);
+    return;
+  }
+  if (pullRequest.base?.repo?.full_name !== repo || pullRequest.head?.repo?.full_name !== repo) {
+    await skip(`pull request #${pullRequestNumber} no longer targets this repository.`);
+    return;
   }
   if (pullRequest.head.sha !== expected.headSha || pullRequest.base.sha !== expected.baseSha || pullRequest.head.ref !== process.env.EXPECTED_BRANCH) {
-    throw new Error("Target pull request changed after its generated-docs artifact was produced");
+    await skip(`pull request #${pullRequestNumber} advanced after its generated-docs artifact was produced.`);
+    return;
   }
   if (pullRequest.base.ref !== process.env.EXPECTED_DEFAULT_BRANCH || pullRequest.head.ref === process.env.EXPECTED_DEFAULT_BRANCH) {
-    throw new Error("Generated docs can only be committed to a non-default branch targeting the default branch");
+    await skip(`pull request #${pullRequestNumber} no longer targets the default branch from a feature branch.`);
+    return;
   }
+
+  const files = await validateGeneratedDocsArtifact(expected);
 
   const protectedChanges = await changedControlFiles(repo, pullRequestNumber);
   if (protectedChanges.length) {
@@ -100,7 +117,10 @@ async function main() {
   }
 
   const ref = await apiRequest(repo, `git/ref/heads/${process.env.EXPECTED_BRANCH}`);
-  if (ref.object?.sha !== expected.headSha) throw new Error("Target branch advanced before generated-docs commit");
+  if (ref.object?.sha !== expected.headSha) {
+    await skip(`target branch for pull request #${pullRequestNumber} advanced after generation.`);
+    return;
+  }
   const commit = await apiRequest(repo, `git/commits/${expected.headSha}`);
   const tree = await apiRequest(repo, `git/trees/${commit.tree.sha}?recursive=1`);
   if (tree.truncated) throw new Error("Repository tree response was truncated; refusing to commit generated output");
