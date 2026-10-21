@@ -9,6 +9,7 @@ import {
   materialPreset,
   materialPricePerKg,
   materialWeightGrams,
+  materialVolumePrecisionMessage,
   meshVolumeCentroid,
   meshVolumeMm3,
   normalizeMaterialPrices,
@@ -177,6 +178,11 @@ describe("material price overrides", () => {
 });
 
 describe("shape material estimate", () => {
+  it("identifies whether a material estimate uses tessellated or exact volume", () => {
+    expect(materialVolumePrecisionMessage("tessellated")).toBe("panels.material.precision.tessellated");
+    expect(materialVolumePrecisionMessage("exact")).toBe("panels.material.precision.exact");
+  });
+
   it("gives the closed-form weight and cost of a PLA cube", () => {
     const estimate = shapeMaterialEstimate(shape({ material: "pla" }), 8000);
     expect(estimate?.volumeCm3).toBeCloseTo(8, 10);

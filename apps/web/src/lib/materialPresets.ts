@@ -188,6 +188,12 @@ export type MaterialEstimate = {
   cost: number;
 };
 
+export type MaterialVolumePrecision = "exact" | "tessellated";
+
+export function materialVolumePrecisionMessage(precision: MaterialVolumePrecision): MessageKey {
+  return precision === "exact" ? "panels.material.precision.exact" : "panels.material.precision.tessellated";
+}
+
 /**
  * Weight and cost for one shape, or undefined when there is nothing to price:
  * no material chosen, a material this build does not know, a hole (which
