@@ -4,8 +4,10 @@ Status: shipped capabilities verified against `origin/main` at `1c8e820`
 (2026-10-21), including PR #180's fixture-tested +X and +Y face-draft cases.
 The open PR #168 branch also carries proposed revolve-source persistence
 (#181) and STEP component ancestry (#183); those changes are not on `main`.
-Open PR #188, stacked on #168, proposes sweep-source persistence. This file
-tracks user-facing capability limits, not every unused OCCT method.
+Open PR #188, stacked through #193 on #168, proposes sweep-source persistence;
+open PR #194, stacked on #188, proposes REST profile updates and rebuilds.
+Neither proposal is merged to `main`. This file tracks user-facing capability
+limits, not every unused OCCT method.
 
 ## Shipped capabilities
 
@@ -58,9 +60,9 @@ These are implemented and should not be filed as missing features:
   independent handle depths. The editor retains the source profile for
   reopening and editing. `POST /shapes` also accepts `kind: "sketchSweep"`;
   the engine, TypeScript client, and Python client expose sweep creation and
-  preserve the returned profile. The API has no dedicated profile-edit/rebuild
-  request. The `.skf` feature index records sweeps, but sweeps do not yet have
-  a separate source-sketch dependency node on `main`.
+  preserve the returned profile. On `main`, the API has no dedicated
+  profile-edit/rebuild request. The `.skf` feature index records sweeps, but
+  sweeps do not yet have a separate source-sketch dependency node on `main`.
 - `.skf` stores a separate source-sketch node and explicit feature input for
   sketch extrusions. Editing the profile keeps source and output identities
   while rebuilding its solid. Revolves and sweeps do not yet have this
@@ -92,12 +94,14 @@ On `main`, sketch extrusion is the only operation with a separate persisted
 source-sketch node and feature input. Open PR #181, carried on the #168 branch,
 proposes the equivalent source and edit/rebuild slice for revolves. Open PR
 #188 proposes a persisted sweep source node and feature input, preserving
-source identity when the editor rebuilds an edited sweep. The REST API can
-create and read sweeps but still has no operation to update a sweep profile and
-rebuild it. Draft operations replace selected geometry with baked results.
-These source links do not yet make a general dependency-ordered feature tree:
-upstream changes are not recomputed through booleans, drafts, or other
-downstream operations.
+source identity when the editor rebuilds an edited sweep. Open PR #194, stacked
+on #188, proposes `PATCH /api/v1/shapes` support for `sketchProfile`, rebuilding
+the sweep solid while preserving shape and source identities. Both #188 and
+#194 remain open; on `main`, REST can create and read sweeps but cannot update a
+profile and request a rebuild. Draft operations replace selected geometry with
+baked results. These source links and the proposed sweep PATCH do not yet make
+a general dependency-ordered feature tree: upstream changes are not
+recomputed through booleans, drafts, or other downstream operations.
 
 Face draft accepts a chosen local CAD axis in the inspector. Fixtures verify
 +Z cases at ±5° for the documented extrusion and box face sets, plus one +X
@@ -143,7 +147,8 @@ yet form a general recomputing dependency graph with sketch extrusion.
 ## Verification baseline
 
 The shipped baseline was checked against `origin/main` at `1c8e820`; proposed
-claims were checked against the #168 and #188 branches and their focused tests.
+claims were checked against the #168, #188, and #194 branches and their focused
+tests.
 Coverage on `main` includes sweep API/client creation, extrusion source-sketch
 serialization, STEP hierarchy metadata, face-ID matching, face-draft axis
 cases, and sketch constraints. Relevant focused coverage includes

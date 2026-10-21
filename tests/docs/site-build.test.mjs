@@ -95,7 +95,8 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /PR #162 merged Mermaid fence rendering/i);
   assert.match(spec, /Open PR #168.*revolve source persistence \(#181\).*STEP component ancestry \(#183\).*not on `main`/i);
   assert.match(spec, /Open PR #187.*historical inbound-link inventory/i);
-  assert.match(spec, /Open PR #188 proposes persisted source-sketch nodes and editor rebuild identity for sweeps; the REST API still cannot update a sweep profile and rebuild it/i);
+  assert.match(spec, /Open PR #188 proposes persisted source-sketch nodes and editor rebuild identity for sweeps/i);
+  assert.match(spec, /Open PR #194 proposes `PATCH \/api\/v1\/shapes` support for sweep profile updates and rebuilds; both remain unmerged, so `main` still lacks REST sweep profile rebuild/i);
   assert.match(spec, /Open PR #182 proposes runtime-backed contracts.*9 of 32 registered operations/i);
   assert.match(spec, /Publishing clients version row — closed by #156 and #167/i);
   assert.match(spec, /Cross-links between documentation and references — closed by #157/i);
@@ -112,7 +113,9 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(capabilities, /separate source-sketch node and explicit feature input for\s+sketch extrusions/i);
   assert.match(capabilities, /Open PR #181[\s\S]*?proposes the equivalent source and edit\/rebuild slice for revolves/i);
   assert.match(capabilities, /Open PR #188[\s\S]*?proposes a persisted sweep source node and feature input/i);
-  assert.match(capabilities, /The REST API can\s+create and read sweeps but still has no operation to update a sweep profile and\s+rebuild it/i);
+  assert.match(capabilities, /Open PR #194[\s\S]*?proposes `PATCH \/api\/v1\/shapes` support for `sketchProfile`[\s\S]*?Both #188 and\s+#194 remain open/i);
+  assert.match(capabilities, /do not yet make\s+a general dependency-ordered feature tree/i);
+  assert.match(capabilities, /On `main`, the API has no dedicated\s+profile-edit\/rebuild request/i);
   assert.match(capabilities, /STEP imports can expose bounded product names and nested `stepAssembly`\s+hierarchy metadata/i);
   assert.match(capabilities, /`POST \/explode` creates independently\s+selectable and movable top-level shapes/i);
   assert.match(capabilities, /PR #183[\s\S]*?`stepComponent` metadata[\s\S]*?not merged to `main`/i);
@@ -153,7 +156,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(migration, /Merged PR #157 adds useful contextual links/i);
   assert.match(migration, /Merged PR #158 expands the engine package README and generated TypeScript/i);
   assert.match(migration, /Open PR #187 proposes an inventory of repository-controlled historical\s+inbound documentation paths/i);
-  assert.match(migration, /Open PR #188 proposes persisted sweep source\s+sketches; REST profile update and rebuild remain unsupported/i);
+  assert.match(migration, /Open PR #188 proposes persisted sweep source\s+sketches, and open PR #194 proposes the REST profile-update\/rebuild request/i);
   assert.match(migration, /PR #162 merged Mermaid fence rendering and CI checks/i);
   assert.match(migration, /broader task guides remain outstanding/i);
   assert.doesNotMatch(migration, /still needs to be set|before the first deployment|could not be confirmed/i);

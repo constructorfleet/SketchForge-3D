@@ -65,4 +65,6 @@ checks merged in PR #128; STEP color guidance merged in PR #119.
   reference into a practical npm listing and API guide, and verifies packed contents.
 - Open PR #187 proposes an inventory of repository-controlled historical
   inbound documentation paths. Open PR #188 proposes persisted sweep source
-  sketches; REST profile update and rebuild remain unsupported.
+  sketches, and open PR #194 proposes the REST profile-update/rebuild request.
+  Both sweep changes remain proposed until merged; broader dependency-ordered
+  recomputation remains unavailable.
