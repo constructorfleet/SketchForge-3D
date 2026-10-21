@@ -93,12 +93,13 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes nine and explains why 23 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
-  assert.match(spec, /Generators currently write outputs including/i);
-  assert.match(spec, /`docs\/openapi-v1\.json` is a tracked generated artifact linked directly from `docs\/REST_API\.md`/i);
-  assert.match(spec, /run `docs:generate` before freshness checks and site builds/i);
-  assert.match(spec, /source change refreshes generated output instead of failing merely because a committed generated copy is stale/i);
-  assert.match(spec, /CI must regenerate the allowlisted generated files and commit refreshed files to the PR branch/i);
-  assert.match(spec, /then run required checks for the resulting commit/i);
+  assert.match(spec, /Seven generators write tracked output/i);
+  assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
+  assert.match(spec, /Pull-request docs CI runs `docs:generate` before generated-output verification and the site build/i);
+  assert.match(spec, /trusted `workflow_run` handler treats that artifact as untrusted input and validates the source run, PR, artifact manifest, and allowlist/i);
+  assert.match(spec, /Fork PRs and workflow-control changes retain the generated artifact as a fallback/i);
+  assert.match(spec, /dispatches CI, docs, and title workflows with the exact resulting commit SHA/i);
+  assert.match(spec, /each dispatched workflow verifies/i);
   assert.match(spec, /Broader task-oriented workflows, complete REST contracts/i);
   assert.match(spec, /Publishing-client version — closed/i);
   assert.match(spec, /Cross-links between documentation and references — closed/i);
@@ -108,10 +109,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
 
   assert.match(migration, /Nine operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
-  assert.match(migration, /`docs\/openapi-v1\.json` is currently\s+a tracked generated artifact/i);
-  assert.match(migration, /run `docs:generate` before `docs:check` and\s+the site build/i);
-  assert.match(migration, /commit refreshed allowlisted outputs to the PR branch/i);
-  assert.match(migration, /run required\s+checks against the resulting commit/i);
+  assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
+  assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
+  assert.match(migration, /trusted artifact-only writer\s+commits\s+allowlisted updates to eligible same-repository PR branches/i);
+  assert.match(migration, /Fork PRs and PRs changing workflow\s+controls use artifact fallback/i);
+  assert.match(migration, /dispatches CI, docs, and\s+title checks for the exact resulting commit SHA/i);
   assert.match(migration, /historical inbound-link inventory/i);
   assert.match(migration, /broader task-oriented guides and corresponding workflow\s+checks remain incomplete/i);
 
@@ -331,8 +333,8 @@ test("a mermaid diagram on a built page renders with labels that fit their nodes
     }));
 
     assert.equal(pageErrors.length, 0, `the diagram should render without page errors: ${pageErrors.join("; ")}`);
-    assert.equal(diagram.nodes, 6, "the documentation pipeline diagram should render every stage");
-    assert.ok(diagram.labels.some((label) => /docs:check/.test(label)), "diagram labels come from the committed fence");
+    assert.equal(diagram.nodes, 5, "the documentation pipeline diagram should render every stage");
+    assert.ok(diagram.labels.some((label) => /workflow_run/.test(label)), "diagram labels come from the committed fence");
     assert.deepEqual(diagram.clipped, [], "node labels must fit inside their nodes rather than overflowing the border");
   } finally {
     await browser.close();

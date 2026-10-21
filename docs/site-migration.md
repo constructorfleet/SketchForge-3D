@@ -3,12 +3,15 @@
 The static VitePress site is published at
 [`https://constructorfleet.github.io/SketchForge-3D/`](https://constructorfleet.github.io/SketchForge-3D/).
 The repository remains the source for maintained prose, examples, and
-generated references. The required CI order is to refresh generated output,
-commit any allowlisted updates to the PR branch, validate the resulting commit,
-build static pages, run built-site checks, and publish the Pages artifact from
-the default branch. The current workflow still runs freshness checks before
-generation and does not commit refreshed outputs; correcting that order is an
-open pipeline task.
+generated references. On pull requests, docs CI generates references before
+verification and site build, then uploads the generated outputs. A trusted
+follow-up validates the artifact and PR before committing only allowlisted
+updates to eligible same-repository PR branches. It dispatches CI, docs, and
+title checks for the exact resulting commit SHA. Fork PRs and PRs changing
+workflow-control files retain the generated artifact as a fallback and do not
+get an automatic branch update. The initial docs run validates/builds the PR
+head; the dispatched checks validate the head after any generated-output
+commit.
 
 ## Delivered site capabilities
 
@@ -32,13 +35,22 @@ open pipeline task.
 - TypeScript, Python, and engine references are generated into
   `.docs-site/docs/reference/` from package declarations and public exports.
   Their rendered pages are validated as part of the Pages artifact.
-- CLI, shape, operator configuration, `.skf`, MCP, publishing-client, and
-  OpenAPI references have source generators and drift checks. These generators
-  write source-controlled Markdown outputs. `docs/openapi-v1.json` is currently
-  a tracked generated artifact. Generated files may remain committed for
-  repository browsing; CI must regenerate the allowlisted outputs before
-  checks, commit any refreshed files to the PR branch, and run required checks
-  against the resulting commit.
+- Seven generators write tracked output for repository browsing:
+  `docs/PUBLISHING_CLIENTS.md`, `docs/SHAPE_REQUEST_REFERENCE.md`,
+  `docs/CLI_REFERENCE.md`, `docs/OPERATOR_CONFIGURATION.md`,
+  `docs/SKF_FORMAT_REFERENCE.md`, `docs/mcp/TOOLS_REFERENCE.md`, and
+  `docs/openapi-v1.json`. The OpenAPI JSON is linked directly from
+  `docs/REST_API.md`. PR docs CI runs `docs:generate` before generated-output
+  verification and site build, then uploads generated output. A trusted
+  `workflow_run` handler treats that artifact as untrusted input, verifies its
+  manifest and source PR, and writes only allowlisted generated paths. It
+  commits changed outputs to eligible same-repository PR branches, then
+  dispatches CI, docs, and PR-title checks for the exact resulting commit SHA;
+  each dispatched workflow verifies its expected SHA. Fork PRs and PRs changing
+  `.github/workflows/` or `.github/actions/` controls use the artifact fallback
+  without an automatic branch update. The TypeScript, Python, and engine
+  references remain generated in `.docs-site/docs/reference/` for the Pages
+  artifact, not tracked source files.
 - Package guides include registry-facing README files, and package examples
   run against a local API. Python package references and examples are checked
   with mypy and integration tests. The MCP example is checked against the
@@ -69,12 +81,13 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
 - **Complete REST reference:** add runtime-backed request/response contracts
   for the remaining operations, generate endpoint pages from those contracts,
   and replace or clearly bound hand-maintained endpoint details.
-- **Generated-output automation:** run `docs:generate` before `docs:check` and
-  the site build. `docs:check` currently compares generated Markdown with
-  sources before the full generator command runs, so stale output fails CI
-  instead of being refreshed first. Generated Markdown may remain tracked; CI
-  should commit refreshed allowlisted outputs to the PR branch and run required
-  checks against the resulting commit.
+- **Generated-output automation — implemented with limits:** generators run
+  before verification/build, and a trusted artifact-only writer commits
+  allowlisted updates to eligible same-repository PR branches before exact-SHA
+  CI, docs, and title checks are dispatched. Fork PRs and PRs changing workflow
+  controls use artifact fallback and require a maintainer to apply generated
+  updates. The initial docs run checks/builds the source PR head; dispatched
+  runs check the updated head containing any generated commit.
 - **Configuration ownership:** the current generated operator reference
   documents supported server/container settings, not every environment read
   across server, desktop, tests, build tools, and browser code. A central
