@@ -3,7 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootArgumentIndex = process.argv.indexOf("--root");
+const rootArgument = rootArgumentIndex >= 0 ? process.argv[rootArgumentIndex + 1] : undefined;
+if (rootArgumentIndex >= 0 && !rootArgument) throw new Error("--root requires a value");
+const root = rootArgument ? path.resolve(rootArgument) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tracked = execFileSync("git", ["ls-files", "-z", "--", "*.md"], {
   cwd: root,
   encoding: "utf8",
