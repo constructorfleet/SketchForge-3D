@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Sketch profiles can carry coincident, horizontal, vertical, and fixed-distance constraints. The Sketch workspace can add or remove these constraints from selected points or segments, and dragging geometry projects it back toward its constraints while keeping dragged points anchored. Unsatisfied constraint IDs appear in the editor notice, and `.skf` saves the declarations while continuing to open older unconstrained profiles. This is a local projection solver; sketches still bake into shapes and do not participate in a parametric feature tree.
+
 - The shape inspector can assign and remove colors by the CAD face indexes returned from `GET /faces`. These positional assignments persist with the shape and feed the existing per-triangle 3MF export. The inspector calls out that geometry edits can invalidate the indexes; the viewport does not preview face colors yet.
 - Exploding a retained STEP assembly now reads its XCAF product labels before splitting the solids. Named products keep their STEP names, and explicit or inherited component colors are used when the STEP reader supplies them; unlabeled solids keep the existing numbered names and imported shape color. Labels are matched to solids by exact volume and bounds, so component ordering does not decide which label lands on which part.
 - Added `POST /api/v1/draft-prism` for retained straight sketch extrusions. The server rebuilds a closed polygon profile with OCCT's draft-prism operation, then stores both the exact BREP and viewport mesh. The TypeScript and Python clients expose it. This first slice requires a single closed linear loop; it does not add editor controls or a re-editable feature-tree node.

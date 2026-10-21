@@ -66,15 +66,18 @@ changes.
 
 ### 4. Geometric sketch constraints and a parametric feature tree
 
-`SketchProfile` currently stores points, segments, and optional images; it has
-no geometric constraints or dimensions. Sketches produce baked geometry rather
-than a dependency-ordered feature history. This is a larger modeling and file
-format change, so begin with a narrow sketch constraint model and solver for a
-small set of constraints (for example coincident, horizontal/vertical, and
-fixed distance), with deterministic under/fully constrained status and an
-explicit unsatisfied-constraint result. Do not describe the full parametric
-feature-tree workflow as supported until edits can recompute dependent features
-and survive project round trips.
+`SketchProfile` now optionally stores coincident point pairs, horizontal or
+vertical segments, and fixed point-to-point distances in millimeters. The
+inspector adds and removes these constraints; point drags run a deterministic
+local projection that anchors the dragged points, and the editor reports
+unsatisfied constraint IDs. `.skf` round trips the declarations while older
+profiles without them remain valid. Splitting a constrained line carries its
+axis constraint to each resulting segment.
+
+This is a first constraint milestone, not a full CAD solver. It does not report
+degrees of freedom or provide a global nonlinear solve, and extrusion/revolve
+still bake the resulting geometry instead of recomputing a dependency-ordered
+feature tree. Those capabilities remain open work.
 
 ## Verification notes
 

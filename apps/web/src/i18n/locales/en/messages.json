@@ -447,6 +447,25 @@
       "chainCleared": "Current sketch chain cleared",
       "selectedItems": "{count, plural, one {Selected {count} sketch item} other {Selected {count} sketch items}}",
       "selectionCleared": "Sketch selection cleared",
+      "constraintUnsatisfied": "Could not satisfy sketch constraint(s): {ids}",
+      "constraintAdded": "Added {kind} sketch constraint",
+      "constraintRemoved": "Sketch constraint removed",
+      "constraints": {
+        "title": "Constraints",
+        "hint": "Select two points for coincident or distance, or one segment for horizontal or vertical.",
+        "addCoincident": "Coincident",
+        "addHorizontal": "Horizontal",
+        "addVertical": "Vertical",
+        "addDistance": "Set distance",
+        "distanceMm": "Distance (mm)",
+        "remove": "Remove {kind} constraint",
+        "kinds": {
+          "coincident": "Coincident",
+          "horizontal": "Horizontal",
+          "vertical": "Vertical",
+          "distance": "Distance"
+        }
+      },
       "primitive": {
         "rectangle": "Rectangle",
         "circle": "Circle",

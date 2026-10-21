@@ -1,4 +1,4 @@
-import type { SketchPoint, SketchProfile, SketchSegment } from "@/types/sketchforge";
+import type { SketchConstraint, SketchPoint, SketchProfile, SketchSegment } from "@/types/sketchforge";
 
 export type SketchSegmentPlacement = {
   point: { x: number; z: number };
@@ -143,10 +143,19 @@ export function splitSketchSegment(
   }
 
   const secondSegmentId = createId("sketch-segment");
+  const constraints = profile.constraints?.reduce<SketchConstraint[]>((result, constraint) => {
+    if ((constraint.kind === "horizontal" || constraint.kind === "vertical") && constraint.segmentId === segmentId) {
+      result.push(constraint, { ...constraint, id: createId("sketch-constraint"), segmentId: secondSegmentId });
+    } else {
+      result.push(constraint);
+    }
+    return result;
+  }, []);
   return {
     profile: {
       ...profile,
       points: [...nextPoints, point],
+      ...(constraints ? { constraints } : {}),
       segments: profile.segments.flatMap((entry) => entry.id === segmentId ? [
         { ...entry, endId: point.id },
         { ...entry, id: secondSegmentId, startId: point.id },
@@ -236,22 +245,37 @@ export function addLineIntersectionPoints(profile: SketchProfile, createId: IdFa
 
   if (!splits.size) return profile;
 
+  const pieceIdsByOriginal = new Map<string, string[]>();
   const segments = profile.segments.flatMap((segment) => {
     const segmentSplits = splits.get(segment.id);
     if (!segmentSplits?.length) return [segment];
     const ordered = [...segmentSplits].sort((left, right) => left.amount - right.amount);
     const pointIds = [segment.startId, ...ordered.map((entry) => entry.pointId), segment.endId];
-    return pointIds.slice(0, -1).map((startId, index) => ({
+    const pieces = pointIds.slice(0, -1).map((startId, index) => ({
       ...segment,
       id: index === 0 ? segment.id : createId("sketch-segment"),
       startId,
       endId: pointIds[index + 1],
     }));
+    pieceIdsByOriginal.set(segment.id, pieces.map((piece) => piece.id));
+    return pieces;
   });
+
+  const constraints = profile.constraints?.reduce<SketchConstraint[]>((result, constraint) => {
+    if (constraint.kind !== "horizontal" && constraint.kind !== "vertical") {
+      result.push(constraint);
+      return result;
+    }
+    const pieces = pieceIdsByOriginal.get(constraint.segmentId);
+    if (!pieces) result.push(constraint);
+    else pieces.forEach((segmentId, index) => result.push(index === 0 ? constraint : { ...constraint, id: createId("sketch-constraint"), segmentId }));
+    return result;
+  }, []);
 
   return {
     ...profile,
     points: [...profile.points, ...addedPoints],
     segments,
+    ...(constraints ? { constraints } : {}),
   };
 }
