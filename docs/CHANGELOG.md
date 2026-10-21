@@ -5,6 +5,8 @@
 ## Unreleased
 
 - Exploding a STEP assembly now creates editable nested groups that follow its product tree when every solid has an unambiguous occurrence association. The exact solid geometry and project-space positions stay on the leaves; moving a group moves its subassembly, and ungrouping works one level at a time. If any association is missing or ambiguous, explosion keeps the existing flat result so no solid disappears. Native STEP transform operations and hierarchy-preserving STEP export remain unsupported.
+- Editing a sketch-backed sweep now recomputes retained boolean-group descendants bottom-up and persists the updated `.skf` result in one write. Invalid sketch profiles or unsuccessful dependent booleans leave the project unchanged. This is a first runtime recompute slice; other downstream operation types remain baked. See the [engine package guide](./packages/engine.md).
+
 - The generated OpenAPI contract now includes both measurement routes, with
   runtime validation for conditional edge and face indices and the exclusive
   angle result fields. The subset documents nine of 32 registered operations.
