@@ -3,9 +3,12 @@
 ## Unreleased
 
 - Exploding a STEP assembly now preserves explicit component display colors when
-  the XCAF label API omits them, using the XCAF document's GLB material data.
-  Named red and blue components are covered by an OCCT-generated STEP fixture.
-  Regular STEP import still combines the assembly into a default-colored mesh.
+  the XCAF label API omits them, using the XCAF document's GLB material data
+  only when the component name identifies one uniformly colored GLB node and
+  one XCAF leaf. Ambiguous duplicate names and components with uncolored or
+  mixed-material primitives keep their inherited/default color rather than
+  receiving a possibly incorrect component color. Regular STEP import still
+  combines the assembly into a default-colored mesh.
 
 - Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide describes the two-stage workflow: draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The generated section is oriented perpendicular to the spine's initial direction.
 

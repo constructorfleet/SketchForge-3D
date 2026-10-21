@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
+import { componentColorsFromGlb } from "./stepGlbColors.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
@@ -17,14 +18,6 @@ function boundsOf(cad: Parameters<Parameters<typeof withCadKernel>[0]>[0], shape
 }
 
 type ComponentMetadata = { name?: string; color?: string };
-type GlbColorDocument = {
-  nodes?: Array<{ name?: string; mesh?: number }>;
-  meshes?: Array<{
-    name?: string;
-    primitives?: Array<{ material?: number }>;
-  }>;
-  materials?: Array<{ pbrMetallicRoughness?: { baseColorFactor?: number[] } }>;
-};
 
 function shapeKey(cad: OcctKernel, shape: ShapeHandle) {
   const bounds = boundsOf(cad, shape);
@@ -39,70 +32,18 @@ function colorHex(color: [number, number, number]) {
   return `#${color.map((channel) => Math.round(Math.max(0, Math.min(1, channel)) * 255).toString(16).padStart(2, "0")).join("")}`;
 }
 
-function componentColorsFromGlb(glb: Uint8Array) {
-  const colorsByName = new Map<string, Set<string>>();
-  if (glb.byteLength < 20) return new Map<string, string>();
-  const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
-  if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) return new Map<string, string>();
-
-  let json: GlbColorDocument | null = null;
-  let offset = 12;
-  while (offset + 8 <= glb.byteLength) {
-    const length = view.getUint32(offset, true);
-    const type = view.getUint32(offset + 4, true);
-    const start = offset + 8;
-    const end = start + length;
-    if (end > glb.byteLength) return new Map<string, string>();
-    if (type === 0x4e4f534a) {
-      try {
-        json = JSON.parse(new TextDecoder().decode(glb.subarray(start, end)).trim()) as GlbColorDocument;
-      } catch {
-        return new Map<string, string>();
-      }
-      break;
-    }
-    offset = end;
-  }
-  if (!json) return new Map<string, string>();
-
-  for (const node of json.nodes ?? []) {
-    const mesh = typeof node.mesh === "number" ? json.meshes?.[node.mesh] : undefined;
-    const names = new Set([node.name?.trim(), mesh?.name?.trim()].filter((name): name is string => Boolean(name)));
-    if (!names.size || !mesh?.primitives?.length) continue;
-    const colors = new Set<string>();
-    let hasUncoloredPrimitive = false;
-    for (const primitive of mesh.primitives) {
-      const factor = typeof primitive.material === "number"
-        ? json.materials?.[primitive.material]?.pbrMetallicRoughness?.baseColorFactor
-        : undefined;
-      if (!factor || factor.length < 3 || !factor.slice(0, 3).every(Number.isFinite)) {
-        hasUncoloredPrimitive = true;
-        break;
-      }
-      colors.add(colorHex([factor[0]!, factor[1]!, factor[2]!]));
-    }
-    if (hasUncoloredPrimitive || colors.size !== 1) continue;
-    for (const name of names) {
-      const entries = colorsByName.get(name) ?? new Set<string>();
-      entries.add([...colors][0]!);
-      colorsByName.set(name, entries);
-    }
-  }
-  return new Map([...colorsByName].flatMap(([name, colors]) =>
-    colors.size === 1 ? [[name, [...colors][0]!] as const] : []));
-}
-
 /** Read XCAF instance labels and associate leaf component metadata with its exact solid. */
 function stepComponentMetadata(cad: OcctKernel, step: string) {
   const metadataBySolid = new Map<string, ComponentMetadata[]>();
   const document = cad.importXCAFFromSTEP(step);
   try {
-    let colorsByName = new Map<string, string>();
+    let colorsByName = new Map<string, { count: number; color?: string }>();
     try {
       colorsByName = componentColorsFromGlb(document.exportGLTF());
     } catch {
       // The XCAF label data remains usable when the optional color view cannot be exported.
     }
+    const leaves: { name: string; nameForOutput?: string; color?: string; solids: ShapeHandle[] }[] = [];
     const visit = (label: LabelTag, inheritedColor?: string) => {
       const info = document.getLabelInfo(label);
       const labelColor = info.hasColor ? colorHex(info.color) : undefined;
@@ -113,19 +54,36 @@ function stepComponentMetadata(cad: OcctKernel, step: string) {
         return;
       }
       if (info.isAssembly || !info.shapeHandle) return;
-      const color = inherited ?? (info.name ? colorsByName.get(info.name) : undefined);
       const solids = cad.getSubShapes(info.shapeHandle, "solid");
-      for (const solid of solids) {
+      const name = info.name.trim();
+      leaves.push({
+        name,
+        ...(name && !/^\d+$/.test(name) ? { nameForOutput: name } : {}),
+        ...(inherited ? { color: inherited } : {}),
+        solids,
+      });
+    };
+    for (const root of document.getRoots()) visit(root);
+
+    const leafCountByName = new Map<string, number>();
+    for (const leaf of leaves) {
+      if (leaf.name) leafCountByName.set(leaf.name, (leafCountByName.get(leaf.name) ?? 0) + 1);
+    }
+    for (const leaf of leaves) {
+      const glbCandidate = colorsByName.get(leaf.name);
+      const color = leaf.color ?? (leaf.name && leafCountByName.get(leaf.name) === 1 && glbCandidate?.count === 1
+        ? glbCandidate.color
+        : undefined);
+      for (const solid of leaf.solids) {
         const key = shapeKey(cad, solid);
         const metadata = metadataBySolid.get(key) ?? [];
         metadata.push({
-          ...(info.name.trim() && !/^\d+$/.test(info.name.trim()) ? { name: info.name.trim() } : {}),
+          ...(leaf.nameForOutput ? { name: leaf.nameForOutput } : {}),
           ...(color ? { color } : {}),
         });
         metadataBySolid.set(key, metadata);
       }
-    };
-    for (const root of document.getRoots()) visit(root);
+    }
   } finally {
     document.close();
   }
