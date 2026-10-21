@@ -92,10 +92,14 @@ import {
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
 
+const UNIQUE_CURVED_FACE_SURFACES = new Set(["cone", "sphere", "torus", "cylinder"]);
+
 /**
  * Carry face metadata across a parameter edit only when a face has a unique
- * surface-and-normal counterpart on both sides. This deliberately leaves
- * repeated coplanar or otherwise ambiguous faces unmatched.
+ * counterpart. Curved faces may change their sampled normal as their defining
+ * dimensions change, so a curved surface type can be a fallback identity only
+ * when it occurs exactly once before and after. Repeated faces remain
+ * unmatched rather than guessed.
  */
 async function preserveUnambiguousFaceMetadata(
   previous: WorkplaneShape,
@@ -118,13 +122,34 @@ async function preserveUnambiguousFaceMetadata(
     if (key) afterBySignature.set(key, [...(afterBySignature.get(key) ?? []), face]);
   }
 
-  const ids = after.map((face) => {
+  const beforeBySurface = new Map<string, ServerCadFace[]>();
+  const afterBySurface = new Map<string, ServerCadFace[]>();
+  for (const face of before) beforeBySurface.set(face.surfaceType, [...(beforeBySurface.get(face.surfaceType) ?? []), face]);
+  for (const face of after) afterBySurface.set(face.surfaceType, [...(afterBySurface.get(face.surfaceType) ?? []), face]);
+
+  const beforeForAfter = new Map<number, ServerCadFace>();
+  const matchedBefore = new Set<number>();
+  for (const face of after) {
     const key = signature(face);
     const oldMatches = key ? beforeBySignature.get(key) ?? [] : [];
     const newMatches = key ? afterBySignature.get(key) ?? [] : [];
-    if (oldMatches.length === 1 && newMatches.length === 1) return oldMatches[0]!.id;
-    return `face_${createLocalId(`${next.id}-${face.index}`)}`;
-  });
+    if (oldMatches.length === 1 && newMatches.length === 1) {
+      beforeForAfter.set(face.index, oldMatches[0]!);
+      matchedBefore.add(oldMatches[0]!.index);
+    }
+  }
+  for (const face of after) {
+    if (beforeForAfter.has(face.index) || !UNIQUE_CURVED_FACE_SURFACES.has(face.surfaceType)) continue;
+    const oldMatches = beforeBySurface.get(face.surfaceType) ?? [];
+    const newMatches = afterBySurface.get(face.surfaceType) ?? [];
+    if (oldMatches.length === 1 && newMatches.length === 1 && !matchedBefore.has(oldMatches[0]!.index)) {
+      beforeForAfter.set(face.index, oldMatches[0]!);
+      matchedBefore.add(oldMatches[0]!.index);
+    }
+  }
+
+  const ids = after.map((face) => beforeForAfter.get(face.index)?.id
+    ?? `face_${createLocalId(`${next.id}-${face.index}`)}`);
   const mappedColors: Record<string, string> = {};
   for (const [key, color] of Object.entries(previous.faceColors ?? {})) {
     const oldIndex = /^\d+$/.test(key) ? Number(key) : -1;
@@ -132,11 +157,8 @@ async function preserveUnambiguousFaceMetadata(
       ? before[oldIndex]
       : before.find((face) => face.id === key);
     if (!oldFace) continue;
-    const oldKey = signature(oldFace);
-    const oldMatches = oldKey ? beforeBySignature.get(oldKey) ?? [] : [];
-    const newMatches = oldKey ? afterBySignature.get(oldKey) ?? [] : [];
-    if (oldMatches.length !== 1 || newMatches.length !== 1) continue;
-    const matched = newMatches[0]!;
+    const matched = after.find((face) => beforeForAfter.get(face.index)?.index === oldFace.index);
+    if (!matched) continue;
     mappedColors[ids[matched.index]!] = color;
   }
   return canonicalizeShape({

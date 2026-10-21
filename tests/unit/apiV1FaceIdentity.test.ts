@@ -44,6 +44,16 @@ async function shape(projectId: string) {
   return payload.shapes[0]!.id;
 }
 
+async function cone(projectId: string) {
+  const response = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "cone", width: 40, depth: 40, height: 30, baseRadius: 20, topRadius: 8, name: "Taper" }),
+  }));
+  const payload = await response.json() as { shapes: Array<{ id: string }> };
+  expect(response.status).toBe(201);
+  return payload.shapes[0]!.id;
+}
+
 function faces(projectId: string, shapeId: string) {
   return listFaces(authorized(`/api/v1/faces?projectId=${projectId}&shapeId=${shapeId}`));
 }
@@ -136,6 +146,43 @@ describe("REST API v1 stable face identity", () => {
     expect(after.faces.some((face) => face.id === topFace!.id)).toBe(true);
     expect(edited.faceColors).toEqual({ [topFace!.id!]: RED });
     expect(edited.faceIds).toContain(topFace!.id);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps the unique conical side face ID and color when its taper changes", async () => {
+    const projectId = await project();
+    const shapeId = await cone(projectId);
+    const before = await (await faces(projectId, shapeId)).json() as {
+      faces: Array<{ id?: string; surfaceType: string; normal: { x: number; y: number; z: number } | null }>;
+    };
+    const side = before.faces.find((face) => face.surfaceType === "cone");
+    expect(side?.id).toBeTruthy();
+    expect(side?.normal).not.toBeNull();
+
+    const painted = await updateShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ faceColors: { [side!.id!]: RED } }),
+    }));
+    expect(painted.status).toBe(200);
+
+    const resized = await updateShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ topRadius: 2 }),
+    }));
+    expect(resized.status).toBe(200);
+
+    const after = await (await faces(projectId, shapeId)).json() as {
+      faces: Array<{ id?: string; surfaceType: string; normal: { x: number; y: number; z: number } | null }>;
+    };
+    const changedSide = after.faces.find((face) => face.surfaceType === "cone");
+    const saved = await (await listShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as {
+      shapes: Array<{ id: string; faceIds?: string[]; faceColors?: Record<string, string> }>;
+    };
+    const edited = saved.shapes.find((entry) => entry.id === shapeId)!;
+
+    expect(changedSide?.id).toBe(side!.id);
+    expect(changedSide?.normal?.y).not.toBeCloseTo(side!.normal!.y, 3);
+    expect(edited.faceIds).toContain(side!.id);
+    expect(edited.faceColors).toEqual({ [side!.id!]: RED });
   }, CAD_TEST_TIMEOUT_MS);
 
   it("returns contract-valid errors for missing or invalid target query values", async () => {

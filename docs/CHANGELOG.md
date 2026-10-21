@@ -6,10 +6,11 @@
   runtime validation for conditional edge and face indices and the exclusive
   angle result fields. The subset documents nine of 32 registered operations.
 - Shape parameter edits now keep face IDs and colors when a face has a unique
-  counterpart with the same surface type and outward normal. Ambiguous faces
-  receive fresh IDs without inherited colors. 3MF export now converts OCCT face
-  group index ranges to triangle ranges correctly, so color assignments on any
-  face are attached to their triangles.
+  counterpart with the same surface type and outward normal. A uniquely
+  occurring cone, sphere, torus, or cylinder surface also retains identity when
+  its sampled normal changes; repeated curved surfaces remain unmatched.
+- 3MF export converts OCCT face group index ranges to triangle ranges correctly,
+  so color assignments on any face are attached to their triangles.
 - The REST API and TypeScript/Python clients can create sketch sweeps from closed section paths and one open spine. `PATCH /shapes` accepts a replacement `sketchProfile` and rebuilds the OCCT solid while preserving output/source identities and resize ratios. Face colors are cleared and face IDs regenerated for the new topology.
 - The documentation site renders ```mermaid fences as diagrams, so documentation no longer has to fall back to ASCII art. The diagram source stays committed markdown, which keeps it reviewable and diffable. The documentation suite plan carries the first one: the ordered docs:check -> docs:generate -> build -> deploy pipeline. Node labels are pinned to the line box mermaid measures with, because the site's wider paragraph line height otherwise pushes the last line of a multi-line label past the node border.
 
