@@ -262,7 +262,8 @@ describe("local MCP engine mode", () => {
 
     const tools = listMcpTools(projectsDir);
     const listEditors = tools.find((tool: { name: string }) => tool.name === "sketchforge_list_editors");
-    expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_export_scene").inputSchema.properties.format.enum).toContain("svg");
+    expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_export_scene").inputSchema.properties.format.enum).toContain("dxf");
+    expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_export_scene").inputSchema.properties.section.required).toEqual(["plane", "offset"]);
     const projectView = tools.find((tool: { name: string }) => tool.name === "sketchforge_project_view");
     expect(projectView.inputSchema.properties.view.enum).toEqual(["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]);
     const sectionView = tools.find((tool: { name: string }) => tool.name === "sketchforge_section_view");

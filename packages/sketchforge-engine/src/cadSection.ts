@@ -38,3 +38,14 @@ export function renderSectionSvg(drawing: SectionDrawing, bounds: { minU: number
   if (!d) throw new Error("The section plane produced no contours.");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${round(width)}mm" height="${round(height)}mm" viewBox="${round(minU)} ${round(minV)} ${round(width)} ${round(height)}" data-plane="${drawing.plane}" data-offset="${round(drawing.offset)}"><g transform="scale(1 -1)"><path d="${escapeXml(d)}" fill="none" stroke="#111111" stroke-width="0.2" stroke-linejoin="round" stroke-linecap="round"/></g></svg>`;
 }
+
+/** Serialize sampled section contours as millimetre-space DXF polylines. */
+export function renderSectionDxf(drawing: SectionDrawing) {
+  const lines = ["0", "SECTION", "2", "ENTITIES"];
+  for (const contour of drawing.contours) {
+    lines.push("0", "LWPOLYLINE", "100", "AcDbEntity", "8", "0", "100", "AcDbPolyline", "90", String(contour.length / 2), "70", "0");
+    for (let i = 0; i + 1 < contour.length; i += 2) lines.push("10", String(contour[i]), "20", String(contour[i + 1]), "30", "0");
+  }
+  lines.push("0", "ENDSEC", "0", "EOF");
+  return lines.join("\n") + "\n";
+}

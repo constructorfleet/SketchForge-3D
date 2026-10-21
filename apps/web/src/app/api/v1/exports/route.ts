@@ -31,8 +31,8 @@ export async function POST(request: Request) {
   if (body.view !== undefined && body.format !== "svg") {
     return apiError("view only applies to the svg format.", 400, "invalid_request");
   }
-  if (body.section !== undefined && body.format !== "svg") {
-    return apiError("section only applies to the svg format.", 400, "invalid_request");
+  if (body.section !== undefined && body.format !== "svg" && body.format !== "dxf") {
+    return apiError("section only applies to svg and dxf formats.", 400, "invalid_request");
   }
   let section: { plane: SectionPlane; offset: number } | undefined;
   if (body.section !== undefined) {

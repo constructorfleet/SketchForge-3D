@@ -3,12 +3,12 @@ import { meshProjectShapes } from "./projectMeshes.js";
 import { exportShapesToStep } from "./stepExport.js";
 import { exportSkfProject } from "./skfProject.js";
 import { projectShapesToSvg } from "./serverCadProjection.js";
-import { sectionShapesToSvg, type SectionOptions } from "./serverCadSection.js";
+import { sectionShapesToDxf, sectionShapesToSvg, type SectionOptions } from "./serverCadSection.js";
 import type { ProjectionLayout } from "./cadProjection.js";
 import type { ProjectDocument } from "./serverProjectDocument.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
-export const PROJECT_EXPORT_FORMATS = ["stl", "obj", "3mf", "step", "skf", "zip", "svg"] as const;
+export const PROJECT_EXPORT_FORMATS = ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] as const;
 export type ProjectExportFormat = (typeof PROJECT_EXPORT_FORMATS)[number];
 
 export type ProjectExportArtifact = {
@@ -98,7 +98,7 @@ export type ProjectExportOptions = {
    * it there rather than ignoring it.
    */
   view?: ProjectionLayout;
-  /** Section contours for a named drawing-coordinate plane; SVG only. */
+  /** Section contours for a named drawing-coordinate plane; SVG or DXF. */
   section?: SectionOptions;
 };
 
@@ -110,7 +110,7 @@ export async function exportProjectScene(
   const shapes = document.shapes.filter((shape) => !requested || requested.has(shape.id));
   const baseName = (options.name?.trim() || document.projectName || "SketchForge project").replace(/[\\/:*?\"<>|]/g, "_");
   const format = options.format;
-  if (options.section && format !== "svg") throw new Error("section only applies to the svg format.");
+  if (options.section && format !== "svg" && format !== "dxf") throw new Error("section only applies to svg and dxf formats.");
   if (options.section && options.view !== undefined) throw new Error("section and view cannot be used together.");
 
   if (format === "skf") {
@@ -125,11 +125,15 @@ export async function exportProjectScene(
 
   const visible: WorkplaneShape[] = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
   if (!visible.length) throw new Error("No visible solid objects to export.");
-  if (format === "svg") {
+  if (format === "svg" || format === "dxf") {
     if (options.section) {
-      const svg = await sectionShapesToSvg(visible, options.section);
-      return { format, filename: `${baseName}.svg`, mimeType: "image/svg+xml", data: new TextEncoder().encode(svg), shapeCount: visible.length };
+      const output = format === "svg"
+        ? await sectionShapesToSvg(visible, options.section)
+        : await sectionShapesToDxf(visible, options.section);
+      const mimeType = format === "svg" ? "image/svg+xml" : "application/dxf";
+      return { format, filename: `${baseName}.${format}`, mimeType, data: new TextEncoder().encode(output), shapeCount: visible.length };
     }
+    if (format === "dxf") throw new Error("A section plane is required for DXF export.");
     // Drawn from the exact solids by hidden-line removal, not from the meshes
     // below: a projected circle stays a circle.
     const svg = await projectShapesToSvg(visible, { view: options.view });

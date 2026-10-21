@@ -358,8 +358,8 @@ const tools = [
   },
   {
     name: "sketchforge_export_scene",
-    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, or an SVG drawing. Set outputPath to save directly on the MCP host and avoid returning large base64 data. Use shapeIds to keep a reference mesh out of mesh exports. An svg export is drawn on the server from the exact geometry and needs projectId; view picks one of its views or the multiview grid.",
-    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip", "svg"] }, view: { type: "string", enum: PROJECTION_LAYOUTS, description: "For svg only: one named view, or the multiview grid (default)." }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings, or section DXF. DXF needs section {plane, offset}. Set outputPath to save directly on the MCP host.",
+    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] }, view: { type: "string", enum: PROJECTION_LAYOUTS, description: "For svg only: one named view, or the multiview grid (default)." }, section: { type: "object", description: "For svg or dxf section export.", properties: { plane: { type: "string", enum: ["xy", "xz", "yz"] }, offset: { type: "number" } }, required: ["plane", "offset"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
   },
   {
     name: "sketchforge_project_view",
@@ -478,6 +478,11 @@ const tools = [
         shapeId: { type: "string", description: "The shape id." },
       },
     },
+  },
+  {
+    name: "sketchforge_estimate_wall_thickness",
+    description: "Estimate wall thickness from a 5 by 5 UV sample grid on each face. This is a screening estimate and may miss thin regions between samples; it is not a certified minimum-thickness result.",
+    inputSchema: { type: "object", required: ["projectId", "shapeId"], properties: { url: { type: "string" }, projectId: { type: "string" }, shapeId: { type: "string" } } },
   },
   {
     name: "sketchforge_hollow_shape",
@@ -637,6 +642,8 @@ async function callRemoteTool(name, args, baseUrl) {
       return restRequest("GET", "/measurements", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_shape_properties":
       return restRequest("GET", "/properties", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
+    case "sketchforge_estimate_wall_thickness":
+      return restRequest("GET", "/thickness", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_measure_between":
       return restRequest("POST", "/measurements", {
         query: { projectId: args.projectId },
@@ -699,12 +706,13 @@ async function callRemoteTool(name, args, baseUrl) {
     case "sketchforge_export_scene": {
       // An SVG is drawn on the server from the stored project; the editor
       // bridge has no such export, so this one takes the REST path.
-      const artifact = args.format === "svg"
+      const artifact = args.format === "svg" || args.format === "dxf"
         ? await restRequest("POST", "/exports", {
           query: { projectId: args.projectId },
           body: {
-            format: "svg",
+            format: args.format,
             ...(args.view === undefined ? {} : { view: args.view }),
+            ...(args.section === undefined ? {} : { section: args.section }),
             ...(args.shapeIds === undefined ? {} : { shapeIds: args.shapeIds }),
             ...(args.name === undefined ? {} : { name: args.name }),
           },
