@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, Layers, LockKeyhole, LockKeyholeOpen, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, Layers, LockKeyhole, LockKeyholeOpen, Pencil, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslations } from "@/i18n";
 import { sceneRows, sceneSummary } from "@/lib/sceneTree";
+import { normalizeRenamedShapeName } from "@/lib/shapeName";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -13,6 +14,7 @@ export type SceneInspectorProps = {
   onSelectRow: (id: string, additive: boolean) => void;
   onToggleHidden: (id: string, hidden: boolean) => void;
   onToggleLocked: (id: string, locked: boolean) => void;
+  onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onGroup: () => void;
   onUngroup: () => void;
@@ -28,6 +30,7 @@ export function SceneInspector({
   onSelectRow,
   onToggleHidden,
   onToggleLocked,
+  onRename,
   onDelete,
   onGroup,
   onUngroup,
@@ -39,6 +42,8 @@ export function SceneInspector({
   const t = useTranslations();
   const [filter, setFilter] = useState("");
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
 
   const rows = useMemo(
     () => sceneRows(shapes, { expandedIds, filter }),
@@ -53,6 +58,17 @@ export function SceneInspector({
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const beginRename = (id: string, name: string) => {
+    setEditingId(id);
+    setDraftName(name);
+  };
+
+  const finishRename = (id: string, currentName: string) => {
+    const nextName = normalizeRenamedShapeName(currentName, draftName);
+    setEditingId(null);
+    if (nextName) onRename(id, nextName);
   };
 
   return (
@@ -125,7 +141,24 @@ export function SceneInspector({
 
                 <span className="scene-row-swatch" style={{ background: row.color }} aria-hidden="true" />
 
-                {row.actionable ? (
+                {editingId === row.id ? (
+                  <input
+                    autoFocus
+                    className="scene-row-rename-input"
+                    aria-label={t("panels.scene.renameInput", { name })}
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        finishRename(row.id, row.name);
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        setEditingId(null);
+                      }
+                    }}
+                  />
+                ) : row.actionable ? (
                   <button
                     type="button"
                     className="scene-row-name"
@@ -145,6 +178,17 @@ export function SceneInspector({
 
                 {row.actionable ? (
                   <span className="scene-row-controls">
+                    {editingId === row.id ? (
+                      <>
+                        <button type="button" aria-label={t("panels.scene.saveName", { name })} onClick={() => finishRename(row.id, row.name)}>
+                          <Check size={15} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                        <button type="button" aria-label={t("panels.scene.cancelRename", { name })} onClick={() => setEditingId(null)}>
+                          <X size={15} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
                     <button
                       type="button"
                       className={row.hidden ? "active" : ""}
@@ -169,6 +213,13 @@ export function SceneInspector({
                     </button>
                     <button
                       type="button"
+                      aria-label={t("panels.scene.rename", { name })}
+                      onClick={() => beginRename(row.id, row.name)}
+                    >
+                      <Pencil size={14} strokeWidth={2.2} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
                       className="scene-row-delete"
                       aria-label={t("panels.scene.delete", { name })}
                       disabled={row.locked}
@@ -176,6 +227,8 @@ export function SceneInspector({
                     >
                       <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
                     </button>
+                      </>
+                    )}
                   </span>
                 ) : null}
               </li>

@@ -47,6 +47,11 @@ describe("sceneRows", () => {
     expect(rows.find((row) => row.id === "a")?.actionable).toBe(false);
   });
 
+  it("keeps top-level groups actionable so their names can be edited", () => {
+    const group = shape("group", { name: "Assembly", groupedShapes: [shape("a")] });
+    expect(sceneRows([group])[0]).toMatchObject({ id: "group", name: "Assembly", actionable: true, childCount: 1 });
+  });
+
   it("carries the flags the list renders", () => {
     const rows = sceneRows([shape("s", { hidden: true, locked: true, hole: true })]);
     expect(rows[0]).toMatchObject({ hidden: true, locked: true, hole: true, childCount: 0 });
