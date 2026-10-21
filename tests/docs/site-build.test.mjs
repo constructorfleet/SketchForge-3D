@@ -105,13 +105,14 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Broader task-oriented workflows, complete REST contracts/i);
   assert.match(spec, /Publishing-client version — closed/i);
   assert.match(spec, /Cross-links between documentation and references — closed/i);
-  assert.match(spec, /Engine package documentation — partial/i);
-  assert.match(spec, /README's Node\.js 20 claim conflicts with locked `brepjs`'s Node 24 minimum/i);
+  assert.match(spec, /Engine package documentation — in progress/i);
+  assert.match(spec, /PR \[#216\][\s\S]*Node\.js 24/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
   assert.match(spec, /fifteen of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /A further stacked OpenAPI coverage slice is in progress/i);
-  assert.match(spec, /Open PR \[#214\][\s\S]*?does not automatically repair stale outputs on `main`/i);
+  assert.match(spec, /creates or refreshes a bot repair PR if tracked outputs differ/i);
+  assert.doesNotMatch(spec, /Open PR \[#209\]|Open PR \[#214\]/i);
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
 

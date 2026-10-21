@@ -72,10 +72,12 @@ open.
 
 `PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep,
 targeted by either its output shape ID or persisted `sketchSourceId`, and
-rebuilds the solid while preserving shape and source IDs. The operation is
-still omitted from OpenAPI because the combined custom face-color and profile
-validation is not fully represented there. Sweep source persistence and
-editing work, but downstream dependency-ordered recomputation is not available.
+rebuilds the solid while preserving shape and source IDs. Editing a
+sketch-backed sweep also recomputes retained boolean descendants bottom-up and
+persists the result atomically. Other downstream operation types remain
+unsupported. The sweep-profile operation is still omitted from OpenAPI because
+the combined custom face-color and profile validation is not fully represented
+there.
 See the [REST API guide](./REST_API.md#sketch-sweeps) and the
 [kernel capability inventory](./UNEXPLORED_KERNEL_CAPABILITIES.md).
 
