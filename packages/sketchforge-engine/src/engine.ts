@@ -706,6 +706,12 @@ export function createEngine(store: ProjectStore): Engine {
       // new width is one call rather than two.
       if (existing.locked && changes.locked !== false) return failed({ reason: "shape_locked", ids: [shapeId] });
 
+      const replacingSketchProfile = changes.sketchProfile !== undefined;
+      const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
+      if (replacingSketchProfile && !isSketchSweep) {
+        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
+      }
+
       const sweptShape = isRevolveShape(existing);
       const misplaced = REVOLVE_ONLY_FIELDS.filter((field) => changes[field] !== undefined);
       if (!sweptShape && misplaced.length > 0) {
@@ -717,6 +723,46 @@ export function createEngine(store: ProjectStore): Engine {
       // leave a thread's pitch readable but not writable.
       const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => changes[field] !== undefined) : [];
       let swept = existing;
+      if (replacingSketchProfile && isSketchSweep) {
+        const invalidProfile = invalidSketchSweepProfile(changes.sketchProfile);
+        if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
+        const frame = existing.cadBrepFrame;
+        try {
+          const rebuilt = await sketchSweepShapeFromRequest({
+            id: existing.id,
+            name: existing.name,
+            color: existing.color,
+            hole: existing.hole,
+            profile: changes.sketchProfile,
+            x: existing.x - (frame?.x ?? 0),
+            z: existing.z - (frame?.z ?? 0),
+            elevation: (existing.elevation ?? 0) - (frame?.elevation ?? 0),
+            rotation: existing.rotation,
+            rotationX: existing.rotationX,
+            rotationZ: existing.rotationZ,
+          });
+          const {
+            faceIds: _faceIds,
+            faceColors: _faceColors,
+            edgeTreatments: _edgeTreatments,
+            edgeTreatmentHistory: _edgeTreatmentHistory,
+            cadDisplayEdges: _cadDisplayEdges,
+            cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
+            ...sourceMetadata
+          } = existing;
+          swept = {
+            ...sourceMetadata,
+            ...rebuilt,
+            id: existing.id,
+            sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+          };
+        } catch (error) {
+          return failed({
+            reason: "sweep_failed",
+            message: error instanceof Error ? error.message : "The sketch sweep could not be rebuilt",
+          });
+        }
+      }
       if (revolveChanges.length > 0 && sweptShape) {
         const outline = changes.profile ?? changes.outline ?? outlineFromProfile(existing.sketchProfile!);
         if (!outline) {
@@ -745,7 +791,10 @@ export function createEngine(store: ProjectStore): Engine {
 
       // The sweep's own fields are already applied, so they are kept out of the
       // per-kind pass -- which would refuse them, the stored kind being `mesh`.
-      const sweepFields: readonly string[] = sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS;
+      const sweepFields: readonly string[] = [
+        ...(sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS),
+        "sketchProfile",
+      ];
       // Shape summaries expose the source ID for identity; echoing a full
       // summary into PATCH must not let callers replace that identity.
       let requestedChanges = Object.fromEntries(

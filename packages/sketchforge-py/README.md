@@ -170,6 +170,21 @@ project.add_many([
 
 `create_many` is one write of the project package per request and splits lists longer than the server's 200-shape limit -- which also means a longer list is no longer atomic.
 
+To edit a retained sweep, use the profile returned as `shape.sketch_profile`; `as_patch` carries it back under the API's `sketchProfile` wire name:
+
+```python
+sweep = client.shapes.create(project_id, {"kind": "sketchSweep", "profile": profile})
+assert sweep.sketch_profile is not None
+edited = {
+    **sweep.sketch_profile,
+    "points": [
+        {**point, "x": point["x"] * 1.1} if point.get("sweepRole") == "section" else point
+        for point in sweep.sketch_profile["points"]
+    ],
+}
+client.shapes.update(project_id, sweep.id, sweep.as_patch(sketchProfile=edited))
+```
+
 Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 `sketchforge3d.layout` has the arithmetic a parameterised part repeats: `row`, `grid`, `ring`, `centered_offsets`, `angle_of`, `mm`.

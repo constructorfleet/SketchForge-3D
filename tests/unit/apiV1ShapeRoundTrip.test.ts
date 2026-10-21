@@ -134,6 +134,64 @@ describe("REST API shape round trip", () => {
     expect(changed.payload.shape?.sketchSourceId).toBe(`sketch/${sweep.id}`);
   });
 
+  it("rebuilds a sketch sweep from an edited profile and preserves its identities and placement", async () => {
+    const projectId = await makeProject();
+    const profile = {
+      points: [
+        { id: "a", x: -1, z: -1, sweepRole: "section" }, { id: "b", x: 1, z: -1, sweepRole: "section" },
+        { id: "c", x: 1, z: 1, sweepRole: "section" }, { id: "d", x: -1, z: 1, sweepRole: "section" },
+        { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        { id: "spine", startId: "p0", endId: "p1" },
+      ],
+    };
+    const sweep = await addShape(projectId, { kind: "sketchSweep", name: "Edited duct", profile, x: 12, z: -4, elevation: 7 });
+    const widerProfile = {
+      ...profile,
+      points: profile.points.map((point) => point.sweepRole === "section" ? { ...point, x: point.x * 2 } : point),
+    };
+
+    const changed = await patch(projectId, sweep.id, { sketchProfile: widerProfile });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape).toMatchObject({
+      id: sweep.id, sketchSourceId: sweep.sketchSourceId, sketchOperation: "sweep", sketchProfile: widerProfile,
+      name: "Edited duct", x: 12, z: -4, elevation: 7,
+    });
+    expect(changed.payload.shape!.width as number).toBeGreaterThan(sweep.width as number);
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(widerProfile);
+  });
+
+  it("validates replacement sweep profiles and refuses them on other shapes", async () => {
+    const projectId = await makeProject();
+    const box = await addShape(projectId, { kind: "box" });
+    const refused = await patch(projectId, box.id, { sketchProfile: { points: [], segments: [] } });
+    expect(refused.status).toBe(422);
+    expect(refused.payload).toMatchObject({ code: "unapplicable_fields", fields: ["sketchProfile"] });
+
+    const sweep = await addShape(projectId, {
+      kind: "sketchSweep",
+      profile: {
+        points: [
+          { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 }, { id: "c", x: 1, z: 1 },
+          { id: "d", x: -1, z: 1 }, { id: "p0", x: 0, z: 0 }, { id: "p1", x: 10, z: 0 },
+        ],
+        segments: [
+          { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+          { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          { id: "spine", startId: "p0", endId: "p1" },
+        ],
+      },
+    });
+    const invalid = await patch(projectId, sweep.id, { sketchProfile: { points: [], segments: [] } });
+    expect(invalid.status).toBe(400);
+    expect(invalid.payload.code).toBe("invalid_request");
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(sweep.sketchProfile);
+  });
+
   it("reports a thread's sweep and the outline it ran round", async () => {
     const projectId = await makeProject();
     const thread = await addShape(projectId, { kind: "thread", size: "M8", turns: 3 });

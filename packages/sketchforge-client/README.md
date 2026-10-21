@@ -154,6 +154,19 @@ await project.addMany([
 
 `addMany` is one write of the project package per request and splits lists longer than the server's 200-shape limit -- which also means a longer list is no longer atomic.
 
+For a retained sketch sweep, replace `sketchProfile` to rebuild the solid while keeping the same shape and source-sketch IDs:
+
+```ts
+const sweep = await client.shapes.create(projectId, { kind: "sketchSweep", profile });
+const widerProfile = {
+  ...sweep.sketchProfile!,
+  points: sweep.sketchProfile!.points.map((point) =>
+    point.sweepRole === "section" ? { ...point, x: point.x * 1.1 } : point,
+  ),
+};
+await client.shapes.update(projectId, sweep.id, { sketchProfile: widerProfile });
+```
+
 Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`) or `SketchForgeTransportError`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 ## Macros

@@ -213,6 +213,16 @@ class ShapesTests(unittest.TestCase):
         self.assertEqual(result.sketch_operation, "sweep")
         self.assertEqual(opener.calls[0].body, {"kind": "sketchSweep", "profile": profile})
 
+    def test_updates_a_sweep_profile_with_the_wire_field(self) -> None:
+        profile = {
+            "points": [{"id": "a", "x": 0, "z": 0}],
+            "segments": [{"id": "edge", "startId": "a", "endId": "a"}],
+        }
+        opener = FakeOpener((200, {"shape": shape_payload(sketchOperation="sweep", sketchProfile=profile), "revision": 5}))
+        client(opener).shapes.update("p1", "s1", {"sketchProfile": profile})
+        self.assertEqual(opener.calls[0].method, "PATCH")
+        self.assertEqual(opener.calls[0].body, {"sketchProfile": profile})
+
     def test_sends_a_batch_as_one_request(self) -> None:
         opener = FakeOpener((201, {"shapes": [shape_payload()], "revision": 3}))
         client(opener).shapes.create_many("p1", [{"kind": "box"}] * 5)
@@ -882,6 +892,11 @@ class ShapeSummaryTests(unittest.TestCase):
         patch = summary.as_patch()
         for field in ("id", "kind", "requestKind", "sketchOperation", "groupedCount"):
             self.assertNotIn(field, patch)
+
+    def test_as_patch_keeps_the_editable_sweep_profile(self) -> None:
+        profile = {"points": [{"id": "a", "x": 0, "z": 0}], "segments": []}
+        summary = ShapeSummary.from_payload(shape_payload(sketchOperation="sweep", sketchProfile=profile))
+        self.assertEqual(summary.as_patch()["sketchProfile"], profile)
 
 
 class ErrorCodeTests(unittest.TestCase):
