@@ -780,7 +780,10 @@
         "title": "Aperçu 3D",
         "empty": "Dessinez un profil fermé à gauche de l’axe"
       },
-      "sweepHelp": "Dessinez exactement une section fermée et un chemin plan ouvert. Gardez le premier point du chemin près de l’origine de la section ; le balayage oriente la section perpendiculairement à la direction initiale."
+      "sweepHelp": "Dessinez exactement une section fermée et un chemin plan ouvert. Gardez le premier point du chemin près de l’origine de la section.",
+      "sweepSectionLabel": "Section",
+      "sweepSpineLabel": "Trajectoire",
+      "sweepPlaneHint": "Cette esquisse les montre dans le même plan ; la section finale est orientée perpendiculairement à la direction initiale de la trajectoire."
     }
   },
   "panels": {

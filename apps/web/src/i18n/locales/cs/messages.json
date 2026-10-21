@@ -780,7 +780,10 @@
         "title": "3D náhled",
         "empty": "Nakreslete uzavřený profil vlevo od osy"
       },
-      "sweepHelp": "Nakreslete přesně jednu uzavřenou oblast a jednu otevřenou rovinnou dráhu. První bod dráhy umístěte blízko počátku profilu; tažení orientuje profil kolmo k počátečnímu směru dráhy."
+      "sweepHelp": "Nakreslete přesně jednu uzavřenou oblast a jednu otevřenou rovinnou dráhu. První bod dráhy umístěte blízko počátku profilu.",
+      "sweepSectionLabel": "Průřez",
+      "sweepSpineLabel": "Dráha",
+      "sweepPlaneHint": "V náčrtu jsou obě křivky ve stejné rovině; při vytvoření se průřez natočí kolmo k počátečnímu směru dráhy."
     }
   },
   "panels": {

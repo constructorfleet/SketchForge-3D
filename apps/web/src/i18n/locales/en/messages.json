@@ -878,7 +878,10 @@
         "title": "3D preview",
         "empty": "Draw a closed profile left of the axis"
       },
-      "sweepHelp": "Draw exactly one closed section loop and one open planar spine. Keep the spine's first point near the section origin; the sweep orients the section perpendicular to the spine's initial direction."
+      "sweepHelp": "Draw exactly one closed section loop and one open planar spine. Keep the spine's first point near the section origin.",
+      "sweepSectionLabel": "Section",
+      "sweepSpineLabel": "Spine",
+      "sweepPlaneHint": "Both are shown in one sketch plane; the finished section is oriented perpendicular to the spine's initial direction."
     }
   },
   "panels": {

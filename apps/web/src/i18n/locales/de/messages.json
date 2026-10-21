@@ -780,7 +780,10 @@
         "title": "3D-Vorschau",
         "empty": "Zeichnen Sie links von der Achse ein geschlossenes Profil"
       },
-      "sweepHelp": "Zeichne genau eine geschlossene Kontur und einen offenen ebenen Pfad. Halte den ersten Pfadpunkt nahe am Ursprung des Querschnitts; der Sweep richtet den Querschnitt senkrecht zur anfänglichen Pfadrichtung aus."
+      "sweepHelp": "Zeichne genau eine geschlossene Kontur und einen offenen ebenen Pfad. Halte den ersten Pfadpunkt nahe am Ursprung des Querschnitts.",
+      "sweepSectionLabel": "Querschnitt",
+      "sweepSpineLabel": "Pfad",
+      "sweepPlaneHint": "In dieser Skizze liegen beide in einer Ebene; der fertige Querschnitt wird senkrecht zur anfänglichen Pfadrichtung ausgerichtet."
     }
   },
   "panels": {

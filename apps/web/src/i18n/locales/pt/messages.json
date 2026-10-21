@@ -780,7 +780,10 @@
         "title": "Pré-visualização 3D",
         "empty": "Desenhe um perfil fechado à esquerda do eixo"
       },
-      "sweepHelp": "Desenhe exatamente uma seção fechada e um caminho plano aberto. Mantenha o primeiro ponto do caminho perto da origem da seção; a varredura orienta a seção perpendicularmente à direção inicial."
+      "sweepHelp": "Desenhe exatamente uma seção fechada e um caminho plano aberto. Mantenha o primeiro ponto do caminho perto da origem da seção.",
+      "sweepSectionLabel": "Seção",
+      "sweepSpineLabel": "Trajetória",
+      "sweepPlaneHint": "Este esboço mostra ambos no mesmo plano; a seção final fica perpendicular à direção inicial da trajetória."
     }
   },
   "panels": {

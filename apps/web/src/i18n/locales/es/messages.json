@@ -780,7 +780,10 @@
         "title": "Vista previa 3D",
         "empty": "Dibuja un perfil cerrado a la izquierda del eje"
       },
-      "sweepHelp": "Dibuja exactamente un contorno cerrado y una trayectoria plana abierta. Mantén el primer punto de la trayectoria cerca del origen de la sección; el barrido orienta la sección perpendicularmente a la dirección inicial."
+      "sweepHelp": "Dibuja exactamente un contorno cerrado y una trayectoria plana abierta. Mantén el primer punto de la trayectoria cerca del origen de la sección.",
+      "sweepSectionLabel": "Sección",
+      "sweepSpineLabel": "Trayectoria",
+      "sweepPlaneHint": "En este boceto aparecen en un mismo plano; la sección terminada se orienta perpendicular a la dirección inicial de la trayectoria."
     }
   },
   "panels": {

@@ -780,7 +780,10 @@
         "title": "Podgląd 3D",
         "empty": "Narysuj zamknięty profil po lewej stronie osi"
       },
-      "sweepHelp": "Narysuj dokładnie jeden zamknięty przekrój i jedną otwartą płaską ścieżkę. Pierwszy punkt ścieżki umieść blisko początku przekroju; przekrój zostanie ustawiony prostopadle do początkowego kierunku ścieżki."
+      "sweepHelp": "Narysuj dokładnie jeden zamknięty przekrój i jedną otwartą płaską ścieżkę. Pierwszy punkt ścieżki umieść blisko początku przekroju.",
+      "sweepSectionLabel": "Przekrój",
+      "sweepSpineLabel": "Ścieżka",
+      "sweepPlaneHint": "Na szkicu oba elementy leżą w jednej płaszczyźnie; gotowy przekrój zostanie ustawiony prostopadle do początkowego kierunku ścieżki."
     }
   },
   "panels": {

@@ -8,6 +8,7 @@ import { notice, unitLabel, useTranslations, type Notice } from "@/i18n";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
+import { sketchSweepGuideRoles } from "@/lib/sketchSweepGuides";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { mirrorSign, resizedImportedMeshPositions } from "@/lib/engine/workplaneShapes";
@@ -585,6 +586,7 @@ export function SketchWorkspace({
   }, [pointerAction, profile.images]);
   const pointById = useMemo(() => new Map(displayProfile.points.map((point) => [point.id, point])), [displayProfile.points]);
   const paths = useMemo(() => orderedPaths(displayProfile), [displayProfile]);
+  const sweepRoles = useMemo(() => sketchSweepGuideRoles(paths, operation), [operation, paths]);
   const activePoint = activePointId ? pointById.get(activePointId) ?? null : null;
   const selectedPoint = selected?.kind === "point" ? pointById.get(selected.id) ?? null : null;
   const selectedImage = selected?.kind === "image" ? displayImages.find((image) => image.id === selected.id) ?? null : null;
@@ -797,8 +799,13 @@ export function SketchWorkspace({
     <main className="sketch-workspace-stage">
       <div className="sketch-mode-badge">{operation === "revolve" ? t("workspace.sketch.badge.revolve") : operation === "sweep" ? t("workspace.sketch.badge.sweep") : t("workspace.sketch.badge.extrude")}</div>
       {operation === "sweep" ? (
-        <div role="note" className="sketch-mode-badge" style={{ top: 36, maxWidth: "min(92vw, 540px)", whiteSpace: "normal", textAlign: "center", borderRadius: 8 }}>
-          {t("workspace.sketch.sweepHelp")}
+        <div role="note" className="sketch-mode-badge sketch-sweep-guide">
+          <span>{t("workspace.sketch.sweepHelp")}</span>
+          <div className="sketch-sweep-legend">
+            <span><i className="section" />{t("workspace.sketch.sweepSectionLabel")}</span>
+            <span><i className="spine" />{t("workspace.sketch.sweepSpineLabel")}</span>
+          </div>
+          <span className="sketch-sweep-plane-hint">{t("workspace.sketch.sweepPlaneHint")}</span>
         </div>
       ) : null}
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
@@ -810,7 +817,7 @@ export function SketchWorkspace({
       <section className="sketch-plate-wrap" aria-label={t("workspace.sketch.plate")}>
         <svg
           ref={svgRef}
-          className={`sketch-plate tool-${tool} ${pointerAction?.kind === "pan" ? "panning" : ""}`}
+          className={`sketch-plate tool-${tool} ${operation === "sweep" ? "operation-sweep" : ""} ${pointerAction?.kind === "pan" ? "panning" : ""}`}
           viewBox={`${pan.x - width / 2} ${pan.z - depth / 2} ${width} ${depth}`}
           preserveAspectRatio="xMidYMid meet"
           onPointerDownCapture={handlePanPointerDownCapture}
@@ -927,7 +934,8 @@ export function SketchWorkspace({
             {displayProfile.segments.map((segment) => (
               <path
                 data-sketch-entity="segment"
-                className={isSegmentSelected(segment.id) ? "selected" : ""}
+                data-sweep-role={sweepRoles.segmentRoles.get(segment.id)}
+                className={`${isSegmentSelected(segment.id) ? "selected" : ""} ${sweepRoles.segmentRoles.has(segment.id) ? `sweep-${sweepRoles.segmentRoles.get(segment.id)}` : ""}`}
                 key={segment.id}
                 d={segmentData(segment, pointById)}
                 onPointerMove={(event) => {
@@ -1105,7 +1113,8 @@ export function SketchWorkspace({
             {displayProfile.points.map((point) => (
               <circle
                 data-sketch-entity="point"
-                className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""}`}
+                data-sweep-role={sweepRoles.pointRoles.get(point.id)}
+                className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""} ${sweepRoles.pointRoles.has(point.id) ? `sweep-${sweepRoles.pointRoles.get(point.id)}` : ""}`}
                 key={point.id}
                 cx={point.x}
                 cy={point.z}

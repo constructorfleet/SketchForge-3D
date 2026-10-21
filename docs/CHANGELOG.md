@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide clarifies that the 2D construction shares a sketch plane while the generated section is oriented perpendicular to the spine's initial direction.
+
 - The Sketch workspace can sweep one closed section loop along one open planar spine. The section is placed at the spine's first point and oriented perpendicular to its initial direction; line and cubic Bezier paths use OCCT rounded-corner transitions. The editor retains the sketch profile for reopening and editing, while the generated solid is baked rather than kept as an editable feature-history node. Multiple section loops and arbitrary 3D spines are not supported.
 
 - The viewport remembers its last settled camera position, target, and zoom in the project workspace, so reopening a design returns to the view you were using. Camera movement is saved after orbiting, panning, or zooming settles; older projects without a saved view still open at the usual home view.
