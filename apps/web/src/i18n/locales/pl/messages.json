@@ -785,7 +785,7 @@
       "sweepSpineLabel": "Ścieżka",
       "sweepPlaneHint": "Narysuj przekrój na wybranej płaszczyźnie roboczej, a potem przejdź do wyprowadzonej z niej płaszczyzny ortogonalnej, aby narysować ścieżkę. Gotowy przekrój jest ustawiany prostopadle do początkowego kierunku ścieżki.",
       "sweepSectionStage": "Etap 1 z 2 · Przekrój na wybranej płaszczyźnie",
-      "sweepSectionHelp": "Narysuj i zamknij przekrój wyśrodkowany w początku układu (0,0) wybranej płaszczyzny. Następnie widok przełączy się na wyprowadzoną z niej płaszczyznę ortogonalną ścieżki.",
+      "sweepSectionHelp": "Narysuj i zamknij co najmniej jeden przekrój ze środkiem w początku układu (0,0) wybranej płaszczyzny. Po każdym zamknięciu widok przełącza się na prostopadłą płaszczyznę ścieżki. Wróć do płaszczyzny przekroju, aby dodać kolejne, a po zakończeniu przełącz się na płaszczyznę ścieżki.",
       "sweepSpineStage": "Etap 2 z 2 · Ścieżka na płaszczyźnie ortogonalnej",
       "sweepSpineAxes": "Na tej płaszczyźnie kierunek w prawo na ekranie to {right}, a w górę to {up}.",
       "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się do kierunku w prawo na ekranie, aby przekrój pozostał prostopadły do początkowej stycznej; kolejne zakręty są swobodne.",
@@ -1181,7 +1181,7 @@
       "noClosedProfile": "Nie znaleziono zamkniętego profilu. Narysuj co najmniej jedną zamkniętą linię i sprawdź, czy nie ma w niej fragmentów o zerowym polu.",
       "invalidTopology": "Nie udało się utworzyć poprawnej bryły ze szkicu (błąd OpenCascade)",
       "buildFailed": "Nie udało się utworzyć bryły ze szkicu",
-      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga dokładnie jednego zamkniętego przekroju i jednej otwartej ścieżki.",
+      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga co najmniej jednego zamkniętego przekroju i dokładnie jednej otwartej ścieżki.",
       "sweepSpineDirection": "Pierwszy odcinek ścieżki musi biec w prawo na ekranie, prostopadle do płaszczyzny przekroju. Narysuj ten odcinek ponownie."
     },
     "skf": {

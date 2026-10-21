@@ -785,7 +785,7 @@
       "sweepSpineLabel": "Trajectoire",
       "sweepPlaneHint": "Dessinez la section sur le plan de travail sélectionné, puis passez au plan orthogonal qui en dérive pour tracer le chemin. La section finale est orientée perpendiculairement à la direction initiale du chemin.",
       "sweepSectionStage": "Étape 1 sur 2 · Section sur le plan sélectionné",
-      "sweepSectionHelp": "Dessinez et fermez une section centrée sur l’origine (0,0) du plan sélectionné. La fermeture passe au plan orthogonal qui en dérive pour le chemin.",
+      "sweepSectionHelp": "Dessinez et fermez une ou plusieurs sections centrées sur l’origine (0,0) du plan sélectionné. Chaque fermeture passe au plan orthogonal du chemin. Revenez au plan de section pour en ajouter, puis passez au plan du chemin lorsque vous avez terminé.",
       "sweepSpineStage": "Étape 2 sur 2 · Chemin sur le plan orthogonal",
       "sweepSpineAxes": "Sur ce plan, la droite de l’écran suit {right} et le haut suit {up}.",
       "sweepSpineHelp": "Commencez le chemin à l’origine de la section (0,0). Le premier segment s’aligne sur la droite de l’écran pour garder la section perpendiculaire à la tangente initiale ; les virages suivants restent libres.",
@@ -1181,7 +1181,7 @@
       "noClosedProfile": "Aucun profil fermé trouvé. Dessinez au moins une boucle fermée et vérifiez qu’elle ne contient aucune partie d’aire nulle.",
       "invalidTopology": "Impossible de construire un solide valide à partir de l’esquisse (erreur OpenCascade)",
       "buildFailed": "Impossible de construire la forme à partir de cette esquisse",
-      "sweepNeedsSectionAndSpine": "Un balayage plan nécessite exactement une section fermée et un chemin ouvert.",
+      "sweepNeedsSectionAndSpine": "Un balayage plan nécessite une ou plusieurs sections fermées et exactement un chemin ouvert.",
       "sweepSpineDirection": "Le premier segment du chemin doit aller vers la droite de l’écran, perpendiculairement au plan de la section. Redessinez ce premier segment."
     },
     "skf": {

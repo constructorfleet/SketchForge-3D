@@ -18,7 +18,7 @@ function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick
 }
 
 export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof cadSketchSweepPaths>[0]): ShapeHandle {
-  const { section, spine: rawSpine } = cadSketchSweepPaths(profile);
+  const { sections, spine: rawSpine } = cadSketchSweepPaths(profile);
   const defaultSection: SketchSweepFrame = {
     origin: { x: 0, y: 0, z: 0 },
     normal: { x: 0, y: 1, z: 0 },
@@ -31,11 +31,18 @@ export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof 
   // The builder returns geometry in the section frame's canonical coordinates.
   // The editor applies the selected workplane transform once after meshing.
   const sectionInWorkplane = (point: Pick<SketchPoint, "x" | "z">): Vec3 => ({ x: point.x, y: 0, z: point.z });
-  return cad.sweep(
-    pathWire(cad, section, sectionInWorkplane),
-    pathWire(cad, spine, spineInOrthogonalPlane),
-    TransitionMode.RoundCorner,
-  );
+  const spineWire = pathWire(cad, spine, spineInOrthogonalPlane);
+  const solids = sections.map((region) => {
+    const solid = cad.sweep(pathWire(cad, region.outer, sectionInWorkplane), spineWire, TransitionMode.RoundCorner);
+    if (region.holes.length === 0) return solid;
+    const cut = region.holes.reduce((result, hole) => {
+      const holeSolid = cad.sweep(pathWire(cad, hole, sectionInWorkplane), spineWire, TransitionMode.RoundCorner);
+      return cad.cut(result, holeSolid);
+    }, solid);
+    const remainingSolids = cad.getSubShapes(cut, "solid");
+    return remainingSolids.length === 1 ? remainingSolids[0]! : cut;
+  });
+  return solids.length === 1 ? solids[0]! : cad.makeCompound(solids);
 }
 
 function orientedSpine(

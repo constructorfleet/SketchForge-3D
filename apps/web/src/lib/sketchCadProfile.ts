@@ -152,12 +152,18 @@ export function cadSketchRegions(profile: SketchProfile): CadSketchRegion[] {
   return regions;
 }
 
-export function cadSketchSweepPaths(profile: SketchProfile): { section: OrderedCadSketchPath; spine: OrderedCadSketchPath } {
+export function cadSketchSweepPaths(profile: SketchProfile): { sections: CadSketchRegion[]; spine: OrderedCadSketchPath } {
   const paths = orderedCadSketchPaths(profile);
-  const sections = paths.filter((path) => path.closed && sampledPath(path).length >= 3 && Math.abs(signedArea(sampledPath(path))) > 1e-8);
+  const closedPaths = paths.filter((path) => path.closed);
+  const sectionPointIds = new Set(closedPaths.flatMap((path) => path.points.map((point) => point.id)));
+  const sectionProfile: SketchProfile = {
+    points: profile.points.filter((point) => sectionPointIds.has(point.id)),
+    segments: profile.segments.filter((segment) => sectionPointIds.has(segment.startId) && sectionPointIds.has(segment.endId)),
+  };
+  const sections = cadSketchRegions(sectionProfile);
   const spines = paths.filter((path) => !path.closed);
-  if (sections.length !== 1 || spines.length !== 1 || paths.length !== 2) {
+  if (sections.length === 0 || spines.length !== 1 || paths.length !== sections.reduce((count, region) => count + 1 + region.holes.length, 0) + 1) {
     throw new LocalizedError("errors.sketch.sweepNeedsSectionAndSpine");
   }
-  return { section: sections[0], spine: spines[0] };
+  return { sections, spine: spines[0] };
 }
