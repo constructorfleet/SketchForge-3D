@@ -5,14 +5,22 @@
  * wrong produces a part that looks right and does not fit. These are the sizes
  * people actually reach for, with the pitch each designation implies.
  *
- * Metric pitches are ISO 261 coarse. Unified pitches are the coarse (UNC)
- * series, converted from threads per inch -- a 1/4-20 is 25.4/20 = 1.27mm.
+ * Coarse metric pitches follow ISO 261. Fine combinations are selected from
+ * its general plan (ISO 262:2023 selects fastener sizes from that plan).
+ * Unified pitches are the UNC series converted from threads per inch. The
+ * added UNF entries use ASME B1.1 fine series values, likewise converted.
+ * Sources: https://www.iso.org/standard/4165.html,
+ * https://www.iso.org/standard/85105.html,
+ * https://www.asme.org/codes-standards/find-codes-standards/b1-1-unified-inch-screw-threads-un-unr-thread-form
+ * and NIST's federal screw-thread standards handbook, which reproduces the
+ * Unified fine-series designations and TPI values:
+ * https://nvlpubs.nist.gov/nistpubs/Legacy/hb/nbshandbook28supp1963.pdf
  */
 
-export type ThreadSeries = "metric" | "unified";
+export type ThreadSeries = "metric" | "metric-fine" | "unified" | "unified-fine";
 
 export type ThreadSize = {
-  /** How the size is written: "M8", "1/4-20". */
+  /** How the size is written: "M8", "M8x1", "1/4-20", "1/4-28 UNF". */
   designation: string;
   series: ThreadSeries;
   /** Outside diameter of the male thread, in mm. */
@@ -30,6 +38,15 @@ function unified(designation: string, diameterInches: number, threadsPerInch: nu
   };
 }
 
+function unifiedFine(designation: string, diameterInches: number, threadsPerInch: number): ThreadSize {
+  return {
+    designation,
+    series: "unified-fine",
+    diameter: diameterInches * 25.4,
+    pitch: 25.4 / threadsPerInch,
+  };
+}
+
 export const THREAD_SIZES: ThreadSize[] = [
   { designation: "M2", series: "metric", diameter: 2, pitch: 0.4 },
   { designation: "M2.5", series: "metric", diameter: 2.5, pitch: 0.45 },
@@ -42,6 +59,19 @@ export const THREAD_SIZES: ThreadSize[] = [
   { designation: "M12", series: "metric", diameter: 12, pitch: 1.75 },
   { designation: "M16", series: "metric", diameter: 16, pitch: 2 },
   { designation: "M20", series: "metric", diameter: 20, pitch: 2.5 },
+  // ISO 261 general plan, limited here to common fine-pitch combinations.
+  // ISO 262:2023 selects fastener sizes from that plan. Fine pitches are
+  // explicit in the designation; the coarse entries above remain defaults.
+  { designation: "M6x0.75", series: "metric-fine", diameter: 6, pitch: 0.75 },
+  { designation: "M8x1", series: "metric-fine", diameter: 8, pitch: 1 },
+  { designation: "M10x1.25", series: "metric-fine", diameter: 10, pitch: 1.25 },
+  { designation: "M10x1", series: "metric-fine", diameter: 10, pitch: 1 },
+  { designation: "M12x1.5", series: "metric-fine", diameter: 12, pitch: 1.5 },
+  { designation: "M12x1.25", series: "metric-fine", diameter: 12, pitch: 1.25 },
+  { designation: "M14x1.5", series: "metric-fine", diameter: 14, pitch: 1.5 },
+  { designation: "M16x1.5", series: "metric-fine", diameter: 16, pitch: 1.5 },
+  { designation: "M18x1.5", series: "metric-fine", diameter: 18, pitch: 1.5 },
+  { designation: "M20x1.5", series: "metric-fine", diameter: 20, pitch: 1.5 },
   unified("#4-40", 0.112, 40),
   unified("#6-32", 0.138, 32),
   unified("#8-32", 0.164, 32),
@@ -50,6 +80,17 @@ export const THREAD_SIZES: ThreadSize[] = [
   unified("5/16-18", 0.3125, 18),
   unified("3/8-16", 0.375, 16),
   unified("1/2-13", 0.5, 13),
+  // ASME B1.1 UNF series. Pitch is 25.4 mm divided by threads per inch.
+  unifiedFine("#4-48 UNF", 0.112, 48),
+  unifiedFine("#6-40 UNF", 0.138, 40),
+  unifiedFine("#8-36 UNF", 0.164, 36),
+  unifiedFine("#10-32 UNF", 0.19, 32),
+  unifiedFine("#12-28 UNF", 0.216, 28),
+  unifiedFine("1/4-28 UNF", 0.25, 28),
+  unifiedFine("5/16-24 UNF", 0.3125, 24),
+  unifiedFine("3/8-24 UNF", 0.375, 24),
+  unifiedFine("7/16-20 UNF", 0.4375, 20),
+  unifiedFine("1/2-20 UNF", 0.5, 20),
 ];
 
 export const DEFAULT_THREAD_SIZE = "M8";

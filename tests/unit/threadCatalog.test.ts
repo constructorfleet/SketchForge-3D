@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveThreadRequest } from "@constructorfleet/sketchforge-engine";
 import {
   DEFAULT_HOLE_CLEARANCE,
   DEFAULT_THREAD_SIZE,
@@ -28,6 +29,41 @@ describe("thread catalog", () => {
     expect(threadSize("#6-32")?.pitch).toBeCloseTo(25.4 / 32, 3);
   });
 
+  it("looks up common metric fine and UNF sizes without changing coarse entries", () => {
+    expect(threadSize("M8x1")).toMatchObject({ designation: "M8x1", series: "metric-fine", diameter: 8, pitch: 1 });
+    expect(threadSize("M10 x 1.25")?.pitch).toBe(1.25);
+    expect(threadSize("1/4-28 UNF")).toMatchObject({ series: "unified-fine", diameter: 6.35 });
+    expect(threadSize("1/4-28 UNF")?.pitch).toBeCloseTo(25.4 / 28, 8);
+    expect(threadSize("5/16-24 UNF")?.diameter).toBe(7.9375);
+    expect(threadSize("#6-40 UNF")?.pitch).toBe(0.635);
+    expect(resolveThreadRequest({ size: "1/4-28 UNF" })).toMatchObject({ pitch: 25.4 / 28, designation: "1/4-28 UNF" });
+    expect(resolveThreadRequest({ size: "M8x1" })).toMatchObject({ pitch: 1, designation: "M8x1" });
+    expect(threadSize("M8")?.pitch).toBe(1.25);
+    expect(threadSize("1/4-20")?.pitch).toBe(1.27);
+    expect(threadSizesInSeries("metric-fine").length).toBeGreaterThan(0);
+    expect(threadSizesInSeries("unified-fine").length).toBeGreaterThan(0);
+  });
+
+  it("keeps every added fine-series pitch in the catalog", () => {
+    const metricFine: Record<string, number> = {
+      "M6x0.75": 0.75, "M8x1": 1, "M10x1.25": 1.25, "M10x1": 1,
+      "M12x1.5": 1.5, "M12x1.25": 1.25, "M14x1.5": 1.5,
+      "M16x1.5": 1.5, "M18x1.5": 1.5, "M20x1.5": 1.5,
+    };
+    const unifiedFine: Record<string, number> = {
+      "#4-48 UNF": 0.5292, "#6-40 UNF": 0.635, "#8-36 UNF": 0.7056,
+      "#10-32 UNF": 0.7938, "#12-28 UNF": 0.9071, "1/4-28 UNF": 0.9071,
+      "5/16-24 UNF": 1.0583, "3/8-24 UNF": 1.0583, "7/16-20 UNF": 1.27,
+      "1/2-20 UNF": 1.27,
+    };
+    for (const [designation, pitch] of Object.entries(metricFine)) {
+      expect(threadSize(designation)?.pitch, designation).toBe(pitch);
+    }
+    for (const [designation, pitch] of Object.entries(unifiedFine)) {
+      expect(threadSize(designation)?.pitch, designation).toBeCloseTo(pitch, 4);
+    }
+  });
+
   it("finds a size however it is written", () => {
     expect(threadSize("m8")?.designation).toBe("M8");
     expect(threadSize("M 8")?.designation).toBe("M8");
@@ -39,9 +75,12 @@ describe("thread catalog", () => {
     expect(threadSize(DEFAULT_THREAD_SIZE)).not.toBeNull();
   });
 
-  it("splits the two series", () => {
+  it("splits every series", () => {
     expect(threadSizesInSeries("metric").every((size) => size.designation.startsWith("M"))).toBe(true);
-    expect(threadSizesInSeries("unified").length + threadSizesInSeries("metric").length).toBe(THREAD_SIZES.length);
+    expect(
+      (["metric", "metric-fine", "unified", "unified-fine"] as const)
+        .flatMap((series) => threadSizesInSeries(series)).length,
+    ).toBe(THREAD_SIZES.length);
   });
 
   it("cuts a tapped hole wider than the bolt, by the clearance on each side", () => {
