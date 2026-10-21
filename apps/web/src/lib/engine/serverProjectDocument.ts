@@ -17,6 +17,7 @@ import {
   type ProjectMetadata,
 } from "@/lib/engine/serverProjectFiles";
 import { exportSkfProject, importSkfProject } from "@/lib/engine/skfProject";
+import { serverSourceImporter } from "@/lib/engine/serverSourceImporter";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 import { horizontalPlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
@@ -81,7 +82,10 @@ export async function readProjectDocument(root: string, projectId: string): Prom
       sketchPlacementWorkplane: horizontalPlacementWorkplane(),
     };
   }
-  const restored = await importSkfProject(packageBytes);
+  // With the server's own source importer: the default one rebuilds a STEP
+  // asset through the browser's kernel loader, so without this every project
+  // holding one is unreadable here.
+  const restored = await importSkfProject(packageBytes, { sourceImporter: serverSourceImporter });
   return {
     metadata,
     projectName: restored.projectName || projectName,

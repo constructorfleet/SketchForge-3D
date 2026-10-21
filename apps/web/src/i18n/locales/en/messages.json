@@ -1411,7 +1411,9 @@
       "sketchMissingPointsOrSegments": "{label} is missing points or segments",
       "sketchDuplicatePointId": "{label} contains duplicate point ID ''{id}'",
       "sketchDuplicateSegmentId": "{label} contains duplicate segment ID ''{id}'",
-      "sketchMissingPointReference": "{label} contains a segment with a missing point reference"
+      "sketchMissingPointReference": "{label} contains a segment with a missing point reference",
+      "sourceAssetUnreadable": "The imported file '{name}' could not be rebuilt into a mesh.",
+      "sourceFormatUnsupportedOnServer": "This server cannot rebuild a {format} import. Open the project in the editor instead."
     },
     "step": {
       "readFailed": "Could not read STEP: {detail}",
