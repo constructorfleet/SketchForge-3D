@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The REST API contract now describes `GET /properties` query parameters,
+  response fields, and geometry provenance. The route rejects malformed kernel
+  property results before returning a success response; the REST reference now
+  states the units for volume, area, center of mass, and bounds.
+
 - Merged PR #116 added the VitePress documentation site with repository-derived
   GitHub Pages base path, built-in local search, canonical Markdown staging,
   local link and source-include checks, local preview, and PR build/default-

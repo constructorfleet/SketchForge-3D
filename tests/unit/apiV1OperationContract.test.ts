@@ -88,6 +88,36 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseListFacesResponse({ faces: [{ index: "0" }] })).toBeNull();
   });
 
+  it("declares and validates GET /properties against the complete mass-properties response", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/properties");
+    expect(operation).toMatchObject({
+      operationId: "getShapeProperties",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      response: {
+        kind: "shape-properties",
+        required: ["properties"],
+        fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+        provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
+      },
+    });
+    const properties = {
+      volume: 120,
+      area: 148,
+      centerOfMass: { x: 10, y: 3, z: 0 },
+      bbox: { xmin: 8, ymin: 0, zmin: -2.5, xmax: 12, ymax: 6, zmax: 2.5 },
+      isValid: true,
+      provenance: { source: "parametric", precision: "exact" },
+    };
+    expect(contract.parseShapePropertiesResponse({ properties })).toEqual({ properties });
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, area: "148" } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, centerOfMass: { x: 0, y: Number.NaN, z: 0 } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, bbox: { ...properties.bbox, xmax: Infinity } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { source: "step", precision: "exact" } } })).toBeNull();
+  });
+
   it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "PATCH" && route === "/api/v1/shapes");

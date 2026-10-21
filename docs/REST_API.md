@@ -486,7 +486,7 @@ To keep a large scene from monopolizing the kernel, a request is refused as a wh
 
 ## Shape properties
 
-`GET /properties?projectId=&shapeId=` returns exact mass properties for the stored shape and includes `provenance`. `source` identifies the representation used (`parametric`, `brep`, or `mesh`); `precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.
+`GET /properties?projectId=&shapeId=` requires both query parameters and returns the measured properties for one stored shape. `volume` is in mm³, `area` is in mm², and `centerOfMass` and the axis-aligned `bbox` coordinates are project-space millimeters. `isValid` reports the CAD kernel validity result. `provenance.source` identifies the representation measured (`parametric`, `brep`, or `mesh`); `provenance.precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.
 
 ```json
 {
