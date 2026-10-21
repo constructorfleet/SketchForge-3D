@@ -15,8 +15,9 @@
 // The route imports this module, so it must stay free of anything that pulls
 // React in: "./../i18n/LocalizedError.js" only, never "./../i18n/index.js".
 import { LocalizedError, errorFromResponse, type ErrorKey, type ErrorResponseFields } from "./../i18n/LocalizedError.js";
+import { operatorSettingName } from "./operatorConfiguration.js";
 
-export const SERVER_PROJECTS_ENV = "SKETCHFORGE_PROJECTS_DIR";
+export const SERVER_PROJECTS_ENV = operatorSettingName("SKETCHFORGE_PROJECTS_DIR");
 export const SERVER_PROJECTS_ENDPOINT = "/api/projects";
 
 /** A project id as the server will spell it on disk, or null when it cannot be one. */
