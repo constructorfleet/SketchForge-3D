@@ -396,6 +396,8 @@ Every number here comes from OCCT's own curve and surface analysis, not from the
 
 The indexes are the same ones `GET /edges` and `GET /faces` give, built from the same geometry, so a listing and a measurement taken together are consistent -- and so is a fillet afterwards that names the same edge.
 
+For `GET /measurements`, `projectId` and `shapeId` are required. `index` is the zero-based edge or face index for that shape. `length`, `area`, `radius`, and `diameter` are in millimeters, square millimeters, millimeters, and millimeters respectively; `sweepDegrees` is in degrees. Fields that do not apply to an entity are present as `null`. When no radius is available, `radiusUnavailable` is either `null` (a radius was measured) or one of the documented reason codes. The route can return `400` for invalid query values, `401` for failed authentication, `404` for disabled API or missing project/shape, `409` for a busy project or locked shape, `422` when the CAD kernel refuses the geometry, `500` for other kernel or response-validation failures, and `503` when server storage is unavailable.
+
 ### What a shape measures
 
 ```json

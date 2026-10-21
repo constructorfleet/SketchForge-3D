@@ -7,10 +7,12 @@
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
 export type ApiV1FieldSchema = {
-  type: "number" | "boolean" | "string" | "object";
+  type: "number" | "integer" | "boolean" | "string" | "object" | "array";
+  nullable?: true;
   required?: readonly string[];
   enum?: readonly string[];
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
+  items?: ApiV1FieldSchema;
 };
 
 export type ApiV1Operation = {
@@ -101,7 +103,43 @@ export const API_V1_OPERATIONS = [
   operation("DELETE", "/api/v1/groups", "ungroupShape"),
   operation("POST", "/api/v1/imports", "importGeometry"),
   operation("POST", "/api/v1/interference", "analyzeInterference"),
-  operation("GET", "/api/v1/measurements", "listMeasurements"),
+  {
+    ...operation("GET", "/api/v1/measurements", "listMeasurements", [200, 400, 401, 404, 409, 422, 500, 503]),
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true },
+      },
+    },
+    response: {
+      required: ["measurements"],
+      schema: {
+        type: "object",
+        required: ["measurements"],
+        properties: {
+          measurements: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
+              properties: {
+                entity: { type: "string", enum: ["edge", "face"] },
+                index: { type: "integer" },
+                geometryType: { type: "string" },
+                length: { type: "number", nullable: true },
+                area: { type: "number", nullable: true },
+                radius: { type: "number", nullable: true },
+                diameter: { type: "number", nullable: true },
+                sweepDegrees: { type: "number", nullable: true },
+                radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   operation("POST", "/api/v1/measurements", "measureEntities"),
   operation("POST", "/api/v1/mirrors", "mirrorShapes"),
   operation("POST", "/api/v1/parts", "splitParts"),
@@ -256,6 +294,38 @@ export function parseShapePropertiesResponse(value: unknown): ShapePropertiesRes
   if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
   if (!(precision === "exact" || precision === "tessellated")) return null;
   return value as ShapePropertiesResponse;
+}
+
+export type MeasurementsResponse = {
+  measurements: Array<{
+    entity: "edge" | "face";
+    index: number;
+    geometryType: string;
+    length: number | null;
+    area: number | null;
+    radius: number | null;
+    diameter: number | null;
+    sweepDegrees: number | null;
+    radiusUnavailable: "notCircular" | "ellipseHasNoSingleRadius" | "degenerateCurve" | "notCurved" | "radiusVariesOverSurface" | "radiusNotReportedByKernel" | "degenerateSurface" | null;
+  }>;
+};
+
+/** Validate every required entry field and nullable measurement value. */
+export function parseMeasurementsResponse(value: unknown): MeasurementsResponse | null {
+  if (!value || typeof value !== "object" || !Array.isArray((value as { measurements?: unknown }).measurements)) return null;
+  const unavailableCodes = new Set(["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"]);
+  for (const measurement of (value as { measurements: unknown[] }).measurements) {
+    if (!measurement || typeof measurement !== "object") return null;
+    const entry = measurement as Record<string, unknown>;
+    if (!(entry.entity === "edge" || entry.entity === "face")) return null;
+    if (!Number.isInteger(entry.index) || (entry.index as number) < 0 || typeof entry.geometryType !== "string") return null;
+    for (const key of ["length", "area", "radius", "diameter", "sweepDegrees"]) {
+      const field = entry[key];
+      if (!(field === null || (typeof field === "number" && Number.isFinite(field)))) return null;
+    }
+    if (!(entry.radiusUnavailable === null || (typeof entry.radiusUnavailable === "string" && unavailableCodes.has(entry.radiusUnavailable)))) return null;
+  }
+  return value as MeasurementsResponse;
 }
 
 

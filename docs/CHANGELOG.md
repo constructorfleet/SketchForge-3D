@@ -6,6 +6,10 @@
 
 - Added an executable local MCP workflow showing project creation, shape creation, scene inspection, and `.skf` export. The example validates each call against the MCP server's current `tools/list` schema and cleans up its temporary project.
 
+- The REST API contract now describes and validates the complete `GET
+  /measurements` response, including nullable values and radius-unavailable
+  codes. The REST reference now states its query requirements and units.
+
 - The REST API contract now describes `GET /properties` query parameters,
   response fields, and geometry provenance. The route rejects malformed kernel
   property results before returning a success response; the REST reference now

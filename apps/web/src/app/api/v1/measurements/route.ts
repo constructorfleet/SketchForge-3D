@@ -1,5 +1,6 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
+import { parseApiTargetQuery, parseMeasurementsResponse } from "@/lib/apiV1OperationContract";
 import type { MeasurementEndRef } from "@/lib/engine/serverCadMeasure";
 
 export const runtime = "nodejs";
@@ -11,15 +12,17 @@ const CAD_FAILED = "The CAD kernel could not measure that shape.";
 export async function GET(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const { projectId, shapeId } = apiTarget(request);
-  if (!projectId) return apiErrors.invalidProjectId();
-  if (!shapeId) return apiErrors.shapeIdRequired();
+  const query = parseApiTargetQuery(request);
+  if (!query.ok) return query.error === "invalid_project_id" ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
+  const { projectId, shapeId } = query;
 
   const measured = await apiEngine(context.root).measurements(projectId, shapeId);
   if (!measured.ok) {
     return apiEngineError(measured.failure, { oneShape: true, cadFailed: CAD_FAILED });
   }
-  return apiJson({ measurements: measured.value });
+  const response = parseMeasurementsResponse({ measurements: measured.value });
+  if (!response) return apiError("The CAD kernel returned invalid measurements.", 500, "cad_failed");
+  return apiJson(response);
 }
 
 const ENTITY_KINDS = ["edge", "face", "shape"] as const;

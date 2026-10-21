@@ -130,6 +130,52 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { source: "step", precision: "exact" } } })).toBeNull();
   });
 
+  it("declares and validates GET /measurements against every edge and face result", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/measurements");
+    expect(operation).toMatchObject({
+      operationId: "listMeasurements",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      response: {
+        required: ["measurements"],
+        schema: {
+          type: "object",
+          required: ["measurements"],
+          properties: {
+            measurements: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
+                properties: {
+                  entity: { type: "string", enum: ["edge", "face"] },
+                  index: { type: "integer" },
+                  geometryType: { type: "string" },
+                  length: { type: "number", nullable: true },
+                  area: { type: "number", nullable: true },
+                  radius: { type: "number", nullable: true },
+                  diameter: { type: "number", nullable: true },
+                  sweepDegrees: { type: "number", nullable: true },
+                  radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const measurements = [
+      { entity: "edge", index: 0, geometryType: "circle", length: 2, area: null, radius: 1, diameter: 2, sweepDegrees: 360, radiusUnavailable: null },
+      { entity: "face", index: 0, geometryType: "plane", length: null, area: 6, radius: null, diameter: null, sweepDegrees: null, radiusUnavailable: "notCurved" },
+    ];
+    expect(contract.parseMeasurementsResponse({ measurements })).toEqual({ measurements });
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[0], entity: "vertex" }] })).toBeNull();
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[1], radiusUnavailable: "unknown" }] })).toBeNull();
+    expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[0], area: "6" }] })).toBeNull();
+  });
+
   it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "PATCH" && route === "/api/v1/shapes");
