@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const projectsDir = process.env.SKETCHFORGE_PROJECTS_DIR;
@@ -10,6 +12,7 @@ async function getBackend() {
   if (!projectsDir) throw new Error("Set SKETCHFORGE_PROJECTS_DIR to a directory containing SketchForge project files.");
   if (!backend) {
     enginePackagePromise ??= import("@constructorfleet/sketchforge-engine");
+    await mkdir(projectsDir, { recursive: true });
     const { createEngine, directoryProjectStore } = await enginePackagePromise;
     const store = directoryProjectStore(projectsDir);
     backend = { store, engine: createEngine(store), package: await enginePackagePromise };
@@ -220,8 +223,54 @@ export async function callLocalEngineTool(name, args = {}) {
   if (["sketchforge_list_editors", "sketchforge_inspect_errors"].includes(name)) {
     throw new Error(`${name} needs an open SketchForge editor and is unavailable in local mode.`);
   }
-  const id = requireProjectId(args);
   const { engine, package: enginePackage } = await getBackend();
+  if (name === "sketchforge_list_projects") {
+    const projects = await Promise.all((await backend.store.list()).map(async (record) => {
+      const project = await unwrap(await engine.project(record.projectId));
+      return {
+        id: record.projectId,
+        name: String(record.metadata.name ?? "Untitled design"),
+        shapes: project.shapes.length,
+        revision: project.revision,
+        updatedAt: record.updatedAt,
+        packageBytes: record.packageBytes,
+      };
+    }));
+    return { projects };
+  }
+  if (name === "sketchforge_create_project") {
+    const projectName = String(args.name ?? "").trim().slice(0, 80);
+    if (!projectName) throw new Error("name is required to create a project.");
+    const id = randomUUID();
+    const now = Date.now();
+    await writeFile(path.join(projectsDir, `${id}.json`), JSON.stringify({ name: projectName, createdAt: now, updatedAt: now, revision: 1 }), { flag: "wx" });
+    return { projectId: id, name: projectName, shapeCount: 0, revision: 1 };
+  }
+  if (name === "sketchforge_import_project") {
+    const sourcePath = path.resolve(String(args.filePath ?? ""));
+    if (path.extname(sourcePath).toLowerCase() !== ".skf") throw new Error("filePath must point to a .skf project file.");
+    const bytes = await readFile(sourcePath);
+    const imported = await enginePackage.importSkfProject(bytes);
+    const projectName = String(args.name ?? imported.projectName ?? "Imported design").trim().slice(0, 80);
+    if (!projectName) throw new Error("name must not be empty.");
+    const id = randomUUID();
+    const now = Date.now();
+    const packagePath = path.join(projectsDir, `${id}.skf`);
+    const metadataPath = path.join(projectsDir, `${id}.json`);
+    const temporaryPackage = `${packagePath}.tmp`;
+    const temporaryMetadata = `${metadataPath}.tmp`;
+    try {
+      await writeFile(temporaryPackage, bytes, { flag: "wx" });
+      await writeFile(temporaryMetadata, JSON.stringify({ name: projectName, createdAt: now, updatedAt: now, revision: 1 }), { flag: "wx" });
+      await rename(temporaryPackage, packagePath);
+      await rename(temporaryMetadata, metadataPath);
+    } catch (error) {
+      await Promise.all([unlink(temporaryPackage).catch(() => {}), unlink(temporaryMetadata).catch(() => {}), unlink(packagePath).catch(() => {})]);
+      throw error;
+    }
+    return { projectId: id, name: projectName, shapeCount: imported.shapes.length, revision: 1 };
+  }
+  const id = requireProjectId(args);
   switch (name) {
     case "sketchforge_read_scene":
     case "sketchforge_list_objects":
