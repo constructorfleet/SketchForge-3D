@@ -8,6 +8,9 @@ const output = path.join(root, ".docs-site");
 const repository = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" })
   .trim().match(/(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/)?.[1];
 if (!repository) throw new Error("Cannot derive GitHub repository for canonical source links");
+const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const packageMetadata = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const documentationVersion = packageMetadata.version;
 const trackedMarkdown = execFileSync("git", ["ls-files", "-z", "--", "*.md"], {
   cwd: root,
   encoding: "utf8",
@@ -74,7 +77,7 @@ for (const generatedPath of markdownFiles) {
     if (!sourceTarget.startsWith(`${root}${path.sep}`)) return whole;
     const targetRelative = path.relative(root, sourceTarget);
     if (targetRelative.startsWith(".github/") || !targetRelative.endsWith(".md")) {
-      const sourceUrl = `https://github.com/${repository}/blob/main/${targetRelative}`;
+      const sourceUrl = `https://github.com/${repository}/blob/${revision}/${targetRelative}`;
       return whole.replace(/\]\([^)]*\)$/, `](${sourceUrl})`);
     }
     return whole;
@@ -85,7 +88,7 @@ for (const generatedPath of markdownFiles) {
     if (!sourceTarget.startsWith(`${root}${path.sep}`)) return whole;
     const targetRelative = path.relative(root, sourceTarget);
     if (targetRelative.startsWith(".github/") || !targetRelative.endsWith(".md")) {
-      return `href="https://github.com/${repository}/blob/main/${targetRelative}"`;
+      return `href="https://github.com/${repository}/blob/${revision}/${targetRelative}"`;
     }
     return whole;
   });
@@ -95,6 +98,8 @@ for (const generatedPath of markdownFiles) {
       'src="https://sketchforge3d.com/assets/sketchforge/sketchforge-logo-transparent.png"',
       'src="./assets/sketchforge/sketchforge-logo-transparent.png"',
     );
+  const sourceUrl = `https://github.com/${repository}/blob/${revision}/${sourceRelative}`;
+  contents += `\n\n---\n\nDocumentation version: \`${documentationVersion}\` · Repository revision: [\`${revision}\`](https://github.com/${repository}/tree/${revision}) · [View source](${sourceUrl})\n`;
   for (const match of contents.matchAll(markdownLink)) {
     const href = match[1].replace(/^<|>$/g, "");
     if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(href)) continue;
