@@ -1,6 +1,6 @@
 # Implementation gaps and next steps
 
-Status: refreshed against the working tree at `e699b20` (2026-10-20). This file
+Status: refreshed against the working tree at `2cfc70a` (2026-10-20). This file
 tracks user-facing gaps, not every unused OCCT method. Several proposals from
 the earlier audit have shipped since it was written.
 
@@ -20,7 +20,12 @@ These are implemented and should not be filed as missing features:
   exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
   implemented. Face colors are keyed to current face indexes and are discarded
-  when geometry changes.
+  when geometry changes. The shape inspector can assign/remove them, though the
+  viewport does not preview them yet.
+- A bounded draft-prism operation is available over REST and in the TypeScript
+  and Python clients. It accepts a retained straight, single-loop sketch
+  extrusion and stores exact geometry; it has no editor control or editable
+  feature-history node yet.
 
 Relevant implementation seams include `serverCadProperties.ts`,
 `serverCadInterference.ts`, `serverCadThickness.ts`, `serverStepExplode.ts`,
@@ -29,15 +34,15 @@ Relevant implementation seams include `serverCadProperties.ts`,
 
 ## Remaining gaps
 
-### 1. Sweep and draft modeling operations
+### 1. Sweep and broader draft modeling operations
 
-The kernel exposes sweep and draft operations, but SketchForge does not yet
-offer them as user-facing modeling operations. A useful first increment should
-reuse existing sketch profiles and persist enough operation data to rebuild the
-result. Prefer a simple planar sweep or draft-on-extrusion before introducing
-arbitrary 3D paths or face-associated editable features. Keep geometry
-rebuild/refusal behavior consistent across the editor, Engine, REST API, and MCP
-surfaces that support the operation.
+The kernel exposes sweep operations, but SketchForge has no sweep workflow. The
+new draft-prism operation is only available through REST and the client
+libraries, and supports one straight closed sketch loop; it is not in the
+editor, MCP, or an editable feature history. Next steps are editor access,
+curved/multi-loop draft profiles, and a first planar sweep that reuses existing
+sketch profiles. Arbitrary 3D paths and face-associated editable drafts need
+additional model support.
 
 ### 2. STEP assembly hierarchy and color verification
 
