@@ -14,6 +14,10 @@ export type SketchSweepStage = "section" | "spine";
 
 export type SketchSweepFrames = { section: SketchSweepFrame; spine: SketchSweepFrame };
 
+export function sketchToolForSweepStage(stage: SketchSweepStage): "select" | "line" {
+  return stage === "section" ? "select" : "line";
+}
+
 export function projectSweepSectionPoint<T extends {
   x: number;
   z: number;

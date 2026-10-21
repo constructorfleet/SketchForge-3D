@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatSweepAxis, projectSweepSectionPoint, sketchSweepGuideRoles, sketchSweepStage, snapInitialSweepSpineEndpoint, sweepFramesForSectionWorkplane, tagSweepProfile } from "@/lib/sketchSweepGuides";
+import { formatSweepAxis, projectSweepSectionPoint, sketchSweepGuideRoles, sketchSweepStage, sketchToolForSweepStage, snapInitialSweepSpineEndpoint, sweepFramesForSectionWorkplane, tagSweepProfile } from "@/lib/sketchSweepGuides";
 
 describe("sweep construction guide roles", () => {
+  it("returns to selection mode when editing the section and drawing mode for the spine", () => {
+    expect(sketchToolForSweepStage("section")).toBe("select");
+    expect(sketchToolForSweepStage("spine")).toBe("line");
+  });
+
   it("advances from section to spine after a closed section exists", () => {
     expect(sketchSweepStage([], "sweep")).toBe("section");
     expect(sketchSweepStage([{ closed: false, points: [{ id: "a" }, { id: "b" }], steps: [{ segment: { id: "ab" } }] }], "sweep")).toBe("section");

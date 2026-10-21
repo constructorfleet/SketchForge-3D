@@ -183,7 +183,7 @@ import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge,
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
-import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
+import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
@@ -9804,7 +9804,7 @@ export function SketchForgeEditor({
             sweepScreenUp={formatSweepAxis(sketchProfile.sweepFrames?.spine.zAxis ?? activeSketchWorkplane.xAxis)}
             onSweepStageChange={(stage) => {
               setSweepStage(stage);
-              setSketchTool("line");
+              setSketchTool(sketchToolForSweepStage(stage));
               setSketchActivePointId(null);
               setSketchSelection(null);
               setSketchMeasureStart(null);
