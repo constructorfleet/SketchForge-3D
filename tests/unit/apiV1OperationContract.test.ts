@@ -202,8 +202,8 @@ describe("REST API v1 operation contract", () => {
           type: "object",
           required: ["distance", "angleDegrees", "angleUnavailable"],
           properties: {
-            distance: { type: "number" },
-            angleDegrees: { type: "number", nullable: true },
+            distance: { type: "number", minimum: 0 },
+            angleDegrees: { type: "number", nullable: true, minimum: 0, maximum: 180 },
             angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
           },
         },
