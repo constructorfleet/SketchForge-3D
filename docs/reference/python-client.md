@@ -6,13 +6,13 @@ The exported names below are the supported import surface. Signatures and summar
 
 ## `ALIGN_AXES`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L921)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L940)
 
 `ALIGN_AXES = ('x', 'y', 'z')`
 
 ## `ALIGN_TARGETS`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L924)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L943)
 
 `ALIGN_TARGETS = ('min', 'center', 'max')`
 
@@ -28,7 +28,7 @@ Puts one edge or one centre of every named shape on the same coordinate.
 
 ## `AlignResult(moved: 'int', axis: 'str', target: 'str', anchor_id: 'Optional[str]', shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L938)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L957)
 
 What an alignment did.
 
@@ -40,13 +40,13 @@ What an alignment did.
 
 ## `BakedMirrorResult(moved: 'int', axis: 'str', shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L971)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L990)
 
 Exact reflection of selected parameter-built solids across their shared bounds plane.
 
 ## `BooleanCutResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L886)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L905)
 
 ## `Booleans(transport: 'Transport') -> 'None'`
 
@@ -170,7 +170,7 @@ class CylinderShapeRequest:
 
 ## `DISTRIBUTE_SPACINGS`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L927)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L946)
 
 `DISTRIBUTE_SPACINGS = ('gaps', 'centers')`
 
@@ -182,7 +182,7 @@ Spreads three or more shapes evenly along an axis.
 
 ## `DistributeResult(moved: 'int', axis: 'str', spacing: 'str', shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L990)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L1009)
 
 What a distribution did, and along which axis it decided to work.
 
@@ -200,7 +200,7 @@ What a distribution did, and along which axis it decided to work.
 
 ## `EdgeSummary(index: 'int', length: 'float', curve_type: 'str', midpoint: 'EdgeMidpoint', filletable: 'bool') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L650)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L669)
 
 ## `Edges(transport: 'Transport') -> 'None'`
 
@@ -212,7 +212,7 @@ What a distribution did, and along which axis it decided to work.
 
 ## `ExportResult(format: 'ExportFormat', filename: 'str', mime_type: 'str', data: 'bytes', shape_count: 'int', exported_count: 'Optional[int]' = None, skipped: 'List[Dict[str, Any]]' = ...) -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L899)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L918)
 
 ## `ExportSection`
 
@@ -246,7 +246,7 @@ Exports a server-stored project or selected shapes to a local file format.
 
 ## `FaceSummary(id: 'Optional[str]', index: 'int', surface_type: 'str', area: 'float', centroid: 'Vector3', normal: 'Optional[Vector3]', facing: 'Optional[str]') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L684)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L703)
 
 ## `Faces(transport: 'Transport') -> 'None'`
 
@@ -319,7 +319,7 @@ class HalfSphereShapeRequest:
 
 ## `IMPORTABLE_MESH_FORMATS`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L935)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L954)
 
 `IMPORTABLE_MESH_FORMATS = ('stl', 'obj', 'svg')`
 
@@ -357,11 +357,11 @@ Adds the model a file describes, and keeps the file with the project.
 
 ## `InterferencePair(a: 'Mapping[str, str]', b: 'Mapping[str, str]', gap: 'float', overlap_volume: 'float', precision: "Literal['exact', 'tessellated']") -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L799)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L818)
 
 ## `InterferenceReport(shapes_checked: 'int', candidate_pairs_checked: 'int', clearance: 'float', method: 'str', pairs: 'List[InterferencePair]') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L818)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L837)
 
 ## `LoftShapeRequest`
 
@@ -399,7 +399,7 @@ class LoftShapeRequest:
 
 ## `MAX_PATTERN_COUNT`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L932)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L951)
 
 `MAX_PATTERN_COUNT = 200`
 
@@ -441,7 +441,7 @@ class LoftShapeRequest:
 
 ## `MIN_PATTERN_COUNT`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L931)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L950)
 
 `MIN_PATTERN_COUNT = 2`
 
@@ -459,11 +459,11 @@ class LoftShapeRequest:
 
 ## `MeasurementPair(distance: 'float', angle_degrees: 'Optional[float]', angle_unavailable: 'Optional[str]') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L779)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L798)
 
 ## `MeasurementSummary(entity: 'str', index: 'int', geometry_type: 'str', length: 'Optional[float]', area: 'Optional[float]', radius: 'Optional[float]', diameter: 'Optional[float]', sweep_degrees: 'Optional[float]', radius_unavailable: 'Optional[str]') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L733)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L752)
 
 One edge or face, measured from the exact B-rep rather than the mesh.
 
@@ -473,7 +473,7 @@ One edge or face, measured from the exact B-rep rather than the mesh.
 
 ## `MeshImportResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L910)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L929)
 
 TreatmentResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int')
 
@@ -497,7 +497,7 @@ The environment does not say how to reach the server.
 
 ## `PATTERN_KINDS`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L929)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L948)
 
 `PATTERN_KINDS = ('linear', 'circular')`
 
@@ -521,7 +521,7 @@ Separates a cut or grouped shape into its independent bodies.
 
 ## `PatternResult(created: 'int', kind: 'str', shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L1016)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L1035)
 
 The copies a pattern added. ``created`` excludes the original.
 
@@ -563,7 +563,7 @@ class PolygonShapeRequest:
 
 ## `ProjectDetail(id: 'str', name: 'str', created_at: 'int', snap_grid: 'Dict[str, Any]', workspace: 'Dict[str, Any]', shapes: 'List[ShapeSummary]') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L621)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L640)
 
 ## `ProjectHandle(client: 'SketchForgeClient', project_id: 'str') -> 'None'`
 
@@ -571,7 +571,7 @@ class PolygonShapeRequest:
 
 ## `ProjectSummary(id: 'str', name: 'str', shapes: 'int', revision: 'int', updated_at: 'int', package_bytes: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L599)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L618)
 
 ## `Projects(transport: 'Transport') -> 'None'`
 
@@ -738,7 +738,7 @@ class RoundRoofShapeRequest:
 
 [Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L433)
 
-`SHAPE_DESCRIPTION_FIELDS = ('id', 'kind', 'requestKind', 'sketchOperation', 'groupedCount')`
+`SHAPE_DESCRIPTION_FIELDS = ('id', 'kind', 'requestKind', 'sketchOperation', 'groupedCount', 'stepAssembly')`
 
 ## `SHAPE_KINDS`
 
@@ -752,33 +752,33 @@ class RoundRoofShapeRequest:
 
 ## `ShapeCollectionResult(shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L893)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L912)
 
 ## `ShapeGeometryProvenance(source: "Literal['parametric', 'brep', 'mesh']", precision: "Literal['exact', 'tessellated']") -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L837)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L856)
 
 ## `ShapeOperationResult(shape: 'ShapeSummary', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L880)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L899)
 
 ## `ShapeProperties(volume: 'float', area: 'float', center_of_mass: 'Mapping[str, float]', bbox: 'Mapping[str, float]', is_valid: 'bool', provenance: 'ShapeGeometryProvenance') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L852)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L871)
 
 ## `ShapeSpec`
 
 [Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L268)
 
-## `ShapeSummary(id: 'str', name: 'str', kind: 'str', color: 'str', hole: 'bool', locked: 'bool', hidden: 'bool', x: 'float', z: 'float', elevation: 'float', width: 'float', depth: 'float', height: 'float', rotation: 'float', rotation_x: 'float', rotation_z: 'float', request_kind: 'Optional[str]' = None, sketch_operation: 'Optional[str]' = None, sketch_profile: 'Optional[Dict[str, Any]]' = None, parameters: 'Dict[str, Any]' = ..., revolve: 'Optional[Dict[str, Any]]' = None, profile: 'Optional[List[List[float]]]' = None, face_ids: 'List[str]' = ..., face_colors: 'Dict[str, str]' = ..., extra: 'Dict[str, Any]' = ...) -> None`
+## `ShapeSummary(id: 'str', name: 'str', kind: 'str', color: 'str', hole: 'bool', locked: 'bool', hidden: 'bool', x: 'float', z: 'float', elevation: 'float', width: 'float', depth: 'float', height: 'float', rotation: 'float', rotation_x: 'float', rotation_z: 'float', request_kind: 'Optional[str]' = None, sketch_operation: 'Optional[str]' = None, sketch_profile: 'Optional[Dict[str, Any]]' = None, parameters: 'Dict[str, Any]' = ..., revolve: 'Optional[Dict[str, Any]]' = None, profile: 'Optional[List[List[float]]]' = None, face_ids: 'List[str]' = ..., face_colors: 'Dict[str, str]' = ..., step_assembly: 'List[StepAssemblyNode]' = ..., extra: 'Dict[str, Any]' = ...) -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L442)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L458)
 
 A shape as the server reports it.
 
 ## `ShapeWriteResult(shapes: 'List[ShapeSummary]', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L874)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L893)
 
 ## `Shapes(transport: 'Transport') -> 'None'`
 
@@ -790,7 +790,7 @@ A shape as the server reports it.
 
 ## `ShellResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L910)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L929)
 
 TreatmentResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int')
 
@@ -910,6 +910,12 @@ class SphereShapeRequest:
     steps: int
 ```
 
+## `StepAssemblyNode(name: 'str', children: "List['StepAssemblyNode']" = ...) -> None`
+
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L443)
+
+A named STEP product and its nested component occurrences.
+
 ## `THREAD_DESIGNATIONS`
 
 [Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L276)
@@ -1015,7 +1021,7 @@ class TorusShapeRequest:
 
 ## `TreatmentResult(shape: 'ShapeSummary', triangles: 'int', revision: 'int') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L910)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L929)
 
 ## `Treatments(transport: 'Transport') -> 'None'`
 
@@ -1050,7 +1056,7 @@ class TubeShapeRequest:
 
 ## `Vector3(x: 'float', y: 'float', z: 'float') -> None`
 
-[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L677)
+[Source](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/types.py#L696)
 
 ## `WedgeShapeRequest`
 

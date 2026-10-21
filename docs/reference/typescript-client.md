@@ -1675,6 +1675,8 @@ export type ShapeSummary = {
     color: string;
     faceIds?: string[];
     faceColors?: Record<string, string>;
+    /** Product hierarchy from an imported STEP assembly, when available. */
+    stepAssembly?: StepAssemblyNode[];
     hole: boolean;
     locked: boolean;
     hidden: boolean;
@@ -2032,6 +2034,19 @@ export type SketchSweepShapeRequest = {
 ```
 
 A retained OCCT sweep made from closed section loops and one open spine.
+
+## `StepAssemblyNode`
+
+**type**
+
+```ts
+export type StepAssemblyNode = {
+    name: string;
+    children: StepAssemblyNode[];
+};
+```
+
+A named STEP product and its nested component occurrences.
 
 ## `TaperFields`
 
