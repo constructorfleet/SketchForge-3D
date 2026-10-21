@@ -39,6 +39,8 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
+The generated OpenAPI 3.1 document describes the project and shape CRUD operations with complete request, query, and response schemas. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a>. It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then. Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+
 ### Contract validation
 
 The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The seven project and shape CRUD operations above carry request metadata and status-specific response schemas; their handlers validate response JSON and return `500 internal_error` for unexpected exceptions or malformed responses. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. `GET` and `POST /measurements` also have request/response validators. Other registry entries remain inventory-only and are not runtime schema-validated yet.
