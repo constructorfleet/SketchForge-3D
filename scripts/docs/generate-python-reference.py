@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import dataclasses
+import ast
 import pathlib
 import sys
 import typing
@@ -15,6 +16,45 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages/sketchforge-py/src"))
 package = importlib.import_module("sketchforge3d")
+source_root = ROOT / "packages/sketchforge-py/src/sketchforge3d"
+
+
+def source_location(name: str, value: Any) -> tuple[str, int]:
+    """Return the defining Python file and line for an exported symbol."""
+    if inspect.ismodule(value) and getattr(value, "__file__", None):
+        path = pathlib.Path(value.__file__)
+        if path.is_relative_to(source_root):
+            return path.relative_to(source_root).as_posix(), 1
+    module = inspect.getmodule(value)
+    try:
+        source_file = inspect.getsourcefile(value) if module else None
+    except TypeError:
+        source_file = None
+    if source_file and pathlib.Path(source_file).is_relative_to(source_root):
+        try:
+            _, line = inspect.getsourcelines(value)
+        except (OSError, TypeError):
+            line = 1
+        return pathlib.Path(source_file).relative_to(source_root).as_posix(), line
+
+    # Scalar exports have no __module__. Resolve them through the package's
+    # import declaration, then point at the assignment that defines the value.
+    init = ast.parse((source_root / "__init__.py").read_text(encoding="utf-8"))
+    modules: dict[str, str] = {}
+    for node in init.body:
+        if isinstance(node, ast.ImportFrom):
+            relative_module = (node.module or "").replace(".", "/")
+            for alias in node.names:
+                module_name = relative_module or alias.name
+                modules[alias.asname or alias.name] = f"{module_name}.py"
+    relative = modules.get(name)
+    if relative:
+        tree = ast.parse((source_root / relative).read_text(encoding="utf-8"))
+        for node in tree.body:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+            if any(isinstance(target, ast.Name) and target.id == name for target in targets):
+                return relative, node.lineno
+    return "__init__.py", 1
 
 
 def signature(value: Any) -> str:
@@ -43,9 +83,11 @@ lines = [
 
 for name in sorted(package.__all__):
     value = getattr(package, name)
+    source_path, source_line = source_location(name, value)
     is_typed_dict = typing.is_typeddict(value)
     label = f"`{name}{signature(value)}`" if callable(value) and not is_typed_dict else f"`{name}`"
-    lines.extend([f"## {label}", ""])
+    source_url = f"https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-py/src/sketchforge3d/{source_path}#L{source_line}"
+    lines.extend([f"## {label}", "", f"[Source]({source_url})", ""])
     if is_typed_dict:
         annotations = typing.get_type_hints(value)
         lines.extend(["```python", f"class {name}:"])
