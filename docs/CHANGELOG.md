@@ -10,6 +10,8 @@
   improves code and navigation contrast, and includes browser checks for WCAG
   2.1 A/AA, reduced motion, keyboard-accessible search, and 320px reflow.
 
+- Added `GET /api/v1/faces` to the generated OpenAPI subset with runtime validation for its query, face fields, nullable values, and status-specific errors.
+
 - The sketch constraint inspector now shows an estimated local degree-of-freedom count from the supported equations' Jacobian rank. Redundant equations are counted once; degenerate zero-length distance geometry is labeled indeterminate. The estimate includes free Bezier handle and sweep-depth parameters and does not imply a global solve.
 
 - Sketch point drags now solve connected coincidence, horizontal/vertical, and fixed-distance constraints together with a bounded damped least-squares iteration. Dragged points stay anchored, Bezier handles translate with their points, and sweep depths remain intact. Unsatisfied constraints are still reported when an iteration cap or singular geometry prevents convergence.

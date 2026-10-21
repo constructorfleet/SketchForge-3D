@@ -31,12 +31,13 @@ export type ApiV1Operation = {
   method: ApiV1Method;
   path: `/api/v1/${string}`;
   auth: "bearer" | "none";
+  description?: string;
   /** Populated only for routes whose response set has been verified. */
   responses?: readonly number[];
   responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
   query?: {
     required: readonly string[];
-    properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; minLength?: number; maxLength?: number }>>;
+    properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; minLength?: number; maxLength?: number; description?: string }>>;
   };
   response?: {
     required: readonly string[];
@@ -98,6 +99,23 @@ const int = { type: "integer" } as const;
 const projectSummary = { type: "object", required: ["id", "name", "shapes", "revision", "updatedAt", "packageBytes"], properties: { id: str, name: str, shapes: int, revision: num, updatedAt: num, packageBytes: int } } as const;
 const shapeSummary = { type: "object", required: ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"], properties: { id: str, name: str, kind: str, requestKind: str, sketchOperation: str, color: str, faceIds: { type: "array", items: str }, faceColors: { type: "object", additionalProperties: str }, hole: { type: "boolean" }, locked: { type: "boolean" }, hidden: { type: "boolean" }, x: num, z: num, elevation: num, width: num, depth: num, height: num, rotation: num, rotationX: num, rotationZ: num, groupedCount: int, revolve: { type: "object", additionalProperties: true }, profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } } } } as const;
 const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
+const faceError = (...codes: string[]): ApiV1FieldSchema => ({ type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: codes } }, additionalProperties: false });
+const vector3Schema = { type: "object", required: ["x", "y", "z"], properties: { x: num, y: num, z: num }, additionalProperties: false } as const;
+const faceItemSchema = {
+  type: "object",
+  required: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"],
+  properties: {
+    index: { type: "integer", minimum: 0, description: "Zero-based index used by shell requests." },
+    id: { type: "string", description: "Application-owned face ID; use it as the faceColors key in PATCH /api/v1/shapes." },
+    surfaceType: { type: "string", description: "Surface kind reported by the CAD kernel, or unknown when unavailable." },
+    area: { type: "number", minimum: 0 },
+    centroid: vector3Schema,
+    normal: { ...vector3Schema, nullable: true },
+    facing: { type: "string", nullable: true, enum: ["top", "bottom", "right", "left", "front", "back"] },
+  },
+  additionalProperties: false,
+} as const;
+const faceListSchema = { type: "object", required: ["faces"], properties: { faces: { type: "array", items: faceItemSchema } }, additionalProperties: false } as const;
 const projectDetail = { type: "object", required: ["project"], properties: { project: { type: "object", required: ["id", "name", "createdAt", "snapGrid", "workspace", "shapes"], properties: { id: str, name: str, createdAt: num, snapGrid: str, workspace: { type: "object", additionalProperties: true }, shapes: { type: "array", items: shapeSummary } } } } } as const;
 const projectList = { type: "object", required: ["projects"], properties: { projects: { type: "array", items: projectSummary } } } as const;
 const shapesList = { type: "object", required: ["shapes"], properties: { shapes: { type: "array", items: shapeSummary } } } as const;
@@ -193,19 +211,23 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/explode", "explodeAssembly"),
   operation("POST", "/api/v1/exports", "exportProject"),
   {
-    ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 409, 500, 503]),
+    ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 422, 500, 503]),
+    description: "Lists each face with its shell-request index and stable application-owned ID. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true },
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
-    response: {
-      required: ["faces"],
-      faceFields: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"],
-      faceIdSemantics: "stable identity for a face while its identity is preserved by the model",
-      colorAssignmentKey: "face id in PATCH /api/v1/shapes faceColors",
+    responseSchemas: {
+      200: faceListSchema,
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
     },
   },
   operation("OPTIONS", "/api/v1/faces", "faceRouteOptions", [204], undefined, "none"),
@@ -366,19 +388,24 @@ function isPoint(value: unknown): value is { x: number; y: number; z: number } {
 
 /** Validate the response shape returned by the engine before it crosses the REST boundary. */
 export function parseListFacesResponse(value: unknown): ListFacesResponse | null {
-  if (!value || typeof value !== "object" || !Array.isArray((value as { faces?: unknown }).faces)) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["faces"]) || !Array.isArray((value as { faces?: unknown }).faces)) return null;
   const faces = (value as { faces: unknown[] }).faces;
   const directions = new Set(["top", "bottom", "right", "left", "front", "back"]);
   for (const face of faces) {
-    if (!face || typeof face !== "object") return null;
+    if (!face || typeof face !== "object" || Array.isArray(face) || !exactKeys(face, ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"])) return null;
     const item = face as Record<string, unknown>;
     if (!Number.isInteger(item.index) || (item.index as number) < 0) return null;
     if (typeof item.id !== "string" || typeof item.surfaceType !== "string") return null;
-    if (typeof item.area !== "number" || !Number.isFinite(item.area)) return null;
+    if (typeof item.area !== "number" || !Number.isFinite(item.area) || item.area < 0) return null;
     if (!isPoint(item.centroid) || !(item.normal === null || isPoint(item.normal))) return null;
     if (!(item.facing === null || (typeof item.facing === "string" && directions.has(item.facing)))) return null;
   }
   return value as ListFacesResponse;
+}
+
+function exactKeys(value: object, expected: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length && actual.every((key, index) => key === [...expected].sort()[index]);
 }
 
 export type ShapePropertiesResponse = {
