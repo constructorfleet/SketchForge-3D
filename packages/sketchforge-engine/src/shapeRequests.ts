@@ -440,10 +440,24 @@ export function shapeWithRequestedChanges(shape: WorkplaneShape, request: ShapeR
       return { ok: false, unapplicable: ["faceColors"] };
     }
     const entries = Object.entries(request.faceColors);
-    if (entries.some(([index, color]) => !/^\d+$/.test(index) || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(String(color)))) {
+    if (entries.some(([index, color]) => !(/^(?:\d+|face_.+)$/.test(index)) || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(String(color)))) {
       return { ok: false, unapplicable: ["faceColors"] };
     }
-    next.faceColors = Object.fromEntries(entries.map(([index, color]) => [Number(index), color as string]));
+    next.faceColors = Object.fromEntries(entries.map(([index, color]) => [index, color as string]));
+    const ids = shape.faceIds;
+    if (ids?.length) {
+      const normalized: Record<string, string> = {};
+      for (const [key, color] of entries) {
+        const index = /^\d+$/.test(key) ? Number(key) : -1;
+        const id = index >= 0 ? ids[index] : key;
+        if (!id || (!/^\d+$/.test(key) && !ids.includes(key))) return { ok: false, unapplicable: ["faceColors"] };
+        normalized[id] = color as string;
+      }
+      next.faceColors = normalized;
+    }
+    if (!ids?.length && entries.some(([key]) => !/^\d+$/.test(key))) {
+      next.faceIds = entries.map(([key]) => key);
+    }
   }
   if (request.name !== undefined) next.name = nonEmptyString(request.name, shape.name);
   if (request.color !== undefined) next.color = nonEmptyString(request.color, shape.color);
@@ -485,6 +499,7 @@ export function shapeWithRequestedChanges(shape: WorkplaneShape, request: ShapeR
   const previousFields = shape as unknown as Record<string, unknown>;
   if (geometryFields.some((field) => request[field] !== undefined && JSON.stringify(nextFields[field]) !== JSON.stringify(previousFields[field]))) {
     delete next.faceColors;
+    delete next.faceIds;
   }
 
   return { ok: true, shape: canonicalizeShape(next) };

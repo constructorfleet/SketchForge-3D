@@ -25,6 +25,7 @@ import {
   EXACT_SOLID_KINDS,
 } from "./cadSolids.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
+import { createLocalId } from "./localIds.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ServerCadEdge = {
@@ -273,6 +274,8 @@ export type ServerCadResult = {
   positions: number[];
   normals: number[] | null;
   triangleCount: number;
+  faceIds?: string[];
+  faceGroups?: number[];
 };
 
 /**
@@ -345,7 +348,7 @@ export function applyBakedMirror(shape: WorkplaneShape, axis: "x" | "y" | "z", p
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
     const localSolid = cad.translate(reflected, -centerX, -minY, -centerZ);
-    const result = meshedCadResult(cad, localSolid);
+    const result = meshedCadResult(cad, localSolid, shape);
     const normalized = shapeWithCadResult(shape, result);
     return canonicalizeShape({
         ...normalized,
@@ -422,7 +425,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
     const treatedSolids = cad.getSubShapes(treated, "solid");
     const result = treatedSolids.length === 1 ? treatedSolids[0] : treated;
 
-    return meshedCadResult(cad, result);
+    return meshedCadResult(cad, result, shape);
   });
 }
 
@@ -475,12 +478,13 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
     if (!cadResultIsValid(cad, result) || !cad.isSolid(result)) {
       throw new ServerCadError("The draft did not produce a valid solid.");
     }
-    return meshedCadResult(cad, result);
+    const meshed = meshedCadResult(cad, result);
+    return { ...meshed, faceIds: freshFaceIds(cad, result, shape.id) };
   });
 }
 
 /** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */
-export function meshedCadResult(cad: OcctKernel, result: ShapeHandle): ServerCadResult {
+export function meshedCadResult(cad: OcctKernel, result: ShapeHandle, sourceShape?: WorkplaneShape): ServerCadResult {
   const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
   // The editor stores a flat triangle list, not an indexed mesh, so the
   // indices are expanded here rather than carried.
@@ -491,12 +495,76 @@ export function meshedCadResult(cad: OcctKernel, result: ShapeHandle): ServerCad
     positions.push(mesh.positions[offset], mesh.positions[offset + 1], mesh.positions[offset + 2]);
     normals.push(mesh.normals[offset], mesh.normals[offset + 1], mesh.normals[offset + 2]);
   }
+  const faces = cad.getSubShapes(result, "face");
+  const faceIndexByHash = new Map(faces.map((face, index) => [cad.hashCode(face, 2_147_483_647), index]));
+  const faceGroups: number[] = [];
+  for (let group = 0; group + 2 < (mesh.faceGroups?.length ?? 0); group += 3) {
+    const index = faceIndexByHash.get(mesh.faceGroups![group + 2]!);
+    if (index !== undefined) faceGroups.push(mesh.faceGroups![group]!, mesh.faceGroups![group + 1]!, index);
+  }
+  const faceIds = sourceShape ? faceIdsForResult(cad, sourceShape, faces) : undefined;
   return {
     brep: cad.toBREP(result),
     positions,
     normals: normals.length === positions.length ? normals : null,
     triangleCount: mesh.triangleCount,
+    ...(faceIds ? { faceIds } : {}),
+    ...(faceGroups.length ? { faceGroups } : {}),
   };
+}
+
+/**
+ * Keep an ID only when an exact face BREP or a unique planar support surface
+ * occurs on each side. OCCT face ordering and hash codes are kernel details,
+ * so an unmatched or ambiguous face receives a new application ID.
+ */
+function faceIdsForResult(cad: OcctKernel, source: WorkplaneShape, resultFaces: ShapeHandle[]): string[] {
+  const sourceFaces = cad.getSubShapes(orientedSolidForShape(cad, source), "face");
+  const fingerprint = (face: ShapeHandle) => {
+    const brep = cad.toBREP(face);
+    try {
+      if (cad.surfaceType(face) !== "plane") return `brep:${brep}`;
+      const bounds = cad.uvBounds(face);
+      const normal = cad.surfaceNormal(face, (bounds.uMin + bounds.uMax) / 2, (bounds.vMin + bounds.vMax) / 2);
+      const center = cad.getSurfaceCenterOfMass(face);
+      const round = (value: number) => Math.round(value * 1e6) / 1e6;
+      const n = [round(normal.x), round(normal.y), round(normal.z)];
+      const offset = round(center.x * normal.x + center.y * normal.y + center.z * normal.z);
+      return `plane:${n.join(",")}:${offset}`;
+    } catch {
+      return `brep:${brep}`;
+    }
+  };
+  const sourceByBrep = new Map<string, number[]>();
+  sourceFaces.forEach((face, index) => {
+    const key = fingerprint(face);
+    sourceByBrep.set(key, [...(sourceByBrep.get(key) ?? []), index]);
+  });
+  const resultCounts = new Map<string, number>();
+  const resultBreps = resultFaces.map((face) => {
+    const key = fingerprint(face);
+    resultCounts.set(key, (resultCounts.get(key) ?? 0) + 1);
+    return key;
+  });
+  const used = new Set<string>();
+  return resultBreps.map((brep, index) => {
+    const matches = sourceByBrep.get(brep) ?? [];
+    const sourceIndex = matches.length === 1 && resultCounts.get(brep) === 1 ? matches[0] : undefined;
+    const inherited = sourceIndex === undefined
+      ? undefined
+      : source.faceIds?.[sourceIndex] ?? `face_${encodeURIComponent(source.id)}_${sourceIndex}`;
+    if (inherited && !used.has(inherited)) {
+      used.add(inherited);
+      return inherited;
+    }
+    const fresh = createLocalId(`${source.id}-face-${index}`);
+    used.add(fresh);
+    return fresh.startsWith("face_") ? fresh : `face_${fresh}`;
+  });
+}
+
+function freshFaceIds(cad: OcctKernel, solid: ShapeHandle, shapeId: string): string[] {
+  return cad.getSubShapes(solid, "face").map((_, index) => `face_${createLocalId(`${shapeId}-face-${index}`)}`);
 }
 
 
@@ -546,9 +614,16 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
   // keeping it would turn the solid twice. One rebuilt from a stored mesh does
   // not, so its rotation has to stay.
   const bakedRotation = treatmentBakesRotation(shape);
+  const survivingColors = Object.fromEntries(Object.entries(shape.faceColors ?? []).flatMap(([key, color]) => {
+    const id = /^\d+$/.test(key)
+      ? shape.faceIds?.[Number(key)] ?? `face_${encodeURIComponent(shape.id)}_${Number(key)}`
+      : key;
+    return result.faceIds?.includes(id) ? [[id, color] as const] : [];
+  }));
   return canonicalizeShape({
     ...shape,
-    faceColors: undefined,
+    faceIds: result.faceIds,
+    faceColors: Object.keys(survivingColors).length ? survivingColors : undefined,
     kind: "mesh",
     width,
     depth,
@@ -578,6 +653,7 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
       baseHeight: height,
       triangleCount: result.triangleCount,
       sourceFormat: "json",
+      ...(result.faceGroups ? { faceGroups: result.faceGroups } : {}),
     },
     cadBrep: result.brep,
     // The frame says where the stored B-Rep *is*, not where the shape is.

@@ -24,12 +24,13 @@ These are implemented and should not be filed as missing features:
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section DXF
   exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
-  implemented. Face colors are keyed to current face indexes and are discarded
-  when geometry changes. STEP-imported meshes retain compact triangle ranges
-  mapped to those indexes, and the viewport previews assigned colors on those
-  faces, including after reopening a .skf project. Face identity is still
-  positional, and other B-rep-backed shapes without a retained triangle map
-  still need preview mapping.
+  implemented. `GET /faces` exposes stable application-owned IDs alongside
+  compatibility indexes; colors use those IDs and survive project round trips.
+  Unchanged faces retain IDs through CAD treatments when the kernel result can
+  be matched unambiguously; new or ambiguous faces receive new IDs without
+  inherited colors. Viewport and 3MF previews map B-rep triangle groups to the
+  same identities. Numeric face indexes remain supported for older projects
+  and callers.
 - A bounded draft-prism operation is available in the shape inspector, over
   REST, and in the TypeScript and Python clients. The editor builds from a
   retained straight, single-loop sketch extrusion in its local CAD worker and
@@ -83,14 +84,17 @@ project-model decision.
 
 ### 3. Stable face identity and broader preview mapping
 
-The shape inspector lets users add and remove face colors by the positional
-indexes returned from `GET /faces`; the API persists them and 3MF exports them
-per triangle. STEP-imported meshes retain a compact mapping from rendered
-triangle ranges to face indexes, so the viewport previews assigned colors and
-`.skf` preserves that preview after reopening. Geometry edits can invalidate
-positional indexes and clear assignments. Other B-rep-backed shapes without a
-retained triangle map and persistent face identity through topology changes
-remain open.
+**Implemented:** `GET /faces` returns app-owned IDs plus compatibility indexes;
+face colors are keyed by ID and persisted in `.skf`. Viewport and 3MF mapping
+use those IDs for STEP-imported and other B-rep-backed shapes. Unambiguous
+unchanged faces retain their colors through supported CAD treatments; split,
+merged, generated, or otherwise ambiguous faces do not inherit assignments.
+Numeric keys remain supported for existing projects and clients.
+
+**Remaining:** Stable semantic identity across arbitrary topology edits is not
+guaranteed. The kernel may not provide useful correspondence for every
+operation, and geometry signatures are only a best-effort match. Unsupported
+or ambiguous correspondences receive fresh IDs and no inherited color.
 
 ### 4. Geometric sketch constraints and a parametric feature tree
 

@@ -80,7 +80,7 @@ The project and shape are named in the query string rather than the path. That i
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
 
-`PATCH /shapes?projectId=&shapeId=` also accepts `faceColors`, a map from the current CAD face index to a hex color, such as `{ "faceColors": { "0": "#ff0000" } }`. Use `GET /faces` to find indexes. Face colors are persisted, previewed for STEP-imported meshes with retained face groups, and included in 3MF per-triangle material assignments. Geometry edits and CAD treatments discard them; indexes are positional, not persistent face identities.
+`GET /faces?projectId=&shapeId=` returns a positional `index` for compatibility and an app-owned `id` for each face. Use the `id` as the key in `faceColors` when updating a shape, for example `{ "faceColors": { "face_…": "#ff0000" } }`; numeric index keys remain accepted for existing callers. Face IDs are persisted with the shape and colors. When a CAD operation can match an unchanged face unambiguously, its ID and color are retained; generated or ambiguous faces receive new IDs and do not inherit a color. Face colors are previewed on B-rep-backed geometry and included in 3MF per-triangle material assignments.
 
 `format: "dxf"` requires `section: { "plane": "xy", "offset": 4 }` (also `xz` or `yz`). It exports sampled section polylines. SVG section export uses the same contours.
 

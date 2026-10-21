@@ -68,6 +68,8 @@ export const FACE_DIRECTION_NAMES = Object.keys(FACE_DIRECTIONS) as FaceDirectio
 
 export type ServerCadFace = {
   index: number;
+  /** App-owned identity, stable across listings and persisted when referenced. */
+  id: string;
   /** As OCCT names the underlying surface: `plane`, `cylinder`, `bspline`... */
   surfaceType: string;
   area: number;
@@ -127,7 +129,7 @@ function reachAlong(centroid: Vec3, direction: Vec3) {
   return centroid.x * direction.x + centroid.y * direction.y + centroid.z * direction.z;
 }
 
-function faceSummaries(cad: OcctKernel, solid: ShapeHandle): ServerCadFace[] {
+function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape): ServerCadFace[] {
   const faces = cad.getSubShapes(solid, "face");
   const described = faces.map((handle, index) => {
     const normal = faceOutwardNormal(cad, handle);
@@ -140,6 +142,7 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle): ServerCadFace[] {
     const centroid = cad.getSurfaceCenterOfMass(handle);
     return {
       index,
+      id: shape.faceIds?.[index] ?? `face_${encodeURIComponent(shape.id)}_${index}`,
       surfaceType,
       area: cad.getSurfaceArea(handle),
       centroid: { x: centroid.x, y: centroid.y, z: centroid.z },
@@ -173,7 +176,7 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle): ServerCadFace[] {
 
 /** A shape's faces, numbered as a shell request refers to them by index. */
 export function shapeFaces(shape: WorkplaneShape): Promise<ServerCadFace[]> {
-  return withCadKernel((cad) => faceSummaries(cad, orientedSolidForShape(cad, shape)));
+  return withCadKernel((cad) => faceSummaries(cad, orientedSolidForShape(cad, shape), shape));
 }
 
 /**
@@ -342,7 +345,7 @@ export function applyShell(shape: WorkplaneShape, request: ServerCadShellRequest
 
   return withCadKernel((cad) => {
     const solid = orientedSolidForShape(cad, shape);
-    const faces = faceSummaries(cad, solid);
+    const faces = faceSummaries(cad, solid, shape);
     if (faces.length === 0) throw new ServerCadError("That shape has no faces to hollow out.");
 
     const openFaces = resolveOpenFaces(request.openFaces ?? [], faces);
@@ -354,7 +357,7 @@ export function applyShell(shape: WorkplaneShape, request: ServerCadShellRequest
 
     const hollow = hollowedSolid(cad, solid, request.thickness, openFaces);
     try {
-      return meshedCadResult(cad, hollow);
+      return meshedCadResult(cad, hollow, shape);
     } catch {
       // A hollowed loft reaches this: the solid passes every check OCCT can
       // answer and then `toBREP` reads past the end of its own memory. There

@@ -272,8 +272,10 @@ export type WorkplaneShape = {
   material?: string;
   /** General surface appearance for viewport rendering; separate from print material estimates. */
   appearance?: ShapeAppearance;
-  /** Face colors keyed by current CAD face index; geometry edits discard them. */
-  faceColors?: Record<number, string>;
+  /** App-owned face identifiers in CAD listing order. Persisted with the shape. */
+  faceIds?: string[];
+  /** Face colors keyed by stable face ID; numeric keys remain readable for old projects. */
+  faceColors?: Record<string, string>;
   hole?: boolean;
   x: number;
   z: number;

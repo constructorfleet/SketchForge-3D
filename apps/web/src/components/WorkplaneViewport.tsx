@@ -1013,6 +1013,7 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
     return JSON.stringify({
       kind: "mesh",
       mesh: shapeResourceId(shape.importedMesh),
+      faceIds: shape.faceIds ?? null,
       faceColors: shape.faceColors ?? null,
       taper,
       preserve: preservesEdgeTreatmentSize(shape)
@@ -8171,7 +8172,7 @@ function createShapeObject(
           group,
           shape.faceColors && shape.importedMesh.faceGroups?.length
             ? createFaceColorPreviewGeometry(
-                { ...shape.importedMesh, faceGroups: shape.importedMesh.faceGroups },
+                { ...shape.importedMesh, faceGroups: shape.importedMesh.faceGroups, faceIds: shape.faceIds },
                 shape.faceColors,
                 shape.hole ? "#b7c0c9" : resolveShapeAppearance(shape).baseColor,
               )

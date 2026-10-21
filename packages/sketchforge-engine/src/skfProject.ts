@@ -1029,11 +1029,18 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   }
   if (definition.faceColors !== undefined) {
     const colors = objectRecord(definition.faceColors, `${label}.faceColors`);
-    for (const [index, color] of Object.entries(colors)) {
-      if (!/^\d+$/.test(index) || typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color)) {
-        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceColors.${index}` });
+    for (const [faceId, color] of Object.entries(colors)) {
+      if (!(/^(?:\d+|face_.+)$/.test(faceId)) || typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color)) {
+        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceColors.${faceId}` });
       }
     }
+  }
+  if (definition.faceIds !== undefined && (
+    !Array.isArray(definition.faceIds)
+    || definition.faceIds.some((faceId) => typeof faceId !== "string" || !faceId.startsWith("face_"))
+    || new Set(definition.faceIds).size !== definition.faceIds.length
+  )) {
+    throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceIds` });
   }
   ["x", "z", "size", "width", "depth", "height", "rotation"].forEach((field) => finiteNumber(definition[field], `${label}.${field}`));
   if ((definition.width as number) <= 0 || (definition.depth as number) <= 0 || (definition.height as number) <= 0) {

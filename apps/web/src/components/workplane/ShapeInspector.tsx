@@ -164,6 +164,8 @@ export function ShapeInspector({
   const [draftAngle, setDraftAngle] = useState("5");
   const [drafting, setDrafting] = useState(false);
   const [faceColorIndex, setFaceColorIndex] = useState("0");
+  const selectedFaceIndex = Number(faceColorIndex);
+  const selectedFaceKey = shape.faceIds?.[selectedFaceIndex] ?? selectedFaceIndex;
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
@@ -352,18 +354,27 @@ export function ShapeInspector({
                 type="color"
                 aria-label={t("panels.inspector.faceColors.title")}
                 disabled={locked || faceColorIndex.trim() === "" || !Number.isInteger(Number(faceColorIndex)) || Number(faceColorIndex) < 0}
-                value={shape.faceColors?.[Number(faceColorIndex)] ?? solidColor}
-                onChange={(event) => onUpdate({ faceColors: updateFaceColor(shape.faceColors, Number(faceColorIndex), event.currentTarget.value) })}
+                value={shape.faceColors?.[String(selectedFaceKey)] ?? shape.faceColors?.[selectedFaceIndex] ?? solidColor}
+                onChange={(event) => onUpdate({ faceColors: updateFaceColor(shape.faceColors, selectedFaceKey, event.currentTarget.value) })}
               />
               <span>{t("panels.inspector.faceColors.add")}</span>
             </label>
-            {Object.entries(shape.faceColors ?? {}).length ? Object.entries(shape.faceColors ?? {}).sort(([a], [b]) => Number(a) - Number(b)).map(([index, color]) => (
-              <div className="face-color-row" key={index}>
-                <span>{t("panels.inspector.faceColors.index")}: {index}</span>
+            {Object.entries(shape.faceColors ?? {}).length ? Object.entries(shape.faceColors ?? {}).sort(([a], [b]) => {
+              const ai = shape.faceIds?.indexOf(a) ?? -1;
+              const bi = shape.faceIds?.indexOf(b) ?? -1;
+              const aOrder = ai >= 0 ? ai : Number.isFinite(Number(a)) ? Number(a) : Number.POSITIVE_INFINITY;
+              const bOrder = bi >= 0 ? bi : Number.isFinite(Number(b)) ? Number(b) : Number.POSITIVE_INFINITY;
+              return aOrder - bOrder;
+            }).map(([faceKey, color]) => {
+              const faceIndex = shape.faceIds?.indexOf(faceKey) ?? -1;
+              const displayIndex = faceIndex >= 0 ? faceIndex : faceKey;
+              return (
+              <div className="face-color-row" key={faceKey}>
+                <span>{t("panels.inspector.faceColors.index")}: {displayIndex}</span>
                 <span className="color-value">{color.toUpperCase()}</span>
-                <button type="button" disabled={locked} aria-label={t("panels.inspector.faceColors.remove", { index })} onClick={() => onUpdate({ faceColors: updateFaceColor(shape.faceColors, Number(index), null) })}>×</button>
+                <button type="button" disabled={locked} aria-label={t("panels.inspector.faceColors.remove", { index: displayIndex })} onClick={() => onUpdate({ faceColors: updateFaceColor(shape.faceColors, faceKey, null) })}>×</button>
               </div>
-            )) : <p>{t("panels.inspector.faceColors.empty")}</p>}
+            );}) : <p>{t("panels.inspector.faceColors.empty")}</p>}
           </div>
         </section>
       ) : null}

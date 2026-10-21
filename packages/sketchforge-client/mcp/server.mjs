@@ -193,7 +193,7 @@ const tools = [
         id: { type: "string" },
         name: { type: "string" },
         color: { type: "string" },
-        faceColors: { type: "object", description: "Optional colors keyed by current CAD face index, such as {0:'#ff0000'}. Geometry edits discard this map." },
+        faceColors: { type: "object", description: "Optional colors keyed by stable face IDs from sketchforge_list_faces, such as {'face_abc':'#ff0000'}. Numeric face indexes remain accepted for older projects." },
         hole: { type: "boolean" },
         x: { type: "number" },
         z: { type: "number" },
@@ -413,7 +413,7 @@ const tools = [
   // CAD operations use the local engine by default and the server API when a URL is supplied.
   {
     name: "sketchforge_list_faces",
-    description: "List a stored project shape's CAD faces, with the direction name each one can be opened by, so a hollow can leave the right ones off. Works offline or against a server when url is supplied.",
+    description: "List a stored project shape's CAD faces with stable IDs and compatibility indexes, plus the direction name each one can be opened by. Use the stable ID to assign a face color; use the index for treatments, measurements, and shell openings. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "shapeId"],
