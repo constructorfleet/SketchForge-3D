@@ -102,6 +102,7 @@ function stepAssemblyNodeSchema(remainingDepth: number): ApiV1FieldSchema {
     type: "object",
     required: ["name", "children"],
     properties: {
+      id: str,
       name: str,
       children: {
         type: "array",
@@ -139,8 +140,28 @@ const shapeSummary = {
     faceColors: { type: "object", additionalProperties: str },
     stepAssembly: {
       type: "array",
-      description: "Optional STEP product hierarchy metadata. The imported geometry remains a single mesh.",
+      description: "Optional STEP product hierarchy metadata. Imported geometry remains one mesh until exploded.",
       items: stepAssemblyNodeSchema(32),
+    },
+    stepComponent: {
+      type: "object",
+      description: "STEP source occurrence identity and root-to-component ancestry for a selectable exploded solid.",
+      required: ["id", "occurrenceId", "path"],
+      properties: {
+        id: str,
+        occurrenceId: str,
+        path: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["name"],
+            properties: { id: str, name: str },
+            additionalProperties: false,
+          },
+        },
+      },
+      additionalProperties: false,
     },
     hole: { type: "boolean" },
     locked: { type: "boolean" },

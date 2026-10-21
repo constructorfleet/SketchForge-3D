@@ -6,7 +6,7 @@ import { importedShapeFromTriangleSoup } from "./stlImport.js";
 import { stepComponentMetadata, stepShapeKey } from "./stepComponentMetadata.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
-import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectAsset, StepAssemblyNode, StepAssemblyPathNode, WorkplaneShape } from "./domain/sketchforge.js";
 import { meshYawDegrees } from "./workplaneShapes.js";
 
 export const MAX_EXPLODE_SOLIDS = 200;
@@ -15,6 +15,18 @@ const X_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } } 
 
 function boundsOf(cad: Parameters<Parameters<typeof withCadKernel>[0]>[0], shape: ShapeHandle) {
   return cad.getBoundingBox(shape, false);
+}
+
+function leafPaths(nodes: StepAssemblyNode[], parentPath: StepAssemblyPathNode[] = []): StepAssemblyPathNode[][] {
+  return nodes.flatMap((node) => {
+    const path = [...parentPath, { ...(node.id ? { id: node.id } : {}), name: node.name }];
+    return node.children.length ? leafPaths(node.children, path) : [path];
+  });
+}
+
+function uniqueNamedPath(paths: StepAssemblyPathNode[][], name: string) {
+  const matches = paths.filter((path) => path.at(-1)?.name === name);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 /** Turn a STEP-imported mesh shape into one exact mesh/B-rep-backed shape per solid. */
@@ -46,9 +58,17 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     const mirrors = new THREE.Vector3(shape.mirrorX ? -1 : 1, shape.mirrorY ? -1 : 1, shape.mirrorZ ? -1 : 1);
     const parentCenter = new THREE.Vector3(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
     const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
+    const paths = leafPaths(shape.stepAssembly ?? []);
+    const orderedPaths = paths.length === solids.length ? paths : undefined;
+    const occurrencePartIndexes = new Map<string, number>();
 
     return solids.map((solid, index) => {
       const metadata = componentMetadata.bySolid.get(stepShapeKey(cad, solid))?.shift();
+      const path = orderedPaths?.[index] ?? (metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined);
+      const occurrenceId = path?.at(-1)?.id;
+      const occurrencePartIndex = occurrenceId ? (occurrencePartIndexes.get(occurrenceId) ?? 0) : 0;
+      if (occurrenceId) occurrencePartIndexes.set(occurrenceId, occurrencePartIndex + 1);
+      const componentName = orderedPaths ? path?.at(-1)?.name : metadata?.name;
       const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
       const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
       const bounds = boundsOf(cad, positioned);
@@ -64,7 +84,7 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
         positions.push(mesh.positions[vertex]!, mesh.positions[vertex + 1]!, mesh.positions[vertex + 2]!);
         if (mesh.normals.length === mesh.positions.length) normals.push(mesh.normals[vertex]!, mesh.normals[vertex + 1]!, mesh.normals[vertex + 2]!);
       }
-      const child = importedShapeFromTriangleSoup(metadata?.name ?? `${shape.name} ${index + 1}`, positions, normals.length ? normals : undefined, "step");
+      const child = importedShapeFromTriangleSoup(componentName ?? `${shape.name} ${index + 1}`, positions, normals.length ? normals : undefined, "step");
       const offset = new THREE.Vector3(partX, partY - shape.height / 2, partZ).multiply(mirrors).applyMatrix4(rotation).add(parentCenter);
       child.color = metadata?.color ?? shape.color;
       child.material = shape.material;
@@ -82,6 +102,13 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
       child.elevation = offset.y;
       child.z = offset.z;
       child.importedMesh!.brepStep = cad.exportStep(local);
+      if (path && occurrenceId) {
+        child.stepComponent = {
+          id: `${occurrenceId}/solid-${occurrencePartIndex + 1}`,
+          occurrenceId,
+          path,
+        };
+      }
       return child;
     });
   });

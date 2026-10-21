@@ -65,10 +65,20 @@ describe("projects", () => {
 });
 
 describe("shapes", () => {
-  it("keeps STEP assembly hierarchy in summaries without echoing it into patches", () => {
-    const stepAssembly = [{ name: "MainAssembly", children: [{ name: "Sensors", children: [{ name: "SensorLeft", children: [] }] }] }];
-    const summary: ShapeSummary = { ...shapeSummary("s1"), stepAssembly };
+  it("keeps STEP component ancestry in summaries without echoing it into patches", () => {
+    const stepAssembly = [{ id: "step-node:0", name: "MainAssembly", children: [{ id: "step-occurrence:8", name: "Sensors", children: [{ id: "step-occurrence:12", name: "SensorLeft", children: [] }] }] }];
+    const stepComponent = {
+      id: "step-occurrence:12/solid-1",
+      occurrenceId: "step-occurrence:12",
+      path: [
+        { id: "step-node:0", name: "MainAssembly" },
+        { id: "step-occurrence:8", name: "Sensors" },
+        { id: "step-occurrence:12", name: "SensorLeft" },
+      ],
+    };
+    const summary: ShapeSummary = { ...shapeSummary("s1"), stepAssembly, stepComponent };
     expect(shapePatchFromSummary(summary)).not.toHaveProperty("stepAssembly");
+    expect(shapePatchFromSummary(summary)).not.toHaveProperty("stepComponent");
   });
 
   it("returns the created shape rather than the envelope", async () => {
