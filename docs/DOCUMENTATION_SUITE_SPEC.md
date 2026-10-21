@@ -243,6 +243,7 @@ the final acceptance criteria. Those are explicitly deferred to later phases.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
+- **Initial slices implemented:** Parameterized shape requests are generated from the engine request registry and checked for drift. `docs/CLI_REFERENCE.md` is generated from published package entry points and actual CLI usage/help output, and is included by the docs-site build and reference navigation. Remaining: project-format inventory, supported operator configuration, MCP tool schemas, and broader workflow guides.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.

@@ -25,6 +25,7 @@ test("built docs emit the project-site shell, imported README, and local search"
   assert.match(search, /search/i, "built-in client search code should be present");
   assert.match(html, /docs\/packages\/typescript-client/, "package guides should be reachable from site navigation");
   assert.match(html, /docs\/reference\/typescript-client/, "generated API references should be reachable from site navigation");
+  assert.match(html, /docs\/CLI_REFERENCE/, "published CLI reference should be reachable from site navigation");
 });
 
 function walk(directory) {

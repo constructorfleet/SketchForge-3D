@@ -59,6 +59,7 @@ export default defineConfig({
           { text: "Engine API", link: "/docs/reference/typescript-engine" },
           { text: "Python API", link: "/docs/reference/python-client" },
           { text: "Shape requests", link: "/docs/SHAPE_REQUEST_REFERENCE" },
+          { text: "CLI commands", link: "/docs/CLI_REFERENCE" },
         ],
       },
     ],
