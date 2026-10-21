@@ -321,6 +321,22 @@ class ExportsTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/exports?projectId=p1")
         self.assertEqual(opener.calls[0].body, {"format": "stl", "shapeIds": ["s1", "s2"], "name": "Bracket"})
 
+    def test_sends_the_drawing_view_only_for_an_svg_export(self) -> None:
+        opener = FakeOpener({
+            "format": "svg",
+            "filename": "Bracket.svg",
+            "mimeType": "image/svg+xml",
+            "bytes": 5,
+            "shapeCount": 1,
+            "base64": "PHN2Zz4=",
+        })
+
+        result = client(opener).exports.export("p1", "svg", view="top")
+
+        self.assertEqual(result.mime_type, "image/svg+xml")
+        self.assertEqual(result.data, b"<svg>")
+        self.assertEqual(opener.calls[0].body, {"format": "svg", "view": "top"})
+
     def test_writes_export_bytes_to_a_file(self) -> None:
         artifact = bytes(range(256)) * 600
         opener = TransferOpener(

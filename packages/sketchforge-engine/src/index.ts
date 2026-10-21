@@ -134,7 +134,15 @@ export {
   type RadiusUnavailableCode,
 } from "./cadMeasurements.js";
 export { exportShapesToStep, type StepExportResult } from "./stepExport.js";
-export { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportArtifact, type ProjectExportFormat } from "./sceneExport.js";
+export { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportArtifact, type ProjectExportFormat, type ProjectExportOptions } from "./sceneExport.js";
+export {
+  parseProjectionLayout,
+  projectionLayoutForCaptureFace,
+  PROJECTION_LAYOUTS,
+  PROJECTION_VIEWS,
+  type ProjectionLayout,
+  type ProjectionView,
+} from "./cadProjection.js";
 export { meshProjectShapes } from "./projectMeshes.js";
 export { analyzeMeshTopology, type TriangleFace } from "./meshValidation.js";
 export { mirrorShapes } from "./serverShapeGroups.js";

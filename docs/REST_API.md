@@ -57,7 +57,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
 | `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
-| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF or a ZIP kit. |
+| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, or an SVG drawing. |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
@@ -567,21 +567,41 @@ An SVG needs an XML parser the Node runtime does not provide, so a server withou
 ```
 
 `shapeIds` and `name` are optional. The formats are `stl`, `obj`, `3mf`, `step`,
-`skf`, and `zip`. The response includes the filename, MIME type, byte count,
+`skf`, `zip`, and `svg`. The response includes the filename, MIME type, byte count,
 shape count, and base64-encoded `base64` content, so a client can write the
 artifact locally. A ZIP kit contains an STL and the editable SKF project. An
 SKF export includes the project and its source assets. STEP export preserves
 exact solids and reports `exportedCount` and `skipped` shapes; only geometry
 with an exact B-rep mapping is exported.
 
+An `svg` export is a 2D drawing made by the CAD kernel's hidden-line removal
+on the exact solids, so a cylinder's outline is a circle and an edge behind
+another face is drawn dashed. `view` chooses what it shows: `multiview` (the
+default) is a grid of `front`, `top`, `right` and `iso` panels, each with a
+label and an XYZ gnomon, with the part's overall size in a footer; any one of
+`front`, `back`, `top`, `bottom`, `left`, `right` or `iso` is a single unlabelled
+panel of that view. The drawing is in the same Z-up frame as the STL, 3MF and
+STEP exports -- `top` looks down the editor's elevation axis -- and the whole
+scene is drawn as one, so parts occlude each other. Hidden shapes and holes
+are left out, as every mesh export leaves them out. The editor's own SVG
+export still flattens the top view of a mesh in the browser; this one needs
+the server's kernel and takes no mesher.
+
+```json
+// POST /exports?projectId=...
+{ "format": "svg", "view": "top" }
+```
+
 ```json
 { "format": "3mf", "filename": "bracket.3mf", "mimeType": "model/3mf",
   "bytes": 2048, "shapeCount": 2, "base64": "..." }
 ```
 
-Unknown format names answer `400` with `code: "unsupported_format"`. A
-requested shape id outside the project answers `404`; a project with no
-exportable solid geometry answers `422` with `code: "geometry_failed"`.
+Unknown format names answer `400` with `code: "unsupported_format"`, and a
+`view` the drawing does not know, or a `view` on any format but `svg`, answers
+`400` with `code: "invalid_request"`. A requested shape id outside the project
+answers `404`; a project with no exportable solid geometry answers `422` with
+`code: "geometry_failed"`.
 
 ## Example: a plate with a row of holes
 

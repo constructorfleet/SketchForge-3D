@@ -1,5 +1,6 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
+import { parseProjectionLayout, PROJECTION_LAYOUTS } from "@constructorfleet/sketchforge-engine/cadProjection";
 import { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "@constructorfleet/sketchforge-engine/sceneExport";
 
 export const runtime = "nodejs";
@@ -24,6 +25,15 @@ export async function POST(request: Request) {
   if (body.name !== undefined && (typeof body.name !== "string" || body.name.length > 120)) {
     return apiError("name must be a string no longer than 120 characters.", 400, "invalid_request");
   }
+  // `view` chooses what an SVG shows. On any other format it would be silently
+  // ignored, which is the one answer a script cannot tell from success.
+  if (body.view !== undefined && body.format !== "svg") {
+    return apiError("view only applies to the svg format.", 400, "invalid_request");
+  }
+  const view = parseProjectionLayout(body.view);
+  if (view === null) {
+    return apiError(`view must be one of: ${PROJECTION_LAYOUTS.join(", ")}.`, 400, "invalid_request");
+  }
 
   const document = await readProjectDocument(context.root, projectId);
   if (!document) return apiErrors.projectNotFound();
@@ -38,6 +48,7 @@ export async function POST(request: Request) {
       format: body.format as ProjectExportFormat,
       shapeIds: shapeIds ?? undefined,
       name: body.name as string | undefined,
+      view,
     });
     if (new URL(request.url).searchParams.get("download") === "1") {
       // The metadata header includes every field returned by JSON exports,

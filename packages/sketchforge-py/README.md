@@ -83,8 +83,8 @@ client.patterns.ring(project_id, ids, count, center=(0, 0), sweep_angle=None, ro
 client.imports.apply(project_id, file_name, data, media_type=None) -> MeshImportResult
 client.imports.file(project_id, path) -> MeshImportResult
 
-client.exports.export(project_id, format, shape_ids=None, name=None) -> ExportResult
-client.exports.file(project_id, format, path, shape_ids=None, name=None) -> ExportResult
+client.exports.export(project_id, format, shape_ids=None, name=None, view=None) -> ExportResult
+client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None) -> ExportResult
 ```
 
 Shape requests remain ordinary mappings, so existing macros can keep passing
@@ -125,12 +125,15 @@ project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=Non
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
 project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
 project.import_mesh(file_name, data) | import_file(path)
-project.export(format, shape_ids=None, name=None) | export_file(format, path, shape_ids=None, name=None)
+project.export(format, shape_ids=None, name=None, view=None) | export_file(format, path, shape_ids=None, name=None, view=None)
 ```
 
 `import_file` uploads multipart form data, avoiding base64 expansion; `import_mesh`
 continues to accept bytes and uses the JSON API. Exports support `stl`, `obj`,
-`3mf`, `step`, `skf`, and `zip`. `export` returns artifact metadata and bytes;
+`3mf`, `step`, `skf`, `zip`, and `svg`. An `svg` is a hidden-line drawing of the
+exact geometry; `view` picks `multiview` (the default front, top, right and iso
+grid) or any one of `EXPORT_VIEWS`, and the server refuses `view` on any other
+format. `export` returns artifact metadata and bytes;
 `export_file` streams the artifact to a local path and returns the same metadata
 with `data=b""`, so large downloads do not also stay resident in Python memory.
 The download response carries all result metadata, including STEP's skipped

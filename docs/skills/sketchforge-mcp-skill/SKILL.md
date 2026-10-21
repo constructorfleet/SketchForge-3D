@@ -82,7 +82,7 @@ For chamfer/fillet, never guess edge ids.
 
 ## Images
 
-Use `sketchforge_capture_image` for viewport PNGs. `face` can be `current`, `home`, `top`, `bottom`, `front`, `back`, `right`, or `left`. These use the same camera/view-cube orientation logic as the editor UI.
+Use `sketchforge_capture_image` for viewport PNGs. `face` can be `current`, `home`, `top`, `bottom`, `front`, `back`, `right`, or `left`. In editor mode these use the same camera/view-cube orientation logic as the editor UI; in local project mode the PNG is a rasterised hidden-line drawing of the stored geometry, with `home` and `current` giving a four-view grid. Use `sketchforge_project_view` for that drawing as SVG text -- `view` is `multiview` (front, top, right and iso, with a gnomon per panel and the overall size) or any one named view -- which reads without vision.
 
 ## Visual Verification
 

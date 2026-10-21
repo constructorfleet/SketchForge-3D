@@ -286,6 +286,46 @@ describe("the REST API over HTTP", () => {
     expect(refused.body.code).toBe("invalid_request");
   });
 
+  it("draws a round post as a circle, not a polygon", async () => {
+    // The SVG export runs OCCT's hidden-line removal through the same
+    // `serverExternalPackages` path as measuring does, and its whole point is
+    // that a projected curve is a curve: the old client-side export flattened
+    // a triangle mesh, so a cylinder's outline was whatever polygon the mesher
+    // had chosen.
+    const created = await api("/projects", { method: "POST", body: JSON.stringify({ name: "Drawing" }) });
+    const drawingProject = ((created.body.project as Record<string, string>) ?? {}).id;
+    const post = await api(`/shapes?projectId=${drawingProject}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [{ kind: "cylinder", width: 30, depth: 30, height: 12, name: "Post" }] }),
+    });
+    expect(post.status).toBe(201);
+
+    const exported = await api(`/exports?projectId=${drawingProject}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", view: "top" }),
+    });
+    expect(exported.status).toBe(200);
+    expect(exported.body).toMatchObject({ format: "svg", mimeType: "image/svg+xml", filename: "Drawing.svg", shapeCount: 1 });
+    const svg = Buffer.from(exported.body.base64 as string, "base64").toString("utf8");
+
+    const outline = [...svg.matchAll(/<path d="([^"]+)" fill="none" stroke="#111111"/g)]
+      .flatMap((match) => [...match[1].matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((point) => [Number(point[1]), Number(point[2])]));
+    const xs = outline.map(([x]) => x);
+    const ys = outline.map(([, y]) => y);
+    const centre = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+    const radii = outline.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1]));
+    const outer = Math.max(...radii);
+    const rim = radii.filter((radius) => radius > outer * 0.5);
+    expect(rim.length).toBeGreaterThanOrEqual(32);
+    expect((outer - Math.min(...rim)) / outer).toBeLessThan(0.01);
+
+    const grid = await api(`/exports?projectId=${drawingProject}`, { method: "POST", body: JSON.stringify({ format: "svg" }) });
+    expect(grid.status).toBe(200);
+    const sheet = Buffer.from(grid.body.base64 as string, "base64").toString("utf8");
+    for (const label of ["Front", "Top", "Right", "Iso"]) expect(sheet).toContain(`>${label}</text>`);
+    expect(sheet).toContain("30 × 30 × 12 (X×Y×Z)");
+  });
+
   it("repeats, aligns and distributes a row over HTTP", async () => {
     // Its own project: this walks the three arranging routes in the order a
     // script would -- make the copies, line them up, space them out -- and the

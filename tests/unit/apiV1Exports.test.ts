@@ -126,6 +126,56 @@ describe("REST API v1 project exports", () => {
     expect(Buffer.from(artifact.base64, "base64").byteLength).toBe(artifact.bytes);
   }, 90_000);
 
+  it("draws the project as a multiview SVG from the exact geometry", async () => {
+    const projectId = await makeProject();
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg" }),
+    }));
+
+    expect(response.status).toBe(200);
+    const artifact = await response.json() as { format: string; filename: string; mimeType: string; bytes: number; shapeCount: number; base64: string };
+    expect(artifact).toMatchObject({ format: "svg", filename: "Export fixture.svg", mimeType: "image/svg+xml", shapeCount: 1 });
+    const svg = Buffer.from(artifact.base64, "base64").toString("utf8");
+    expect(Buffer.byteLength(svg)).toBe(artifact.bytes);
+    expect(svg.startsWith("<svg")).toBe(true);
+    for (const label of ["Front", "Top", "Right", "Iso"]) expect(svg).toContain(`>${label}</text>`);
+    expect(svg).toContain("20 × 10 × 4 (X×Y×Z)");
+  }, 90_000);
+
+  it("draws one named view when asked, as a file download too", async () => {
+    const projectId = await makeProject();
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}&download=1`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", view: "top" }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/svg+xml");
+    expect(response.headers.get("content-disposition")).toContain("Export%20fixture.svg");
+    const svg = await response.text();
+    expect(svg.startsWith("<svg")).toBe(true);
+    expect(svg).not.toContain(">Front</text>");
+    expect(svg).not.toContain("(X×Y×Z)");
+  }, 90_000);
+
+  it("refuses a view it does not know, and a view on a format that has none", async () => {
+    const projectId = await makeProject();
+    const unknown = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", view: "sideways" }),
+    }));
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toMatchObject({ code: "invalid_request", error: expect.stringContaining("multiview") });
+
+    const misplaced = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "stl", view: "top" }),
+    }));
+    expect(misplaced.status).toBe(400);
+    expect(await misplaced.json()).toMatchObject({ code: "invalid_request" });
+  });
+
   it("rejects an unsupported format before building geometry", async () => {
     const projectId = await makeProject();
     const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {

@@ -168,55 +168,58 @@ async function validateScene(args) {
   return { objectsChecked: shapes.length, topology, clearances, intersections, clearanceMethod: "AABB lower bound; conservative, not exact surface distance.", intersectionMethod: "Manifold intersection volume for overlapping AABB pairs; unsupported or invalid meshes report an error per pair." };
 }
 
-async function captureScene(args) {
+/**
+ * The project drawn by the engine's hidden-line projection.
+ *
+ * One path for the drawing tool, the SVG export and the image capture, so all
+ * three show the same picture. `shapeIds` narrows it to named objects, else to
+ * the local selection, else to the whole scene.
+ */
+async function drawProject(args, view) {
   const id = requireProjectId(args);
-  const { engine, package: enginePackage } = await getBackend();
-  const project = await unwrap(await engine.project(id));
-  const shapes = project.shapes.filter((shape) => !shape.hidden && !shape.hole);
-  const meshes = await enginePackage.meshProjectShapes(shapes);
-  const face = ["home", "top", "bottom", "front", "back", "right", "left"].includes(args.face) ? args.face : "home";
-  const direction = {
-    top: [0, 1, 0], bottom: [0, -1, 0], front: [0, 0, 1], back: [0, 0, -1], right: [1, 0, 0], left: [-1, 0, 0],
-  }[face] ?? [1, 1, 1];
-  const unit = (v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); };
-  const camera = unit(direction);
-  const right = face === "top" ? [1, 0, 0] : face === "bottom" ? [-1, 0, 0] : unit([camera[2], 0, -camera[0]]);
-  const up = face === "top" || face === "bottom" ? [0, 0, -1] : unit([
-    camera[1] * right[2] - camera[2] * right[1],
-    camera[2] * right[0] - camera[0] * right[2],
-    camera[0] * right[1] - camera[1] * right[0],
-  ]);
-  const all = meshes.flatMap((mesh, meshIndex) => mesh.faces.map((faceIndices) => ({
-    meshIndex,
-    points: faceIndices.map((index) => mesh.vertices[index]),
-  })));
-  const projectPoint = (point) => [point[0] * right[0] + point[1] * right[1] + point[2] * right[2], point[0] * up[0] + point[1] * up[1] + point[2] * up[2]];
-  const projected = all.map((triangle) => ({ ...triangle, projected: triangle.points.map(projectPoint), depth: triangle.points.reduce((sum, point) => sum + point.reduce((d, value, i) => d + value * camera[i], 0), 0) / 3 }));
-  const extent = projected.flatMap((triangle) => triangle.projected);
-  const minX = extent.length ? Math.min(...extent.map((p) => p[0])) : -1;
-  const maxX = extent.length ? Math.max(...extent.map((p) => p[0])) : 1;
-  const minY = extent.length ? Math.min(...extent.map((p) => p[1])) : -1;
-  const maxY = extent.length ? Math.max(...extent.map((p) => p[1])) : 1;
-  const width = 960, height = 720, margin = 56;
-  const scale = Math.min((width - margin * 2) / Math.max(maxX - minX, 1), (height - margin * 2) / Math.max(maxY - minY, 1));
-  const screen = ([x, y]) => [width / 2 + (x - (minX + maxX) / 2) * scale, height / 2 - (y - (minY + maxY) / 2) * scale];
-  const xml = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
-  const draw = projected.sort((a, b) => a.depth - b.depth).map(({ meshIndex, points, projected: coordinates }) => {
-    const [a,b,c] = points;
-    const u = b.map((v,i) => v-a[i]), v = c.map((value,i) => value-a[i]);
-    const normal = unit([u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]);
-    const light = unit([0.3, 0.8, 0.6]);
-    const shade = Math.round(0.55 + 0.4 * Math.max(0, normal.reduce((sum, value, i) => sum + value*light[i], 0)));
-    const color = shapes[meshIndex]?.color ?? "#6f8fa8";
-    const hex = /^#[0-9a-f]{6}$/i.test(color) ? color : "#6f8fa8";
-    const channels = [1,3,5].map((index) => Math.min(255, Math.round(parseInt(hex.slice(index,index+2),16)*shade)).toString(16).padStart(2,"0"));
-    const pointsText = coordinates.map((point) => screen(point).join(",")).join(" ");
-    return `<polygon points="${pointsText}" fill="#${channels.join("")}" stroke="#34495a" stroke-width="0.65" stroke-linejoin="round"/>`;
-  }).join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#f5f7f9"/><text x="28" y="36" font-family="sans-serif" font-size="16" fill="#40515e">${xml(project.projectName)} · ${face}</text>${draw}</svg>`;
+  const { store, package: enginePackage } = await getBackend();
+  const document = await store.read(id);
+  if (!document) throw new Error(`Project not found: ${id}`);
+  const requestedIds = Array.isArray(args.shapeIds) && args.shapeIds.length ? args.shapeIds : selectedObjectIds;
+  return enginePackage.exportProjectScene(document, {
+    format: "svg",
+    view,
+    shapeIds: requestedIds.length ? requestedIds : undefined,
+    name: args.name,
+  });
+}
+
+async function projectView(args) {
+  const { package: enginePackage } = await getBackend();
+  const view = enginePackage.parseProjectionLayout(args.view);
+  if (view === null) throw new Error(`view must be one of: ${enginePackage.PROJECTION_LAYOUTS.join(", ")}.`);
+  const artifact = await drawProject(args, view);
+  const svg = Buffer.from(artifact.data).toString("utf8");
+  const response = { view, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.data.byteLength, shapeCount: artifact.shapeCount };
+  if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+    const destination = path.resolve(args.outputPath);
+    writeFileSync(destination, artifact.data);
+    return { ...response, savedTo: destination };
+  }
+  return { ...response, svg };
+}
+
+/**
+ * A PNG of the project, rasterised from the same drawing.
+ *
+ * A named face is that one view; `home` and `current` -- the editor's
+ * three-quarter look -- are the four-view grid, which is the headless answer to
+ * "show me the part". This replaced a hand-written painter's algorithm that
+ * depth-sorted every triangle, which is not a correct occlusion solution.
+ */
+async function captureScene(args) {
+  const { package: enginePackage } = await getBackend();
+  const face = typeof args.face === "string" ? args.face : "home";
+  const view = enginePackage.projectionLayoutForCaptureFace(face);
+  const artifact = await drawProject({ ...args, shapeIds: undefined }, view);
   const sharp = (await import("sharp")).default;
-  const png = await sharp(Buffer.from(svg)).png().toBuffer();
-  return { face, bytesApprox: png.byteLength, dataUrl: `data:image/png;base64,${png.toString("base64")}` };
+  const png = await sharp(Buffer.from(artifact.data)).png().toBuffer();
+  return { face, view, bytesApprox: png.byteLength, dataUrl: `data:image/png;base64,${png.toString("base64")}` };
 }
 
 export async function callLocalEngineTool(name, args = {}) {
@@ -349,6 +352,8 @@ export async function callLocalEngineTool(name, args = {}) {
       return validateScene(args);
     case "sketchforge_capture_image":
       return captureScene(args);
+    case "sketchforge_project_view":
+      return projectView(args);
     case "sketchforge_mirror_objects": {
       const ids = Array.isArray(args.ids) && args.ids.length ? args.ids : selectedObjectIds;
       if (!ids.length || !["x", "y", "z"].includes(args.axis)) throw new Error("mirror_objects requires object ids or a local selection, and axis x, y, or z.");
