@@ -158,6 +158,35 @@ describe("REST API v1 operation contract", () => {
     }
   });
 
+  it("contracts boolean, treatment, shell, and draft-prism runtime behavior", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const keys = ["POST /api/v1/booleans", "POST /api/v1/treatments", "POST /api/v1/shell", "POST /api/v1/draft-prism"];
+    for (const key of keys) {
+      const item = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key)!;
+      expect(item.requestBody).toBeDefined();
+      expect(item.responses).toContain(400);
+      expect(item.responses).toContain(422);
+      expect(item.responseSchemas).toBeDefined();
+      const responses = item.responseSchemas as Record<number, unknown>;
+      for (const status of item.responses ?? []) expect(responses[status]).toBeDefined();
+      expect(responses[200] ?? responses[201]).toMatchObject({
+        type: "object", required: ["shape", "triangles", "revision"],
+      });
+    }
+    expect(contract.validateApiV1RequestBody(keys[0], { solidIds: ["base"], holeIds: ["cutter"] })).toBe(true);
+    expect(contract.validateApiV1RequestBody(keys[0], { solidIds: [], holeIds: ["cutter"] })).toBe(false);
+    expect(contract.validateApiV1RequestBody(keys[1], { kind: "fillet", amount: 1, edges: "all" })).toBe(true);
+    expect(contract.validateApiV1RequestBody(keys[1], { kind: "fillet", amount: 0 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(keys[2], { thickness: 2, openFaces: ["top", 3] })).toBe(true);
+    expect(contract.validateApiV1RequestBody(keys[2], { thickness: 0 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(keys[3], { angle: 5 })).toBe(true);
+    expect(contract.validateApiV1RequestBody(keys[3], { angle: 0 })).toBe(false);
+    const success = { shape: { id: "out", name: "out", kind: "brep", color: "#ffffff", hole: false, locked: false, hidden: false, x: 0, z: 0, elevation: 0, width: 1, depth: 1, rotation: 0, rotationX: 0, rotationZ: 0 }, triangles: 0, revision: 3 };
+    expect(contract.validateApiV1Response(keys[0], 201, success)).toBe(true);
+    expect(contract.validateApiV1Response(keys[1], 200, success)).toBe(true);
+    expect(contract.validateApiV1Response(keys[2], 200, { ...success, triangles: -1 })).toBe(false);
+  });
+
   it("converts unexpected exceptions and malformed response bodies into internal_error", async () => {
     const { withApiV1Contract } = await import("@/lib/apiV1OperationContract");
     const request = new Request("https://example.test/api/v1/projects");

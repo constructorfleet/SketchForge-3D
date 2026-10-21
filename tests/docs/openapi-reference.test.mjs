@@ -74,9 +74,20 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(distribute.requestBody.content["application/json"].schema.properties.spacing.enum, ["gaps", "centers"]);
   assert.deepEqual(distribute.responses["200"].content["application/json"].schema.required, ["moved", "axis", "spacing", "shapes", "revision"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "alignShapes" || operationId === "distributeShapes"), false);
+  for (const [pathName, method, operationId] of [
+    ["/api/v1/booleans", "post", "booleanShapes"],
+    ["/api/v1/treatments", "post", "treatShape"],
+    ["/api/v1/shell", "post", "shellShape"],
+    ["/api/v1/draft-prism", "post", "draftPrism"],
+  ]) {
+    assert.ok(spec.paths[pathName]?.[method], `${method.toUpperCase()} ${pathName} has a verified runtime contract`);
+    assert.equal(spec.paths[pathName][method].operationId, operationId);
+    assert.ok(spec.paths[pathName][method].requestBody.content["application/json"].schema);
+    assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
+  }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 11);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 21);
+  assert.equal(documentedOperationCount, 15);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 17);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

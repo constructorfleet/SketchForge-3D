@@ -112,6 +112,8 @@ function toJsonSchema(schema) {
   if (schema.default !== undefined) result.default = schema.default;
   if (schema.minimum !== undefined) result.minimum = schema.minimum;
   if (schema.maximum !== undefined) result.maximum = schema.maximum;
+  if (schema.exclusiveMinimum !== undefined) result.exclusiveMinimum = schema.exclusiveMinimum;
+  if (schema.exclusiveMaximum !== undefined) result.exclusiveMaximum = schema.exclusiveMaximum;
   if (schema.minimumLength !== undefined) result.minLength = schema.minimumLength;
   if (schema.maximumLength !== undefined) result.maxLength = schema.maximumLength;
   if (schema.pattern !== undefined) result.pattern = schema.pattern;
