@@ -1,14 +1,13 @@
 # Implementation gaps and next steps
 
-Status: refreshed against `main` at `3dc11df` (2026-10-21). PR #142 added
+Status: refreshed against `main` at `aae1285` (2026-10-21). PR #142 added
 independent cubic-Bezier handle depth to the 3D sweep path; PR #146 added a
 local rank-based sketch constraint degree-of-freedom estimate; and PR #147
 preserved STEP component colors in regular imports. These merged steps narrow
 the sweep, sketch, and STEP gaps below but do not provide editable feature
-history and assembly hierarchy. Open PR #153 adds a bounded deterministic
-least-squares solve for coupled supported constraints; the merged baseline
-still uses sequential projection. The new solver is local and bounded, not a
-symbolic or global guarantee. This file tracks
+history and assembly hierarchy. Merged PR #153 adds a bounded deterministic
+least-squares solve for supported coupled constraints. It is a local bounded
+solver, not a symbolic or global guarantee. This file tracks
 user-facing gaps, not every unused OCCT method.
 
 ## Shipped since the earlier audit
@@ -72,19 +71,19 @@ The Sketch workspace has a planar sketch sweep alongside extrusion and
 revolve. The workflow has two stages: draw one or more closed section loops on
 the selected workplane (nested loops become holes and disjoint loops become
 separate swept solids), then switch to the orthogonal plane derived from that
-workplane and draw exactly one open spine. Start the spine near the section
-origin. Each section region is positioned at the spine's first point and
-oriented perpendicular to its initial tangent; the spine may use line or cubic
+workplane and draw exactly one open spine. The new spine's first point snaps to
+the section origin. Each section region is positioned at that point and oriented
+perpendicular to its initial tangent; the first segment must begin perpendicular
+to the section plane. The spine may use line or cubic
 Bezier segments, and OCCT uses rounded-corner transitions. Selecting a spine
 point exposes a 3D depth offset along the section workplane's third axis, so
 connected line and Bezier segments can leave the orthogonal sketch plane. Cubic
 Bezier handles each expose an independent depth on that same workplane axis, so
 the path can bend in 3D between its endpoints; handles without an explicit depth
-inherit their endpoint's depth. The first segment must still start perpendicular
-to the section plane. The editor retains the source sketch profile and marks
-the result as a `sketch-sweep`, but the resulting geometry is baked rather than
-represented by an editable feature-history node. This is a local editor
-operation, not a REST or client-library operation.
+inherit their endpoint's depth. The editor retains the source sketch profile,
+which remains editable, and marks the result as a `sketch-sweep`. The result is
+not a rebuildable, dependency-tracked feature-history node. This is a local
+editor operation, not a REST or client-library operation.
 
 Draft prism remains available in the editor, REST, and client libraries, but
 supports one straight closed sketch loop, draft angles strictly between -45°
@@ -109,41 +108,53 @@ or default color. Existing XCAF label colors and inherited parent colors take
 precedence. Generated STEP fixtures verify component names and explicit XCAF
 colors; constructed GLB payload tests verify the fallback's ambiguity and
 material rules. Arbitrary external STEP variants still need representative
-coverage. Regular STEP import now maps available explicit component colors to
-stable face IDs on its combined mesh. The viewport displays those colors, and
-the IDs and assignments persist with the project. Color extraction is bounded
-to 200 solids and 8 MiB of source data; ambiguous coincident components and
-unavailable or partial color metadata retain the default shape color. The
-import remains one combined mesh rather than editable component objects. The
-explode operation refuses sources above 200 solids or 8 MiB. Nested assembly
-hierarchy is still flattened into independent parts. The current `occt-wasm` XCAF authoring API can create
-only the single-level fixtures covered here: attempts to make a child component
-a nested assembly fail, and compound-based exports round-trip as unnamed flat
-leaves. A representative externally authored nested STEP fixture, plus a
-project-model decision about editable assembly nodes, is required before
-hierarchy preservation can be implemented and verified.
+coverage. Regular STEP import maps available component colors, using
+explicit/inherited XCAF colors and the conservative GLB fallback described
+above, to app-owned face IDs on its combined mesh. These IDs persist with the
+imported shape, and color assignments persist with the project; IDs are not
+deterministic across a fresh re-import. The viewport displays the mapped colors.
+Extraction is bounded to 200 solids and
+8 MiB of source data; ambiguous coincident components or a component without a
+usable color retain the default shape color while other components can still
+receive colors. The import remains one combined mesh rather than editable
+component objects. The explode operation refuses sources above 200 solids or
+8 MiB. Nested assembly hierarchy is still flattened into independent parts.
+The current `occt-wasm` XCAF authoring API has only been verified with
+single-level fixtures; nested authoring attempts have failed, and compound-
+based exports round-trip as unnamed flat leaves. A representative externally
+authored nested STEP fixture, plus a project-model decision about editable
+assembly nodes, is required before hierarchy preservation can be implemented
+and verified.
 
 ### 3. Stable face identity and broader preview mapping
 
-**Implemented:** `GET /faces` returns app-owned IDs plus compatibility indexes;
-face colors are keyed by ID and persisted in `.skf`. Viewport and 3MF mapping
-use those IDs for STEP-imported and other B-rep-backed shapes. Unambiguous
-unchanged faces retain their colors through supported CAD treatments; split,
-merged, generated, or otherwise ambiguous faces do not inherit assignments.
-Numeric keys remain supported for existing projects and clients.
+**Implemented:** `GET /faces` returns an ID and index. If IDs have not been
+materialized on the shape, the response derives them from the shape ID and
+current face index; listing alone does not persist them, so stability depends
+on face ordering until a color update or CAD operation stores IDs. Face colors
+are keyed by ID and persisted in `.skf`. Viewport face-color mapping applies to
+shapes with stored imported-mesh face groups; 3MF triangle mapping uses those
+IDs. Unambiguous unchanged faces retain their colors through supported CAD
+treatments such as fillet, chamfer, shell, and mirror; split, merged, generated,
+or otherwise ambiguous faces do not inherit assignments. Draft prism assigns
+fresh IDs to every result face and drops prior colors. Numeric keys remain
+supported for existing projects and clients.
 
 **Remaining:** Stable semantic identity across arbitrary topology edits is not
-guaranteed. The kernel may not provide useful correspondence for every
-operation, and geometry signatures are only a best-effort match. Unsupported
-or ambiguous correspondences receive fresh IDs and no inherited color.
+guaranteed. Ordinary shape-parameter edits also clear face IDs and colors, even
+when some geometry may be unchanged. The kernel may not provide useful
+correspondence for every operation, and geometry signatures are only a
+best-effort match. Unsupported or ambiguous correspondences receive fresh IDs
+and no inherited color. The ID-to-triangle mapping has focused tests, but lacks
+a full scene-export color regression test.
 
 ### 4. Geometric sketch constraints and a parametric feature tree
 
 `SketchProfile` now optionally stores coincident point pairs, horizontal or
 vertical segments, and fixed point-to-point distances in millimeters. The
-inspector adds and removes these constraints; point drags run a deterministic
-local projection that anchors the dragged points, and the editor reports
-unsatisfied constraint IDs. `.skf` round trips the declarations while older
+inspector adds and removes these constraints; point drags run a bounded
+deterministic damped least-squares solve that anchors the dragged points, and
+the editor reports unsatisfied constraint IDs. `.skf` round trips the declarations while older
 profiles without them remain valid. Splitting a constrained line carries its
 axis constraint to each resulting segment.
 
@@ -155,19 +166,21 @@ parameters because these constraints do not constrain them. At a zero-length
 distance pair, the distance equation has no unique local direction, so the
 report is indeterminate instead of presenting a misleading count. The
 supported relations are translation-invariant, so even a fully constrained
-relative layout retains two global translation freedoms.
+relative layout retains two global translation freedoms. The degree-of-freedom
+estimate is a local rank estimate, not a solvability test.
 
-This remains a local rank estimate at the current geometry, not a full CAD
-solver: it does not prove global solvability, detect every nonlinear or
-second-order dependency, move geometry to satisfy constraints, or provide a
-global nonlinear solve. Extrusion/revolve still bake the resulting geometry
-instead of recomputing a dependency-ordered feature tree. Those capabilities
-remain open work.
+The estimate does not prove global solvability or detect every nonlinear or
+second-order dependency. The drag solver is a bounded local damped least-squares
+solve; incompatible equations, singular systems, or iteration limits can leave
+unsatisfied constraint IDs, which the editor reports. It is not a symbolic or
+globally guaranteed CAD solver. Extrusion/revolve still bake the resulting
+geometry instead of recomputing a dependency-ordered feature tree. Editable
+feature history remains open work.
 
 ## Verification notes
 
 The shipped claims and remaining gaps above were rechecked against `main` at
-  `b831290`, including the engine modules, REST API, client package, project
+`aae1285`, including the engine modules, REST API, client packages, project
 serialization, and editor source. The remaining items are limits in the
 current model or workflows, not unused kernel calls. Recheck limits and surface
 coverage before raising them, especially for large STEP assemblies and
