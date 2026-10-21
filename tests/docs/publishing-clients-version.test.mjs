@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (file) => readFile(new URL(`../../${file}`, import.meta.url), "utf8");
+
+test("publishing clients table shows the current release-please version", async () => {
+  const [guide, manifestText, rootText, engineText, clientText, python] = await Promise.all([
+    read("docs/PUBLISHING_CLIENTS.md"),
+    read(".release-please-manifest.json"),
+    read("package.json"),
+    read("packages/sketchforge-engine/package.json"),
+    read("packages/sketchforge-client/package.json"),
+    read("packages/sketchforge-py/pyproject.toml"),
+  ]);
+  const version = JSON.parse(manifestText)["."];
+  assert.match(version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+  for (const packageText of [rootText, engineText, clientText]) {
+    assert.equal(JSON.parse(packageText).version, version);
+  }
+  assert.match(python, new RegExp(`^version\\s*=\\s*"${version.replaceAll(".", "\\.")}"`, "m"));
+
+  for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
+    const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));
+    assert.ok(row, `missing publishing row for ${name}`);
+    assert.ok(row.endsWith(`| \`${version}\` |`), `${name} row should show ${version}: ${row}`);
+  }
+  assert.doesNotMatch(guide, /the release version/i);
+});
