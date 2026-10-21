@@ -159,6 +159,44 @@ describe("REST API v1 project exports", () => {
     expect(svg).not.toContain("(X×Y×Z)");
   }, 90_000);
 
+  it("exports exact contours cut by a named axis plane", async () => {
+    const projectId = await makeProject();
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "xy", offset: 2 } }),
+    }));
+
+    expect(response.status).toBe(200);
+    const artifact = await response.json() as { base64: string; bytes: number; shapeCount: number };
+    const svg = Buffer.from(artifact.base64, "base64").toString("utf8");
+    expect(Buffer.byteLength(svg)).toBe(artifact.bytes);
+    expect(artifact.shapeCount).toBe(1);
+    expect(svg).toContain('data-plane="xy"');
+    expect(svg).toContain('data-offset="2"');
+    expect(svg).toContain("<path");
+  }, 90_000);
+
+  it("validates section parameters and keeps them separate from projection views", async () => {
+    const projectId = await makeProject();
+    const invalidPlane = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "oblique", offset: 0 } }),
+    }));
+    expect(invalidPlane.status).toBe(400);
+
+    const both = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "xy", offset: 2 }, view: "top" }),
+    }));
+    expect(both.status).toBe(400);
+
+    const outOfRange = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "xy", offset: 100_001 } }),
+    }));
+    expect(outOfRange.status).toBe(400);
+  });
+
   it("refuses a view it does not know, and a view on a format that has none", async () => {
     const projectId = await makeProject();
     const unknown = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {

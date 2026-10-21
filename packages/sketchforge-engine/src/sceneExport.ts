@@ -3,6 +3,7 @@ import { meshProjectShapes } from "./projectMeshes.js";
 import { exportShapesToStep } from "./stepExport.js";
 import { exportSkfProject } from "./skfProject.js";
 import { projectShapesToSvg } from "./serverCadProjection.js";
+import { sectionShapesToSvg, type SectionOptions } from "./serverCadSection.js";
 import type { ProjectionLayout } from "./cadProjection.js";
 import type { ProjectDocument } from "./serverProjectDocument.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
@@ -97,6 +98,8 @@ export type ProjectExportOptions = {
    * it there rather than ignoring it.
    */
   view?: ProjectionLayout;
+  /** Section contours for a named drawing-coordinate plane; SVG only. */
+  section?: SectionOptions;
 };
 
 export async function exportProjectScene(
@@ -107,6 +110,8 @@ export async function exportProjectScene(
   const shapes = document.shapes.filter((shape) => !requested || requested.has(shape.id));
   const baseName = (options.name?.trim() || document.projectName || "SketchForge project").replace(/[\\/:*?\"<>|]/g, "_");
   const format = options.format;
+  if (options.section && format !== "svg") throw new Error("section only applies to the svg format.");
+  if (options.section && options.view !== undefined) throw new Error("section and view cannot be used together.");
 
   if (format === "skf") {
     const data = await skfBytes(document, shapes);
@@ -121,6 +126,10 @@ export async function exportProjectScene(
   const visible: WorkplaneShape[] = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
   if (!visible.length) throw new Error("No visible solid objects to export.");
   if (format === "svg") {
+    if (options.section) {
+      const svg = await sectionShapesToSvg(visible, options.section);
+      return { format, filename: `${baseName}.svg`, mimeType: "image/svg+xml", data: new TextEncoder().encode(svg), shapeCount: visible.length };
+    }
     // Drawn from the exact solids by hidden-line removal, not from the meshes
     // below: a projected circle stays a circle.
     const svg = await projectShapesToSvg(visible, { view: options.view });

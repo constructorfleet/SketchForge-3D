@@ -327,6 +327,16 @@ ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip", "svg"]
 ExportView = Literal["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]
 EXPORT_VIEWS = ("multiview", "front", "back", "top", "bottom", "left", "right", "iso")
 
+ExportSectionPlane = Literal["xy", "xz", "yz"]
+EXPORT_SECTION_PLANES = ("xy", "xz", "yz")
+
+
+class ExportSection(TypedDict):
+    """An axis-aligned section in drawing coordinates; offset is in millimetres."""
+
+    plane: ExportSectionPlane
+    offset: float
+
 #: ``[distance from the axis, position along it]``.
 ProfilePoint = Sequence[float]
 
