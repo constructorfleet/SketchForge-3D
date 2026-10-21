@@ -85,83 +85,52 @@ test("built pages identify their release and link to source at the represented r
     "the package guide should link to its exact source revision");
 });
 
-test("documentation suite status distinguishes merged work from open PRs", () => {
+test("documentation status records durable capabilities and outstanding requirements", () => {
   const spec = readFileSync(new URL("../../docs/DOCUMENTATION_SUITE_SPEC.md", import.meta.url), "utf8");
-  const changelog = readFileSync(new URL("../../docs/CHANGELOG.md", import.meta.url), "utf8");
   const migration = readFileSync(new URL("../../docs/site-migration.md", import.meta.url), "utf8");
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
-  assert.match(spec, /first GitHub Pages deployment after PR #116 merged succeeded/i);
-  assert.match(spec, /verified against `origin\/main` at `1c8e820` and live PR state/i);
-  assert.match(spec, /runtime-backed `GET \/faces` contract \(#151\)/i);
-  assert.match(spec, /PR #162 merged Mermaid fence rendering/i);
-  assert.match(spec, /Open PR #168.*revolve source persistence \(#181\).*STEP component ancestry \(#183\).*not on `main`/i);
-  assert.match(spec, /Open PR #187.*historical inbound-link inventory/i);
-  assert.match(spec, /Open PR #188 proposes persisted source-sketch nodes and editor rebuild identity for sweeps/i);
-  assert.match(spec, /Open PR #194 proposes `PATCH \/api\/v1\/shapes` support for sweep profile updates and rebuilds; both remain unmerged, so `main` still lacks REST sweep profile rebuild/i);
-  assert.match(spec, /Open PR #182 proposes runtime-backed contracts.*9 of 32 registered operations/i);
-  assert.match(spec, /Publishing clients version row — closed by #156 and #167/i);
-  assert.match(spec, /Cross-links between documentation and references — closed by #157/i);
-  assert.match(spec, /Engine npm listing and generated reference — closed by #158/i);
-  assert.match(spec, /Remote failures are advisory; internal broken links stay blocking/i);
-  assert.match(spec, /REST reference authoritative for the whole API/i);
-  assert.match(spec, /Main currently covers seven operations and records 25 of 32 registered operations as omitted/i);
-  assert.match(capabilities, /shipped capabilities verified against `origin\/main` at `1c8e820`/i);
+  assert.match(spec, /Current implementation status/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes nine and explains why 23 remain omitted/i);
+  assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
+  assert.match(spec, /Generators currently write outputs including/i);
+  assert.match(spec, /`docs\/openapi-v1\.json` is a tracked generated artifact linked directly from `docs\/REST_API\.md`/i);
+  assert.match(spec, /run `docs:generate` before freshness checks and site builds/i);
+  assert.match(spec, /source change refreshes generated output instead of failing merely because a committed generated copy is stale/i);
+  assert.match(spec, /CI must regenerate the allowlisted generated files and commit refreshed files to the PR branch/i);
+  assert.match(spec, /then run required checks for the resulting commit/i);
+  assert.match(spec, /Broader task-oriented workflows, complete REST contracts/i);
+  assert.match(spec, /Publishing-client version — closed/i);
+  assert.match(spec, /Cross-links between documentation and references — closed/i);
+  assert.match(spec, /Engine package documentation — closed/i);
+  assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
+  assert.match(spec, /nine of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /Generated Markdown may remain tracked/i);
+
+  assert.match(migration, /Nine operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
+  assert.match(migration, /`docs\/openapi-v1\.json` is currently\s+a tracked generated artifact/i);
+  assert.match(migration, /run `docs:generate` before `docs:check` and\s+the site build/i);
+  assert.match(migration, /commit refreshed allowlisted outputs to the PR branch/i);
+  assert.match(migration, /run required\s+checks against the resulting commit/i);
+  assert.match(migration, /historical inbound-link inventory/i);
+  assert.match(migration, /broader task-oriented guides and corresponding workflow\s+checks remain incomplete/i);
+
+  assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
+  assert.match(capabilities, /Broader and editable drafting/i);
+  assert.match(capabilities, /Editable STEP assembly hierarchy and robust component association/i);
+  assert.match(capabilities, /Stable face identity across arbitrary topology changes/i);
+  assert.match(capabilities, /Broader sketch constraints and globally determined solutions/i);
+  assert.match(capabilities, /source-sketch nodes and feature inputs for sketch extrusions,\s+revolves, and sweeps/i);
+  assert.match(capabilities, /`sketchProfile`[\s\S]*?`PATCH \/api\/v1\/shapes`[\s\S]*?retaining shape and source IDs/i);
+  assert.match(capabilities, /retains `stepComponent` source\s+occurrence identity and root-to-component ancestry/i);
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);
   assert.match(capabilities, /report unsatisfied constraint IDs/i);
   assert.match(capabilities, /does not guarantee global solvability/i);
-  assert.match(capabilities, /shape-parameter edits and supported CAD\s+treatments when faces can be matched uniquely/i);
-  assert.match(capabilities, /new or ambiguous faces get\s+fresh IDs and do not inherit colors/i);
-  assert.match(capabilities, /separate source-sketch node and explicit feature input for\s+sketch extrusions/i);
-  assert.match(capabilities, /Open PR #181[\s\S]*?proposes the equivalent source and edit\/rebuild slice for revolves/i);
-  assert.match(capabilities, /Open PR #188[\s\S]*?proposes a persisted sweep source node and feature input/i);
-  assert.match(capabilities, /Open PR #194[\s\S]*?proposes `PATCH \/api\/v1\/shapes` support for `sketchProfile`[\s\S]*?Both #188 and\s+#194 remain open/i);
-  assert.match(capabilities, /do not yet make\s+a general dependency-ordered feature tree/i);
-  assert.match(capabilities, /On `main`, the API has no dedicated\s+profile-edit\/rebuild request/i);
-  assert.match(capabilities, /STEP imports can expose bounded product names and nested `stepAssembly`\s+hierarchy metadata/i);
-  assert.match(capabilities, /`POST \/explode` creates independently\s+selectable and movable top-level shapes/i);
-  assert.match(capabilities, /PR #183[\s\S]*?`stepComponent` metadata[\s\S]*?not merged to `main`/i);
-  assert.match(capabilities, /PR #180 also verifies face 0 at ±30° along \+X.*face 2 at \+10° along \+Y/is);
   assert.match(capabilities, /selectable local CAD pull axis/i);
-  assert.doesNotMatch(spec, /before the first deployment|first published deployment.*not verified|Pages publishing source.*not changed/i);
 
-  assert.match(changelog, /first GitHub Pages deployment after PR #116\s+merged succeeded/i);
-  assert.match(changelog, /Merged PR #118/i);
-  assert.match(changelog, /Merged PRs #120 and #125/i);
-  assert.match(changelog, /Merged PR #121/i);
-  assert.match(changelog, /Merged PR #123/i);
-  assert.match(changelog, /Merged PR #119 clarifies STEP color fallback/i);
-  assert.match(changelog, /MCP tool schema reference/i);
-  assert.match(changelog, /Merged PR #122/i);
-  assert.match(changelog, /PR #126 added version, revision, and pinned source links/i);
-  assert.match(changelog, /Merged PR #128 wired/i);
-  assert.match(changelog, /Merged PR #116/i);
-  assert.match(changelog, /Merged PR #117/i);
-  assert.doesNotMatch(changelog, /before the first deployment|must select GitHub Actions as the publishing source/i);
-
-  assert.match(migration, /first GitHub Pages deployment after PR #116\s+merged succeeded/i);
-  assert.match(migration, /package references and executable examples merged in PR #118/i);
-  assert.match(migration, /`GET \/faces` and `PATCH \/shapes` stable face color\s+contracts merged in PRs #120 and #125/i);
-  assert.match(migration, /operator configuration \(#121\), `\.skf` format \(#123\), and MCP schema\/navigation\s+\(#122\) references have merged/i);
-  assert.match(migration, /STEP color guidance merged in PR #119/i);
-  assert.match(migration, /deterministic reference-generator\s+checks merged in PR #128/i);
-  assert.match(migration, /site version\/revision stamps and pinned source links merged in\s+PR #126/i);
-  assert.match(migration, /PR #144 added generated OpenAPI for\s+six schema-backed CRUD operations/i);
-  assert.match(migration, /Merged PR #151 adds runtime-backed `GET \/faces` query and response coverage/i);
-  assert.match(migration, /STEP component-color\s+import support merged in PR #147/i);
-  assert.match(migration, /face identity parity \(#145\) have merged/i);
-  assert.match(migration, /browser smoke checks merged in PR #141/i);
-  assert.match(migration, /external-link report merged in PR #143/i);
-  assert.match(spec, /editor quick-start \(#150\).*merged/i);
-  assert.match(migration, /tested editor quick-start from first\s+sketch through save\/export merged in PR #150/i);
-  assert.match(migration, /Merged PR #156 resolves the publishing-clients version gap/i);
-  assert.match(migration, /Merged PR #157 adds useful contextual links/i);
-  assert.match(migration, /Merged PR #158 expands the engine package README and generated TypeScript/i);
-  assert.match(migration, /Open PR #187 proposes an inventory of repository-controlled historical\s+inbound documentation paths/i);
-  assert.match(migration, /Open PR #188 proposes persisted sweep source\s+sketches, and open PR #194 proposes the REST profile-update\/rebuild request/i);
-  assert.match(migration, /PR #162 merged Mermaid fence rendering and CI checks/i);
-  assert.match(migration, /broader task guides remain outstanding/i);
-  assert.doesNotMatch(migration, /still needs to be set|before the first deployment|could not be confirmed/i);
+  const statusDocs = `${spec}\n${migration}\n${capabilities}`;
+  assert.doesNotMatch(statusDocs, /Open PR #\d+|Merged PR #\d+|origin\/main at `?[0-9a-f]{7,}/i);
+  assert.doesNotMatch(spec, /seven operations|25 of 32|still lacks REST sweep profile rebuild|release PR #184/i);
 });
 
 test("built docs support accessible keyboard navigation and a narrow viewport", async () => {
@@ -362,7 +331,7 @@ test("a mermaid diagram on a built page renders with labels that fit their nodes
     }));
 
     assert.equal(pageErrors.length, 0, `the diagram should render without page errors: ${pageErrors.join("; ")}`);
-    assert.equal(diagram.nodes, 5, "the documentation pipeline diagram should render every stage");
+    assert.equal(diagram.nodes, 6, "the documentation pipeline diagram should render every stage");
     assert.ok(diagram.labels.some((label) => /docs:check/.test(label)), "diagram labels come from the committed fence");
     assert.deepEqual(diagram.clipped, [], "node labels must fit inside their nodes rather than overflowing the border");
   } finally {
