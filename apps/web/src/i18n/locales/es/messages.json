@@ -743,7 +743,8 @@
         "smooth": "Suave",
         "smoothTitle": "Convertir en punto suave",
         "split": "Separar",
-        "splitTitle": "Separar los controladores"
+        "splitTitle": "Separar los controladores",
+        "sweepDepth": "Profundidad 3D (mm)"
       },
       "notice": {
         "shapeMoved": "Se movió la forma del boceto",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Dibuja y cierra uno o más contornos centrados en el origen (0,0) del plano seleccionado. Cada cierre cambia al plano ortogonal de la trayectoria. Vuelve al plano de sección para añadir más contornos y cambia al plano de la trayectoria cuando termines.",
       "sweepSpineStage": "Paso 2 de 2 · Trayectoria en el plano ortogonal",
       "sweepSpineAxes": "En este plano, la derecha de la pantalla sigue {right} y la parte superior sigue {up}.",
-      "sweepSpineHelp": "Inicia la trayectoria en el origen de la sección (0,0). El primer segmento se ajusta hacia la derecha de la pantalla para mantener la sección perpendicular a la tangente inicial; los siguientes giros quedan libres.",
+      "sweepSpineHelp": "Inicia la trayectoria en el origen de la sección (0,0). El primer segmento se ajusta a la derecha para mantener la sección perpendicular a la tangente inicial. Selecciona un punto y asigna la profundidad 3D (mm) para sacarlo de este plano.",
       "sweepSectionPlane": "Editar sección · plano seleccionado",
       "sweepSpinePlane": "Dibujar trayectoria · plano ortogonal"
     }

@@ -59,15 +59,18 @@ separate swept solids), then switch to the orthogonal plane derived from that
 workplane and draw exactly one open, planar spine. Start the spine near the
 section origin. Each section region is positioned at the spine's first point
 and oriented perpendicular to its initial tangent; the spine may use line or
-cubic Bezier segments, and OCCT uses rounded-corner transitions. The editor
-retains the source sketch profile and marks the result as a `sketch-sweep`, but
-the resulting geometry is baked rather than represented by an editable
-feature-history node. This is a local editor operation, not a REST or
-client-library operation.
+cubic Bezier segments, and OCCT uses rounded-corner transitions. Selecting a
+spine point exposes a 3D depth offset along the section workplane's third axis,
+so connected line and Bezier segments can leave the orthogonal sketch plane.
+The first segment must still start perpendicular to the section plane. The
+editor retains the source sketch profile and marks the result as a
+`sketch-sweep`, but the resulting geometry is baked rather than represented by
+an editable feature-history node. This is a local editor operation, not a REST
+or client-library operation.
 
 Draft prism remains available in the editor, REST, and client libraries, but
 supports one straight closed sketch loop and also stores baked geometry. More
-work remains for arbitrary 3D sweep paths, face-based drafting, and
+work remains for free 3D curve-handle control, face-based drafting, and
 dependency-ordered editable feature history.
 
 ### 2. STEP assembly hierarchy and color verification

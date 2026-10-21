@@ -743,7 +743,8 @@
         "smooth": "Lisse",
         "smoothTitle": "Convertir en point lisse",
         "split": "Séparer",
-        "splitTitle": "Séparer les poignées"
+        "splitTitle": "Séparer les poignées",
+        "sweepDepth": "Profondeur 3D (mm)"
       },
       "notice": {
         "shapeMoved": "Forme de l’esquisse déplacée",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Dessinez et fermez une ou plusieurs sections centrées sur l’origine (0,0) du plan sélectionné. Chaque fermeture passe au plan orthogonal du chemin. Revenez au plan de section pour en ajouter, puis passez au plan du chemin lorsque vous avez terminé.",
       "sweepSpineStage": "Étape 2 sur 2 · Chemin sur le plan orthogonal",
       "sweepSpineAxes": "Sur ce plan, la droite de l’écran suit {right} et le haut suit {up}.",
-      "sweepSpineHelp": "Commencez le chemin à l’origine de la section (0,0). Le premier segment s’aligne sur la droite de l’écran pour garder la section perpendiculaire à la tangente initiale ; les virages suivants restent libres.",
+      "sweepSpineHelp": "Commencez le chemin à l’origine de la section (0,0). Le premier segment s’aligne à droite pour garder la section perpendiculaire à la tangente initiale. Sélectionnez un point du chemin et réglez sa profondeur 3D (mm) pour le déplacer hors de ce plan.",
       "sweepSectionPlane": "Modifier la section · plan sélectionné",
       "sweepSpinePlane": "Dessiner le chemin · plan orthogonal"
     }

@@ -60,6 +60,7 @@ type SketchWorkspaceProps = {
   onMoveHandle: (id: string, handle: "in" | "out", point: { x: number; z: number }) => void;
   onInsertPoint: (segmentId: string, point: { x: number; z: number }, amount: number) => void;
   onSetPointMode: (id: string, mode: "corner" | "smooth" | "split") => void;
+  onSetSweepDepth: (id: string, depth: number) => void;
   onClearMeasurement: () => void;
 };
 
@@ -509,6 +510,7 @@ export function SketchWorkspace({
   onMoveHandle,
   onInsertPoint,
   onSetPointMode,
+  onSetSweepDepth,
   onClearMeasurement,
 }: SketchWorkspaceProps) {
   const t = useTranslations();
@@ -1149,29 +1151,36 @@ export function SketchWorkspace({
           ) : null}
           <g className="sketch-points">
             {visiblePoints.map((point) => (
-              <circle
-                data-sketch-entity="point"
-                data-sweep-role={sweepRoles.pointRoles.get(point.id)}
-                className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""} ${sweepRoles.pointRoles.has(point.id) ? `sweep-${sweepRoles.pointRoles.get(point.id)}` : ""}`}
-                key={point.id}
-                cx={point.x}
-                cy={point.z}
-                r={pointRadius}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (event.button === 1) {
-                    beginPan(event);
-                  } else if (tool === "erase" || tool === "refine") {
-                    onDeletePoint(point.id);
-                  } else if (event.button === 0 && tool === "select") {
-                    onPointPress(point.id);
-                    beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, current: { x: point.x, z: point.z } });
-                  } else if (event.button === 0) {
-                    onPointPress(point.id);
-                  }
-                }}
-              />
+              <g key={point.id}>
+                {point.sweepRole === "spine" && Math.abs(point.sweepDepth ?? 0) > 1e-9 ? (
+                  <text className="sketch-sweep-depth-label" x={point.x + pointRadius * 1.5} y={point.z - pointRadius * 1.5} fontSize={10 * screenUnit} pointerEvents="none">
+                    {`${point.sweepDepth! > 0 ? "+" : ""}${point.sweepDepth!.toFixed(1)} mm`}
+                  </text>
+                ) : null}
+                <circle
+                  data-sketch-entity="point"
+                  data-sweep-role={sweepRoles.pointRoles.get(point.id)}
+                  className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""} ${sweepRoles.pointRoles.has(point.id) ? `sweep-${sweepRoles.pointRoles.get(point.id)}` : ""}`}
+                  data-sweep-depth={point.sweepDepth ?? undefined}
+                  cx={point.x}
+                  cy={point.z}
+                  r={pointRadius}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (event.button === 1) {
+                      beginPan(event);
+                    } else if (tool === "erase" || tool === "refine") {
+                      onDeletePoint(point.id);
+                    } else if (event.button === 0 && tool === "select") {
+                      onPointPress(point.id);
+                      beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, current: { x: point.x, z: point.z } });
+                    } else if (event.button === 0) {
+                      onPointPress(point.id);
+                    }
+                  }}
+                />
+              </g>
             ))}
           </g>
           {selectedImage && selectedImageBounds && tool === "select" ? (
@@ -1253,6 +1262,9 @@ export function SketchWorkspace({
       ) : null}
       {selectedPoint && tool === "select" ? (
         <div className="sketch-point-actions" aria-label={t("workspace.sketch.point.actions")}>
+          {operation === "sweep" && spineStage && selectedPoint.sweepRole === "spine" ? (
+            <SketchSweepDepthInput point={selectedPoint} onSetDepth={onSetSweepDepth} />
+          ) : null}
           <button type="button" title={t("workspace.sketch.point.cornerTitle")} onClick={() => onSetPointMode(selectedPoint.id, "corner")}><CornerDownRight /><span>{t("workspace.sketch.point.corner")}</span></button>
           <button type="button" title={t("workspace.sketch.point.smoothTitle")} onClick={() => onSetPointMode(selectedPoint.id, "smooth")}><Waves /><span>{t("workspace.sketch.point.smooth")}</span></button>
           <button type="button" title={t("workspace.sketch.point.splitTitle")} onClick={() => onSetPointMode(selectedPoint.id, "split")}><Split /><span>{t("workspace.sketch.point.split")}</span></button>
@@ -1270,6 +1282,29 @@ export function SketchWorkspace({
         <SnapGridControl snap={snap} snapOpen={snapOpen} onSnapChange={setSnap} onSnapOpenChange={setSnapOpen} />
       </div>
     </main>
+  );
+}
+
+function SketchSweepDepthInput({ point, onSetDepth }: { point: SketchPoint; onSetDepth: (id: string, depth: number) => void }) {
+  const t = useTranslations();
+  const [draft, setDraft] = useState(String(point.sweepDepth ?? 0));
+  useEffect(() => setDraft(String(point.sweepDepth ?? 0)), [point.id, point.sweepDepth]);
+  return (
+    <label className="sketch-sweep-depth">
+      <span>{t("workspace.sketch.point.sweepDepth")}</span>
+      <input
+        type="number"
+        step="0.1"
+        value={draft}
+        aria-label={t("workspace.sketch.point.sweepDepth")}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onBlur={() => {
+          const value = Number(draft);
+          if (Number.isFinite(value)) onSetDepth(point.id, value);
+          else setDraft(String(point.sweepDepth ?? 0));
+        }}
+      />
+    </label>
   );
 }
 

@@ -841,7 +841,8 @@
         "smooth": "Smooth",
         "smoothTitle": "Make smooth",
         "split": "Split",
-        "splitTitle": "Split handles"
+        "splitTitle": "Split handles",
+        "sweepDepth": "3D depth (mm)"
       },
       "notice": {
         "shapeMoved": "Sketch shape moved",
@@ -886,7 +887,7 @@
       "sweepSectionHelp": "Draw and close one or more section loops centered at the selected plane origin (0,0). Each closure switches to the orthogonal spine plane. Return to the section plane to add more loops, then switch to the spine plane when done.",
       "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
       "sweepSpineAxes": "On this plane, screen-right follows {right} and screen-up follows {up}.",
-      "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent; later bends are free.",
+      "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent. Select a spine point and set 3D depth (mm) to move it out of this plane.",
       "sweepSectionPlane": "Edit section · selected plane",
       "sweepSpinePlane": "Draw spine · orthogonal plane"
     }

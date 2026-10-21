@@ -743,7 +743,8 @@
         "smooth": "Hladký",
         "smoothTitle": "Změnit na hladký bod",
         "split": "Rozdělit",
-        "splitTitle": "Rozdělit úchyty"
+        "splitTitle": "Rozdělit úchyty",
+        "sweepDepth": "3D hloubka (mm)"
       },
       "notice": {
         "shapeMoved": "Tvar náčrtu přesunut",
@@ -788,7 +789,7 @@
       "sweepSectionHelp": "Nakreslete a uzavřete jeden nebo více profilů se středem v počátku (0,0) vybrané roviny. Po každém uzavření se přepne na kolmou rovinu dráhy. Vraťte se na rovinu profilu, chcete-li přidat další, a po dokončení přepněte na rovinu dráhy.",
       "sweepSpineStage": "Krok 2 ze 2 · Dráha na kolmé rovině",
       "sweepSpineAxes": "Na této rovině odpovídá směr doprava na obrazovce {right} a směr nahoru {up}.",
-      "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí ke směru doprava na obrazovce, aby profil zůstal kolmý k počáteční tečně; další ohyby jsou volné.",
+      "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí doprava, aby profil zůstal kolmý k počáteční tečně. Vyberte bod dráhy a nastavte 3D hloubku (mm), chcete-li jej posunout mimo tuto rovinu.",
       "sweepSectionPlane": "Upravit profil · vybraná rovina",
       "sweepSpinePlane": "Kreslit dráhu · kolmá rovina"
     }

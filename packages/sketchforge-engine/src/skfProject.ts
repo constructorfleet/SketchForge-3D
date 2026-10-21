@@ -955,6 +955,10 @@ function validateSketchProfile(value: unknown, label: string) {
     pointIds.add(id);
     finiteNumber(point.x, `${label}.points[${index}].x`);
     finiteNumber(point.z, `${label}.points[${index}].z`);
+    if (point.sweepDepth !== undefined) {
+      finiteNumber(point.sweepDepth, `${label}.points[${index}].sweepDepth`);
+      if (point.sweepRole !== "spine") throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].sweepDepth` });
+    }
     if (point.sweepRole !== undefined && point.sweepRole !== "section" && point.sweepRole !== "spine") {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].sweepRole` });
     }

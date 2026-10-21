@@ -130,6 +130,8 @@ export type SketchPoint = {
   x: number;
   z: number;
   sweepRole?: "section" | "spine";
+  /** Millimeter offset along the section workplane's z axis for 3D sweep spine points. */
+  sweepDepth?: number;
   handleIn?: { x: number; z: number };
   handleOut?: { x: number; z: number };
   mode?: "corner" | "smooth" | "split";

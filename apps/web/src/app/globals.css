@@ -4277,6 +4277,15 @@ button {
   stroke-width: 2;
 }
 
+.sketch-sweep-depth-label {
+  fill: #7e164f;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
 .sketch-plate.operation-sweep .sketch-points circle[data-sweep-role].selected {
   fill: #ffb24b;
   stroke: #9d4d00;
@@ -4369,7 +4378,7 @@ button {
 
 .sketch-point-actions {
   position: absolute;
-  bottom: 12px;
+  bottom: 52px;
   left: 50%;
   z-index: 9;
   display: flex;
@@ -4408,6 +4417,28 @@ button {
 .sketch-point-actions svg {
   width: 17px;
   height: 17px;
+}
+
+.sketch-sweep-depth {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  color: #435d72;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sketch-sweep-depth input {
+  width: 76px;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #cad9e3;
+  border-radius: 8px;
+  color: #19374e;
+  background: white;
+  font: inherit;
 }
 
 .sketch-constraint-inspector {

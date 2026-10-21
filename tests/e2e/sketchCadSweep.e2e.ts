@@ -120,6 +120,26 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
     }
   });
 
+  it("uses a spine point's out-of-plane offset to make a nonplanar 3D path", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    const profile = profileWithSpine([
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+      { x: 10, z: 10 },
+      { x: 20, z: 10 },
+    ]);
+    profile.points.find((point) => point.id === "p3")!.sweepDepth = 5;
+    try {
+      const solid = buildCadSketchSweep(cad, profile);
+      expect(cad.isValid(solid)).toBe(true);
+      expect(cad.isSolid(solid)).toBe(true);
+      expect(cad.getBoundingBox(solid, false).zmax).toBeGreaterThan(5.9);
+    } finally {
+      cad.releaseAll();
+    }
+  });
+
   it("derives an orthogonal spine frame from non-axis-aligned section workplanes", async () => {
     const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });

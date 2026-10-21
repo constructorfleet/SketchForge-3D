@@ -388,7 +388,7 @@ describe("SketchForge .skf project packages", () => {
     const sweep = shape("mesh", "sweep-sketch", {
       sketchOperation: "sweep",
       sketchProfile: {
-        points: [{ id: "p1", x: 0, z: 0 }, { id: "p2", x: 2, z: 0 }, { id: "p3", x: 2, z: 3 }, { id: "p4", x: 0, z: 3 }, { id: "path1", x: 5, z: 0 }, { id: "path2", x: 12, z: 6 }],
+        points: [{ id: "p1", x: 0, z: 0 }, { id: "p2", x: 2, z: 0 }, { id: "p3", x: 2, z: 3 }, { id: "p4", x: 0, z: 3 }, { id: "path1", x: 5, z: 0, sweepRole: "spine" }, { id: "path2", x: 12, z: 6, sweepRole: "spine", sweepDepth: 5 }],
         segments: [
           { id: "s1", startId: "p1", endId: "p2", kind: "line" },
           { id: "s2", startId: "p2", endId: "p3", kind: "line" },
@@ -415,6 +415,7 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.shapes[0].sketchOperation).toBe("sweep");
     expect(restored.shapes[0].sketchProfile).toEqual(sweep.sketchProfile);
     expect(restored.shapes[0].sketchProfile?.sweepFrames).toEqual(sweepFrames);
+    expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path2")?.sweepDepth).toBe(5);
   });
 
   it("preserves nested groups, holes, intersection metadata, edge history, B-Rep, and undo/redo", async () => {
