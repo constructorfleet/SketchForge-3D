@@ -46,6 +46,45 @@ describe("local MCP engine mode", () => {
     for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
   });
 
+  it("lists projects from the configured local directory", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    fs.writeFileSync(path.join(projectsDir, "other.json"), JSON.stringify({ name: "Other project", createdAt: 2, revision: 3 }));
+
+    const tools = listMcpTools(projectsDir);
+    expect(tools.some((tool: { name: string }) => tool.name === "sketchforge_list_projects")).toBe(true);
+    const response = callMcp(projectsDir, 2, "sketchforge_list_projects", {});
+    expect(response[1].result.isError).toBeUndefined();
+    expect(JSON.parse(response[1].result.content[0].text).projects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "case", name: "Local case" }),
+      expect.objectContaining({ id: "other", name: "Other project" }),
+    ]));
+
+    const created = callMcp(projectsDir, 3, "sketchforge_create_project", { name: "Fresh project" });
+    expect(created[1].result.isError).toBeUndefined();
+    expect(JSON.parse(created[1].result.content[0].text)).toMatchObject({ name: "Fresh project", shapeCount: 0, revision: 1 });
+  });
+
+  it("imports an SKF package as a new local project", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "source.json"), JSON.stringify({ name: "Source", createdAt: 1, revision: 1 }));
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "source", kind: "box", name: "Imported box", width: 12, depth: 8, height: 4 });
+    const shapeId = JSON.parse(created[1].result.content[0].text).shapes[0].id;
+    const packagePath = path.join(projectsDir, "source.skf");
+    const exported = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "source", format: "skf", outputPath: packagePath });
+    expect(JSON.parse(exported[1].result.content[0].text).shapeCount).toBe(1);
+
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_project", { filePath: packagePath, name: "Imported copy" });
+    expect(imported[1].result.isError).toBeUndefined();
+    const importedProject = JSON.parse(imported[1].result.content[0].text);
+    expect(importedProject).toMatchObject({ name: "Imported copy", shapeCount: 1 });
+    expect(importedProject.projectId).not.toBe("source");
+    const scene = callMcp(projectsDir, 2, "sketchforge_read_scene", { projectId: importedProject.projectId });
+    expect(JSON.parse(scene[1].result.content[0].text).objects).toEqual([expect.objectContaining({ id: shapeId, name: "Imported box" })]);
+  });
+
   it("creates and reads a project directly from its directory without a server", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);

@@ -36,6 +36,21 @@ const editorTargetSchema = {
 
 const tools = [
   {
+    name: "sketchforge_list_projects",
+    description: "List projects stored in SKETCHFORGE_PROJECTS_DIR for offline MCP use.",
+    inputSchema: { ...editorTargetSchema, properties: { url: editorTargetSchema.properties.url } },
+  },
+  {
+    name: "sketchforge_create_project",
+    description: "Create an empty project in the local SKETCHFORGE_PROJECTS_DIR.",
+    inputSchema: { ...editorTargetSchema, required: ["name"], properties: { ...editorTargetSchema.properties, name: { type: "string" } } },
+  },
+  {
+    name: "sketchforge_import_project",
+    description: "Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.",
+    inputSchema: { ...editorTargetSchema, required: ["filePath"], properties: { ...editorTargetSchema.properties, filePath: { type: "string" }, name: { type: "string" } } },
+  },
+  {
     name: "sketchforge_list_editors",
     description: "List SketchForge editor tabs that are currently open and heartbeating, including editorNumber and projectName.",
     inputSchema: { ...editorTargetSchema, properties: { url: editorTargetSchema.properties.url } },
@@ -608,6 +623,9 @@ function normalizedServerUrl(value) {
 
 async function callTool(name, args = {}) {
   const { url, ...toolArgs } = args || {};
+  if (["sketchforge_list_projects", "sketchforge_create_project", "sketchforge_import_project"].includes(name) && typeof url === "string" && url.trim()) {
+    throw new Error(`${name} is only available in local mode; omit url.`);
+  }
   if (typeof url === "string" && url.trim()) {
     return callRemoteTool(name, toolArgs, normalizedServerUrl(url.trim()));
   }
