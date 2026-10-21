@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 20
     env:
       SKETCHFORGE_API_TOKEN: docs-example-token
-      SKETCHFORGE_PROJECTS_DIR: ${{ runner.temp }}/sketchforge-doc-example-projects
+      SKETCHFORGE_PROJECTS_DIR: /tmp/sketchforge-doc-example-projects
       SKETCHFORGE_URL: http://127.0.0.1:3100
       PORT: 3100
 
