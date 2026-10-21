@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The sketch constraint inspector now shows an estimated local degree-of-freedom count from the supported equations' Jacobian rank. Redundant equations are counted once; degenerate zero-length distance geometry is labeled indeterminate. The estimate includes free Bezier handle and sweep-depth parameters and does not imply a global solve.
+
 - Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and local CAD +Z pull axis, reports incompatible selections, and replaces the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured support currently covers specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.
 
 - Added a Chromium smoke test against the built `/SketchForge-3D/` artifact for

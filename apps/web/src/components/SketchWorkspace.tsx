@@ -8,6 +8,7 @@ import { notice, unitLabel, useTranslations, type Notice } from "@/i18n";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
+import { sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
 import { projectSweepSectionPoint, sketchSweepGuideRoles, snapInitialSweepSpineEndpoint, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
@@ -1364,12 +1365,18 @@ function SketchConstraintPanel({
   const selectedPair = pointIds.length === 2 && pointIds[0] !== pointIds[1] ? pointIds as [string, string] : null;
   const segmentId = selected?.kind === "segment" ? selected.id : selected?.kind === "multiple" && selected.segmentIds.length === 1 ? selected.segmentIds[0] : null;
   const valueMm = Number(distanceValue);
+  const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
   const addConstraint = (constraint: NewConstraint) => onAddConstraint({ ...constraint, id: createLocalId("constraint") } as SketchConstraint);
 
   return (
     <aside className="shape-inspector sketch-constraint-inspector" aria-label={t("editor.sketch.constraints.title")} onPointerDown={(event) => event.stopPropagation()}>
       <div className="shape-inspector-header"><strong>{t("editor.sketch.constraints.title")}</strong></div>
       <p>{t("editor.sketch.constraints.hint")}</p>
+      <p aria-live="polite" data-testid="sketch-constraint-dof">
+        {degreesOfFreedom.status === "estimated" && degreesOfFreedom.degreesOfFreedom !== null
+          ? t("editor.sketch.constraints.dofEstimate", { count: degreesOfFreedom.degreesOfFreedom })
+          : t("editor.sketch.constraints.dofIndeterminate")}
+      </p>
       <div className="sketch-constraint-actions">
         <button type="button" disabled={!selectedPair} onClick={() => selectedPair && addConstraint({ kind: "coincident", pointIds: selectedPair })}>{t("editor.sketch.constraints.addCoincident")}</button>
         <button type="button" disabled={!segmentId} onClick={() => segmentId && addConstraint({ kind: "horizontal", segmentId })}>{t("editor.sketch.constraints.addHorizontal")}</button>
