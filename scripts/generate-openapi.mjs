@@ -95,6 +95,9 @@ function omissionReason(operation) {
   if ([...operation.responses].sort((a, b) => a - b).join(",") !== declaredStatuses.join(",")) {
     return "Not every declared response status has a response schema.";
   }
+  if (operation.operationId === "updateShape" && operation.requestBody?.faceColors) {
+    return "PATCH /shapes is omitted because faceColors uses custom validation not expressible in JSON Schema. It also accepts sketchProfile to rebuild a retained sketch sweep; see https://constructorfleet.github.io/SketchForge-3D/docs/REST_API#sketch-sweeps.";
+  }
   if (operation.response || operation.requestBody?.faceColors) return "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema.";
   if (operation.requestBody && !operation.requestBody.schema) return "Request body schema is not declared.";
   return undefined;
