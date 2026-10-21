@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The viewport remembers its last settled camera position, target, and zoom in the project workspace, so reopening a design returns to the view you were using. Camera movement is saved after orbiting, panning, or zooming settles; older projects without a saved view still open at the usual home view.
+
 - Sketch profiles can carry coincident, horizontal, vertical, and fixed-distance constraints. The Sketch workspace can add or remove these constraints from selected points or segments, and dragging geometry projects it back toward its constraints while keeping dragged points anchored. Unsatisfied constraint IDs appear in the editor notice, and `.skf` saves the declarations while continuing to open older unconstrained profiles. This is a local projection solver; sketches still bake into shapes and do not participate in a parametric feature tree.
 
 - The shape inspector can assign and remove colors by the CAD face indexes returned from `GET /faces`. These positional assignments persist with the shape and feed the existing per-triangle 3MF export. The inspector calls out that geometry edits can invalidate the indexes; the viewport does not preview face colors yet.

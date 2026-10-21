@@ -101,6 +101,21 @@ describe("SketchForge .skf project packages", () => {
     expect((await importSkfProject(corrupt)).workspace.cameraProjection).toBe("perspective");
   });
 
+  it("round-trips the saved camera pose and framing", async () => {
+    const cameraView = {
+      position: { x: 83, y: 62, z: 91 },
+      target: { x: 14, y: 8, z: -6 },
+      zoom: 1.75,
+    };
+    const bytes = await exportSkfProject(input([canonicalizeShape(shape("box"))], {
+      workspace: { ...DEFAULT_WORKPLANE_WORKSPACE, cameraView },
+    }));
+
+    const { document } = packageDocument(bytes);
+    expect(document.editor.workspace.cameraView).toEqual(cameraView);
+    expect((await importSkfProject(bytes)).workspace.cameraView).toEqual(cameraView);
+  });
+
   it("round-trips bounded autosave history while keeping explicit export depth independent", async () => {
     const history = Array.from({ length: 80 }, (_, x) => editorHistoryEntry([shape("box", "box-1", { x })], ["box-1"]));
     const activeIndex = 60;

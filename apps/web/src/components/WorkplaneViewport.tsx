@@ -42,9 +42,11 @@ import {
 import { gridAlignedDelta, snapDimension, snapToGrid as snapValue } from "@/lib/gridSnap";
 import { appendTypedCharacter, backspaceTypedEntry, typedEntryValue } from "@/lib/numericEntry";
 import { orbitDirection, orbitFromDrag, type CameraOrbit } from "@/lib/viewCubeOrbit";
+import { captureCameraView, restoreCameraView } from "@/lib/cameraView";
 import { cutPreviewCutterScale, cutterShapeForBoolean } from "@/lib/engine/cutterPadding";
 import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, putGeometryOnBase } from "@/lib/engine/primitiveGeometry";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
+import type { CameraView } from "@/types/sketchforge";
 import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
 import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationSyncDecision } from "@/lib/engine/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
@@ -224,6 +226,8 @@ type WorkplaneViewportProps = {
   onInteractionActiveChange?: (active: boolean) => void;
   /** Fires while the camera moves, so keep it out of state and park it in a ref. */
   onCameraOrientationChange?: (orientation: CameraOrientation) => void;
+  /** Fires once after orbit/pan/zoom settles so the editor can persist the view. */
+  onCameraViewChange?: (view: CameraView) => void;
   onEditSketch?: () => void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
@@ -2405,6 +2409,7 @@ export function WorkplaneViewport({
   onToggleWorkplaneTool,
   onInteractionActiveChange,
   onCameraOrientationChange,
+  onCameraViewChange,
   onEditSketch,
   canSeparateParts = false,
   onSeparateParts,
@@ -2551,6 +2556,11 @@ export function WorkplaneViewport({
 
   const onCameraOrientationChangeRef = useRef(onCameraOrientationChange);
   onCameraOrientationChangeRef.current = onCameraOrientationChange;
+  const onCameraViewChangeRef = useRef(onCameraViewChange);
+  onCameraViewChangeRef.current = onCameraViewChange;
+  const cameraViewSaveTimerRef = useRef<number | null>(null);
+  const latestCameraViewRef = useRef<CameraView | null>(null);
+  const lastPersistedCameraViewRef = useRef<CameraView | null>(null);
 
   const clearMoveDimensions = useCallback(() => {
     moveDimensionSessionRef.current = null;
@@ -2656,7 +2666,8 @@ export function WorkplaneViewport({
 
   useLayoutEffect(() => {
     const nextKey = workspaceSettingsKey ?? null;
-    if (workspaceSettingsKeyRef.current !== nextKey) {
+    const projectChanged = workspaceSettingsKeyRef.current !== nextKey;
+    if (projectChanged) {
       workspaceSettingsKeyRef.current = nextKey;
       lastWorkspaceSettingsSyncRef.current = "";
     }
@@ -2664,6 +2675,7 @@ export function WorkplaneViewport({
     const savedDefault = shouldUseSavedDefault ? readSavedWorkspaceDefault(nextKey) : null;
     const nextSnap = savedDefault?.snap ?? normalizeSnapGrid(initialSnap, DEFAULT_SNAP_GRID);
     const nextWorkspace = savedDefault?.workspace ?? normalizeWorkspaceSettings(initialWorkspace);
+    const cameraViewChanged = JSON.stringify(nextWorkspace.cameraView) !== JSON.stringify(workspaceRef.current.cameraView);
     const nextFingerprint = workplaneSettingsFingerprint(nextWorkspace, nextSnap);
     // Prop hydration must not echo back to the parent. Parent persistence creates
     // new object references even when the values are unchanged, which previously
@@ -2674,7 +2686,21 @@ export function WorkplaneViewport({
     workspaceRef.current = nextWorkspace;
     if (threeRef.current) {
       rebuildWorkplane(threeRef.current, nextWorkspace, resolvedThemeRef.current, placementWorkplaneRef.current);
-      constrainCamera(threeRef.current, nextWorkspace);
+      if (projectChanged) {
+        if (nextWorkspace.cameraView) {
+          restoreCameraView(threeRef.current.camera, threeRef.current.controls.target, nextWorkspace.cameraView);
+        } else {
+          resetCamera(threeRef.current);
+        }
+        threeRef.current.controls.update();
+        lastPersistedCameraViewRef.current = captureCameraView(threeRef.current.camera, threeRef.current.controls.target);
+      } else if (cameraViewChanged && nextWorkspace.cameraView) {
+        restoreCameraView(threeRef.current.camera, threeRef.current.controls.target, nextWorkspace.cameraView);
+        threeRef.current.controls.update();
+        lastPersistedCameraViewRef.current = captureCameraView(threeRef.current.camera, threeRef.current.controls.target);
+      } else {
+        constrainCamera(threeRef.current, nextWorkspace);
+      }
       threeRef.current.needsRender = true;
     }
     setSnap((current) => (current === nextSnap ? current : nextSnap));
@@ -3036,6 +3062,11 @@ export function WorkplaneViewport({
     };
     perfRef.current.lastSample = performance.now();
     resetCamera(state);
+    if (workspaceRef.current.cameraView) {
+      restoreCameraView(state.camera, state.controls.target, workspaceRef.current.cameraView);
+      state.controls.update();
+    }
+    lastPersistedCameraViewRef.current = captureCameraView(state.camera, state.controls.target);
     rebuildShapes(state, shapesRef.current, renderSelectionIds(), true, false, placementWorkplaneRef.current);
 
     const animate = () => {
@@ -3059,6 +3090,18 @@ export function WorkplaneViewport({
       // can read the previous matrix unless we force the matrix world current here.
       // Removing this brings back the one-frame-late handle/line lag during camera motion.
       state.camera.updateMatrixWorld();
+      const currentCameraView = captureCameraView(state.camera, state.controls.target);
+      if (JSON.stringify(currentCameraView) !== JSON.stringify(lastPersistedCameraViewRef.current)) {
+        latestCameraViewRef.current = currentCameraView;
+        if (cameraViewSaveTimerRef.current !== null) window.clearTimeout(cameraViewSaveTimerRef.current);
+        cameraViewSaveTimerRef.current = window.setTimeout(() => {
+          const settledCameraView = latestCameraViewRef.current;
+          cameraViewSaveTimerRef.current = null;
+          if (!settledCameraView) return;
+          lastPersistedCameraViewRef.current = settledCameraView;
+          onCameraViewChangeRef.current?.(settledCameraView);
+        }, 250);
+      }
       if (cubeDragActiveRef.current || now - state.lastViewCubeSync > 48 || cameraSettled || state.needsRender) {
         syncViewCube(state, viewCubeRef.current);
         onCameraOrientationChangeRef.current?.(cameraOrientation(state));
@@ -3128,6 +3171,10 @@ export function WorkplaneViewport({
 
     return () => {
       window.cancelAnimationFrame(state.animationId);
+      if (cameraViewSaveTimerRef.current !== null) {
+        window.clearTimeout(cameraViewSaveTimerRef.current);
+        cameraViewSaveTimerRef.current = null;
+      }
       window.removeEventListener("resize", state.resize);
       state.disposeInteractionListeners();
       state.controls.dispose();

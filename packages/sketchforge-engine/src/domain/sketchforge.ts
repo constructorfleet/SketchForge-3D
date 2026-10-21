@@ -79,6 +79,13 @@ export type ShapeCustomization = {
 
 export type ShapeCustomizationMap = Partial<Record<ShapeKind, ShapeCustomization>>;
 
+export type CameraView = {
+  position: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  /** Orthographic magnification. Perspective framing is encoded by camera distance. */
+  zoom: number;
+};
+
 export type WorkplaneWorkspaceSettings = {
   width: number;
   depth: number;
@@ -94,6 +101,8 @@ export type WorkplaneWorkspaceSettings = {
   zoomSpeed: number;
   /** Projection the viewport camera uses. See lib/cameraProjection.ts. */
   cameraProjection: CameraProjection;
+  /** Last settled viewport pose, absent in projects saved before camera persistence. */
+  cameraView?: CameraView;
   units: string;
   scale: string;
   accuracy: MeasurementAccuracy;

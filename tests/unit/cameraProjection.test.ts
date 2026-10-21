@@ -71,6 +71,46 @@ describe("workspace settings carry the projection", () => {
   });
 });
 
+describe("workspace settings carry a saved camera view", () => {
+  const cameraView = {
+    position: { x: 83, y: 62, z: 91 },
+    target: { x: 14, y: 8, z: -6 },
+    zoom: 1.75,
+  };
+
+  it("preserves a valid pose and framing", () => {
+    expect(normalizeWorkspaceSettings({ ...DEFAULT_WORKPLANE_WORKSPACE, cameraView }).cameraView).toEqual(cameraView);
+  });
+
+  it("keeps projects without a saved view on the viewport default", () => {
+    const legacy = { ...DEFAULT_WORKPLANE_WORKSPACE } as Record<string, unknown>;
+    delete legacy.cameraView;
+
+    expect(normalizeWorkspaceSettings(legacy).cameraView).toBeUndefined();
+  });
+
+  it("clamps zoom and refuses a camera at its own target", () => {
+    expect(normalizeWorkspaceSettings({
+      ...DEFAULT_WORKPLANE_WORKSPACE,
+      cameraView: { ...cameraView, zoom: 1000 },
+    }).cameraView?.zoom).toBe(100);
+    expect(normalizeWorkspaceSettings({
+      ...DEFAULT_WORKPLANE_WORKSPACE,
+      cameraView: { ...cameraView, position: cameraView.target },
+    }).cameraView).toBeUndefined();
+  });
+
+  it("discards incomplete or non-finite saved views", () => {
+    for (const cameraView of [
+      { position: { x: 1, y: 2 }, target: { x: 0, y: 0, z: 0 }, zoom: 1 },
+      { position: { x: Number.NaN, y: 2, z: 3 }, target: { x: 0, y: 0, z: 0 }, zoom: 1 },
+      { position: { x: 1, y: 2, z: 3 }, target: { x: 0, y: 0, z: 0 }, zoom: Number.POSITIVE_INFINITY },
+    ]) {
+      expect(normalizeWorkspaceSettings({ ...DEFAULT_WORKPLANE_WORKSPACE, cameraView }).cameraView).toBeUndefined();
+    }
+  });
+});
+
 describe("switching projection without moving the view", () => {
   it("builds a frustum as tall as the perspective camera already saw", () => {
     const distance = 200;

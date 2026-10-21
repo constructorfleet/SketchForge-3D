@@ -1,4 +1,4 @@
-import type { GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomization, ShapeCustomizationMap, ShapeKind, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import type { CameraView, GridSize, HistoryRetentionLimit, MeasurementAccuracy, ShapeCustomization, ShapeCustomizationMap, ShapeKind, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 import { normalizeMaterialPrices } from "./support/lib/materialPresets.js";
 import { normalizeScaleForUnits } from "./support/lib/measurementUnits.js";
 import { DEFAULT_CAMERA_PROJECTION, normalizeCameraProjection } from "./domain/cameraProjection.js";
@@ -85,6 +85,37 @@ function optionalShapeText(value: unknown, fallback: string | undefined, maxLeng
   if (value === undefined) return fallback;
   if (typeof value !== "string") return fallback;
   return value.slice(0, maxLength) || " ";
+}
+
+const CAMERA_COORDINATE_LIMIT = 1_000_000;
+
+function cameraVector(value: unknown): CameraView["position"] | null {
+  const candidate = value && typeof value === "object" ? value as Partial<CameraView["position"]> : {};
+  if (![candidate.x, candidate.y, candidate.z].every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate))) {
+    return null;
+  }
+  return {
+    x: Math.min(CAMERA_COORDINATE_LIMIT, Math.max(-CAMERA_COORDINATE_LIMIT, candidate.x!)),
+    y: Math.min(CAMERA_COORDINATE_LIMIT, Math.max(-CAMERA_COORDINATE_LIMIT, candidate.y!)),
+    z: Math.min(CAMERA_COORDINATE_LIMIT, Math.max(-CAMERA_COORDINATE_LIMIT, candidate.z!)),
+  };
+}
+
+function normalizeCameraView(value: unknown, fallback: CameraView | undefined): CameraView | undefined {
+  if (value === undefined) return fallback;
+  if (!value || typeof value !== "object") return fallback;
+  const candidate = value as Partial<CameraView>;
+  const position = cameraVector(candidate.position);
+  const target = cameraVector(candidate.target);
+  if (!position || !target || typeof candidate.zoom !== "number" || !Number.isFinite(candidate.zoom)) return fallback;
+  if (Math.hypot(position.x - target.x, position.y - target.y, position.z - target.z) < 0.001) {
+    return fallback;
+  }
+  return {
+    position,
+    target,
+    zoom: Math.min(100, Math.max(0.02, candidate.zoom)),
+  };
 }
 
 export function normalizeShapeCustomizations(value: unknown, fallback: ShapeCustomizationMap = {}): ShapeCustomizationMap {
@@ -197,6 +228,7 @@ export function normalizeWorkspaceSettings(value: unknown, fallback: WorkplaneWo
     selectBeforeMove: booleanOrDefault(candidate.selectBeforeMove, fallback.selectBeforeMove),
     zoomSpeed: numberOrDefault(candidate.zoomSpeed, fallback.zoomSpeed),
     cameraProjection: normalizeCameraProjection(candidate.cameraProjection, fallback.cameraProjection),
+    cameraView: normalizeCameraView(candidate.cameraView, fallback.cameraView),
     units,
     scale: normalizeScaleForUnits(units, stringOrDefault(candidate.scale, fallback.scale)),
     accuracy: accuracyOrDefault(candidate.accuracy, fallback.accuracy),

@@ -6214,6 +6214,14 @@ export function SketchForgeEditor({
     [onProjectWorkspaceChange, placementElevation, projectId],
   );
 
+  const rememberCameraView = useCallback((cameraView: WorkplaneWorkspaceSettings["cameraView"]) => {
+    if (!cameraView) return;
+    updateProjectWorkspaceSettings({
+      workspace: { ...workspaceSettingsRef.current, cameraView },
+      snap: snapGridRef.current,
+    });
+  }, [updateProjectWorkspaceSettings]);
+
   useEffect(() => {
     if (!projectId || !onProjectWorkspaceChange) return;
     onProjectWorkspaceChange({
@@ -9743,6 +9751,7 @@ export function SketchForgeEditor({
           onToggleWorkplaneTool={activateWorkplaneTool}
           onInteractionActiveChange={updateProjectInteractionActive}
           onCameraOrientationChange={rememberCameraOrientation}
+          onCameraViewChange={rememberCameraView}
           onEditSketch={beginSketchEdit}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
