@@ -62,6 +62,23 @@ describe("sketch point refinement", () => {
     expect(next.segments.filter((segment) => segment.startId === intersection?.id || segment.endId === intersection?.id)).toHaveLength(4);
   });
 
+  it("carries an axis constraint onto every piece when intersection points split a segment", () => {
+    const profile: SketchProfile = {
+      points: [
+        { id: "a", x: 0, z: 5 }, { id: "b", x: 10, z: 5 },
+        { id: "c", x: 5, z: 0 }, { id: "d", x: 5, z: 10 },
+      ],
+      segments: [
+        { id: "horizontal", startId: "a", endId: "b", kind: "line" },
+        { id: "vertical", startId: "c", endId: "d", kind: "line" },
+      ],
+      constraints: [{ id: "keep-level", kind: "horizontal", segmentId: "horizontal" }],
+    };
+    const next = addLineIntersectionPoints(profile, idFactory());
+    const horizontalPieces = next.segments.filter((segment) => segment.startId === "a" || segment.endId === "b");
+    expect(next.constraints?.map((constraint) => constraint.kind === "horizontal" ? constraint.segmentId : null)).toEqual(horizontalPieces.map((segment) => segment.id));
+  });
+
   it("reuses an existing endpoint when it lands on the middle of another line", () => {
     const profile: SketchProfile = {
       points: [

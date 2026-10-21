@@ -134,6 +134,7 @@ import { importedShapeFromObj } from "@/lib/engine/objImport";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { findSketchOutlineIntersection } from "@/lib/sketchProfileValidation";
 import { addLineIntersectionPoints, splitSketchSegment } from "@/lib/sketchPointRefinement";
+import { addSketchConstraint as addConstraintToProfile, removeSketchConstraint as removeConstraintFromProfile, solveSketchConstraints, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
 import { buildSketchRevolveMesh, DEFAULT_SKETCH_REVOLVE_SETTINGS, normalizeSketchRevolveSettings, type SketchRevolveMesh } from "@/lib/engine/sketchRevolve";
 import { exportSkfProject, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 import { makeShapeFromAsset, sceneShape, toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
@@ -180,7 +181,7 @@ import {
 } from "@/lib/sketchforgeMcpProtocol";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import type { SketchCadBuildResponse } from "@/lib/sketchCadTypes";
-import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
@@ -314,6 +315,7 @@ function cloneSketchProfile(profile: SketchProfile): SketchProfile {
       handleOut: point.handleOut ? { ...point.handleOut } : undefined,
     })),
     segments: profile.segments.map((segment) => ({ ...segment })),
+    ...(profile.constraints ? { constraints: profile.constraints.map((constraint): SketchConstraint => ({ ...constraint, ...("pointIds" in constraint ? { pointIds: [...constraint.pointIds] as [string, string] } : {}) })) } : {}),
     images: (profile.images ?? []).map((image) => ({ ...image })),
   };
 }
@@ -6281,13 +6283,17 @@ export function SketchForgeEditor({
   }, [commitShapes, invalidateCadModifierSession, selectedEdgeFeatureCount, selectedEdgeHistoryOptions, selectedShape, t]);
 
   const commitSketchProfile = useCallback(
-    (next: SketchProfile, message?: Notice) => {
-      const snapshot = cloneSketchProfile(addLineIntersectionPoints(next, createLocalId));
+    (next: SketchProfile, message?: Notice, anchoredPointIds?: readonly string[]) => {
+      const solved = anchoredPointIds ? solveSketchConstraints(next, anchoredPointIds) : null;
+      const snapshot = cloneSketchProfile(addLineIntersectionPoints(solved?.profile ?? next, createLocalId));
       const current = sketchHistoryRef.current;
       const currentIndex = Math.min(sketchHistoryIndexRef.current, Math.max(0, current.length - 1));
       const trimmed = current.slice(0, currentIndex + 1);
       const latest = trimmed.at(-1);
       setSketchProfile(snapshot);
+      if (solved?.unsatisfiedConstraintIds.length) {
+        setNotice(notice((translate) => translate("editor.sketch.constraintUnsatisfied", { ids: solved.unsatisfiedConstraintIds.join(", ") })));
+      }
       if (latest && JSON.stringify(latest) === JSON.stringify(snapshot)) {
         return;
       }
@@ -6296,9 +6302,9 @@ export function SketchForgeEditor({
       sketchHistoryIndexRef.current = nextHistory.length - 1;
       setSketchHistory(nextHistory);
       setSketchHistoryIndex(sketchHistoryIndexRef.current);
-      if (message) setNotice(message);
+      if (!solved?.unsatisfiedConstraintIds.length && message) setNotice(message);
     },
-    [],
+    [setNotice],
   );
 
   const beginSketch = useCallback((
@@ -6636,6 +6642,7 @@ export function SketchForgeEditor({
         points: sketchProfile.points.filter((point) => point.id !== id),
         segments: remainingSegments,
       };
+      next.constraints = sketchConstraintsForProfile(next);
       commitSketchProfile(next.segments.some((segment) => segment.kind === "smooth") ? withSmoothSketchHandles(next) : next, notice((t) => t("editor.sketch.pointRemoved")));
       if (sketchActivePointId === id) setSketchActivePointId(null);
       setSketchSelection(null);
@@ -6645,7 +6652,9 @@ export function SketchForgeEditor({
 
   const deleteSketchSegment = useCallback(
     (id: string) => {
-      commitSketchProfile({ ...sketchProfile, segments: sketchProfile.segments.filter((segment) => segment.id !== id) }, notice((t) => t("editor.sketch.lineRemoved")));
+      const next = { ...sketchProfile, segments: sketchProfile.segments.filter((segment) => segment.id !== id) };
+      next.constraints = sketchConstraintsForProfile(next);
+      commitSketchProfile(next, notice((t) => t("editor.sketch.lineRemoved")));
       setSketchActivePointId(null);
       setSketchSelection(null);
     },
@@ -6753,6 +6762,15 @@ export function SketchForgeEditor({
     }
   }, [commitSketchProfile, deleteSketchImage, deleteSketchPoint, deleteSketchSegment, sketchProfile, sketchSelection, t]);
 
+  const addSketchConstraint = useCallback((constraint: SketchConstraint) => {
+    const next = addConstraintToProfile(sketchProfile, constraint);
+    commitSketchProfile(next, notice((t) => t("editor.sketch.constraintAdded", { kind: constraint.kind })), []);
+  }, [commitSketchProfile, sketchProfile]);
+
+  const removeSketchConstraint = useCallback((constraintId: string) => {
+    commitSketchProfile(removeConstraintFromProfile(sketchProfile, constraintId), notice((t) => t("editor.sketch.constraintRemoved")));
+  }, [commitSketchProfile, sketchProfile]);
+
   const moveSketchPoint = useCallback((id: string, position: { x: number; z: number }) => {
     const current = sketchProfile.points.find((point) => point.id === id);
     if (!current) return;
@@ -6767,7 +6785,7 @@ export function SketchForgeEditor({
         handleOut: point.handleOut ? { x: point.handleOut.x + deltaX, z: point.handleOut.z + deltaZ } : undefined,
       } : point),
     };
-    commitSketchProfile(next, notice((t) => t("editor.sketch.pointMoved")));
+    commitSketchProfile(next, notice((t) => t("editor.sketch.pointMoved")), [id]);
   }, [commitSketchProfile, sketchProfile, t]);
 
   const transformSketchPoints = useCallback((points: SketchPoint[], message?: Notice) => {
@@ -6776,7 +6794,7 @@ export function SketchForgeEditor({
     commitSketchProfile({
       ...sketchProfile,
       points: sketchProfile.points.map((point) => byId.get(point.id) ?? point),
-    }, message ?? notice((t) => t("editor.sketch.geometryTransformed")));
+    }, message ?? notice((t) => t("editor.sketch.geometryTransformed")), points.map((point) => point.id));
   }, [commitSketchProfile, sketchProfile, t]);
 
   const rotateSelectedClosedSketch45 = useCallback(() => {
@@ -9649,6 +9667,8 @@ export function SketchForgeEditor({
         {toolbarMode === "sketch" && sketchActive ? (
           <SketchWorkspace
             profile={sketchProfile}
+            onAddConstraint={addSketchConstraint}
+            onRemoveConstraint={removeSketchConstraint}
             operation={sketchOperation}
             revolvePreviewPositions={sketchRevolvePreview?.positions ?? null}
             referenceShapes={sketchReferenceShapes.filter((shape) => shape.id !== editingSketchShapeId)}

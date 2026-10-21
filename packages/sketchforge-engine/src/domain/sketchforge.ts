@@ -132,6 +132,12 @@ export type SketchSegment = {
   kind?: "line" | "bezier" | "smooth";
 };
 
+export type SketchConstraint =
+  | { id: string; kind: "coincident"; pointIds: [string, string] }
+  | { id: string; kind: "horizontal"; segmentId: string }
+  | { id: string; kind: "vertical"; segmentId: string }
+  | { id: string; kind: "distance"; pointIds: [string, string]; valueMm: number };
+
 export type SketchImage = {
   id: string;
   name: string;
@@ -151,6 +157,7 @@ export type SketchImage = {
 export type SketchProfile = {
   points: SketchPoint[];
   segments: SketchSegment[];
+  constraints?: SketchConstraint[];
   images?: SketchImage[];
 };
 

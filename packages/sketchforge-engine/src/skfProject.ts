@@ -564,6 +564,7 @@ async function serializeShapeNode(
     definition.sketchProfile = {
       points: sketchProfile.points,
       segments: sketchProfile.segments,
+      ...(sketchProfile.constraints?.length ? { constraints: sketchProfile.constraints } : {}),
       ...(images.length ? { images } : {}),
     };
   }
@@ -962,6 +963,32 @@ function validateSketchProfile(value: unknown, label: string) {
     const endId = stringValue(segment.endId, `${label}.segments[${index}].endId`);
     if (!pointIds.has(startId) || !pointIds.has(endId)) throw new LocalizedError("errors.skf.sketchMissingPointReference", { label });
   });
+  if (profile.constraints !== undefined) {
+    if (!Array.isArray(profile.constraints)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.constraints` });
+    const constraintIds = new Set<string>();
+    profile.constraints.forEach((rawConstraint, index) => {
+      const constraint = objectRecord(rawConstraint, `${label}.constraints[${index}]`);
+      const constraintLabel = `${label}.constraints[${index}]`;
+      const id = stringValue(constraint.id, `${constraintLabel}.id`);
+      if (constraintIds.has(id)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.id` });
+      constraintIds.add(id);
+      const kind = stringValue(constraint.kind, `${constraintLabel}.kind`);
+      if (kind === "horizontal" || kind === "vertical") {
+        if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
+        }
+      } else if (kind === "coincident" || kind === "distance") {
+        if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });
+        }
+        if (kind === "distance" && finiteNumber(constraint.valueMm, `${constraintLabel}.valueMm`) < 0) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.valueMm` });
+        }
+      } else {
+        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.kind` });
+      }
+    });
+  }
 }
 
 function validateShapeDefinition(definition: Record<string, unknown>, label: string) {
