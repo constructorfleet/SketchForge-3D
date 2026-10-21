@@ -318,6 +318,9 @@ export type WorkplaneShape = {
     baseHeight: number;
     triangleCount: number;
     sourceFormat: "stl" | "obj" | "svg" | "json" | "step";
+    // Compact triangle ranges mapping the STEP mesh to current CAD face indexes.
+    // Each triple is [triangleStart, triangleCount, faceIndex].
+    faceGroups?: number[];
     // IndexedDB persistence uses this only in compact stored shape records.
     // Runtime editor shapes are hydrated with the full immutable mesh resource.
     storageResourceId?: string;

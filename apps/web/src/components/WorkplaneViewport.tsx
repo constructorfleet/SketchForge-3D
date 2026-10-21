@@ -24,6 +24,7 @@ import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransform
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
+import { createFaceColorPreviewGeometry } from "@/lib/faceColorPreview";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { resolveShapeAppearance } from "@/lib/shapeAppearance";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
@@ -1012,6 +1013,7 @@ function shapeGeometrySignature(shape: WorkplaneShape): string {
     return JSON.stringify({
       kind: "mesh",
       mesh: shapeResourceId(shape.importedMesh),
+      faceColors: shape.faceColors ?? null,
       taper,
       preserve: preservesEdgeTreatmentSize(shape)
         ? [shapeWidth(shape), shapeDepth(shape), shape.height, shape.edgeTreatments]
@@ -7895,7 +7897,8 @@ function releaseSharedShapeGeometry(mesh: THREE.Mesh | THREE.LineSegments) {
 
 function sharedShapeMaterial(shape: WorkplaneShape) {
   const appearance = resolveShapeAppearance(shape);
-  const color = shape.hole ? "#b7c0c9" : appearance.baseColor;
+  const vertexColors = Boolean(shape.faceColors && shape.importedMesh?.faceGroups?.length);
+  const color = vertexColors ? "#ffffff" : shape.hole ? "#b7c0c9" : appearance.baseColor;
   const roughness = shape.hole ? 0.88 : appearance.roughness;
   const metalness = shape.hole ? 0.02 : appearance.metalness;
   const sheen = shape.hole ? 0 : appearance.sheen;
@@ -7906,6 +7909,7 @@ function sharedShapeMaterial(shape: WorkplaneShape) {
     roughness,
     metalness,
     sheen,
+    vertexColors,
     side: "double",
   });
   const cached = sharedShapeMaterialCache.get(key);
@@ -7921,6 +7925,7 @@ function sharedShapeMaterial(shape: WorkplaneShape) {
     roughness,
     metalness,
     sheen,
+    vertexColors,
     sheenColor: color,
     sheenRoughness: roughness,
     side: THREE.DoubleSide,
@@ -8164,7 +8169,13 @@ function createShapeObject(
         const preserveEdgeSize = preservesEdgeTreatmentSize(shape);
         addMesh(
           group,
-          preserveEdgeSize ? getPreservedImportedMeshGeometry(shape) : getImportedMeshGeometry(shape.importedMesh),
+          shape.faceColors && shape.importedMesh.faceGroups?.length
+            ? createFaceColorPreviewGeometry(
+                { ...shape.importedMesh, faceGroups: shape.importedMesh.faceGroups },
+                shape.faceColors,
+                shape.hole ? "#b7c0c9" : resolveShapeAppearance(shape).baseColor,
+              )
+            : preserveEdgeSize ? getPreservedImportedMeshGeometry(shape) : getImportedMeshGeometry(shape.importedMesh),
           material,
           shape,
           undefined,

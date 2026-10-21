@@ -981,7 +981,7 @@
       "placement": "Placement",
       "faceColors": {
         "title": "Face colors",
-        "hint": "Face indexes are positional. Geometry edits can change them and clear these colors. Use GET /faces to find indexes. Colors are included in 3MF export; the viewport does not preview them yet.",
+        "hint": "Face indexes are positional. Geometry edits can change them and clear these colors. Use GET /faces to find indexes. Colors preview on STEP imports and are included in 3MF export.",
         "index": "CAD face index",
         "add": "Add face color",
         "remove": "Remove color for face {index}",

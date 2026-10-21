@@ -20,8 +20,11 @@ These are implemented and should not be filed as missing features:
   exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
   implemented. Face colors are keyed to current face indexes and are discarded
-  when geometry changes. The shape inspector can assign/remove them, though the
-  viewport does not preview them yet.
+  when geometry changes. STEP-imported meshes retain compact triangle ranges
+  mapped to those indexes, and the viewport previews assigned colors on those
+  faces, including after reopening a .skf project. Face identity is still
+  positional, and other B-rep-backed shapes without a retained triangle map
+  still need preview mapping.
 - A bounded draft-prism operation is available in the shape inspector, over
   REST, and in the TypeScript and Python clients. The editor builds from a
   retained straight, single-loop sketch extrusion in its local CAD worker and
@@ -58,11 +61,12 @@ project-model decision.
 
 The shape inspector now lets users add and remove face colors by the positional
 indexes returned from `GET /faces`; the API persists them and 3MF exports them
-per triangle. The viewport still does not preview those assignments because
-its rendered triangles are not mapped to CAD face indexes. Geometry edits can
-also invalidate positional indexes. A future persistent face identity model
-and viewport mapping would make colors previewable and robust through topology
-changes.
+per triangle. STEP-imported meshes now retain a compact mapping from rendered
+triangle ranges to face indexes, so the viewport previews assigned colors and
+.skf preserves that preview after reopening. Geometry edits can invalidate
+positional indexes and clear assignments. Other B-rep-backed shapes without a
+retained triangle map and persistent face identity through topology changes
+remain open.
 
 ### 4. Geometric sketch constraints and a parametric feature tree
 
