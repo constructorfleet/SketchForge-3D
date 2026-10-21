@@ -15,10 +15,14 @@ The app runs at `http://127.0.0.1:3000/` by default.
 
 - Keep changes focused.
 - Avoid unrelated refactors.
-- Run `npm run typecheck`.
+- Follow test-driven development: add or update a focused test first, confirm it fails for the expected reason, implement the change, then rerun it.
+- Run the relevant automated tests and quality checks, including `npm run typecheck`; use `npm run test`, `npm run test:e2e`, `npm run test:integration`, and `npm run build` as appropriate to the affected area.
 - Manually test the editor workflow you changed.
 - Include screenshots or short recordings for UI changes when possible.
 - Call out changes to storage, import, export, grouping, or undo/redo behavior.
+- Update the relevant roadmap and documentation for every feature or behavior change. Add user-visible changes to `docs/CHANGELOG.md` using its existing format.
+- Commit each coherent unit of work atomically, including its tests and documentation. Open separate PRs for independent, reviewable chunks.
+- Monitor each PR for merge conflicts, review feedback, and failing or pending checks through merge or explicit handoff. Resolve conflicts and failures, push fixes, and recheck the PR; report unresolved blockers and pending checks accurately.
 
 ## Areas That Need Care
 
