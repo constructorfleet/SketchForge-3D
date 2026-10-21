@@ -29,10 +29,14 @@ describe("OCCT sketch profile preparation", () => {
   it("separates one closed sweep section from one open planar spine", () => {
     const section = rectangle("section", 0, 0, 2, 3);
     const spine: SketchProfile = {
-      points: [{ id: "spine-a", x: 5, z: 0 }, { id: "spine-b", x: 15, z: 0 }, { id: "spine-c", x: 20, z: 5 }],
+      points: [
+        { id: "spine-a", x: 5, z: 0 },
+        { id: "spine-b", x: 15, z: 0, handleOut: { x: 17, z: 0 } },
+        { id: "spine-c", x: 20, z: 5, handleIn: { x: 20, z: 2 } },
+      ],
       segments: [
         { id: "spine-1", kind: "line", startId: "spine-a", endId: "spine-b" },
-        { id: "spine-2", kind: "bezier", startId: "spine-b", endId: "spine-c", handleOut: { x: 17, z: 0 }, handleIn: { x: 20, z: 2 } },
+        { id: "spine-2", kind: "bezier", startId: "spine-b", endId: "spine-c" },
       ],
     };
     const result = cadSketchSweepPaths({
