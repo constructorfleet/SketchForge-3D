@@ -77,11 +77,11 @@ describe("REST API v1 operation contract", () => {
       query: { required: ["projectId", "shapeId"] },
       response: { required: ["faces"], faceFields: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"], faceIdSemantics: "stable identity for a face while its identity is preserved by the model", colorAssignmentKey: "face id in PATCH /api/v1/shapes faceColors" },
     });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
       .toEqual({ ok: true, projectId: "part_1", shapeId: "solid" });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=../bad&shapeId=x")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=../bad&shapeId=x")))
       .toEqual({ ok: false, error: "invalid_project_id" });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=p")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=p")))
       .toEqual({ ok: false, error: "invalid_shape_id" });
     expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] }))
       .toEqual({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] });
@@ -101,6 +101,18 @@ describe("REST API v1 operation contract", () => {
         required: ["properties"],
         fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
         provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
+        schema: {
+          type: "object",
+          required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+          properties: {
+            volume: { type: "number" },
+            area: { type: "number" },
+            centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+            bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
+            isValid: { type: "boolean" },
+            provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+          },
+        },
       },
     });
     const properties = {

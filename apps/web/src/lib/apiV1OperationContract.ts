@@ -6,6 +6,13 @@
 
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
+export type ApiV1FieldSchema = {
+  type: "number" | "boolean" | "string" | "object";
+  required?: readonly string[];
+  enum?: readonly string[];
+  properties?: Readonly<Record<string, ApiV1FieldSchema>>;
+};
+
 export type ApiV1Operation = {
   operationId: string;
   method: ApiV1Method;
@@ -25,6 +32,7 @@ export type ApiV1Operation = {
     kind?: "shape-properties";
     fields?: readonly string[];
     provenance?: { source: readonly string[]; precision: readonly string[] };
+    schema?: ApiV1FieldSchema;
   };
   requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
 };
@@ -115,6 +123,18 @@ export const API_V1_OPERATIONS = [
       kind: "shape-properties",
       fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
       provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
+      schema: {
+        type: "object",
+        required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+        properties: {
+          volume: { type: "number" },
+          area: { type: "number" },
+          centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+          bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
+          isValid: { type: "boolean" },
+          provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+        },
+      },
     },
   },
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
@@ -170,7 +190,7 @@ export type ListFacesResponse = {
 };
 
 /** Apply the same normalization and project-id validation as the GET /faces handler. */
-export function parseListFacesQuery(request: Request):
+export function parseApiTargetQuery(request: Request):
   | { ok: true; projectId: string; shapeId: string }
   | { ok: false; error: "invalid_project_id" | "invalid_shape_id" } {
   const params = new URL(request.url).searchParams;

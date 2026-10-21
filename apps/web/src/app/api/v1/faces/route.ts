@@ -1,6 +1,6 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson } from "@/lib/apiV1";
-import { parseListFacesQuery, parseListFacesResponse } from "@/lib/apiV1OperationContract";
+import { parseApiTargetQuery, parseListFacesResponse } from "@/lib/apiV1OperationContract";
 import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const revalidate = false;
 export async function GET(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const query = parseListFacesQuery(request);
+  const query = parseApiTargetQuery(request);
   if (!query.ok) return query.error === "invalid_project_id" ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
   const { projectId, shapeId } = query;
 
