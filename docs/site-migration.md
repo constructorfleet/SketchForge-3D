@@ -21,8 +21,8 @@ client, translation, and capability documents.
 
 ## Follow-up phases
 
-- **Site capabilities:** Open PR #162 renders ```mermaid fences as diagrams and
-  publishes the documentation build pipeline as the first one.
+- **Site capabilities:** PR #162 merged Mermaid fence rendering and CI checks;
+  diagrams now publish as rendered content.
 - **Phase 2:** package references and executable examples merged in PR #118.
 - **Python client:** reference type checks and source links (#136) and stable-
   face identity parity (#145) have merged. The latter adds stable face IDs,
@@ -63,3 +63,6 @@ checks merged in PR #128; STEP color guidance merged in PR #119.
   and generated API references.
 - Merged PR #158 expands the engine package README and generated TypeScript
   reference into a practical npm listing and API guide, and verifies packed contents.
+- Open PR #187 proposes an inventory of repository-controlled historical
+  inbound documentation paths. Open PR #188 proposes persisted sweep source
+  sketches; REST profile update and rebuild remain unsupported.
