@@ -35,9 +35,9 @@ client, translation, and capability documents.
   operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
   (#122) references have merged. Deterministic generator-hook wiring merged in
   PR #128. STEP color guidance merged in PR #119, and STEP component-color
-  import support merged in PR #147. An editor quick-start from first sketch
-  through save/export is implemented on branch `docs/editor-quickstart` and
-  not yet merged; broader task guides remain outstanding.
+  import support merged in PR #147. Open PR #150 adds a tested editor
+  quick-start from first sketch through save/export with browser acceptance
+  and screenshots; broader task guides remain outstanding.
 - **Phase 5:** site version/revision stamps and pinned source links merged in
   PR #126, lower-case compatibility routes in PR #134, and the release-process
   guide/check in PR #132. Built-site browser smoke checks merged in PR #141;

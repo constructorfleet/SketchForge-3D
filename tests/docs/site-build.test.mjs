@@ -124,8 +124,8 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(migration, /face identity parity \(#145\) have merged/i);
   assert.match(migration, /browser smoke checks merged in PR #141/i);
   assert.match(migration, /external-link report merged in PR #143/i);
-  assert.match(spec, /editor quick-start is implemented on branch `docs\/editor-quickstart` and is not yet merged/i);
-  assert.match(migration, /editor quick-start[\s\S]*?implemented on branch `docs\/editor-quickstart` and\s+not yet merged/i);
+  assert.match(spec, /Open PR #150 adds the tested editor quick-start/i);
+  assert.match(migration, /Open PR #150 adds a tested editor\s+quick-start/i);
   assert.match(migration, /broader task guides remain outstanding/i);
   assert.doesNotMatch(migration, /still needs to be set|before the first deployment|could not be confirmed/i);
 });
