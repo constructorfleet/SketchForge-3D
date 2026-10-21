@@ -58,7 +58,11 @@ These are implemented and should not be filed as missing features:
   reopening and editing. `POST /shapes` accepts `kind: "sketchSweep"`; the
   engine and TypeScript and Python clients can create sweeps and replace
   `sketchProfile` through `PATCH /api/v1/shapes`, rebuilding geometry while
-  retaining shape and source IDs. A profile rebuild receives fresh face IDs
+  retaining shape and source IDs. `PATCH /shapes` can target a sketch sweep by
+  its persisted `sketchSourceId` or by output shape ID; it updates the source
+  profile and rebuilds its dependent sweep before writing the project. Invalid
+  profiles leave the persisted source and sweep unchanged. A profile rebuild
+  receives fresh face IDs
   and drops face colors and edge-treatment metadata because old faces cannot
   be assumed to correspond to the new profile.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,

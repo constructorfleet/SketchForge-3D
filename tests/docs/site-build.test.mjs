@@ -91,7 +91,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /32 operations; generated OpenAPI describes nine and explains why 23 remain omitted/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes eleven and explains why 21 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
@@ -107,10 +107,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Cross-links between documentation and references — closed/i);
   assert.match(spec, /Engine package documentation — closed/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
-  assert.match(spec, /nine of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /drift alone does not fail the docs build/i);
+  assert.match(spec, /eleven of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Generated Markdown may remain tracked/i);
 
-  assert.match(migration, /Nine operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
+  assert.match(migration, /Eleven operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
   assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
   assert.match(migration, /trusted\s+default-branch follow-up validates the artifact and PR before committing only\s+allowlisted updates to same-repository PR branches/i);
@@ -125,6 +126,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /Stable face identity across arbitrary topology changes/i);
   assert.match(capabilities, /Broader sketch constraints and globally determined solutions/i);
   assert.match(capabilities, /source-sketch nodes and feature inputs for sketch extrusions,\s+revolves, and sweeps/i);
+  assert.match(capabilities, /`PATCH \/shapes` can target a sketch sweep by\s+its persisted `sketchSourceId`/i);
   assert.match(capabilities, /`sketchProfile`[\s\S]*?`PATCH \/api\/v1\/shapes`[\s\S]*?retaining shape and source IDs/i);
   assert.match(capabilities, /retains `stepComponent` source\s+occurrence identity and root-to-component ancestry/i);
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);

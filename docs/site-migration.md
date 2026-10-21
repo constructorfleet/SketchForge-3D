@@ -65,12 +65,13 @@ so stale tracked output alone does not fail the docs check.
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. Nine operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 23 are listed
+the registry and handlers. Eleven operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 21 are listed
 with omission reasons in the generated contract; full route coverage remains
 open.
 
-`PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep and
+`PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep,
+targeted by either its output shape ID or persisted `sketchSourceId`, and
 rebuilds the solid while preserving shape and source IDs. The operation is
 still omitted from OpenAPI because the combined custom face-color and profile
 validation is not fully represented there. Sweep source persistence and
