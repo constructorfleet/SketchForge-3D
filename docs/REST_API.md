@@ -51,7 +51,7 @@ The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists
 | `GET` | `/projects?projectId=` | One project with its shapes and settings. |
 | `POST` | `/projects` | Creates an empty project. Body: `{ "name": "Bracket" }`. |
 | `DELETE` | `/projects?projectId=` | Deletes the project and its geometry. |
-| `GET` | `/shapes?projectId=` | The project's shapes, including optional `stepAssembly` product hierarchy metadata for qualifying STEP imports. |
+| `GET` | `/shapes?projectId=` | The project's shapes, including optional `stepAssembly` and `stepComponent` metadata for STEP assemblies. |
 | `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
 | `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest; refuses the ones that kind cannot take. |
 | `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
@@ -65,7 +65,7 @@ The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
 | `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
 | `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF. |
-| `POST` | `/explode?projectId=&shapeId=` | Splits a retained STEP assembly into separately positioned exact solids, preserving STEP product names and XCAF colors where present (up to 200 solids and 8 MiB source). |
+| `POST` | `/explode?projectId=&shapeId=` | Splits a retained STEP assembly into separately positioned exact solids, preserving component names, available XCAF colors, and unambiguous occurrence ancestry (up to 200 solids and 8 MiB source). |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `GET` | `/edges?projectId=&shapeId=` | Lists edges by their current numeric index, with geometric measurements and filletability. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
@@ -93,7 +93,7 @@ The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` re
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
 
-`stepAssembly` on a shape summary is an optional tree of STEP product names and direct children. It is metadata only: imported geometry remains one combined mesh, so these product nodes are not independently editable shapes. Extraction is bounded to STEP inputs up to 200 solids and 8 MiB, 2,000 hierarchy nodes, and depth 32; absent or unsupported hierarchy data leaves the field out.
+`stepAssembly` on a shape summary is an optional tree of STEP product names, optional occurrence IDs, and direct children. It describes the imported source; the import remains one combined mesh until `POST /explode` creates independently selectable top-level solids. Each exploded result can include `stepComponent` with a solid ID, occurrence ID, and root-to-component path. Ambiguous source-to-solid associations omit this metadata rather than guessing. See the [STEP assembly guide](/docs/guides/step-assemblies.md) for identity, persistence, association limits, and an example. Extraction is bounded to STEP inputs up to 200 solids and 8 MiB, 2,000 hierarchy nodes, and depth 32; absent or unsupported hierarchy data leaves `stepAssembly` out.
 
 `GET /faces?projectId=&shapeId=` returns a positional `index` for compatibility and an app-owned `id` for each face. Use the `id` as the key in `faceColors` when updating a shape, for example `{ "faceColors": { "face_…": "#ff0000" } }`; numeric index keys remain accepted for existing callers. Face IDs are persisted with the shape and colors. Across a shape-parameter edit, the engine retains an ID and its color only when the face has a unique counterpart with the same surface type and outward normal on both sides. Treatment operations use their own geometric matching. Generated or ambiguous faces receive new IDs and do not inherit a color. Face colors are previewed on B-rep-backed geometry and included in 3MF per-triangle material assignments.
 

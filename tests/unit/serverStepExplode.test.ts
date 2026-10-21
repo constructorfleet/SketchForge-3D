@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
@@ -11,6 +12,32 @@ import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engi
 import type { ProjectAsset } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("keeps nested component ancestry and occurrence identity on selectable exploded solids", async () => {
+    const step = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
+    const bytes = new TextEncoder().encode(step);
+    const source: ProjectAsset = { id: "source", name: "nested-assembly.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
+    const imported = await importedShapeFromStepOnKernel(source.name, step);
+    imported.shape.importedMesh!.assetId = source.id;
+
+    const parts = await explodeStepAssembly(imported.shape, source);
+    const byName = new Map(parts.map((part) => [part.name, part]));
+
+    expect([...byName.keys()].sort()).toEqual(["Frame", "SensorLeft", "SensorRight"]);
+    expect(byName.get("SensorLeft")).toMatchObject({
+      stepComponent: {
+        id: expect.any(String),
+        path: [
+          { name: "MainAssembly" },
+          { name: "Sensors" },
+          { name: "SensorLeft" },
+        ],
+      },
+    });
+    expect(new Set(parts.map((part) => part.stepComponent?.id)).size).toBe(parts.length);
+    expect(byName.get("SensorLeft")!.x).toBeLessThan(byName.get("SensorRight")!.x);
+    expect(parts.every((part) => part.importedMesh?.positions.length && part.importedMesh.brepStep)).toBe(true);
+  });
+
   it("preserves STEP product names when exploding a multi-product STEP file", async () => {
     const step = await withCadKernel((cad) => {
       const document = cad.createXCAFDocument();

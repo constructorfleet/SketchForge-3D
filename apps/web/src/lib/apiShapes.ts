@@ -52,6 +52,7 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     ...(shape.faceIds ? { faceIds: shape.faceIds } : {}),
     ...(shape.faceColors ? { faceColors: shape.faceColors } : {}),
     ...(shape.stepAssembly ? { stepAssembly: shape.stepAssembly } : {}),
+    ...(shape.stepComponent ? { stepComponent: shape.stepComponent } : {}),
     hole: Boolean(shape.hole),
     locked: Boolean(shape.locked),
     hidden: Boolean(shape.hidden),

@@ -828,11 +828,25 @@ class ImportTests(unittest.TestCase):
 
 
 class ShapeSummaryTests(unittest.TestCase):
-    def test_step_assembly_hierarchy_is_typed_and_description_only(self):
-        summary = ShapeSummary.from_payload({**shape_payload(), "stepAssembly": [{"name": "MainAssembly", "children": [{"name": "Sensors", "children": []}]}]})
+    def test_step_component_ancestry_is_typed_and_description_only(self):
+        summary = ShapeSummary.from_payload({
+            **shape_payload(),
+            "stepAssembly": [{"id": "step-node:0", "name": "MainAssembly", "children": [{"id": "step-occurrence:8", "name": "Sensors", "children": []}]}],
+            "stepComponent": {
+                "id": "step-occurrence:12/solid-1",
+                "occurrenceId": "step-occurrence:12",
+                "path": [{"id": "step-node:0", "name": "MainAssembly"}, {"id": "step-occurrence:8", "name": "Sensors"}],
+            },
+        })
         self.assertEqual(summary.step_assembly[0].name, "MainAssembly")
+        self.assertEqual(summary.step_assembly[0].id, "step-node:0")
         self.assertEqual(summary.step_assembly[0].children[0].name, "Sensors")
+        self.assertEqual(summary.step_component.id, "step-occurrence:12/solid-1")
+        self.assertEqual(summary.step_component.occurrence_id, "step-occurrence:12")
+        self.assertEqual(summary.step_component.path[-1].name, "Sensors")
         self.assertIn("stepAssembly", SHAPE_DESCRIPTION_FIELDS)
+        self.assertIn("stepComponent", SHAPE_DESCRIPTION_FIELDS)
+        self.assertNotIn("stepComponent", summary.as_patch())
 
     def test_collects_the_per_kind_parameters(self) -> None:
         summary = ShapeSummary.from_payload(
