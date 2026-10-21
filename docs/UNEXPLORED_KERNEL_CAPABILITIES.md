@@ -1,11 +1,13 @@
 # Implementation gaps and next steps
 
 Status: shipped capabilities verified against `origin/main` at `1c8e820`
-(2026-10-21). This includes PR #180's fixture-tested +X and +Y face-draft
-cases. The current PR also adds persisted sketch-revolve sources and
-root-to-leaf STEP component ancestry for exploded solids. Those changes are
-described separately below as in-flight work until this PR merges. This file
-tracks user-facing capability limits, not every unused OCCT method.
+(2026-10-21), including PR #180's fixture-tested +X and +Y face-draft cases.
+The open PR #168 branch also carries proposed revolve-source persistence
+(#181) and STEP component ancestry (#183); those changes are not on `main`.
+Open PR #188, stacked through #193 on #168, proposes sweep-source persistence;
+open PR #194, stacked on #188, proposes REST profile updates and rebuilds.
+Neither proposal is merged to `main`. This file tracks user-facing capability
+limits, not every unused OCCT method.
 
 ## Shipped capabilities
 
@@ -23,9 +25,10 @@ These are implemented and should not be filed as missing features:
 - STEP imports can expose bounded product names and nested `stepAssembly`
   hierarchy metadata in shape summaries. Extraction is limited to inputs up to
   200 solids and 8 MiB, with at most 2,000 hierarchy nodes and depth 32.
-  `POST /explode` produces independently selectable top-level solids; source
-  ancestry metadata is added by this PR. Nested assembly groups and transforms
-  are not reconstructed as editable project groups.
+  `POST /explode` produces independently selectable top-level solids. On
+  `main`, exploded shapes do not retain source occurrence IDs or ancestry
+  metadata. Nested assembly groups and transforms are not reconstructed as
+  editable project groups.
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section
   DXF exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
@@ -57,14 +60,13 @@ These are implemented and should not be filed as missing features:
   independent handle depths. The editor retains the source profile for
   reopening and editing. `POST /shapes` also accepts `kind: "sketchSweep"`;
   the engine, TypeScript client, and Python client expose sweep creation and
-  preserve the returned profile. The API has no dedicated profile-edit/rebuild
-  request. The `.skf` feature index records sweeps, but sweeps do not yet have
-  a separate source-sketch dependency node for general feature recomputation.
-- `.skf` stores separate source-sketch nodes and explicit feature inputs for
-  sketch extrusions and revolves. Editing either profile keeps source and
-  output identities while rebuilding its solid. The current PR adds the
-  revolve slice; neither operation is yet part of a dependency-ordered feature
-  tree covering sweep, draft, booleans, and downstream operations.
+  preserve the returned profile. On `main`, the API has no dedicated
+  profile-edit/rebuild request. The `.skf` feature index records sweeps, but
+  sweeps do not yet have a separate source-sketch dependency node on `main`.
+- `.skf` stores a separate source-sketch node and explicit feature input for
+  sketch extrusions. Editing the profile keeps source and output identities
+  while rebuilding its solid. Revolves and sweeps do not yet have this
+  persisted source-sketch dependency on `main`.
 - Coincident, horizontal, vertical, and fixed-distance sketch constraints are
   supported. Point drags use a deterministic, bounded damped least-squares
   solve for supported coupled constraints, keep directly dragged points
@@ -88,15 +90,18 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 ### 1. General editable feature history and broader draft operations
 
-Sketch extrusion and revolve now have distinct persisted source-sketch nodes
-and explicit feature inputs; revolve editing/rebuild is part of this PR.
-Sweep profiles can be reopened and edited in the editor, and REST/clients can
-create sweeps from profiles, but the API cannot update a sweep profile and
-request a rebuild. The `.skf` feature index records sweep metadata, but sweep
-remains outside the separate source-sketch dependency slice. Draft operations
-also replace the selected geometry with baked results. More broadly, the
-project does not recompute a dependency-ordered feature tree when an upstream
-sketch or operation changes.
+On `main`, sketch extrusion is the only operation with a separate persisted
+source-sketch node and feature input. Open PR #181, carried on the #168 branch,
+proposes the equivalent source and edit/rebuild slice for revolves. Open PR
+#188 proposes a persisted sweep source node and feature input, preserving
+source identity when the editor rebuilds an edited sweep. Open PR #194, stacked
+on #188, proposes `PATCH /api/v1/shapes` support for `sketchProfile`, rebuilding
+the sweep solid while preserving shape and source identities. Both #188 and
+#194 remain open; on `main`, REST can create and read sweeps but cannot update a
+profile and request a rebuild. Draft operations replace selected geometry with
+baked results. These source links and the proposed sweep PATCH do not yet make
+a general dependency-ordered feature tree: upstream changes are not
+recomputed through booleans, drafts, or other downstream operations.
 
 Face draft accepts a chosen local CAD axis in the inspector. Fixtures verify
 +Z cases at ±5° for the documented extrusion and box face sets, plus one +X
@@ -107,15 +112,17 @@ unverified; a selectable axis is not evidence that every combination works.
 ### 2. Editable STEP components and assembly operations
 
 Nested STEP product names and parent/child relationships are available as
-bounded `stepAssembly` metadata. `POST /explode` creates independently
-selectable and movable top-level shapes; this PR adds `stepComponent` metadata
-with a source occurrence ID and root-to-leaf ancestry path, persisted through
-`.skf` round trips when the association is unambiguous. It does not reconstruct
-nested groups or source assembly transforms as editable project objects.
-Assembly authoring, per-component operations within the hierarchy, and
-hierarchy-preserving export remain open. Metadata extraction remains bounded to
-200 solids, 8 MiB, 2,000 nodes, and depth 32; STEP writers with unsupported or
-ambiguous product metadata may omit the tree.
+bounded `stepAssembly` metadata. On `main`, `POST /explode` creates independently
+selectable and movable top-level shapes without retaining source occurrence
+identity on each result. PR #183, carried on the #168 branch, proposes
+`stepComponent` metadata with a source occurrence ID and root-to-leaf ancestry
+path, persisted through `.skf` round trips when matching is unambiguous; this
+proposal is not merged to `main`. Neither the shipped behavior nor that proposal
+reconstructs nested groups or source assembly transforms as editable project
+objects. Assembly authoring, per-component operations within the hierarchy,
+and hierarchy-preserving export remain open. Metadata extraction remains
+bounded to 200 solids, 8 MiB, 2,000 nodes, and depth 32; STEP writers with
+unsupported or ambiguous product metadata may omit the tree.
 
 ### 3. Stable face identity across arbitrary topology changes
 
@@ -139,10 +146,11 @@ yet form a general recomputing dependency graph with sketch extrusion.
 
 ## Verification baseline
 
-The shipped baseline was checked against `origin/main` at `1c8e820`; the
-in-flight claims were checked against this PR's source and tests. Coverage
-includes sweep API/client behavior, `.skf` source-sketch serialization,
-STEP hierarchy and component metadata, face-ID matching, face-draft axis
+The shipped baseline was checked against `origin/main` at `1c8e820`; proposed
+claims were checked against the #168, #188, and #194 branches and their focused
+tests.
+Coverage on `main` includes sweep API/client creation, extrusion source-sketch
+serialization, STEP hierarchy metadata, face-ID matching, face-draft axis
 cases, and sketch constraints. Relevant focused coverage includes
 `tests/e2e/sketchCadSweep.e2e.ts`, `tests/e2e/restApi.e2e.ts`,
 `tests/unit/skfProject.test.ts`, `tests/e2e/stepImportKernel.e2e.ts`,
