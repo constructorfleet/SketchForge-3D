@@ -210,10 +210,6 @@ export class ProjectHandle {
     return this.client.explosions.explode(this.id, shapeId);
   }
 
-  estimateWallThickness(shapeId: string) {
-    return this.client.thickness.estimate(this.id, shapeId);
-  }
-
   sectionDrawing(request: SectionDrawingRequest): Promise<SectionDrawingArtifact> {
     return this.client.drawings.section(this.id, request);
   }
