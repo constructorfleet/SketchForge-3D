@@ -55,7 +55,8 @@ for (const sourceRelative of markdownSources) {
 }
 
 const landingSource = path.join(root, "docs/index.md");
-const landing = includeMarkdown(await readFile(landingSource, "utf8"), landingSource);
+const landing = includeMarkdown(await readFile(landingSource, "utf8"), landingSource)
+  .replace(/<h1(\s[^>]*)>([\s\S]*?)<\/h1>/, "<h2$1>$2</h2>");
 await writeFile(path.join(output, "index.md"), landing);
 
 // Preserve repository-relative image and downloadable-file paths referenced by
