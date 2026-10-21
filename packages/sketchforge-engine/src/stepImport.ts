@@ -1,4 +1,5 @@
 import type { WorkplaneShape } from "./domain/sketchforge.js";
+import { getFaces, getHashCode } from "brepjs";
 import { LocalizedError } from "./support/i18n/LocalizedError.js";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
 import { loadBrepWithOcct } from "./support/lib/brepKernel.js";
@@ -44,6 +45,12 @@ export async function importedShapeFromStep(fileName: string, buffer: ArrayBuffe
   const positions: number[] = [];
   const normals: number[] = [];
   const hasNormals = tess.normals.length === tess.vertices.length;
+  const faceIndexByHash = new Map(getFaces(flipped).map((face, index) => [getHashCode(face), index]));
+  const faceGroups: number[] = [];
+  for (const group of tess.faceGroups) {
+    const index = faceIndexByHash.get(group.faceId);
+    if (index !== undefined) faceGroups.push(group.start, group.count, index);
+  }
   for (let i = 0; i < tess.triangles.length; i += 1) {
     const v = tess.triangles[i] * 3;
     positions.push(tess.vertices[v], tess.vertices[v + 1], tess.vertices[v + 2]);
@@ -73,6 +80,7 @@ export async function importedShapeFromStep(fileName: string, buffer: ArrayBuffe
   const stepText = exported.ok ? await exported.value.text() : undefined;
 
   const shape = importedShapeFromTriangleSoup(fileName, positions, hasNormals ? normals : undefined, "step");
+  if (shape.importedMesh && faceGroups.length) shape.importedMesh.faceGroups = faceGroups;
   if (shape.importedMesh && stepText) {
     shape.importedMesh.brepStep = stepText;
   }

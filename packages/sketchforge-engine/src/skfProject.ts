@@ -61,6 +61,7 @@ export type SkfImportedMeshReferenceV1 = {
   baseHeight: number;
   triangleCount: number;
   sourceFormat: NonNullable<WorkplaneShape["importedMesh"]>["sourceFormat"];
+  faceGroups?: number[];
 };
 
 export type SkfShapeNodeV1 = {
@@ -595,6 +596,7 @@ async function serializeShapeNode(
       baseHeight: importedMesh.baseHeight,
       triangleCount: importedMesh.triangleCount,
       sourceFormat: importedMesh.sourceFormat,
+      ...(importedMesh.faceGroups?.length ? { faceGroups: importedMesh.faceGroups } : {}),
     };
   }
 
@@ -1352,7 +1354,11 @@ async function restoreShapeFromNode(
       sourceMeshCache.set(sourceAsset.id, promise);
     }
     const regenerated = await promise;
-    importedMesh = resources.meshes.get(meshKey!) ?? { ...regenerated, assetId: sourceAsset.id };
+    importedMesh = resources.meshes.get(meshKey!) ?? {
+      ...regenerated,
+      assetId: sourceAsset.id,
+      ...(node.importedMesh?.faceGroups ? { faceGroups: node.importedMesh.faceGroups } : {}),
+    };
   } else if (node.importedMesh?.meshAssetId) {
     const meshRecord = assetById.get(node.importedMesh.meshAssetId);
     if (!meshRecord) throw new LocalizedError("errors.skf.objectMissingMesh", { id: node.objectId });
@@ -1369,6 +1375,7 @@ async function restoreShapeFromNode(
       baseHeight: node.importedMesh.baseHeight,
       triangleCount: node.importedMesh.triangleCount,
       sourceFormat: node.importedMesh.sourceFormat,
+      ...(node.importedMesh.faceGroups ? { faceGroups: node.importedMesh.faceGroups } : {}),
       ...(brepRecord ? { brepStep: resources.text(brepRecord, files) } : {}),
     };
   }
@@ -1498,6 +1505,13 @@ function validateLegacyRuntimeShape(shape: WorkplaneShape, label: string) {
     const mesh = objectRecord(importedMesh, `${label}.importedMesh`);
     if (!Array.isArray(mesh.positions) || mesh.positions.length > SKF_LIMITS.meshNumbers || mesh.positions.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
       throw new LocalizedError("errors.skf.invalidPositions", { label: `${label}.importedMesh` });
+    }
+    if (mesh.faceGroups !== undefined && (
+      !Array.isArray(mesh.faceGroups)
+      || mesh.faceGroups.length % 3 !== 0
+      || mesh.faceGroups.some((value) => typeof value !== "number" || !Number.isInteger(value) || value < 0)
+    )) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.importedMesh.faceGroups` });
     }
   }
   if (Array.isArray(groupedShapes)) groupedShapes.forEach((child, index) => validateLegacyRuntimeShape(child as WorkplaneShape, `${label}.groupedShapes[${index}]`));

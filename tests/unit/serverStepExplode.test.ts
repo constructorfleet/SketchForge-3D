@@ -29,6 +29,10 @@ describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     const imported = await importedShapeFromStepOnKernel(source.name, step);
     imported.shape.importedMesh!.assetId = source.id;
 
+    const faceGroups = imported.shape.importedMesh!.faceGroups ?? [];
+    expect(faceGroups.length).toBeGreaterThan(0);
+    expect(faceGroups.every((value, index) => index % 3 !== 2 || Number.isInteger(value) && value >= 0)).toBe(true);
+
     const parts = await explodeStepAssembly(imported.shape, source);
 
     expect(parts.map((part) => part.name).sort()).toEqual(["Blue Pin", "Red Housing"]);

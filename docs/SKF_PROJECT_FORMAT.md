@@ -46,7 +46,7 @@ Nodes reference display edges through `cadDisplayEdgesAssetId`; the edge version
 - Nested groups, boolean operands, subtraction results, and intersection metadata
 - Sketch points, lines, Bezier/smooth handles, disjoint profiles, reference images, and extrusion depth
 - Imported STL, SVG, and STEP sources, stored once and reused by instances
-- Exact imported STEP data, current exact CAD B-Rep, display edges, chamfer/fillet settings, and reversible edge-treatment history
+- Exact imported STEP data, compact STEP triangle ranges mapped to current CAD face indexes for viewport color preview, current exact CAD B-Rep, display edges, chamfer/fillet settings, and reversible edge-treatment history
 - Undo and redo states according to the export choice: Unlimited, 100, 50, or 30 recent actions. Unlimited means every state still retained by the editor, including available redo states.
 - Workspace units, grid/snap settings, dimensions, active offset workplane, and camera projection
 - The last settled camera position, target, and zoom. Older projects without a saved camera view open at the standard home view.

@@ -80,7 +80,7 @@ export async function importedShapeFromStepOnKernel(fileName: string, stepText: 
     // first attempt rotated first, and both failed here.
     let mesh;
     try {
-      mesh = cad.tessellate(imported, IMPORT_TESSELLATION);
+      mesh = cad.meshShape(imported, IMPORT_TESSELLATION);
     } catch (error) {
       throw new LocalizedError("errors.step.meshFailed", { detail: messageOf(error) });
     }
@@ -93,7 +93,17 @@ export async function importedShapeFromStepOnKernel(fileName: string, stepText: 
     // multiply-free swap per vertex instead of a copy of the model.
     const positions: number[] = [];
     const normals: number[] = [];
+    const faceGroups: number[] = [];
     const hasNormals = mesh.normals.length === mesh.positions.length;
+    const faceIndexByHash = new Map(
+      cad.getSubShapes(imported, "face").map((face, index) => [cad.hashCode(face, 2_147_483_647), index]),
+    );
+    for (let group = 0; group + 2 < (mesh.faceGroups?.length ?? 0); group += 3) {
+      const start = mesh.faceGroups![group]!;
+      const count = mesh.faceGroups![group + 1]!;
+      const index = faceIndexByHash.get(mesh.faceGroups![group + 2]!);
+      if (index !== undefined) faceGroups.push(start, count, index);
+    }
     for (let index = 0; index < mesh.indices.length; index += 1) {
       const vertex = mesh.indices[index] * 3;
       positions.push(mesh.positions[vertex], mesh.positions[vertex + 2], -mesh.positions[vertex + 1]);
@@ -101,6 +111,7 @@ export async function importedShapeFromStepOnKernel(fileName: string, stepText: 
     }
 
     const shape = importedShapeFromTriangleSoup(fileName, positions, hasNormals ? normals : undefined, "step");
+    if (shape.importedMesh && faceGroups.length) shape.importedMesh.faceGroups = faceGroups;
 
     // `importedShapeFromTriangleSoup` recentres the mesh on x/z and rests it on
     // y = 0, so the stored exact geometry has to move by the same offset or the

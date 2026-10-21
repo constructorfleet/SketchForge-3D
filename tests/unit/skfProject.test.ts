@@ -548,6 +548,7 @@ describe("SketchForge .skf project packages", () => {
       triangleCount: 1,
       sourceFormat,
       assetId: asset.id,
+      ...(sourceFormat === "step" ? { faceGroups: [0, 1, 0] } : {}),
       ...(sourceFormat === "step" ? { brepStep: "exact STEP" } : {}),
     };
     const exported = await exportSkfProject(input([shape("mesh", `${sourceFormat}-object`, { importedMesh })], { assets: [asset] }));
@@ -558,6 +559,10 @@ describe("SketchForge .skf project packages", () => {
     expect(document.assets.filter((entry) => entry.kind === "derived-mesh")).toHaveLength(0);
     expect(restored.assets[0].sourceFormat).toBe(sourceFormat);
     expect(restored.shapes[0].importedMesh?.sourceFormat).toBe(sourceFormat);
+    if (sourceFormat === "step") {
+      expect(document.states[0]?.nodes[0]?.importedMesh?.faceGroups).toEqual([0, 1, 0]);
+      expect(restored.shapes[0].importedMesh?.faceGroups).toEqual([0, 1, 0]);
+    }
     if (sourceFormat === "step") expect(document.exactCad[0].importedStepAssetId).toBeTruthy();
   });
 
