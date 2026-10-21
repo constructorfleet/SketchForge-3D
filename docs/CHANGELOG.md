@@ -12,6 +12,10 @@
   `POST /distribute`, with runtime request and response validation for the
   shape-arrangement operations. The subset documents eleven of 32 registered
   operations.
+- The generated OpenAPI contract now includes server-side booleans, edge
+  treatments, shelling, and draft-prism operations, with runtime request and
+  response validation. The subset documents fifteen of 32 registered
+  operations.
 - Shape parameter edits now keep face IDs and colors when a face has a unique
   counterpart with the same surface type and outward normal. A uniquely
   occurring cone, sphere, torus, or cylinder surface also retains identity when

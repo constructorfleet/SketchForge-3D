@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -18,7 +19,7 @@ export const revalidate = false;
  * takes, and the refusal of a cut that removed nothing. This handler's job is
  * the request and the reply.
  */
-export async function POST(request: Request) {
+const postBoolean = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
   if (!holeIds?.length) return apiError("Send holeIds: the ids of the shapes to subtract.", 400, "invalid_request");
   const both = solidIds.filter((id) => holeIds.includes(id));
   if (both.length > 0) return apiError(`A shape cannot be both a solid and a hole: ${both.join(", ")}.`, 400, "invalid_request");
+  if (!validateApiV1RequestBody("POST /api/v1/booleans", { solidIds, holeIds })) return apiError("The boolean request does not match its contract.", 400, "invalid_request");
 
   const cut = await apiEngine(context.root).cut(projectId, { solidIds, holeIds });
   if (!cut.ok) {
@@ -45,3 +47,5 @@ export async function POST(request: Request) {
     revision: cut.value.revision,
   }, 201);
 }
+
+export const POST = withApiV1Contract("POST /api/v1/booleans", postBoolean);

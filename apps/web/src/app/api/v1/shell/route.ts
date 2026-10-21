@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -29,7 +30,7 @@ function openFaces(value: unknown) {
  * its top face open is a tray. Done here with OCCT, and stored as exact
  * geometry, so a hollowed part still exports to STEP and can still be filleted.
  */
-export async function POST(request: Request) {
+const postShell = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       "invalid_request",
     );
   }
+  if (!validateApiV1RequestBody("POST /api/v1/shell", { thickness, ...(body.openFaces === undefined && body.open === undefined ? {} : { openFaces: body.openFaces ?? body.open }) })) return apiError("The shell request does not match its contract.", 400, "invalid_request");
 
   const hollowed = await apiEngine(context.root).shell(projectId, shapeId, { thickness, openFaces: faces });
   if (!hollowed.ok) return apiEngineError(hollowed.failure, { oneShape: true });
@@ -59,3 +61,5 @@ export async function POST(request: Request) {
     revision: hollowed.value.revision,
   });
 }
+
+export const POST = withApiV1Contract("POST /api/v1/shell", postShell);

@@ -14,6 +14,8 @@ export type ApiV1FieldSchema = {
   default?: string;
   minimum?: number;
   maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
   minimumLength?: number;
   maximumLength?: number;
   pattern?: string;
@@ -261,7 +263,7 @@ export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): b
   }
   if (schema.type === "string") return typeof value === "string" && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
   if (schema.type === "boolean") return typeof value === "boolean";
-  if (schema.type === "number" || schema.type === "integer") return typeof value === "number" && Number.isFinite(value) && (schema.type !== "integer" || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum);
+  if (schema.type === "number" || schema.type === "integer") return typeof value === "number" && Number.isFinite(value) && (schema.type !== "integer" || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum) && (schema.exclusiveMinimum === undefined || value > schema.exclusiveMinimum) && (schema.exclusiveMaximum === undefined || value < schema.exclusiveMaximum);
   return schema.type === undefined;
 }
 
@@ -321,6 +323,14 @@ const shapeOperations = [
 ] as const satisfies readonly ApiV1Operation[];
 
 const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
+const featureErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
+const changedShapeResponse = { type: "object", required: ["shape", "triangles", "revision"], properties: { shape: shapeSummary, triangles: { type: "integer", minimum: 0 }, revision: num } } as const;
+const featureOperations = [
+  { ...operation("POST", "/api/v1/booleans", "booleanShapes", [201, 400, 401, 404, 409, 422, 500, 503], json({ type: "object", required: ["solidIds", "holeIds"], properties: { solidIds: { oneOf: [{ type: "string", pattern: "\\S" }, { type: "array", minItems: 1, items: { type: "string", pattern: "\\S" } }] }, holeIds: { oneOf: [{ type: "string", pattern: "\\S" }, { type: "array", minItems: 1, items: { type: "string", pattern: "\\S" } }] } }, additionalProperties: true })), description: "Subtract one or more cutter shapes from one or more solids and persist the resulting exact geometry.", query: projectQuery, responseSchemas: { 201: changedShapeResponse, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("POST", "/api/v1/treatments", "treatShape", [200, 400, 401, 404, 409, 422, 500, 503], json({ type: "object", required: ["kind", "amount"], properties: { kind: { type: "string", enum: ["fillet", "chamfer"] }, amount: { type: "number", exclusiveMinimum: 0 }, angle: num, edges: { oneOf: [{ type: "string", enum: ["all"] }, { type: "array", nullable: true, items: num }] } }, additionalProperties: true })), description: "Apply a fillet or chamfer to all edges or selected edge indexes.", query: shapeQuery, responseSchemas: { 200: changedShapeResponse, ...featureErrors } },
+  { ...operation("POST", "/api/v1/shell", "shellShape", [200, 400, 401, 404, 409, 422, 500, 503], json({ type: "object", required: ["thickness"], properties: { thickness: { type: "number", exclusiveMinimum: 0 }, openFaces: { oneOf: [{ type: "string", nullable: true }, { type: "number" }, { type: "array", items: { oneOf: [{ type: "string" }, num] } }] } }, additionalProperties: true })), description: "Hollow a shape to a specified wall thickness, optionally leaving selected faces open.", query: shapeQuery, responseSchemas: { 200: changedShapeResponse, ...featureErrors } },
+  { ...operation("POST", "/api/v1/draft-prism", "draftPrism", [200, 400, 401, 404, 409, 422, 500, 503], json({ type: "object", required: ["angle"], properties: { angle: { oneOf: [{ type: "number", exclusiveMinimum: 0, maximum: 45 }, { type: "number", minimum: -45, exclusiveMaximum: 0 }] } }, additionalProperties: true })), description: "Draft an extruded shape along its vertical axis by an angle between -45 and 45 degrees, excluding zero.", query: shapeQuery, responseSchemas: { 200: changedShapeResponse, ...featureErrors } },
+] as const satisfies readonly ApiV1Operation[];
 const arrangementIds = {
   oneOf: [
     { type: "string", pattern: "\\S", description: "One non-empty shape ID." },
@@ -384,10 +394,10 @@ const arrangementOperations = [
 ] as const satisfies readonly ApiV1Operation[];
 
 export const API_V1_OPERATIONS = [
+  ...featureOperations.slice(0, 1),
   ...arrangementOperations.slice(0, 1),
-  operation("POST", "/api/v1/booleans", "booleanShapes"),
   ...arrangementOperations.slice(1),
-  operation("POST", "/api/v1/draft-prism", "draftPrism"),
+  ...featureOperations.slice(3, 4),
   operation("GET", "/api/v1/edges", "listEdges"),
   operation("OPTIONS", "/api/v1/edges", "edgeRouteOptions", [204], undefined, "none"),
   operation("POST", "/api/v1/explode", "explodeAssembly"),
@@ -500,10 +510,10 @@ export const API_V1_OPERATIONS = [
   ...shapeOperations.slice(0, 2),
   { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
   shapeOperations[3],
-  operation("POST", "/api/v1/shell", "shellShape"),
+  ...featureOperations.slice(2, 3),
   operation("GET", "/api/v1/thickness", "estimateThickness"),
   operation("OPTIONS", "/api/v1/thickness", "thicknessRouteOptions", [204], undefined, "none"),
-  operation("POST", "/api/v1/treatments", "treatShape"),
+  ...featureOperations.slice(1, 2),
 ] as const satisfies readonly ApiV1Operation[];
 
 export type CreateProjectRequest = { name: string };

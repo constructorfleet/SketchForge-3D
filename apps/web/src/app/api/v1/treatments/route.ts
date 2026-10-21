@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -19,7 +20,7 @@ function edgeIndexes(value: unknown) {
  * and the result is stored as exact geometry so STEP export and any later
  * treatment build on it rather than on a triangle mesh.
  */
-export async function POST(request: Request) {
+const postTreatment = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
   if (body.angle !== undefined && typeof body.angle !== "number") return apiError("angle must be a number of degrees.", 400, "invalid_request");
   const edges = edgeIndexes(body.edges);
   if (edges === null) return apiError('edges must be a list of edge indexes, or "all".', 400, "invalid_request");
+  const contractBody = { kind, amount: body.amount, ...(body.angle === undefined ? {} : { angle: body.angle }), ...(body.edges === undefined ? {} : { edges: body.edges }) };
+  if (!validateApiV1RequestBody("POST /api/v1/treatments", contractBody)) return apiError("The treatment request does not match its contract.", 400, "invalid_request");
 
   const treated = await apiEngine(context.root).treat(projectId, shapeId, {
     kind,
@@ -48,3 +51,5 @@ export async function POST(request: Request) {
     revision: treated.value.revision,
   });
 }
+
+export const POST = withApiV1Contract("POST /api/v1/treatments", postTreatment);
