@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -19,7 +20,7 @@ const SPACINGS = ["gaps", "centers"] as const;
  * `axis` may be left out, and then it is whichever axis the shapes are already
  * most spread along: a row along X is a row whoever made it meant to be a row.
  */
-export async function POST(request: Request) {
+const postDistribute = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
   }
   if (body.spacing !== undefined && !SPACINGS.includes(body.spacing as (typeof SPACINGS)[number])) {
     return apiError(`spacing must be one of ${SPACINGS.join(", ")}.`, 400, "invalid_request");
+  }
+  if (!validateApiV1RequestBody("POST /api/v1/distribute", { ...body, ids })) {
+    return apiError("The distribution request does not match its contract.", 400, "invalid_request");
   }
 
   const distributed = await apiEngine(context.root).distribute(projectId, {
@@ -58,4 +62,6 @@ export async function POST(request: Request) {
     shapes: distributed.value.shapes.map(apiShapeSummary),
     revision: distributed.value.revision,
   });
-}
+};
+
+export const POST = withApiV1Contract("POST /api/v1/distribute", postDistribute);

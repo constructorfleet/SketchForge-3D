@@ -120,6 +120,44 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=p&shapeId=%20"))).toMatchObject({ ok: false, invalid: ["shapeId"] });
   });
 
+  it("contracts alignment and distribution request and response behavior", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const align = API_V1_OPERATIONS.find(({ method, path: route }) => method === "POST" && route === "/api/v1/align");
+    const distribute = API_V1_OPERATIONS.find(({ method, path: route }) => method === "POST" && route === "/api/v1/distribute");
+    expect(align).toMatchObject({
+      operationId: "alignShapes",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      requestBody: { contentType: "application/json", required: true },
+    });
+    expect(distribute).toMatchObject({
+      operationId: "distributeShapes",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      requestBody: { contentType: "application/json", required: true },
+    });
+    const alignBody = { ids: ["left", "right"], axis: "y", target: "max", anchorId: "right" };
+    const distributeBody = { ids: ["left", "middle", "right"], axis: "x", spacing: "centers" };
+    expect(contract.validateApiV1RequestBody("POST /api/v1/align", alignBody)).toBe(true);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/align", { ids: ["a", "b"], axis: "q", target: "max" })).toBe(false);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/distribute", distributeBody)).toBe(true);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/distribute", { ids: ["a", "b", "c"], axis: "y" })).toBe(false);
+    expect(contract.validateApiV1RequestBody("POST /api/v1/distribute", { ids: ["a", "b", "c"], spacing: "centres" })).toBe(false);
+
+    const aligned = { moved: 1, axis: "y", target: "max", anchorId: "right", shapes: [], revision: 12 };
+    const distributed = { moved: 1, axis: "x", spacing: "centers", shapes: [], revision: 13 };
+    expect(contract.validateApiV1Response("POST /api/v1/align", 200, aligned)).toBe(true);
+    expect(contract.validateApiV1Response("POST /api/v1/align", 200, { ...aligned, moved: -1 })).toBe(false);
+    expect(contract.validateApiV1Response("POST /api/v1/distribute", 200, distributed)).toBe(true);
+    expect(contract.validateApiV1Response("POST /api/v1/distribute", 200, { ...distributed, spacing: "equal" })).toBe(false);
+    for (const key of ["POST /api/v1/align", "POST /api/v1/distribute"]) {
+      for (const status of [400, 401, 404, 409, 422, 500, 503]) {
+        expect(contract.validateApiV1Response(key, status, { error: "failure", code: "invalid_request" })).toBe(true);
+      }
+      expect(contract.validateApiV1Response(key, 418, { error: "failure", code: "invalid_request" })).toBe(false);
+    }
+  });
+
   it("converts unexpected exceptions and malformed response bodies into internal_error", async () => {
     const { withApiV1Contract } = await import("@/lib/apiV1OperationContract");
     const request = new Request("https://example.test/api/v1/projects");

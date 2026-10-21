@@ -5,6 +5,10 @@
 - The generated OpenAPI contract now includes both measurement routes, with
   runtime validation for conditional edge and face indices and the exclusive
   angle result fields. The subset documents nine of 32 registered operations.
+- The generated OpenAPI contract now includes `POST /align` and
+  `POST /distribute`, with runtime request and response validation for the
+  shape-arrangement operations. The subset documents eleven of 32 registered
+  operations.
 - Shape parameter edits now keep face IDs and colors when a face has a unique
   counterpart with the same surface type and outward normal. Ambiguous faces
   receive fresh IDs without inherited colors. 3MF export now converts OCCT face
