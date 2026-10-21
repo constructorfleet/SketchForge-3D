@@ -32,7 +32,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `sceneStateId` | `string` |
 | `states` | `SkfStateV1[]` |
 | `history` | `{ entries: Array<{ stateId: string; selectedObjectIds: string[] }>; index: number; }` |
-| `sketches` | `Array<{ id: string; nodeId: string; objectId: string; operation?: SketchOperation; extrusionDepth: number; revolve?: SketchRevolveSettings }>` |
+| `sketches` | `Array<{ id: string; nodeId: string; objectId: string; sourceNodeId?: string; sourceObjectId?: string; operation?: SketchOperation; extrusionDepth: number; revolve?: SketchRevolveSettings }>` |
 | `features` | `SkfFeatureV1[]` |
 | `groups` | `Array<{ id: string; nodeId: string; objectId: string; memberNodeIds: string[]; operation: string }>` |
 | `workplanes` | `Array<{ id: string; kind: "base" | "offset"; elevation: number }>` |

@@ -353,6 +353,8 @@ export type WorkplaneShape = {
   };
   sketchProfile?: SketchProfile;
   sketchOperation?: SketchOperation;
+  /** Stable identity of the editable sketch consumed by this sketch feature. */
+  sketchSourceId?: string;
   sketchRevolve?: SketchRevolveSettings;
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];

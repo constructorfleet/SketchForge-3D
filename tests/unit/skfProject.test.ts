@@ -72,6 +72,57 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it("round-trips an extrusion's editable source sketch and its feature dependency", async () => {
+    const extrusion = shape("mesh", "extrusion-1", {
+      sketchSourceId: "sketch-source-1",
+      sketchOperation: "extrude",
+      sketchProfile: {
+        points: [
+          { id: "a", x: -5, z: -5 }, { id: "b", x: 5, z: -5 },
+          { id: "c", x: 5, z: 5 }, { id: "d", x: -5, z: 5 },
+        ],
+        segments: [
+          { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+          { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        ],
+      },
+    });
+    const history = [
+      editorHistoryEntry([{ ...extrusion, height: 12 }], []),
+      editorHistoryEntry([extrusion], []),
+    ];
+    const bytes = await exportSkfProject(input([extrusion], { history, historyIndex: 1 }));
+    const { document } = packageDocument(bytes);
+    const extrusionFeature = document.features.find((feature) => feature.type === "sketch-extrusion");
+    const sourceSketch = document.sketches.find((sketch) => sketch.id === "sketch-source-1");
+    const sourceNode = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((node) => node.nodeId === sourceSketch?.sourceNodeId);
+
+    expect(document.sketches).toContainEqual(expect.objectContaining({ id: "sketch-source-1", objectId: "extrusion-1" }));
+    expect(sourceSketch?.sourceObjectId).toBe("sketch-source-1");
+    expect(sourceSketch?.sourceNodeId).toBeTruthy();
+    expect(sourceNode).toMatchObject({ objectId: "sketch-source-1", objectType: "sketch" });
+    expect(sourceNode?.definition.sketchProfile).toMatchObject({ points: expect.arrayContaining([{ id: "a", x: -5, z: -5 }]) });
+    expect(extrusionFeature?.inputObjectIds).toEqual(["sketch-source-1"]);
+    expect(extrusionFeature?.parameters).toMatchObject({ depth: 16, direction: "positive-y" });
+
+    const restored = await importSkfProject(bytes);
+    expect(restored.shapes[0]).toMatchObject({
+      sketchSourceId: "sketch-source-1",
+      sketchOperation: "extrude",
+      sketchProfile: { points: expect.arrayContaining([{ id: "a", x: -5, z: -5 }]) },
+      height: 16,
+    });
+    expect(restored.history.map((entry) => entry.shapes[0].sketchSourceId)).toEqual([
+      "sketch-source-1",
+      "sketch-source-1",
+    ]);
+    expect(restored.history.map((entry) => entry.shapes[0].height)).toEqual([12, 16]);
+    const missingSource = mutateProject(bytes, (document) => {
+      document.sketches[0].sourceNodeId = "missing-source-node";
+    });
+    await expect(importSkfProject(missingSource)).rejects.toThrow(/missing input object/i);
+  });
+
   it("round-trips stable face IDs and ID-keyed colors", async () => {
     const part = shape("box", "face-id-roundtrip", {
       faceIds: ["face_face-id-roundtrip_0", "face_face-id-roundtrip_1"],

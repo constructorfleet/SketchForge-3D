@@ -612,6 +612,7 @@ async function shapeFromSketchProfile(profile: SketchProfile, height: number, ex
     },
     sketchProfile: cloneSketchProfile(profile),
     sketchOperation: "extrude",
+    sketchSourceId: existing?.sketchSourceId ?? createLocalId("sketch"),
   } satisfies WorkplaneShape);
 }
 
@@ -659,6 +660,7 @@ async function cadShapeFromSketchProfile(profile: SketchProfile, height: number,
     worker.postMessage({ type: "build", requestId, profile: cloneSketchProfile(profile), height: safeHeight } satisfies SketchCadWorkerRequest);
   });
   if (response.type === "error") throw errorFromPayload(response);
+  const sketchSourceId = existing?.sketchSourceId ?? createLocalId("sketch");
   const source = canonicalizeShape({
     ...(existing ?? {
       id: createLocalId("sketch-extrusion"),
@@ -675,6 +677,7 @@ async function cadShapeFromSketchProfile(profile: SketchProfile, height: number,
     }),
     sketchProfile: cloneSketchProfile(profile),
     sketchOperation: "extrude",
+    sketchSourceId,
     edgeTreatments: undefined,
     edgeTreatmentHistory: undefined,
     cadDisplayEdges: undefined,
@@ -682,7 +685,12 @@ async function cadShapeFromSketchProfile(profile: SketchProfile, height: number,
   });
   const shape = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep);
   if (!shape) throw new LocalizedError("errors.editor.sketchEmptySolid");
-  return { ...shape, sketchProfile: cloneSketchProfile(profile), sketchOperation: "extrude" as const };
+  return {
+    ...shape,
+    sketchProfile: cloneSketchProfile(profile),
+    sketchOperation: "extrude" as const,
+    sketchSourceId,
+  };
 }
 
 async function cadShapeFromSketchSweepProfile(profile: SketchProfile, existing?: WorkplaneShape | null) {
