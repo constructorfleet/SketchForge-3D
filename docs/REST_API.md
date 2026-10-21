@@ -13,7 +13,7 @@ Two clients wrap everything below, with the macro runner that makes a parameteri
 | TypeScript | `npm install @constructorfleet/sketchforge3d` | [packages/sketchforge-client](../packages/sketchforge-client/README.md) |
 | Python | `pip install sketchforge3d` | [packages/sketchforge-py](../packages/sketchforge-py/README.md) |
 
-Both are thin: everything here is reachable through them, and nothing is only reachable through them. Reach for `curl` for one request and a client for a part.
+Both are thin: everything here is reachable through them, and nothing is only reachable through them. Reach for `curl` for one request and a client for a part. If you need the exported method and type signatures, use the [TypeScript API reference](./reference/typescript-client.md) or [Python API reference](./reference/python-client.md). To start from working code instead, use the [package examples](./guides/package-examples.md) or the [macro and MCP command-line reference](./CLI_REFERENCE.md).
 
 ## Turning it on
 
@@ -39,7 +39,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD plus `GET /faces`, with complete query and response schemas for each included operation. The face listing schema includes stable face IDs, geometry fields, and nullable normals/directions. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a>. It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then. Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The generated OpenAPI 3.1 document describes project and shape CRUD plus `GET /faces`, with complete query and response schemas for each included operation. The face listing schema includes stable face IDs, geometry fields, and nullable normals/directions. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
 
 ### Contract validation
 

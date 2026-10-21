@@ -3,6 +3,8 @@
 
 This reference is generated from the engine's exported project types, version constants, and archive limits. It describes the serialized contract; see [the project format guide](./SKF_PROJECT_FORMAT.md) for behavior and safety semantics.
 
+For automated project export from a server-backed project, see [`POST /exports` in the REST API guide](./REST_API.md#endpoints).
+
 ## Package identity
 
 | Property | Value |

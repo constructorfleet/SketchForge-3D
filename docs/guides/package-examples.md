@@ -2,6 +2,8 @@
 
 These examples are included from the package files that the integration suites execute. The TypeScript macros run through the published client macro runner; the Python examples run through `sketchforge3d`. Both suites create projects on a temporary local server and remove the projects after each run.
 
+Use the [REST API guide](../REST_API.md) for server setup and endpoint semantics. For the full public client signatures, see the [TypeScript](../reference/typescript-client.md) and [Python](../reference/python-client.md) references.
+
 ## TypeScript: bolt plate
 
 Source: `packages/sketchforge-client/examples/bolt-plate.macro.mjs`.

@@ -4,6 +4,8 @@
 
 This executable workflow uses the local project store. It creates a temporary project, adds an 80 × 56 × 3 mm mounting plate, reads the resulting scene, exports an `.skf` file, and removes the temporary directory when it exits. It does not need a browser, running editor, or API token.
 
+For the `.skf` file's archive layout, validation, and compatibility behavior, see the [project format guide](../SKF_PROJECT_FORMAT.md) and [generated format reference](../SKF_FORMAT_REFERENCE.md). REST-based automation is covered separately in the [REST API guide](../REST_API.md).
+
 Build the engine once, then run the example from the repository root:
 
 ```sh
