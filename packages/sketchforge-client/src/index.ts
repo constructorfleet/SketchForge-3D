@@ -5,6 +5,7 @@ export { Projects } from "./resources/projects.js";
 export { Shapes, chunk, shapePatchFromSummary } from "./resources/shapes.js";
 export { Align, Distribute, Patterns } from "./resources/arrange.js";
 export { Edges } from "./resources/edges.js";
+export { Explosions } from "./resources/explosions.js";
 export { Faces } from "./resources/faces.js";
 export { Thickness } from "./resources/thickness.js";
 export { Imports } from "./resources/imports.js";
