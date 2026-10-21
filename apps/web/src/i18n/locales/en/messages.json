@@ -1016,6 +1016,16 @@
         "apply": "Apply draft",
         "applying": "Applying draft…",
         "applied": "Draft applied. The shape is now baked geometry."
+      },
+      "draftFace": {
+        "title": "Draft face",
+        "hint": "Taper one face of exact B-rep geometry. The pull direction is local CAD +Z, relative to the shape's coordinate frame. Incompatible faces or angles are rejected by the kernel.",
+        "index": "CAD face index",
+        "axis": "Local CAD pull axis: +Z",
+        "angle": "Draft angle",
+        "apply": "Apply face draft",
+        "applying": "Applying face draft…",
+        "applied": "Face draft applied. The result is baked geometry."
       }
     },
     "appearance": {
@@ -1348,6 +1358,9 @@
       "notPrepared": "Prepare an object before previewing the modifier",
       "noEdgesSelected": "Select at least one highlighted edge",
       "invalidResult": "The chosen size creates invalid or overlapping edge geometry",
+      "draftFaceInvalid": "The face draft could not produce a valid solid. Check the face index and draft angle.",
+      "draftFaceNotFound": "The selected face is no longer available on this solid. Choose another face index.",
+      "draftFaceIncompatible": "The selected face cannot be drafted along that local CAD axis at this angle. Try another axis, face, or angle.",
       "filletTooLarge": "The selected edges cannot be filleted together at this size. Reduce the size or select fewer connected edges.",
       "chamferTooLarge": "The selected edges cannot be chamfered together at this size. Reduce the size or select fewer connected edges.",
       "edgeTreatmentFailed": "The CAD kernel could not complete this edge treatment",

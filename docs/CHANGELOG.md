@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and local CAD +Z pull axis, reports incompatible selections, and replaces the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured support currently covers specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.
+
 - Added lower-case compatibility routes for the REST API, `.skf` project format, publishing clients, and shape request reference pages. The static pages redirect to canonical paths and retain a fallback link.
 
 - Added an executable local MCP workflow showing project creation, shape creation, scene inspection, and `.skf` export. The example validates each call against the MCP server's current `tools/list` schema and cleans up its temporary project.
@@ -66,6 +68,8 @@
 - Added `POST /api/v1/draft-prism` for retained straight sketch extrusions. The server rebuilds a closed polygon profile with OCCT's draft-prism operation, then stores both the exact BREP and viewport mesh. The TypeScript and Python clients expose it. This first slice requires a single closed linear loop and does not store an editable feature-tree node.
 
 - Added a draft-prism control to the shape inspector for retained straight sketch extrusions. It accepts angles between -45° and 45°, excluding zero, and uses the local CAD worker to replace the selection with exact BREP and mesh geometry. This operation is baked and does not add an editable feature-tree node.
+
+- Added a face-draft operation for exact B-rep shapes in the shape inspector. It addresses faces through their stable IDs, uses the local CAD +Z pull axis, and replaces the source with baked geometry and fresh face IDs. The result clears prior face colors and edge-treatment metadata. Unsupported face/angle combinations show a localized kernel error. Its measured support is limited: the editor's sketch extrusion fixture supports faces 1, 3, 4, and 5 at ±5°; a 10 mm box supports faces 0–3 at ±5°.
 
 - Align, distribute, repeat and import are now operations rather than buttons. `POST /api/v1/align`, `/distribute`, `/patterns` and `/imports` join the API, and all four are on the `Engine`, which means a macro with no server and no browser can reach them too. Align and distribute were editor-only because their arithmetic lived inside `SketchForgeEditor.tsx` with the overlay that drives them; repeat and import were editor-only because nothing had asked for them anywhere else. A script could place a row of bosses to four decimal places and could not ask for their tops to be flush, which is a strange shape for a capability to have.
 

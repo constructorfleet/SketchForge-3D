@@ -34,6 +34,15 @@ These are implemented and should not be filed as missing features:
   REST, and in the TypeScript and Python clients. The editor builds from a
   retained straight, single-loop sketch extrusion in its local CAD worker and
   stores exact geometry; the result is baked without an editable feature node.
+- Face-based drafting is available in the shape inspector for exact B-rep
+  solids. It selects a face by the stable-ID-backed face listing, drafts along
+  local CAD +Z, and replaces the selection with baked exact geometry. The
+  resulting faces receive fresh IDs; face colors and edge-treatment metadata
+  are cleared. Unsupported face/angle combinations return a localized error.
+  Measured support is geometry-specific: the editor's XZ-profile, +Y
+  extrusion fixture accepts faces 1, 3, 4, and 5 at ±5° along +Z; a 10 mm box
+  accepts faces 0–3 at ±5° along +Z. These 36-case fixtures do not establish
+  general support for arbitrary solids, other axes, or all draft angles.
 - OBJ import is supported alongside STL, SVG, and STEP, and imported source
   assets are preserved in `.skf` projects.
 - Camera view orientation, target, and zoom are saved with the project and
@@ -69,8 +78,8 @@ or client-library operation.
 
 Draft prism remains available in the editor, REST, and client libraries, but
 supports one straight closed sketch loop and also stores baked geometry. More
-work remains for free 3D curve-handle control, face-based drafting, and
-dependency-ordered editable feature history.
+work remains for free 3D curve-handle control and dependency-ordered editable
+feature history.
 
 ### 2. STEP assembly hierarchy and color verification
 
