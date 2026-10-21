@@ -18,8 +18,15 @@ test("docs scripts generate and check each deterministic reference", async () =>
   ];
 
   for (const generator of generators) {
-    assert.ok(scripts["docs:generate"].includes(generator), `docs:generate must invoke ${generator}`);
-    assert.ok(scripts["docs:check"].includes(`${generator} --check`), `docs:check must check ${generator}`);
+    if (generator === "scripts/docs/generate-package-references.mjs") {
+      assert.ok(scripts["docs:generate"].includes(`${generator} --output-dir .docs-site/docs/reference`),
+        "docs:generate must publish package references into the staged site");
+      assert.ok(!scripts["docs:check"].includes(`${generator} --check`),
+        "docs:check must not require generated package reference markdown to be committed");
+    } else {
+      assert.ok(scripts["docs:generate"].includes(generator), `docs:generate must invoke ${generator}`);
+      assert.ok(scripts["docs:check"].includes(`${generator} --check`), `docs:check must check ${generator}`);
+    }
   }
   assert.ok(scripts["docs:generate"].includes("npm run engine:build"), "generated package references require built engine declarations");
   assert.ok(scripts["docs:generate"].includes("npm run client:build"), "generated package references require built client declarations");

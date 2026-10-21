@@ -43,6 +43,23 @@ test("built docs emit the project-site shell, imported README, and local search"
   assert.match(restApi, /href="\/SketchForge-3D\/openapi-v1\.json"/, "the REST reference should link to the OpenAPI download under the project-site prefix");
 });
 
+test("Pages artifact contains generated TypeScript and Python package references", () => {
+  const output = path.join(rootPath, "docs-site-dist/docs/reference");
+  const references = [
+    ["typescript-client.html", /TypeScript client API/, /SketchForgeClient/],
+    ["typescript-engine.html", /Engine API/, /createEngine/],
+    ["python-client.html", /Python client API/, /SketchForgeClient/],
+  ];
+
+  for (const [filename, title, symbol] of references) {
+    const pagePath = path.join(output, filename);
+    assert.ok(existsSync(pagePath), `${filename} must be included in the Pages artifact`);
+    const html = readFileSync(pagePath, "utf8");
+    assert.match(html, title, `${filename} should render its generated package title`);
+    assert.match(html, symbol, `${filename} should expose an expected current package symbol`);
+  }
+});
+
 test("built pages identify their release and link to source at the represented revision", () => {
   const output = path.join(rootPath, "docs-site-dist");
   const home = readFileSync(path.join(output, "index.html"), "utf8");

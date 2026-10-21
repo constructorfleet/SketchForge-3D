@@ -31,11 +31,14 @@ jobs:
       - name: Build public packages
         run: npm run engine:build && npm run client:build
 
-      - name: Generate package references
-        run: node scripts/docs/generate-package-references.mjs
+      - name: Stage documentation sources
+        run: node scripts/docs-generate.mjs
 
-      - name: Check generated references are current
-        run: git diff --exit-code -- docs/reference
+      - name: Generate package references into the site artifact
+        run: node scripts/docs/generate-package-references.mjs --output-dir .docs-site/docs/reference
+
+      - name: Check staged package references
+        run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference
 
   package-examples:
     name: Package examples against local API
