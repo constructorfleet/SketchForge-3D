@@ -126,6 +126,13 @@ describe("REST API v1", () => {
     expect(payload.shapes[0]).toMatchObject({ name: "Post", kind: "cylinder", sides: 6, width: 8, height: 30, x: 12 });
   });
 
+  it("rejects a shape request without its required kind before engine dispatch", async () => {
+    const projectId = await makeProject();
+    const created = await addShape(projectId, { width: 10 });
+    expect(created.status).toBe(400);
+    expect(created.payload).toMatchObject({ code: "invalid_request" });
+  });
+
   it("adds a batch of shapes in one write", async () => {
     const projectId = await makeProject();
 

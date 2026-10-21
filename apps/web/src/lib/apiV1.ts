@@ -42,6 +42,7 @@ export const API_ERROR_CODES = [
   "too_many_shapes",
   "geometry_failed",
   "cad_failed",
+  "internal_error",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
