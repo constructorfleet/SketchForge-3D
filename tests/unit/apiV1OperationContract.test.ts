@@ -271,6 +271,7 @@ describe("REST API v1 operation contract", () => {
   it("declares and validates POST /measurements between-entity requests and results", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "POST" && route === "/api/v1/measurements");
+    if (!operation) throw new Error("POST /api/v1/measurements must be registered");
     expect(operation).toMatchObject({
       operationId: "measureEntities",
       auth: "bearer",
@@ -293,7 +294,7 @@ describe("REST API v1 operation contract", () => {
       .toMatchObject({ ok: false, side: "from" });
     expect(contract.parseMeasureBetweenRequest({ from: { shapeId: "a", entity: "vertex", index: 0 }, to: { shapeId: "b" } }))
       .toMatchObject({ ok: false, side: "from" });
-    const bodySchema = operation!.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema : undefined;
+    const bodySchema = operation.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema : undefined;
     expect(bodySchema).toBeDefined();
     expect(contract.validateApiV1Schema({ from: { shapeId: "a" }, to: { shapeId: "b", entity: "face", index: 0 } }, bodySchema!)).toBe(true);
     expect(contract.validateApiV1Schema({ from: { shapeId: "a", entity: "edge" }, to: { shapeId: "b" } }, bodySchema!)).toBe(false);
