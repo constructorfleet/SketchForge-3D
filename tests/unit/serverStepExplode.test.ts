@@ -42,6 +42,28 @@ describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  it("does not use GLB name colors for duplicate XCAF component names", async () => {
+    const step = await withCadKernel((cad) => {
+      const document = cad.createXCAFDocument();
+      try {
+        document.addShape(cad.makeBox(10, 8, 6), { name: "Repeated", color: [0.8, 0.1, 0.2] });
+        document.addShape(cad.translate(cad.makeBox(5, 4, 3), 20, 0, 0), { name: "Repeated" });
+        return document.exportSTEP();
+      } finally {
+        document.close();
+      }
+    });
+    const bytes = new TextEncoder().encode(step);
+    const source: ProjectAsset = { id: "source", name: "duplicate.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
+    const imported = await importedShapeFromStepOnKernel(source.name, step);
+    imported.shape.importedMesh!.assetId = source.id;
+
+    const parts = await explodeStepAssembly(imported.shape, source);
+
+    expect(parts).toHaveLength(2);
+    expect(parts.map((part) => part.color)).toEqual(["#0098c7", "#0098c7"]);
+  });
+
   it("returns separately positioned solids with exact BREP geometry", async () => {
     const step = await withCadKernel((cad) => {
       const first = cad.makeBox(10, 8, 6);
