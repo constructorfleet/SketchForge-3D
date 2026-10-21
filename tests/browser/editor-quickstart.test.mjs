@@ -68,6 +68,24 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
     await page.getByRole("button", { name: "Finish sketch", exact: true }).waitFor({ state: "hidden", timeout: 30_000 });
     await page.screenshot({ path: "docs/screenshots/parametric-extrusion-rebuilt-solid.png" });
 
+    await page.getByRole("tab", { name: "Sketch" }).click();
+    await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+    await page.getByRole("menuitem", { name: /Revolve sketch/ }).click();
+    await page.getByRole("button", { name: "Add sketch shape" }).click();
+    await page.getByRole("menuitem", { name: "Rectangle" }).click();
+    await page.getByRole("button", { name: "Finish revolve" }).click();
+    await page.getByRole("button", { name: "Sketch revolve", exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
+    await page.getByRole("button", { name: "Finish revolve", exact: true }).waitFor({ state: "visible" });
+    await page.screenshot({ path: "docs/screenshots/parametric-revolve-edit-sketch.png" });
+    await page.getByRole("button", { name: "Finish revolve", exact: true }).click();
+    await page.getByRole("button", { name: "Finish revolve", exact: true }).waitFor({ state: "hidden", timeout: 30_000 });
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await page.getByRole("button", { name: "Sketch revolve", exact: true }).waitFor({ state: "hidden" });
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await page.getByRole("button", { name: "Sketch revolve", exact: true }).waitFor({ state: "visible" });
+    await page.screenshot({ path: "docs/screenshots/parametric-revolve-rebuilt-solid.png" });
+
     const projectName = page.getByRole("textbox", { name: "Project name" });
     await projectName.fill("Quick-start block");
     await projectName.press("Enter");

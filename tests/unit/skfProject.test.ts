@@ -425,7 +425,21 @@ describe("SketchForge .skf project packages", () => {
         sourceFormat: "json",
       },
     });
-    const restored = await importSkfProject(await exportSkfProject(input([revolve])));
+    const bytes = await exportSkfProject(input([revolve]));
+    const { document } = packageDocument(bytes);
+    const sourceSketchId = "sketch/revolve-sketch";
+    const sourceSketch = document.sketches.find((sketch) => sketch.id === sourceSketchId);
+    const sourceNode = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((node) => node.nodeId === sourceSketch?.sourceNodeId);
+    const revolveFeature = document.features.find((feature) => feature.type === "sketch-revolve");
+
+    expect(sourceSketch).toMatchObject({ sourceObjectId: sourceSketchId, objectId: "revolve-sketch" });
+    expect(sourceNode).toMatchObject({ objectId: sourceSketchId, objectType: "sketch" });
+    expect(sourceNode?.definition.sketchProfile).toEqual(revolve.sketchProfile);
+    expect(revolveFeature?.inputObjectIds).toEqual([sourceSketchId]);
+    expect(revolveFeature?.parameters).toMatchObject({ ...revolve.sketchRevolve, mode: "create" });
+
+    const restored = await importSkfProject(bytes);
+    expect(restored.shapes[0].sketchSourceId).toBe(sourceSketchId);
     expect(restored.shapes[0].sketchOperation).toBe("revolve");
     expect(restored.shapes[0].sketchRevolve).toEqual(revolve.sketchRevolve);
     expect(restored.shapes[0].sketchProfile).toEqual(revolve.sketchProfile);
