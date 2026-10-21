@@ -14,7 +14,7 @@ const headSha = "a".repeat(40);
 const baseSha = "b".repeat(40);
 const newSha = "c".repeat(40);
 
-async function withWriter({ staleBranch = false, closedPullRequest = false, advancedPullRequest = false, runConclusion = "success" } = {}, callback) {
+async function withWriter({ staleBranch = false, closedPullRequest = false, advancedPullRequest = false, runConclusion = "success", artifactHeadSha = headSha } = {}, callback) {
   const artifactDir = await mkdtemp(path.join(os.tmpdir(), "sketchforge-generated-docs-writer-"));
   for (const relative of GENERATED_DOC_PATHS) {
     const target = path.join(artifactDir, relative);
@@ -24,7 +24,7 @@ async function withWriter({ staleBranch = false, closedPullRequest = false, adva
   await writeFile(path.join(artifactDir, "manifest.json"), JSON.stringify({
     repo: "constructorfleet/SketchForge-3D",
     pullRequest: 42,
-    headSha,
+    headSha: artifactHeadSha,
     baseSha,
     files: GENERATED_DOC_PATHS,
   }));
@@ -158,6 +158,16 @@ test("trusted docs writer treats a PR that advanced after generation as a succes
     assert.match(result.stdout, /skipped.*advanced/i);
     assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname.startsWith("git/")), false);
     assert.equal(requests.some(({ pathname }) => pathname.startsWith("actions/workflows/")), false);
+  });
+});
+
+test("trusted docs writer treats a stale generated artifact as a successful no-op", async () => {
+  await withWriter({ artifactHeadSha: "9".repeat(40) }, async ({ artifactDir, requests, apiUrl }) => {
+    const result = await runWriter({ artifactDir, apiUrl });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /skipped.*artifact.*stale/i);
+    assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname.startsWith("git/")), false);
+    assert.equal(requests.some(({ pathname }) => pathname === "dispatches"), false);
   });
 });
 

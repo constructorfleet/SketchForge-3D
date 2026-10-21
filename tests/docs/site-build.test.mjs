@@ -97,9 +97,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
   assert.match(spec, /Pull-request docs CI runs `docs:generate` before generated-output verification and the site build/i);
   assert.match(spec, /trusted `workflow_run` handler treats that artifact as untrusted input and validates the source run, PR, artifact manifest, and allowlist/i);
-  assert.match(spec, /Fork PRs and workflow-control changes retain the generated artifact as a fallback/i);
-  assert.match(spec, /dispatches CI, docs, and title workflows with the exact resulting commit SHA/i);
-  assert.match(spec, /each dispatched workflow verifies/i);
+  assert.match(spec, /Fork PRs use the artifact fallback because their branches cannot be pushed/i);
+  assert.match(spec, /main remains stale only until that repair PR is merged/i);
+  assert.match(spec, /default-branch-only verifier/i);
+  assert.match(spec, /records the required contexts on that SHA/i);
+  assert.match(spec, /staleness alone does not fail the docs check/i);
   assert.match(spec, /Broader task-oriented workflows, complete REST contracts/i);
   assert.match(spec, /Publishing-client version — closed/i);
   assert.match(spec, /Cross-links between documentation and references — closed/i);
@@ -111,9 +113,9 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /Nine operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
   assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
-  assert.match(migration, /trusted artifact-only writer\s+commits\s+allowlisted updates to eligible same-repository PR branches/i);
-  assert.match(migration, /Fork PRs and PRs changing workflow\s+controls use artifact fallback/i);
-  assert.match(migration, /dispatches CI, docs, and\s+title checks for the exact resulting commit SHA/i);
+  assert.match(migration, /trusted\s+default-branch follow-up validates the artifact and PR before committing only\s+allowlisted updates to same-repository PR branches/i);
+  assert.match(migration, /Fork PRs use\s+the generated artifact fallback because their branches cannot be pushed/i);
+  assert.match(migration, /Main remains\s+stale only until that repair PR is merged/i);
   assert.match(migration, /historical inbound-link inventory/i);
   assert.match(migration, /broader task-oriented guides and corresponding workflow\s+checks remain incomplete/i);
 

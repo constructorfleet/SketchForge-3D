@@ -97,6 +97,11 @@ async function main() {
     return;
   }
 
+  const artifactManifest = JSON.parse(await readFile(`${expected.artifactDir}/manifest.json`, "utf8"));
+  if (artifactManifest.headSha !== expected.headSha || artifactManifest.baseSha !== expected.baseSha) {
+    await skip("generated artifact is stale because the pull request advanced after that documentation run.");
+    return;
+  }
   const files = await validateGeneratedDocsArtifact(expected);
 
   const ref = await apiRequest(repo, `git/ref/heads/${process.env.EXPECTED_BRANCH}`);
