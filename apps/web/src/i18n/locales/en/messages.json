@@ -986,6 +986,14 @@
         "add": "Add face color",
         "remove": "Remove color for face {index}",
         "empty": "No face colors assigned."
+      },
+      "draftPrism": {
+        "title": "Draft prism",
+        "hint": "Taper a retained straight sketch extrusion. This creates baked geometry.",
+        "angle": "Draft angle",
+        "apply": "Apply draft",
+        "applying": "Applying draft…",
+        "applied": "Draft applied. The shape is now baked geometry."
       }
     },
     "appearance": {

@@ -18,6 +18,7 @@ import { unitLabel, useTranslations, type MessageKey } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
 import { updateFaceColor } from "@/lib/faceColorEditor";
+import { draftPrismControlForShape, draftPrismRequestForShape, isDraftPrismAngle } from "@/lib/draftPrismEditor";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -105,6 +106,7 @@ export function ShapeInspector({
   onSnapChange,
   onSnapOpenChange,
   onEditSketch,
+  onApplyDraftPrism,
   canSeparateParts = false,
   onSeparateParts,
   onInteractionActiveChange,
@@ -119,6 +121,7 @@ export function ShapeInspector({
   onSnapChange: Dispatch<SetStateAction<GridSize>>;
   onSnapOpenChange: Dispatch<SetStateAction<boolean>>;
   onEditSketch?: () => void;
+  onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -131,6 +134,7 @@ export function ShapeInspector({
   const surfaceAppearance = resolveShapeAppearance(shape);
   const locked = Boolean(shape.locked);
   const properties = getShapeProperties(shape, onUpdate, workspace);
+  const draftControl = draftPrismControlForShape(shape);
   const gearType = shape.kind === "gear" ? normalizeGearType(shape.gearType) : null;
   const primaryProperties = shape.kind === "gear"
     ? properties.filter((property) => (["centerHole", "length", "width", "height"] as ShapePropertyId[]).includes(property.id))
@@ -157,6 +161,8 @@ export function ShapeInspector({
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(false);
+  const [draftAngle, setDraftAngle] = useState("5");
+  const [drafting, setDrafting] = useState(false);
   const [faceColorIndex, setFaceColorIndex] = useState("0");
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -366,6 +372,46 @@ export function ShapeInspector({
         <button className="edit-sketch-button" type="button" disabled={locked} onClick={onEditSketch}>
           {t("panels.inspector.editSketch")}
         </button>
+      ) : null}
+
+      {draftControl.available && onApplyDraftPrism ? (
+        <section className="property-card draft-prism-card" aria-label={t("panels.inspector.draftPrism.title")}>
+          <div className="property-card-header"><span>{t("panels.inspector.draftPrism.title")}</span></div>
+          <div className="property-list">
+            <p>{t("panels.inspector.draftPrism.hint")}</p>
+            <label>
+              <span>{t("panels.inspector.draftPrism.angle")}</span>
+              <input
+                type="number"
+                min="-44.9"
+                max="44.9"
+                step="0.1"
+                value={draftAngle}
+                disabled={locked || drafting}
+                onChange={(event) => setDraftAngle(event.currentTarget.value)}
+                onFocus={() => onInteractionActiveChange?.(true)}
+                onBlur={() => onInteractionActiveChange?.(false)}
+              />
+            </label>
+            <button
+              className="inspector-action-button"
+              type="button"
+              disabled={locked || drafting || !draftPrismRequestForShape(shape, Number(draftAngle))}
+              onClick={async () => {
+                const angle = Number(draftAngle);
+                if (!isDraftPrismAngle(angle)) return;
+                setDrafting(true);
+                try {
+                  await onApplyDraftPrism(angle);
+                } finally {
+                  setDrafting(false);
+                }
+              }}
+            >
+              <span>{t(drafting ? "panels.inspector.draftPrism.applying" : "panels.inspector.draftPrism.apply")}</span>
+            </button>
+          </div>
+        </section>
       ) : null}
 
       {canSeparateParts && onSeparateParts ? (

@@ -180,6 +180,7 @@ import {
   type SketchForgeMcpViewFace,
 } from "@/lib/sketchforgeMcpProtocol";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
+import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import type { SketchCadBuildResponse } from "@/lib/sketchCadTypes";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -7484,6 +7485,46 @@ export function SketchForgeEditor({
     });
   }, []);
 
+  const applyDraftPrismToSelection = useCallback(async (angle: number) => {
+    const source = selectedShape;
+    const request = source && draftPrismRequestForShape(source, angle);
+    if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.draftPrism.applying")));
+    try {
+      const response = await postCadModifierRequestAsync({ type: "draft-prism", ...request }, [], CAD_BOOLEAN_REQUEST_TIMEOUT_MS);
+      if (response.type === "error") {
+        const error = errorFromPayload(response);
+        setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+        return;
+      }
+      if (response.type !== "draft-prism") throw new Error("The CAD worker did not return a drafted solid");
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (projectInfoRef.current.projectId !== sourceProjectId || !current || projectShapesFingerprint([current]) !== fingerprint) return;
+      const drafted = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep);
+      if (!drafted) throw new Error("The draft did not produce a usable solid");
+      commitShapes(
+        shapesRef.current.map((shape) => shape.id === source.id ? {
+          ...drafted,
+          x: source.x,
+          z: source.z,
+          elevation: source.elevation ?? 0,
+          faceColors: undefined,
+          edgeTreatments: undefined,
+          edgeTreatmentHistory: undefined,
+          cadDisplayEdges: undefined,
+          cadDisplayEdgesVersion: undefined,
+        } : shape),
+        [source.id],
+        notice((translate) => translate("panels.inspector.draftPrism.applied")),
+      );
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
+
   // Hand the module-level boolean helpers a way to reach the worker. The sender
   // already restarts the worker and rejects on a timeout, so a kernel that
   // never loads costs one wait and then falls back to the mesh cut rather than
@@ -9753,6 +9794,7 @@ export function SketchForgeEditor({
           onCameraOrientationChange={rememberCameraOrientation}
           onCameraViewChange={rememberCameraView}
           onEditSketch={beginSketchEdit}
+          onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}

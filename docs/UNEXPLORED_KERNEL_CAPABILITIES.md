@@ -22,10 +22,10 @@ These are implemented and should not be filed as missing features:
   implemented. Face colors are keyed to current face indexes and are discarded
   when geometry changes. The shape inspector can assign/remove them, though the
   viewport does not preview them yet.
-- A bounded draft-prism operation is available over REST and in the TypeScript
-  and Python clients. It accepts a retained straight, single-loop sketch
-  extrusion and stores exact geometry; it has no editor control or editable
-  feature-history node yet.
+- A bounded draft-prism operation is available in the shape inspector, over
+  REST, and in the TypeScript and Python clients. The editor builds from a
+  retained straight, single-loop sketch extrusion in its local CAD worker and
+  stores exact geometry; the result is baked without an editable feature node.
 
 Relevant implementation seams include `serverCadProperties.ts`,
 `serverCadInterference.ts`, `serverCadThickness.ts`, `serverStepExplode.ts`,
@@ -36,13 +36,13 @@ Relevant implementation seams include `serverCadProperties.ts`,
 
 ### 1. Sweep and broader draft modeling operations
 
-The kernel exposes sweep operations, but SketchForge has no sweep workflow. The
-new draft-prism operation is only available through REST and the client
-libraries, and supports one straight closed sketch loop; it is not in the
-editor, MCP, or an editable feature history. Next steps are editor access,
-curved/multi-loop draft profiles, and a first planar sweep that reuses existing
-sketch profiles. Arbitrary 3D paths and face-associated editable drafts need
-additional model support.
+SketchForge has no general profile-along-path sweep workflow; its revolve and
+helical revolve remain specialized sketch operations. Draft prism is available
+in the editor, REST, and client libraries, but supports one straight closed
+sketch loop and stores baked geometry without an editable feature-history node.
+Next steps are curved or multi-loop draft profiles and a first planar sweep
+that reuses existing sketch profiles. Arbitrary 3D paths and face-associated
+editable drafts need additional model support.
 
 ### 2. STEP assembly hierarchy and color verification
 

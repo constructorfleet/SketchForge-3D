@@ -1,5 +1,6 @@
 import type { LocalizedErrorPayload } from "./i18n/LocalizedError.js";
 import type { WorkplaneShape } from "./../domain/sketchforge.js";
+import type { SketchProfile } from "./../domain/sketchforge.js";
 
 export type CadModifierKind = "chamfer" | "fillet";
 
@@ -73,6 +74,7 @@ export type CadModifierWorkerRequest =
       chamferAngle: number;
     }
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
+  | { type: "draft-prism"; requestId: number; profile: SketchProfile; height: number; angle: number }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
@@ -98,6 +100,15 @@ export type CadModifierWorkerResponse =
       /** Volume before and after the holes, so the caller can tell a cut that did nothing. */
       fusedVolume: number;
       cutVolume: number;
+    }
+  | {
+      type: "draft-prism";
+      requestId: number;
+      positions: Float32Array;
+      normals: Float32Array;
+      indices: Uint32Array;
+      triangleCount: number;
+      brep: string;
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);
