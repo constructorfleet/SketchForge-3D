@@ -29,9 +29,9 @@ const start = "<!-- publishing-version-table:start -->";
 const end = "<!-- publishing-version-table:end -->";
 const table = [
   start,
-  `| \`@constructorfleet/sketchforge3d\` | npm | \`${version}\` |`,
-  `| \`@constructorfleet/sketchforge-engine\` | npm | \`${version}\` |`,
-  `| \`sketchforge3d\` | PyPI | \`${version}\` |`,
+  `| \`@constructorfleet/sketchforge3d\` | npm | \`${version}\` | <!-- x-release-please-version -->`,
+  `| \`@constructorfleet/sketchforge-engine\` | npm | \`${version}\` | <!-- x-release-please-version -->`,
+  `| \`sketchforge3d\` | PyPI | \`${version}\` | <!-- x-release-please-version -->`,
   end,
 ].join("\n");
 const current = await readFile(outputPath, "utf8");

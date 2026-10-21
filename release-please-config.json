@@ -25,6 +25,10 @@
           "type": "toml",
           "path": "packages/sketchforge-py/pyproject.toml",
           "jsonpath": "$.project.version"
+        },
+        {
+          "type": "generic",
+          "path": "docs/PUBLISHING_CLIENTS.md"
         }
       ],
       "include-component-in-tag": false
