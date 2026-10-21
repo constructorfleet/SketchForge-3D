@@ -389,3 +389,15 @@ export function editorHistoryForExport(
     index: index - start,
   };
 }
+
+/** Autosaves keep enough recent undo history for routine recovery without
+ * serializing the editor's entire retained history on every change. Explicit
+ * project exports continue to use the user's selected history depth. */
+export const AUTOSAVE_EDITOR_HISTORY_ACTION_LIMIT = 30;
+
+export function editorHistoryForAutosave(
+  entries: EditorHistoryEntry[],
+  requestedIndex: number,
+): EditorHistoryState {
+  return boundedEditorHistoryState(entries, requestedIndex, AUTOSAVE_EDITOR_HISTORY_ACTION_LIMIT);
+}

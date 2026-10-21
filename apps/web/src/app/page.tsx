@@ -27,7 +27,7 @@ import {
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
-import { hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
+import { editorHistoryForAutosave, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createLocalId } from "@/lib/engine/localIds";
 import {
@@ -371,14 +371,15 @@ async function loadProjectShapes(projectId: string) {
 }
 
 async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
+  const autosaveHistory = editorHistoryForAutosave(entry.history, entry.historyIndex);
   const skfPackage = await exportSkfProject({
     projectId,
     projectName: context.projectName,
     createdAt: context.createdAt,
     modifiedAt: entry.revision,
     shapes: entry.shapes,
-    history: entry.history,
-    historyIndex: entry.historyIndex,
+    history: autosaveHistory.entries,
+    historyIndex: autosaveHistory.index,
     assets: entry.assets,
     workspace: context.workspace,
     snapGrid: context.snapGrid,
