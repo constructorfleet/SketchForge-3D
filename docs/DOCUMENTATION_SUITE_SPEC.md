@@ -1,11 +1,11 @@
 # Documentation suite specification
 
-**Status (2026-10-21, verified at `6fa14b0`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), stable face identity in the Python client (#145), API reference sources (#139), face-based drafting (#140), the REST measurement listing (#137), and the editor quick-start (#150) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), the six-operation generated OpenAPI slice (#144), and built-site accessibility improvements (#154) have also merged. PR #147's STEP component-color import support has merged. Merged PR #153 adds a bounded deterministic least-squares solve for supported coupled sketch constraints; it does not provide a symbolic or global guarantee. Merged PR #151 adds runtime-backed OpenAPI coverage for `GET /faces` (7 operations documented, 25 still omitted). Merged PR #156 generates concrete publishing client versions and resolves the generic version-row gap. Merged PR #157 adds contextual cross-links between task guides and references. Merged PR #158 expands the engine npm listing and generated API guide. Open PR #162 renders ```mermaid fences as diagrams and carries the first one in §7. Broader workflow guides and editable feature history remain open.
+**Status (2026-10-21, verified against `origin/main` at `e5aba0b`):** The searchable VitePress site is deployed on GitHub Pages. The editor quick-start (#150), runtime-backed `GET /faces` OpenAPI coverage (#151; 7 operations documented and 25 of 32 still omitted), built-site accessibility checks (#154), Mermaid rendering (#162), and the earlier package, format, MCP, configuration, provenance, examples, and reference slices are merged. The three gaps listed in the prior audit are resolved: publishing-client versions are generated from release metadata (#156; with update automation in #167), contextual links connect task guides and references (#157), and the engine package listing/reference is expanded (#158). Recent API/client sweep, editable extrusion history, and STEP hierarchy work (#164–#166) is merged; these are product capabilities and do not close the remaining documentation-suite criteria by themselves. PR #168 proposes generating current TypeScript/Python package references into the Pages build artifact instead of requiring their generated Markdown diffs to be committed. All hosted checks passed on its prior head; the branch is being refreshed onto `e5aba0b` and checks will rerun. Broader task/workflow guides, complete REST schema coverage, full inbound-link inventory, and other acceptance gaps below remain open.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
-## Repository baseline (verified at `6fa14b0`, 2026-10-21)
+## Repository baseline (verified against `origin/main` at `e5aba0b`, 2026-10-21)
 
 The current default branch builds a static VitePress site under
 `/SketchForge-3D/`, with local search, canonical Markdown staging, local link
@@ -47,9 +47,7 @@ CLI.
 | The public CLI surface differs from root developer scripts. `packages/sketchforge-client/package.json` declares `sketchforge-macro` and `sketchforge-mcp`; `packages/sketchforge-py/pyproject.toml` declares its `sketchforge-macro`. | `docs/CLI_REFERENCE.md` is now generated from the published entry points and actual usage/help output (merged in PR #117). Keep root npm scripts separate as contributor commands. |
 | At the initial audit, GitHub Actions did not publish documentation to Pages; it built/tests the app and deployed app content to Cloudflare separately. | PR #116 added the Pages workflow and was merged; the first deployment succeeded. Pages publication is no longer an unverified or outstanding setup decision. |
 
-The repository observations were initially audited on 2026-10-21. The status
-column tracks later implementation and merge evidence; the underlying gap list
-should be rechecked as the remaining phases land.
+The initial observations date from 2026-10-21. The current baseline above was rechecked against `origin/main` at `e5aba0b`; historical findings below are retained as audit context, while phase status and acceptance criteria reflect the current implementation.
 
 ## 1. Objective
 
@@ -179,7 +177,7 @@ next one runs.
 
 ```mermaid
 graph TD;
-  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>stage docs and generate package refs"];
+  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>copy docs into .docs-site"];
   B --> C["vitepress build<br/>docs-site-dist"];
   C --> D["site-build tests<br/>provenance, accessibility, search"];
   D --> E["GitHub Pages deploy<br/>main only"];
@@ -190,13 +188,13 @@ graph TD;
 Expose stable repository scripts, independent of the chosen site generator:
 
 ```text
-npm run docs:generate   # stage docs, generate package refs into .docs-site, and include executable examples
+npm run docs:generate   # stage docs, generate package references into .docs-site, and include executable examples
 npm run docs:check      # links, source directives, schema parity, API coverage, and maintained generated diff checks
 npm run docs:build      # produce the static Pages artifact
 npm run docs:preview    # serve the artifact locally under the project-site base path
 ```
 
-The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. TypeScript and Python package references are generated into `.docs-site/docs/reference/` after canonical Markdown is staged, so current declarations and package docs are included in the Pages artifact without committing generated reference diffs. The source copies under `docs/reference/` remain useful compatibility pages on GitHub; the generated staged copies are authoritative for the built site. Other generated references remain checked against their committed sources where the repository maintains them.
+The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. Generated files should live in the build directory unless a source-controlled compatibility copy is explicitly needed. PR #168 generates current TypeScript and Python package references into staged `.docs-site/docs/reference/`, validates them there, and publishes them inside the Pages artifact; tracked `docs/reference/` files remain compatibility copies for repository browsers. The Pages artifact is authoritative for current package reference content. Other reference generators remain checked against committed outputs unless separately migrated.
 
 ### Pull request checks
 
@@ -204,7 +202,7 @@ On every pull request that changes application code, packages, tests/examples, d
 
 1. Install from the lockfile and build the public packages.
 2. Generate API, configuration, shape, format, package, and CLI reference inputs.
-3. Check that generation is clean and has no uncommitted diff where generated artifacts are committed.
+3. Validate generated artifacts in their configured destination: compare maintained source-controlled outputs to their generators and validate package references in the staged Pages tree.
 4. Verify source directives, internal links, fragments, redirects, and image references.
 5. Typecheck and execute the examples described in section 5.
 6. Run API route/contract parity and project-format compatibility checks.
@@ -264,7 +262,7 @@ its Ubuntu system dependencies before running the build.
 
 ### Phase 2: generate package and example documentation
 
-- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Current package references are generated into `.docs-site/docs/reference/` for the Pages artifact and linked from the docs site's reference navigation; the tracked source copies remain as compatibility pages for repository browsers. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
+- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. PR #168 stages current generated pages at `.docs-site/docs/reference/` for the Pages artifact and retains tracked copies as compatibility pages. The three `docs/packages/*.md` pages recursively include registry-facing package READMEs as canonical prose. `docs/guides/package-examples.md` includes six existing client and Python macro examples directly. Integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
 - **Merged PR #136:** adds Python static type checking and symbol-level source links. PR #137 adds the complete REST measurement listing contract, #139 adds API reference source links, and #140 adds face-based drafting documentation.
 - **Merged PR #145:** adds stable face IDs, face-color fields, and a source-backed example to the Python client. Package example CI verifies it against the local API.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
