@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
