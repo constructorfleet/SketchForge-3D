@@ -33,7 +33,7 @@ async function waitForServer(url, server, getLogs) {
 test("a new user can sketch, extrude, save, and export a model", { timeout: 120_000 }, async () => {
   const port = await unusedPort();
   const baseURL = `http://127.0.0.1:${port}`;
-  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/web", "--port", String(port)], {
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
     cwd: process.cwd(),
     detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
@@ -89,7 +89,8 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
     const projectName = page.getByRole("textbox", { name: "Project name" });
     await projectName.fill("Quick-start block");
     await projectName.press("Enter");
-    await page.reload();
+    const reloadResponse = await page.reload();
+    assert.equal(reloadResponse?.status(), 200, "Reloading the saved project should return a successful editor page");
     await page.getByText("Sketch extrusion").first().waitFor({ state: "visible", timeout: 30_000 });
     assert.equal(await page.getByRole("textbox", { name: "Project name" }).inputValue(), "Quick-start block");
 
