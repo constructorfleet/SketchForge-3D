@@ -34,10 +34,12 @@ These are implemented and should not be filed as missing features:
   implemented. `GET /faces` exposes stable application-owned IDs alongside
   compatibility indexes; colors use those IDs and survive project round
   trips. IDs and colors survive shape-parameter edits and supported CAD
-  treatments when faces can be matched uniquely. New or ambiguous faces get
-  fresh IDs and do not inherit colors. Viewport and 3MF previews map B-rep
-  triangle groups to the same identities. Numeric face indexes remain
-  supported for older projects and callers.
+  treatments when faces can be matched uniquely. For parameter edits, uniquely
+  occurring cones, spheres, tori, and cylinders can retain identity when their
+  sampled normal changes; repeated curved surfaces remain unmatched. New or
+  ambiguous faces get fresh IDs and do not inherit colors. Viewport and 3MF
+  previews map B-rep triangle groups to the same identities. Numeric face
+  indexes remain supported for older projects and callers.
 - A bounded draft-prism operation is available in the shape inspector, over
   REST, and in the TypeScript and Python clients. It accepts a retained
   straight, single-loop sketch extrusion and stores exact geometry; the result
@@ -68,16 +70,19 @@ These are implemented and should not be filed as missing features:
   and drops face colors and edge-treatment metadata because old faces cannot
   be assumed to correspond to the new profile.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
-  revolves, and sweeps. The source profiles and operation parameters survive
-  project round trips; profile edits in the editor rebuild the corresponding
-  solid while retaining its shape and source identity. These operations do
-  not yet participate in a general downstream recompute graph.
-- Coincident, horizontal, vertical, and fixed-distance sketch constraints are
-  supported. Point drags use a deterministic, bounded damped least-squares
-  solve for supported coupled constraints, keep directly dragged points
-  anchored, and report unsatisfied constraint IDs. The inspector also reports
-  an estimated local degree-of-freedom count from the supported equations'
-  Jacobian rank.
+  revolves, sweeps, and boolean groups. Source profiles, operation parameters,
+  and dependency links survive project round trips. Profile edits rebuild the
+  corresponding solid while retaining its shape and source identity; editing a
+  sketch-backed sweep also recomputes retained boolean descendants bottom-up
+  and persists the result atomically. Other downstream operation types do not
+  yet participate in a general recompute graph.
+- Coincident, horizontal, vertical, perpendicular, and fixed-distance sketch
+  constraints are supported, including `.skf` persistence and TypeScript
+  profile types. Perpendicular relations take part in the bounded coupled solve
+  and local degree-of-freedom estimate. Point drags keep directly dragged
+  points anchored and report unsatisfied constraint IDs. The inspector also
+  estimates local degrees of freedom from the supported equations' Jacobian
+  rank.
 - OBJ import is supported alongside STL, SVG, and STEP, and imported source
   assets are preserved in `.skf` projects.
 - Camera view orientation, target, and zoom are saved with the project and
@@ -97,19 +102,14 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 Sketch extrusion, revolve, and sweep persist source sketches and operation
 parameters; `.skf` also records dependency links for sketch outputs and boolean
-groups. Runtime recomputation is still narrow: editing a sketch-backed sweep
-now rebuilds it inside retained boolean groups, bottom-up, and writes the
-updated result atomically. Invalid sketches or failed dependent booleans leave
-the project unchanged. Extrusion/revolve descendants, drafts, and other
-operation types do not yet recompute, and draft prism/face draft remain baked
-rather than editable feature nodes. A general dependency-ordered graph with
-consistent failure propagation remains the highest-value foundation before
-expanding editable downstream operations.
-
-Open PR [#215](https://github.com/constructorfleet/SketchForge-3D/pull/215)
-adds one bounded descendant case: editing a persisted sweep recomputes retained
-boolean ancestors in order and rejects partial or ineffective updates. It does
-not provide a general dependency graph or recomputation for other operations.
+groups. Runtime recomputation remains narrow: editing a sketch-backed sweep
+rebuilds it inside retained boolean groups, bottom-up, and writes the updated
+result atomically. Invalid sketches or failed dependent booleans leave the
+project unchanged. Extrusion/revolve descendants, drafts, and other operation
+types do not yet recompute, and draft prism/face draft remain baked rather than
+editable feature nodes. A general dependency-ordered graph with consistent
+failure propagation remains the highest-value foundation before expanding
+editable downstream operations.
 
 ### 2. Broader and editable drafting
 
@@ -138,31 +138,22 @@ association across exporters and broader STEP fixtures.
 
 Stable IDs and color assignments survive shape-parameter edits and supported
 CAD treatments when the engine finds a unique match. Matching uses exact face
-B-rep or a unique planar support surface; it is not a semantic identity
-contract. Split, merged, generated, or otherwise ambiguous faces receive new
+B-rep or a unique planar support surface; for parameter edits, uniquely
+occurring cone, sphere, torus, and cylinder faces can also retain identity
+when their sampled normal changes. This is not a semantic identity contract.
+Split, merged, generated, repeated, or otherwise ambiguous faces receive new
 IDs without inherited assignments. General identity across arbitrary topology
 edits remains unsupported.
 
-PR [#206](https://github.com/constructorfleet/SketchForge-3D/pull/206) is open
-to preserve IDs for uniquely occurring analytic curved faces after supported
-parameter edits. That narrower case does not establish identity across
-arbitrary split, merge, or generated-face changes, so it is not counted as
-shipped here.
-
 ### 5. Broader sketch constraints and globally determined solutions
 
-The solver supports coincident, horizontal, vertical, and fixed-distance
-relations with a bounded deterministic least-squares solve and a local
-Jacobian-rank estimate. It does not guarantee global solvability, identify
-every nonlinear or second-order dependency, or remove the two global
+The solver supports coincident, horizontal, vertical, perpendicular, and
+fixed-distance relations with a bounded deterministic least-squares solve and
+a local Jacobian-rank estimate. It does not guarantee global solvability,
+identify every nonlinear or second-order dependency, or remove the two global
 translation freedoms. Degenerate zero-length distance geometry has no
 determinate degree-of-freedom report. Additional constraint types and a solver
 that can robustly determine global placement remain open.
-
-PR [#207](https://github.com/constructorfleet/SketchForge-3D/pull/207) is open
-with perpendicular segment constraints, including persistence and local
-degree-of-freedom reporting. The broader constraint and global-solution limits
-above remain after that slice.
 
 ## Verification baseline
 

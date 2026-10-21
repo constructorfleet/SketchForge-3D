@@ -57,16 +57,16 @@ so stale tracked output alone does not fail the docs check.
   run against a local API. Python package references and examples are checked
   with mypy and integration tests. The MCP example is checked against the
   server's current advertised tool schemas.
-- The editor quick-start is tested in a browser from the first sketch through
-  save and export. Broader task-oriented guides and corresponding workflow
-  checks remain incomplete.
+- The editor quick-start and the create/edit/save/reload/export guide are tested
+  through browser acceptance. Broader task-oriented guides and corresponding
+  workflow checks remain incomplete.
 
 ## REST API coverage
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. Eleven operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 21 are listed
+the registry and handlers. Fifteen operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 17 are listed
 with omission reasons in the generated contract; full route coverage remains
 open.
 
