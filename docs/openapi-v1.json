@@ -5209,7 +5209,7 @@
       "method": "PATCH",
       "path": "/api/v1/shapes",
       "operationId": "updateShape",
-      "reason": "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema."
+      "reason": "PATCH /shapes is omitted because faceColors uses custom validation not expressible in JSON Schema. It also accepts sketchProfile to rebuild a retained sketch sweep; see https://constructorfleet.github.io/SketchForge-3D/docs/REST_API#sketch-sweeps."
     },
     {
       "method": "POST",
