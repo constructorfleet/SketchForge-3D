@@ -23,16 +23,24 @@ export type ApiV1Operation = {
     faceIdSemantics?: string;
     colorAssignmentKey?: string;
   };
-  requestBody?: {
-    contentType: "application/json";
-    required: true;
-    normalization?: readonly ["trim", "truncate:80"];
-    schema?: { type: "object"; required: readonly ["name"]; name: { type: "string"; minLength: 1; maxLength: 80 } };
-    faceColors?: {
-      type: "object";
-      keyKinds: readonly ["stable-face-id", "legacy-numeric-index"];
-      colorPattern: string;
-    };
+  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
+};
+
+export type ApiV1CreateProjectRequestBody = {
+  contentType: "application/json";
+  required: true;
+  normalization: readonly ["trim", "truncate:80"];
+  schema: { type: "object"; required: readonly ["name"]; name: { type: "string"; minLength: 1; maxLength: 80 } };
+};
+
+export type ApiV1ShapePatchRequestBody = {
+  contentType: "application/json";
+  required: true;
+  faceColors: {
+    type: "object";
+    keyKinds: readonly ["stable-face-id", "legacy-numeric-index"];
+    keyPattern: string;
+    colorPattern: string;
   };
 };
 
@@ -109,6 +117,7 @@ export const API_V1_OPERATIONS = [
       faceColors: {
         type: "object",
         keyKinds: ["stable-face-id", "legacy-numeric-index"],
+        keyPattern: "^(?:[0-9]+|face_[^\\s]+)$",
         colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$",
       },
     },
@@ -192,7 +201,7 @@ export function parseShapePatchRequest(body: Record<string, unknown>):
     return { ok: false, error: "invalid_face_colors" };
   }
   const entries = Object.entries(faceColors);
-  if (entries.some(([key]) => !/^\d+$/.test(key) && !/^face_.+$/.test(key))) {
+  if (entries.some(([key]) => !/^\d+$/.test(key) && !/^face_[^\s]+$/.test(key))) {
     return { ok: false, error: "invalid_face_color_key" };
   }
   if (entries.some(([, color]) => typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color))) {

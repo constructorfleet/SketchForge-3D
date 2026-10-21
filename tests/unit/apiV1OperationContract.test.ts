@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { API_V1_OPERATIONS, type ApiV1Operation } from "@/lib/apiV1OperationContract";
 
 const routeRoot = path.resolve("apps/web/src/app/api/v1");
 
@@ -25,7 +25,18 @@ function sourceOperations() {
   return found.sort();
 }
 
+type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
+
 describe("REST API v1 operation contract", () => {
+  it("keeps create-project normalization and schema required in the contract type", () => {
+    expectTypeOf<CreateProjectBody["normalization"]>().toEqualTypeOf<readonly ["trim", "truncate:80"]>();
+    expectTypeOf<CreateProjectBody["schema"]>().toEqualTypeOf<{
+      type: "object";
+      required: readonly ["name"];
+      name: { type: "string"; minLength: 1; maxLength: 80 };
+    }>();
+  });
+
   it("registers every public route method exactly once", () => {
     const registered = API_V1_OPERATIONS.map(({ method, path: route }) => `${method} ${route}`).sort();
     expect(registered).toEqual(sourceOperations());
@@ -96,6 +107,7 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseShapePatchRequest({ name: "Updated", faceColors: { "0": "#12aBcF" } }))
       .toEqual({ ok: true, body: { name: "Updated", faceColors: { "0": "#12aBcF" } } });
     expect(contract.parseShapePatchRequest({ faceColors: { other_key: "#12aBcF" } })).toEqual({ ok: false, error: "invalid_face_color_key" });
+    expect(contract.parseShapePatchRequest({ faceColors: { "face_bad id": "#12aBcF" } })).toEqual({ ok: false, error: "invalid_face_color_key" });
     expect(contract.parseShapePatchRequest({ faceColors: { face_abc123: "red" } })).toEqual({ ok: false, error: "invalid_face_colors" });
     expect(contract.parseShapePatchRequest({ faceColors: [] })).toEqual({ ok: false, error: "invalid_face_colors" });
   });
