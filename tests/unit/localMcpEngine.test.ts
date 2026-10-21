@@ -169,6 +169,13 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(singleView[1].result.content[0].text)).toMatchObject({ view: "front", savedTo: drawingPath, shapeCount: 1 });
     expect(fs.readFileSync(drawingPath, "utf8")).not.toContain(">Front</text>");
 
+    const section = callMcp(projectsDir, 2, "sketchforge_section_view", { projectId: "case", plane: "xy", offset: 1.5, shapeIds: [plate.id] });
+    expect(section[1].result.isError, JSON.stringify(section[1].result.content)).toBeUndefined();
+    const sectionDrawing = JSON.parse(section[1].result.content[0].text);
+    expect(sectionDrawing).toMatchObject({ plane: "xy", offset: 1.5, mimeType: "image/svg+xml", shapeCount: 1 });
+    expect(sectionDrawing.svg).toContain('data-plane="xy"');
+    expect(sectionDrawing.svg).toContain("<path");
+
     for (const format of ["stl", "obj", "3mf", "svg"]) {
       const target = path.join(projectsDir, `Local case.${format}`);
       const result = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format, shapeIds: [plate.id], outputPath: target });
@@ -250,6 +257,9 @@ describe("local MCP engine mode", () => {
     expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_export_scene").inputSchema.properties.format.enum).toContain("svg");
     const projectView = tools.find((tool: { name: string }) => tool.name === "sketchforge_project_view");
     expect(projectView.inputSchema.properties.view.enum).toEqual(["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]);
+    const sectionView = tools.find((tool: { name: string }) => tool.name === "sketchforge_section_view");
+    expect(sectionView.inputSchema.properties.plane.enum).toEqual(["xy", "xz", "yz"]);
+    expect(sectionView.inputSchema.required).toEqual(["projectId", "plane", "offset"]);
     expect(listEditors.inputSchema.properties.url).toMatchObject({ type: "string" });
     for (const tool of tools.filter((candidate: { name: string }) => candidate.name !== "sketchforge_list_macros")) {
       expect(tool.inputSchema.properties.url).toMatchObject({ type: "string" });

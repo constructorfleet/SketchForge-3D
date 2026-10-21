@@ -632,9 +632,20 @@ are left out, as every mesh export leaves them out. The editor's own SVG
 export still flattens the top view of a mesh in the browser; this one needs
 the server's kernel and takes no mesher.
 
+For a cut through the model, pass `section` instead of `view`. Plane names use
+the drawing's Z-up frame: `xy` omits Z, `xz` omits Y and `yz` omits X; `offset`
+is the coordinate of that omitted axis in millimetres. The plane must intersect
+the selected scene. The server limits a section to 100 shapes, 50,000 imported
+mesh triangles, and an 8,000 mm maximum span.
+
 ```json
 // POST /exports?projectId=...
 { "format": "svg", "view": "top" }
+```
+
+```json
+// POST /exports?projectId=...
+{ "format": "svg", "section": { "plane": "xy", "offset": 3 } }
 ```
 
 ```json
@@ -644,7 +655,9 @@ the server's kernel and takes no mesher.
 
 Unknown format names answer `400` with `code: "unsupported_format"`, and a
 `view` the drawing does not know, or a `view` on any format but `svg`, answers
-`400` with `code: "invalid_request"`. A requested shape id outside the project
+`400` with `code: "invalid_request"`. `section` and `view` cannot be used
+together. A plane that misses the selected scene answers `422`; oversized
+sections answer `413`. A requested shape id outside the project
 answers `404`; a project with no exportable solid geometry answers `422` with
 `code: "geometry_failed"`.
 

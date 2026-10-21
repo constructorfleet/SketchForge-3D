@@ -85,9 +85,13 @@ client.patterns.ring(project_id, ids, count, center=(0, 0), sweep_angle=None, ro
 client.imports.apply(project_id, file_name, data, media_type=None) -> MeshImportResult
 client.imports.file(project_id, path) -> MeshImportResult
 
-client.exports.export(project_id, format, shape_ids=None, name=None, view=None) -> ExportResult
-client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None) -> ExportResult
+client.exports.export(project_id, format, shape_ids=None, name=None, view=None, section=None) -> ExportResult
+client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None, section=None) -> ExportResult
 ```
+
+For an SVG section drawing, set `section={"plane": "xy", "offset": 3}` instead
+of `view`. The supported planes are `xy`, `xz`, and `yz` in drawing coordinates;
+the plane must intersect the selected shapes.
 
 Shape requests remain ordinary mappings, so existing macros can keep passing
 plain dictionaries and can include fields added by newer server versions. For

@@ -1,6 +1,7 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { parseProjectionLayout, PROJECTION_LAYOUTS } from "@constructorfleet/sketchforge-engine/cadProjection";
+import { SECTION_PLANES, type SectionPlane } from "@constructorfleet/sketchforge-engine/cadSection";
 import { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "@constructorfleet/sketchforge-engine/sceneExport";
 
 export const runtime = "nodejs";
@@ -30,6 +31,24 @@ export async function POST(request: Request) {
   if (body.view !== undefined && body.format !== "svg") {
     return apiError("view only applies to the svg format.", 400, "invalid_request");
   }
+  if (body.section !== undefined && body.format !== "svg") {
+    return apiError("section only applies to the svg format.", 400, "invalid_request");
+  }
+  let section: { plane: SectionPlane; offset: number } | undefined;
+  if (body.section !== undefined) {
+    if (!body.section || typeof body.section !== "object" || Array.isArray(body.section)) {
+      return apiError("section must contain a named plane and numeric offset.", 400, "invalid_request");
+    }
+    const request = body.section as Record<string, unknown>;
+    if (typeof request.plane !== "string" || !SECTION_PLANES.includes(request.plane as SectionPlane)) {
+      return apiError(`section.plane must be one of: ${SECTION_PLANES.join(", ")}.`, 400, "invalid_request");
+    }
+    if (typeof request.offset !== "number" || !Number.isFinite(request.offset) || Math.abs(request.offset) > 100_000) {
+      return apiError("section.offset must be a finite coordinate between -100000 and 100000.", 400, "invalid_request");
+    }
+    if (body.view !== undefined) return apiError("section and view cannot be used together.", 400, "invalid_request");
+    section = { plane: request.plane as SectionPlane, offset: request.offset };
+  }
   const view = parseProjectionLayout(body.view);
   if (view === null) {
     return apiError(`view must be one of: ${PROJECTION_LAYOUTS.join(", ")}.`, 400, "invalid_request");
@@ -48,7 +67,7 @@ export async function POST(request: Request) {
       format: body.format as ProjectExportFormat,
       shapeIds: shapeIds ?? undefined,
       name: body.name as string | undefined,
-      view,
+      ...(section ? { section } : { view }),
     });
     if (new URL(request.url).searchParams.get("download") === "1") {
       // The metadata header includes every field returned by JSON exports,

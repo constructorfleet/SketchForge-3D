@@ -147,5 +147,7 @@ export {
   type ProjectionView,
 } from "./cadProjection.js";
 export { meshProjectShapes } from "./projectMeshes.js";
+export { renderSectionSvg, SECTION_PLANES, type SectionDrawing, type SectionPlane } from "./cadSection.js";
+export { sectionShapesToSvg, type SectionOptions } from "./serverCadSection.js";
 export { analyzeMeshTopology, type TriangleFace } from "./meshValidation.js";
 export { mirrorShapes } from "./serverShapeGroups.js";

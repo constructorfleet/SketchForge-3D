@@ -337,6 +337,21 @@ class ExportsTests(unittest.TestCase):
         self.assertEqual(result.data, b"<svg>")
         self.assertEqual(opener.calls[0].body, {"format": "svg", "view": "top"})
 
+    def test_sends_a_named_section_plane_for_an_svg_export(self) -> None:
+        opener = FakeOpener({
+            "format": "svg",
+            "filename": "Bracket.svg",
+            "mimeType": "image/svg+xml",
+            "bytes": 5,
+            "shapeCount": 1,
+            "base64": "PHN2Zz4=",
+        })
+
+        result = client(opener).project("p1").export("svg", section={"plane": "xy", "offset": 3})
+
+        self.assertEqual(result.data, b"<svg>")
+        self.assertEqual(opener.calls[0].body, {"format": "svg", "section": {"plane": "xy", "offset": 3}})
+
     def test_writes_export_bytes_to_a_file(self) -> None:
         artifact = bytes(range(256)) * 600
         opener = TransferOpener(

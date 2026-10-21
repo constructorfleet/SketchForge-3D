@@ -9,6 +9,7 @@
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Align, Distribute, Patterns } from "./resources/arrange.js";
+import { Drawings } from "./resources/drawings.js";
 import { Edges } from "./resources/edges.js";
 import { Faces } from "./resources/faces.js";
 import { Imports } from "./resources/imports.js";
@@ -44,6 +45,8 @@ import type {
   ShellRequest,
   ShellResult,
   TreatmentResult,
+  SectionDrawingArtifact,
+  SectionDrawingRequest,
 } from "./types.js";
 
 export type SketchForgeClientOptions = TransportOptions;
@@ -56,6 +59,7 @@ export class SketchForgeClient {
   readonly measurements: Measurements;
   readonly properties: Properties;
   readonly treatments: Treatments;
+  readonly drawings: Drawings;
   readonly shell: Shell;
   readonly align: Align;
   readonly distribute: Distribute;
@@ -73,6 +77,7 @@ export class SketchForgeClient {
     this.measurements = new Measurements(this.transport);
     this.properties = new Properties(this.transport);
     this.treatments = new Treatments(this.transport);
+    this.drawings = new Drawings(this.transport);
     this.shell = new Shell(this.transport);
     this.align = new Align(this.transport);
     this.distribute = new Distribute(this.transport);
@@ -187,6 +192,10 @@ export class ProjectHandle {
 
   propertiesOf(shapeId: string): Promise<ShapeProperties> {
     return this.client.properties.get(this.id, shapeId);
+  }
+
+  sectionDrawing(request: SectionDrawingRequest): Promise<SectionDrawingArtifact> {
+    return this.client.drawings.section(this.id, request);
   }
 
   measurementsWithRadius(shapeId: string): Promise<MeasurementSummary[]> {

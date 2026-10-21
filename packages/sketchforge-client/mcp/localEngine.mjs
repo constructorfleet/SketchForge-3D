@@ -248,6 +248,33 @@ async function projectView(args) {
   return { ...response, svg };
 }
 
+async function sectionView(args) {
+  const { package: enginePackage } = await getBackend();
+  if (!enginePackage.SECTION_PLANES.includes(args.plane)) throw new Error(`plane must be one of: ${enginePackage.SECTION_PLANES.join(", ")}.`);
+  if (typeof args.offset !== "number" || !Number.isFinite(args.offset) || Math.abs(args.offset) > 100_000) {
+    throw new Error("offset must be a finite coordinate between -100000 and 100000.");
+  }
+  const id = requireProjectId(args);
+  const { store } = await getBackend();
+  const document = await store.read(id);
+  if (!document) throw new Error(`Project not found: ${id}`);
+  const requestedIds = Array.isArray(args.shapeIds) && args.shapeIds.length ? args.shapeIds : selectedObjectIds;
+  const artifact = await enginePackage.exportProjectScene(document, {
+    format: "svg",
+    section: { plane: args.plane, offset: args.offset },
+    shapeIds: requestedIds.length ? requestedIds : undefined,
+    name: args.name,
+  });
+  const svg = Buffer.from(artifact.data).toString("utf8");
+  const response = { plane: args.plane, offset: args.offset, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.data.byteLength, shapeCount: artifact.shapeCount };
+  if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+    const destination = path.resolve(args.outputPath);
+    writeFileSync(destination, artifact.data);
+    return { ...response, savedTo: destination };
+  }
+  return { ...response, svg };
+}
+
 /**
  * A PNG of the project, rasterised from the same drawing.
  *
@@ -405,6 +432,8 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return captureScene(args);
     case "sketchforge_project_view":
       return projectView(args);
+    case "sketchforge_section_view":
+      return sectionView(args);
     case "sketchforge_mirror_objects": {
       const ids = Array.isArray(args.ids) && args.ids.length ? args.ids : selectedObjectIds;
       if (!ids.length || !["x", "y", "z"].includes(args.axis)) throw new Error("mirror_objects requires object ids or a local selection, and axis x, y, or z.");

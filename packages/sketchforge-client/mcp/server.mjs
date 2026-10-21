@@ -25,6 +25,7 @@ const version = (() => {
 const MCP_ROUTE = "/api/sketchforge-mcp";
 /** What a drawing shows, as `POST /exports` and the engine name it. Kept in step by `localMcpEngine.test.ts`. */
 const PROJECTION_LAYOUTS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"];
+const SECTION_PLANES = ["xy", "xz", "yz"];
 
 const editorTargetSchema = {
   type: "object",
@@ -372,6 +373,23 @@ const tools = [
     },
   },
   {
+    name: "sketchforge_section_view",
+    description: "Return an exact CAD section drawing as SVG by cutting the stored solids with one axis-aligned plane in drawing coordinates. offset is the coordinate of the omitted axis, in millimetres. Works offline or against a server when url is supplied.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "plane", "offset"],
+      properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
+        projectId: { type: "string", description: "The project id." },
+        plane: { type: "string", enum: SECTION_PLANES, description: "Plane in drawing coordinates; XY omits Z, XZ omits Y, and YZ omits X." },
+        offset: { type: "number", description: "Coordinate of the omitted axis in millimetres; must intersect the selected scene." },
+        shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." },
+        name: { type: "string", description: "Optional base name for the file." },
+        outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise." },
+      },
+    },
+  },
+  {
     name: "sketchforge_validate_scene",
     description: "Check triangle topology, conservative AABB clearance bounds, and exact Manifold intersection volumes for overlapping scene objects.",
     inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
@@ -640,6 +658,26 @@ async function callRemoteTool(name, args, baseUrl) {
       });
       const bytes = Buffer.from(artifact.base64, "base64");
       const response = { view: args.view ?? "multiview", filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount };
+      if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+        const destination = path.resolve(args.outputPath);
+        writeFileSync(destination, bytes);
+        return { ...response, savedTo: destination };
+      }
+      return { ...response, svg: bytes.toString("utf8") };
+    }
+    case "sketchforge_section_view": {
+      const artifact = await restRequest("POST", "/exports", {
+        query: { projectId: args.projectId },
+        body: {
+          format: "svg",
+          section: { plane: args.plane, offset: args.offset },
+          ...(args.shapeIds === undefined ? {} : { shapeIds: args.shapeIds }),
+          ...(args.name === undefined ? {} : { name: args.name }),
+        },
+        baseUrl,
+      });
+      const bytes = Buffer.from(artifact.base64, "base64");
+      const response = { plane: args.plane, offset: args.offset, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount };
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
         const destination = path.resolve(args.outputPath);
         writeFileSync(destination, bytes);

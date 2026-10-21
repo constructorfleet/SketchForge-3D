@@ -605,6 +605,26 @@ export type PatternResult = {
 
 export const IMPORTABLE_MESH_FORMATS = ["stl", "obj", "svg"] as const;
 
+/** Axis-aligned section planes in the CAD drawing's Z-up coordinates. */
+export const SECTION_PLANES = ["xy", "xz", "yz"] as const;
+export type SectionPlane = (typeof SECTION_PLANES)[number];
+
+export type SectionDrawingRequest = {
+  plane: SectionPlane;
+  /** Coordinate of the plane's omitted axis, in millimetres. */
+  offset: number;
+  shapeIds?: readonly string[];
+  name?: string;
+};
+
+export type SectionDrawingArtifact = {
+  filename: string;
+  mimeType: "image/svg+xml";
+  bytes: number;
+  shapeCount: number;
+  svg: string;
+};
+
 /**
  * A model file to import.
  *

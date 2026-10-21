@@ -324,6 +324,16 @@ describe("the REST API over HTTP", () => {
     const sheet = Buffer.from(grid.body.base64 as string, "base64").toString("utf8");
     for (const label of ["Front", "Top", "Right", "Iso"]) expect(sheet).toContain(`>${label}</text>`);
     expect(sheet).toContain("30 × 30 × 12 (X×Y×Z)");
+
+    const section = await api(`/exports?projectId=${drawingProject}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "xy", offset: 6 } }),
+    });
+    expect(section.status).toBe(200);
+    const sectionSvg = Buffer.from(section.body.base64 as string, "base64").toString("utf8");
+    expect(sectionSvg).toContain('data-plane="xy"');
+    expect(sectionSvg).toContain('data-offset="6"');
+    expect(sectionSvg).toContain("<path");
   });
 
   it("repeats, aligns and distributes a row over HTTP", async () => {

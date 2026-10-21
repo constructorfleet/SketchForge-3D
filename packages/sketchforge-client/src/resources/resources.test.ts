@@ -296,6 +296,19 @@ describe("interference", () => {
   });
 });
 
+describe("section drawings", () => {
+  it("requests a named plane and decodes the returned SVG", async () => {
+    const svg = '<svg data-plane="xy"><path d="M0 0L1 1"/></svg>';
+    const base64 = btoa(svg);
+    const server = fakeServer({ body: { filename: "Plate.svg", mimeType: "image/svg+xml", bytes: svg.length, shapeCount: 1, base64 } });
+
+    await expect(client(server).project("p1").sectionDrawing({ plane: "xy", offset: 2, shapeIds: ["s1"] }))
+      .resolves.toMatchObject({ filename: "Plate.svg", shapeCount: 1, svg });
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/exports?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ format: "svg", section: { plane: "xy", offset: 2 }, shapeIds: ["s1"] });
+  });
+});
+
 describe("align, distribute and patterns", () => {
   it("sends the axis and target, and leaves an absent anchor out", async () => {
     const server = fakeServer({ body: { moved: 2, axis: "y", target: "max", anchorId: null, shapes: [], revision: 1 } });
