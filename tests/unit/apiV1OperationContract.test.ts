@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { API_V1_OPERATIONS, type ApiV1Operation } from "@/lib/apiV1OperationContract";
 
 const routeRoot = path.resolve("apps/web/src/app/api/v1");
 
@@ -25,7 +25,18 @@ function sourceOperations() {
   return found.sort();
 }
 
+type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
+
 describe("REST API v1 operation contract", () => {
+  it("keeps create-project normalization and schema required in the contract type", () => {
+    expectTypeOf<CreateProjectBody["normalization"]>().toEqualTypeOf<readonly ["trim", "truncate:80"]>();
+    expectTypeOf<CreateProjectBody["schema"]>().toEqualTypeOf<{
+      type: "object";
+      required: readonly ["name"];
+      name: { type: "string"; minLength: 1; maxLength: 80 };
+    }>();
+  });
+
   it("registers every public route method exactly once", () => {
     const registered = API_V1_OPERATIONS.map(({ method, path: route }) => `${method} ${route}`).sort();
     expect(registered).toEqual(sourceOperations());
@@ -75,6 +86,30 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] }))
       .toEqual({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] });
     expect(contract.parseListFacesResponse({ faces: [{ index: "0" }] })).toBeNull();
+  });
+
+  it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "PATCH" && route === "/api/v1/shapes");
+    expect(operation).toMatchObject({
+      operationId: "updateShape",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      requestBody: {
+        contentType: "application/json",
+        required: true,
+        faceColors: { keyKinds: ["stable-face-id", "legacy-numeric-index"], colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" },
+      },
+    });
+    expect(contract.parseShapePatchRequest({ faceColors: { face_abc123: "#12aBcF", "0": "#12aBcF80" } }))
+      .toEqual({ ok: true, body: { faceColors: { face_abc123: "#12aBcF", "0": "#12aBcF80" } } });
+    expect(contract.parseShapePatchRequest({ name: "Updated", faceColors: { "0": "#12aBcF" } }))
+      .toEqual({ ok: true, body: { name: "Updated", faceColors: { "0": "#12aBcF" } } });
+    expect(contract.parseShapePatchRequest({ faceColors: { other_key: "#12aBcF" } })).toEqual({ ok: false, error: "invalid_face_color_key" });
+    expect(contract.parseShapePatchRequest({ faceColors: { "face_bad id": "#12aBcF" } })).toEqual({ ok: false, error: "invalid_face_color_key" });
+    expect(contract.parseShapePatchRequest({ faceColors: { face_abc123: "red" } })).toEqual({ ok: false, error: "invalid_face_colors" });
+    expect(contract.parseShapePatchRequest({ faceColors: [] })).toEqual({ ok: false, error: "invalid_face_colors" });
   });
 
   it("records read-only OPTIONS handlers as unauthenticated 204 responses", () => {

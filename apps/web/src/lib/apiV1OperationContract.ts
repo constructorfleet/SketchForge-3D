@@ -23,11 +23,24 @@ export type ApiV1Operation = {
     faceIdSemantics?: string;
     colorAssignmentKey?: string;
   };
-  requestBody?: {
-    contentType: "application/json";
-    required: true;
-    normalization: readonly ["trim", "truncate:80"];
-    schema: { type: "object"; required: readonly ["name"]; name: { type: "string"; minLength: 1; maxLength: 80 } };
+  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
+};
+
+export type ApiV1CreateProjectRequestBody = {
+  contentType: "application/json";
+  required: true;
+  normalization: readonly ["trim", "truncate:80"];
+  schema: { type: "object"; required: readonly ["name"]; name: { type: "string"; minLength: 1; maxLength: 80 } };
+};
+
+export type ApiV1ShapePatchRequestBody = {
+  contentType: "application/json";
+  required: true;
+  faceColors: {
+    type: "object";
+    keyKinds: readonly ["stable-face-id", "legacy-numeric-index"];
+    keyPattern: string;
+    colorPattern: string;
   };
 };
 
@@ -89,7 +102,26 @@ export const API_V1_OPERATIONS = [
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
   operation("GET", "/api/v1/shapes", "listShapes"),
   operation("POST", "/api/v1/shapes", "createShapes"),
-  operation("PATCH", "/api/v1/shapes", "updateShape"),
+  {
+    ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]),
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true },
+      },
+    },
+    requestBody: {
+      contentType: "application/json",
+      required: true,
+      faceColors: {
+        type: "object",
+        keyKinds: ["stable-face-id", "legacy-numeric-index"],
+        keyPattern: "^(?:[0-9]+|face_[^\\s]+)$",
+        colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$",
+      },
+    },
+  },
   operation("DELETE", "/api/v1/shapes", "deleteShape"),
   operation("POST", "/api/v1/shell", "shellShape"),
   operation("GET", "/api/v1/thickness", "estimateThickness"),
@@ -154,4 +186,26 @@ export function parseListFacesResponse(value: unknown): ListFacesResponse | null
     if (!(item.facing === null || (typeof item.facing === "string" && directions.has(item.facing)))) return null;
   }
   return value as ListFacesResponse;
+}
+
+
+export type ShapePatchRequest = Record<string, unknown>;
+
+/** Validate face color syntax while preserving all other engine-supported patch fields. */
+export function parseShapePatchRequest(body: Record<string, unknown>):
+  | { ok: true; body: ShapePatchRequest }
+  | { ok: false; error: "invalid_face_color_key" | "invalid_face_colors" } {
+  if (!("faceColors" in body)) return { ok: true, body };
+  const faceColors = body.faceColors;
+  if (!faceColors || typeof faceColors !== "object" || Array.isArray(faceColors)) {
+    return { ok: false, error: "invalid_face_colors" };
+  }
+  const entries = Object.entries(faceColors);
+  if (entries.some(([key]) => !/^\d+$/.test(key) && !/^face_[^\s]+$/.test(key))) {
+    return { ok: false, error: "invalid_face_color_key" };
+  }
+  if (entries.some(([, color]) => typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color))) {
+    return { ok: false, error: "invalid_face_colors" };
+  }
+  return { ok: true, body };
 }
