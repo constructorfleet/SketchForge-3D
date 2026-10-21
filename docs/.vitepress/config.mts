@@ -32,6 +32,7 @@ const config = defineConfig({
     nav: [
       { text: "Learn", link: "/" },
       { text: "Quick start", link: "/docs/guides/editor-quickstart" },
+      { text: "Edit a model", link: "/docs/guides/edit-and-export-model" },
       { text: "REST API", link: "/docs/REST_API" },
       { text: "Project format", link: "/docs/SKF_PROJECT_FORMAT" },
       { text: "Clients", link: "/docs/PUBLISHING_CLIENTS" },
@@ -44,6 +45,7 @@ const config = defineConfig({
         items: [
           { text: "Overview", link: "/" },
           { text: "Editor quick start", link: "/docs/guides/editor-quickstart" },
+          { text: "Create, edit, save, export", link: "/docs/guides/edit-and-export-model" },
           { text: "Face drafting", link: "/docs/guides/face-drafting" },
           { text: "REST API", link: "/docs/REST_API" },
           { text: ".skf project format", link: "/docs/SKF_PROJECT_FORMAT" },
