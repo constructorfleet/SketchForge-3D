@@ -285,6 +285,17 @@ describe("shape properties", () => {
   });
 });
 
+describe("interference", () => {
+  it("sends the project, selected ids and clearance to the exact endpoint", async () => {
+    const report = { shapesChecked: 2, candidatePairsChecked: 1, clearance: 0.5, method: "OCCT exact distance and common volume; AABB candidate prefilter" as const, pairs: [] };
+    const server = fakeServer({ body: report });
+    await expect(client(server).project("p9").interferenceReport({ ids: ["a", "b"], clearance: 0.5 })).resolves.toEqual(report);
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/interference?projectId=p9");
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b"], clearance: 0.5 });
+  });
+});
+
 describe("align, distribute and patterns", () => {
   it("sends the axis and target, and leaves an absent anchor out", async () => {
     const server = fakeServer({ body: { moved: 2, axis: "y", target: "max", anchorId: null, shapes: [], revision: 1 } });

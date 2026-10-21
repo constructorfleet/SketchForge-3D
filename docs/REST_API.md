@@ -63,6 +63,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
 | `POST` | `/measurements?projectId=` | The distance between two entities, and the angle if both are flat faces. |
 | `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
+| `POST` | `/interference?projectId=` | Exact shape-to-shape gaps and overlap volumes within a requested clearance; capped at 128 shapes and 512 AABB candidates. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
@@ -436,6 +437,30 @@ Each end names a shape and what part of it to measure from -- the whole solid, o
 `angleDegrees` is the angle between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
 
 Naming an index the shape does not have is a `422` with `cad_failed`, and the message says how many there were: a script that has not re-listed after changing the shape finds out rather than measuring the wrong face. A shape **changes shape** when it is hollowed or filleted, so re-measure a result before naming indexes on it.
+
+### Checking interference across a scene
+
+`POST /interference?projectId=` checks every visible, non-cutter shape by default. Pass `ids` to narrow the set and `clearance` in millimetres (default `0`) to report pairs within that exact surface gap. The broad phase uses project-space axis-aligned bounds only to discard pairs that cannot be within the requested clearance; each remaining pair is measured by OCCT's exact `distanceBetween`, and touching or overlapping pairs also report their exact common volume.
+
+```json
+{ "ids": ["post-a", "post-b", "plate"], "clearance": 0.4 }
+```
+
+The response lists closest pairs first:
+
+```json
+{
+  "shapesChecked": 3,
+  "candidatePairsChecked": 2,
+  "clearance": 0.4,
+  "method": "OCCT exact distance and common volume; AABB candidate prefilter",
+  "pairs": [
+    { "a": { "id": "post-a", "name": "Post A" }, "b": { "id": "post-b", "name": "Post B" }, "gap": 0.25, "overlapVolume": 0, "precision": "exact" }
+  ]
+}
+```
+
+To keep a large scene from monopolizing the kernel, a request is refused as a whole above 128 selected shapes or 512 AABB candidate pairs. The `422 invalid_request` response names the limit; narrow `ids` or lower `clearance` and retry. `pairs` contains only pairs whose gap is at most the requested clearance. `precision` is `exact` for parametric and B-rep inputs; a pair involving an imported triangle mesh reports `tessellated`, because OCCT can solve the stored mesh precisely but cannot recover the unsampled source surface. This is shape-to-shape reporting; it does not identify faces. Sampled wall-thickness estimation remains separate and must state its sampling limits.
 
 ## Shape properties
 

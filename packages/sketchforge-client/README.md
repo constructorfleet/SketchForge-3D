@@ -92,6 +92,7 @@ client.measurements.list(projectId, shapeId): Promise<MeasurementSummary[]>
 client.measurements.withRadius(projectId, shapeId): Promise<MeasurementSummary[]>
 client.measurements.between(projectId, from, to): Promise<MeasurementPair>
 client.properties.get(projectId, shapeId): Promise<ShapeProperties>
+client.interference.check(projectId, { ids?, clearance? }): Promise<InterferenceReport>
 
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
@@ -118,7 +119,7 @@ project.get() | delete() | listShapes() | add(shape) | addMany(shapes) | update(
 project.remove(id) | clear() | edges(id) | filletableEdges(id)
 project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance, options?)
 project.faces(id) | facesFacing(id, direction)
-project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to) | propertiesOf(id)
+project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to) | propertiesOf(id) | interferenceReport({ ids?, clearance? })
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
 project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)

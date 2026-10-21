@@ -608,6 +608,24 @@ class ShapePropertiesTests(unittest.TestCase):
         self.assertEqual(result.provenance.precision, "tessellated")
 
 
+class InterferenceTests(unittest.TestCase):
+    def test_checks_exact_interference_and_parses_pair_precision(self) -> None:
+        opener = FakeOpener({
+            "shapesChecked": 2, "candidatePairsChecked": 1, "clearance": 0.5,
+            "method": "OCCT exact distance and common volume; AABB candidate prefilter",
+            "pairs": [{
+                "a": {"id": "a", "name": "A"}, "b": {"id": "b", "name": "B"},
+                "gap": 0.25, "overlapVolume": 0, "precision": "tessellated",
+            }],
+        })
+        result = client(opener).project("p1").check_interference(ids=["a", "b"], clearance=0.5)
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/interference?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"ids": ["a", "b"], "clearance": 0.5})
+        self.assertEqual(result.pairs[0].gap, 0.25)
+        self.assertEqual(result.pairs[0].precision, "tessellated")
+
+
 class ArrangeTests(unittest.TestCase):
     def test_sends_the_axis_and_target_and_leaves_an_absent_anchor_out(self) -> None:
         opener = FakeOpener(

@@ -12,6 +12,7 @@ import { Align, Distribute, Patterns } from "./resources/arrange.js";
 import { Edges } from "./resources/edges.js";
 import { Faces } from "./resources/faces.js";
 import { Imports } from "./resources/imports.js";
+import { Interference } from "./resources/interference.js";
 import { Measurements } from "./resources/measurements.js";
 import { Projects } from "./resources/projects.js";
 import { Properties } from "./resources/properties.js";
@@ -60,6 +61,7 @@ export class SketchForgeClient {
   readonly distribute: Distribute;
   readonly patterns: Patterns;
   readonly imports: Imports;
+  readonly interference: Interference;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -76,6 +78,7 @@ export class SketchForgeClient {
     this.distribute = new Distribute(this.transport);
     this.patterns = new Patterns(this.transport);
     this.imports = new Imports(this.transport);
+    this.interference = new Interference(this.transport);
   }
 
   get apiRoot() {
@@ -193,6 +196,11 @@ export class ProjectHandle {
   /** The distance between two entities, which may be on two different shapes. */
   measureBetween(from: MeasurementEnd, to: MeasurementEnd): Promise<MeasurementPair> {
     return this.client.measurements.between(this.id, from, to);
+  }
+
+  /** Exact gaps and penetration volumes between selected project solids. */
+  interferenceReport(request: import("./types.js").InterferenceRequest = {}) {
+    return this.client.interference.check(this.id, request);
   }
 
   /** Hollows the shape out, sealed unless `openFaces` names faces to leave off. */

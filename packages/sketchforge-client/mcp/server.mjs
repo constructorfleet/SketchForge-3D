@@ -376,6 +376,11 @@ const tools = [
     description: "Check triangle topology, conservative AABB clearance bounds, and exact Manifold intersection volumes for overlapping scene objects.",
     inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, shapeIds: { type: "array", items: { type: "string" } }, excludeShapeIds: { type: "array", items: { type: "string" } } } },
   },
+  {
+    name: "sketchforge_check_interference",
+    description: "Check exact OCCT surface gaps and overlap volumes between visible, non-cutter solids. Clearance is in millimetres. The report refuses the whole request above 128 shapes or 512 AABB candidate pairs; narrow ids or reduce clearance. Works offline or against a server.",
+    inputSchema: { ...editorTargetSchema, properties: { ...editorTargetSchema.properties, ids: { type: "array", items: { type: "string" }, description: "Optional shape ids; defaults to all visible non-cutter solids." }, clearance: { type: "number", minimum: 0, description: "Maximum exact surface gap to report, in mm (default 0)." } } },
+  },
   // CAD operations use the local engine by default and the server API when a URL is supplied.
   {
     name: "sketchforge_list_faces",
@@ -666,6 +671,12 @@ async function callRemoteTool(name, args, baseUrl) {
     }
     case "sketchforge_validate_scene":
       return bridgeCommand("validate_scene", args, 60000, baseUrl);
+    case "sketchforge_check_interference":
+      return restRequest("POST", "/interference", {
+        query: { projectId: args.projectId },
+        body: { ...(Array.isArray(args.ids) && args.ids.length ? { ids: args.ids } : {}), ...(args.clearance === undefined ? {} : { clearance: args.clearance }) },
+        baseUrl,
+      });
     case "sketchforge_list_macros":
       return listMacros();
     case "sketchforge_run_macro":

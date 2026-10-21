@@ -30,6 +30,7 @@ from .types import (
     MeasurementEnd,
     MeasurementPair,
     MeasurementSummary,
+    InterferenceReport,
     ShapeProperties,
     MeshImportResult,
     PatternResult,
@@ -330,6 +331,26 @@ class Properties:
             "GET", "/properties", {"projectId": project_id, "shapeId": shape_id}
         ) or {}
         return ShapeProperties.from_payload(payload.get("properties", {}))
+
+
+class Interference:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def check(
+        self,
+        project_id: str,
+        ids: Optional[Sequence[str]] = None,
+        clearance: Optional[float] = None,
+    ) -> InterferenceReport:
+        """Check exact gaps and penetration; the server refuses requests above its work caps."""
+        body: Dict[str, Any] = {}
+        if ids is not None:
+            body["ids"] = list(ids)
+        if clearance is not None:
+            body["clearance"] = clearance
+        payload = self._transport.send("POST", "/interference", {"projectId": project_id}, body) or {}
+        return InterferenceReport.from_payload(payload)
 
 
 class Shell:
@@ -795,6 +816,7 @@ class SketchForgeClient:
         self.faces = Faces(self._transport)
         self.measurements = Measurements(self._transport)
         self.properties = Properties(self._transport)
+        self.interference = Interference(self._transport)
         self.treatments = Treatments(self._transport)
         self.shell = Shell(self._transport)
         self.booleans = Booleans(self._transport)
@@ -954,6 +976,12 @@ class ProjectHandle:
     def measure_between(self, from_: MeasurementEnd, to: MeasurementEnd) -> MeasurementPair:
         """The distance between two entities, which may be on two different shapes."""
         return self._client.measurements.between(self.id, from_, to)
+
+    def check_interference(
+        self, ids: Optional[Sequence[str]] = None, clearance: Optional[float] = None
+    ) -> InterferenceReport:
+        """Check exact clearances between visible solids in this project."""
+        return self._client.interference.check(self.id, ids=ids, clearance=clearance)
 
     def shell(
         self,

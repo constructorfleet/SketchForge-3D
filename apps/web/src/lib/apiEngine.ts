@@ -114,6 +114,12 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
       return apiError(failure.message, failure.status, "cad_failed");
     case "cad_failed":
       return apiError(wording.cadFailed ?? "The CAD kernel could not complete that operation.", 500, "cad_failed");
+    case "interference_refused": {
+      const refusal = failure.refusal;
+      if (refusal.reason === "invalid_clearance") return apiError("clearance must be a finite, non-negative number of millimetres.", 400, "invalid_request");
+      if (refusal.reason === "too_many_shapes") return apiError(`Interference check refused: ${refusal.given} shapes exceed the limit of ${refusal.limit}. Narrow the ids list.`, 422, "invalid_request", { limit: refusal.limit, given: refusal.given });
+      return apiError(`Interference check refused: more than ${refusal.limit} candidate pairs; narrow the ids list or reduce clearance.`, 422, "invalid_request", { limit: refusal.limit, atLeast: refusal.given });
+    }
     case "unsupported_kind":
       return apiError(
         `Shape ${failure.index} has an unsupported kind. The API can build: ${failure.kinds.join(", ")}.`,

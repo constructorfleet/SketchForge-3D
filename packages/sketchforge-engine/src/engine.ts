@@ -37,6 +37,7 @@ import {
   type ServerCadMeasurementPair,
 } from "./serverCadMeasure.js";
 import { shapeProperties, type ServerCadShapeProperties } from "./serverCadProperties.js";
+import { checkInterference, type InterferenceReport, type InterferenceRequest, type InterferenceRefusal } from "./serverCadInterference.js";
 import {
   alignShifts,
   effectiveAlignAnchorId,
@@ -112,6 +113,7 @@ export type EngineFailure =
   | { reason: "geometry_failed"; message: string; status: number }
   | { reason: "cad_refused"; message: string; status: number }
   | { reason: "cad_failed" }
+  | { reason: "interference_refused"; refusal: InterferenceRefusal }
   // --- describing a shape ----------------------------------------------------
   //
   // `index` is the position in a batch, so a request adding two hundred shapes
@@ -296,6 +298,8 @@ export type Engine = {
     from: MeasurementEndRef,
     to: MeasurementEndRef,
   ): Promise<EngineResult<ServerCadMeasurementPair>>;
+  /** Exact, bounded gaps and overlap volumes between visible non-cutter shapes. */
+  interference(projectId: string, request?: InterferenceRequest): Promise<EngineResult<InterferenceReport>>;
 };
 
 function ok<T>(value: T): EngineResult<T> {
@@ -877,6 +881,20 @@ export function createEngine(store: ProjectStore): Engine {
           { shape: shapeById(from.shapeId), entity: from.entity, index: from.index },
           { shape: shapeById(to.shapeId), entity: to.entity, index: to.index },
         ));
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+    }),
+
+    interference: (projectId, request = {}) => reading(projectId, async (document) => {
+      const ids = request.ids;
+      if (ids) {
+        const found = shapesByIds(document, ids);
+        if (!found.ok) return found;
+      }
+      try {
+        const result = await checkInterference(document.shapes, request);
+        return result.ok ? ok(result.value) : failed({ reason: "interference_refused", refusal: result.refusal });
       } catch (error) {
         return failed(cadFailure(error));
       }

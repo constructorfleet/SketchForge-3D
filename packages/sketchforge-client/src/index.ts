@@ -7,6 +7,7 @@ export { Align, Distribute, Patterns } from "./resources/arrange.js";
 export { Edges } from "./resources/edges.js";
 export { Faces } from "./resources/faces.js";
 export { Imports } from "./resources/imports.js";
+export { Interference } from "./resources/interference.js";
 export { Measurements } from "./resources/measurements.js";
 export { Properties } from "./resources/properties.js";
 export { Shell } from "./resources/shell.js";

@@ -383,6 +383,11 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return unwrap(await engine.properties(id, args.shapeId));
     case "sketchforge_measure_between":
       return unwrap(await engine.measureBetween(id, args.from, args.to));
+    case "sketchforge_check_interference":
+      return unwrap(await engine.interference(id, {
+        ...(Array.isArray(args.ids) && args.ids.length ? { ids: args.ids } : {}),
+        ...(args.clearance === undefined ? {} : { clearance: args.clearance }),
+      }));
     case "sketchforge_apply_edge_treatment":
       return unwrap(await engine.treat(id, args.id, {
         kind: args.kind,
