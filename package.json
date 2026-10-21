@@ -40,7 +40,7 @@
     "desktop:pack": "npm run desktop:web:build && electron-builder --dir --config apps/desktop/electron-builder.yml",
     "desktop:dist": "npm run desktop:web:build && electron-builder --config apps/desktop/electron-builder.yml",
     "docs:generate": "npm run engine:build && npm run client:build && node scripts/docs/generate-package-references.mjs && node scripts/generate-shape-reference.mjs && node scripts/generate-cli-reference.mjs && node scripts/docs-generate.mjs",
-    "docs:check": "node scripts/docs-check.mjs && node scripts/generate-cli-reference.mjs --check",
+    "docs:check": "node scripts/docs-check.mjs && node scripts/generate-cli-reference.mjs --check && node scripts/generate-mcp-reference.mjs --check && node --test tests/docs/mcp-reference.test.mjs"
     "docs:build": "npm run docs:check && npm run docs:generate && vitepress build .docs-site && node --test tests/docs/site-build.test.mjs",
     "docs:preview": "npm run docs:build && vitepress preview .docs-site --host 127.0.0.1",
     "mcp:sketchforge": "node packages/sketchforge-client/mcp/server.mjs",
