@@ -9,6 +9,15 @@ export type SketchConstraintSolveResult = {
   unsatisfiedConstraintIds: string[];
 };
 
+export type SketchConstraintDegreesOfFreedomReport = {
+  parameterCount: number;
+  equationCount: number;
+  rank: number | null;
+  degreesOfFreedom: number | null;
+  status: "estimated" | "indeterminate";
+  reason?: "degenerate-distance";
+};
+
 export function addSketchConstraint(profile: SketchProfile, constraint: SketchConstraint): SketchProfile {
   if (profile.constraints?.some((existing) => existing.id === constraint.id)) return profile;
   return { ...profile, constraints: [...(profile.constraints ?? []), constraint] };
@@ -140,4 +149,83 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
   return (profile.constraints ?? []).filter((constraint) => constraint.kind === "horizontal" || constraint.kind === "vertical"
     ? segmentIds.has(constraint.segmentId)
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
+}
+
+/**
+ * Estimates local parameter freedom from the rank of the supported constraint
+ * equations at the profile's current coordinates. This is not a solver or a
+ * proof of global constraint satisfaction. Bezier handles and sweep depths are
+ * counted as free parameters because the supported constraints do not constrain
+ * them.
+ */
+export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): SketchConstraintDegreesOfFreedomReport {
+  const constraints = sketchConstraintsForProfile(profile);
+  const pointIndex = new Map(profile.points.map((point, index) => [point.id, index * 2]));
+  const parameterCount = profile.points.reduce((count, point) => count + 2
+    + (point.handleIn ? 2 : 0) + (point.handleOut ? 2 : 0) + (point.sweepDepth !== undefined ? 1 : 0), 0);
+  const equationCount = constraints.reduce((count, constraint) => count + (constraint.kind === "coincident" ? 2 : 1), 0);
+  const rows: number[][] = [];
+
+  for (const constraint of constraints) {
+    if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
+      const segment = profile.segments.find(({ id }) => id === constraint.segmentId)!;
+      const start = pointIndex.get(segment.startId)!;
+      const end = pointIndex.get(segment.endId)!;
+      const row = Array(parameterCount).fill(0) as number[];
+      const coordinate = constraint.kind === "horizontal" ? 1 : 0;
+      row[start + coordinate] = (row[start + coordinate] ?? 0) + 1;
+      row[end + coordinate] = (row[end + coordinate] ?? 0) - 1;
+      rows.push(row);
+      continue;
+    }
+    const [firstId, secondId] = constraint.pointIds;
+    const firstIndex = pointIndex.get(firstId)!;
+    const secondIndex = pointIndex.get(secondId)!;
+    if (constraint.kind === "coincident") {
+      for (const coordinate of [0, 1]) {
+        const row = Array(parameterCount).fill(0) as number[];
+        row[firstIndex + coordinate] = (row[firstIndex + coordinate] ?? 0) + 1;
+        row[secondIndex + coordinate] = (row[secondIndex + coordinate] ?? 0) - 1;
+        rows.push(row);
+      }
+      continue;
+    }
+    const first = profile.points.find(({ id }) => id === firstId)!;
+    const second = profile.points.find(({ id }) => id === secondId)!;
+    const dx = second.x - first.x;
+    const dz = second.z - first.z;
+    const length = Math.hypot(dx, dz);
+    if (length <= CONSTRAINT_TOLERANCE_MM) {
+      return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-distance" };
+    }
+    const row = Array(parameterCount).fill(0) as number[];
+    row[firstIndex] = -dx / length;
+    row[firstIndex + 1] = -dz / length;
+    row[secondIndex] = dx / length;
+    row[secondIndex + 1] = dz / length;
+    rows.push(row);
+  }
+
+  // Row reduction with partial pivoting gives the local constraint rank, so
+  // duplicate and dependent equations only remove freedom once.
+  let rank = 0;
+  const matrix = rows.map((row) => [...row]);
+  for (let column = 0; column < parameterCount && rank < matrix.length; column += 1) {
+    let pivot = rank;
+    for (let row = rank + 1; row < matrix.length; row += 1) {
+      if (Math.abs(matrix[row]![column]!) > Math.abs(matrix[pivot]![column]!)) pivot = row;
+    }
+    if (Math.abs(matrix[pivot]?.[column] ?? 0) < 1e-8) continue;
+    [matrix[rank], matrix[pivot]] = [matrix[pivot]!, matrix[rank]!];
+    const divisor = matrix[rank]![column]!;
+    for (let index = column; index < parameterCount; index += 1) matrix[rank]![index] /= divisor;
+    for (let row = 0; row < matrix.length; row += 1) {
+      if (row === rank) continue;
+      const factor = matrix[row]![column]!;
+      for (let index = column; index < parameterCount; index += 1) matrix[row]![index] -= factor * matrix[rank]![index]!;
+    }
+    rank += 1;
+  }
+
+  return { parameterCount, equationCount, rank, degreesOfFreedom: parameterCount - rank, status: "estimated" };
 }

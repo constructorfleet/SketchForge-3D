@@ -453,6 +453,8 @@
       "constraints": {
         "title": "Constraints",
         "hint": "Select two points for coincident or distance, or one segment for horizontal or vertical.",
+        "dofEstimate": "Estimated free parameters: {count}. This local constraint-rank estimate is not a global solve.",
+        "dofIndeterminate": "Free parameters: indeterminate at this degenerate distance geometry.",
         "addCoincident": "Coincident",
         "addHorizontal": "Horizontal",
         "addVertical": "Vertical",

@@ -135,10 +135,22 @@ unsatisfied constraint IDs. `.skf` round trips the declarations while older
 profiles without them remain valid. Splitting a constrained line carries its
 axis constraint to each resulting segment.
 
-This is a first constraint milestone, not a full CAD solver. It does not report
-degrees of freedom or provide a global nonlinear solve, and extrusion/revolve
-still bake the resulting geometry instead of recomputing a dependency-ordered
-feature tree. Those capabilities remain open work.
+The inspector reports an estimated local degree-of-freedom count by subtracting
+the numerical rank of the supported constraint equations' Jacobian from the
+profile's editable scalar parameters. Duplicate or dependent equations count
+only once. Bezier handle coordinates and sweep spine depths count as free
+parameters because these constraints do not constrain them. At a zero-length
+distance pair, the distance equation has no unique local direction, so the
+report is indeterminate instead of presenting a misleading count. The
+supported relations are translation-invariant, so even a fully constrained
+relative layout retains two global translation freedoms.
+
+This remains a local rank estimate at the current geometry, not a full CAD
+solver: it does not prove global solvability, detect every nonlinear or
+second-order dependency, move geometry to satisfy constraints, or provide a
+global nonlinear solve. Extrusion/revolve still bake the resulting geometry
+instead of recomputing a dependency-ordered feature tree. Those capabilities
+remain open work.
 
 ## Verification notes
 
