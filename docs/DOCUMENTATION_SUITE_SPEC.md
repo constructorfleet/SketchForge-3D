@@ -1,6 +1,6 @@
 # Documentation suite specification
 
-**Status (2026-10-21, verified at `6fa14b0`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), stable face identity in the Python client (#145), API reference sources (#139), face-based drafting (#140), the REST measurement listing (#137), and the editor quick-start (#150) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), the six-operation generated OpenAPI slice (#144), and built-site accessibility improvements (#154) have also merged. PR #147's STEP component-color import support has merged. Merged PR #153 adds a bounded deterministic least-squares solve for supported coupled sketch constraints; it does not provide a symbolic or global guarantee. Merged PR #151 adds runtime-backed OpenAPI coverage for `GET /faces` (7 operations documented, 25 still omitted). Merged PR #156 generates concrete publishing client versions and resolves the generic version-row gap. Merged PR #157 adds contextual cross-links between task guides and references. Merged PR #158 expands the engine npm listing and generated API guide. Broader workflow guides and editable feature history remain open.
+**Status (2026-10-21, verified at `6fa14b0`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), stable face identity in the Python client (#145), API reference sources (#139), face-based drafting (#140), the REST measurement listing (#137), and the editor quick-start (#150) have merged. Built-site accessibility smoke checks (#141), the recurring external-link availability report (#143), independent Bezier sweep-handle depth controls (#142), a sketch-constraint degree-of-freedom estimate (#146), the six-operation generated OpenAPI slice (#144), and built-site accessibility improvements (#154) have also merged. PR #147's STEP component-color import support has merged. Merged PR #153 adds a bounded deterministic least-squares solve for supported coupled sketch constraints; it does not provide a symbolic or global guarantee. Merged PR #151 adds runtime-backed OpenAPI coverage for `GET /faces` (7 operations documented, 25 still omitted). Merged PR #156 generates concrete publishing client versions and resolves the generic version-row gap. Merged PR #157 adds contextual cross-links between task guides and references. Merged PR #158 expands the engine npm listing and generated API guide. Open PR #162 renders ```mermaid fences as diagrams and carries the first one in §7. Broader workflow guides and editable feature history remain open.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
@@ -170,8 +170,20 @@ Examples are product behavior, not decorative text.
 - No page depends on fetching live application state during build or render.
 - Support source links that point to the exact repository path and commit represented by a page.
 - Images and downloads have explicit licenses/provenance and reasonable size budgets.
+- Diagrams are authored as ```mermaid fences and rendered by the site; ASCII art is not a substitute. Fences are rendered client-side from the committed diagram source, so the diagram stays reviewable in the repository.
 
 ## 7. Build and publishing workflow
+
+The site is produced by one ordered pipeline; every stage must pass before the
+next one runs.
+
+```mermaid
+graph TD;
+  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>copy docs into .docs-site"];
+  B --> C["vitepress build<br/>docs-site-dist"];
+  C --> D["site-build tests<br/>provenance, accessibility, search"];
+  D --> E["GitHub Pages deploy<br/>main only"];
+```
 
 ### Required commands
 

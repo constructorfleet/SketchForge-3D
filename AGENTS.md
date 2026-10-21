@@ -21,6 +21,7 @@ These instructions apply to all work in this repository. Follow more specific in
 
 - Update the relevant roadmap whenever a feature is added, changed, deferred, or completed. Keep roadmap status consistent with the shipped or merged state, and do not invent commitments. If no roadmap exists, create or propose a concise one when feature work needs a durable record of planned and completed work.
 - Update the relevant user, developer, API, configuration, or workflow documentation whenever a feature or change affects it. Include migration, compatibility, and behavior details where applicable. Update `docs/CHANGELOG.md` for user-visible changes according to its existing format.
+- Author diagrams as ```mermaid fences. The documentation site renders them, so there is no reason to fall back to ASCII art.
 - Treat tests and documentation as part of the work, not optional follow-up. Include those changes in the same logical commit and PR as the behavior they describe.
 
 ## Project conventions

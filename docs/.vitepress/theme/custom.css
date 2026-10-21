@@ -15,3 +15,16 @@
 .vp-doc [class*="language-"] pre > code span {
   color: var(--vp-code-block-color) !important;
 }
+
+/*
+ * Mermaid sizes each node from a 24px line box, but the site's document styles
+ * give paragraphs a taller one, so the last line of a multi-line label spills
+ * past the node border. Pin label metrics to the ones mermaid measured with.
+ * Covered by tests/docs/site-build.test.mjs.
+ */
+.mermaid p,
+.mermaid .nodeLabel,
+.mermaid foreignObject div {
+  margin: 0;
+  line-height: 1.5;
+}

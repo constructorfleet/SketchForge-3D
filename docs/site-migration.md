@@ -21,6 +21,8 @@ client, translation, and capability documents.
 
 ## Follow-up phases
 
+- **Site capabilities:** Open PR #162 renders ```mermaid fences as diagrams and
+  publishes the documentation build pipeline as the first one.
 - **Phase 2:** package references and executable examples merged in PR #118.
 - **Python client:** reference type checks and source links (#136) and stable-
   face identity parity (#145) have merged. The latter adds stable face IDs,
