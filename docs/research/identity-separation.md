@@ -288,10 +288,47 @@ producer cannot certify its own work" is enforced by GitHub rather than by
 configuration. Its reach is narrow: it binds the *approval* action only, not
 merging, not pushing, and not ruleset editing.
 
-**NOT ESTABLISHED**: whether a GitHub App can itself be a required reviewer or a
-CODEOWNER entry. I did not find a primary statement either permitting or
-prohibiting it, so treat App-as-reviewer as unverified rather than as either
-available or unavailable.
+### Can a GitHub App be the reviewer?
+
+**VERIFIED — no, and this is a hard constraint on the App route.** Two
+independent primary sources agree:
+
+1. The ruleset `required_reviewers` parameter takes a `Reviewer` whose `type`
+   enum has exactly one member:
+
+   ```json
+   {
+     "title": "Reviewer",
+     "description": "A required reviewing team",
+     "properties": {
+       "id": {"type": "integer", "description": "ID of the reviewer which must review changes to matching files."},
+       "type": {"type": "string", "description": "The type of the reviewer", "enum": ["Team"]}
+     },
+     "required": ["id", "type"]
+   }
+   ```
+
+   ([`repository-rule-params-reviewer`](https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json))
+   A ruleset required reviewer can only ever be a **Team**. Not a User, not an
+   Integration.
+
+2. CODEOWNERS is likewise restricted to humans and teams: "You can use a
+   CODEOWNERS file to define **individuals or teams** that are responsible for
+   code in a repository," and "The people you choose as code owners **must have
+   write permissions** for the repository," and "If you specify a user or team
+   that doesn't exist or has insufficient access, a code owner will not be
+   assigned."
+   ([About code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners))
+   The documented syntax enumerates users and teams only; there is no App
+   notation.
+
+The consequence for identity separation is specific and important: **the
+approval-shaped controls cannot be delegated to an App.** An App can *publish a
+check* (section 1) and that check can be *pinned* as required (section 4), but
+an App cannot occupy the reviewer slot. If the design wants the verification
+identity to withhold an **approval**, that identity must be a *user* — i.e. a
+machine account, with write access, and (for the ruleset path) in a team. If it
+only needs to withhold a **check**, an App suffices and is the stronger option.
 
 ## 3. Actions-native separation, without a second identity
 
@@ -538,10 +575,22 @@ access from force pushing to refs."
 ([`repository-rule-non-fast-forward`](https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json);
 [Available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets))
 It is active on `main` here, together with `deletion`. But `enforcement` is a
-first-class mutable field with enum `active | evaluate | disabled`
-(`repository-rule-enforcement`), and a repo admin can set it — so
-`non_fast_forward` stops a force-push by anyone who is not a repo admin, and
-stops a repo admin only until they spend one API call.
+first-class mutable field:
+
+```json
+{
+  "description": "The enforcement level of the ruleset. `evaluate` allows admins to test rules before enforcing them. Admins can view insights on the Rule Insights page (`evaluate` is only available with GitHub Enterprise).",
+  "enum": ["disabled", "active", "evaluate"]
+}
+```
+
+([`repository-rule-enforcement`](https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json))
+
+A repo admin can set that field. So `non_fast_forward` stops a force-push by
+anyone who is not a repo admin, and stops a repo admin only until they spend one
+API call. Note also that `evaluate` — the dry-run mode — is Enterprise-only per
+the schema's own description, so on this Team plan the only states are on and
+off.
 
 ## 5. The honest ceiling
 
@@ -592,6 +641,9 @@ depending on the human's restraint:
 - **A required check can be pinned to a specific App** via `integration_id`, so
   a forged same-named check from another source does not satisfy the gate.
 - **An author cannot approve their own PR.** GitHub-enforced, not configurable.
+  But note the shape constraint from section 2: the reviewer slot accepts only
+  a Team (rulesets) or a user/team (CODEOWNERS), never an App — so this
+  guarantee is only reachable by a *second account*, not by an App.
 - **Environment secrets are unreachable from jobs that do not declare the
   environment**, and are gated behind protection rules for jobs that do.
   Workable basis for R-2.9.
@@ -633,6 +685,8 @@ calls recorded above show is one request wide.
   course of this research.
 - Facts that could not be grounded in a primary source are marked
   **NOT ESTABLISHED** and are not relied on by section 5. Specifically
-  unestablished: App-as-required-reviewer / App-in-CODEOWNERS; GitHub's own API
-  accepting Actions OIDC tokens; App access to *user*-owned Projects V2;
-  enterprise-level ruleset availability for this account.
+  unestablished: GitHub's own API accepting Actions OIDC tokens as a credential
+  (the docs scope OIDC exclusively to external providers, so this is
+  unsupported-because-undocumented rather than documented-as-impossible); App
+  access to *user*-owned Projects V2; enterprise-level ruleset availability for
+  this account.
