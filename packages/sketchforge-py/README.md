@@ -87,6 +87,30 @@ client.exports.export(project_id, format, shape_ids=None, name=None) -> ExportRe
 client.exports.file(project_id, format, path, shape_ids=None, name=None) -> ExportResult
 ```
 
+Shape requests remain ordinary mappings, so existing macros can keep passing
+plain dictionaries and can include fields added by newer server versions. For
+editor completion and static checking, the package also exports opt-in typed
+request definitions for every parameter-created shape kind:
+
+```python
+from sketchforge3d import BoxShapeRequest, GearShapeRequest
+
+plate: BoxShapeRequest = {"kind": "box", "name": "Plate", "width": 60, "depth": 40, "height": 8}
+gear: GearShapeRequest = {"kind": "gear", "teeth": 24, "toothSize": 1.5}
+project.add(plate)
+project.add(gear)
+```
+
+The available per-kind types are `BoxShapeRequest`, `CubeShapeRequest`,
+`CylinderShapeRequest`, `ConeShapeRequest`, `SphereShapeRequest`,
+`HalfSphereShapeRequest`, `TorusShapeRequest`, `TubeShapeRequest`,
+`RingShapeRequest`, `PolygonShapeRequest`, `PyramidShapeRequest`,
+`RoofShapeRequest`, `RoundRoofShapeRequest`, `WedgeShapeRequest`,
+`IcosahedronShapeRequest`, `TextShapeRequest`, `LoftShapeRequest`,
+`GearShapeRequest`, `RevolveShapeRequest`, and `ThreadShapeRequest`.
+`ShapeSpec` is their union, and `RequestableShapeKind` names the supported kind
+values. These are static typing aids; they do not validate requests at runtime.
+
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
 
 ```python

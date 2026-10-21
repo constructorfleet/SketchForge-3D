@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 import os
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, overload
 
 from ._http import DEFAULT_RETRY_ON_BUSY, DEFAULT_TIMEOUT_SECONDS, Transport
 from .errors import SketchForgeApiError, SketchForgeTransportError
@@ -35,6 +35,7 @@ from .types import (
     ShapeCollectionResult,
     ShapeOperationResult,
     ShapeRequest,
+    ShapeSpec,
     ShapeSummary,
     ShapeWriteResult,
     ShellResult,
@@ -88,6 +89,12 @@ class Shapes:
         payload = self._transport.send("GET", "/shapes", {"projectId": project_id}) or {}
         return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])]
 
+    @overload
+    def create(self, project_id: str, shape: ShapeSpec) -> ShapeSummary: ...
+
+    @overload
+    def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary: ...
+
     def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary:
         payload = self._transport.send(
             "POST", "/shapes", {"projectId": project_id}, dict(shape), retryable=True
@@ -96,6 +103,12 @@ class Shapes:
         if not created:
             raise SketchForgeApiError("POST", "/shapes", 500, "the server returned no shape")
         return ShapeSummary.from_payload(created[0])
+
+    @overload
+    def create_many(self, project_id: str, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: ...
+
+    @overload
+    def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: ...
 
     def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         """
@@ -771,8 +784,20 @@ class ProjectHandle:
     def list_shapes(self) -> List[ShapeSummary]:
         return self._client.shapes.list(self.id)
 
+    @overload
+    def add(self, shape: ShapeSpec) -> ShapeSummary: ...
+
+    @overload
+    def add(self, shape: ShapeRequest) -> ShapeSummary: ...
+
     def add(self, shape: ShapeRequest) -> ShapeSummary:
         return self._client.shapes.create(self.id, shape)
+
+    @overload
+    def add_many(self, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: ...
+
+    @overload
+    def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: ...
 
     def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         return self._client.shapes.create_many(self.id, shapes)

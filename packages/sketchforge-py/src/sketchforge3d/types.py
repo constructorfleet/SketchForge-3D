@@ -12,7 +12,7 @@ client built against an older server still round-trips what a newer one sends.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict, Union, get_args
 
 PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "box",
@@ -36,6 +36,212 @@ PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
 )
 
 SHAPE_KINDS: Tuple[str, ...] = PARAMETRIC_SHAPE_KINDS + ("revolve", "thread")
+
+# Kinds accepted by the shape creation endpoint. Callers get useful editor
+# completion from the Literal; the runtime tuple is derived from it. Neither
+# changes the permissive mapping contract of ShapeRequest below.
+RequestableShapeKind = Literal[
+    "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus", "tube",
+    "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge", "icosahedron",
+    "text", "loft", "gear", "revolve", "thread",
+]
+REQUESTABLE_SHAPE_KINDS: Tuple[RequestableShapeKind, ...] = get_args(RequestableShapeKind)
+
+
+class _ShapePlacement(TypedDict, total=False):
+    name: str
+    color: str
+    x: float
+    z: float
+    elevation: float
+    width: float
+    depth: float
+    height: float
+    size: float
+    rotation: float
+    rotationX: float
+    rotationZ: float
+    hole: bool
+    taperTopWidth: float
+    taperTopDepth: float
+    taperBottomWidth: float
+    taperBottomDepth: float
+
+
+class BoxShapeRequest(_ShapePlacement):
+    kind: Literal["box"]
+
+
+class CubeShapeRequest(_ShapePlacement):
+    kind: Literal["cube"]
+
+
+class _CylinderShapeRequestBase(_ShapePlacement):
+    kind: Literal["cylinder"]
+
+
+class CylinderShapeRequest(_CylinderShapeRequestBase, total=False):
+    sides: int
+
+
+class _ConeShapeRequestBase(_ShapePlacement):
+    kind: Literal["cone"]
+
+
+class ConeShapeRequest(_ConeShapeRequestBase, total=False):
+    sides: int
+    topRadius: float
+    baseRadius: float
+
+
+class _SphereShapeRequestBase(_ShapePlacement):
+    kind: Literal["sphere"]
+
+
+class SphereShapeRequest(_SphereShapeRequestBase, total=False):
+    steps: int
+
+
+class _HalfSphereShapeRequestBase(_ShapePlacement):
+    kind: Literal["halfSphere"]
+
+
+class HalfSphereShapeRequest(_HalfSphereShapeRequestBase, total=False):
+    steps: int
+
+
+class TorusShapeRequest(_ShapePlacement):
+    kind: Literal["torus"]
+
+
+class _TubeShapeRequestBase(_ShapePlacement):
+    kind: Literal["tube"]
+
+
+class TubeShapeRequest(_TubeShapeRequestBase, total=False):
+    bevel: float
+
+
+class _RingShapeRequestBase(_ShapePlacement):
+    kind: Literal["ring"]
+
+
+class RingShapeRequest(_RingShapeRequestBase, total=False):
+    bevel: float
+
+
+class PolygonShapeRequest(_ShapePlacement):
+    kind: Literal["polygon"]
+
+
+class _PyramidShapeRequestBase(_ShapePlacement):
+    kind: Literal["pyramid"]
+
+
+class PyramidShapeRequest(_PyramidShapeRequestBase, total=False):
+    sides: int
+
+
+class RoofShapeRequest(_ShapePlacement):
+    kind: Literal["roof"]
+
+
+class _RoundRoofShapeRequestBase(_ShapePlacement):
+    kind: Literal["roundRoof"]
+
+
+class RoundRoofShapeRequest(_RoundRoofShapeRequestBase, total=False):
+    sides: int
+
+
+class WedgeShapeRequest(_ShapePlacement):
+    kind: Literal["wedge"]
+
+
+class IcosahedronShapeRequest(_ShapePlacement):
+    kind: Literal["icosahedron"]
+
+
+class _TextShapeRequestBase(_ShapePlacement):
+    kind: Literal["text"]
+
+
+class TextShapeRequest(_TextShapeRequestBase, total=False):
+    text: str
+    font: str
+    bevel: float
+    segments: int
+
+
+class _LoftShapeRequestBase(_ShapePlacement):
+    kind: Literal["loft"]
+
+
+class LoftShapeRequest(_LoftShapeRequestBase, total=False):
+    loftBottomShape: str
+    loftTopShape: str
+    loftTopWidth: float
+    loftTopDepth: float
+    loftBottomRotation: float
+    loftTopRotation: float
+    loftSegments: int
+    loftLayers: int
+
+
+class _GearShapeRequestBase(_ShapePlacement):
+    kind: Literal["gear"]
+
+
+class GearShapeRequest(_GearShapeRequestBase, total=False):
+    teeth: int
+    toothSize: float
+    toothWidth: float
+    centerHoleSize: float
+    gearType: str
+    helixAngle: float
+
+
+class _RevolveShapeRequestBase(_ShapePlacement):
+    kind: Literal["revolve"]
+    profile: Sequence[Sequence[float]]
+
+
+class RevolveShapeRequest(_RevolveShapeRequestBase, total=False):
+    pitch: float
+    turns: float
+    startAngle: float
+    sweepAngle: float
+    sides: int
+    quality: str
+    coreRadius: float
+    outline: Sequence[Sequence[float]]
+    revolve: Mapping[str, Any]
+
+
+class _ThreadShapeRequestBase(_ShapePlacement):
+    kind: Literal["thread"]
+
+
+class ThreadShapeRequest(_ThreadShapeRequestBase, total=False):
+    size: str
+    diameter: float
+    length: float
+    pitch: float
+    turns: float
+    clearance: float
+    core: bool
+    profile: Sequence[Sequence[float]]
+    outline: Sequence[Sequence[float]]
+    revolve: Mapping[str, Any]
+
+
+ShapeSpec = Union[
+    BoxShapeRequest, CubeShapeRequest, CylinderShapeRequest, ConeShapeRequest,
+    SphereShapeRequest, HalfSphereShapeRequest, TorusShapeRequest, TubeShapeRequest,
+    RingShapeRequest, PolygonShapeRequest, PyramidShapeRequest, RoofShapeRequest,
+    RoundRoofShapeRequest, WedgeShapeRequest, IcosahedronShapeRequest, TextShapeRequest,
+    LoftShapeRequest, GearShapeRequest, RevolveShapeRequest, ThreadShapeRequest,
+]
 
 THREAD_DESIGNATIONS: Tuple[str, ...] = (
     "M2",
