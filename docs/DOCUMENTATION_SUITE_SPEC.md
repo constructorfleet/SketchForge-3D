@@ -229,6 +229,7 @@ Deliver the suite in small steps while retaining current published docs until re
 
 ### Phase 3: make the REST reference authoritative
 
+- **Initial slice implemented:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract or OpenAPI source.
 - Define the typed operation contract and migrate routes incrementally.
 - Generate OpenAPI and REST pages from that contract.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
