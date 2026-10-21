@@ -125,6 +125,7 @@ const shapeSummary = {
     kind: str,
     requestKind: str,
     sketchOperation: str,
+    sketchSourceId: str,
     sketchProfile: {
       type: "object",
       required: ["points", "segments"],
