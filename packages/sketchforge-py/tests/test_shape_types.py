@@ -34,3 +34,93 @@ class ShapeRequestTypeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FaceIdentityTypeTests(unittest.TestCase):
+    """
+    Face colors are keyed by a stable, project-persisted face id rather than by
+    the face's position in the CAD listing, which OCCT reorders after any
+    operation. The client has to expose both halves: the ids a shape carries,
+    and the colors keyed by them.
+    """
+
+    def test_shape_summary_exposes_face_ids_and_colors(self):
+        summary = sketchforge3d.types.ShapeSummary.from_payload({
+            "id": "s1",
+            "name": "Bracket",
+            "kind": "box",
+            "color": "#d41721",
+            "hole": False,
+            "locked": False,
+            "hidden": False,
+            "x": 0,
+            "z": 0,
+            "elevation": 0,
+            "width": 20,
+            "depth": 20,
+            "height": 10,
+            "rotation": 0,
+            "rotationX": 0,
+            "rotationZ": 0,
+            "faceIds": ["face_a", "face_b"],
+            "faceColors": {"face_a": "#00ff00"},
+        })
+
+        self.assertEqual(summary.face_ids, ["face_a", "face_b"])
+        self.assertEqual(summary.face_colors, {"face_a": "#00ff00"})
+        # Recognised fields do not also land in `extra`, or a caller reading
+        # both sees the same data twice under two names.
+        self.assertNotIn("faceIds", summary.extra)
+        self.assertNotIn("faceColors", summary.extra)
+
+    def test_shape_summary_defaults_face_identity_for_an_older_server(self):
+        summary = sketchforge3d.types.ShapeSummary.from_payload({
+            "id": "s1",
+            "name": "Bracket",
+            "kind": "box",
+            "color": "#d41721",
+            "hole": False,
+            "locked": False,
+            "hidden": False,
+            "x": 0,
+            "z": 0,
+            "elevation": 0,
+            "width": 20,
+            "depth": 20,
+            "height": 10,
+            "rotation": 0,
+            "rotationX": 0,
+            "rotationZ": 0,
+        })
+
+        self.assertEqual(summary.face_ids, [])
+        self.assertEqual(summary.face_colors, {})
+
+    def test_numeric_face_color_keys_from_an_older_project_stay_readable(self):
+        # The server still accepts numeric keys, so the client must not lose
+        # them when reading a project saved before stable identity.
+        summary = sketchforge3d.types.ShapeSummary.from_payload({
+            "id": "s1",
+            "name": "Bracket",
+            "kind": "box",
+            "color": "#d41721",
+            "hole": False,
+            "locked": False,
+            "hidden": False,
+            "x": 0,
+            "z": 0,
+            "elevation": 0,
+            "width": 20,
+            "depth": 20,
+            "height": 10,
+            "rotation": 0,
+            "rotationX": 0,
+            "rotationZ": 0,
+            "faceColors": {"3": "#0000ff"},
+        })
+
+        self.assertEqual(summary.face_colors, {"3": "#0000ff"})
+
+    def test_face_summary_declares_an_optional_id(self):
+        hints = get_type_hints(sketchforge3d.types.FaceSummary)
+        self.assertIn("id", hints)

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The Python client can now read and use stable face identity, which it could not. `GET /faces` has reported an app-owned `id` for each face since face colours stopped being keyed by position, and the Python `FaceSummary` dropped it on the floor -- so a Python caller could see only the `index`, which the kernel reorders after any operation, and had no way to learn the id a colour has to be keyed by. `FaceSummary.id` now carries it, `faces.ids_facing(...)` answers with ids where `faces.facing(...)` answers with indexes, and a `ShapeSummary` reports `face_ids` and `face_colors` as fields rather than leaving them in `extra`. Numeric colour keys from a project saved before stable identity are kept as they are, because the server still accepts them.
+
+  `examples/face_colors.py` is the worked example: it colours a box's top and bottom by id, rounds every roundable edge, and reports which colours came through. Run against a real server it paints 2 of 6 faces and keeps 2 of 2 through the fillet, which is the behaviour the ids exist to provide.
+
 - The sketch constraint inspector now shows an estimated local degree-of-freedom count from the supported equations' Jacobian rank. Redundant equations are counted once; degenerate zero-length distance geometry is labeled indeterminate. The estimate includes free Bezier handle and sweep-depth parameters and does not imply a global solve.
 
 - Regular STEP imports preserve available component colors on the combined mesh. The editor preview and `.skf` projects use stable face IDs for those assignments. Color extraction is limited to imports up to 200 solids and 8 MiB; ambiguous or unavailable component colors keep the shape's default color.
