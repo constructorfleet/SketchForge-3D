@@ -169,6 +169,51 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(cadMacro[1].result.content[0].text)).toMatchObject({ report: { projectCreated: true, shapeCount: 1, result: { rounded: expect.any(Number), triangles: expect.any(Number) } } });
   }, 60_000);
 
+  it("keeps imported mesh coordinates out of mutation results unless raw scene data is requested", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const positions = [0, 0, 0, 1, 0, 0, 0, 1, 0];
+    const normals = [0, 0, 1, 0, 0, 1, 0, 0, 1];
+
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_mesh", {
+      projectId: "case", name: "Triangle", positions, normals,
+    });
+    expect(imported[1].result.isError).toBeUndefined();
+    const mutation = JSON.parse(imported[1].result.content[0].text);
+    expect(mutation.shape).toMatchObject({ name: "Triangle", kind: "mesh", importedMesh: { triangleCount: 1 } });
+    expect(mutation.shape.importedMesh).not.toHaveProperty("positions");
+    expect(mutation.shape.importedMesh).not.toHaveProperty("normals");
+    expect(mutation.shape.importedMesh).toMatchObject({ triangleCount: 1, positionCount: 9, normalCount: 9 });
+    expect(mutation.shape).not.toHaveProperty("cadBrep");
+    expect(mutation.shape).not.toHaveProperty("cadDisplayEdges");
+
+    const patterned = callMcp(projectsDir, 3, "sketchforge_pattern_objects", {
+      projectId: "case", ids: [mutation.shape.id], count: 2, stepX: 2,
+    });
+    const patternResult = JSON.parse(patterned[1].result.content[0].text);
+    expect(patternResult).toMatchObject({ shapes: expect.arrayContaining([expect.objectContaining({ name: "Triangle" })]), revision: expect.any(Number) });
+    expect(patternResult.shapes[0].importedMesh).not.toHaveProperty("positions");
+
+    const boxCall = callMcp(projectsDir, 4, "sketchforge_create_shape", {
+      projectId: "case", kind: "box", name: "Treated box", width: 10, depth: 8, height: 4,
+    });
+    const box = JSON.parse(boxCall[1].result.content[0].text).shapes[0];
+    const treatedCall = callMcp(projectsDir, 5, "sketchforge_apply_edge_treatment", {
+      projectId: "case", id: box.id, kind: "chamfer", amount: 0.2, allEdges: true,
+    });
+    const treatedResult = JSON.parse(treatedCall[1].result.content[0].text);
+    expect(treatedResult.shape).toMatchObject({ id: box.id, hasCadBrep: true });
+    expect(treatedResult.shape).not.toHaveProperty("cadBrep");
+    expect(treatedResult.shape).not.toHaveProperty("cadDisplayEdges");
+
+    const raw = callMcp(projectsDir, 6, "sketchforge_read_scene", {
+      projectId: "case", includeRawShapeIds: [mutation.shape.id],
+    });
+    const scene = JSON.parse(raw[1].result.content[0].text);
+    expect(scene.rawShapes[0].importedMesh.positions).toEqual([-0.5, 0, 0, 0.5, 0, 0, -0.5, 1, 0]);
+  });
+
   it("advertises an optional URL and uses it to opt into a remote editor", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);
