@@ -1,8 +1,8 @@
 # Implementation gaps and next steps
 
-Status: refreshed against the working tree at `a0aa980` (2026-10-20). This file
-tracks user-facing gaps, not every unused OCCT method. Several proposals from
-the earlier audit have shipped since it was written.
+Status: refreshed against `main` at `efd3ef6` and the verified changes in this
+branch (2026-10-20). This file tracks user-facing gaps, not every unused OCCT
+method.
 
 ## Shipped since the earlier audit
 
@@ -29,6 +29,14 @@ These are implemented and should not be filed as missing features:
   REST, and in the TypeScript and Python clients. The editor builds from a
   retained straight, single-loop sketch extrusion in its local CAD worker and
   stores exact geometry; the result is baked without an editable feature node.
+- OBJ import is supported alongside STL, SVG, and STEP, and imported source
+  assets are preserved in `.skf` projects. The format documentation had lagged
+  behind the implementation.
+- Camera view orientation, target, and zoom are now saved with the project and
+  restored when it is reopened. Older projects without camera data retain the
+  default view.
+- Server-side project reads regenerate source-backed STEP meshes with the
+  server kernel, so STEP imports can reopen from server-backed storage.
 
 Relevant implementation seams include `serverCadProperties.ts`,
 `serverCadInterference.ts`, `serverCadThickness.ts`, `serverStepExplode.ts`,
@@ -57,13 +65,13 @@ operation refuses sources above 200 solids or 8 MiB. Nested assembly hierarchy
 is still flattened into independent parts; representing it losslessly needs a
 project-model decision.
 
-### 3. Face-color preview and stable identity
+### 3. Stable face identity and broader preview mapping
 
-The shape inspector now lets users add and remove face colors by the positional
+The shape inspector lets users add and remove face colors by the positional
 indexes returned from `GET /faces`; the API persists them and 3MF exports them
-per triangle. STEP-imported meshes now retain a compact mapping from rendered
+per triangle. STEP-imported meshes retain a compact mapping from rendered
 triangle ranges to face indexes, so the viewport previews assigned colors and
-.skf preserves that preview after reopening. Geometry edits can invalidate
+`.skf` preserves that preview after reopening. Geometry edits can invalidate
 positional indexes and clear assignments. Other B-rep-backed shapes without a
 retained triangle map and persistent face identity through topology changes
 remain open.
@@ -86,8 +94,7 @@ feature tree. Those capabilities remain open work.
 ## Verification notes
 
 The gap claims above were checked against the current engine modules, REST API,
-client package, and editor source. The older version of this document described
-mass properties, interference, wall thickness, projection, section DXF,
-explosion, mirrors, and face-color storage as proposals; that status was no
-longer accurate. Recheck limits and surface coverage against source before
-raising them, especially for large STEP assemblies and offline/static builds.
+client package, project serialization, and editor source. The remaining items
+are limits in the current model or workflows, not unused kernel calls. Recheck
+limits and surface coverage before raising them, especially for large STEP
+assemblies and offline/static builds.
