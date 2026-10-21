@@ -5,9 +5,10 @@ import test from "node:test";
 const packageJson = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 const workflow = readFileSync(new URL("../../.github/workflows/docs.yml", import.meta.url), "utf8");
 const ciWorkflow = readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+const titleWorkflow = readFileSync(new URL("../../.github/workflows/pr-title.yml", import.meta.url), "utf8");
 const commitWorkflow = readFileSync(new URL("../../.github/workflows/docs-generated-commit.yml", import.meta.url), "utf8");
 const commitScript = readFileSync(new URL("../../scripts/docs/commit-generated-docs.mjs", import.meta.url), "utf8");
-const titleWorkflow = readFileSync(new URL("../../.github/workflows/pr-title.yml", import.meta.url), "utf8");
+const trustedWorkflow = readFileSync(new URL("../../.github/workflows/trusted-pr-checks.yml", import.meta.url), "utf8");
 const manifestScript = readFileSync(new URL("../../scripts/docs/write-generated-docs-manifest.mjs", import.meta.url), "utf8");
 
 test("docs checks generate committed references before validating them", () => {
@@ -38,7 +39,7 @@ test("docs checks generate committed references before validating them", () => {
   assert.match(workflow, /group: pages-\$\{\{ github\.repository \}\}/);
   assert.match(commitWorkflow, /workflow_run:/);
   assert.match(commitWorkflow, /contents: write/);
-  assert.match(commitWorkflow, /actions: write/);
+  assert.match(commitWorkflow, /actions: read/);
   assert.match(commitWorkflow, /EXPECTED_HEAD_SHA/);
   assert.match(commitWorkflow, /workflow_conclusion.*!= success/,
     "the trusted writer must skip output if any docs workflow validation or build failed");
@@ -52,19 +53,18 @@ test("docs checks generate committed references before validating them", () => {
   assert.match(commitScript, /validateGeneratedDocsArtifact/);
   assert.match(commitScript, /EXPECTED_HEAD_SHA/);
   assert.match(commitScript, /sourceJobs/);
-  assert.match(commitScript, /actions\/workflows\/\$\{workflow\}\/dispatches/);
-  assert.match(commitScript, /pr-title\.yml/);
-  assert.match(commitScript, /pr_title: pullRequest\.title/);
-  assert.match(titleWorkflow, /workflow_dispatch:/);
-  assert.match(titleWorkflow, /expected_sha:/);
-  assert.match(titleWorkflow, /pr_title:/);
-  assert.match(titleWorkflow, /pr_number:/);
-  assert.match(titleWorkflow, /pulls\/\$PR_NUMBER/);
-  assert.match(commitScript, /pr_number: String\(pullRequestNumber\)/);
-  assert.match(titleWorkflow, /GITHUB_SHA/);
-  for (const source of [workflow, ciWorkflow]) {
-    assert.match(source, /workflow_dispatch:/);
-    assert.match(source, /expected_sha:/);
-    assert.match(source, /GITHUB_SHA/);
+  assert.match(commitScript, /generated_docs_pr_checks/);
+  assert.match(commitScript, /pr_number: pullRequestNumber/);
+  assert.match(trustedWorkflow, /repository_dispatch:/);
+  assert.doesNotMatch(trustedWorkflow, /workflow_dispatch:/);
+  assert.match(trustedWorkflow, /persist-credentials: false/);
+  assert.match(trustedWorkflow, /checks: write/);
+  assert.doesNotMatch(trustedWorkflow, /contents: write/);
+  assert.match(trustedWorkflow, /record-trusted-pr-checks\.mjs/);
+  for (const branchWorkflow of [workflow, ciWorkflow, titleWorkflow]) {
+    assert.doesNotMatch(branchWorkflow, /workflow_dispatch:/,
+      "generated-docs updates must only dispatch trusted default-branch workflow definitions");
   }
+  assert.doesNotMatch(commitScript, /changedControlFiles|\.github\/workflows|\.github\/actions/,
+    "trusted default-branch verifier should allow workflow-control PRs through the same safe path");
 });

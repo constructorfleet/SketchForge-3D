@@ -1,0 +1,266 @@
+name: Trusted PR checks
+
+on:
+  repository_dispatch:
+    types: [generated_docs_pr_checks]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-target:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      expected_sha: ${{ steps.target.outputs.expected_sha }}
+      pr_number: ${{ steps.target.outputs.pr_number }}
+      title_b64: ${{ steps.target.outputs.title_b64 }}
+      default_branch: ${{ steps.target.outputs.default_branch }}
+    steps:
+      - name: Validate dispatch against the live same-repository PR
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.client_payload.pr_number }}
+          EXPECTED_SHA: ${{ github.event.client_payload.expected_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then echo "Invalid PR number" >&2; exit 1; fi
+          if ! [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]; then echo "Invalid expected SHA" >&2; exit 1; fi
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          test "$(jq -r '.state' <<< "$pr")" = open
+          test "$(jq -r '.head.repo.full_name' <<< "$pr")" = "$REPOSITORY"
+          test "$(jq -r '.base.repo.full_name' <<< "$pr")" = "$REPOSITORY"
+          test "$(jq -r '.base.ref' <<< "$pr")" = "$default_branch"
+          test "$(jq -r '.head.sha' <<< "$pr")" = "$EXPECTED_SHA"
+          title=$(jq -r '.title' <<< "$pr")
+          {
+            echo "expected_sha=$EXPECTED_SHA"
+            echo "pr_number=$PR_NUMBER"
+            echo "title_b64=$(printf '%s' "$title" | base64 -w0)"
+            echo "default_branch=$default_branch"
+          } >> "$GITHUB_OUTPUT"
+
+  typecheck:
+    name: Typecheck and unit tests
+    needs: validate-target
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run typecheck:tests
+      - run: npm test
+
+  static-export:
+    name: Static export build
+    needs: validate-target
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run export
+
+  package-reference:
+    name: Package reference generation
+    needs: validate-target
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run engine:build && npm run client:build
+      - run: npm run docs:stage
+      - run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference
+
+  package-examples:
+    name: Package examples against local API
+    needs: validate-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SKETCHFORGE_API_TOKEN: docs-example-token
+      SKETCHFORGE_PROJECTS_DIR: /tmp/sketchforge-doc-example-projects
+      SKETCHFORGE_URL: http://127.0.0.1:3100
+      PORT: 3100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run engine:build
+      - name: Start local API
+        run: |
+          mkdir -p "$SKETCHFORGE_PROJECTS_DIR"
+          npx next dev apps/web -p "$PORT" > "$RUNNER_TEMP/sketchforge-doc-example-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/sketchforge-doc-example-server.pid"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent -H "Authorization: Bearer $SKETCHFORGE_API_TOKEN" "$SKETCHFORGE_URL/api/v1/projects" >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/sketchforge-doc-example-server.log"
+          exit 1
+      - run: npm run test:integration
+      - run: npm run client:test:py:integration
+      - name: Stop local API
+        if: always()
+        run: if [ -f "$RUNNER_TEMP/sketchforge-doc-example-server.pid" ]; then kill "$(cat "$RUNNER_TEMP/sketchforge-doc-example-server.pid")" || true; fi
+
+  api-e2e:
+    name: REST API end to end
+    needs: validate-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e
+
+  docs:
+    name: Check and build docs
+    needs: validate-target
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.validate-target.outputs.expected_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: python -m pip install -r packages/sketchforge-py/requirements-dev.txt
+      - run: npx playwright install --with-deps --only-shell chromium
+      - run: npm run docs:generate
+      - run: npm run docs:verify
+      - run: npm run docs:site-build
+      - run: npm run test:browser
+
+  title:
+    name: Conventional commit
+    needs: validate-target
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate the live PR title
+        env:
+          PR_NUMBER: ${{ needs.validate-target.outputs.pr_number }}
+          EXPECTED_SHA: ${{ needs.validate-target.outputs.expected_sha }}
+          EXPECTED_TITLE_B64: ${{ needs.validate-target.outputs.title_b64 }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+          test "$(jq -r '.state' <<< "$pr")" = open
+          test "$(jq -r '.head.sha' <<< "$pr")" = "$EXPECTED_SHA"
+          test "$(jq -r '.title' <<< "$pr" | base64 -w0)" = "$EXPECTED_TITLE_B64"
+          printf '%s' "$EXPECTED_TITLE_B64" | base64 -d > "$RUNNER_TEMP/pr-title"
+      - name: Check conventional title
+        env:
+          PR_TITLE_FILE: ${{ runner.temp }}/pr-title
+        run: node scripts/check-conventional-title.mjs "$(cat "$PR_TITLE_FILE")"
+
+  record-checks:
+    name: Record trusted checks on PR SHA
+    if: always() && needs.validate-target.result == 'success'
+    needs: [validate-target, typecheck, static-export, package-reference, package-examples, api-e2e, docs, title]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Record results against the exact live PR SHA
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_REPO: ${{ github.repository }}
+          EXPECTED_PULL_REQUEST: ${{ needs.validate-target.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.validate-target.outputs.expected_sha }}
+          EXPECTED_DEFAULT_BRANCH: ${{ needs.validate-target.outputs.default_branch }}
+          EXPECTED_TITLE_B64: ${{ needs.validate-target.outputs.title_b64 }}
+          CHECK_RESULTS: '{"typecheck":"${{ needs.typecheck.result }}","static-export":"${{ needs.static-export.result }}","package-reference":"${{ needs.package-reference.result }}","package-examples":"${{ needs.package-examples.result }}","api-e2e":"${{ needs.api-e2e.result }}","docs":"${{ needs.docs.result }}","title":"${{ needs.title.result }}"}'
+        run: node scripts/docs/record-trusted-pr-checks.mjs
