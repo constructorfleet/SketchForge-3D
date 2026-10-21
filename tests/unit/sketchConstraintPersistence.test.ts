@@ -9,11 +9,15 @@ const sketch: WorkplaneShape = {
   size: 10, width: 10, depth: 10, height: 10, rotation: 0,
   sketchProfile: {
     points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 }],
-    segments: [{ id: "line", startId: "a", endId: "b" }],
+    segments: [
+      { id: "line", startId: "a", endId: "b" },
+      { id: "other", startId: "b", endId: "a" },
+    ],
     constraints: [
       { id: "c", kind: "coincident", pointIds: ["a", "b"] },
       { id: "h", kind: "horizontal", segmentId: "line" },
       { id: "v", kind: "vertical", segmentId: "line" },
+      { id: "p", kind: "perpendicular", segmentIds: ["line", "other"] },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
     ],
   },

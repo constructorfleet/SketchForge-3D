@@ -1,5 +1,7 @@
 # Changelog
 
+- Sketch constraints now include a perpendicular relation between two selected segments. The solver projects both segments toward a right angle during point edits, and the constraint persists in `.skf` sketches and is represented in the TypeScript client profile type.
+
 ## Unreleased
 
 - Exploding a STEP assembly now creates editable nested groups that follow its product tree when every solid has an unambiguous occurrence association. The exact solid geometry and project-space positions stay on the leaves; moving a group moves its subassembly, and ungrouping works one level at a time. If any association is missing or ambiguous, explosion keeps the existing flat result so no solid disappears. Native STEP transform operations and hierarchy-preserving STEP export remain unsupported.

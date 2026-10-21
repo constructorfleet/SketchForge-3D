@@ -1364,6 +1364,8 @@ function SketchConstraintPanel({
   const pointIds = selected?.kind === "point" ? [selected.id] : selected?.kind === "multiple" ? selected.pointIds : [];
   const selectedPair = pointIds.length === 2 && pointIds[0] !== pointIds[1] ? pointIds as [string, string] : null;
   const segmentId = selected?.kind === "segment" ? selected.id : selected?.kind === "multiple" && selected.segmentIds.length === 1 ? selected.segmentIds[0] : null;
+  const selectedSegmentPair = selected?.kind === "multiple" && selected.segmentIds.length === 2 && selected.segmentIds[0] !== selected.segmentIds[1]
+    ? selected.segmentIds as [string, string] : null;
   const valueMm = Number(distanceValue);
   const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
   const addConstraint = (constraint: NewConstraint) => onAddConstraint({ ...constraint, id: createLocalId("constraint") } as SketchConstraint);
@@ -1381,6 +1383,7 @@ function SketchConstraintPanel({
         <button type="button" disabled={!selectedPair} onClick={() => selectedPair && addConstraint({ kind: "coincident", pointIds: selectedPair })}>{t("editor.sketch.constraints.addCoincident")}</button>
         <button type="button" disabled={!segmentId} onClick={() => segmentId && addConstraint({ kind: "horizontal", segmentId })}>{t("editor.sketch.constraints.addHorizontal")}</button>
         <button type="button" disabled={!segmentId} onClick={() => segmentId && addConstraint({ kind: "vertical", segmentId })}>{t("editor.sketch.constraints.addVertical")}</button>
+        <button type="button" disabled={!selectedSegmentPair} onClick={() => selectedSegmentPair && addConstraint({ kind: "perpendicular", segmentIds: selectedSegmentPair })}>{t("editor.sketch.constraints.addPerpendicular")}</button>
         <label>
           <span>{t("editor.sketch.constraints.distanceMm")}</span>
           <input type="number" min="0" step="0.1" value={distanceValue} onChange={(event) => setDistanceValue(event.currentTarget.value)} />
@@ -1390,7 +1393,7 @@ function SketchConstraintPanel({
       <div className="sketch-constraint-list">
         {(profile.constraints ?? []).map((constraint) => (
           <div className="sketch-constraint-row" key={constraint.id}>
-            <span>{constraint.kind === "distance" ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm` : t(`editor.sketch.constraints.kinds.${constraint.kind}`)} {constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.pointIds.join("–")}</span>
+            <span>{constraint.kind === "distance" ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm` : t(`editor.sketch.constraints.kinds.${constraint.kind}`)} {constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}</span>
             <button type="button" aria-label={t("editor.sketch.constraints.remove", { kind: constraint.kind })} onClick={() => onRemoveConstraint(constraint.id)}>×</button>
           </div>
         ))}

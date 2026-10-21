@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addSketchConstraint, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
+import { addSketchConstraint, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
 import type { SketchProfile } from "@/types/sketchforge";
 
 function profile(overrides: Partial<SketchProfile> = {}): SketchProfile {
@@ -41,6 +41,60 @@ describe("solveSketchConstraints", () => {
     expect(result.profile.points.map((point) => point.x)).toEqual([expect.closeTo(10, 8), 10]);
     expect(result.profile.points[1]?.z).toBe(4);
     expect(result.unsatisfiedConstraintIds).toEqual([]);
+  });
+
+  it("makes two selected segments perpendicular while anchoring the first segment", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 4, z: 3 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "right-angle", kind: "perpendicular", segmentIds: ["base", "other"] }],
+    }), ["a", "b"]);
+
+    const [c, d] = result.profile.points.slice(2);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect((d!.x - c!.x) * (10) + (d!.z - c!.z) * 0).toBeCloseTo(0, 6);
+    expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
+  });
+
+  it("counts a perpendicular relation as one independent equation in the local freedom estimate", () => {
+    const report = sketchConstraintDegreesOfFreedom(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 4, z: 3 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "right-angle", kind: "perpendicular", segmentIds: ["base", "other"] }],
+    }));
+
+    expect(report.status).toBe("estimated");
+    expect(report.equationCount).toBe(1);
+    expect(report.rank).toBe(1);
+    expect(report.degreesOfFreedom).toBe(7);
+  });
+
+  it("marks the freedom estimate indeterminate when a perpendicular segment has zero length", () => {
+    const report = sketchConstraintDegreesOfFreedom(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 2, z: 2 }, { id: "d", x: 2, z: 2 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "right-angle", kind: "perpendicular", segmentIds: ["base", "other"] }],
+    }));
+
+    expect(report).toMatchObject({ status: "indeterminate", degreesOfFreedom: null, rank: null, reason: "degenerate-segment" });
   });
 
   it("preserves a fixed distance when one endpoint is dragged", () => {
