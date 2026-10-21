@@ -176,6 +176,51 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseMeasurementsResponse({ measurements: [{ ...measurements[0], area: "6" }] })).toBeNull();
   });
 
+  it("declares and validates POST /measurements between-entity requests and results", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "POST" && route === "/api/v1/measurements");
+    expect(operation).toMatchObject({
+      operationId: "measureEntities",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId"] },
+      requestBody: {
+        contentType: "application/json",
+        required: true,
+        schema: {
+          type: "object",
+          required: ["from", "to"],
+          properties: {
+            from: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+            to: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+          },
+        },
+      },
+      response: {
+        required: ["distance", "angleDegrees", "angleUnavailable"],
+        schema: {
+          type: "object",
+          required: ["distance", "angleDegrees", "angleUnavailable"],
+          properties: {
+            distance: { type: "number" },
+            angleDegrees: { type: "number", nullable: true },
+            angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
+          },
+        },
+      },
+    });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: " block-a " }, to: { shapeId: "block-b", entity: "face", index: 2 } }))
+      .toEqual({ ok: true, from: { shapeId: "block-a", entity: "shape" }, to: { shapeId: "block-b", entity: "face", index: 2 } });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: "a", entity: "edge" }, to: { shapeId: "b" } }))
+      .toMatchObject({ ok: false, side: "from" });
+    expect(contract.parseMeasureBetweenRequest({ from: { shapeId: "a", entity: "vertex", index: 0 }, to: { shapeId: "b" } }))
+      .toMatchObject({ ok: false, side: "from" });
+    expect(contract.parseMeasureBetweenResponse({ distance: 12, angleDegrees: null, angleUnavailable: "notPlanar" }))
+      .toEqual({ distance: 12, angleDegrees: null, angleUnavailable: "notPlanar" });
+    expect(contract.parseMeasureBetweenResponse({ distance: Number.NaN, angleDegrees: null, angleUnavailable: "notPlanar" })).toBeNull();
+    expect(contract.parseMeasureBetweenResponse({ distance: 12, angleDegrees: 90, angleUnavailable: "degenerateNormal" })).toBeNull();
+  });
+
   it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "PATCH" && route === "/api/v1/shapes");

@@ -11,6 +11,9 @@ export type ApiV1FieldSchema = {
   nullable?: true;
   required?: readonly string[];
   enum?: readonly string[];
+  default?: string;
+  minimum?: number;
+  description?: string;
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
   items?: ApiV1FieldSchema;
 };
@@ -36,7 +39,7 @@ export type ApiV1Operation = {
     provenance?: { source: readonly string[]; precision: readonly string[] };
     schema?: ApiV1FieldSchema;
   };
-  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
+  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody | ApiV1MeasureBetweenRequestBody;
 };
 
 export type ApiV1CreateProjectRequestBody = {
@@ -55,6 +58,12 @@ export type ApiV1ShapePatchRequestBody = {
     keyPattern: string;
     colorPattern: string;
   };
+};
+
+export type ApiV1MeasureBetweenRequestBody = {
+  contentType: "application/json";
+  required: true;
+  schema: ApiV1FieldSchema;
 };
 
 const operation = (
@@ -140,7 +149,36 @@ export const API_V1_OPERATIONS = [
       },
     },
   },
-  operation("POST", "/api/v1/measurements", "measureEntities"),
+  {
+    ...operation("POST", "/api/v1/measurements", "measureEntities", [200, 400, 401, 404, 409, 422, 500, 503], {
+      contentType: "application/json",
+      required: true,
+      schema: {
+        type: "object",
+        required: ["from", "to"],
+        properties: {
+          from: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+          to: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+        },
+      },
+    }),
+    query: {
+      required: ["projectId"],
+      properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } },
+    },
+    response: {
+      required: ["distance", "angleDegrees", "angleUnavailable"],
+      schema: {
+        type: "object",
+        required: ["distance", "angleDegrees", "angleUnavailable"],
+        properties: {
+          distance: { type: "number" },
+          angleDegrees: { type: "number", nullable: true },
+          angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
+        },
+      },
+    },
+  },
   operation("POST", "/api/v1/mirrors", "mirrorShapes"),
   operation("POST", "/api/v1/parts", "splitParts"),
   operation("POST", "/api/v1/patterns", "patternShapes"),
@@ -326,6 +364,55 @@ export function parseMeasurementsResponse(value: unknown): MeasurementsResponse 
     if (!(entry.radiusUnavailable === null || (typeof entry.radiusUnavailable === "string" && unavailableCodes.has(entry.radiusUnavailable)))) return null;
   }
   return value as MeasurementsResponse;
+}
+
+type ParsedMeasurementEnd = { shapeId: string; entity: "shape" | "edge" | "face"; index?: number };
+
+export type MeasureBetweenRequestResult =
+  | { ok: true; from: ParsedMeasurementEnd; to: ParsedMeasurementEnd }
+  | { ok: false; side: "from" | "to"; error: string };
+
+/** Apply the route's defaults and validation to both endpoints of a measurement request. */
+export function parseMeasureBetweenRequest(body: Record<string, unknown>): MeasureBetweenRequestResult {
+  const parseEnd = (value: unknown): ParsedMeasurementEnd | string => {
+    if (!value || typeof value !== "object") return "must be an object with a shapeId.";
+    const candidate = value as Record<string, unknown>;
+    const shapeId = typeof candidate.shapeId === "string" ? candidate.shapeId.trim() : "";
+    if (!shapeId) return "needs a shapeId.";
+    const requested = candidate.entity === undefined ? "shape" : candidate.entity;
+    if (!(requested === "shape" || requested === "edge" || requested === "face")) {
+      return `has an entity of ${JSON.stringify(requested)}; it must be one of edge, face, shape.`;
+    }
+    if (requested === "shape") return { shapeId, entity: requested };
+    const index = candidate.index;
+    if (typeof index !== "number" || !Number.isInteger(index) || index < 0) {
+      return `needs a whole, non-negative index to name which ${requested} to measure.`;
+    }
+    return { shapeId, entity: requested, index };
+  };
+
+  const from = parseEnd(body.from);
+  if (typeof from === "string") return { ok: false, side: "from", error: from };
+  const to = parseEnd(body.to);
+  if (typeof to === "string") return { ok: false, side: "to", error: to };
+  return { ok: true, from, to };
+}
+
+export type MeasureBetweenResponse = {
+  distance: number;
+  angleDegrees: number | null;
+  angleUnavailable: "notPlanar" | "degenerateNormal" | null;
+};
+
+/** Validate the measured distance and its optional planar-face angle result. */
+export function parseMeasureBetweenResponse(value: unknown): MeasureBetweenResponse | null {
+  if (!value || typeof value !== "object") return null;
+  const result = value as Record<string, unknown>;
+  if (typeof result.distance !== "number" || !Number.isFinite(result.distance) || result.distance < 0) return null;
+  if (!(result.angleDegrees === null || (typeof result.angleDegrees === "number" && Number.isFinite(result.angleDegrees) && result.angleDegrees >= 0 && result.angleDegrees <= 180))) return null;
+  if (!(result.angleUnavailable === null || result.angleUnavailable === "notPlanar" || result.angleUnavailable === "degenerateNormal")) return null;
+  if ((result.angleDegrees === null) === (result.angleUnavailable === null)) return null;
+  return value as MeasureBetweenResponse;
 }
 
 

@@ -8,7 +8,9 @@
 
 - The REST API contract now describes and validates the complete `GET
   /measurements` response, including nullable values and radius-unavailable
-  codes. The REST reference now states its query requirements and units.
+  codes. The companion `POST /measurements` contract now specifies and validates
+  its endpoint references and distance/angle result. The REST reference states
+  both operations' query requirements, statuses, and units.
 
 - The REST API contract now describes `GET /properties` query parameters,
   response fields, and geometry provenance. The route rejects malformed kernel
