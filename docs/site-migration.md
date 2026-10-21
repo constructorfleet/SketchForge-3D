@@ -23,18 +23,18 @@ client, translation, and capability documents.
 
 - **Phase 2:** package references and executable examples merged in PR #118.
 - **Phase 3:** the initial typed REST operation inventory and route parity
-  check merged in PR #112; the stable-face `GET /faces` contract merged in
-  PR #120. Full schemas, OpenAPI generation, and `PATCH faceColors` contract
-  coverage (open PR #125) remain outstanding.
+  check merged in PR #112; `GET /faces` and `PATCH /shapes` stable face color
+  contracts merged in PRs #120 and #125. Full schemas and OpenAPI generation
+  remain outstanding.
 - **Phase 4:** parameterized shape reference (#115), published CLI (#117),
-  operator configuration (#121), and `.skf` format reference (#123) have
-  merged. STEP documentation PR #119 and MCP reference PR #122 remain open;
-  broader workflow guides and smoke examples remain outstanding.
-- **Phase 5:** close coverage for all public symbols and claims, add source
-  revision stamps and release checks, and assess redirects and screenshot
-  acceptance coverage.
+  operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
+  (#122) references have merged. STEP documentation PR #119 and generator-hook
+  wiring PR #128 remain open; broader workflow guides and smoke examples remain
+  outstanding.
+- **Phase 5:** site version/revision stamps and pinned source links merged in
+  PR #126. Coverage rules, redirects, release checks, and screenshot acceptance
+  coverage remain outstanding.
 
 The merged site includes generated package, example, shape, CLI, operator
-configuration, and `.skf` references. The STEP documentation in PR #119 and MCP
-reference in PR #122 are open and not yet deployed. The `PATCH faceColors`
-contract in PR #125 is open.
+configuration, `.skf`, and MCP references. STEP documentation in PR #119 and
+deterministic generator-hook wiring in PR #128 remain open.

@@ -14,15 +14,17 @@
   examples from executable source files. CI runs those examples against a
   temporary local server.
 
-- Merged PR #120 added stable application-owned IDs to `GET /faces`. The
-  `PATCH faceColors` contract is still under review in open PR #125.
+- Merged PRs #120 and #125 added stable application-owned IDs to `GET /faces`
+  and made them the persisted `faceColors` keys for `PATCH /shapes`.
 
 - Merged PR #121 added the operator configuration reference, and merged PR #123
   corrected and generated the `.skf` project-format reference.
 
-- Open documentation PRs: #119 covers STEP color fallback, #122 publishes the
-  MCP tool schema reference, and #125 validates the `PATCH faceColors` contract.
-  These changes are not yet part of the deployed site.
+- Merged PR #122 added the generated MCP tool schema reference and navigation.
+  PR #126 added version, revision, and pinned source links to the generated site.
+
+- Open documentation PRs: #119 clarifies STEP color fallback and #128 wires
+  every deterministic generated reference into `docs:generate` and `docs:check`.
 
 - Merged PR #117 added a generated reference for published TypeScript and
   Python CLI commands, including options from their actual help/parser sources.
