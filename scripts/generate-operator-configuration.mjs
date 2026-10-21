@@ -14,15 +14,25 @@ const markdown = [
   '',
   '`required` means required to enable the described optional feature; no setting is required for the application to start with its default behavior.',
   '',
-  '| Name | Default | Required | Validation and behavior | Sensitive | Owning subsystem |',
-  '| --- | --- | --- | --- | --- | --- |',
-  ...rows,
+  '| Name | Default | Required | Validation and behavior | Sensitive | Owning subsystem | Owner guide | Source reader |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  ...settings.map((setting, index) => `${rows[index]} [${setting.subsystem} guide](${setting.ownerPage}) | [${setting.source}](${sourceUrl(setting.source)}) |`),
+  '',
+  '## Update settings',
+  '',
+  'The update status and server-triggered update settings are read by [`apps/web/src/app/api/app-update/route.ts`](../apps/web/src/app/api/app-update/route.ts). The version, manifest URL, and guide URL customize update information. Trigger URL, admin key, and trigger token enable the privileged update action; keep both credentials in deployment secrets and only configure a trigger endpoint you control.',
   '',
   '## Scope and limitations',
   '',
   'Compose uses `SKETCHFORGE_PORT` to choose the host port published to container port 3000. The Docker launcher currently validates `PORT` and `SKETCHFORGE_LEGACY_PORT`; invalid values fall back to their listed defaults. Other path and URL settings are validated or interpreted by their owning subsystem at runtime as described above. Keep secrets in the deployment secret store and avoid printing them in logs.',
   '',
-  'The reference covers supported public server/container configuration found in the current readers and deployment examples. It does not claim to inventory every environment variable used by build tooling, tests, desktop development, or the browser editor.',
+  'This table covers supported public server/container settings represented by the operator registry. Each row links to the user guide that owns the setting and to its implementation reader or deployment declaration. The current inventory does not claim that every environment value read anywhere in the repository is supported configuration.',
+  '',
+  '## Configuration outside this registry',
+  '',
+  'The JavaScript and Python macro clients also read `SKETCHFORGE_URL`, `SKETCHFORGE_API_TOKEN`, and `SKETCHFORGE_PROJECT_ID`; their command-line behavior is described in the [CLI reference](./CLI_REFERENCE.md) and package guides. Local MCP mode reads `SKETCHFORGE_PROJECTS_DIR`, while macro execution reads `SKETCHFORGE_MACRO_DIR`; see the [MCP tool reference](./mcp/TOOLS_REFERENCE.md) and client package guides. Those client settings have not yet been joined to this registry or checked for complete page ownership.',
+  '',
+  'Desktop development/packaging, build and deployment switches, test-only settings, and compile-time browser flags are separate operational inputs. For example, `apps/desktop/dev.mjs`, `apps/web/next.config.ts`, and `apps/web/src/components/SketchForgeEditor.tsx` read environment values outside this operator registry. They are not presented as supported operator settings here. A repository-wide reader inventory and source-to-page ownership check remain open work.',
   '',
 ].join('\n');
 
@@ -43,4 +53,8 @@ if (process.argv.includes('--stdout')) {
 
 function escapeCell(value) {
   return String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
+}
+
+function sourceUrl(relativePath) {
+  return `https://github.com/constructorfleet/SketchForge-3D/blob/main/${relativePath.replace(/^\.\.\//, '')}`;
 }

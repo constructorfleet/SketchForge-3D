@@ -6,7 +6,9 @@
       "required": false,
       "validation": "Compose host port published to container port 3000; configure this when host port 3000 is already occupied.",
       "sensitive": false,
-      "subsystem": "Docker port publishing"
+      "subsystem": "Docker port publishing",
+      "source": "../deploy/docker/compose.yaml",
+      "ownerPage": "guides/deployment.md#docker-listener"
     },
     {
       "name": "SKETCHFORGE_SHARED_PROJECTS_VOLUME",
@@ -14,7 +16,9 @@
       "required": false,
       "validation": "Docker named volume or bind mount source for /data/projects, where shared project files are stored.",
       "sensitive": false,
-      "subsystem": "Docker shared project persistence"
+      "subsystem": "Docker shared project persistence",
+      "source": "../deploy/docker/compose.yaml",
+      "ownerPage": "guides/deployment.md#shared-projects"
     },
     {
       "name": "SKETCHFORGE_PROJECTS_VOLUME",
@@ -22,7 +26,9 @@
       "required": false,
       "validation": "Docker named volume or bind mount source for /data/my-projects. Used when SKETCHFORGE_PROJECTS_DIR points to that path.",
       "sensitive": false,
-      "subsystem": "Docker server project persistence"
+      "subsystem": "Docker server project persistence",
+      "source": "../deploy/docker/compose.yaml",
+      "ownerPage": "guides/deployment.md#server-backed-projects"
     },
     {
       "name": "PORT",
@@ -30,7 +36,9 @@
       "required": false,
       "validation": "Integer from 1 through 65535; invalid values fall back to 3000.",
       "sensitive": false,
-      "subsystem": "Docker server listener"
+      "subsystem": "Docker server listener",
+      "source": "../deploy/docker/start-server.mjs",
+      "ownerPage": "guides/deployment.md#docker-listener"
     },
     {
       "name": "HOSTNAME",
@@ -38,7 +46,9 @@
       "required": false,
       "validation": "Passed to the Next.js server as its bind host.",
       "sensitive": false,
-      "subsystem": "Docker server listener"
+      "subsystem": "Docker server listener",
+      "source": "../deploy/docker/start-server.mjs",
+      "ownerPage": "guides/deployment.md#docker-listener"
     },
     {
       "name": "SKETCHFORGE_LEGACY_PORT",
@@ -46,7 +56,9 @@
       "required": false,
       "validation": "Integer from 1 through 65535; invalid values fall back to 80. Set equal to PORT to disable the compatibility proxy.",
       "sensitive": false,
-      "subsystem": "Docker compatibility proxy"
+      "subsystem": "Docker compatibility proxy",
+      "source": "../deploy/docker/start-server.mjs",
+      "ownerPage": "guides/deployment.md#docker-listener"
     },
     {
       "name": "SKETCHFORGE_PROJECTS_DIR",
@@ -54,7 +66,9 @@
       "required": false,
       "validation": "Filesystem path writable by the server. Enables server-backed project storage and must be paired with SKETCHFORGE_API_TOKEN to enable the scripting REST API.",
       "sensitive": false,
-      "subsystem": "Server project storage and REST API"
+      "subsystem": "Server project storage and REST API",
+      "source": "../apps/web/src/lib/serverProjectStore.ts",
+      "ownerPage": "guides/deployment.md#server-backed-projects"
     },
     {
       "name": "SKETCHFORGE_API_TOKEN",
@@ -62,7 +76,9 @@
       "required": false,
       "validation": "Non-empty bearer token. Configure a high-entropy secret; never expose it to browsers or logs. Used with SKETCHFORGE_PROJECTS_DIR.",
       "sensitive": true,
-      "subsystem": "REST API authentication"
+      "subsystem": "REST API authentication",
+      "source": "../apps/web/src/lib/apiTokens.ts",
+      "ownerPage": "guides/deployment.md#rest-api-access"
     },
     {
       "name": "SKETCHFORGE_SHARED_PROJECTS_DIR",
@@ -70,7 +86,9 @@
       "required": false,
       "validation": "Filesystem path writable by the server; mount persistent storage at this path to retain shared projects across container replacement.",
       "sensitive": false,
-      "subsystem": "Shared project files"
+      "subsystem": "Shared project files",
+      "source": "../apps/web/src/app/api/shared-projects/route.ts",
+      "ownerPage": "guides/deployment.md#shared-projects"
     },
     {
       "name": "SKETCHFORGE_APP_VERSION",
@@ -78,7 +96,9 @@
       "required": false,
       "validation": "Semantic version; invalid values are ignored.",
       "sensitive": false,
-      "subsystem": "Update status"
+      "subsystem": "Update status",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     },
     {
       "name": "SKETCHFORGE_UPDATE_MANIFEST_URL",
@@ -86,7 +106,9 @@
       "required": false,
       "validation": "HTTP or HTTPS URL returning JSON with a semantic-version `version` field.",
       "sensitive": false,
-      "subsystem": "Update status"
+      "subsystem": "Update status",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     },
     {
       "name": "SKETCHFORGE_UPDATE_GUIDE_URL",
@@ -94,7 +116,9 @@
       "required": false,
       "validation": "URL shown to users as the update guide.",
       "sensitive": false,
-      "subsystem": "Update status"
+      "subsystem": "Update status",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     },
     {
       "name": "SKETCHFORGE_UPDATE_TRIGGER_URL",
@@ -102,7 +126,9 @@
       "required": false,
       "validation": "HTTP or HTTPS URL for the configured update trigger endpoint.",
       "sensitive": false,
-      "subsystem": "Server-triggered updates"
+      "subsystem": "Server-triggered updates",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     },
     {
       "name": "SKETCHFORGE_UPDATE_ADMIN_KEY",
@@ -110,7 +136,9 @@
       "required": false,
       "validation": "Secret expected by the update trigger service. Required with SKETCHFORGE_UPDATE_TRIGGER_URL.",
       "sensitive": true,
-      "subsystem": "Server-triggered updates"
+      "subsystem": "Server-triggered updates",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     },
     {
       "name": "SKETCHFORGE_UPDATE_TRIGGER_TOKEN",
@@ -118,7 +146,9 @@
       "required": false,
       "validation": "Secret bearer token sent to the configured trigger endpoint. Required when that endpoint enforces a trigger token.",
       "sensitive": true,
-      "subsystem": "Server-triggered updates"
+      "subsystem": "Server-triggered updates",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
     }
   ]
 }
