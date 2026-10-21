@@ -1,6 +1,6 @@
 # Implementation gaps and next steps
 
-Status: refreshed against `main` at `b831290` (2026-10-21). PR #142 added
+Status: refreshed against `main` at `7b5079a` (2026-10-21). PR #142 added
 independent cubic-Bezier handle depth to the 3D sweep path; PR #146 added a
 local rank-based sketch constraint degree-of-freedom estimate; and PR #147
 preserved STEP component colors in regular imports. These merged steps narrow

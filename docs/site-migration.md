@@ -31,6 +31,9 @@ client, translation, and capability documents.
   contracts merged in PRs #120 and #125. PR #144 added generated OpenAPI for
   six schema-backed CRUD operations and records the 26 registered operations
   still omitted; full route schemas and live-handler parity remain outstanding.
+  Open PR #151 adds runtime-backed `GET /faces` query and response coverage,
+  bringing the generated contract to 7 operations with 25 registered operations
+  still omitted.
 - **Phase 4:** parameterized shape reference (#115), published CLI (#117),
   operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
   (#122) references have merged. Deterministic generator-hook wiring merged in
