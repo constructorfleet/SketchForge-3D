@@ -54,7 +54,7 @@
     "pretest:e2e": "npm run engine:build",
     "predesktop:web:build": "npm run engine:build",
     "premcp:sketchforge": "npm run engine:build",
-    "test:browser": "npm run engine:build && npm run copy:occt && node --test tests/browser/editor-quickstart.test.mjs"
+    "test:browser": "npm run build && node --test tests/browser/editor-quickstart.test.mjs"
   },
   "dependencies": {
     "@constructorfleet/sketchforge-engine": "file:packages/sketchforge-engine",
