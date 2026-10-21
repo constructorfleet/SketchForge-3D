@@ -20,6 +20,12 @@ export default defineConfig({
   outDir: "../docs-site-dist",
   cleanUrls: true,
   lastUpdated: true,
+  postRender(context) {
+    return {
+      ...context,
+      content: context.content.replace('id="VPContent"', 'id="VPContent" role="main"'),
+    };
+  },
   head: [["link", { rel: "icon", href: `${base}favicon.svg` }]],
   themeConfig: {
     nav: [

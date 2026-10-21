@@ -29,12 +29,13 @@ client, translation, and capability documents.
 - **Phase 4:** parameterized shape reference (#115), published CLI (#117),
   operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
   (#122) references have merged. Deterministic generator-hook wiring merged in
-  PR #128. STEP documentation PR #119 remains open; broader workflow guides and smoke examples remain
-  outstanding.
+  PR #128. STEP color guidance merged in PR #119; broader workflow guides and
+  smoke examples remain outstanding.
 - **Phase 5:** site version/revision stamps and pinned source links merged in
-  PR #126. Coverage rules, redirects, release checks, and screenshot acceptance
-  coverage remain outstanding.
+  PR #126, lower-case compatibility routes in PR #134, and the release-process
+  guide/check in PR #132. Coverage rules and screenshot acceptance coverage
+  remain outstanding.
 
 The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
-checks merged in PR #128; STEP documentation in PR #119 remains open.
+checks merged in PR #128; STEP color guidance merged in PR #119.

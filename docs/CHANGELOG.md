@@ -4,6 +4,14 @@
 
 - Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and local CAD +Z pull axis, reports incompatible selections, and replaces the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured support currently covers specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.
 
+- Added a Chromium smoke test against the built `/SketchForge-3D/` artifact for
+  skip navigation, visible keyboard focus, the keyboard-operated mobile menu,
+  semantic landmarks and headings, local search results, and overflow at a
+  390px viewport. The test captures `output/playwright/docs-site-mobile-keyboard-smoke.png`.
+- Added the missing `main` landmark to rendered docs and removed the duplicate
+  landing-page h1 while preserving the canonical README source. Added pinned
+  Playwright and a CI Chromium install step.
+
 - Added lower-case compatibility routes for the REST API, `.skf` project format, publishing clients, and shape request reference pages. The static pages redirect to canonical paths and retain a fallback link.
 
 - Added an executable local MCP workflow showing project creation, shape creation, scene inspection, and `.skf` export. The example validates each call against the MCP server's current `tools/list` schema and cleans up its temporary project.
@@ -48,7 +56,8 @@
   `.skf`, and MCP references into `docs:generate` and drift checks into
   `docs:check`.
 
-- Open documentation PR: #119 clarifies STEP color fallback.
+- Merged PR #119 clarifies STEP color fallback; lower-case compatibility routes
+  merged in PR #134.
 
 - Merged PR #117 added a generated reference for published TypeScript and
   Python CLI commands, including options from their actual help/parser sources.

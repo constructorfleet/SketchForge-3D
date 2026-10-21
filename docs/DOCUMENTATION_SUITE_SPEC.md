@@ -1,20 +1,23 @@
 # Documentation suite specification
 
-**Status (2026-10-21):** The site is deployed after PR #116. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), and deterministic reference-generator wiring (#128) have merged. STEP documentation PR #119 remains open. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
+**Status (2026-10-21, verified at `39ab478`):** The searchable VitePress site is deployed on GitHub Pages. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), the local MCP example (#135), stable face identity in the editor (#138), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks and source links (#136), API reference sources (#139), face-based drafting (#140), and the REST measurement listing (#137) have merged. Open documentation work includes PR #141 (built-site browser smoke coverage). Full REST schemas/OpenAPI, broader end-to-end examples, and complete accessibility acceptance remain in progress. PR #141 adds the first real-browser built-site smoke checks for keyboard navigation, mobile layout, landmarks/headings, and local search.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
-## Repository baseline (audit, 2026-10-21)
+## Repository baseline (verified at `39ab478`, 2026-10-21)
 
-The merged Phase 1 implementation builds a static VitePress site under
+The current default branch builds a static VitePress site under
 `/SketchForge-3D/`, with local search, canonical Markdown staging, local link
-and include checks, a local preview command, and a GitHub Pages workflow. The
-first GitHub Pages deployment after PR #116 merged succeeded at the
-canonical URL. The Pages API returned 404 during initial setup; that was a
-temporary verification blocker and is no longer the current deployment status.
-The app's `scripts/build-static.mjs` remains separate and builds SketchForge
-for Cloudflare Workers.
+and include checks, generated package/CLI/shape/configuration/format/MCP
+references, deterministic reference drift checks, a local preview command,
+and a GitHub Pages workflow. The first GitHub Pages deployment after PR #116 merged succeeded.
+PR #134 added lower-case compatibility routes. The Pages API's initial 404
+was a temporary setup blocker, not current status. The app's
+`scripts/build-static.mjs` remains separate and builds SketchForge for
+Cloudflare Workers. Existing built-site tests check static output and provenance. PR #141 adds a
+real browser smoke test for keyboard navigation, visible focus, landmarks and
+headings, mobile navigation, local search, and layout overflow at 390px.
 
 The migration starts with useful maintained sources already in place:
 `README.md`, `docs/REST_API.md`, `docs/SKF_PROJECT_FORMAT.md`,
@@ -49,7 +52,10 @@ Build a public, searchable documentation site from the repository's code, packag
 
 The site must not create a second hand-maintained copy of API signatures, endpoint lists, CLI options, environment variables, shape fields, package versions, or runnable examples. Human-written explanations remain appropriate for concepts, design rationale, workflows, limitations, and troubleshooting; every factual listing that can be extracted from source must be extracted or checked against source.
 
-The implementation is framework-neutral. Select a static-site tool only after validating the requirements in this spec. The generated result must be plain static assets and must work under the GitHub Pages project-site path, including on a clean build with no secrets or access to production services.
+VitePress 1.6.4 is the selected static-site tool and already satisfies the
+project-site build and local-search requirements. The generated result must be
+plain static assets and work under the GitHub Pages project-site path on a
+clean build without secrets or production connectivity.
 
 ## 2. Audiences and outcomes
 
@@ -225,15 +231,22 @@ Deliver the suite in small steps while retaining current published docs until re
 Phase 1 established and deployed the site shell. Package references and
 executable examples (#118), stable-face `GET /faces` and `PATCH faceColors`
 contracts (#120, #125), operator configuration (#121), project-format
-reference (#123), MCP reference/navigation (#122), and source provenance (#126)
-have merged. Deterministic generator-hook integration (#128) has also merged;
-STEP docs (#119) remain open. Full API schemas/OpenAPI and the remaining accessibility
-and behavioral smoke checks are incomplete.
+reference (#123), MCP reference/navigation (#122), source provenance (#126),
+STEP color guidance (#119), and lower-case compatibility routes (#134) have
+merged. Deterministic generator-hook integration (#128) has also merged.
+Full API schemas/OpenAPI and remaining accessibility and behavioral smoke
+checks are incomplete; this branch adds an initial browser smoke slice, not a
+complete accessibility audit.
+
+The built-site browser test uses the pinned Playwright dependency. On a local
+checkout, install its Chromium binary with `npm run docs:browser:install`
+before `npm run docs:build`; the documentation workflow installs Chromium and
+its Ubuntu system dependencies before running the build.
 
 ### Phase 2: generate package and example documentation
 
 - **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
-- This slice does not add a Python static type checker or symbol-level source links for every generated item. Those remain Phase 2 work.
+- **Merged PR #136:** adds Python static type checking and symbol-level source links. PR #137 adds the complete REST measurement listing contract, #139 adds API reference source links, and #140 adds face-based drafting documentation.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
 - Reuse package README content for package registries and the site from a shared source or generated subset.
 
@@ -248,7 +261,7 @@ and behavioral smoke checks are incomplete.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
-- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), and MCP schemas/navigation (PR #122). STEP documentation is in open PR #119. Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
+- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), MCP schemas/navigation (PR #122), and STEP color guidance (PR #119). Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
@@ -272,8 +285,8 @@ The suite is ready for general use when all of these are true:
 5. TypeScript, Python, engine, configuration, and format references are generated from authoritative source inputs.
 6. Every runnable code example in the site is sourced from a repository file and typechecked or executed in CI.
 7. CI fails on missing source includes, broken internal links, undocumented public configuration, unregistered public routes, example failures, or generated-reference drift.
-8. Search, keyboard navigation, responsive behavior, and accessibility basics are smoke-checked on the built artifact.
-9. Existing public documentation links either resolve to the new site or have intentional redirects/compatibility pages.
+8. Search, keyboard navigation, responsive behavior, and accessibility basics are smoke-checked on the built artifact. This branch covers local search, skip navigation, visible focus, mobile menu keyboard operation, landmarks/headings, and overflow at 390px; contrast, alt text, and broader workflow checks remain open.
+9. Existing public documentation links either resolve to the new site or have intentional redirects/compatibility pages. Lower-case compatibility paths merged in PR #134; the full historical inbound-link inventory remains to be audited.
 10. Maintainers can identify the source file and owning page from a generated-reference check failure.
 
 ## 11. Explicit non-goals

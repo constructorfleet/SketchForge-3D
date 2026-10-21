@@ -42,6 +42,7 @@
     "docs:generate": "npm run engine:build && npm run client:build && node scripts/docs/generate-package-references.mjs && node scripts/generate-shape-reference.mjs && node scripts/generate-cli-reference.mjs && node scripts/generate-operator-configuration.mjs && node scripts/generate-skf-format-reference.mjs && node scripts/generate-mcp-reference.mjs && node scripts/docs-generate.mjs && node scripts/docs/generate-legacy-redirects.mjs",
     "docs:check": "npm run engine:build && npm run client:build && cd packages/sketchforge-py && python3 -m mypy src examples && cd ../.. && node scripts/docs-check.mjs && node scripts/docs/generate-package-references.mjs --check && node scripts/generate-shape-reference.mjs --check && node scripts/generate-cli-reference.mjs --check && node scripts/generate-operator-configuration.mjs --check && node scripts/generate-skf-format-reference.mjs --check && node scripts/generate-mcp-reference.mjs --check && node --test tests/docs/generator-hooks.test.mjs tests/docs/python-reference.test.mjs tests/docs/operator-configuration.test.mjs tests/docs/mcp-reference.test.mjs tests/docs/release-process.test.mjs tests/docs/mcp-examples.test.mjs",
     "docs:build": "npm run docs:check && npm run docs:generate && vitepress build .docs-site && node --test tests/docs/site-build.test.mjs tests/docs/legacy-redirects.test.mjs",
+    "docs:browser:install": "playwright install --only-shell chromium",
     "docs:preview": "npm run docs:build && vitepress preview .docs-site --host 127.0.0.1",
     "mcp:sketchforge": "node packages/sketchforge-client/mcp/server.mjs",
     "engine:build": "npm run build --prefix packages/sketchforge-engine",
@@ -85,6 +86,7 @@
     "electron": "^43.8.0",
     "electron-builder": "^26.15.3",
     "js-yaml": "^4.3.2",
+    "playwright": "1.64.1",
     "typescript": "^5.8.3",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.12"
