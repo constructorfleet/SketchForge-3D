@@ -27,6 +27,7 @@ export default defineConfig({
       { text: "REST API", link: "/docs/REST_API" },
       { text: "Project format", link: "/docs/SKF_PROJECT_FORMAT" },
       { text: "Clients", link: "/docs/PUBLISHING_CLIENTS" },
+      { text: "References", link: "/docs/reference/typescript-client" },
       { text: "Migration map", link: "/docs/site-migration" },
     ],
     sidebar: [
@@ -46,9 +47,18 @@ export default defineConfig({
       {
         text: "Packages",
         items: [
-          { text: "TypeScript client", link: "/packages/sketchforge-client/README" },
-          { text: "Engine", link: "/packages/sketchforge-engine/README" },
-          { text: "Python client", link: "/packages/sketchforge-py/README" },
+          { text: "TypeScript client", link: "/docs/packages/typescript-client" },
+          { text: "Engine", link: "/docs/packages/engine" },
+          { text: "Python client", link: "/docs/packages/python-client" },
+        ],
+      },
+      {
+        text: "Generated references",
+        items: [
+          { text: "TypeScript client API", link: "/docs/reference/typescript-client" },
+          { text: "Engine API", link: "/docs/reference/typescript-engine" },
+          { text: "Python API", link: "/docs/reference/python-client" },
+          { text: "Shape requests", link: "/docs/SHAPE_REQUEST_REFERENCE" },
         ],
       },
     ],

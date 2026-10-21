@@ -9,7 +9,7 @@
   the GitHub Pages API returned 404; a maintainer still needs to select GitHub
   Actions as the publishing source before the first deployment.
 
-- Added generated TypeScript client, engine, and Python public API references, plus a documentation page that includes the package macro examples from their executable source files. CI now runs those examples against a temporary local server.
+- Added generated TypeScript client, engine, and Python public API references to the searchable docs site, plus package pages that reuse their canonical READMEs and include macro examples from executable source files. CI runs those examples against a temporary local server.
 
 - Exploding a STEP assembly now preserves explicit component display colors when
   the XCAF label API omits them, using the XCAF document's GLB material data
