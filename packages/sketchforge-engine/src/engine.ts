@@ -698,9 +698,29 @@ export function createEngine(store: ProjectStore): Engine {
     },
 
     changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
-      const found = oneShape(document, shapeId);
+      const byOutputId = oneShape(document, shapeId);
+      // A persisted sketch source is an input node, not a renderable shape.
+      // When a caller edits that node's profile, resolve its dependent sweep
+      // output and rebuild it before the single project write below. The
+      // output keeps its own stable object ID; SKF export derives the source
+      // node from the synchronized profile on that output.
+      const sourceOutputs = !byOutputId.ok && changes.sketchProfile !== undefined
+        ? document.shapes.filter((shape) => shape.sketchSourceId === shapeId)
+        : [];
+      const sourceSketchTarget = !byOutputId.ok && sourceOutputs.length === 1;
+      const found = byOutputId.ok
+        ? byOutputId
+        : sourceSketchTarget
+          ? ok(sourceOutputs[0]!)
+          : byOutputId;
       if (!found.ok) return found;
       const existing = found.value;
+      if (sourceSketchTarget) {
+        const outputFields = Object.keys(changes).filter((field) => field !== "sketchProfile");
+        if (outputFields.length > 0) {
+          return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
+        }
+      }
       // A locked shape refuses every change but the one that unlocks it, which
       // may arrive in the same request as the rest: `locked: false` alongside a
       // new width is one call rather than two.
@@ -869,7 +889,7 @@ export function createEngine(store: ProjectStore): Engine {
         }
       }
 
-      const shapes = document.shapes.map((shape) => (shape.id === shapeId ? updatedShape : shape));
+      const shapes = document.shapes.map((shape) => (shape.id === existing.id ? updatedShape : shape));
       return ok({ shape: updatedShape, revision: await writeShapes(projectId, document, shapes) });
     }),
 
