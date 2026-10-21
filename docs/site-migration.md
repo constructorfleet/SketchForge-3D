@@ -5,13 +5,15 @@ The static VitePress site is published at
 The repository remains the source for maintained prose, examples, and
 generated references. On pull requests, docs CI generates references before
 verification and site build, then uploads the generated outputs. A trusted
-follow-up validates the artifact and PR before committing only allowlisted
-updates to eligible same-repository PR branches. It dispatches CI, docs, and
-title checks for the exact resulting commit SHA. Fork PRs and PRs changing
-workflow-control files retain the generated artifact as a fallback and do not
-get an automatic branch update. The initial docs run validates/builds the PR
-head; the dispatched checks validate the head after any generated-output
-commit.
+default-branch follow-up validates the artifact and PR before committing only
+allowlisted updates to same-repository PR branches. A separate trusted workflow
+checks the exact resulting SHA in read-only jobs and records the required
+contexts without checking out PR code in the check-writing job. Fork PRs use
+the generated artifact fallback because their branches cannot be pushed.
+Successful docs builds on main also upload their outputs; a trusted writer
+opens or refreshes a bot repair PR if tracked outputs differ. Main remains
+stale only until that repair PR is merged, and CI regenerates before validation
+so stale tracked output alone does not fail the docs check.
 
 ## Delivered site capabilities
 
@@ -44,11 +46,11 @@ commit.
   verification and site build, then uploads generated output. A trusted
   `workflow_run` handler treats that artifact as untrusted input, verifies its
   manifest and source PR, and writes only allowlisted generated paths. It
-  commits changed outputs to eligible same-repository PR branches, then
-  dispatches CI, docs, and PR-title checks for the exact resulting commit SHA;
-  each dispatched workflow verifies its expected SHA. Fork PRs and PRs changing
-  `.github/workflows/` or `.github/actions/` controls use the artifact fallback
-  without an automatic branch update. The TypeScript, Python, and engine
+  commits changed outputs to same-repository PR branches and dispatches a
+  default-branch verifier for the exact resulting SHA. Fork PRs use the
+  artifact fallback. Successful main docs runs create or refresh one bot repair
+  PR when generated tracked output differs; protected main is never written
+  directly by the workflow. The TypeScript, Python, and engine
   references remain generated in `.docs-site/docs/reference/` for the Pages
   artifact, not tracked source files.
 - Package guides include registry-facing README files, and package examples
@@ -83,11 +85,10 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   and replace or clearly bound hand-maintained endpoint details.
 - **Generated-output automation — implemented with limits:** generators run
   before verification/build, and a trusted artifact-only writer commits
-  allowlisted updates to eligible same-repository PR branches before exact-SHA
-  CI, docs, and title checks are dispatched. Fork PRs and PRs changing workflow
-  controls use artifact fallback and require a maintainer to apply generated
-  updates. The initial docs run checks/builds the source PR head; dispatched
-  runs check the updated head containing any generated commit.
+  allowlisted updates to same-repository PR branches before exact-SHA checks
+  are recorded by a default-branch workflow. Fork PRs use artifact fallback.
+  Successful main docs runs open or refresh a bot repair PR for stale tracked
+  output; main remains stale until that repair PR is merged.
 - **Configuration ownership:** the current generated operator reference
   documents supported server/container settings, not every environment read
   across server, desktop, tests, build tools, and browser code. A central
