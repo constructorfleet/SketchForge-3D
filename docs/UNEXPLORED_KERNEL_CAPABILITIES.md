@@ -1,6 +1,6 @@
 # Implementation gaps and next steps
 
-Status: refreshed against the working tree at `2cfc70a` (2026-10-20). This file
+Status: refreshed against the working tree at `a0aa980` (2026-10-20). This file
 tracks user-facing gaps, not every unused OCCT method. Several proposals from
 the earlier audit have shipped since it was written.
 
