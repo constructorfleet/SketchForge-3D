@@ -90,6 +90,20 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     }
   });
 
+  it("drafts box faces along negative X and negative Y", async () => {
+    const source = await withCadKernel((cad) => {
+      const solid = cad.makeBox(10, 10, 10);
+      return { brep: cad.toBREP(solid), faceIds: cad.getSubShapes(solid, "face").map((_, index) => `face-${index}`) };
+    });
+    for (const { face, axis } of [{ face: 0, axis: "-x" }, { face: 2, axis: "-y" }] as const) {
+      const result = await withCadKernel((cad) => buildFaceDraft(cad, {
+        ...source, faceId: `face-${face}`, angle: 30, pullDirection: axis,
+      }));
+      expect(result.brep).toContain("CASCADE Topology");
+      expect(result.volume).toBeGreaterThan(0);
+    }
+  });
+
   it("creates a valid exact solid for a supported stable face selection", async () => {
     const source = await extrusionSource();
     const result = await withCadKernel((cad) => buildFaceDraft(cad, {
@@ -115,7 +129,7 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     });
     const supported = await withCadKernel((cad) => {
       const cases: string[] = [];
-      for (const axis of ["x", "y", "z"] as const) for (const angle of [-5, 5]) {
+      for (const axis of ["x", "-x", "y", "-y", "z", "-z"] as const) for (const angle of [-30, -5, 5, 30]) {
         for (let face = 0; face < 6; face += 1) {
           try {
             buildFaceDraft(cad, { ...source, faceId: `face-${face}`, angle, pullDirection: axis });
@@ -130,8 +144,16 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
       return cases;
     });
     expect(supported).toEqual([
+      "0/-x/5", "0/-x/30",
+      "2/-y/5", "2/-y/30",
+      "0/z/-30", "1/z/-30", "2/z/-30", "3/z/-30",
       "0/z/-5", "1/z/-5", "2/z/-5", "3/z/-5",
       "0/z/5", "1/z/5", "2/z/5", "3/z/5",
+      "0/z/30", "1/z/30", "2/z/30", "3/z/30",
+      "0/-z/-30", "1/-z/-30", "2/-z/-30", "3/-z/-30",
+      "0/-z/-5", "1/-z/-5", "2/-z/-5", "3/-z/-5",
+      "0/-z/5", "1/-z/5", "2/-z/5", "3/-z/5",
+      "0/-z/30", "1/-z/30", "2/-z/30", "3/-z/30",
     ]);
   });
 });

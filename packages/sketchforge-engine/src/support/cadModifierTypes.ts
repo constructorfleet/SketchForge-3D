@@ -75,7 +75,7 @@ export type CadModifierWorkerRequest =
     }
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "draft-prism"; requestId: number; profile: SketchProfile; height: number; angle: number }
-  | { type: "draft-face"; requestId: number; brep: string; faceIds: string[]; faceId: string; angle: number; pullDirection: "x" | "y" | "z"; brepTransform?: number[] }
+  | { type: "draft-face"; requestId: number; brep: string; faceIds: string[]; faceId: string; angle: number; pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z"; brepTransform?: number[] }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
