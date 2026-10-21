@@ -320,10 +320,73 @@ const shapeOperations = [
   { ...operation("DELETE", "/api/v1/shapes", "deleteShape", [200, ...commonErrors]), query: shapeQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
 ] as const satisfies readonly ApiV1Operation[];
 
+const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
+const arrangementIds = {
+  oneOf: [
+    { type: "string", pattern: "\\S", description: "One non-empty shape ID." },
+    { type: "array", minItems: 1, items: { type: "string", pattern: "\\S" }, description: "Distinct non-empty shape IDs; surrounding whitespace is trimmed." },
+  ],
+} as const;
+const alignRequest = {
+  type: "object",
+  required: ["ids", "axis", "target"],
+  properties: {
+    ids: arrangementIds,
+    axis: { type: "string", enum: ["x", "y", "z"] },
+    target: { type: "string", enum: ["min", "center", "max"] },
+    anchorId: { type: "string", description: "Optional reference shape ID; empty or whitespace is treated as omitted." },
+  },
+  additionalProperties: true,
+} as const;
+const distributeRequest = {
+  type: "object",
+  required: ["ids"],
+  properties: {
+    ids: arrangementIds,
+    axis: { type: "string", enum: ["x", "z"], description: "Omit to choose the axis along which the shapes are already most spread." },
+    spacing: { type: "string", enum: ["gaps", "centers"], default: "gaps" },
+  },
+  additionalProperties: true,
+} as const;
+const arrangementShapes = { type: "array", items: shapeSummary } as const;
+const alignResponse = {
+  type: "object", required: ["moved", "axis", "target", "anchorId", "shapes", "revision"],
+  properties: {
+    moved: { type: "integer", minimum: 0 },
+    axis: { type: "string", enum: ["x", "y", "z"] },
+    target: { type: "string", enum: ["min", "center", "max"] },
+    anchorId: { type: "string", nullable: true },
+    shapes: arrangementShapes,
+    revision: num,
+  },
+} as const;
+const distributeResponse = {
+  type: "object", required: ["moved", "axis", "spacing", "shapes", "revision"],
+  properties: {
+    moved: { type: "integer", minimum: 0 },
+    axis: { type: "string", enum: ["x", "z"] },
+    spacing: { type: "string", enum: ["gaps", "centers"] },
+    shapes: arrangementShapes,
+    revision: num,
+  },
+} as const;
+const arrangementOperations = [
+  {
+    ...operation("POST", "/api/v1/align", "alignShapes", [200, 400, 401, 404, 409, 422, 500, 503], json(alignRequest)),
+    description: "Align selected shapes by a shared minimum, centre, or maximum coordinate.",
+    responseSchemas: { 200: alignResponse, ...arrangementErrors },
+  },
+  {
+    ...operation("POST", "/api/v1/distribute", "distributeShapes", [200, 400, 401, 404, 409, 422, 500, 503], json(distributeRequest)),
+    description: "Evenly space three or more selected shapes while keeping the outermost shapes fixed.",
+    responseSchemas: { 200: distributeResponse, ...arrangementErrors },
+  },
+] as const satisfies readonly ApiV1Operation[];
+
 export const API_V1_OPERATIONS = [
-  operation("POST", "/api/v1/align", "alignShapes"),
+  ...arrangementOperations.slice(0, 1),
   operation("POST", "/api/v1/booleans", "booleanShapes"),
-  operation("POST", "/api/v1/distribute", "distributeShapes"),
+  ...arrangementOperations.slice(1),
   operation("POST", "/api/v1/draft-prism", "draftPrism"),
   operation("GET", "/api/v1/edges", "listEdges"),
   operation("OPTIONS", "/api/v1/edges", "edgeRouteOptions", [204], undefined, "none"),

@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import type { AlignAxis, AlignTarget } from "@/lib/engine/alignShapes";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ const TARGETS = ["min", "center", "max"] as const;
  * selection on a server -- that is the one thing the editor has and this does
  * not.
  */
-export async function POST(request: Request) {
+const postAlign = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -42,6 +43,10 @@ export async function POST(request: Request) {
     return apiError(`Send target as one of ${TARGETS.join(", ")}: which edge or centre to line up.`, 400, "invalid_request");
   }
   const anchorId = typeof body.anchorId === "string" ? body.anchorId.trim() || null : null;
+  const contractBody = { ids, axis, target, ...(anchorId ? { anchorId } : {}) };
+  if (!validateApiV1RequestBody("POST /api/v1/align", contractBody)) {
+    return apiError("The alignment request does not match its contract.", 400, "invalid_request");
+  }
 
   const aligned = await apiEngine(context.root).align(projectId, {
     ids,
@@ -65,4 +70,6 @@ export async function POST(request: Request) {
     shapes: aligned.value.shapes.map(apiShapeSummary),
     revision: aligned.value.revision,
   });
-}
+};
+
+export const POST = withApiV1Contract("POST /api/v1/align", postAlign);
