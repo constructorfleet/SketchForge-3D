@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Aktualizowanie podglądu bryły obrotowej…",
       "revolveShapeUpdated": "Zaktualizowano bryłę obrotową",
       "revolveSettingsFailed": "Nie udało się zastosować ustawień bryły obrotowej",
-      "sweepStarted": "Szkic wyciągnięcia: narysuj jeden zamknięty przekrój i jedną otwartą ścieżkę",
+      "sweepStarted": "Rozpoczęto szkic wyciągnięcia: narysuj zamknięty przekrój na pierwszej płaszczyźnie roboczej, przełącz się na prostopadłą płaszczyznę i narysuj otwartą ścieżkę",
       "editingSweep": "Edycja profilu wyciągnięcia",
       "buildingSweep": "Tworzenie płaskiego wyciągnięcia",
       "cannotSweep": "Nie udało się utworzyć płaskiego wyciągnięcia",
@@ -581,7 +581,7 @@
       "sketch": "Szkic",
       "finishSweep": "Zakończ wyciąganie po ścieżce",
       "sweepSketch": "Wyciągnij szkic po ścieżce",
-      "sweepSketchHint": "Przesuń zamknięty przekrój wzdłuż otwartej płaskiej ścieżki"
+      "sweepSketchHint": "Najpierw narysuj przekrój, potem ścieżkę na prostopadłej płaszczyźnie roboczej"
     },
     "panel": {
       "import": "Import",
@@ -780,10 +780,10 @@
         "title": "Podgląd 3D",
         "empty": "Narysuj zamknięty profil po lewej stronie osi"
       },
-      "sweepHelp": "Narysuj dokładnie jeden zamknięty przekrój i jedną otwartą płaską ścieżkę. Pierwszy punkt ścieżki umieść blisko początku przekroju.",
+      "sweepHelp": "Najpierw narysuj dokładnie jeden zamknięty przekrój na pierwszej płaszczyźnie roboczej. Następnie przełącz się na prostopadłą płaszczyznę i narysuj dokładnie jedną otwartą ścieżkę zaczynającą się blisko początku przekroju.",
       "sweepSectionLabel": "Przekrój",
       "sweepSpineLabel": "Ścieżka",
-      "sweepPlaneHint": "Na szkicu oba elementy leżą w jednej płaszczyźnie; gotowy przekrój zostanie ustawiony prostopadle do początkowego kierunku ścieżki."
+      "sweepPlaneHint": "Najpierw narysuj przekrój, a potem przełącz się na prostopadłą płaszczyznę roboczą, aby narysować ścieżkę. Gotowy przekrój jest ustawiany prostopadle do początkowego kierunku ścieżki."
     }
   },
   "panels": {

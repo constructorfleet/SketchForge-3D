@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Mise à jour de l’aperçu de la révolution…",
       "revolveShapeUpdated": "Révolution mise à jour",
       "revolveSettingsFailed": "Impossible d’appliquer les paramètres de la révolution",
-      "sweepStarted": "Esquisse de balayage : dessinez une section fermée et un chemin ouvert",
+      "sweepStarted": "Esquisse de balayage commencée : dessinez la section fermée sur le premier plan de travail, puis passez à un plan orthogonal et dessinez un chemin ouvert",
       "editingSweep": "Modification du profil de balayage",
       "buildingSweep": "Création du balayage plan",
       "cannotSweep": "Impossible de créer le balayage plan",
@@ -581,7 +581,7 @@
       "sketch": "Esquisse",
       "finishSweep": "Terminer le balayage",
       "sweepSketch": "Balayer une esquisse",
-      "sweepSketchHint": "Déplacer une section fermée le long d’un chemin plan ouvert"
+      "sweepSketchHint": "Dessinez d’abord la section, puis son chemin sur un plan orthogonal"
     },
     "panel": {
       "import": "Importer",
@@ -780,10 +780,10 @@
         "title": "Aperçu 3D",
         "empty": "Dessinez un profil fermé à gauche de l’axe"
       },
-      "sweepHelp": "Dessinez exactement une section fermée et un chemin plan ouvert. Gardez le premier point du chemin près de l’origine de la section.",
+      "sweepHelp": "Dessinez d’abord exactement une section fermée sur le premier plan de travail. Passez ensuite à un plan orthogonal et dessinez exactement un chemin ouvert qui commence près de l’origine de la section.",
       "sweepSectionLabel": "Section",
       "sweepSpineLabel": "Trajectoire",
-      "sweepPlaneHint": "Cette esquisse les montre dans le même plan ; la section finale est orientée perpendiculairement à la direction initiale de la trajectoire."
+      "sweepPlaneHint": "Dessinez d’abord la section, puis passez à un plan orthogonal pour tracer le chemin. La section finale est orientée perpendiculairement à la direction initiale du chemin."
     }
   },
   "panels": {

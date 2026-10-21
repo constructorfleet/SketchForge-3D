@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Vorschau der Rotation wird aktualisiert…",
       "revolveShapeUpdated": "Rotationskörper aktualisiert",
       "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden",
-      "sweepStarted": "Sweep-Skizze: eine geschlossene Kontur und einen offenen Pfad zeichnen",
+      "sweepStarted": "Sweep-Skizze gestartet: Zeichne den geschlossenen Querschnitt auf der ersten Arbeitsebene, wechsle dann zu einer senkrechten Arbeitsebene und zeichne einen offenen Pfad",
       "editingSweep": "Sweep-Skizzenprofil bearbeiten",
       "buildingSweep": "Planarer Sweep wird erstellt",
       "cannotSweep": "Planarer Sweep konnte nicht erstellt werden",
@@ -581,7 +581,7 @@
       "sketch": "Skizze",
       "finishSweep": "Sweep abschließen",
       "sweepSketch": "Skizze sweepen",
-      "sweepSketchHint": "Einen geschlossenen Querschnitt entlang eines offenen ebenen Pfads führen"
+      "sweepSketchHint": "Zeichne zuerst den Querschnitt, dann den Pfad auf einer senkrechten Arbeitsebene"
     },
     "panel": {
       "import": "Import",
@@ -780,10 +780,10 @@
         "title": "3D-Vorschau",
         "empty": "Zeichnen Sie links von der Achse ein geschlossenes Profil"
       },
-      "sweepHelp": "Zeichne genau eine geschlossene Kontur und einen offenen ebenen Pfad. Halte den ersten Pfadpunkt nahe am Ursprung des Querschnitts.",
+      "sweepHelp": "Zeichne zuerst genau einen geschlossenen Querschnitt auf der ersten Arbeitsebene. Wechsle dann zu einer senkrechten Arbeitsebene und zeichne genau einen offenen Pfad, der nahe am Ursprung des Querschnitts beginnt.",
       "sweepSectionLabel": "Querschnitt",
       "sweepSpineLabel": "Pfad",
-      "sweepPlaneHint": "In dieser Skizze liegen beide in einer Ebene; der fertige Querschnitt wird senkrecht zur anfänglichen Pfadrichtung ausgerichtet."
+      "sweepPlaneHint": "Zeichne zuerst den Querschnitt und wechsle dann für den Pfad zu einer senkrechten Arbeitsebene. Der fertige Querschnitt wird senkrecht zur Anfangsrichtung des Pfads ausgerichtet."
     }
   },
   "panels": {

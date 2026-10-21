@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Aktualizace náhledu rotace…",
       "revolveShapeUpdated": "Rotační těleso aktualizováno",
       "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít",
-      "sweepStarted": "Náčrt tažení: nakreslete jednu uzavřenou oblast a jednu otevřenou dráhu",
+      "sweepStarted": "Náčrt tažení zahájen: nakreslete uzavřený profil na první pracovní rovině, potom přepněte na kolmou pracovní rovinu a nakreslete jednu otevřenou dráhu",
       "editingSweep": "Úprava profilu tažení",
       "buildingSweep": "Vytváření rovinného tažení",
       "cannotSweep": "Rovinné tažení se nepodařilo vytvořit",
@@ -581,7 +581,7 @@
       "sketch": "Náčrt",
       "finishSweep": "Dokončit tažení",
       "sweepSketch": "Tažení náčrtu",
-      "sweepSketchHint": "Veďte uzavřený profil po otevřené rovinné dráze"
+      "sweepSketchHint": "Nejprve nakreslete profil, potom jeho dráhu na kolmé pracovní rovině"
     },
     "panel": {
       "import": "Import",
@@ -780,10 +780,10 @@
         "title": "3D náhled",
         "empty": "Nakreslete uzavřený profil vlevo od osy"
       },
-      "sweepHelp": "Nakreslete přesně jednu uzavřenou oblast a jednu otevřenou rovinnou dráhu. První bod dráhy umístěte blízko počátku profilu.",
+      "sweepHelp": "Nejprve nakreslete přesně jeden uzavřený profil na první pracovní rovině. Potom přepněte na kolmou pracovní rovinu a nakreslete přesně jednu otevřenou dráhu, která začíná blízko počátku profilu.",
       "sweepSectionLabel": "Průřez",
       "sweepSpineLabel": "Dráha",
-      "sweepPlaneHint": "V náčrtu jsou obě křivky ve stejné rovině; při vytvoření se průřez natočí kolmo k počátečnímu směru dráhy."
+      "sweepPlaneHint": "Nejprve nakreslete profil, potom přepněte na kolmou pracovní rovinu a nakreslete dráhu. Výsledný profil je orientován kolmo k počátečnímu směru dráhy."
     }
   },
   "panels": {

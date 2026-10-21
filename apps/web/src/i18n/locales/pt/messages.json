@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Atualizando a pré-visualização da revolução…",
       "revolveShapeUpdated": "Sólido de revolução atualizado",
       "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução",
-      "sweepStarted": "Esboço de varredura: desenhe uma seção fechada e um caminho aberto",
+      "sweepStarted": "Esboço de varredura iniciado: desenhe a seção fechada no primeiro plano de trabalho, depois mude para um plano ortogonal e desenhe um caminho aberto",
       "editingSweep": "Editando o perfil de varredura",
       "buildingSweep": "Criando varredura plana",
       "cannotSweep": "Não foi possível criar a varredura plana",
@@ -581,7 +581,7 @@
       "sketch": "Esboço",
       "finishSweep": "Concluir varredura",
       "sweepSketch": "Varredura de esboço",
-      "sweepSketchHint": "Desloque uma seção fechada ao longo de um caminho plano aberto"
+      "sweepSketchHint": "Desenhe primeiro a seção e depois o caminho num plano de trabalho ortogonal"
     },
     "panel": {
       "import": "Importar",
@@ -780,10 +780,10 @@
         "title": "Pré-visualização 3D",
         "empty": "Desenhe um perfil fechado à esquerda do eixo"
       },
-      "sweepHelp": "Desenhe exatamente uma seção fechada e um caminho plano aberto. Mantenha o primeiro ponto do caminho perto da origem da seção.",
+      "sweepHelp": "Desenhe primeiro exatamente uma seção fechada no plano de trabalho inicial. Depois mude para um plano ortogonal e desenhe exatamente um caminho aberto que comece perto da origem da seção.",
       "sweepSectionLabel": "Seção",
       "sweepSpineLabel": "Trajetória",
-      "sweepPlaneHint": "Este esboço mostra ambos no mesmo plano; a seção final fica perpendicular à direção inicial da trajetória."
+      "sweepPlaneHint": "Desenhe primeiro a seção e depois mude para um plano ortogonal para traçar o caminho. A seção final fica perpendicular à direção inicial do caminho."
     }
   },
   "panels": {

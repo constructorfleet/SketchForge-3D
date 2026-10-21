@@ -52,14 +52,15 @@ Relevant implementation seams include `serverCadProperties.ts`,
 ### 1. Sweep and broader draft modeling operations
 
 The Sketch workspace now has a planar sketch sweep alongside extrusion and
-revolve. It accepts exactly one closed section loop and one open, planar spine
-in the same sketch profile. The section is positioned at the spine's first
-point and oriented perpendicular to its initial tangent; the spine may use
-line or cubic Bezier segments, and OCCT uses rounded-corner transitions. The
-editor retains the source sketch profile and marks the result as a
-`sketch-sweep`, but the resulting geometry is baked rather than represented by
-an editable feature-history node. This is a local editor operation, not a REST
-or client-library operation.
+revolve. The workflow has two stages: draw exactly one closed section loop on
+the first workplane, then switch to an orthogonal workplane and draw exactly
+one open, planar spine. Start the spine near the section origin. The section
+is positioned at the spine's first point and oriented perpendicular to its
+initial tangent; the spine may use line or cubic Bezier segments, and OCCT
+uses rounded-corner transitions. The editor retains the source sketch profile
+and marks the result as a `sketch-sweep`, but the resulting geometry is baked
+rather than represented by an editable feature-history node. This is a local
+editor operation, not a REST or client-library operation.
 
 Draft prism remains available in the editor, REST, and client libraries, but
 supports one straight closed sketch loop and also stores baked geometry. More

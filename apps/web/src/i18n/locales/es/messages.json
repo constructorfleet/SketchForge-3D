@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Actualizando la vista previa de la revolución…",
       "revolveShapeUpdated": "Revolución actualizada",
       "revolveSettingsFailed": "No se pudieron aplicar los valores de la revolución",
-      "sweepStarted": "Boceto de barrido: dibuja un único contorno cerrado y una trayectoria abierta",
+      "sweepStarted": "Boceto de barrido iniciado: dibuja la sección cerrada en el primer plano de trabajo, cambia después a un plano perpendicular y dibuja una trayectoria abierta",
       "editingSweep": "Editando el perfil del barrido",
       "buildingSweep": "Creando barrido plano",
       "cannotSweep": "No se pudo crear el barrido plano",
@@ -581,7 +581,7 @@
       "sketch": "Boceto",
       "finishSweep": "Finalizar barrido",
       "sweepSketch": "Barrido de boceto",
-      "sweepSketchHint": "Desplaza una sección cerrada a lo largo de una trayectoria plana abierta"
+      "sweepSketchHint": "Dibuja primero la sección y después su trayectoria en un plano perpendicular"
     },
     "panel": {
       "import": "Importar",
@@ -780,10 +780,10 @@
         "title": "Vista previa 3D",
         "empty": "Dibuja un perfil cerrado a la izquierda del eje"
       },
-      "sweepHelp": "Dibuja exactamente un contorno cerrado y una trayectoria plana abierta. Mantén el primer punto de la trayectoria cerca del origen de la sección.",
+      "sweepHelp": "Dibuja primero exactamente una sección cerrada en el plano de trabajo inicial. Después cambia a un plano perpendicular y dibuja exactamente una trayectoria abierta que empiece cerca del origen de la sección.",
       "sweepSectionLabel": "Sección",
       "sweepSpineLabel": "Trayectoria",
-      "sweepPlaneHint": "En este boceto aparecen en un mismo plano; la sección terminada se orienta perpendicular a la dirección inicial de la trayectoria."
+      "sweepPlaneHint": "Dibuja primero la sección y cambia después a un plano perpendicular para la trayectoria. La sección final se orienta perpendicularmente a la dirección inicial de la trayectoria."
     }
   },
   "panels": {
