@@ -1,28 +1,27 @@
 # Documentation suite specification
 
-**Status (2026-10-21, verified against `origin/main` at `1c8e820` and live PR state):** The searchable VitePress site is deployed on GitHub Pages. The editor quick-start (#150), runtime-backed `GET /faces` contract (#151), bounded coupled-constraint solver (#153), expanded built-site accessibility checks (#154), versioned publishing-client table (#156), contextual reference links (#157), and engine package documentation (#158) are merged to `main`. Other shipped documentation slices include package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), deterministic reference-generator wiring (#128), local MCP example (#135), stable face identity in the editor and Python client (#138, #145), STEP color guidance (#119), release-process checks (#132), lower-case compatibility routes (#134), Python reference type checks/source links (#136), API reference sources (#139), face-based drafting (#140), REST measurement listing (#137), built-site smoke checks (#141), external-link reporting (#143), Bezier sweep-handle depth controls (#142), constraint degree-of-freedom estimate (#146), generated OpenAPI (#144), and fixture-tested +X/+Y face drafting (#180). PR #162 merged Mermaid fence rendering. Open PR #168 proposes publishing generated TypeScript and Python references from the Pages artifact; its branch also carries revolve source persistence (#181) and STEP component ancestry (#183), which are not on `main`. Open PR #187 proposes the historical inbound-link inventory. Open PR #188 proposes persisted source-sketch nodes and editor rebuild identity for sweeps. Open PR #194 proposes `PATCH /api/v1/shapes` support for sweep profile updates and rebuilds; both remain unmerged, so `main` still lacks REST sweep profile rebuild. Open PR #182 proposes runtime-backed contracts for both measurement operations; it would raise generated OpenAPI coverage from 7 to 9 of 32 registered operations, leaving 23 omitted. The three gaps identified in §9 are closed by #156–#158. Remaining suite work includes broader task-oriented workflow coverage and complete OpenAPI contract coverage; proposed PRs do not count as shipped until merged.
+**Current implementation status:** The searchable VitePress site is published on GitHub Pages at the canonical URL below. It includes generated TypeScript, Python, and engine references in the Pages artifact, source-linked package guides, a tested editor quick-start, generated format/configuration/CLI/MCP references, Mermaid rendering, accessibility and browser smoke checks, and a repository-controlled historical inbound-link inventory. The REST operation registry contains 32 operations; generated OpenAPI describes nine and explains why 23 remain omitted. `PATCH /api/v1/shapes` can rebuild a persisted sketch sweep from an updated profile, but this operation remains outside OpenAPI because the combined face-color and profile validation is not fully represented there. Broader task-oriented workflows, complete REST contracts, whole-surface configuration ownership, complete example and content/source ownership checks, and CI automation that regenerates and commits allowlisted outputs before checks remain open requirements. See the phases and acceptance criteria below for durable scope and evidence.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
-## Repository baseline (verified at `origin/main` `1c8e820`, 2026-10-21)
+## Repository baseline
 
 The current default branch builds a static VitePress site under
 `/SketchForge-3D/`, with local search, canonical Markdown staging, local link
 and include checks, generated package/CLI/shape/configuration/format/MCP
 references, deterministic reference drift checks, a local preview command,
-and a GitHub Pages workflow. The first GitHub Pages deployment after PR #116 merged succeeded.
-PR #134 added lower-case compatibility routes. Merged PR #141 added built-site browser
-checks for keyboard navigation, focus, landmarks, headings, mobile navigation,
-search, and 390px overflow. PR #143 added a separate recurring external-link
+and a GitHub Pages workflow. The GitHub Actions publishing source is configured,
+and the published site is reachable at the canonical URL. Lower-case
+compatibility routes preserve legacy paths. Built-site browser checks cover
+keyboard navigation, focus, landmarks, headings, mobile navigation, search,
+and narrow viewport reflow. A separate recurring external-link
 report that uploads advisory JSON and Markdown artifacts; external failures do
 not fail the required local docs check or site build. The Pages API's initial
 404 was a temporary setup blocker, not current status. The app's
 `scripts/build-static.mjs` remains separate and builds SketchForge for
-Cloudflare Workers. Existing built-site tests check static output and provenance.
-Merged PR #141 adds a real browser smoke test for keyboard navigation, visible
-focus, landmarks and headings, mobile navigation, local search, and layout
-overflow at 390px.
+Cloudflare Workers. Existing built-site tests check static output and generated
+provenance. The browser smoke suite also checks the editor quick-start workflow.
 
 The migration starts with useful maintained sources already in place:
 `README.md`, `docs/REST_API.md`, `docs/SKF_PROJECT_FORMAT.md`,
@@ -40,16 +39,16 @@ CLI.
 
 | Audited gap or contradiction | Evidence and consequence for the first implementation phases |
 | --- | --- |
-| The initial audit found no complete REST operation contract; route behavior lived in individual `apps/web/src/app/api/v1/*/route.ts` handlers and `docs/REST_API.md` was explanatory prose and tables. | The initial route inventory and first runtime-consumed request contract merged in PR #112. Full request/response schemas and OpenAPI generation remain incomplete; do not describe the inventory as a complete contract. |
-| Configuration has no central schema. Environment reads and defaults are distributed across API, storage, MCP, macro, and desktop modules. | The operator configuration reference merged in PR #121. It documents supported operator settings; it does not establish one central schema or make every `process.env` use a supported setting. |
-| The initial audit found a generic “the release version” value in the publishing-client table and version mismatch between the README badge and manifests. | PR #156 now generates the table's version from package metadata and checks against blank/generic values; PR #167 automates publishing-version updates. At this baseline, the released package version is 1.15.0; release PR #184 for 1.16.0 is still open. |
-| Project-format documentation contained a camera-state contradiction. `docs/SKF_PROJECT_FORMAT.md` said camera state is preserved, then later said camera position is omitted, despite `cameraView` in the workspace model and round-trip test. | The `.skf` reference update merged in PR #123 and resolves the stale format description. |
-| The public CLI surface differs from root developer scripts. `packages/sketchforge-client/package.json` declares `sketchforge-macro` and `sketchforge-mcp`; `packages/sketchforge-py/pyproject.toml` declares its `sketchforge-macro`. | `docs/CLI_REFERENCE.md` is now generated from the published entry points and actual usage/help output (merged in PR #117). Keep root npm scripts separate as contributor commands. |
-| At the initial audit, GitHub Actions did not publish documentation to Pages; it built/tests the app and deployed app content to Cloudflare separately. | PR #116 added the Pages workflow and was merged; the first deployment succeeded. Pages publication is no longer an unverified or outstanding setup decision. |
+| The initial audit found no complete REST operation contract; route behavior lived in individual `apps/web/src/app/api/v1/*/route.ts` handlers and `docs/REST_API.md` was explanatory prose and tables. | A route registry and parity test now cover the public method inventory. Runtime request/response contracts and generated OpenAPI cover only nine of 32 registered operations; the remainder still need verified schemas and response behavior. |
+| Configuration has no central schema. Environment reads and defaults are distributed across API, storage, MCP, macro, and desktop modules. | The generated operator reference covers supported public server/container settings and checks its source-derived output. It does not establish one central schema or claim that every `process.env` use is a supported setting. |
+| The initial audit found a generic “the release version” value in the publishing-client table and a version mismatch between the README badge and manifests. | The publishing-client table now reads the Release Please manifest, verifies it against package manifests, and is refreshed by release automation. `docs:check` rejects stale or generic values. |
+| Project-format documentation contained a camera-state contradiction. `docs/SKF_PROJECT_FORMAT.md` said camera state is preserved, then later said camera position is omitted, despite `cameraView` in the workspace model and round-trip test. | The generated `.skf` reference and maintained project-format guide now agree with the workspace model and round-trip coverage. |
+| The public CLI surface differs from root developer scripts. `packages/sketchforge-client/package.json` declares `sketchforge-macro` and `sketchforge-mcp`; `packages/sketchforge-py/pyproject.toml` declares its `sketchforge-macro`. | `docs/CLI_REFERENCE.md` is generated from the published entry points and actual usage/help output. Keep root npm scripts separate as contributor commands. |
+| At the initial audit, GitHub Actions did not publish documentation to Pages; it built/tests the app and deployed app content to Cloudflare separately. | The Pages workflow now builds and deploys the static documentation artifact from the default branch. Pages publication is no longer an unverified setup decision. |
 
-The repository observations were initially audited on 2026-10-21. The status
-column tracks later implementation and merge evidence; the underlying gap list
-should be rechecked as the remaining phases land.
+The table records the original problems and their durable implementation
+status. Remaining requirements are tracked in the phase and acceptance sections
+below.
 
 ## 1. Objective
 
@@ -179,10 +178,11 @@ next one runs.
 
 ```mermaid
 graph TD;
-  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>copy docs into .docs-site"];
-  B --> C["vitepress build<br/>docs-site-dist"];
-  C --> D["site-build tests<br/>provenance, accessibility, search"];
-  D --> E["GitHub Pages deploy<br/>main only"];
+  A["docs:generate<br/>refresh generated references and stage docs"] --> B["commit allowlisted generated updates<br/>to the PR branch"];
+  B --> C["docs:check<br/>validate sources and generated output"];
+  C --> D["vitepress build<br/>docs-site-dist"];
+  D --> E["site-build tests<br/>provenance, accessibility, search"];
+  E --> F["GitHub Pages deploy<br/>main only"];
 ```
 
 ### Required commands
@@ -190,13 +190,13 @@ graph TD;
 Expose stable repository scripts, independent of the chosen site generator:
 
 ```text
-npm run docs:generate   # stage docs, generate package references into .docs-site, and include executable examples
-npm run docs:check      # links, source directives, schema parity, API coverage, and maintained generated diff checks
-npm run docs:build      # produce the static Pages artifact
+npm run docs:generate   # refresh generated references, stage canonical docs, and include examples
+npm run docs:check      # validate sources and the output produced by docs:generate
+npm run docs:build      # generate, validate, and produce the static Pages artifact
 npm run docs:preview    # serve the artifact locally under the project-site base path
 ```
 
-The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. Generated files should live in the build directory unless a source-controlled compatibility copy is explicitly needed. PR #168 generates current TypeScript and Python package references into staged `.docs-site/docs/reference/`, validates them there, and publishes them inside the Pages artifact; tracked `docs/reference/` files remain compatibility copies for repository browsers. The Pages artifact is authoritative for current package reference content. Other reference generators remain checked against committed outputs unless separately migrated.
+The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. Generated Markdown may remain tracked when repository browsing or compatibility requires it. Generators currently write outputs including `docs/PUBLISHING_CLIENTS.md`, `docs/SHAPE_REQUEST_REFERENCE.md`, `docs/CLI_REFERENCE.md`, `docs/OPERATOR_CONFIGURATION.md`, `docs/SKF_FORMAT_REFERENCE.md`, `docs/mcp/TOOLS_REFERENCE.md`, and `docs/openapi-v1.json`; the package TypeScript, Python, and engine references are staged under `.docs-site/docs/reference/`. `docs/openapi-v1.json` is a tracked generated artifact linked directly from `docs/REST_API.md`. The required invariant is to run `docs:generate` before freshness checks and site builds, so a source change refreshes generated output instead of failing merely because a committed generated copy is stale. CI must regenerate the allowlisted generated files and commit refreshed files to the PR branch, then run required checks for the resulting commit. The current workflow does not meet that invariant: `docs.yml` runs `docs:check` first, and `docs:build` also checks before generating. Reorder these stages and validate the commit containing regenerated outputs.
 
 ### Pull request checks
 
@@ -204,10 +204,10 @@ On every pull request that changes application code, packages, tests/examples, d
 
 1. Install from the lockfile and build the public packages.
 2. Generate API, configuration, shape, format, package, and CLI reference inputs.
-3. Validate generated artifacts in their configured destination: compare maintained source-controlled outputs to their generators and validate package references in the staged Pages tree.
+3. Run every generator before freshness checks. If allowlisted generated files change, commit those updates to the PR branch, then run required checks against that resulting commit. Tracked generated Markdown is allowed, but stale output must be regenerated before checks/builds.
 4. Verify source directives, internal links, fragments, redirects, and image references.
 5. Typecheck and execute the examples described in section 5.
-6. Run API route/contract parity and project-format compatibility checks.
+6. Run API route-registry parity, covered runtime contract tests, and project-format compatibility checks.
 7. Build the static site with the exact `/SketchForge-3D/` base path.
 8. Smoke-test representative deep links, search, and assets from the built artifact.
 
@@ -226,11 +226,11 @@ When practical, upload the built site as a pull-request artifact for reviewers. 
 
 ## 8. Content ownership and change policy
 
-- Every maintained page has front matter containing a stable slug, title, audience, owner area, and optional reviewed revision.
+- Every maintained page should have front matter containing a stable slug, title, audience, owner area, and optional reviewed revision; applying and enforcing that metadata across all current pages remains outstanding.
 - Each public code area maps to at least one reference page and one tested example or an explicit reason no example is appropriate.
 - A pull request that changes public behavior must either update the source-derived reference automatically or update the owning concept/workflow page when user-facing explanation changes.
 - Reviewers should reject manually copied signatures, endpoint lists, config tables, shape catalogs, and runnable code blocks when source directives or generators can provide them.
-- A `docs:check` job reports the changed source symbol/route/config key and the owning page or missing example to make failures actionable.
+- A `docs:check` job should report the changed source symbol/route/config key and the owning page or missing example. Current diagnostics cover links/includes and individual generator failures, but a complete source-to-owner map is not implemented.
 - Translate stable prose only after the English source and generated contract are current. Generated API signatures and code examples remain language-neutral; localized UI labels come from locale catalogs.
 
 ## 9. Migration plan
@@ -243,17 +243,17 @@ Deliver the suite in small steps while retaining current published docs until re
 - [x] Add site shell, navigation, base path derived from repository metadata, Pages workflow, local source/link checks, and local preview command.
 - [x] Import tracked repository Markdown from canonical sources without rewriting factual tables.
 - [x] Publish a migration map and retain repository-relative Markdown paths in the generated source tree.
-- [x] Configure the repository Pages publishing source as GitHub Actions and verify the first published deployment. The first deployment succeeded after PR #116 merged.
+- [x] Configure the repository Pages publishing source as GitHub Actions and verify the first published deployment.
 
-Phase 1 established and deployed the site shell. Package references and
-executable examples (#118), stable-face `GET /faces` and `PATCH faceColors`
-contracts (#120, #125), operator configuration (#121), project-format
-reference (#123), MCP reference/navigation (#122), source provenance (#126),
-STEP color guidance (#119), and lower-case compatibility routes (#134) have
-merged. Deterministic generator-hook integration (#128) has also merged.
-The initial browser smoke slice is merged, but a complete accessibility audit
-and broader workflow smoke checks remain incomplete. External-link reporting is
-merged as an advisory workflow; local link and include failures remain blocking.
+Phase 1 established and deployed the static site shell. Generated package,
+CLI, shape, operator-configuration, `.skf`, and MCP references; runtime-backed
+REST contracts for a subset of operations; source provenance; legacy-path
+compatibility; and deterministic local link/include checks are present. The
+built-site browser checks cover keyboard navigation, visible focus, landmarks,
+headings, mobile navigation, local search, accessible names, contrast, alt
+text, reduced motion, and narrow viewport reflow. Broader task-workflow smoke
+checks remain incomplete. External-link reporting is advisory; local link and
+include failures are blocking.
 
 The built-site browser test uses the pinned Playwright dependency. On a local
 checkout, install its Chromium binary with `npm run docs:browser:install`
@@ -262,22 +262,18 @@ its Ubuntu system dependencies before running the build.
 
 ### Phase 2: generate package and example documentation
 
-- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. PR #168 stages current generated pages at `.docs-site/docs/reference/` for the Pages artifact and retains tracked copies as compatibility pages. The three `docs/packages/*.md` pages recursively include registry-facing package READMEs as canonical prose. `docs/guides/package-examples.md` includes six existing client and Python macro examples directly. Integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
-- **Merged PR #136:** adds Python static type checking and symbol-level source links. PR #137 adds the complete REST measurement listing contract, #139 adds API reference source links, and #140 adds face-based drafting documentation.
-- **Merged PR #145:** adds stable face IDs, face-color fields, and a source-backed example to the Python client. Package example CI verifies it against the local API.
-- **Open PR #168:** proposes generating current TypeScript client, engine, and Python references directly into the Pages build artifact, validating staged output and rendered package-reference routes rather than requiring generated Markdown diffs in commits. Its branch also carries the #181 revolve source-persistence and #183 STEP ancestry changes; neither proposal is on `main`.
+- The TypeScript client and engine references are built from declarations; the Python reference is built from public exports, annotations, and docstrings. Current generated package references are staged at `.docs-site/docs/reference/` and validated there for the Pages artifact. Package guide pages include the registry-facing READMEs as canonical prose.
+- Python references include type checks and symbol-level source links. The API docs link to operation sources and examples; stable face IDs and face colors are available from the Python client.
+- `docs/guides/package-examples.md` includes existing client and Python macro examples. Integration jobs execute those package examples against a local API, and a separate documentation browser check exercises the editor quick-start.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
 - Reuse package README content for package registries and the site from a shared source or generated subset.
 
 ### Phase 3: make the REST reference authoritative
 
-- **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract; the generated OpenAPI currently covers only operations with faithful schemas.
-- **Merged PRs #120 and #125:** stable application-owned IDs are included in `GET /faces` and are the persisted `faceColors` keys for `PATCH /shapes`. The operation inventory still lacks complete schemas for the rest of the REST surface.
-- **Merged PR #144:** `docs/openapi-v1.json` is generated from the runtime operation registry and documents six project/shape CRUD operations whose request/query/status schemas can be represented accurately. The document enumerates 26 of 32 registered operations as omitted, with reasons; this partial output does not make the REST reference authoritative for the whole API.
-- **Merged PR #151:** adds runtime-backed query and response validation for `GET /faces`; current main's generated document covers seven operations and lists 25 of 32 registered operations as omitted with reasons.
-- **Open PR #182:** adds runtime-backed contracts for `GET /measurements` and `POST /measurements`. Its proposed OpenAPI output covers nine of 32 registered operations and lists the remaining 23 as omitted with reasons. Full REST reference coverage remains outstanding.
-- **Open PR #188:** proposes a persisted source-sketch node and feature input for sketch sweeps, including stable identity when editor edits rebuild the sweep. It does not add a REST operation to update the sweep profile and rebuild it. General recomputation across downstream features remains outstanding.
-- **Open PR #194:** proposes `PATCH /api/v1/shapes` support for updating `sketchProfile` and rebuilding sketch sweeps, preserving the shape and source identities. It is stacked on #188 and remains unmerged. The operation stays out of generated OpenAPI because its request validation is not fully represented there; general dependency-ordered recomputation remains outstanding.
+- `apps/web/src/lib/apiV1OperationContract.ts` registers every public route method and auth mode. A parity test compares the registry with discovered route handlers. Request/response validation is runtime-backed for nine operations; generated OpenAPI lists the 23 registered operations that remain omitted, with reasons.
+- `GET /faces` exposes stable application-owned IDs, and `PATCH /shapes` accepts them as persisted `faceColors` keys. Measurement routes have query/body and response contracts.
+- Sketch sweeps retain their source profile in `.skf`. The engine and both clients can create sweeps; `PATCH /api/v1/shapes` accepts an updated `sketchProfile` and rebuilds geometry while retaining shape and source IDs. The operation remains omitted from OpenAPI because custom `faceColors` validation and profile validation are not yet faithfully represented together.
+- General dependency-ordered recomputation across downstream operations remains outstanding.
 - Define the typed operation contract and migrate routes incrementally.
 - Expand the generated OpenAPI coverage as operation metadata becomes a faithful description of runtime validation and response behavior; generate endpoint pages from the same source.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
@@ -285,8 +281,8 @@ its Ubuntu system dependencies before running the build.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
-- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), MCP schemas/navigation (PR #122), and STEP color guidance (PR #119). Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
-- The tested package-example guide and editor quick-start (#150) are merged. Broader task guides remain outstanding.
+- The parameterized-shape, CLI, operator-configuration, `.skf`, and MCP references are generated from their code or metadata inputs and checked for drift. STEP color guidance describes the supported import behavior.
+- Package examples and an editor quick-start are tested. Broader task-oriented guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
@@ -294,32 +290,37 @@ its Ubuntu system dependencies before running the build.
 ### Phase 5: close the stale-content loop
 
 - Add coverage rules for every public route, exported symbol, config key, format, and example.
-- **Merged PR #143:** adds scheduled, pull-request, and manual external-link reporting with downloadable JSON/Markdown artifacts. Remote failures are advisory; internal broken links stay blocking in `docs:check`.
-- The recurring report checks the outbound links separately from the deterministic site build. A recent 144-link run recorded one GitHub 404 and two standards-site 403 responses; these are report data, not build failures.
-- **Merged PR #126:** generated site pages show the package version, full repository revision, and source links pinned to that revision. PR #134 adds redirect coverage for legacy public paths.
-- Merged PR #132 adds a release-process guide and checks release metadata consistency. Coverage rules for every route, export, configuration key, format, and example remain outstanding.
+- Scheduled, pull-request, and manual external-link reporting uploads advisory JSON and Markdown artifacts. Remote failures do not fail the deterministic local docs check or site build.
+- Generated site pages show the package version, repository revision, and source links pinned to that revision. Compatibility routes cover legacy public paths, and release metadata consistency is checked.
+- Complete coverage rules for every route, export, configuration key, format, and example remain outstanding.
 - Remove superseded manually maintained tables and duplicate code blocks.
 
-### Documentation gaps identified 2026-10-21 — status at `1c8e820`
+### Current documentation gaps
 
-- **Publishing clients version row — closed by #156 and #167:** the table now reads package versions from metadata and automated release updates keep it current; CI rejects a blank or generic version. Main is on 1.15.0; release PR #184 proposes 1.16.0.
-- **Cross-links between documentation and references — closed by #157:** task guides, package pages, API references, and generated symbol references gained contextual cross-links and link checks.
-- **Engine npm listing and generated reference — closed by #158:** the npm README and generated engine reference now include installation, runtime requirements, package purpose, runnable usage, and links from exported APIs to relevant concepts; packed-package content is checked.
+- **Publishing-client version — closed:** the table reads package versions from the Release Please manifest, checks them against package manifests, and is updated automatically during release preparation.
+- **Cross-links between documentation and references — closed:** task guides, package pages, API references, and generated symbol references link to related concepts and are checked for local-link validity.
+- **Engine package documentation — closed:** the package README and generated reference cover installation, runtime requirements, package purpose, runnable usage, and links from exported APIs to relevant concepts; packed-package content is checked.
+- **Generated-output automation — open:** reference generators write allowlisted source-controlled output, which may remain committed for repository browsing. The docs workflow currently runs `docs:check` before generation, and `docs:build` checks before generating. CI should run `docs:generate`, commit any refreshed allowlisted outputs to the PR branch, then run required checks for that resulting commit.
+- **Complete REST contracts — open:** nine of 32 registered operations have runtime-backed contracts and appear in OpenAPI; 23 remain omitted with reasons. The sweep profile update works but is not yet represented in OpenAPI.
+- **Task-oriented coverage and ownership — open:** more complete workflows, page ownership metadata, and source-to-owning-page diagnostics remain necessary.
 
 ## 10. Acceptance criteria
 
-The suite is ready for general use when all of these are true:
+The suite is ready for general use when all of these are true. The status below
+is based on the current workflows, generators, source documents, and tests; a
+green narrow check does not imply that the broader requirement is complete.
 
-1. A clean checkout can build and preview the docs without secrets or production connectivity.
-2. A default-branch merge deploys the built site to GitHub Pages at the configured canonical URL.
-3. The site loads all assets and deep links under the repository path prefix.
-4. Public API route coverage is complete and the generated OpenAPI/reference is tested against running route behavior. Main currently covers seven operations and records 25 of 32 registered operations as omitted; open PR #182 proposes nine covered and 23 omitted. Open PR #194 adds a proposed sweep-profile PATCH/rebuild contract but leaves it out of generated OpenAPI. This criterion is not yet met.
-5. TypeScript, Python, engine, configuration, and format references are generated from authoritative source inputs.
-6. Every runnable code example in the site is sourced from a repository file and typechecked or executed in CI.
-7. CI fails on missing source includes, broken internal links, undocumented public configuration, unregistered public routes, example failures, or generated-reference drift.
-8. Search, keyboard navigation, responsive behavior, and accessibility basics are smoke-checked on the built artifact. PRs #141 and #154 cover local search, skip navigation, visible focus, mobile menu keyboard operation, landmarks/headings, contrast, alt text, accessible search naming, reduced motion, and reflow at 320px. Broader task-workflow checks remain open.
-9. Existing public documentation links either resolve to the new site or have intentional redirects/compatibility pages. Lower-case compatibility paths merged in PR #134. Open PR #187 supplies a repository-controlled historical inbound-link inventory and links it from the migration map; it is proposed, not merged. The inventory cannot establish external backlinks outside repository history.
-10. Maintainers can identify the source file and owning page from a generated-reference check failure.
+1. **Met:** A clean CI checkout builds and previews the docs without secrets or production connectivity. The workflow installs lockfile dependencies and Python docs-check requirements before running the local pipeline.
+2. **Met:** A default-branch merge deploys the built site to GitHub Pages at the configured canonical URL. The repository Pages source is GitHub Actions and the published URL is live.
+3. **Met:** The site loads assets and deep links under `/SketchForge-3D/`; VitePress is configured for that project prefix and built-site tests serve and inspect the artifact under it.
+4. **Open:** Route registration parity is enforced, but only nine of 32 operations have runtime-backed request/response contracts and appear in generated OpenAPI. Twenty-three remain explicitly omitted. `PATCH /api/v1/shapes` supports `sketchProfile` rebuilds but remains omitted because the combined request validation is not faithfully represented.
+5. **Met for published references:** TypeScript, Python, engine, CLI, supported operator configuration, shape, MCP, and `.skf` references are generated or checked from declarations, exports, validators, readers, registries, or package metadata. The operator reference explicitly does not claim to inventory every environment variable; complete configuration ownership remains open.
+6. **Partial:** Package and MCP examples are sourced from repository files and exercised in CI, and the editor quick-start has browser acceptance. The site does not yet enforce that every runnable code block across all pages comes from a source file and is typechecked or executed.
+7. **Partial:** Required checks fail on missing includes and broken internal links, route registry mismatches, selected example failures, and generated-reference drift. They do not yet reject every undocumented public configuration key or map all public changes to owning pages and examples.
+8. **Met for accessibility basics:** Built-artifact checks cover local search, keyboard navigation, skip navigation, visible focus, landmarks/headings, mobile menu operation, contrast, alt text, accessible search naming, reduced motion, and reflow at 320px. Broader task-workflow checks remain open.
+9. **Partial:** Local links, compatibility routes, and repository-controlled historical inbound paths are checked and inventoried in [`HISTORICAL_INBOUND_LINKS.md`](./HISTORICAL_INBOUND_LINKS.md). The inventory cannot establish external backlinks outside repository history.
+10. **Partial:** Generated sources are linked and generator failures identify their source input, but all maintained pages do not carry owner metadata and diagnostics do not consistently name the owning page or missing example.
+11. **Open:** CI must run all documentation generators before freshness checks and site builds. Generated Markdown may remain committed for repository browsing, but stale allowlisted output must be regenerated and committed to the PR branch before required checks run against the resulting commit. Today `docs.yml` runs `docs:check` before `docs:build`, and `docs:build` itself checks before generating.
 
 ## 11. Explicit non-goals
 
@@ -331,9 +332,9 @@ The suite is ready for general use when all of these are true:
 
 ## 12. Risks and decisions to settle during implementation
 
-- **API contract extraction cost:** the current REST reference is prose and endpoint tables alongside route handlers. A contract registry is needed to keep request/response docs honest; migrate incrementally and prove it against handlers rather than scraping them.
+- **API contract extraction cost:** an operation registry and partial runtime contracts exist, but most route schemas and response behaviors remain uncontracted. Extend the registry incrementally and prove each contract against handlers rather than scraping them.
 - **Pages base path:** app deployment and static export currently have their own build assumptions. Keep the docs artifact independent so documentation deployment cannot change production app hosting.
-- **Shared README content:** package registries expect README files. Choose a shared-source/include strategy that works for both package publishing and the site, and test the actual packed packages.
+- **Generated reference automation:** generated Markdown may remain tracked, but CI must refresh allowlisted files, commit updates to the PR branch, and run required checks against the resulting commit before building and publishing the site.
 - **Screenshot stability:** UI screenshots can be noisy across browser/OS versions. Capture them in a pinned browser environment, compare only stable workflows, and treat explanatory diagrams separately.
 - **Generated docs readability:** generated API references need curated summaries and runnable examples, but those summaries must link back to authoritative symbols and tested examples.
 - **External link availability:** never make the docs build depend on arbitrary external hosts; report external link failures separately from required internal-link checks.

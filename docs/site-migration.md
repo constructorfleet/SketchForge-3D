@@ -1,74 +1,93 @@
-# Documentation site migration map
+# Documentation site status and migration map
 
-This phase establishes the static site shell and publishes canonical Markdown
-sources as pages. The repository files remain the maintained sources; the
-build assembles a temporary VitePress tree and expands the landing page's
-README include. Existing repository paths are retained in the site where
-possible, and the navigation points to the maintained API, project-format,
-client, translation, and capability documents.
+The static VitePress site is published at
+[`https://constructorfleet.github.io/SketchForge-3D/`](https://constructorfleet.github.io/SketchForge-3D/).
+The repository remains the source for maintained prose, examples, and
+generated references. The required CI order is to refresh generated output,
+commit any allowlisted updates to the PR branch, validate the resulting commit,
+build static pages, run built-site checks, and publish the Pages artifact from
+the default branch. The current workflow still runs freshness checks before
+generation and does not commit refreshed outputs; correcting that order is an
+open pipeline task.
 
-## Phase 1 delivered
+## Delivered site capabilities
 
-- VitePress 1.6.4 static build with a repository-derived project-site base path.
-- Built-in local search, navigation, source includes, local link and include
-  checks, and a local preview command.
-- Pull-request build artifact and default-branch GitHub Pages deployment
-  workflow. The first GitHub Pages deployment after PR #116 merged succeeded.
-- Existing README, `docs/*.md`, package README, and other tracked Markdown
-  pages are staged from their canonical files without hand-copying facts.
-- README images hosted on the application website are shown as their alt text
-  in the offline site; the tracked logo and site favicon are served locally.
+- Project-path routing, local search, navigation, recursive source includes,
+  local-link checks, a local preview command, and GitHub Pages deployment.
+- Compatibility pages and redirects preserve the repository's public
+  documentation paths. See the
+  [historical inbound-link inventory](./HISTORICAL_INBOUND_LINKS.md) for the
+  repository-controlled paths and their destinations.
+- Source provenance is rendered into built pages: package version, repository
+  revision, and source links point to the revision represented by the build.
+- The built-site browser checks cover navigation, visible focus, landmarks,
+  headings, search, responsive behavior, accessible names, contrast, alt text,
+  reduced motion, and 320px reflow. A separate browser check exercises the
+  editor quick-start. The docs workflow installs its pinned browser runtime.
+- External-link availability is reported in a separate advisory job. Remote
+  failures do not block the deterministic local docs check or site build.
 
-## Follow-up phases
+## Current reference coverage
 
-- **Site capabilities:** PR #162 merged Mermaid fence rendering and CI checks;
-  diagrams now publish as rendered content.
-- **Phase 2:** package references and executable examples merged in PR #118.
-- **Python client:** reference type checks and source links (#136) and stable-
-  face identity parity (#145) have merged. The latter adds stable face IDs,
-  face colors, and a source-backed example; package examples run against the
-  local API.
-- **Phase 3:** the initial typed REST operation inventory and route parity
-  check merged in PR #112; `GET /faces` and `PATCH /shapes` stable face color
-  contracts merged in PRs #120 and #125. PR #144 added generated OpenAPI for
-  six schema-backed CRUD operations and records the 26 registered operations
-  still omitted; full route schemas and live-handler parity remain outstanding.
-  Merged PR #151 adds runtime-backed `GET /faces` query and response coverage,
-  bringing the generated contract to 7 operations with 25 registered operations
-  still omitted.
-- **Phase 4:** parameterized shape reference (#115), published CLI (#117),
-  operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
-  (#122) references have merged. Deterministic generator-hook wiring merged in
-  PR #128. STEP color guidance merged in PR #119, and STEP component-color
-  import support merged in PR #147. The tested editor quick-start from first
-  sketch through save/export merged in PR #150 with browser acceptance and
-  screenshots; broader task guides remain outstanding.
-- **Phase 5:** site version/revision stamps and pinned source links merged in
-  PR #126, lower-case compatibility routes in PR #134, and the release-process
-  guide/check in PR #132. Built-site browser smoke checks merged in PR #141;
-  the scheduled non-blocking external-link report merged in PR #143. Coverage
-  rules remain outstanding. PR #154 added built-site checks and fixes for
-  contrast, alt text, accessible search naming, reduced motion, and 320px
-  reflow; broader page and workflow coverage remains outstanding.
+- TypeScript, Python, and engine references are generated into
+  `.docs-site/docs/reference/` from package declarations and public exports.
+  Their rendered pages are validated as part of the Pages artifact.
+- CLI, shape, operator configuration, `.skf`, MCP, publishing-client, and
+  OpenAPI references have source generators and drift checks. These generators
+  write source-controlled Markdown outputs. `docs/openapi-v1.json` is currently
+  a tracked generated artifact. Generated files may remain committed for
+  repository browsing; CI must regenerate the allowlisted outputs before
+  checks, commit any refreshed files to the PR branch, and run required checks
+  against the resulting commit.
+- Package guides include registry-facing README files, and package examples
+  run against a local API. Python package references and examples are checked
+  with mypy and integration tests. The MCP example is checked against the
+  server's current advertised tool schemas.
+- The editor quick-start is tested in a browser from the first sketch through
+  save and export. Broader task-oriented guides and corresponding workflow
+  checks remain incomplete.
 
-The merged site includes generated package, example, shape, CLI, operator
-configuration, `.skf`, and MCP references. Deterministic reference-generator
-checks merged in PR #128; STEP color guidance merged in PR #119.
+## REST API coverage
 
-The current repository-controlled inbound links and historical published
-paths, including their canonical destinations and compatibility behavior, are
-listed in the [inbound-link inventory](HISTORICAL_INBOUND_LINKS.md).
+[`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
+registers all 32 public route operations, and route tests check parity between
+the registry and handlers. Nine operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 23 are listed
+with omission reasons in the generated contract; full route coverage remains
+open.
 
-## Newly identified documentation gaps
+`PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep and
+rebuilds the solid while preserving shape and source IDs. The operation is
+still omitted from OpenAPI because the combined custom face-color and profile
+validation is not fully represented there. Sweep source persistence and
+editing work, but downstream dependency-ordered recomputation is not available.
+See the [REST API guide](./REST_API.md#sketch-sweeps) and the
+[kernel capability inventory](./UNEXPLORED_KERNEL_CAPABILITIES.md).
 
-- Merged PR #156 resolves the publishing-clients version gap with a generated,
-  manifest-backed table and consistency checks.
-- Merged PR #157 adds useful contextual links among task guides, package pages,
-  and generated API references.
-- Merged PR #158 expands the engine package README and generated TypeScript
-  reference into a practical npm listing and API guide, and verifies packed contents.
-- Open PR #187 proposes an inventory of repository-controlled historical
-  inbound documentation paths. Open PR #188 proposes persisted sweep source
-  sketches, and open PR #194 proposes the REST profile-update/rebuild request.
-  Both sweep changes remain proposed until merged; broader dependency-ordered
-  recomputation remains unavailable.
+## Durable gaps
+
+- **Complete REST reference:** add runtime-backed request/response contracts
+  for the remaining operations, generate endpoint pages from those contracts,
+  and replace or clearly bound hand-maintained endpoint details.
+- **Generated-output automation:** run `docs:generate` before `docs:check` and
+  the site build. `docs:check` currently compares generated Markdown with
+  sources before the full generator command runs, so stale output fails CI
+  instead of being refreshed first. Generated Markdown may remain tracked; CI
+  should commit refreshed allowlisted outputs to the PR branch and run required
+  checks against the resulting commit.
+- **Configuration ownership:** the current generated operator reference
+  documents supported server/container settings, not every environment read
+  across server, desktop, tests, build tools, and browser code. A central
+  supported-configuration schema and complete ownership checks remain open.
+- **Examples and page ownership:** require runnable examples to come from
+  source files and execute them in CI; add consistent page audience/owner
+  metadata and diagnostics mapping changed sources to their owning pages.
+- **Task workflows:** expand tested task guides beyond the editor quick-start,
+  package examples, and current REST/MCP workflows.
+- **Inbound links:** local links, compatibility paths, and repository history
+  are inventoried. External backlinks outside repository history cannot be
+  established by this inventory.
+
+See the [documentation suite specification](./DOCUMENTATION_SUITE_SPEC.md)
+for the full objective, source-of-truth rules, implementation phases, and
+acceptance audit.
