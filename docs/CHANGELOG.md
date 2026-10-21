@@ -4,6 +4,8 @@
 
 - Added lower-case compatibility routes for the REST API, `.skf` project format, publishing clients, and shape request reference pages. The static pages redirect to canonical paths and retain a fallback link.
 
+- Added an executable local MCP workflow showing project creation, shape creation, scene inspection, and `.skf` export. The example validates each call against the MCP server's current `tools/list` schema and cleans up its temporary project.
+
 - The REST API contract now describes `GET /properties` query parameters,
   response fields, and geometry provenance. The route rejects malformed kernel
   property results before returning a success response; the REST reference now

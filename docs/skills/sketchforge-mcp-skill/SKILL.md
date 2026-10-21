@@ -28,6 +28,8 @@ bridge without the download.
 
 The MCP server talks to the app through `/api/sketchforge-mcp`. Open editor tabs heartbeat into that route and receive commands from it. Production and Docker/static builds intentionally return 404 for the MCP route.
 
+For a complete executable example that creates, reads, and exports a temporary local project, see [MCP examples](../../mcp/EXAMPLES.md).
+
 ## Client Compatibility
 
 Codex can use this folder as a skill and the MCP server as tools. Install the folder under `~/.codex/skills/sketchforge-mcp-skill` and configure the MCP server in Codex.
