@@ -39,7 +39,12 @@ beforeEach(async () => {
   macroDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "sketchforge-macros-"));
   outsideDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "sketchforge-outside-"));
   await fs.writeFile(path.join(macroDirectory, "plate.mjs"), "export default { name: 'x', project: 'fresh', run: () => {} };\n");
-  await fs.writeFile(path.join(macroDirectory, "flange.py"), "MACRO = None\n");
+  await fs.writeFile(path.join(macroDirectory, "flange.py"), [
+    "def build(context):",
+    "    pass",
+    "MACRO = define_macro(name='Flange', project='replace', description='Six bolt holes', params={'holes': 6}, run=build)",
+    "",
+  ].join("\n"));
   await fs.writeFile(path.join(macroDirectory, "notes.txt"), "not a macro\n");
   await fs.writeFile(path.join(outsideDirectory, "secret.mjs"), "export default () => {};\n");
 });
@@ -62,6 +67,16 @@ describe("macro listing", () => {
   it("says which runner each macro needs", async () => {
     const listing = await listMacros({ [MACRO_DIR_ENV]: macroDirectory });
     expect(listing.macros.map((macro: { language: string }) => macro.language)).toEqual(["python", "javascript"]);
+  });
+
+  it("shows Python macro description, project mode and parameter defaults", async () => {
+    const listing = await listMacros({ [MACRO_DIR_ENV]: macroDirectory });
+    expect(listing.macros[0]?.metadata).toEqual({
+      name: "Flange",
+      description: "Six bolt holes",
+      project: { mode: "replace" },
+      params: { holes: 6 },
+    });
   });
 });
 

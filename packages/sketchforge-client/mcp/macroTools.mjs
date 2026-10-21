@@ -50,6 +50,60 @@ export function macroDirectory(environment = process.env) {
   return path.resolve(configured);
 }
 
+function pythonRunnerEnvironment(environment) {
+  const pythonPath = existsSync(bundledPythonSource)
+    ? [bundledPythonSource, environment.PYTHONPATH].filter(Boolean).join(path.delimiter)
+    : environment.PYTHONPATH;
+  return {
+    command: environment.SKETCHFORGE_MACRO_PYTHON || "python3",
+    environment: { ...environment, ...(pythonPath ? { PYTHONPATH: pythonPath } : {}) },
+  };
+}
+
+function inspectPythonMacro(filePath, environment) {
+  const runner = pythonRunnerEnvironment(environment);
+  return new Promise((resolve) => {
+    const child = spawn(runner.command, ["-m", "sketchforge3d.macro", filePath, "--describe", "--json"], {
+      cwd: path.dirname(filePath),
+      env: runner.environment,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let stdout = "";
+    let finished = false;
+    const timer = setTimeout(() => {
+      finished = true;
+      child.kill("SIGKILL");
+      resolve(null);
+    }, 5_000);
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.length > 64 * 1024) {
+        finished = true;
+        clearTimeout(timer);
+        child.kill("SIGKILL");
+        resolve(null);
+      }
+    });
+    child.on("error", () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve(null);
+    });
+    child.on("close", (code) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (code !== 0) return resolve(null);
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
 /**
  * The macros an operator has installed.
  *
@@ -75,11 +129,13 @@ export async function listMacros(environment = process.env) {
     // A symlink out of the directory is still a file the operator put there on
     // purpose; what matters is that the name came from this listing.
     if (!info?.isFile()) continue;
+    const metadata = extension === ".py" ? await inspectPythonMacro(full, environment) : null;
     macros.push({
       name: entry.name,
       language: extension === ".py" ? "python" : "javascript",
       bytes: info.size,
       modifiedAt: new Date(info.mtimeMs).toISOString(),
+      ...(metadata ? { metadata } : {}),
     });
   }
   return { directory, macros: macros.sort((left, right) => left.name.localeCompare(right.name)) };
@@ -104,14 +160,11 @@ function runnerFor(macroName, environment) {
     return { command: process.execPath, leadingArguments: [path.join(moduleDirectory, "localMacroRunner.mjs")], extraEnvironment: {} };
   }
   if (path.extname(macroName).toLowerCase() === ".py") {
-    const python = environment.SKETCHFORGE_MACRO_PYTHON || "python3";
-    const pythonPath = existsSync(bundledPythonSource)
-      ? [bundledPythonSource, environment.PYTHONPATH].filter(Boolean).join(path.delimiter)
-      : environment.PYTHONPATH;
+    const runner = pythonRunnerEnvironment(environment);
     return {
-      command: python,
+      command: runner.command,
       leadingArguments: ["-m", "sketchforge3d.macro"],
-      extraEnvironment: pythonPath ? { PYTHONPATH: pythonPath } : {},
+      extraEnvironment: runner.environment,
     };
   }
   return { command: process.execPath, leadingArguments: [javascriptRunner(environment)], extraEnvironment: {} };

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import datetime
+import contextlib
+import io
+import json
 import os
 import tempfile
 import unittest
@@ -18,7 +21,7 @@ from sketchforge3d import (
     run_stamp,
     target_project_from_environment,
 )
-from sketchforge3d.macro import describe_report, macro_from_module, parse_parameters
+from sketchforge3d.macro import describe_report, macro_from_module, parse_parameters, main
 
 from support import FakeOpener, project_payload, shape_payload
 
@@ -49,6 +52,7 @@ class ParameterTests(unittest.TestCase):
             resolve_macro_params({"count": 5}, {"cuont": "9"})
         self.assertIn("count", str(caught.exception))
 
+
     def test_refuses_a_whole_number_that_is_not_one(self) -> None:
         with self.assertRaises(SketchForgeError):
             resolve_macro_params({"count": 5}, {"count": "4.5"})
@@ -63,6 +67,37 @@ class ParameterTests(unittest.TestCase):
     def test_refuses_a_flag_with_no_value(self) -> None:
         with self.assertRaises(SketchForgeError):
             parse_parameters(["--count"])
+
+
+class DescribeMacroTests(unittest.TestCase):
+    def test_cli_describes_defaults_without_executing_the_macro_file(self) -> None:
+        source = '''
+raise RuntimeError("describe must not execute macro code")
+def build(context):
+    pass
+MACRO = define_macro(
+    name="Bracket",
+    project=("replace", "Bracket prototype"),
+    description="A reusable bracket",
+    params={"width": 24.0, "holes": 4, "label": "M8"},
+    run=build,
+)
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "bracket.py")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(source)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                exit_code = main([path, "--describe", "--json"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(output.getvalue()), {
+            "name": "Bracket",
+            "description": "A reusable bracket",
+            "project": {"mode": "replace", "name": "Bracket prototype"},
+            "params": {"width": 24.0, "holes": 4, "label": "M8"},
+        })
 
 
 class ProjectModeTests(unittest.TestCase):

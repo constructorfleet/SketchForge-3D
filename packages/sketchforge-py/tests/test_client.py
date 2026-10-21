@@ -6,10 +6,13 @@ import tempfile
 import unittest
 
 from sketchforge3d import (
+    BooleanCutResult,
+    ExportResult,
     Imports,
     SketchForgeApiError,
     SketchForgeClient,
     SketchForgeTransportError,
+    ShapeCollectionResult,
     chunk,
 )
 from sketchforge3d._http import Transport, build_url, normalize_base_url
@@ -162,6 +165,107 @@ class ShapesTests(unittest.TestCase):
         shape = client(opener).shapes.list("p1")[0]
         self.assertEqual(shape.sides, 6)
         self.assertEqual(shape.grouped_count, 3)
+
+
+class BooleanAndGroupingTests(unittest.TestCase):
+    def test_cuts_named_solids_with_named_holes(self) -> None:
+        opener = FakeOpener((201, {
+            "shape": shape_payload("cut", kind="mesh"),
+            "triangles": 128,
+            "revision": 7,
+        }))
+
+        result = client(opener).booleans.cut("p1", ["plate"], ["bore"])
+
+        self.assertIsInstance(result, BooleanCutResult)
+        self.assertEqual(result.shape.id, "cut")
+        self.assertEqual(result.triangles, 128)
+        self.assertEqual(result.revision, 7)
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/booleans?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"solidIds": ["plate"], "holeIds": ["bore"]})
+
+    def test_groups_shapes_and_returns_the_group(self) -> None:
+        opener = FakeOpener((201, {"shape": shape_payload("group"), "revision": 4}))
+
+        result = client(opener).groups.group("p1", ["plate", "bore"])
+
+        self.assertEqual(result.shape.id, "group")
+        self.assertEqual(result.revision, 4)
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/groups?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"ids": ["plate", "bore"]})
+
+    def test_ungroups_a_shape_and_parses_children(self) -> None:
+        opener = FakeOpener({"shapes": [shape_payload("plate"), shape_payload("bore")], "revision": 5})
+
+        result = client(opener).groups.ungroup("p1", "group")
+
+        self.assertIsInstance(result, ShapeCollectionResult)
+        self.assertEqual([shape.id for shape in result.shapes], ["plate", "bore"])
+        self.assertEqual(result.revision, 5)
+        self.assertEqual(opener.calls[0].method, "DELETE")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/groups?projectId=p1&shapeId=group")
+
+    def test_separates_disconnected_parts(self) -> None:
+        opener = FakeOpener({"shapes": [shape_payload("left"), shape_payload("right")], "revision": 8})
+
+        result = client(opener).parts.separate("p1", "cut")
+
+        self.assertEqual([shape.id for shape in result.shapes], ["left", "right"])
+        self.assertEqual(result.revision, 8)
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/parts?projectId=p1&shapeId=cut")
+        self.assertIsNone(opener.calls[0].body)
+
+    def test_exposes_operations_on_the_project_handle(self) -> None:
+        opener = FakeOpener(
+            (201, {"shape": shape_payload("group"), "revision": 2}),
+            {"shapes": [shape_payload("plate"), shape_payload("bore")], "revision": 3},
+            {"shapes": [shape_payload("left"), shape_payload("right")], "revision": 4},
+            (201, {"shape": shape_payload("cut"), "triangles": 12, "revision": 5}),
+        )
+        project = client(opener).project("p1")
+
+        self.assertEqual(project.group(["plate", "bore"]).shape.id, "group")
+        self.assertEqual([shape.id for shape in project.ungroup("group").shapes], ["plate", "bore"])
+        self.assertEqual([shape.id for shape in project.separate("group").shapes], ["left", "right"])
+        self.assertEqual(project.cut(["plate"], ["bore"]).shape.id, "cut")
+
+
+class ExportsTests(unittest.TestCase):
+    def test_decodes_an_export_and_preserves_metadata(self) -> None:
+        opener = FakeOpener({
+            "format": "stl",
+            "filename": "Bracket.stl",
+            "mimeType": "model/stl",
+            "bytes": 4,
+            "shapeCount": 2,
+            "base64": "AQIDBA==",
+            "exportedCount": 2,
+            "skipped": [],
+        })
+
+        result = client(opener).exports.export("p1", "stl", ["s1", "s2"], name="Bracket")
+
+        self.assertIsInstance(result, ExportResult)
+        self.assertEqual(result.data, bytes([1, 2, 3, 4]))
+        self.assertEqual(result.filename, "Bracket.stl")
+        self.assertEqual(result.mime_type, "model/stl")
+        self.assertEqual(result.shape_count, 2)
+        self.assertEqual(result.exported_count, 2)
+        self.assertEqual(opener.calls[0].method, "POST")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/exports?projectId=p1")
+        self.assertEqual(opener.calls[0].body, {"format": "stl", "shapeIds": ["s1", "s2"], "name": "Bracket"})
+
+    def test_writes_export_bytes_to_a_file(self) -> None:
+        opener = FakeOpener({"format": "obj", "filename": "Part.obj", "mimeType": "text/plain", "base64": "b2Jq", "shapeCount": 1})
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "part.obj")
+            result = client(opener).project("p1").export_file("obj", path)
+            with open(path, "rb") as handle:
+                self.assertEqual(handle.read(), b"obj")
+        self.assertEqual(result.filename, "Part.obj")
+        self.assertEqual(opener.calls[0].body, {"format": "obj"})
 
 
 class EdgesAndTreatmentsTests(unittest.TestCase):
