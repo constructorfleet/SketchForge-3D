@@ -132,7 +132,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);
   assert.match(capabilities, /report unsatisfied constraint IDs/i);
   assert.match(capabilities, /does not guarantee global solvability/i);
-  assert.match(capabilities, /selectable local CAD pull axis/i);
+  assert.match(capabilities, /selector for all six signed local CAD pull axes/i);
 
   const statusDocs = `${spec}\n${migration}\n${capabilities}`;
   assert.doesNotMatch(statusDocs, /Open PR #\d+|Merged PR #\d+|origin\/main at `?[0-9a-f]{7,}/i);

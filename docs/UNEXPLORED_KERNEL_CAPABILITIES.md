@@ -42,7 +42,8 @@ These are implemented and should not be filed as missing features:
   straight, single-loop sketch extrusion and stores exact geometry; the result
   is baked without an editable draft-feature node.
 - Face-based drafting is available in the shape inspector for exact B-rep
-  solids, with a selectable local CAD pull axis. Measured support remains
+  solids, with a selector for all six signed local CAD pull axes. Measured
+  support remains
   geometry-specific: the documented XZ-profile, +Y extrusion fixture accepts
   faces 1, 3, 4, and 5 at ±5° along +Z; a 10 mm box accepts faces 0–3 at ±5°
   along +Z; a +90° Y-rotated fixture accepts face 0 at ±30° along +X; and a
