@@ -3795,6 +3795,7 @@ button {
   border: 1px solid rgba(113, 177, 194, 0.72);
   box-shadow: 0 2px 8px rgba(25, 64, 78, 0.14);
   padding: 8px 12px;
+  pointer-events: auto;
 }
 
 .sketch-plate.operation-sweep.stage-section .sketch-plate-background {
