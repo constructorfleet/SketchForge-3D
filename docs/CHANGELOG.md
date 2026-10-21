@@ -6,6 +6,10 @@
 
   `examples/face_colors.py` is the worked example: it colours a box's top and bottom by id, rounds every roundable edge, and reports which colours came through. Run against a real server it paints 2 of 6 faces and keeps 2 of 2 through the fillet, which is the behaviour the ids exist to provide.
 
+- The built documentation site now retains the README's editor screenshot,
+  improves code and navigation contrast, and includes browser checks for WCAG
+  2.1 A/AA, reduced motion, keyboard-accessible search, and 320px reflow.
+
 - The sketch constraint inspector now shows an estimated local degree-of-freedom count from the supported equations' Jacobian rank. Redundant equations are counted once; degenerate zero-length distance geometry is labeled indeterminate. The estimate includes free Bezier handle and sweep-depth parameters and does not imply a global solve.
 
 - Regular STEP imports preserve available component colors on the combined mesh. The editor preview and `.skf` projects use stable face IDs for those assignments. Color extraction is limited to imports up to 200 solids and 8 MiB; ambiguous or unavailable component colors keep the shape's default color.
