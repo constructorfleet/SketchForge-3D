@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Atualizando a pré-visualização da revolução…",
       "revolveShapeUpdated": "Sólido de revolução atualizado",
       "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução",
-      "sweepStarted": "Esboço de varredura iniciado: desenhe a seção fechada no primeiro plano de trabalho, depois mude para um plano ortogonal e desenhe um caminho aberto",
+      "sweepStarted": "Esboço de varredura iniciado: desenhe a seção fechada no plano de trabalho selecionado, depois mude para o plano ortogonal derivado dele e desenhe um caminho aberto",
       "editingSweep": "Editando o perfil de varredura",
       "buildingSweep": "Criando varredura plana",
       "cannotSweep": "Não foi possível criar a varredura plana",
@@ -581,7 +581,7 @@
       "sketch": "Esboço",
       "finishSweep": "Concluir varredura",
       "sweepSketch": "Varredura de esboço",
-      "sweepSketchHint": "Desenhe primeiro a seção e depois o caminho num plano de trabalho ortogonal"
+      "sweepSketchHint": "Desenhe a seção no plano selecionado e depois o caminho no plano ortogonal derivado"
     },
     "panel": {
       "import": "Importar",
@@ -780,10 +780,16 @@
         "title": "Pré-visualização 3D",
         "empty": "Desenhe um perfil fechado à esquerda do eixo"
       },
-      "sweepHelp": "Desenhe primeiro exatamente uma seção fechada no plano de trabalho inicial. Depois mude para um plano ortogonal e desenhe exatamente um caminho aberto que comece perto da origem da seção.",
+      "sweepHelp": "Desenhe primeiro exatamente uma seção fechada no plano de trabalho selecionado. Depois mude para o plano ortogonal derivado dele e desenhe exatamente um caminho aberto que comece perto da origem da seção.",
       "sweepSectionLabel": "Seção",
       "sweepSpineLabel": "Trajetória",
-      "sweepPlaneHint": "Desenhe primeiro a seção e depois mude para um plano ortogonal para traçar o caminho. A seção final fica perpendicular à direção inicial do caminho."
+      "sweepPlaneHint": "Desenhe a seção no plano de trabalho selecionado e depois mude para o plano ortogonal derivado para traçar o caminho. A seção final fica perpendicular à direção inicial do caminho.",
+      "sweepSectionStage": "Etapa 1 de 2 · Seção no plano selecionado",
+      "sweepSectionHelp": "Desenhe e feche uma seção centralizada na origem (0,0) do plano selecionado. Ao fechar, a vista muda para o plano ortogonal derivado para o caminho.",
+      "sweepSpineStage": "Etapa 2 de 2 · Caminho no plano ortogonal",
+      "sweepSpineHelp": "Desenhe um caminho aberto no plano ortogonal começando na origem da seção (0,0). A seção fica perpendicular à direção inicial do caminho.",
+      "sweepSectionPlane": "Editar seção · plano selecionado",
+      "sweepSpinePlane": "Desenhar caminho · plano ortogonal"
     }
   },
   "panels": {

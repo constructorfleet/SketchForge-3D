@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Vorschau der Rotation wird aktualisiert…",
       "revolveShapeUpdated": "Rotationskörper aktualisiert",
       "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden",
-      "sweepStarted": "Sweep-Skizze gestartet: Zeichne den geschlossenen Querschnitt auf der ersten Arbeitsebene, wechsle dann zu einer senkrechten Arbeitsebene und zeichne einen offenen Pfad",
+      "sweepStarted": "Sweep-Skizze gestartet: Zeichne den geschlossenen Querschnitt auf der ausgewählten Arbeitsebene, wechsle dann zu der daraus abgeleiteten orthogonalen Ebene und zeichne einen offenen Pfad",
       "editingSweep": "Sweep-Skizzenprofil bearbeiten",
       "buildingSweep": "Planarer Sweep wird erstellt",
       "cannotSweep": "Planarer Sweep konnte nicht erstellt werden",
@@ -581,7 +581,7 @@
       "sketch": "Skizze",
       "finishSweep": "Sweep abschließen",
       "sweepSketch": "Skizze sweepen",
-      "sweepSketchHint": "Zeichne zuerst den Querschnitt, dann den Pfad auf einer senkrechten Arbeitsebene"
+      "sweepSketchHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und dann den Pfad auf der abgeleiteten orthogonalen Ebene"
     },
     "panel": {
       "import": "Import",
@@ -780,10 +780,16 @@
         "title": "3D-Vorschau",
         "empty": "Zeichnen Sie links von der Achse ein geschlossenes Profil"
       },
-      "sweepHelp": "Zeichne zuerst genau einen geschlossenen Querschnitt auf der ersten Arbeitsebene. Wechsle dann zu einer senkrechten Arbeitsebene und zeichne genau einen offenen Pfad, der nahe am Ursprung des Querschnitts beginnt.",
+      "sweepHelp": "Zeichne zuerst genau einen geschlossenen Querschnitt auf der ausgewählten Arbeitsebene. Wechsle dann zu der daraus abgeleiteten orthogonalen Ebene und zeichne genau einen offenen Pfad, der nahe am Ursprung des Querschnitts beginnt.",
       "sweepSectionLabel": "Querschnitt",
       "sweepSpineLabel": "Pfad",
-      "sweepPlaneHint": "Zeichne zuerst den Querschnitt und wechsle dann für den Pfad zu einer senkrechten Arbeitsebene. Der fertige Querschnitt wird senkrecht zur Anfangsrichtung des Pfads ausgerichtet."
+      "sweepPlaneHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und wechsle dann für den Pfad zur daraus abgeleiteten orthogonalen Ebene. Der fertige Querschnitt wird senkrecht zur Anfangsrichtung des Pfads ausgerichtet.",
+      "sweepSectionStage": "Schritt 1 von 2 · Querschnitt auf ausgewählter Ebene",
+      "sweepSectionHelp": "Zeichne und schließe einen am Ursprung (0,0) der ausgewählten Ebene zentrierten Querschnitt. Danach wechselt die Ansicht zur daraus abgeleiteten orthogonalen Ebene für den Pfad.",
+      "sweepSpineStage": "Schritt 2 von 2 · Pfad auf orthogonaler Ebene",
+      "sweepSpineHelp": "Zeichne einen offenen Pfad auf der orthogonalen Ebene ab dem Querschnittursprung (0,0). Der Querschnitt wird senkrecht zur anfänglichen Pfadrichtung ausgerichtet.",
+      "sweepSectionPlane": "Querschnitt bearbeiten · ausgewählte Ebene",
+      "sweepSpinePlane": "Pfad zeichnen · orthogonale Ebene"
     }
   },
   "panels": {

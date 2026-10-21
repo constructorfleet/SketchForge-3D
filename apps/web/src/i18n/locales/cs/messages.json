@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Aktualizace náhledu rotace…",
       "revolveShapeUpdated": "Rotační těleso aktualizováno",
       "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít",
-      "sweepStarted": "Náčrt tažení zahájen: nakreslete uzavřený profil na první pracovní rovině, potom přepněte na kolmou pracovní rovinu a nakreslete jednu otevřenou dráhu",
+      "sweepStarted": "Náčrt tažení zahájen: nakreslete uzavřený profil na vybrané pracovní rovině, potom přepněte na kolmou rovinu odvozenou z této roviny a nakreslete jednu otevřenou dráhu",
       "editingSweep": "Úprava profilu tažení",
       "buildingSweep": "Vytváření rovinného tažení",
       "cannotSweep": "Rovinné tažení se nepodařilo vytvořit",
@@ -581,7 +581,7 @@
       "sketch": "Náčrt",
       "finishSweep": "Dokončit tažení",
       "sweepSketch": "Tažení náčrtu",
-      "sweepSketchHint": "Nejprve nakreslete profil, potom jeho dráhu na kolmé pracovní rovině"
+      "sweepSketchHint": "Nakreslete profil na vybrané pracovní rovině a potom dráhu na odvozené kolmé rovině"
     },
     "panel": {
       "import": "Import",
@@ -780,10 +780,16 @@
         "title": "3D náhled",
         "empty": "Nakreslete uzavřený profil vlevo od osy"
       },
-      "sweepHelp": "Nejprve nakreslete přesně jeden uzavřený profil na první pracovní rovině. Potom přepněte na kolmou pracovní rovinu a nakreslete přesně jednu otevřenou dráhu, která začíná blízko počátku profilu.",
+      "sweepHelp": "Nejprve nakreslete přesně jeden uzavřený profil na vybrané pracovní rovině. Potom přepněte na kolmou rovinu odvozenou z této roviny a nakreslete přesně jednu otevřenou dráhu, která začíná blízko počátku profilu.",
       "sweepSectionLabel": "Průřez",
       "sweepSpineLabel": "Dráha",
-      "sweepPlaneHint": "Nejprve nakreslete profil, potom přepněte na kolmou pracovní rovinu a nakreslete dráhu. Výsledný profil je orientován kolmo k počátečnímu směru dráhy."
+      "sweepPlaneHint": "Nakreslete profil na vybrané pracovní rovině a potom přepněte na kolmou rovinu odvozenou z ní a nakreslete dráhu. Výsledný profil je orientován kolmo k počátečnímu směru dráhy.",
+      "sweepSectionStage": "Krok 1 ze 2 · Profil na vybrané rovině",
+      "sweepSectionHelp": "Nakreslete a uzavřete profil se středem v počátku (0,0) vybrané roviny. Po uzavření se přepne na kolmou rovinu odvozenou z této pracovní roviny.",
+      "sweepSpineStage": "Krok 2 ze 2 · Dráha na kolmé rovině",
+      "sweepSpineHelp": "Nakreslete otevřenou dráhu na kolmé rovině od počátku profilu (0,0). Profil se natočí kolmo k počátečnímu směru dráhy.",
+      "sweepSectionPlane": "Upravit profil · vybraná rovina",
+      "sweepSpinePlane": "Kreslit dráhu · kolmá rovina"
     }
   },
   "panels": {

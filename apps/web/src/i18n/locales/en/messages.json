@@ -502,7 +502,7 @@
       "revolvePreviewUpdating": "Updating revolve preview…",
       "revolveShapeUpdated": "Revolve updated",
       "revolveSettingsFailed": "The revolve settings could not be applied",
-      "sweepStarted": "Sweep sketch started: draw the closed section on the first workplane, then switch to an orthogonal workplane and draw one open spine",
+      "sweepStarted": "Sweep sketch started: draw the closed section on the selected workplane, then switch to an orthogonal plane derived from it and draw one open spine",
       "editingSweep": "Editing sweep sketch profile",
       "buildingSweep": "Building planar sweep",
       "cannotSweep": "Could not create the planar sweep",
@@ -659,7 +659,7 @@
       "patternApply": "Repeat",
       "finishSweep": "Finish sweep",
       "sweepSketch": "Sweep sketch",
-      "sweepSketchHint": "Draw the section first, then draw its spine on an orthogonal workplane"
+      "sweepSketchHint": "Draw the section on the selected workplane, then its spine on the derived orthogonal plane"
     },
     "panel": {
       "import": "Import",
@@ -878,10 +878,16 @@
         "title": "3D preview",
         "empty": "Draw a closed profile left of the axis"
       },
-      "sweepHelp": "First draw exactly one closed section loop on the initial workplane. Then switch to an orthogonal workplane and draw exactly one open spine, starting near the section origin.",
+      "sweepHelp": "First draw exactly one closed section loop on the selected workplane. Then switch to the orthogonal plane derived from it and draw exactly one open spine, starting near the section origin.",
       "sweepSectionLabel": "Section",
       "sweepSpineLabel": "Spine",
-      "sweepPlaneHint": "Draw the section first, then switch to an orthogonal workplane for the spine. The finished section is oriented perpendicular to the spine's initial direction."
+      "sweepPlaneHint": "Draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The finished section is oriented perpendicular to the spine’s initial direction.",
+      "sweepSectionStage": "Step 1 of 2 · Section on selected plane",
+      "sweepSectionHelp": "Draw and close one section loop centered at the selected plane origin (0,0). Closing it switches to the orthogonal plane derived from this workplane for the spine.",
+      "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
+      "sweepSpineHelp": "Draw one open spine on the orthogonal plane, starting at the section origin (0,0). The section is oriented perpendicular to the spine’s initial direction.",
+      "sweepSectionPlane": "Edit section · selected plane",
+      "sweepSpinePlane": "Draw spine · orthogonal plane"
     }
   },
   "panels": {

@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Actualizando la vista previa de la revolución…",
       "revolveShapeUpdated": "Revolución actualizada",
       "revolveSettingsFailed": "No se pudieron aplicar los valores de la revolución",
-      "sweepStarted": "Boceto de barrido iniciado: dibuja la sección cerrada en el primer plano de trabajo, cambia después a un plano perpendicular y dibuja una trayectoria abierta",
+      "sweepStarted": "Boceto de barrido iniciado: dibuja la sección cerrada en el plano de trabajo seleccionado, cambia después al plano ortogonal derivado de este y dibuja una trayectoria abierta",
       "editingSweep": "Editando el perfil del barrido",
       "buildingSweep": "Creando barrido plano",
       "cannotSweep": "No se pudo crear el barrido plano",
@@ -581,7 +581,7 @@
       "sketch": "Boceto",
       "finishSweep": "Finalizar barrido",
       "sweepSketch": "Barrido de boceto",
-      "sweepSketchHint": "Dibuja primero la sección y después su trayectoria en un plano perpendicular"
+      "sweepSketchHint": "Dibuja la sección en el plano seleccionado y después su trayectoria en el plano ortogonal derivado"
     },
     "panel": {
       "import": "Importar",
@@ -780,10 +780,16 @@
         "title": "Vista previa 3D",
         "empty": "Dibuja un perfil cerrado a la izquierda del eje"
       },
-      "sweepHelp": "Dibuja primero exactamente una sección cerrada en el plano de trabajo inicial. Después cambia a un plano perpendicular y dibuja exactamente una trayectoria abierta que empiece cerca del origen de la sección.",
+      "sweepHelp": "Dibuja primero exactamente una sección cerrada en el plano de trabajo seleccionado. Después cambia al plano ortogonal derivado de este y dibuja exactamente una trayectoria abierta que empiece cerca del origen de la sección.",
       "sweepSectionLabel": "Sección",
       "sweepSpineLabel": "Trayectoria",
-      "sweepPlaneHint": "Dibuja primero la sección y cambia después a un plano perpendicular para la trayectoria. La sección final se orienta perpendicularmente a la dirección inicial de la trayectoria."
+      "sweepPlaneHint": "Dibuja la sección en el plano de trabajo seleccionado y después cambia al plano ortogonal derivado para la trayectoria. La sección final se orienta perpendicularmente a la dirección inicial de la trayectoria.",
+      "sweepSectionStage": "Paso 1 de 2 · Sección en el plano seleccionado",
+      "sweepSectionHelp": "Dibuja y cierra una sección centrada en el origen (0,0) del plano seleccionado. Al cerrarla, se cambia al plano ortogonal derivado para la trayectoria.",
+      "sweepSpineStage": "Paso 2 de 2 · Trayectoria en el plano ortogonal",
+      "sweepSpineHelp": "Dibuja una trayectoria abierta en el plano ortogonal desde el origen de la sección (0,0). La sección se orienta perpendicularmente a la dirección inicial.",
+      "sweepSectionPlane": "Editar sección · plano seleccionado",
+      "sweepSpinePlane": "Dibujar trayectoria · plano ortogonal"
     }
   },
   "panels": {

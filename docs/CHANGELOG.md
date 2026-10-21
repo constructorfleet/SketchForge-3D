@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-- Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide describes the two-stage workflow: draw the section on the first workplane, then switch to an orthogonal workplane for the spine. The generated section is oriented perpendicular to the spine's initial direction.
+- Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide describes the two-stage workflow: draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The generated section is oriented perpendicular to the spine's initial direction.
 
-- The Sketch workspace can sweep one closed section loop along one open planar spine. The section is placed at the spine's first point and oriented perpendicular to its initial direction; line and cubic Bezier paths use OCCT rounded-corner transitions. The editor retains the sketch profile for reopening and editing, while the generated solid is baked rather than kept as an editable feature-history node. Multiple section loops and arbitrary 3D spines are not supported.
+- The Sketch workspace can sweep one closed section loop along one open spine on the orthogonal plane derived from the selected section workplane. The section is placed at the spine's first point and oriented perpendicular to its initial direction; line and cubic Bezier paths use OCCT rounded-corner transitions. The editor retains the sketch profile for reopening and editing, while the generated solid is baked rather than kept as an editable feature-history node. Multiple section loops and arbitrary 3D spines are not supported.
 
 - The viewport remembers its last settled camera position, target, and zoom in the project workspace, so reopening a design returns to the view you were using. Camera movement is saved after orbiting, panning, or zooming settles; older projects without a saved view still open at the usual home view.
 

@@ -460,7 +460,7 @@
       "revolvePreviewUpdating": "Mise à jour de l’aperçu de la révolution…",
       "revolveShapeUpdated": "Révolution mise à jour",
       "revolveSettingsFailed": "Impossible d’appliquer les paramètres de la révolution",
-      "sweepStarted": "Esquisse de balayage commencée : dessinez la section fermée sur le premier plan de travail, puis passez à un plan orthogonal et dessinez un chemin ouvert",
+      "sweepStarted": "Esquisse de balayage commencée : dessinez la section fermée sur le plan de travail sélectionné, puis passez au plan orthogonal qui en dérive pour dessiner un chemin ouvert",
       "editingSweep": "Modification du profil de balayage",
       "buildingSweep": "Création du balayage plan",
       "cannotSweep": "Impossible de créer le balayage plan",
@@ -581,7 +581,7 @@
       "sketch": "Esquisse",
       "finishSweep": "Terminer le balayage",
       "sweepSketch": "Balayer une esquisse",
-      "sweepSketchHint": "Dessinez d’abord la section, puis son chemin sur un plan orthogonal"
+      "sweepSketchHint": "Dessinez la section sur le plan sélectionné, puis le chemin sur le plan orthogonal qui en dérive"
     },
     "panel": {
       "import": "Importer",
@@ -780,10 +780,16 @@
         "title": "Aperçu 3D",
         "empty": "Dessinez un profil fermé à gauche de l’axe"
       },
-      "sweepHelp": "Dessinez d’abord exactement une section fermée sur le premier plan de travail. Passez ensuite à un plan orthogonal et dessinez exactement un chemin ouvert qui commence près de l’origine de la section.",
+      "sweepHelp": "Dessinez d’abord exactement une section fermée sur le plan de travail sélectionné. Passez ensuite au plan orthogonal qui en dérive et dessinez exactement un chemin ouvert qui commence près de l’origine de la section.",
       "sweepSectionLabel": "Section",
       "sweepSpineLabel": "Trajectoire",
-      "sweepPlaneHint": "Dessinez d’abord la section, puis passez à un plan orthogonal pour tracer le chemin. La section finale est orientée perpendiculairement à la direction initiale du chemin."
+      "sweepPlaneHint": "Dessinez la section sur le plan de travail sélectionné, puis passez au plan orthogonal qui en dérive pour tracer le chemin. La section finale est orientée perpendiculairement à la direction initiale du chemin.",
+      "sweepSectionStage": "Étape 1 sur 2 · Section sur le plan sélectionné",
+      "sweepSectionHelp": "Dessinez et fermez une section centrée sur l’origine (0,0) du plan sélectionné. La fermeture passe au plan orthogonal qui en dérive pour le chemin.",
+      "sweepSpineStage": "Étape 2 sur 2 · Chemin sur le plan orthogonal",
+      "sweepSpineHelp": "Dessinez un chemin ouvert sur le plan orthogonal en partant de l’origine de la section (0,0). La section est orientée perpendiculairement à la direction initiale.",
+      "sweepSectionPlane": "Modifier la section · plan sélectionné",
+      "sweepSpinePlane": "Dessiner le chemin · plan orthogonal"
     }
   },
   "panels": {
