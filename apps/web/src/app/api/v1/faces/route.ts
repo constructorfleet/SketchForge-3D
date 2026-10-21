@@ -1,5 +1,6 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
-import { apiContext, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson } from "@/lib/apiV1";
+import { parseListFacesQuery, parseListFacesResponse } from "@/lib/apiV1OperationContract";
 import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
 
 export const runtime = "nodejs";
@@ -9,15 +10,17 @@ export const revalidate = false;
 export async function GET(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const { projectId, shapeId } = apiTarget(request);
-  if (!projectId) return apiErrors.invalidProjectId();
-  if (!shapeId) return apiErrors.shapeIdRequired();
+  const query = parseListFacesQuery(request);
+  if (!query.ok) return query.error === "invalid_project_id" ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
+  const { projectId, shapeId } = query;
 
   const faces = await apiEngine(context.root).faces(projectId, shapeId);
   if (!faces.ok) {
     return apiEngineError(faces.failure, { oneShape: true, cadFailed: "The CAD kernel could not read that shape." });
   }
-  return apiJson({ faces: faces.value });
+  const response = parseListFacesResponse({ faces: faces.value });
+  if (!response) return apiError("The CAD kernel returned an invalid face listing.", 500, "cad_failed");
+  return apiJson(response);
 }
 
 /**

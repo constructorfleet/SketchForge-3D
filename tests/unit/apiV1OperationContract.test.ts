@@ -56,6 +56,27 @@ describe("REST API v1 operation contract", () => {
     expect(parseCreateProjectRequest({ name: "x".repeat(90) })?.name).toHaveLength(80);
   });
 
+  it("declares and parses the verified GET /faces query and response contract", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/faces");
+    expect(operation).toMatchObject({
+      operationId: "listFaces",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      response: { required: ["faces"], faceFields: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"], faceIdSemantics: "stable identity for a face while its identity is preserved by the model", colorAssignmentKey: "face id in PATCH /api/v1/shapes faceColors" },
+    });
+    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
+      .toEqual({ ok: true, projectId: "part_1", shapeId: "solid" });
+    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=../bad&shapeId=x")))
+      .toEqual({ ok: false, error: "invalid_project_id" });
+    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=p")))
+      .toEqual({ ok: false, error: "invalid_shape_id" });
+    expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] }))
+      .toEqual({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] });
+    expect(contract.parseListFacesResponse({ faces: [{ index: "0" }] })).toBeNull();
+  });
+
   it("records read-only OPTIONS handlers as unauthenticated 204 responses", () => {
     for (const route of ["edges", "faces", "properties", "thickness"]) {
       expect(API_V1_OPERATIONS.find(({ method, path: routePath }) => method === "OPTIONS" && routePath === `/api/v1/${route}`))
