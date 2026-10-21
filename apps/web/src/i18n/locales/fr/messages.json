@@ -1180,7 +1180,8 @@
       "noClosedProfile": "Aucun profil fermé trouvé. Dessinez au moins une boucle fermée et vérifiez qu’elle ne contient aucune partie d’aire nulle.",
       "invalidTopology": "Impossible de construire un solide valide à partir de l’esquisse (erreur OpenCascade)",
       "buildFailed": "Impossible de construire la forme à partir de cette esquisse",
-      "sweepNeedsSectionAndSpine": "Un balayage plan nécessite exactement une section fermée et un chemin ouvert."
+      "sweepNeedsSectionAndSpine": "Un balayage plan nécessite exactement une section fermée et un chemin ouvert.",
+      "sweepSpineDirection": "Le premier segment du chemin doit aller vers la droite de l’écran, perpendiculairement au plan de la section. Redessinez ce premier segment."
     },
     "skf": {
       "fileEmpty": "Le fichier .skf est vide",

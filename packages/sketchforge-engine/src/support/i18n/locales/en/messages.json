@@ -1305,7 +1305,8 @@
       "sweepNeedsSectionAndSpine": "A planar sweep needs exactly one closed section loop and one open spine.",
       "noClosedProfile": "No closed profile found. Draw at least one closed loop and ensure it has no degenerate (zero-area) geometry.",
       "invalidTopology": "OpenCascade produced invalid sketch topology",
-      "buildFailed": "The CAD kernel could not build this sketch"
+      "buildFailed": "The CAD kernel could not build this sketch",
+      "sweepSpineDirection": "The first spine segment must follow screen-right, perpendicular to the section plane. Redraw that first segment."
     },
     "skf": {
       "fileEmpty": ".skf file is empty",

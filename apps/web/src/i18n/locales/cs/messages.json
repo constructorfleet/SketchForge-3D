@@ -1180,7 +1180,8 @@
       "noClosedProfile": "Nebyl nalezen žádný uzavřený profil. Nakreslete alespoň jednu uzavřenou čáru a zkontrolujte, že nemá části s nulovým obsahem.",
       "invalidTopology": "Z náčrtu se nepodařilo vytvořit platné těleso (chyba OpenCascade)",
       "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso",
-      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje přesně jednu uzavřenou oblast a jednu otevřenou dráhu."
+      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje přesně jednu uzavřenou oblast a jednu otevřenou dráhu.",
+      "sweepSpineDirection": "První úsek osy musí vést doprava po obrazovce, kolmo k rovině řezu. První úsek překreslete."
     },
     "skf": {
       "fileEmpty": "Soubor .skf je prázdný",

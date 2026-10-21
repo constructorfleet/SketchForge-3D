@@ -2,6 +2,7 @@ import { TransitionMode, type OcctKernel, type ShapeHandle, type Vec3 } from "oc
 import { cadSketchSweepPaths, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
 import type { SketchPoint, SketchSweepFrame } from "@/types/sketchforge";
 import { deriveSketchSweepFrames, sketchSweepSpinePointInSection } from "@constructorfleet/sketchforge-engine/sketchSweepFrames";
+import { LocalizedError } from "@/i18n/LocalizedError";
 
 function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z">) => Vec3 = (point) => ({ x: point.x, y: 0, z: point.z })) {
   const edges = path.steps.map(({ segment, from, to }) => {
@@ -17,7 +18,7 @@ function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick
 }
 
 export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof cadSketchSweepPaths>[0]): ShapeHandle {
-  const { section, spine } = cadSketchSweepPaths(profile);
+  const { section, spine: rawSpine } = cadSketchSweepPaths(profile);
   const defaultSection: SketchSweepFrame = {
     origin: { x: 0, y: 0, z: 0 },
     normal: { x: 0, y: 1, z: 0 },
@@ -25,13 +26,57 @@ export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof 
     zAxis: { x: 0, y: 0, z: 1 },
   };
   const frames = profile.sweepFrames ?? deriveSketchSweepFrames(defaultSection);
+  const spineInOrthogonalPlane = (point: Pick<SketchPoint, "x" | "z">): Vec3 => sketchSweepSpinePointInSection(frames, point);
+  const spine = orientedSpine(rawSpine, spineInOrthogonalPlane);
   // The builder returns geometry in the section frame's canonical coordinates.
   // The editor applies the selected workplane transform once after meshing.
   const sectionInWorkplane = (point: Pick<SketchPoint, "x" | "z">): Vec3 => ({ x: point.x, y: 0, z: point.z });
-  const spineInOrthogonalPlane = (point: Pick<SketchPoint, "x" | "z">): Vec3 => sketchSweepSpinePointInSection(frames, point);
   return cad.sweep(
     pathWire(cad, section, sectionInWorkplane),
     pathWire(cad, spine, spineInOrthogonalPlane),
     TransitionMode.RoundCorner,
   );
+}
+
+function orientedSpine(
+  path: OrderedCadSketchPath,
+  map: (point: Pick<SketchPoint, "x" | "z">) => Vec3,
+): OrderedCadSketchPath {
+  if (path.steps.length === 0) throw new LocalizedError("errors.sketch.sweepNeedsSectionAndSpine");
+  const reversed = reversePath(path);
+  const forwardAligned = initialTangentIsNormal(path, map);
+  const reverseAligned = initialTangentIsNormal(reversed, map);
+  if (!forwardAligned && !reverseAligned) throw new LocalizedError("errors.sketch.sweepSpineDirection");
+  if (forwardAligned && reverseAligned) {
+    const forwardStart = path.steps[0]!.from;
+    const reverseStart = reversed.steps[0]!.from;
+    const forwardDistance = forwardStart.x ** 2 + forwardStart.z ** 2;
+    const reverseDistance = reverseStart.x ** 2 + reverseStart.z ** 2;
+    return reverseDistance < forwardDistance ? reversed : path;
+  }
+  return reverseAligned ? reversed : path;
+}
+
+function initialTangentIsNormal(path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z">) => Vec3) {
+  const step = path.steps[0];
+  if (!step) return false;
+  const forward = step.segment.startId === step.from.id;
+  const firstControl = forward ? step.from.handleOut : step.from.handleIn;
+  const secondControl = forward ? step.to.handleIn : step.to.handleOut;
+  const firstHandle = step.segment.kind !== "line" && firstControl && secondControl ? firstControl : undefined;
+  const start = map(step.from);
+  const tangentEnd = map(firstHandle ?? step.to);
+  const dx = tangentEnd.x - start.x;
+  const dy = tangentEnd.y - start.y;
+  const dz = tangentEnd.z - start.z;
+  const length = Math.hypot(dx, dy, dz);
+  return length > 0 && Math.hypot(dx, dz) <= length * 1e-6;
+}
+
+function reversePath(path: OrderedCadSketchPath): OrderedCadSketchPath {
+  return {
+    ...path,
+    points: [...path.points].reverse(),
+    steps: [...path.steps].reverse().map((step) => ({ ...step, from: step.to, to: step.from })),
+  };
 }

@@ -1180,7 +1180,8 @@
       "noClosedProfile": "Nie znaleziono zamkniętego profilu. Narysuj co najmniej jedną zamkniętą linię i sprawdź, czy nie ma w niej fragmentów o zerowym polu.",
       "invalidTopology": "Nie udało się utworzyć poprawnej bryły ze szkicu (błąd OpenCascade)",
       "buildFailed": "Nie udało się utworzyć bryły ze szkicu",
-      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga dokładnie jednego zamkniętego przekroju i jednej otwartej ścieżki."
+      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga dokładnie jednego zamkniętego przekroju i jednej otwartej ścieżki.",
+      "sweepSpineDirection": "Pierwszy odcinek ścieżki musi biec w prawo na ekranie, prostopadle do płaszczyzny przekroju. Narysuj ten odcinek ponownie."
     },
     "skf": {
       "fileEmpty": "Plik .skf jest pusty",

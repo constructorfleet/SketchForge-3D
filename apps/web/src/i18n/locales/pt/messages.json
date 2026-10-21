@@ -1180,7 +1180,8 @@
       "noClosedProfile": "Nenhum perfil fechado encontrado. Desenhe pelo menos uma linha fechada e verifique se ela não tem partes de área zero.",
       "invalidTopology": "O módulo OpenCascade gerou um esboço inválido",
       "buildFailed": "O módulo CAD não conseguiu construir este esboço",
-      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de exatamente uma seção fechada e um caminho aberto."
+      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de exatamente uma seção fechada e um caminho aberto.",
+      "sweepSpineDirection": "O primeiro segmento do percurso deve seguir para a direita no ecrã, perpendicular ao plano da secção. Desenhe esse segmento novamente."
     },
     "skf": {
       "fileEmpty": "O arquivo .skf está vazio",

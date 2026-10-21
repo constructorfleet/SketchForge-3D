@@ -1180,7 +1180,8 @@
       "noClosedProfile": "Kein geschlossenes Profil gefunden. Zeichnen Sie mindestens eine geschlossene Linie und achten Sie darauf, dass sie keine Abschnitte ohne Flächeninhalt hat.",
       "invalidTopology": "Aus der Skizze ist eine ungültige Form entstanden (Fehler in OpenCascade)",
       "buildFailed": "Aus dieser Skizze konnte keine Form erstellt werden",
-      "sweepNeedsSectionAndSpine": "Ein planarer Sweep benötigt genau eine geschlossene Kontur und einen offenen Pfad."
+      "sweepNeedsSectionAndSpine": "Ein planarer Sweep benötigt genau eine geschlossene Kontur und einen offenen Pfad.",
+      "sweepSpineDirection": "Das erste Segment der Leitkurve muss auf dem Bildschirm nach rechts verlaufen und senkrecht zur Schnittebene stehen. Zeichnen Sie dieses Segment neu."
     },
     "skf": {
       "fileEmpty": "Die .skf-Datei ist leer",

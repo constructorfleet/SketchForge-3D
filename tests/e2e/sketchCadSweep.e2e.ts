@@ -182,4 +182,16 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
       cad.releaseAll();
     }
   });
+
+  it("rejects a first spine tangent that leaves the orthogonal sweep plane", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    try {
+      expect(() => buildCadSketchSweep(cad, profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 2 }]))).toThrowError(
+        expect.objectContaining({ key: "errors.sketch.sweepSpineDirection" }),
+      );
+    } finally {
+      cad.releaseAll();
+    }
+  });
 });
