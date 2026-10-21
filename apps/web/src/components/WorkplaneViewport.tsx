@@ -229,6 +229,7 @@ type WorkplaneViewportProps = {
   /** Fires once after orbit/pan/zoom settles so the editor can persist the view. */
   onCameraViewChange?: (view: CameraView) => void;
   onEditSketch?: () => void;
+  onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   /** Solid volume of the selected shape, for the inspector's material readout. */
@@ -2411,6 +2412,7 @@ export function WorkplaneViewport({
   onCameraOrientationChange,
   onCameraViewChange,
   onEditSketch,
+  onApplyDraftPrism,
   canSeparateParts = false,
   onSeparateParts,
   selectedShapeVolumeMm3,
@@ -5645,6 +5647,7 @@ export function WorkplaneViewport({
             onSnapChange={chooseSnapGrid}
             onSnapOpenChange={setSnapOpen}
             onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
+            onApplyDraftPrism={onApplyDraftPrism}
             canSeparateParts={canSeparateParts}
             onSeparateParts={onSeparateParts}
             volumeMm3={selectedShapeVolumeMm3}

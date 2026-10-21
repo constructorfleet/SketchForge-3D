@@ -5,6 +5,7 @@ import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
 import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/engine/exactBooleanSolids";
+import { buildDraftPrism } from "@/lib/engine/draftPrism";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -433,6 +434,19 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
         if (!sessionOpen) releaseSession(activeCad);
       }
       return;
+    }
+    if (request.type === "draft-prism") {
+      releaseSession(activeCad);
+      try {
+        const result = buildDraftPrism(activeCad, request);
+        post(
+          { type: "draft-prism", requestId: request.requestId, ...result },
+          [result.positions.buffer, result.normals.buffer, result.indices.buffer],
+        );
+        return;
+      } finally {
+        releaseSession(activeCad);
+      }
     }
     if (request.type === "prepare") {
       releaseSession(activeCad);
