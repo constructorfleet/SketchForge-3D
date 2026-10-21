@@ -128,9 +128,14 @@ project.import_mesh(file_name, data) | import_file(path)
 project.export(format, shape_ids=None, name=None) | export_file(format, path, shape_ids=None, name=None)
 ```
 
-Exports return artifact metadata and bytes. Supported formats are `stl`, `obj`,
-`3mf`, `step`, `skf`, and `zip`; use `export_file` to save directly to a local
-path. STEP reports the exact solids it exported and shapes it skipped.
+`import_file` uploads multipart form data, avoiding base64 expansion; `import_mesh`
+continues to accept bytes and uses the JSON API. Exports support `stl`, `obj`,
+`3mf`, `step`, `skf`, and `zip`. `export` returns artifact metadata and bytes;
+`export_file` streams the artifact to a local path and returns the same metadata
+with `data=b""`, so large downloads do not also stay resident in Python memory.
+The download response carries all result metadata, including STEP's skipped
+shapes, in a response header; very large skip lists may exceed proxy header
+limits. STEP reports the exact solids it exported and shapes it skipped.
 
 Requests are plain dicts, because the server takes a bag of parameters; responses are frozen dataclasses with snake_case fields, so `shape.rotation_x` is checked and a typo is an error rather than a `None`. A field this version does not know about is kept in `shape.extra` rather than dropped.
 

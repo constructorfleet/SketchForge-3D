@@ -39,6 +39,27 @@ export async function POST(request: Request) {
       shapeIds: shapeIds ?? undefined,
       name: body.name as string | undefined,
     });
+    if (new URL(request.url).searchParams.get("download") === "1") {
+      // The metadata header includes every field returned by JSON exports,
+      // including STEP's skipped-shape details, so the Python file API can
+      // stream the artifact body without losing its result metadata.
+      const metadata = {
+        format: artifact.format,
+        filename: artifact.filename,
+        mimeType: artifact.mimeType,
+        shapeCount: artifact.shapeCount,
+        ...(artifact.exportedCount === undefined ? {} : { exportedCount: artifact.exportedCount }),
+        ...(artifact.skipped === undefined ? {} : { skipped: artifact.skipped }),
+      };
+      return new Response(Buffer.from(artifact.data), {
+        headers: {
+          "Content-Type": artifact.mimeType,
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(artifact.filename)}`,
+          "X-SketchForge-Metadata": encodeURIComponent(JSON.stringify(metadata)),
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     return apiJson({
       format: artifact.format,
       filename: artifact.filename,

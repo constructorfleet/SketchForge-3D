@@ -75,6 +75,23 @@ describe("REST API v1 project exports", () => {
     expect(bytes.readUInt32LE(80)).toBeGreaterThan(0);
   });
 
+  it("returns raw artifact bytes and metadata headers for file downloads", async () => {
+    const projectId = await makeProject();
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}&download=1`, {
+      method: "POST",
+      body: JSON.stringify({ format: "stl" }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("model/stl");
+    expect(response.headers.get("content-disposition")).toContain("Export%20fixture.stl");
+    const metadata = JSON.parse(decodeURIComponent(response.headers.get("x-sketchforge-metadata") ?? "{}"));
+    expect(metadata).toMatchObject({ format: "stl", filename: "Export fixture.stl", shapeCount: 1 });
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect(bytes.byteLength).toBeGreaterThan(84);
+    expect(new DataView(bytes.buffer).getUint32(80, true)).toBeGreaterThan(0);
+  });
+
   it.each(["obj", "3mf", "skf", "zip"] as const)("exports the %s artifact", async (format) => {
     const projectId = await makeProject();
     const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
