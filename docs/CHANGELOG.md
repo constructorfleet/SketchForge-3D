@@ -40,6 +40,8 @@
 
 - Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and lets users choose local CAD +X, +Y, or +Z as the pull axis. The kernel rejects incompatible face, axis, and angle combinations; successful results replace the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Kernel tests now verify specific +X and +Y cases on rotated exact B-rep fixtures, in addition to earlier +Z cases; see the [face-drafting guide](guides/face-drafting.md) for the measured support matrix.
 
+- Face drafting now accepts all six signed local CAD axes, so compatible faces can be drafted while pulling along -X, -Y, or -Z as well as the positive directions. Kernel verification adds 10 mm box cases at +30° along -X and -Y; each combination remains geometry-specific and incompatible cases still surface the localized kernel error. The shape inspector's pull-axis selector lists each signed direction.
+
 - Added a Chromium smoke test against the built `/SketchForge-3D/` artifact for
   skip navigation, visible keyboard focus, the keyboard-operated mobile menu,
   semantic landmarks and headings, local search results, and overflow at a

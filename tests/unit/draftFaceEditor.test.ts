@@ -20,7 +20,7 @@ const base = {
 
 describe("face draft editor request", () => {
   it("offers all kernel pull axes to the inspector", () => {
-    expect(DRAFT_FACE_PULL_AXES).toEqual(["x", "y", "z"]);
+    expect(DRAFT_FACE_PULL_AXES).toEqual(["x", "-x", "y", "-y", "z", "-z"]);
   });
 
   it("sends the selected stable face ID with the chosen local CAD axis", () => {
@@ -33,6 +33,7 @@ describe("face draft editor request", () => {
   it("preserves a user-selected X or Y pull axis in the kernel request", () => {
     expect(draftFaceRequestForShape(base, 1, 5, "x")).toMatchObject({ faceId: "stable-b", pullDirection: "x" });
     expect(draftFaceRequestForShape(base, 1, 5, "y")).toMatchObject({ faceId: "stable-b", pullDirection: "y" });
+    expect(draftFaceRequestForShape(base, 1, 5, "-z")).toMatchObject({ faceId: "stable-b", pullDirection: "-z" });
   });
 
   it("passes the selected axis through the editor apply operation", async () => {

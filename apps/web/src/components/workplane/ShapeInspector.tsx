@@ -124,7 +124,7 @@ export function ShapeInspector({
   onSnapOpenChange: Dispatch<SetStateAction<boolean>>;
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
-  onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z") => Promise<void> | void;
+  onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -448,7 +448,7 @@ export function ShapeInspector({
               <select aria-label={t("panels.inspector.draftFace.axis")} value={draftFacePullAxis}
                 disabled={locked || draftFaceApplying}
                 onChange={(event) => setDraftFacePullAxis(event.currentTarget.value as DraftFacePullAxis)}>
-                {DRAFT_FACE_PULL_AXES.map((axis) => <option key={axis} value={axis}>+{axis.toUpperCase()}</option>)}
+                {DRAFT_FACE_PULL_AXES.map((axis) => <option key={axis} value={axis}>{axis.toUpperCase()}</option>)}
               </select>
             </label>
             <label>

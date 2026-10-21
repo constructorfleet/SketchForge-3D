@@ -181,7 +181,7 @@ import {
 } from "@/lib/sketchforgeMcpProtocol";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
-import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent } from "@/lib/draftFaceEditor";
+import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
@@ -7648,7 +7648,7 @@ export function SketchForgeEditor({
     }
   }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
 
-  const applyDraftFaceToSelection = useCallback(async (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z") => {
+  const applyDraftFaceToSelection = useCallback(async (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => {
     const source = selectedShape;
     const request = source && draftFaceRequestForShape(source, faceIndex, angle, pullDirection);
     if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;

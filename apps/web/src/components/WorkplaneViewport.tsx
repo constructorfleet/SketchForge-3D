@@ -231,7 +231,7 @@ type WorkplaneViewportProps = {
   onCameraViewChange?: (view: CameraView) => void;
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
-  onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z") => Promise<void> | void;
+  onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   /** Solid volume of the selected shape, for the inspector's material readout. */

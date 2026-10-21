@@ -6,7 +6,7 @@ export type DraftFaceRequest = {
   faceIds: string[];
   faceId: string;
   angle: number;
-  pullDirection: "x" | "y" | "z";
+  pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z";
   brepTransform?: number[];
 };
 
@@ -24,6 +24,9 @@ const AXIS: Record<DraftFaceRequest["pullDirection"], Vec3> = {
   x: { x: 1, y: 0, z: 0 },
   y: { x: 0, y: 1, z: 0 },
   z: { x: 0, y: 0, z: 1 },
+  "-x": { x: -1, y: 0, z: 0 },
+  "-y": { x: 0, y: -1, z: 0 },
+  "-z": { x: 0, y: 0, z: -1 },
 };
 
 export function buildFaceDraft(cad: OcctKernel, request: DraftFaceRequest): DraftFaceResult {

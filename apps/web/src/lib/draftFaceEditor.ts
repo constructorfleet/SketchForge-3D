@@ -3,7 +3,7 @@ import { cadBrepTransformForShape } from "@/lib/engine/cadBakeMetadata";
 import { createLocalId } from "@/lib/engine/localIds";
 import { projectShapesFingerprint } from "@/lib/engine/editorHistory";
 
-export const DRAFT_FACE_PULL_AXES = ["x", "y", "z"] as const;
+export const DRAFT_FACE_PULL_AXES = ["x", "-x", "y", "-y", "z", "-z"] as const;
 export type DraftFacePullAxis = typeof DRAFT_FACE_PULL_AXES[number];
 
 export function isDraftFaceAngle(angle: number) {
@@ -14,7 +14,7 @@ export function draftFaceRequestForShape(
   shape: WorkplaneShape,
   faceIndex: number,
   angle: number,
-  pullDirection: "x" | "y" | "z",
+  pullDirection: DraftFacePullAxis,
 ) {
   const brep = shape.cadBrep ?? shape.importedMesh?.brepStep;
   if (!brep || !Number.isInteger(faceIndex) || faceIndex < 0 || !isDraftFaceAngle(angle)) return null;
