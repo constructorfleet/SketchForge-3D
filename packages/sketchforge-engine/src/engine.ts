@@ -746,8 +746,10 @@ export function createEngine(store: ProjectStore): Engine {
       // The sweep's own fields are already applied, so they are kept out of the
       // per-kind pass -- which would refuse them, the stored kind being `mesh`.
       const sweepFields: readonly string[] = sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS;
+      // Shape summaries expose the source ID for identity; echoing a full
+      // summary into PATCH must not let callers replace that identity.
       let requestedChanges = Object.fromEntries(
-        Object.entries(changes).filter(([field]) => !sweepFields.includes(field)),
+        Object.entries(changes).filter(([field]) => field !== "sketchSourceId" && !sweepFields.includes(field)),
       );
       let changeBase = swept;
       if (changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {

@@ -509,6 +509,7 @@ class ShapeSummary:
     rotation_z: float
     request_kind: Optional[str] = None
     sketch_operation: Optional[str] = None
+    sketch_source_id: Optional[str] = None
     sketch_profile: Optional[Dict[str, Any]] = None
     #: The per-kind parameters this shape carries, under the server's own names.
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -532,6 +533,7 @@ class ShapeSummary:
         "kind",
         "requestKind",
         "sketchOperation",
+        "sketchSourceId",
         "sketchProfile",
         "color",
         "hole",
@@ -564,6 +566,7 @@ class ShapeSummary:
             kind=_text(payload, "kind"),
             request_kind=payload.get("requestKind") if isinstance(payload.get("requestKind"), str) else None,
             sketch_operation=payload.get("sketchOperation") if isinstance(payload.get("sketchOperation"), str) else None,
+            sketch_source_id=payload.get("sketchSourceId") if isinstance(payload.get("sketchSourceId"), str) else None,
             sketch_profile=dict(payload["sketchProfile"]) if isinstance(payload.get("sketchProfile"), Mapping) else None,
             color=_text(payload, "color"),
             hole=bool(payload.get("hole")),

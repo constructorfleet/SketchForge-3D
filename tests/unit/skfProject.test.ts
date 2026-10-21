@@ -4,7 +4,7 @@ import { editorHistoryEntry, editorHistoryForAutosave, editorHistoryForExport } 
 import { placementWorkplaneFromSurface } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/projectAssets";
 import * as projectAssets from "@constructorfleet/sketchforge-engine/projectAssets";
-import { canonicalizeShape } from "@constructorfleet/sketchforge-engine/workplaneShapes";
+import { canonicalizeShape, cloneWorkplaneShapeTreeWithFreshIds } from "@constructorfleet/sketchforge-engine/workplaneShapes";
 import {
   exportSkfProject,
   importSkfProject,
@@ -446,6 +446,49 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.shapes[0].importedMesh?.positions).toEqual(revolve.importedMesh?.positions);
   });
 
+  it("duplicates a revolve with distinct source sketch nodes and feature references", async () => {
+    const revolve = shape("mesh", "revolve-original", {
+      name: "Sketch revolve",
+      sketchOperation: "revolve",
+      sketchSourceId: "sketch/revolve-original",
+      sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 32, quality: 8, pitch: 0, turns: 1, coreRadius: 0 },
+      sketchProfile: {
+        points: [{ id: "p1", x: -4, z: 0 }, { id: "p2", x: -8, z: 0 }, { id: "p3", x: -8, z: 12 }, { id: "p4", x: -4, z: 12 }],
+        segments: [
+          { id: "s1", startId: "p1", endId: "p2", kind: "line" },
+          { id: "s2", startId: "p2", endId: "p3", kind: "line" },
+          { id: "s3", startId: "p3", endId: "p4", kind: "line" },
+          { id: "s4", startId: "p4", endId: "p1", kind: "line" },
+        ],
+      },
+      importedMesh: {
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        baseWidth: 16,
+        baseDepth: 16,
+        baseHeight: 12,
+        triangleCount: 1,
+        sourceFormat: "json",
+      },
+    });
+    const duplicate = cloneWorkplaneShapeTreeWithFreshIds(revolve, "copy");
+    const bytes = await exportSkfProject(input([revolve, duplicate]));
+    const { document } = packageDocument(bytes);
+    const sketches = document.sketches.filter((sketch) => sketch.operation === "revolve");
+    const features = document.features.filter((feature) => feature.type === "sketch-revolve");
+    const sourceIds = sketches.map((sketch) => sketch.id);
+    const sourceNodeIds = sketches.map((sketch) => sketch.sourceNodeId);
+
+    expect(sourceIds).toHaveLength(2);
+    expect(new Set(sourceIds).size).toBe(2);
+    expect(new Set(sourceNodeIds).size).toBe(2);
+    expect(features).toHaveLength(2);
+    expect(new Set(features.map((feature) => feature.id)).size).toBe(2);
+    expect(features.map((feature) => feature.inputObjectIds[0]).sort()).toEqual([...sourceIds].sort());
+
+    const restored = await importSkfProject(bytes);
+    expect(restored.shapes.map((shape) => shape.sketchSourceId).sort()).toEqual([...sourceIds].sort());
+  });
+
   it("preserves the sweep sketch operation through SKF export and import", async () => {
     const sweepFrames = {
       section: {
@@ -463,6 +506,7 @@ describe("SketchForge .skf project packages", () => {
     };
     const sweep = shape("mesh", "sweep-sketch", {
       sketchOperation: "sweep",
+      sketchSourceId: "source-sketch-42",
       sketchProfile: {
         points: [{ id: "p1", x: 0, z: 0 }, { id: "p2", x: 2, z: 0 }, { id: "p3", x: 2, z: 3 }, { id: "p4", x: 0, z: 3 }, { id: "path1", x: 5, z: 0, sweepRole: "spine", handleOut: { x: 7, z: 1, sweepDepth: 2.5 } }, { id: "path2", x: 12, z: 6, sweepRole: "spine", sweepDepth: 5, handleIn: { x: 10, z: 5, sweepDepth: -1.25 } }],
         segments: [
@@ -486,14 +530,27 @@ describe("SketchForge .skf project packages", () => {
     const exported = await exportSkfProject(input([sweep]));
     const { document } = packageDocument(exported);
     const restored = await importSkfProject(exported);
+    const sourceSketchId = "source-sketch-42";
+    const sourceSketch = document.sketches.find((sketch) => sketch.id === sourceSketchId);
+    const sourceNode = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((node) => node.nodeId === sourceSketch?.sourceNodeId);
+    const sweepFeature = document.features.find((feature) => feature.type === "sketch-sweep");
+
     expect(document.sketches[0].operation).toBe("sweep");
     expect(document.features[0].type).toBe("sketch-sweep");
+    expect(sourceSketch).toMatchObject({ id: sourceSketchId, sourceObjectId: sourceSketchId, objectId: sweep.id });
+    expect(sourceNode).toMatchObject({ objectId: sourceSketchId, objectType: "sketch" });
+    expect(sourceNode?.definition.sketchProfile).toEqual(sweep.sketchProfile);
+    expect(sweepFeature?.inputObjectIds).toEqual([sourceSketchId]);
     expect(restored.shapes[0].sketchOperation).toBe("sweep");
+    expect(restored.shapes[0].sketchSourceId).toBe(sourceSketchId);
+    expect(restored.history.map((entry) => entry.shapes[0]?.sketchSourceId)).toEqual([sourceSketchId]);
     expect(restored.shapes[0].sketchProfile).toEqual(sweep.sketchProfile);
     expect(restored.shapes[0].sketchProfile?.sweepFrames).toEqual(sweepFrames);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path2")?.sweepDepth).toBe(5);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path1")?.handleOut?.sweepDepth).toBe(2.5);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path2")?.handleIn?.sweepDepth).toBe(-1.25);
+    const repackaged = packageDocument(await exportSkfProject(input(restored.shapes))).document;
+    expect(repackaged.sketches).toContainEqual(expect.objectContaining({ id: sourceSketchId, sourceObjectId: sourceSketchId }));
 
     const invalidHandleDepth = mutateProject(exported, (document) => {
       for (const state of document.states) {

@@ -161,14 +161,14 @@ describe("the REST API over HTTP", () => {
       method: "POST",
       body: JSON.stringify({ kind: "sketchSweep", name: "API sweep", profile }),
     });
-    expect(created.status).toBe(201);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
     const [shape] = created.body.shapes as Array<Record<string, any>>;
-    expect(shape).toMatchObject({ kind: "mesh", requestKind: "sketchSweep", sketchOperation: "sweep", name: "API sweep", sketchProfile: profile });
+    expect(shape).toMatchObject({ kind: "mesh", requestKind: "sketchSweep", sketchOperation: "sweep", sketchSourceId: `sketch/${shape.id}`, name: "API sweep", sketchProfile: profile });
     expect(shape.width).toBeGreaterThan(0);
     expect(shape.height).toBeGreaterThan(0);
     expect(shape.depth).toBeGreaterThan(0);
     const listed = await api(`/shapes?projectId=${projectId}`);
-    expect((listed.body.shapes as Array<Record<string, any>>).find((candidate) => candidate.id === shape.id)?.sketchProfile).toEqual(profile);
+    expect((listed.body.shapes as Array<Record<string, any>>).find((candidate) => candidate.id === shape.id)).toMatchObject({ sketchSourceId: `sketch/${shape.id}`, sketchProfile: profile });
   });
 
   it("rejects malformed sketch sweep topology before invoking the CAD kernel", async () => {

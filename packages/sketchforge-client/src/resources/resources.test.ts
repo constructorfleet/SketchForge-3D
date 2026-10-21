@@ -101,8 +101,8 @@ describe("shapes", () => {
       ],
     };
     const request: ShapeRequest = { kind: "sketchSweep", profile };
-    const server = fakeServer({ status: 201, body: { shapes: [{ ...shapeSummary("s1"), sketchOperation: "sweep", sketchProfile: profile }], revision: 4 } });
-    await expect(client(server).shapes.create("p1", request)).resolves.toMatchObject({ sketchOperation: "sweep", sketchProfile: profile });
+    const server = fakeServer({ status: 201, body: { shapes: [{ ...shapeSummary("s1"), sketchOperation: "sweep", sketchSourceId: "sketch/s1", sketchProfile: profile }], revision: 4 } });
+    await expect(client(server).shapes.create("p1", request)).resolves.toMatchObject({ sketchOperation: "sweep", sketchSourceId: "sketch/s1", sketchProfile: profile });
     expect(server.calls[0]?.body).toEqual(request);
   });
 

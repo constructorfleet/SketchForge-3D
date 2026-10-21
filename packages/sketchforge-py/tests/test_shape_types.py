@@ -38,10 +38,12 @@ class ShapeRequestTypeTests(unittest.TestCase):
             "hole": False, "locked": False, "hidden": False, "x": 0, "z": 0,
             "elevation": 0, "width": 2, "depth": 2, "height": 10,
             "rotation": 0, "rotationX": 0, "rotationZ": 0,
-            "sketchOperation": "sweep", "sketchProfile": {"points": [], "segments": []},
+            "sketchOperation": "sweep", "sketchSourceId": "sketch/s1", "sketchProfile": {"points": [], "segments": []},
         })
         self.assertEqual(summary.sketch_profile, {"points": [], "segments": []})
+        self.assertEqual(summary.sketch_source_id, "sketch/s1")
         self.assertNotIn("sketchProfile", summary.extra)
+        self.assertNotIn("sketchSourceId", summary.extra)
 
 
 if __name__ == "__main__":

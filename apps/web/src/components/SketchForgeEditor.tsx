@@ -706,6 +706,7 @@ async function cadShapeFromSketchSweepProfile(profile: SketchProfile, existing?:
     worker.postMessage({ type: "sweep", requestId, profile: cloneSketchProfile(profile) } satisfies SketchCadWorkerRequest);
   });
   if (response.type === "error") throw errorFromPayload(response);
+  const sketchSourceId = existing?.sketchSourceId ?? createLocalId("sketch");
   const source = canonicalizeShape({
     ...(existing ?? {
       id: createLocalId("sketch-sweep"),
@@ -722,6 +723,7 @@ async function cadShapeFromSketchSweepProfile(profile: SketchProfile, existing?:
     }),
     sketchProfile: cloneSketchProfile(profile),
     sketchOperation: "sweep",
+    sketchSourceId,
     edgeTreatments: undefined,
     edgeTreatmentHistory: undefined,
     cadDisplayEdges: undefined,
@@ -729,7 +731,12 @@ async function cadShapeFromSketchSweepProfile(profile: SketchProfile, existing?:
   });
   const shape = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep);
   if (!shape) throw new LocalizedError("errors.editor.sketchEmptySolid");
-  return { ...shape, sketchProfile: cloneSketchProfile(profile), sketchOperation: "sweep" as const };
+  return {
+    ...shape,
+    sketchProfile: cloneSketchProfile(profile),
+    sketchOperation: "sweep" as const,
+    sketchSourceId,
+  };
 }
 
 async function shapeFromRevolvedSketchProfile(
