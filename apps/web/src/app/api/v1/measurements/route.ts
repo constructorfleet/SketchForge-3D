@@ -1,6 +1,6 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
-import { parseApiTargetQuery, parseMeasureBetweenRequest, parseMeasureBetweenResponse, parseMeasurementsResponse } from "@/lib/apiV1OperationContract";
+import { parseApiTargetQuery, parseMeasureBetweenRequest, parseMeasureBetweenResponse, parseMeasurementsResponse, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -8,7 +8,7 @@ export const revalidate = false;
 const CAD_FAILED = "The CAD kernel could not measure that shape.";
 
 /** A shape's edges and faces, measured from its exact geometry. */
-export async function GET(request: Request) {
+async function getMeasurements(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const query = parseApiTargetQuery(request);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 /** The distance between two entities, and the angle between them if both are flat faces. */
-export async function POST(request: Request) {
+async function measureEntities(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -45,3 +45,6 @@ export async function POST(request: Request) {
   if (!response) return apiError("The CAD kernel returned an invalid measurement.", 500, "cad_failed");
   return apiJson(response);
 }
+
+export const GET = withApiV1Contract("GET /api/v1/measurements", getMeasurements);
+export const POST = withApiV1Contract("POST /api/v1/measurements", measureEntities);
