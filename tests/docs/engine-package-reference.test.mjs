@@ -8,15 +8,29 @@ const root = new URL("../../", import.meta.url);
 
 test("the published engine README explains installation, supported usage, scope, and links", async () => {
   const readme = await readFile(new URL("packages/sketchforge-engine/README.md", root), "utf8");
-  for (const section of ["Installation", "Quick start", "Public API", "Limitations", "License"]) {
+  const [manifestText, lockText] = await Promise.all([
+    readFile(new URL("packages/sketchforge-engine/package.json", root), "utf8"),
+    readFile(new URL("package-lock.json", root), "utf8"),
+  ]);
+  const manifest = JSON.parse(manifestText);
+  const lock = JSON.parse(lockText);
+  assert.equal(manifest.engines.node, ">=20");
+  assert.equal(lock.packages["node_modules/brepjs"].engines.node, ">=24");
+  for (const section of ["Node compatibility", "Installation", "Quick start", "Public API", "Limitations", "License"]) {
     assert.match(readme, new RegExp(`^## ${section}$`, "m"), `README should include ${section}`);
   }
   assert.match(readme, /npm install @constructorfleet\/sketchforge-engine/);
   assert.match(readme, /Node\.js 20 or newer/i);
+  assert.match(readme, /Node\.js 24 or newer[\s\S]*Use Node\.js 24\+ for the complete engine/i);
+  assert.match(readme, /declares Node\.js 20[\s\S]*brepjs.*Node\.js 24/i);
   assert.match(readme, /typescript-engine/);
   assert.match(readme, /AGPL-3\.0-only/);
   assert.match(readme, /meshForShape/);
   assert.match(readme, /meshForShape.*dispatcher/i);
+  assert.match(readme, /does not create projects/i);
+  for (const method of ["project", "addShapes", "changeShape", "removeShape", "align", "distribute", "pattern", "importMesh", "cut", "group", "ungroup", "separate", "explode", "edges", "faces", "treat", "draftPrism", "mirrorBaked", "shell", "measurements", "properties", "measureBetween", "interference"]) {
+    assert.ok(readme.includes(`\`${method}\``), `README should map the Engine.${method} operation`);
+  }
 
   const example = readme.match(/```js\n([\s\S]*?)\n```/)?.[1];
   assert.ok(example, "README should include a runnable JavaScript example");
@@ -44,4 +58,6 @@ test("the generated engine API leads with the package guide and links API areas"
   assert.match(reference, /## Exported API/);
   assert.match(reference, /### Projects and engine operations/);
   assert.match(reference, /\[`createEngine`\]\(#createengine\)/);
+  assert.match(reference, /Node\.js 24 or newer/);
+  assert.match(reference, /addShapes\(projectId: string, requests: readonly ShapeRequest\[\]\)/);
 });
