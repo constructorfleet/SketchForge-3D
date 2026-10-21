@@ -195,6 +195,89 @@ test("built docs support accessible keyboard navigation and a narrow viewport", 
   }
 });
 
+test("representative built pages pass accessibility rules, reduced-motion, and 400% reflow checks", async () => {
+  const output = path.join(rootPath, "docs-site-dist");
+  const server = createServer((request, response) => {
+    const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+    const relativePath = pathname.replace(/^\/SketchForge-3D\/?/, "") || "index.html";
+    const requested = path.resolve(output, relativePath);
+    if (!requested.startsWith(`${output}${path.sep}`) && requested !== path.join(output, "index.html")) {
+      response.writeHead(403).end();
+      return;
+    }
+    const file = requested.endsWith(path.sep) ? path.join(requested, "index.html") : requested;
+    try {
+      const content = readFileSync(file);
+      const extension = path.extname(file);
+      const contentType = ({ ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml" })[extension] ?? "application/octet-stream";
+      response.writeHead(200, { "content-type": contentType }).end(content);
+    } catch {
+      response.writeHead(404).end("Not found");
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    const pages = [
+      "/SketchForge-3D/",
+      "/SketchForge-3D/docs/REST_API.html",
+      "/SketchForge-3D/docs/packages/python-client.html",
+      "/SketchForge-3D/docs/mcp/TOOLS_REFERENCE.html",
+    ];
+    const violations = [];
+    for (const colorScheme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme });
+      for (const url of pages) {
+        await page.goto(`http://127.0.0.1:${address.port}${url}`);
+        assert.equal(await page.getByRole("button", { name: "Search" }).count(), 1, `${url} search control has an accessible name matching its visible text`);
+        if (!(await page.evaluate(() => Boolean(window.axe)))) {
+          await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
+        }
+        if (colorScheme === "light" && url.endsWith("/")) {
+          assert.equal(await page.getByRole("img", { name: "SketchForge editor showing a selected model on the workplane" }).count(), 1,
+            "landing screenshot renders as an image with its useful alternative text, not as a paragraph");
+        }
+        const result = await page.evaluate(async () => window.axe.run(document, {
+          runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+        }));
+        violations.push(...result.violations.map((violation) => ({
+          page: url,
+          colorScheme,
+          id: violation.id,
+          impact: violation.impact,
+          help: violation.help,
+          nodes: violation.nodes.slice(0, 8).map((node) => ({ target: node.target.join(" "), message: node.any[0]?.message ?? node.failureSummary })),
+        })));
+
+        await page.setViewportSize({ width: 320, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `${url} reflows without horizontal page overflow at a 320 CSS pixel viewport (400% reflow)`);
+        if (colorScheme === "light" && url.endsWith("/")) {
+          mkdirSync(path.join(rootPath, "output/playwright"), { recursive: true });
+          await page.screenshot({ path: path.join(rootPath, "output/playwright/docs-site-accessibility-320.png"), fullPage: true });
+        }
+
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), true, "browser reduced-motion setting is active");
+        const movingElements = await page.locator("*").evaluateAll((elements) => elements.flatMap((element) => {
+          const style = getComputedStyle(element);
+          return style.animationName !== "none" && style.animationDuration.split(",").some((value) => parseFloat(value) > 0)
+            ? [{ tag: element.tagName, className: String(element.className), animation: style.animationName, duration: style.animationDuration }]
+            : [];
+        }));
+        assert.deepEqual(movingElements, [], `${url} has no ongoing CSS animation with reduced motion enabled`);
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+        await page.setViewportSize({ width: 1280, height: 900 });
+      }
+    }
+    assert.deepEqual(violations, [], `WCAG 2.1 A/AA axe-core violations: ${JSON.stringify(violations, null, 2)}`);
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 function walk(directory) {
   return readdirSync(directory).flatMap((entry) => {
     const absolute = path.join(directory, entry);

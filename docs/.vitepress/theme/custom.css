@@ -1,0 +1,17 @@
+:root {
+  --vp-c-brand-3: #4f69bc;
+  --vp-code-lang-color: var(--vp-c-text-2);
+  --vp-code-line-number-color: var(--vp-c-text-2);
+}
+
+.DocSearch-Button .DocSearch-Button-Keys {
+  display: none;
+}
+
+.dark {
+  --vp-c-text-3: #a0a0a6;
+}
+
+.vp-doc [class*="language-"] pre > code span {
+  color: var(--vp-code-block-color) !important;
+}

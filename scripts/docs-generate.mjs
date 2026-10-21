@@ -44,6 +44,10 @@ await cp(
   path.join(root, "apps/web/public/assets/sketchforge/sketchforge-logo-transparent.png"),
   path.join(output, "assets/sketchforge/sketchforge-logo-transparent.png"),
 );
+await cp(
+  path.join(root, "docs/site-assets/editor-phone-stand.png"),
+  path.join(output, "assets/sketchforge/editor-phone-stand.png"),
+);
 await cp(path.join(root, "docs/site-assets/favicon.svg"), path.join(output, "public/favicon.svg"));
 await cp(path.join(root, "docs/openapi-v1.json"), path.join(output, "public/openapi-v1.json"));
 
@@ -97,7 +101,11 @@ for (const generatedPath of markdownFiles) {
   });
   contents = contents
     .replaceAll('href="/openapi-v1.json"', `href="${pagesBase}/openapi-v1.json"`)
-    .replace(/!\[([^\]]*)\]\(https?:\/\/[^)]+\)/g, "$1")
+    .replace(
+      '![SketchForge editor showing a selected model on the workplane](https://sketchforge3d.com/assets/landing/editor-phone-stand.png)',
+      '![SketchForge editor showing a selected model on the workplane](./assets/sketchforge/editor-phone-stand.png)',
+    )
+    .replace(/!\[[^\]]*\]\(https?:\/\/[^)]+\)/g, "")
     .replace(
       'src="https://sketchforge3d.com/assets/sketchforge/sketchforge-logo-transparent.png"',
       'src="./assets/sketchforge/sketchforge-logo-transparent.png"',
