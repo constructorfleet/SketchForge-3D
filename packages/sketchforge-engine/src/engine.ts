@@ -741,8 +741,22 @@ export function createEngine(store: ProjectStore): Engine {
             rotationX: existing.rotationX,
             rotationZ: existing.rotationZ,
           });
+          const baseDimensions = {
+            width: frame?.width ?? existing.importedMesh?.baseWidth ?? existing.width,
+            depth: frame?.depth ?? existing.importedMesh?.baseDepth ?? existing.depth,
+            height: frame?.height ?? existing.importedMesh?.baseHeight ?? existing.height,
+          };
+          const resized = {
+            ...rebuilt,
+            width: rebuilt.width * existing.width / Math.max(0.01, baseDimensions.width),
+            depth: rebuilt.depth * existing.depth / Math.max(0.01, baseDimensions.depth),
+            height: rebuilt.height * existing.height / Math.max(0.01, baseDimensions.height),
+          };
+          resized.size = Math.max(resized.width, resized.depth);
+          const refreshedFaceIds = (await shapeFaces(rebuilt))
+            .map((face) => `face_${createLocalId(`${existing.id}-${face.index}`)}`);
           const {
-            faceIds: _faceIds,
+            faceIds: _oldFaceIds,
             faceColors: _faceColors,
             edgeTreatments: _edgeTreatments,
             edgeTreatmentHistory: _edgeTreatmentHistory,
@@ -752,9 +766,10 @@ export function createEngine(store: ProjectStore): Engine {
           } = existing;
           swept = {
             ...sourceMetadata,
-            ...rebuilt,
+            ...resized,
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+            faceIds: refreshedFaceIds,
           };
         } catch (error) {
           return failed({
@@ -798,10 +813,14 @@ export function createEngine(store: ProjectStore): Engine {
       // Shape summaries expose the source ID for identity; echoing a full
       // summary into PATCH must not let callers replace that identity.
       let requestedChanges = Object.fromEntries(
-        Object.entries(changes).filter(([field]) => field !== "sketchSourceId" && !sweepFields.includes(field)),
+        Object.entries(changes).filter(([field]) =>
+          field !== "sketchSourceId"
+          && field !== "faceIds"
+          && !(replacingSketchProfile && field === "faceColors")
+          && !sweepFields.includes(field)),
       );
       let changeBase = swept;
-      if (changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {
+      if (!replacingSketchProfile && changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {
         const colors = changes.faceColors as Record<string, unknown>;
         if (Object.keys(colors).some((key) => !/^\d+$/.test(key))) {
           try {
@@ -842,7 +861,7 @@ export function createEngine(store: ProjectStore): Engine {
         !== JSON.stringify((changed.shape as unknown as Record<string, unknown>)[field]),
       );
       let updatedShape = changed.shape;
-      if (geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
+      if (!replacingSketchProfile && geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
         try {
           updatedShape = await preserveUnambiguousFaceMetadata(existing, changed.shape);
         } catch (error) {

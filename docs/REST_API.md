@@ -259,7 +259,7 @@ A `thread` is a `revolve` with the outline filled in; pass your own `profile` to
 }
 ```
 
-The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`. Send a replacement profile in `sketchProfile` to `PATCH /shapes`; the server rebuilds the OCCT solid while preserving the shape ID, source-sketch ID, name, and placement. Invalid profiles return `400 invalid_request`; other shape kinds return `422 unapplicable_fields`.
+The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`. Send a replacement profile in `sketchProfile` to `PATCH /shapes`; the server rebuilds the OCCT solid while preserving the shape ID, source-sketch ID, name, placement, and existing resize ratios. Face colors are cleared and new face IDs are issued because face identity belongs to the rebuilt topology; recolor by the new IDs returned afterward. Invalid profiles return `400 invalid_request`; other shape kinds return `422 unapplicable_fields`.
 
 ```json
 {
