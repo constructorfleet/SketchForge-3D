@@ -80,12 +80,13 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /MCP schemas\/navigation \(#122\)/i);
   assert.match(spec, /static provenance \(#126\)/i);
   assert.match(spec, /deterministic reference-generator wiring \(#128\)/i);
-  assert.match(spec, /verified at `7b5079a`/i);
+  assert.match(spec, /verified at `3dc11df`/i);
   assert.match(spec, /built-site accessibility smoke checks \(#141\).*merged/i);
   assert.match(spec, /external-link availability report \(#143\).*merged/i);
   assert.match(spec, /sketch-constraint degree-of-freedom estimate \(#146\).*merged/i);
   assert.match(spec, /six-operation generated OpenAPI slice \(#144\).*merged/i);
   assert.match(spec, /Open PR #151 adds runtime-backed OpenAPI coverage.*7 operations.*25 still omitted/i);
+  assert.match(spec, /Open PR #153 adds a bounded deterministic least-squares sketch constraint solve/i);
   assert.match(spec, /PR #147's STEP component-color import support has merged/i);
   assert.match(spec, /stable face identity in the Python client \(#145\).*merged/i);
   assert.match(spec, /STEP color guidance \(#119\)/i);
@@ -95,7 +96,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /Remote failures are advisory; internal broken links stay blocking/i);
   assert.match(spec, /REST reference authoritative for the whole API/i);
   assert.match(spec, /Merged PR #144 covers six schema-backed operations and records 26 omitted operations/i);
-  assert.match(capabilities, /refreshed against `main` at `7b5079a`/i);
+  assert.match(capabilities, /refreshed against `main` at `3dc11df`/i);
   assert.match(capabilities, /PR #147\s+preserved STEP component colors/i);
   assert.doesNotMatch(spec, /before the first deployment|first published deployment.*not verified|Pages publishing source.*not changed/i);
 
