@@ -33,7 +33,7 @@ project.skf
 - `groups`: explicit parent/member references and operation type
 - `workplanes`: base and selected offset workplanes
 - `exactCad`: objects with exact B-Rep or imported STEP sources
-- `editor`: workspace dimensions, units, snap grid, and selected workplane elevation
+- `editor`: workspace dimensions, units, snap grid, camera projection and saved camera view, and selected workplane elevation
 
 Object nodes keep stable SketchForge object IDs. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles.
 
@@ -48,7 +48,8 @@ Nodes reference display edges through `cadDisplayEdgesAssetId`; the edge version
 - Imported STL, SVG, and STEP sources, stored once and reused by instances
 - Exact imported STEP data, current exact CAD B-Rep, display edges, chamfer/fillet settings, and reversible edge-treatment history
 - Undo and redo states according to the export choice: Unlimited, 100, 50, or 30 recent actions. Unlimited means every state still retained by the editor, including available redo states.
-- Workspace units, grid/snap settings, dimensions, and active offset workplane
+- Workspace units, grid/snap settings, dimensions, active offset workplane, and camera projection
+- The last settled camera position, target, and zoom. Older projects without a saved camera view open at the standard home view.
 
 Native primitives are regenerated from definitions and do not receive mesh assets. Source-backed STL, SVG, and STEP objects are regenerated from their original asset. Derived mesh assets are written only when the current editor has genuinely baked geometry (for example a boolean or edge treatment), or when an older local project no longer has its original imported source.
 
