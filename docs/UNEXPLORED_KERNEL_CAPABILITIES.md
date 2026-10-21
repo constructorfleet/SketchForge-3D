@@ -64,22 +64,29 @@ The Sketch workspace has a planar sketch sweep alongside extrusion and
 revolve. The workflow has two stages: draw one or more closed section loops on
 the selected workplane (nested loops become holes and disjoint loops become
 separate swept solids), then switch to the orthogonal plane derived from that
-workplane and draw exactly one open, planar spine. Start the spine near the
-section origin. Each section region is positioned at the spine's first point
-and oriented perpendicular to its initial tangent; the spine may use line or
-cubic Bezier segments, and OCCT uses rounded-corner transitions. Selecting a
-spine point exposes a 3D depth offset along the section workplane's third axis,
-so connected line and Bezier segments can leave the orthogonal sketch plane.
-The first segment must still start perpendicular to the section plane. The
-editor retains the source sketch profile and marks the result as a
-`sketch-sweep`, but the resulting geometry is baked rather than represented by
-an editable feature-history node. This is a local editor operation, not a REST
-or client-library operation.
+workplane and draw exactly one open spine. Start the spine near the section
+origin. Each section region is positioned at the spine's first point and
+oriented perpendicular to its initial tangent; the spine may use line or cubic
+Bezier segments, and OCCT uses rounded-corner transitions. Selecting a spine
+point exposes a 3D depth offset along the section workplane's third axis, so
+connected line and Bezier segments can leave the orthogonal sketch plane. Cubic
+Bezier handles each expose an independent depth on that same workplane axis, so
+the path can bend in 3D between its endpoints; handles without an explicit depth
+inherit their endpoint's depth. The first segment must still start perpendicular
+to the section plane. The editor retains the source sketch profile and marks
+the result as a `sketch-sweep`, but the resulting geometry is baked rather than
+represented by an editable feature-history node. This is a local editor
+operation, not a REST or client-library operation.
 
 Draft prism remains available in the editor, REST, and client libraries, but
-supports one straight closed sketch loop and also stores baked geometry. More
-work remains for free 3D curve-handle control and dependency-ordered editable
-feature history.
+supports one straight closed sketch loop, draft angles strictly between -45°
+and 45° excluding zero, and stores baked geometry. Face-based drafting is now
+available in the shape inspector with bounded, fixture-verified support: the
+documented extrusion fixture accepts faces 1, 3, 4, and 5 at ±5° along +Z, and
+a 10 mm box accepts faces 0–3 at ±5° along +Z. These cases do not establish
+support for arbitrary solids, other pull axes, or all draft angles. More work
+remains for broader face-draft support and dependency-ordered editable feature
+history.
 
 ### 2. STEP assembly hierarchy and color verification
 

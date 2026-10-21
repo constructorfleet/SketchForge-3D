@@ -61,6 +61,7 @@ type SketchWorkspaceProps = {
   onInsertPoint: (segmentId: string, point: { x: number; z: number }, amount: number) => void;
   onSetPointMode: (id: string, mode: "corner" | "smooth" | "split") => void;
   onSetSweepDepth: (id: string, depth: number) => void;
+  onSetSweepHandleDepth: (id: string, handle: "in" | "out", depth: number) => void;
   onClearMeasurement: () => void;
 };
 
@@ -511,6 +512,7 @@ export function SketchWorkspace({
   onInsertPoint,
   onSetPointMode,
   onSetSweepDepth,
+  onSetSweepHandleDepth,
   onClearMeasurement,
 }: SketchWorkspaceProps) {
   const t = useTranslations();
@@ -1263,7 +1265,11 @@ export function SketchWorkspace({
       {selectedPoint && tool === "select" ? (
         <div className="sketch-point-actions" aria-label={t("workspace.sketch.point.actions")}>
           {operation === "sweep" && spineStage && selectedPoint.sweepRole === "spine" ? (
-            <SketchSweepDepthInput point={selectedPoint} onSetDepth={onSetSweepDepth} />
+            <>
+              <SketchSweepDepthInput point={selectedPoint} onSetDepth={onSetSweepDepth} />
+              {selectedPoint.handleIn ? <SketchSweepHandleDepthInput point={selectedPoint} handle="in" onSetDepth={onSetSweepHandleDepth} /> : null}
+              {selectedPoint.handleOut ? <SketchSweepHandleDepthInput point={selectedPoint} handle="out" onSetDepth={onSetSweepHandleDepth} /> : null}
+            </>
           ) : null}
           <button type="button" title={t("workspace.sketch.point.cornerTitle")} onClick={() => onSetPointMode(selectedPoint.id, "corner")}><CornerDownRight /><span>{t("workspace.sketch.point.corner")}</span></button>
           <button type="button" title={t("workspace.sketch.point.smoothTitle")} onClick={() => onSetPointMode(selectedPoint.id, "smooth")}><Waves /><span>{t("workspace.sketch.point.smooth")}</span></button>
@@ -1302,6 +1308,36 @@ function SketchSweepDepthInput({ point, onSetDepth }: { point: SketchPoint; onSe
           const value = Number(draft);
           if (Number.isFinite(value)) onSetDepth(point.id, value);
           else setDraft(String(point.sweepDepth ?? 0));
+        }}
+      />
+    </label>
+  );
+}
+
+function SketchSweepHandleDepthInput({ point, handle, onSetDepth }: {
+  point: SketchPoint;
+  handle: "in" | "out";
+  onSetDepth: (id: string, handle: "in" | "out", depth: number) => void;
+}) {
+  const t = useTranslations();
+  const handlePoint = handle === "in" ? point.handleIn : point.handleOut;
+  const depth = handlePoint?.sweepDepth ?? point.sweepDepth ?? 0;
+  const [draft, setDraft] = useState(String(depth));
+  useEffect(() => setDraft(String(depth)), [point.id, handle, depth]);
+  const label = t(handle === "in" ? "workspace.sketch.point.sweepHandleInDepth" : "workspace.sketch.point.sweepHandleOutDepth");
+  return (
+    <label className="sketch-sweep-depth">
+      <span>{label}</span>
+      <input
+        type="number"
+        step="0.1"
+        value={draft}
+        aria-label={label}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onBlur={() => {
+          const value = Number(draft);
+          if (Number.isFinite(value)) onSetDepth(point.id, handle, value);
+          else setDraft(String(depth));
         }}
       />
     </label>

@@ -744,7 +744,9 @@
         "smoothTitle": "Změnit na hladký bod",
         "split": "Rozdělit",
         "splitTitle": "Rozdělit úchyty",
-        "sweepDepth": "3D hloubka (mm)"
+        "sweepDepth": "3D hloubka (mm)",
+        "sweepHandleInDepth": "Hloubka 3D vstupní rukojeti (mm)",
+        "sweepHandleOutDepth": "Hloubka 3D výstupní rukojeti (mm)"
       },
       "notice": {
         "shapeMoved": "Tvar náčrtu přesunut",

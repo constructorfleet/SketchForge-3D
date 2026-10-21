@@ -744,7 +744,9 @@
         "smoothTitle": "Punkt glatt machen",
         "split": "Trennen",
         "splitTitle": "Ziehpunkte trennen",
-        "sweepDepth": "3D-Tiefe (mm)"
+        "sweepDepth": "3D-Tiefe (mm)",
+        "sweepHandleInDepth": "3D-Tiefe Eingangsgriff (mm)",
+        "sweepHandleOutDepth": "3D-Tiefe Ausgangsgriff (mm)"
       },
       "notice": {
         "shapeMoved": "Form in der Skizze verschoben",

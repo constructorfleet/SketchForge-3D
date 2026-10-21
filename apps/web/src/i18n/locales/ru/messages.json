@@ -744,7 +744,9 @@
         "smoothTitle": "Сделать точку гладкой",
         "split": "Разделить",
         "splitTitle": "Разделить маркеры",
-        "sweepDepth": "Глубина 3D (мм)"
+        "sweepDepth": "Глубина 3D (мм)",
+        "sweepHandleInDepth": "Глубина 3D входящей ручки (мм)",
+        "sweepHandleOutDepth": "Глубина 3D исходящей ручки (мм)"
       },
       "notice": {
         "shapeMoved": "Фигура эскиза перемещена",

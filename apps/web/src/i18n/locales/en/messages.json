@@ -842,7 +842,9 @@
         "smoothTitle": "Make smooth",
         "split": "Split",
         "splitTitle": "Split handles",
-        "sweepDepth": "3D depth (mm)"
+        "sweepDepth": "3D depth (mm)",
+        "sweepHandleInDepth": "Incoming handle 3D depth (mm)",
+        "sweepHandleOutDepth": "Outgoing handle 3D depth (mm)"
       },
       "notice": {
         "shapeMoved": "Sketch shape moved",

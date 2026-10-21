@@ -744,7 +744,9 @@
         "smoothTitle": "Convertir en point lisse",
         "split": "Séparer",
         "splitTitle": "Séparer les poignées",
-        "sweepDepth": "Profondeur 3D (mm)"
+        "sweepDepth": "Profondeur 3D (mm)",
+        "sweepHandleInDepth": "Profondeur 3D de la poignée entrante (mm)",
+        "sweepHandleOutDepth": "Profondeur 3D de la poignée sortante (mm)"
       },
       "notice": {
         "shapeMoved": "Forme de l’esquisse déplacée",
