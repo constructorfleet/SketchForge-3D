@@ -100,6 +100,21 @@ class ExampleMacroTests(unittest.TestCase):
         self.assertGreater(result["triangles"], 0)
         self.assertEqual(result["size"], {"width": 60, "depth": 40, "height": 20})
 
+    def test_face_colors_survive_a_fillet_by_stable_id(self) -> None:
+        report = self.run_example("face_colors.py", width="60", depth="40", height="20", radius="4")
+        result: Dict[str, Any] = report.result
+
+        # The top and bottom of a box are the same faces after its vertical
+        # edges are rounded, so their colors are still keyed by the same ids.
+        self.assertEqual(result["painted"], 2)
+        self.assertEqual(result["coloredBefore"], 2)
+        self.assertEqual(result["survived"], 2)
+        self.assertEqual(result["lost"], 0)
+        self.assertEqual(sorted(result["colorsAfter"].values()), ["#1565c0", "#2e7d32"])
+        # And the keys are ids, not indexes -- the whole point of the feature.
+        for face_id in result["colorsAfter"]:
+            self.assertTrue(face_id.startswith("face_"), face_id)
+
     def test_filleted_box_refuses_a_radius_the_geometry_cannot_take(self) -> None:
         with self.assertRaises(SketchForgeApiError) as caught:
             self.run_example("filleted_box.py", width="30", depth="30", height="2", radius="9")

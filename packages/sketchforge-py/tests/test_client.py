@@ -433,6 +433,7 @@ class FacesAndShellTests(unittest.TestCase):
     @staticmethod
     def _face(index: int, facing):
         return {
+            "id": f"face_demo_{index}",
             "index": index,
             "surfaceType": "plane",
             "area": 400,
@@ -447,6 +448,28 @@ class FacesAndShellTests(unittest.TestCase):
         self.assertEqual(
             opener.calls[0].url, "http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1"
         )
+
+    def test_reads_the_stable_face_id_the_server_reports(self) -> None:
+        # The id is what a face color is keyed by, and it survives an operation
+        # where the index does not. A client that cannot read it cannot use it.
+        opener = FakeOpener({"faces": [self._face(0, "top"), self._face(1, "bottom")]})
+        faces = client(opener).faces.list("p1", "s1")
+        self.assertEqual([face.id for face in faces], ["face_demo_0", "face_demo_1"])
+
+    def test_reports_stable_ids_for_the_faces_pointing_a_given_way(self) -> None:
+        # `facing` answers with indexes for compatibility; this is the form a
+        # caller should persist, because an index is only true until the next
+        # operation reorders the faces.
+        opener = FakeOpener({"faces": [self._face(0, "top"), self._face(1, None), self._face(2, "bottom")]})
+        self.assertEqual(client(opener).faces.ids_facing("p1", "s1", "top"), ["face_demo_0"])
+
+    def test_keeps_a_face_without_an_id_readable(self) -> None:
+        # A server from before stable identity sends no id at all.
+        payload = self._face(0, "top")
+        del payload["id"]
+        face = client(FakeOpener({"faces": [payload]})).faces.list("p1", "s1")[0]
+        self.assertIsNone(face.id)
+        self.assertEqual(face.index, 0)
 
     def test_reads_a_face_with_no_normal(self) -> None:
         payload = self._face(0, None)

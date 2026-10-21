@@ -449,6 +449,12 @@ class ShapeSummary:
     revolve: Optional[Dict[str, Any]] = None
     #: The outline the sweep ran round, when it was described rather than drawn.
     profile: Optional[List[List[float]]] = None
+    #: The shape's face identities, in the order ``GET /faces`` lists them.
+    face_ids: List[str] = field(default_factory=list)
+    #: Face colors keyed by face id. A project saved before stable identity
+    #: keys them by face index instead, and those keys are kept as they are
+    #: rather than guessed at, because the server still accepts them.
+    face_colors: Dict[str, str] = field(default_factory=dict)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
@@ -472,6 +478,8 @@ class ShapeSummary:
         "rotationZ",
         "revolve",
         "profile",
+        "faceIds",
+        "faceColors",
     ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
@@ -498,6 +506,12 @@ class ShapeSummary:
             rotation_x=_number(payload, "rotationX"),
             rotation_z=_number(payload, "rotationZ"),
             parameters={name: payload[name] for name in SHAPE_PARAMETER_NAMES if name in payload},
+            face_ids=[value for value in (payload.get("faceIds") or []) if isinstance(value, str)],
+            face_colors={
+                str(key): value
+                for key, value in (payload.get("faceColors") or {}).items()
+                if isinstance(value, str)
+            },
             revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
             profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},
@@ -636,6 +650,13 @@ class Vector3:
 
 @dataclass(frozen=True)
 class FaceSummary:
+    #: The face's stable, project-persisted identity.
+    #:
+    #: This is what a face color is keyed by, and it survives an operation
+    #: where ``index`` does not: OCCT reorders faces after a fillet, a chamfer
+    #: or a mirror, so an index is only true until the next one. ``None`` from
+    #: a server older than stable face identity.
+    id: Optional[str]
     index: int
     #: As OCCT names the surface: ``plane``, ``cylinder``, ``bspline``...
     surface_type: str
@@ -656,7 +677,9 @@ class FaceSummary:
         centroid = payload.get("centroid") or {}
         normal = payload.get("normal")
         facing = payload.get("facing")
+        identity = payload.get("id")
         return cls(
+            id=identity if isinstance(identity, str) and identity else None,
             index=int(_number(payload, "index")),
             surface_type=_text(payload, "surfaceType", "unknown"),
             area=_number(payload, "area"),

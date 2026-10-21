@@ -284,6 +284,20 @@ class Faces:
             if face.facing == direction
         ]
 
+    def ids_facing(self, project_id: str, shape_id: str, direction: str) -> List[str]:
+        """
+        The stable ids of the faces pointing a given way.
+
+        The sibling of :meth:`facing`, which answers with indexes. An index is
+        only true until the next operation reorders the faces, so this is the
+        form to persist -- a face color is keyed by id.
+        """
+        return [
+            face.id
+            for face in self.list(project_id, shape_id)
+            if face.facing == direction and face.id is not None
+        ]
+
 
 def _measurement_end(end: MeasurementEnd) -> Dict[str, Any]:
     """

@@ -255,13 +255,22 @@ A module with a bare `run(context)` function instead of a `MACRO` runs in a `fre
 
 ## Examples
 
-`examples/` holds the three worked macros, which double as the integration tests:
+`examples/` holds the four worked macros, which double as the integration tests:
 
 | Macro | Builds |
 | --- | --- |
 | `bolt_plate.py` | A plate sized around a computed row of tapped holes |
 | `bolt_circle.py` | A flange with N tapped holes on a ring of radius R |
 | `filleted_box.py` | A box from three numbers, with every roundable edge filleted on the server |
+| `face_colors.py` | A box coloured by face, then filleted, reporting which colours survived |
+
+A face colour is keyed by the face's `id` from `project.faces(...)`, not by its
+position in the listing: the kernel reorders faces after any operation, so an
+index is only true until the next one. `faces.ids_facing(...)` gives the ids of
+the faces pointing a given way, which is the form to persist; `faces.facing(...)`
+still answers with indexes for choosing a face right now. A `ShapeSummary`
+carries both halves back as `face_ids` and `face_colors`, and a project saved
+before stable identity keeps its numeric keys, which the server still accepts.
 
 Tapped holes are `{"kind": "thread", "hole": True}`: the form is cut wider by a clearance and the shape is marked as a hole. Grouping the hole with the plate cuts it; `project.group([...])` exposes that operation, and `project.cut(...)` supports explicit solid and cutter lists. `project.separate(id)` splits disconnected bodies and `project.ungroup(id)` restores a group's children.
 
