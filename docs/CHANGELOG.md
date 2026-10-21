@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added a VitePress documentation site with repository-derived GitHub Pages
+  base path, built-in local search, canonical Markdown staging, local link and
+  source-include checks, local preview, and PR build/default-branch deploy
+  workflows. Pages repository configuration could not be verified because
+  the GitHub Pages API returned 404; a maintainer still needs to select GitHub
+  Actions as the publishing source before the first deployment.
+
 - Exploding a STEP assembly now preserves explicit component display colors when
   the XCAF label API omits them, using the XCAF document's GLB material data
   only when the component name identifies one uniformly colored GLB node and

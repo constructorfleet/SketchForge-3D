@@ -1,19 +1,20 @@
 # Documentation suite specification
 
-**Status:** Proposed
+**Status:** Phase 1 site shell and guardrails implemented; generated references remain planned
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
 
 ## Repository baseline (audit, 2026-10-21)
 
-This spec describes a proposed docs product, not an existing site. The current
-repository has no docs generator, `docs:*` scripts, or GitHub Pages workflow.
-The existing `scripts/build-static.mjs` builds the SketchForge application for
-its Cloudflare Workers deployment; it is not a docs build. Keep that app
-release path independent from the proposed Pages artifact. The Pages URL above
-is a proposed target and must be checked against repository settings and any
-custom-domain decision before deployment work starts.
+The initial implementation now builds a static VitePress site under
+`/SketchForge-3D/`, with local search, canonical Markdown staging, local link
+and include checks, a local preview command, and a GitHub Pages workflow. The
+app's `scripts/build-static.mjs` remains separate and continues to build the
+SketchForge application for Cloudflare Workers. The repository Pages API
+returned 404 during implementation, so whether Pages is configured and the
+canonical URL is active remain unverified. A repository maintainer must select
+GitHub Actions as the Pages publishing source before the first deployment.
 
 The migration starts with useful maintained sources already in place:
 `README.md`, `docs/REST_API.md`, `docs/SKF_PROJECT_FORMAT.md`,
@@ -215,10 +216,15 @@ Deliver the suite in small steps while retaining current published docs until re
 
 ### Phase 1: establish the site and guardrails
 
-- Choose the static-site framework by testing base-path support, source includes, generated API references, search, accessibility, and GitHub Actions deployment.
-- Add the site shell, navigation, URL/base-path configuration, Pages workflow, link checker, and local preview command.
-- Import existing README and `docs/*.md` content without rewriting factual tables yet.
-- Publish a migration map and preserve current links.
+- [x] Select VitePress 1.6.4; verify project base-path build support, built-in local search, source includes, static output, and Actions artifact deployment workflow.
+- [x] Add site shell, navigation, base path derived from repository metadata, Pages workflow, local source/link checks, and local preview command.
+- [x] Import tracked repository Markdown from canonical sources without rewriting factual tables.
+- [x] Publish a migration map and retain repository-relative Markdown paths in the generated source tree.
+- [ ] Configure the repository Pages publishing source as GitHub Actions and verify the first published deployment. The API returned 404, so this external setting was not changed.
+
+Phase 1 does not generate API/package/configuration/format references, execute
+examples, or provide the full accessibility and behavioral smoke coverage in
+the final acceptance criteria. Those are explicitly deferred to later phases.
 
 ### Phase 2: generate package and example documentation
 
