@@ -1049,6 +1049,10 @@ function validateSketchProfile(value: unknown, label: string) {
         if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }
+      } else if (kind === "perpendicular") {
+        if (!Array.isArray(constraint.segmentIds) || constraint.segmentIds.length !== 2 || constraint.segmentIds[0] === constraint.segmentIds[1] || !constraint.segmentIds.every((segmentId) => typeof segmentId === "string" && segmentIds.has(segmentId))) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+        }
       } else if (kind === "coincident" || kind === "distance") {
         if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });

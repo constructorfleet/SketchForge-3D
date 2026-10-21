@@ -1,5 +1,7 @@
 # Changelog
 
+- Sketch constraints now include a perpendicular relation between two selected segments. The solver projects both segments toward a right angle during point edits, and the constraint persists in `.skf` sketches and is represented in the TypeScript client profile type.
+
 ## Unreleased
 
 - The generated OpenAPI contract now includes both measurement routes, with
