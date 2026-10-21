@@ -11,6 +11,7 @@ import {
   type MeasurementSummary,
   type ShapeRequest,
   type ShapeSummary,
+  type SketchSweepProfile,
 } from "../types.js";
 import { meshBytesToBase64 } from "./imports.js";
 import { chunk, shapePatchFromSummary } from "./shapes.js";
@@ -104,6 +105,25 @@ describe("shapes", () => {
     const server = fakeServer({ status: 201, body: { shapes: [{ ...shapeSummary("s1"), sketchOperation: "sweep", sketchSourceId: "sketch/s1", sketchProfile: profile }], revision: 4 } });
     await expect(client(server).shapes.create("p1", request)).resolves.toMatchObject({ sketchOperation: "sweep", sketchSourceId: "sketch/s1", sketchProfile: profile });
     expect(server.calls[0]?.body).toEqual(request);
+  });
+
+  it("updates a sweep profile through the public shapes client", async () => {
+    const profile: SketchSweepProfile = {
+      points: [
+        { id: "a", x: -2, z: -1, sweepRole: "section" }, { id: "b", x: 2, z: -1, sweepRole: "section" },
+        { id: "c", x: 2, z: 1, sweepRole: "section" }, { id: "d", x: -2, z: 1, sweepRole: "section" },
+        { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        { id: "spine", startId: "p0", endId: "p1" },
+      ],
+    };
+    const server = fakeServer({ body: { shape: { ...shapeSummary("s1"), sketchProfile: profile }, revision: 5 } });
+    await client(server).shapes.update("p1", "s1", { sketchProfile: profile });
+    expect(server.calls[0]?.method).toBe("PATCH");
+    expect(server.calls[0]?.body).toEqual({ sketchProfile: profile });
   });
 
   it("sends a batch as one request under the server's limit", async () => {

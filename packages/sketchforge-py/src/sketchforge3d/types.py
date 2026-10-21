@@ -637,6 +637,8 @@ class ShapeSummary:
             patch["revolve"] = dict(self.revolve)
         if self.profile is not None:
             patch["profile"] = [list(point) for point in self.profile]
+        if self.sketch_profile is not None:
+            patch["sketchProfile"] = self.sketch_profile
         patch.update(changes)
         return patch
 

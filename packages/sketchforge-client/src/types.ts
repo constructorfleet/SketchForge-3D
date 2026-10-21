@@ -256,6 +256,8 @@ export type ShapePatch = ShapePlacement &
     hidden?: boolean;
     /** Replaces a revolve's outline; the sweep is rebuilt on the server. */
     profile?: readonly ProfilePoint[];
+    /** Replaces a sketch sweep's editable source profile and rebuilds its mesh. */
+    sketchProfile?: SketchSweepProfile;
     /** The sweep's settings as one object, for a caller that keeps them together. */
     revolve?: RevolveSettings;
   };

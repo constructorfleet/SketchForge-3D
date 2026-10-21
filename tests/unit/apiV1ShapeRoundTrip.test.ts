@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as createProject } from "@/app/api/v1/projects/route";
+import { GET as listFaces } from "@/app/api/v1/faces/route";
 import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -48,6 +49,35 @@ async function readShape(projectId: string, shapeId: string) {
   const response = await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`));
   const payload = await response.json() as { shapes: Summary[] };
   return payload.shapes.find((shape) => shape.id === shapeId)!;
+}
+
+async function readFaces(projectId: string, shapeId: string) {
+  const response = await listFaces(authorized(`/api/v1/faces?projectId=${projectId}&shapeId=${shapeId}`));
+  return await response.json() as { faces: Array<{ id: string; index: number }> };
+}
+
+function sweepProfile(sectionXScale = 1, sectionZScale = 1, spineLength = 10, diamond = false) {
+  const points = diamond
+    ? [
+      { id: "a", x: 0, z: -1 }, { id: "b", x: 1, z: 0 },
+      { id: "c", x: 0, z: 1 }, { id: "d", x: -1, z: 0 },
+    ]
+    : [
+      { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+      { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+    ];
+  return {
+    points: [
+      ...points.map((point) => ({ ...point, x: point.x * sectionXScale, z: point.z * sectionZScale, sweepRole: "section" as const })),
+      { id: "p0", x: 0, z: 0, sweepRole: "spine" as const },
+      { id: "p1", x: spineLength, z: 0, sweepRole: "spine" as const },
+    ],
+    segments: [
+      { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+      { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+      { id: "spine", startId: "p0", endId: "p1" },
+    ],
+  };
 }
 
 async function patch(projectId: string, shapeId: string, body: Record<string, unknown>) {
@@ -132,6 +162,113 @@ describe("REST API shape round trip", () => {
     const changed = await patch(projectId, sweep.id, { sketchSourceId: "sketch/replaced" });
     expect(changed.status).toBe(200);
     expect(changed.payload.shape?.sketchSourceId).toBe(`sketch/${sweep.id}`);
+  });
+
+  it("rebuilds a sketch sweep from an edited profile and preserves its identities and placement", async () => {
+    const projectId = await makeProject();
+    const profile = {
+      points: [
+        { id: "a", x: -1, z: -1, sweepRole: "section" }, { id: "b", x: 1, z: -1, sweepRole: "section" },
+        { id: "c", x: 1, z: 1, sweepRole: "section" }, { id: "d", x: -1, z: 1, sweepRole: "section" },
+        { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        { id: "spine", startId: "p0", endId: "p1" },
+      ],
+    };
+    const sweep = await addShape(projectId, { kind: "sketchSweep", name: "Edited duct", profile, x: 12, z: -4, elevation: 7 });
+    const widerProfile = {
+      ...profile,
+      points: profile.points.map((point) => point.sweepRole === "section" ? { ...point, x: point.x * 2 } : point),
+    };
+
+    const changed = await patch(projectId, sweep.id, { sketchProfile: widerProfile });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape).toMatchObject({
+      id: sweep.id, sketchSourceId: sweep.sketchSourceId, sketchOperation: "sweep", sketchProfile: widerProfile,
+      name: "Edited duct", x: 12, z: -4, elevation: 7,
+    });
+    expect(changed.payload.shape!.width as number).toBeGreaterThan(sweep.width as number);
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(widerProfile);
+  });
+
+  it("preserves resize ratios when rebuilding an edited sweep profile", async () => {
+    const projectId = await makeProject();
+    const initialProfile = sweepProfile();
+    const changedProfile = sweepProfile(1.5, 0.75, 12);
+    const sweep = await addShape(projectId, { kind: "sketchSweep", profile: initialProfile });
+    const resizedResponse = await patch(projectId, sweep.id, {
+      width: (sweep.width as number) * 1.5,
+      depth: (sweep.depth as number) * 1.25,
+      height: (sweep.height as number) * 0.75,
+    });
+    expect(resizedResponse.status, JSON.stringify(resizedResponse.payload)).toBe(200);
+    const resized = resizedResponse.payload.shape!;
+    const unscaledRebuild = await addShape(projectId, { kind: "sketchSweep", profile: changedProfile });
+
+    const rebuilt = await patch(projectId, sweep.id, { sketchProfile: changedProfile });
+
+    expect(rebuilt.status, JSON.stringify(rebuilt.payload)).toBe(200);
+    expect(rebuilt.payload.shape!.width as number).toBeCloseTo((unscaledRebuild.width as number) * (resized.width as number) / (sweep.width as number), 4);
+    expect(rebuilt.payload.shape!.depth as number).toBeCloseTo((unscaledRebuild.depth as number) * (resized.depth as number) / (sweep.depth as number), 4);
+    expect(rebuilt.payload.shape!.height as number).toBeCloseTo((unscaledRebuild.height as number) * (resized.height as number) / (sweep.height as number), 4);
+  });
+
+  it("does not reuse echoed face IDs or colors after a same-bounds profile rebuild", async () => {
+    const projectId = await makeProject();
+    const squareProfile = sweepProfile();
+    const diamondProfile = sweepProfile(1, 1, 10, true);
+    const sweep = await addShape(projectId, { kind: "sketchSweep", profile: squareProfile });
+    const listedFaces = await readFaces(projectId, sweep.id);
+    const oldFaceIds = listedFaces.faces.map((face) => face.id);
+    const oldFaceColors = { [oldFaceIds[0]!]: "#d41721" };
+    const colored = await patch(projectId, sweep.id, { faceColors: oldFaceColors });
+    expect(colored.status, JSON.stringify(colored.payload)).toBe(200);
+    const summary = await readShape(projectId, sweep.id);
+    expect(summary.faceIds).toEqual(oldFaceIds);
+    expect(summary.faceColors).toEqual(oldFaceColors);
+
+    const rebuilt = await patch(projectId, sweep.id, {
+      sketchProfile: diamondProfile,
+      faceColors: summary.faceColors as Record<string, string>,
+    });
+
+    expect(rebuilt.status, JSON.stringify(rebuilt.payload)).toBe(200);
+    expect(rebuilt.payload.shape!.width).toBe(sweep.width);
+    expect(rebuilt.payload.shape!.depth).toBe(sweep.depth);
+    expect(rebuilt.payload.shape!.height).toBe(sweep.height);
+    expect(rebuilt.payload.shape!.faceIds).not.toEqual(oldFaceIds);
+    expect(rebuilt.payload.shape!.faceColors).toBeUndefined();
+  });
+
+  it("validates replacement sweep profiles and refuses them on other shapes", async () => {
+    const projectId = await makeProject();
+    const box = await addShape(projectId, { kind: "box" });
+    const refused = await patch(projectId, box.id, { sketchProfile: { points: [], segments: [] } });
+    expect(refused.status).toBe(422);
+    expect(refused.payload).toMatchObject({ code: "unapplicable_fields", fields: ["sketchProfile"] });
+
+    const sweep = await addShape(projectId, {
+      kind: "sketchSweep",
+      profile: {
+        points: [
+          { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 }, { id: "c", x: 1, z: 1 },
+          { id: "d", x: -1, z: 1 }, { id: "p0", x: 0, z: 0 }, { id: "p1", x: 10, z: 0 },
+        ],
+        segments: [
+          { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+          { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          { id: "spine", startId: "p0", endId: "p1" },
+        ],
+      },
+    });
+    const invalid = await patch(projectId, sweep.id, { sketchProfile: { points: [], segments: [] } });
+    expect(invalid.status).toBe(400);
+    expect(invalid.payload.code).toBe("invalid_request");
+    expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(sweep.sketchProfile);
   });
 
   it("reports a thread's sweep and the outline it ran round", async () => {

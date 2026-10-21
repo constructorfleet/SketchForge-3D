@@ -37,7 +37,10 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     schema: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
   });
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listFaces"), false);
-  assert.ok(spec["x-sketchforge-omitted-operations"].some(({ operationId, reason }) => operationId === "updateShape" && reason.includes("custom validation")));
+  const patchOmission = spec["x-sketchforge-omitted-operations"].find(({ operationId }) => operationId === "updateShape");
+  assert.match(patchOmission.reason, /custom validation/);
+  assert.match(patchOmission.reason, /sketchProfile.*rebuild/i);
+  assert.match(patchOmission.reason, /https:\/\/constructorfleet\.github\.io\/SketchForge-3D\/docs\/REST_API#sketch-sweeps/);
 
   const listMeasurements = spec.paths["/api/v1/measurements"].get;
   assert.ok(listMeasurements, "GET /measurements should be present once its runtime contract is complete");

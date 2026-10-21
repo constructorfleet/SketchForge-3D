@@ -40,6 +40,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
 The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /faces`, and both measurement operations. It includes nullable kernel measurement values, the conditional edge/face index requirement, and the mutually exclusive angle result fields. The face listing schema includes stable face IDs, geometry fields, and nullable normals/directions. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The shape `PATCH` operation remains omitted because its `faceColors` validation is custom; its omission entry calls out the supported `sketchProfile` rebuild and links to the [sweep update contract](#sketch-sweeps) below. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then.
 
 ### Contract validation
 
@@ -258,7 +259,26 @@ A `thread` is a `revolve` with the outline filled in; pass your own `profile` to
 }
 ```
 
-The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`, so clients can preserve or revise the source sketch. The current API creates the sweep but does not expose a dedicated PATCH operation to edit its profile or rebuild it.
+The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`. Send a replacement profile in `sketchProfile` to `PATCH /shapes`; the server rebuilds the OCCT solid while preserving the shape ID, source-sketch ID, name, placement, and existing resize ratios. Face colors are cleared and new face IDs are issued because face identity belongs to the rebuilt topology; recolor by the new IDs returned afterward. Invalid profiles return `400 invalid_request`; other shape kinds return `422 unapplicable_fields`.
+
+```json
+{
+  "sketchProfile": {
+    "points": [
+      {"id":"a","x":-2,"z":-1}, {"id":"b","x":2,"z":-1},
+      {"id":"c","x":2,"z":1}, {"id":"d","x":-2,"z":1},
+      {"id":"p0","x":0,"z":0}, {"id":"p1","x":10,"z":0}
+    ],
+    "segments": [
+      {"id":"ab","startId":"a","endId":"b"}, {"id":"bc","startId":"b","endId":"c"},
+      {"id":"cd","startId":"c","endId":"d"}, {"id":"da","startId":"d","endId":"a"},
+      {"id":"spine","startId":"p0","endId":"p1"}
+    ]
+  }
+}
+```
+
+The TypeScript client accepts this as `client.shapes.update(projectId, shapeId, { sketchProfile })`. The Python client accepts the same camelCase wire field in its `changes` mapping: `client.shapes.update(project_id, shape_id, {"sketchProfile": profile})`.
 
 Threads and springs are built by manifold rather than OCCT, so unlike a fillet they need no exact B-Rep -- but for the same reason the fillet endpoints will not treat one: a swept mesh has no analytic surface to blend. Fillet the profile instead, before sweeping it.
 
