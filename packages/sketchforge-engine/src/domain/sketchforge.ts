@@ -170,7 +170,7 @@ export type SketchProfile = {
   images?: SketchImage[];
 };
 
-export type SketchOperation = "extrude" | "revolve";
+export type SketchOperation = "extrude" | "revolve" | "sweep";
 
 export type GearType = "spur" | "helical" | "bevel";
 

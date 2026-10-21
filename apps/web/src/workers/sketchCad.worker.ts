@@ -3,7 +3,8 @@
 import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import { cadSketchRegions, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
-import type { SketchCadBuildRequest, SketchCadBuildResponse } from "@/lib/sketchCadTypes";
+import { buildCadSketchSweep } from "@/lib/sketchCadSweep";
+import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 
 let kernelPromise: Promise<OcctKernel> | null = null;
 
@@ -42,19 +43,24 @@ function pathWire(cad: OcctKernel, path: OrderedCadSketchPath) {
   return cad.makeWire(edges);
 }
 
-self.onmessage = async (event: MessageEvent<SketchCadBuildRequest>) => {
+self.onmessage = async (event: MessageEvent<SketchCadWorkerRequest>) => {
   const request = event.data;
   let cad: OcctKernel | null = null;
   try {
     cad = await kernel();
     cad.releaseAll();
-    const regions = cadSketchRegions(request.profile);
-    if (regions.length === 0) throw new LocalizedError("errors.sketch.noClosedProfile");
-    const solids: ShapeHandle[] = regions.map((region) => {
-      let face = cad!.makeFace(pathWire(cad!, region.outer));
-      if (region.holes.length > 0) face = cad!.addHolesInFace(face, region.holes.map((hole) => pathWire(cad!, hole)));
-      return cad!.extrude(face, 0, request.height, 0);
-    });
+    let solids: ShapeHandle[];
+    if (request.type === "sweep") {
+      solids = [buildCadSketchSweep(cad, request.profile)];
+    } else {
+      const regions = cadSketchRegions(request.profile);
+      if (regions.length === 0) throw new LocalizedError("errors.sketch.noClosedProfile");
+      solids = regions.map((region) => {
+        let face = cad!.makeFace(pathWire(cad!, region.outer));
+        if (region.holes.length > 0) face = cad!.addHolesInFace(face, region.holes.map((hole) => pathWire(cad!, hole)));
+        return cad!.extrude(face, 0, request.height, 0);
+      });
+    }
     const result = solids.length === 1 ? solids[0] : cad.makeCompound(solids);
     if (!cad.isValid(result)) throw new LocalizedError("errors.sketch.invalidTopology");
     const mesh = cad.tessellate(result, { linearDeflection: 0.05, angularDeflection: 0.16 });

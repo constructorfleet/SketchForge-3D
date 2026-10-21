@@ -459,7 +459,13 @@
       "revolveCreated": "Utworzono bryłę obrotową ze szkicu",
       "revolvePreviewUpdating": "Aktualizowanie podglądu bryły obrotowej…",
       "revolveShapeUpdated": "Zaktualizowano bryłę obrotową",
-      "revolveSettingsFailed": "Nie udało się zastosować ustawień bryły obrotowej"
+      "revolveSettingsFailed": "Nie udało się zastosować ustawień bryły obrotowej",
+      "sweepStarted": "Szkic wyciągnięcia: narysuj jeden zamknięty przekrój i jedną otwartą ścieżkę",
+      "editingSweep": "Edycja profilu wyciągnięcia",
+      "buildingSweep": "Tworzenie płaskiego wyciągnięcia",
+      "cannotSweep": "Nie udało się utworzyć płaskiego wyciągnięcia",
+      "sweepCreated": "Utworzono płaskie wyciągnięcie",
+      "sweepUpdated": "Zaktualizowano płaskie wyciągnięcie"
     },
     "export": {
       "needSolidSelected": "Przed eksportem zaznacz co najmniej jedną bryłę",
@@ -572,7 +578,10 @@
       "edit": "Edytuj",
       "editorMode": "Tryb edytora",
       "geometry": "Model 3D",
-      "sketch": "Szkic"
+      "sketch": "Szkic",
+      "finishSweep": "Zakończ wyciąganie po ścieżce",
+      "sweepSketch": "Wyciągnij szkic po ścieżce",
+      "sweepSketchHint": "Przesuń zamknięty przekrój wzdłuż otwartej płaskiej ścieżki"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Tryb szkicu",
-        "revolve": "Szkic bryły obrotowej"
+        "revolve": "Szkic bryły obrotowej",
+        "sweep": "Płaskie wyciągnięcie"
       },
       "viewControls": "Sterowanie widokiem szkicu",
       "resetView": "Przywróć widok szkicu",
@@ -769,7 +779,8 @@
         "label": "Podgląd 3D bryły obrotowej",
         "title": "Podgląd 3D",
         "empty": "Narysuj zamknięty profil po lewej stronie osi"
-      }
+      },
+      "sweepHelp": "Narysuj dokładnie jeden zamknięty przekrój i jedną otwartą płaską ścieżkę. Pierwszy punkt ścieżki umieść blisko początku przekroju; przekrój zostanie ustawiony prostopadle do początkowego kierunku ścieżki."
     }
   },
   "panels": {
@@ -1159,7 +1170,8 @@
       "allPathsOpen": "Wszystkie linie szkicu są otwarte. Aby zakończyć szkic, zamknij co najmniej jedną z nich.",
       "noClosedProfile": "Nie znaleziono zamkniętego profilu. Narysuj co najmniej jedną zamkniętą linię i sprawdź, czy nie ma w niej fragmentów o zerowym polu.",
       "invalidTopology": "Nie udało się utworzyć poprawnej bryły ze szkicu (błąd OpenCascade)",
-      "buildFailed": "Nie udało się utworzyć bryły ze szkicu"
+      "buildFailed": "Nie udało się utworzyć bryły ze szkicu",
+      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga dokładnie jednego zamkniętego przekroju i jednej otwartej ścieżki."
     },
     "skf": {
       "fileEmpty": "Plik .skf jest pusty",

@@ -36,7 +36,7 @@ const SHAPE_KINDS = new Set([
 const LOFT_PROFILE_SHAPES = new Set(["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"]);
 
 const FEATURE_TYPES = new Set([
-  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "fillet", "chamfer",
+  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer",
 ]);
 
 type SkfAssetKind = "source" | "derived-mesh" | "brep" | "image" | "display-edges";
@@ -689,8 +689,8 @@ function activeProjectIndexes(state: SkfStateV1) {
     (node.groupedShapeNodeIds ?? []).forEach(visit);
     let previous: string | undefined;
     if (node.definition.sketchProfile) {
-      const operation = node.definition.sketchOperation === "revolve" ? "revolve" : "extrude";
-      const featureType = operation === "revolve" ? "sketch-revolve" : "sketch-extrusion";
+      const operation = (node.definition.sketchOperation as SketchOperation | undefined) ?? "extrude";
+      const featureType = operation === "revolve" ? "sketch-revolve" : operation === "sweep" ? "sketch-sweep" : "sketch-extrusion";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${featureType}`;
       features.push({
         id: featureId,
@@ -700,7 +700,7 @@ function activeProjectIndexes(state: SkfStateV1) {
         dependsOnFeatureIds: [],
         parameters: operation === "revolve"
           ? { ...(node.definition.sketchRevolve as Record<string, unknown> | undefined), axis: "vertical-sketch-axis", mode: "create" }
-          : { depth: node.definition.height, direction: "positive-y", mode: "create" },
+          : operation === "sweep" ? { mode: "create" } : { depth: node.definition.height, direction: "positive-y", mode: "create" },
       });
       sketches.push({
         id: `sketch/${safeNodeToken(node.objectId)}`,
@@ -1032,7 +1032,7 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     throw new LocalizedError("errors.skf.inlinePackageFields", { label });
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
-  if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve") {
+  if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve" && definition.sketchOperation !== "sweep") {
     throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.sketchOperation` });
   }
   if (definition.sketchRevolve !== undefined) {

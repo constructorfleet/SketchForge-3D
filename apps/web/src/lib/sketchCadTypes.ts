@@ -8,6 +8,14 @@ export type SketchCadBuildRequest = {
   height: number;
 };
 
+export type SketchCadSweepRequest = {
+  type: "sweep";
+  requestId: number;
+  profile: SketchProfile;
+};
+
+export type SketchCadWorkerRequest = SketchCadBuildRequest | SketchCadSweepRequest;
+
 export type SketchCadBuildResponse =
   | {
       type: "built";

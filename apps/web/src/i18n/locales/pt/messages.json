@@ -459,7 +459,13 @@
       "revolveCreated": "Sólido de revolução criado a partir do esboço",
       "revolvePreviewUpdating": "Atualizando a pré-visualização da revolução…",
       "revolveShapeUpdated": "Sólido de revolução atualizado",
-      "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução"
+      "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução",
+      "sweepStarted": "Esboço de varredura: desenhe uma seção fechada e um caminho aberto",
+      "editingSweep": "Editando o perfil de varredura",
+      "buildingSweep": "Criando varredura plana",
+      "cannotSweep": "Não foi possível criar a varredura plana",
+      "sweepCreated": "Varredura plana criada",
+      "sweepUpdated": "Varredura plana atualizada"
     },
     "export": {
       "needSolidSelected": "Selecione pelo menos uma forma sólida antes de exportar",
@@ -572,7 +578,10 @@
       "edit": "Editar",
       "editorMode": "Modo do editor",
       "geometry": "Modelo 3D",
-      "sketch": "Esboço"
+      "sketch": "Esboço",
+      "finishSweep": "Concluir varredura",
+      "sweepSketch": "Varredura de esboço",
+      "sweepSketchHint": "Desloque uma seção fechada ao longo de um caminho plano aberto"
     },
     "panel": {
       "import": "Importar",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Modo esboço",
-        "revolve": "Esboço de revolução"
+        "revolve": "Esboço de revolução",
+        "sweep": "Varredura plana"
       },
       "viewControls": "Controles da vista do esboço",
       "resetView": "Redefinir a vista do esboço",
@@ -769,7 +779,8 @@
         "label": "Pré-visualização 3D da revolução",
         "title": "Pré-visualização 3D",
         "empty": "Desenhe um perfil fechado à esquerda do eixo"
-      }
+      },
+      "sweepHelp": "Desenhe exatamente uma seção fechada e um caminho plano aberto. Mantenha o primeiro ponto do caminho perto da origem da seção; a varredura orienta a seção perpendicularmente à direção inicial."
     }
   },
   "panels": {
@@ -1159,7 +1170,8 @@
       "allPathsOpen": "Todas as linhas do perfil estão abertas. Feche pelo menos uma antes de concluir o esboço.",
       "noClosedProfile": "Nenhum perfil fechado encontrado. Desenhe pelo menos uma linha fechada e verifique se ela não tem partes de área zero.",
       "invalidTopology": "O módulo OpenCascade gerou um esboço inválido",
-      "buildFailed": "O módulo CAD não conseguiu construir este esboço"
+      "buildFailed": "O módulo CAD não conseguiu construir este esboço",
+      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de exatamente uma seção fechada e um caminho aberto."
     },
     "skf": {
       "fileEmpty": "O arquivo .skf está vazio",

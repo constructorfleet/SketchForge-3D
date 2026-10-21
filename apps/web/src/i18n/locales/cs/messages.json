@@ -459,7 +459,13 @@
       "revolveCreated": "Z náčrtu vytvořeno rotační těleso",
       "revolvePreviewUpdating": "Aktualizace náhledu rotace…",
       "revolveShapeUpdated": "Rotační těleso aktualizováno",
-      "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít"
+      "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít",
+      "sweepStarted": "Náčrt tažení: nakreslete jednu uzavřenou oblast a jednu otevřenou dráhu",
+      "editingSweep": "Úprava profilu tažení",
+      "buildingSweep": "Vytváření rovinného tažení",
+      "cannotSweep": "Rovinné tažení se nepodařilo vytvořit",
+      "sweepCreated": "Rovinné tažení vytvořeno",
+      "sweepUpdated": "Rovinné tažení aktualizováno"
     },
     "export": {
       "needSolidSelected": "Před exportem vyberte alespoň jedno těleso",
@@ -572,7 +578,10 @@
       "edit": "Upravit",
       "editorMode": "Režim editoru",
       "geometry": "3D model",
-      "sketch": "Náčrt"
+      "sketch": "Náčrt",
+      "finishSweep": "Dokončit tažení",
+      "sweepSketch": "Tažení náčrtu",
+      "sweepSketchHint": "Veďte uzavřený profil po otevřené rovinné dráze"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Režim náčrtu",
-        "revolve": "Náčrt pro rotaci"
+        "revolve": "Náčrt pro rotaci",
+        "sweep": "Rovinné tažení"
       },
       "viewControls": "Ovládání pohledu na náčrt",
       "resetView": "Obnovit pohled na náčrt",
@@ -769,7 +779,8 @@
         "label": "3D náhled rotace",
         "title": "3D náhled",
         "empty": "Nakreslete uzavřený profil vlevo od osy"
-      }
+      },
+      "sweepHelp": "Nakreslete přesně jednu uzavřenou oblast a jednu otevřenou rovinnou dráhu. První bod dráhy umístěte blízko počátku profilu; tažení orientuje profil kolmo k počátečnímu směru dráhy."
     }
   },
   "panels": {
@@ -1159,7 +1170,8 @@
       "allPathsOpen": "Všechny čáry náčrtu jsou otevřené. Před dokončením náčrtu alespoň jednu uzavřete.",
       "noClosedProfile": "Nebyl nalezen žádný uzavřený profil. Nakreslete alespoň jednu uzavřenou čáru a zkontrolujte, že nemá části s nulovým obsahem.",
       "invalidTopology": "Z náčrtu se nepodařilo vytvořit platné těleso (chyba OpenCascade)",
-      "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso"
+      "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso",
+      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje přesně jednu uzavřenou oblast a jednu otevřenou dráhu."
     },
     "skf": {
       "fileEmpty": "Soubor .skf je prázdný",

@@ -459,7 +459,13 @@
       "revolveCreated": "Rotationskörper aus der Skizze erstellt",
       "revolvePreviewUpdating": "Vorschau der Rotation wird aktualisiert…",
       "revolveShapeUpdated": "Rotationskörper aktualisiert",
-      "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden"
+      "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden",
+      "sweepStarted": "Sweep-Skizze: eine geschlossene Kontur und einen offenen Pfad zeichnen",
+      "editingSweep": "Sweep-Skizzenprofil bearbeiten",
+      "buildingSweep": "Planarer Sweep wird erstellt",
+      "cannotSweep": "Planarer Sweep konnte nicht erstellt werden",
+      "sweepCreated": "Planarer Sweep erstellt",
+      "sweepUpdated": "Planarer Sweep aktualisiert"
     },
     "export": {
       "needSolidSelected": "Wählen Sie vor dem Export mindestens einen Volumenkörper aus",
@@ -572,7 +578,10 @@
       "edit": "Bearbeiten",
       "editorMode": "Editormodus",
       "geometry": "3D-Modell",
-      "sketch": "Skizze"
+      "sketch": "Skizze",
+      "finishSweep": "Sweep abschließen",
+      "sweepSketch": "Skizze sweepen",
+      "sweepSketchHint": "Einen geschlossenen Querschnitt entlang eines offenen ebenen Pfads führen"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Skizzenmodus",
-        "revolve": "Skizze für die Rotation"
+        "revolve": "Skizze für die Rotation",
+        "sweep": "Planarer Sweep"
       },
       "viewControls": "Ansicht der Skizze steuern",
       "resetView": "Ansicht der Skizze zurücksetzen",
@@ -769,7 +779,8 @@
         "label": "3D-Vorschau der Rotation",
         "title": "3D-Vorschau",
         "empty": "Zeichnen Sie links von der Achse ein geschlossenes Profil"
-      }
+      },
+      "sweepHelp": "Zeichne genau eine geschlossene Kontur und einen offenen ebenen Pfad. Halte den ersten Pfadpunkt nahe am Ursprung des Querschnitts; der Sweep richtet den Querschnitt senkrecht zur anfänglichen Pfadrichtung aus."
     }
   },
   "panels": {
@@ -1159,7 +1170,8 @@
       "allPathsOpen": "Alle Pfade des Profils sind offen. Schließen Sie mindestens einen, bevor Sie die Skizze fertigstellen.",
       "noClosedProfile": "Kein geschlossenes Profil gefunden. Zeichnen Sie mindestens eine geschlossene Linie und achten Sie darauf, dass sie keine Abschnitte ohne Flächeninhalt hat.",
       "invalidTopology": "Aus der Skizze ist eine ungültige Form entstanden (Fehler in OpenCascade)",
-      "buildFailed": "Aus dieser Skizze konnte keine Form erstellt werden"
+      "buildFailed": "Aus dieser Skizze konnte keine Form erstellt werden",
+      "sweepNeedsSectionAndSpine": "Ein planarer Sweep benötigt genau eine geschlossene Kontur und einen offenen Pfad."
     },
     "skf": {
       "fileEmpty": "Die .skf-Datei ist leer",

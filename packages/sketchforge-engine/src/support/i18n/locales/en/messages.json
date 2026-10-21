@@ -1302,6 +1302,7 @@
     },
     "sketch": {
       "allPathsOpen": "All profile paths are open. Close at least one loop before finishing the sketch.",
+      "sweepNeedsSectionAndSpine": "A planar sweep needs exactly one closed section loop and one open spine.",
       "noClosedProfile": "No closed profile found. Draw at least one closed loop and ensure it has no degenerate (zero-area) geometry.",
       "invalidTopology": "OpenCascade produced invalid sketch topology",
       "buildFailed": "The CAD kernel could not build this sketch"

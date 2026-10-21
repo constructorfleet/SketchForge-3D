@@ -361,6 +361,37 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.shapes[0].importedMesh?.positions).toEqual(revolve.importedMesh?.positions);
   });
 
+  it("preserves the sweep sketch operation through SKF export and import", async () => {
+    const sweep = shape("mesh", "sweep-sketch", {
+      sketchOperation: "sweep",
+      sketchProfile: {
+        points: [{ id: "p1", x: 0, z: 0 }, { id: "p2", x: 2, z: 0 }, { id: "p3", x: 2, z: 3 }, { id: "p4", x: 0, z: 3 }, { id: "path1", x: 5, z: 0 }, { id: "path2", x: 12, z: 6 }],
+        segments: [
+          { id: "s1", startId: "p1", endId: "p2", kind: "line" },
+          { id: "s2", startId: "p2", endId: "p3", kind: "line" },
+          { id: "s3", startId: "p3", endId: "p4", kind: "line" },
+          { id: "s4", startId: "p4", endId: "p1", kind: "line" },
+          { id: "s5", startId: "path1", endId: "path2", kind: "line" },
+        ],
+      },
+      importedMesh: {
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        baseWidth: 16,
+        baseDepth: 16,
+        baseHeight: 16,
+        triangleCount: 1,
+        sourceFormat: "json",
+      },
+    });
+    const exported = await exportSkfProject(input([sweep]));
+    const { document } = packageDocument(exported);
+    const restored = await importSkfProject(exported);
+    expect(document.sketches[0].operation).toBe("sweep");
+    expect(document.features[0].type).toBe("sketch-sweep");
+    expect(restored.shapes[0].sketchOperation).toBe("sweep");
+    expect(restored.shapes[0].sketchProfile).toEqual(sweep.sketchProfile);
+  });
+
   it("preserves nested groups, holes, intersection metadata, edge history, B-Rep, and undo/redo", async () => {
     const cadDisplayEdges = [{ points: [0, 0, 0, 1, 2, 3] }];
     const solid = shape("box", "solid", { x: 0, cadDisplayEdges });

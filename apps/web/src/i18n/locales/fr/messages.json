@@ -459,7 +459,13 @@
       "revolveCreated": "Forme de révolution créée à partir de l’esquisse",
       "revolvePreviewUpdating": "Mise à jour de l’aperçu de la révolution…",
       "revolveShapeUpdated": "Révolution mise à jour",
-      "revolveSettingsFailed": "Impossible d’appliquer les paramètres de la révolution"
+      "revolveSettingsFailed": "Impossible d’appliquer les paramètres de la révolution",
+      "sweepStarted": "Esquisse de balayage : dessinez une section fermée et un chemin ouvert",
+      "editingSweep": "Modification du profil de balayage",
+      "buildingSweep": "Création du balayage plan",
+      "cannotSweep": "Impossible de créer le balayage plan",
+      "sweepCreated": "Balayage plan créé",
+      "sweepUpdated": "Balayage plan mis à jour"
     },
     "export": {
       "needSolidSelected": "Sélectionnez au moins une forme solide avant d’exporter",
@@ -572,7 +578,10 @@
       "edit": "Modifier",
       "editorMode": "Mode de l’éditeur",
       "geometry": "Modèle 3D",
-      "sketch": "Esquisse"
+      "sketch": "Esquisse",
+      "finishSweep": "Terminer le balayage",
+      "sweepSketch": "Balayer une esquisse",
+      "sweepSketchHint": "Déplacer une section fermée le long d’un chemin plan ouvert"
     },
     "panel": {
       "import": "Importer",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Mode esquisse",
-        "revolve": "Esquisse de révolution"
+        "revolve": "Esquisse de révolution",
+        "sweep": "Balayage plan"
       },
       "viewControls": "Commandes de la vue d’esquisse",
       "resetView": "Réinitialiser la vue d’esquisse",
@@ -769,7 +779,8 @@
         "label": "Aperçu 3D de la révolution",
         "title": "Aperçu 3D",
         "empty": "Dessinez un profil fermé à gauche de l’axe"
-      }
+      },
+      "sweepHelp": "Dessinez exactement une section fermée et un chemin plan ouvert. Gardez le premier point du chemin près de l’origine de la section ; le balayage oriente la section perpendiculairement à la direction initiale."
     }
   },
   "panels": {
@@ -1159,7 +1170,8 @@
       "allPathsOpen": "Tous les tracés du profil sont ouverts. Fermez au moins une boucle avant de terminer l’esquisse.",
       "noClosedProfile": "Aucun profil fermé trouvé. Dessinez au moins une boucle fermée et vérifiez qu’elle ne contient aucune partie d’aire nulle.",
       "invalidTopology": "Impossible de construire un solide valide à partir de l’esquisse (erreur OpenCascade)",
-      "buildFailed": "Impossible de construire la forme à partir de cette esquisse"
+      "buildFailed": "Impossible de construire la forme à partir de cette esquisse",
+      "sweepNeedsSectionAndSpine": "Un balayage plan nécessite exactement une section fermée et un chemin ouvert."
     },
     "skf": {
       "fileEmpty": "Le fichier .skf est vide",

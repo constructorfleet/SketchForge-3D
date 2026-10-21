@@ -795,7 +795,12 @@ export function SketchWorkspace({
 
   return (
     <main className="sketch-workspace-stage">
-      <div className="sketch-mode-badge">{operation === "revolve" ? t("workspace.sketch.badge.revolve") : t("workspace.sketch.badge.extrude")}</div>
+      <div className="sketch-mode-badge">{operation === "revolve" ? t("workspace.sketch.badge.revolve") : operation === "sweep" ? t("workspace.sketch.badge.sweep") : t("workspace.sketch.badge.extrude")}</div>
+      {operation === "sweep" ? (
+        <div role="note" className="sketch-mode-badge" style={{ top: 36, maxWidth: "min(92vw, 540px)", whiteSpace: "normal", textAlign: "center", borderRadius: 8 }}>
+          {t("workspace.sketch.sweepHelp")}
+        </div>
+      ) : null}
       {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
       <div className="view-tools sketch-view-tools" aria-label={t("workspace.sketch.viewControls")}>
         <button aria-label={t("workspace.sketch.resetView")} onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}><Home size={28} /></button>

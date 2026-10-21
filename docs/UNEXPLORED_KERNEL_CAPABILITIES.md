@@ -51,13 +51,20 @@ Relevant implementation seams include `serverCadProperties.ts`,
 
 ### 1. Sweep and broader draft modeling operations
 
-SketchForge has no general profile-along-path sweep workflow; its revolve and
-helical revolve remain specialized sketch operations. Draft prism is available
-in the editor, REST, and client libraries, but supports one straight closed
-sketch loop and stores baked geometry without an editable feature-history node.
-Next steps are curved or multi-loop draft profiles and a first planar sweep
-that reuses existing sketch profiles. Arbitrary 3D paths and face-associated
-editable drafts need additional model support.
+The Sketch workspace now has a planar sketch sweep alongside extrusion and
+revolve. It accepts exactly one closed section loop and one open, planar spine
+in the same sketch profile. The section is positioned at the spine's first
+point and oriented perpendicular to its initial tangent; the spine may use
+line or cubic Bezier segments, and OCCT uses rounded-corner transitions. The
+editor retains the source sketch profile and marks the result as a
+`sketch-sweep`, but the resulting geometry is baked rather than represented by
+an editable feature-history node. This is a local editor operation, not a REST
+or client-library operation.
+
+Draft prism remains available in the editor, REST, and client libraries, but
+supports one straight closed sketch loop and also stores baked geometry. More
+work remains for multiple section loops/holes, arbitrary 3D paths, face-based
+drafting, and dependency-ordered editable feature history.
 
 ### 2. STEP assembly hierarchy and color verification
 
