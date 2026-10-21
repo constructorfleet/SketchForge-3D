@@ -92,9 +92,11 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   documents supported server/container settings, not every environment read
   across server, desktop, tests, build tools, and browser code. A central
   supported-configuration schema and complete ownership checks remain open.
-- **Examples and page ownership:** require runnable examples to come from
-  source files and execute them in CI; add consistent page audience/owner
-  metadata and diagnostics mapping changed sources to their owning pages.
+- **Examples and page ownership:** the local-project MCP shell command is
+  included from and executed as the same source fixture. Remaining work is to
+  require every runnable example to come from source and execute in CI; add
+  consistent page audience/owner metadata and diagnostics mapping changed
+  sources to their owning pages.
 - **Task workflows:** expand tested task guides beyond the editor quick-start,
   package examples, and current REST/MCP workflows.
 - **Inbound links:** local links, compatibility paths, and repository history
