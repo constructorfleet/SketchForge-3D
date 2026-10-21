@@ -101,10 +101,14 @@ or default color. Existing XCAF label colors and inherited parent colors take
 precedence. Generated STEP fixtures verify component names and explicit XCAF
 colors; constructed GLB payload tests verify the fallback's ambiguity and
 material rules. Arbitrary external STEP variants still need representative
-coverage. Regular STEP import still creates a combined mesh with the default
-color, and does not preserve assembly component colors. The operation refuses
-sources above 200 solids or 8 MiB. Nested assembly hierarchy is still flattened
-into independent parts. The current `occt-wasm` XCAF authoring API can create
+coverage. Regular STEP import now maps available explicit component colors to
+stable face IDs on its combined mesh. The viewport displays those colors, and
+the IDs and assignments persist with the project. Color extraction is bounded
+to 200 solids and 8 MiB of source data; ambiguous coincident components and
+unavailable or partial color metadata retain the default shape color. The
+import remains one combined mesh rather than editable component objects. The
+explode operation refuses sources above 200 solids or 8 MiB. Nested assembly
+hierarchy is still flattened into independent parts. The current `occt-wasm` XCAF authoring API can create
 only the single-level fixtures covered here: attempts to make a child component
 a nested assembly fail, and compound-based exports round-trip as unnamed flat
 leaves. A representative externally authored nested STEP fixture, plus a
