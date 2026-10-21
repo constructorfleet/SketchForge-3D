@@ -31,21 +31,23 @@ client, translation, and capability documents.
   contracts merged in PRs #120 and #125. PR #144 added generated OpenAPI for
   six schema-backed CRUD operations and records the 26 registered operations
   still omitted; full route schemas and live-handler parity remain outstanding.
-  Open PR #151 adds runtime-backed `GET /faces` query and response coverage,
+  Merged PR #151 adds runtime-backed `GET /faces` query and response coverage,
   bringing the generated contract to 7 operations with 25 registered operations
   still omitted.
 - **Phase 4:** parameterized shape reference (#115), published CLI (#117),
   operator configuration (#121), `.skf` format (#123), and MCP schema/navigation
   (#122) references have merged. Deterministic generator-hook wiring merged in
   PR #128. STEP color guidance merged in PR #119, and STEP component-color
-  import support merged in PR #147. Open PR #150 adds a tested editor
-  quick-start from first sketch through save/export with browser acceptance
-  and screenshots; broader task guides remain outstanding.
+  import support merged in PR #147. The tested editor quick-start from first
+  sketch through save/export merged in PR #150 with browser acceptance and
+  screenshots; broader task guides remain outstanding.
 - **Phase 5:** site version/revision stamps and pinned source links merged in
   PR #126, lower-case compatibility routes in PR #134, and the release-process
   guide/check in PR #132. Built-site browser smoke checks merged in PR #141;
   the scheduled non-blocking external-link report merged in PR #143. Coverage
-  rules and a complete accessibility audit remain outstanding.
+  rules remain outstanding. PR #154 added built-site checks and fixes for
+  contrast, alt text, accessible search naming, reduced motion, and 320px
+  reflow; broader page and workflow coverage remains outstanding.
 
 The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
@@ -53,10 +55,9 @@ checks merged in PR #128; STEP color guidance merged in PR #119.
 
 ## Newly identified documentation gaps
 
-- The publishing-clients version table still prints the generic phrase “the
-  release version”; display a concrete version derived from package metadata and
-  guard it with a documentation test.
-- Add useful cross-links among task guides, package pages, and generated API
-  references, with checks that the important reader paths remain connected.
-- Expand the engine package README and generated TypeScript engine reference
-  into a practical npm listing and API guide, and verify the package contents.
+- Merged PR #156 resolves the publishing-clients version gap with a generated,
+  manifest-backed table and consistency checks.
+- Merged PR #157 adds useful contextual links among task guides, package pages,
+  and generated API references.
+- Open PR #158 expands the engine package README and generated TypeScript
+  reference into a practical npm listing and API guide, and verifies packed contents.
