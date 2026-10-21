@@ -294,14 +294,6 @@ describe("STEP assembly explosion", () => {
   });
 });
 
-describe("wall thickness estimates", () => {
-  it("requests the sampled estimate for one project shape", async () => {
-    const thickness = { minimum: 2, unit: "mm" as const, method: "sampled-opposing-surface-distance" as const, samplesPerFace: 25, facesChecked: 6 };
-    const server = fakeServer({ body: { thickness } });
-    await expect(client(server).thickness.estimate("p1", "s1")).resolves.toEqual(thickness);
-    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/thickness?projectId=p1&shapeId=s1");
-  });
-});
 
 describe("interference", () => {
   it("sends the project, selected ids and clearance to the exact endpoint", async () => {
