@@ -59,5 +59,5 @@ checks merged in PR #128; STEP color guidance merged in PR #119.
   manifest-backed table and consistency checks.
 - Merged PR #157 adds useful contextual links among task guides, package pages,
   and generated API references.
-- Open PR #158 expands the engine package README and generated TypeScript
-  reference into a practical npm listing and API guide, verifies packed contents, and has been rebased onto current main; hosted checks are running.
+- Merged PR #158 expands the engine package README and generated TypeScript
+  reference into a practical npm listing and API guide, and verifies packed contents.
