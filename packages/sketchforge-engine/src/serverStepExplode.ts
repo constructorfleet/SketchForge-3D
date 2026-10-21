@@ -59,16 +59,22 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     const parentCenter = new THREE.Vector3(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
     const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
     const paths = leafPaths(shape.stepAssembly ?? []);
-    const orderedPaths = paths.length === solids.length ? paths : undefined;
     const occurrencePartIndexes = new Map<string, number>();
 
     return solids.map((solid, index) => {
-      const metadata = componentMetadata.bySolid.get(stepShapeKey(cad, solid))?.shift();
-      const path = orderedPaths?.[index] ?? (metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined);
+      const candidates = componentMetadata.bySolid.get(stepShapeKey(cad, solid)) ?? [];
+      const firstCandidate = candidates[0];
+      const metadata = firstCandidate ? {
+        ...(candidates.length === 1 && firstCandidate.name ? { name: firstCandidate.name } : {}),
+        ...(candidates.every((candidate) => candidate.color === firstCandidate.color) && firstCandidate.color
+          ? { color: firstCandidate.color }
+          : {}),
+      } : undefined;
+      const path = metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined;
       const occurrenceId = path?.at(-1)?.id;
       const occurrencePartIndex = occurrenceId ? (occurrencePartIndexes.get(occurrenceId) ?? 0) : 0;
       if (occurrenceId) occurrencePartIndexes.set(occurrenceId, occurrencePartIndex + 1);
-      const componentName = orderedPaths ? path?.at(-1)?.name : metadata?.name;
+      const componentName = path?.at(-1)?.name ?? (paths.length === 0 ? metadata?.name : undefined);
       const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
       const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
       const bounds = boundsOf(cad, positioned);
