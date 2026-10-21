@@ -513,6 +513,8 @@ class MeasurementsTests(unittest.TestCase):
         self.assertIsNone(measurement.area)
         self.assertIsNone(measurement.sweep_degrees)
 
+
+
     def test_reports_only_the_entries_carrying_a_radius(self) -> None:
         opener = FakeOpener(
             {
@@ -588,6 +590,22 @@ class MeasurementsTests(unittest.TestCase):
             MEASUREMENT_UNAVAILABLE_CODES,
             MEASUREMENT_RADIUS_UNAVAILABLE_CODES + MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
         )
+
+
+class ShapePropertiesTests(unittest.TestCase):
+    def test_reads_shape_properties_and_keeps_tessellated_provenance(self) -> None:
+        opener = FakeOpener({"properties": {
+            "volume": 120, "area": 148,
+            "centerOfMass": {"x": 12, "y": 3, "z": -4},
+            "bbox": {"xmin": 10, "ymin": 0, "zmin": -6, "xmax": 14, "ymax": 6, "zmax": -2},
+            "isValid": True, "provenance": {"source": "mesh", "precision": "tessellated"},
+        }})
+        result = client(opener).properties.get("p1", "s1")
+        self.assertEqual(opener.calls[0].method, "GET")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/properties?projectId=p1&shapeId=s1")
+        self.assertEqual(result.volume, 120)
+        self.assertEqual(result.provenance.source, "mesh")
+        self.assertEqual(result.provenance.precision, "tessellated")
 
 
 class ArrangeTests(unittest.TestCase):

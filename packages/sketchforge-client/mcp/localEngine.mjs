@@ -379,6 +379,8 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return unwrap(await engine.faces(id, args.shapeId));
     case "sketchforge_measure_shape":
       return unwrap(await engine.measurements(id, args.shapeId));
+    case "sketchforge_shape_properties":
+      return unwrap(await engine.properties(id, args.shapeId));
     case "sketchforge_measure_between":
       return unwrap(await engine.measureBetween(id, args.from, args.to));
     case "sketchforge_apply_edge_treatment":

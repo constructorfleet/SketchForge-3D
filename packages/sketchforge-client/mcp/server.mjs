@@ -439,6 +439,19 @@ const tools = [
     },
   },
   {
+    name: "sketchforge_shape_properties",
+    description: "Read one stored shape's volume, surface area, center of mass, bounds and validity, with provenance identifying the geometry source and whether precision is exact or tessellated. Works offline or against a server when url is supplied.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId"],
+      properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
+        projectId: { type: "string", description: "The project id." },
+        shapeId: { type: "string", description: "The shape id." },
+      },
+    },
+  },
+  {
     name: "sketchforge_hollow_shape",
     description: "Hollow a stored project shape out to a wall of a given thickness, optionally leaving faces open so a box becomes a tray. Exact (OCCT), so the result still exports to STEP and can still be filleted. A sphere, torus, cone or round-walled tube cannot be hollowed at any thickness. Works offline or against a server when url is supplied.",
     inputSchema: {
@@ -588,6 +601,8 @@ async function callRemoteTool(name, args, baseUrl) {
       return restRequest("GET", "/faces", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_measure_shape":
       return restRequest("GET", "/measurements", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
+    case "sketchforge_shape_properties":
+      return restRequest("GET", "/properties", { query: { projectId: args.projectId, shapeId: args.shapeId }, baseUrl });
     case "sketchforge_measure_between":
       return restRequest("POST", "/measurements", {
         query: { projectId: args.projectId },

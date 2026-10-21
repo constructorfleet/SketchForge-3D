@@ -484,6 +484,22 @@ export type MeasurementPair = {
   angleUnavailable: MeasurementAngleUnavailableCode | null;
 };
 
+/** Which stored representation supplied the solid to the CAD kernel. */
+export type ShapeGeometryProvenance = {
+  source: "parametric" | "brep" | "mesh";
+  precision: "exact" | "tessellated";
+};
+
+/** Exact mass properties for one shape in project coordinates. */
+export type ShapeProperties = {
+  volume: number;
+  area: number;
+  centerOfMass: { x: number; y: number; z: number };
+  bbox: { xmin: number; ymin: number; zmin: number; xmax: number; ymax: number; zmax: number };
+  isValid: boolean;
+  provenance: ShapeGeometryProvenance;
+};
+
 export const ALIGN_AXES = ["x", "y", "z"] as const;
 
 /** `x` is left/right, `z` front/back, `y` bottom/top. */

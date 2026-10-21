@@ -120,7 +120,7 @@ describe("the REST API from a production build", { timeout: 180_000 }, () => {
   });
 
   it("answers the read-only routes with data rather than a cached 404", async () => {
-    // `edges` and `faces` answered `404 api_disabled` with `x-nextjs-cache: HIT`
+    // `edges`, `faces`, and `properties` answered `404 api_disabled` with `x-nextjs-cache: HIT`
     // from a built server, whatever the token was, because they export only GET.
     // `measurements` escapes by exporting POST as well, which is the accident
     // every other route in `/api/v1` relies on -- it is in this loop so that
@@ -132,6 +132,10 @@ describe("the REST API from a production build", { timeout: 180_000 }, () => {
       expect(listed.cache, route).not.toBe("HIT");
       expect((listed.body[route] as unknown[]).length, route).toBeGreaterThan(0);
     }
+    const properties = await api(`/properties?projectId=${projectId}&shapeId=${shapeId}`);
+    expect(properties.status).toBe(200);
+    expect(properties.cache).not.toBe("HIT");
+    expect(properties.body.properties).toMatchObject({ provenance: { source: "parametric", precision: "exact" } });
   });
 
   it("still refuses an unauthorized caller, which the cache would have faked", async () => {
@@ -143,7 +147,7 @@ describe("the REST API from a production build", { timeout: 180_000 }, () => {
   });
 
   it("names the allowed methods when asked", async () => {
-    const response = await fetch(`${origin}/api/v1/faces`, { method: "OPTIONS" });
+    const response = await fetch(`${origin}/api/v1/properties`, { method: "OPTIONS" });
     expect(response.status).toBe(204);
     expect(response.headers.get("allow")).toBe("GET, OPTIONS");
   });

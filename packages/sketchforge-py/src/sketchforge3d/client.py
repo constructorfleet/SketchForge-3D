@@ -30,6 +30,7 @@ from .types import (
     MeasurementEnd,
     MeasurementPair,
     MeasurementSummary,
+    ShapeProperties,
     MeshImportResult,
     PatternResult,
     ProjectDetail,
@@ -317,6 +318,18 @@ class Measurements:
             for measurement in self.list(project_id, shape_id)
             if measurement.radius is not None
         ]
+
+
+class Properties:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def get(self, project_id: str, shape_id: str) -> ShapeProperties:
+        """Exact mass properties and geometry provenance for one shape."""
+        payload = self._transport.send(
+            "GET", "/properties", {"projectId": project_id, "shapeId": shape_id}
+        ) or {}
+        return ShapeProperties.from_payload(payload.get("properties", {}))
 
 
 class Shell:
@@ -781,6 +794,7 @@ class SketchForgeClient:
         self.edges = Edges(self._transport)
         self.faces = Faces(self._transport)
         self.measurements = Measurements(self._transport)
+        self.properties = Properties(self._transport)
         self.treatments = Treatments(self._transport)
         self.shell = Shell(self._transport)
         self.booleans = Booleans(self._transport)
@@ -930,6 +944,9 @@ class ProjectHandle:
 
     def measurements(self, shape_id: str) -> List[MeasurementSummary]:
         return self._client.measurements.list(self.id, shape_id)
+
+    def properties_of(self, shape_id: str) -> ShapeProperties:
+        return self._client.properties.get(self.id, shape_id)
 
     def measurements_with_radius(self, shape_id: str) -> List[MeasurementSummary]:
         return self._client.measurements.with_radius(self.id, shape_id)

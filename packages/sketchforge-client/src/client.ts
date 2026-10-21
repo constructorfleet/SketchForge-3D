@@ -14,6 +14,7 @@ import { Faces } from "./resources/faces.js";
 import { Imports } from "./resources/imports.js";
 import { Measurements } from "./resources/measurements.js";
 import { Projects } from "./resources/projects.js";
+import { Properties } from "./resources/properties.js";
 import { Shapes } from "./resources/shapes.js";
 import { Shell } from "./resources/shell.js";
 import { Treatments } from "./resources/treatments.js";
@@ -29,6 +30,7 @@ import type {
   MeasurementEnd,
   MeasurementPair,
   MeasurementSummary,
+  ShapeProperties,
   MeshImportRequest,
   MeshImportResult,
   PatternRequest,
@@ -51,6 +53,7 @@ export class SketchForgeClient {
   readonly edges: Edges;
   readonly faces: Faces;
   readonly measurements: Measurements;
+  readonly properties: Properties;
   readonly treatments: Treatments;
   readonly shell: Shell;
   readonly align: Align;
@@ -66,6 +69,7 @@ export class SketchForgeClient {
     this.edges = new Edges(this.transport);
     this.faces = new Faces(this.transport);
     this.measurements = new Measurements(this.transport);
+    this.properties = new Properties(this.transport);
     this.treatments = new Treatments(this.transport);
     this.shell = new Shell(this.transport);
     this.align = new Align(this.transport);
@@ -176,6 +180,10 @@ export class ProjectHandle {
 
   measurements(shapeId: string): Promise<MeasurementSummary[]> {
     return this.client.measurements.list(this.id, shapeId);
+  }
+
+  propertiesOf(shapeId: string): Promise<ShapeProperties> {
+    return this.client.properties.get(this.id, shapeId);
   }
 
   measurementsWithRadius(shapeId: string): Promise<MeasurementSummary[]> {

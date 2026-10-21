@@ -62,6 +62,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
 | `POST` | `/measurements?projectId=` | The distance between two entities, and the angle if both are flat faces. |
+| `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
@@ -368,6 +369,7 @@ Every number here comes from OCCT's own curve and surface analysis, not from the
 | --- | --- | --- |
 | `GET` | `/measurements?projectId=&shapeId=` | Every edge and face of the shape, measured. |
 | `POST` | `/measurements?projectId=` | The distance between two entities, and their angle when both are flat faces. |
+| `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
 
 The indexes are the same ones `GET /edges` and `GET /faces` give, built from the same geometry, so a listing and a measurement taken together are consistent -- and so is a fillet afterwards that names the same edge.
 
@@ -434,6 +436,24 @@ Each end names a shape and what part of it to measure from -- the whole solid, o
 `angleDegrees` is the angle between two **planar** faces, measured between their outward normals, from 0 to 180. Two faces meeting at the square corner of a box read 90, which is the number a corner ought to give. Two opposite faces of that box read 180: they face away from each other, which is a true thing to say about a pair of parallel planes and is not the same claim as "the planes are 180 degrees apart". Anything else -- a curved face, a whole solid, an edge -- gets `null` and `notPlanar`, because a cylinder's normal turns as you move across it and there is no single answer.
 
 Naming an index the shape does not have is a `422` with `cad_failed`, and the message says how many there were: a script that has not re-listed after changing the shape finds out rather than measuring the wrong face. A shape **changes shape** when it is hollowed or filleted, so re-measure a result before naming indexes on it.
+
+## Shape properties
+
+`GET /properties?projectId=&shapeId=` returns exact mass properties for the stored shape and includes `provenance`. `source` identifies the representation used (`parametric`, `brep`, or `mesh`); `precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.
+
+```json
+{
+  "properties": {
+    "volume": 120,
+    "area": 148,
+    "centerOfMass": { "x": 12, "y": 3, "z": -4 },
+    "bbox": { "xmin": 10, "ymin": 0, "zmin": -6, "xmax": 14, "ymax": 6, "zmax": -2 },
+    "isValid": true,
+    "provenance": { "source": "parametric", "precision": "exact" }
+  }
+}
+```
+
 
 ## Arranging what is already there
 
