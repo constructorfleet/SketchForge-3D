@@ -30,9 +30,8 @@ These are implemented and should not be filed as missing features:
   retained straight, single-loop sketch extrusion in its local CAD worker and
   stores exact geometry; the result is baked without an editable feature node.
 - OBJ import is supported alongside STL, SVG, and STEP, and imported source
-  assets are preserved in `.skf` projects. The format documentation had lagged
-  behind the implementation.
-- Camera view orientation, target, and zoom are now saved with the project and
+  assets are preserved in `.skf` projects.
+- Camera view orientation, target, and zoom are saved with the project and
   restored when it is reopened. Older projects without camera data retain the
   default view.
 - Server-side project reads regenerate source-backed STEP meshes with the
