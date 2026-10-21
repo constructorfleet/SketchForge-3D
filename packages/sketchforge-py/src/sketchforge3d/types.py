@@ -320,7 +320,12 @@ MeasurementEnd = Mapping[str, Any]
 #: The fields a PATCH may change. Anything else needs a new shape.
 ShapePatch = Mapping[str, Any]
 
-ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip"]
+ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip", "svg"]
+
+#: What an ``svg`` export shows: one of the kernel's named views, or the
+#: four-view grid (front, top, right, iso), which is the default.
+ExportView = Literal["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]
+EXPORT_VIEWS = ("multiview", "front", "back", "top", "bottom", "left", "right", "iso")
 
 #: ``[distance from the axis, position along it]``.
 ProfilePoint = Sequence[float]

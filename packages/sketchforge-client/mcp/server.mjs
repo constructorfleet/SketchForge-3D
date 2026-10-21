@@ -23,6 +23,9 @@ const version = (() => {
   }
 })();
 const MCP_ROUTE = "/api/sketchforge-mcp";
+/** What a drawing shows, as `POST /exports` and the engine name it. Kept in step by `localMcpEngine.test.ts`. */
+const PROJECTION_LAYOUTS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"];
+
 const editorTargetSchema = {
   type: "object",
   properties: {
@@ -338,7 +341,7 @@ const tools = [
   },
   {
     name: "sketchforge_capture_image",
-    description: "Capture a PNG image from current/home/top/bottom/front/back/right/left view. Local project mode renders the model headlessly; editor mode captures the live viewport.",
+    description: "Capture a PNG image from current/home/top/bottom/front/back/right/left view. Editor mode captures the live viewport. Local project mode rasterises the kernel's hidden-line drawing of the stored geometry: a named face is that one view, home and current are the four-view grid. Prefer sketchforge_project_view for the SVG itself.",
     inputSchema: {
       ...editorTargetSchema,
       properties: {
@@ -349,8 +352,24 @@ const tools = [
   },
   {
     name: "sketchforge_export_scene",
-    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, or a ZIP kit. Set outputPath to save directly on the MCP host and avoid returning large base64 data. Use shapeIds to keep a reference mesh out of mesh exports.",
-    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, or an SVG drawing. Set outputPath to save directly on the MCP host and avoid returning large base64 data. Use shapeIds to keep a reference mesh out of mesh exports. An svg export is drawn on the server from the exact geometry and needs projectId; view picks one of its views or the multiview grid.",
+    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip", "svg"] }, view: { type: "string", enum: PROJECTION_LAYOUTS, description: "For svg only: one named view, or the multiview grid (default)." }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+  },
+  {
+    name: "sketchforge_project_view",
+    description: "Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true curves, hidden edges dashed, a gnomon per view and the overall size. The multiview grid (front, top, right, iso) is the readable picture of the geometry; a single view is a 2D drawing of that face. Works offline or against a server when url is supplied.",
+    inputSchema: {
+      type: "object",
+      required: ["projectId"],
+      properties: {
+        url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
+        projectId: { type: "string", description: "The server-side project id." },
+        view: { type: "string", enum: PROJECTION_LAYOUTS, description: "One named view, or the multiview grid (default)." },
+        shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." },
+        name: { type: "string", description: "Optional base name for the file." },
+        outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise." },
+      },
+    },
   },
   {
     name: "sketchforge_validate_scene",
@@ -588,8 +607,41 @@ async function callRemoteTool(name, args, baseUrl) {
       return bridgeCommand("inspect_errors", args, 15000, baseUrl);
     case "sketchforge_capture_image":
       return bridgeCommand("capture_image", args, 30000, baseUrl);
+    case "sketchforge_project_view": {
+      const artifact = await restRequest("POST", "/exports", {
+        query: { projectId: args.projectId },
+        body: {
+          format: "svg",
+          ...(args.view === undefined ? {} : { view: args.view }),
+          ...(args.shapeIds === undefined ? {} : { shapeIds: args.shapeIds }),
+          ...(args.name === undefined ? {} : { name: args.name }),
+        },
+        baseUrl,
+      });
+      const bytes = Buffer.from(artifact.base64, "base64");
+      const response = { view: args.view ?? "multiview", filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount };
+      if (typeof args.outputPath === "string" && args.outputPath.trim()) {
+        const destination = path.resolve(args.outputPath);
+        writeFileSync(destination, bytes);
+        return { ...response, savedTo: destination };
+      }
+      return { ...response, svg: bytes.toString("utf8") };
+    }
     case "sketchforge_export_scene": {
-      const artifact = await bridgeCommand("export_scene", args, 60000, baseUrl);
+      // An SVG is drawn on the server from the stored project; the editor
+      // bridge has no such export, so this one takes the REST path.
+      const artifact = args.format === "svg"
+        ? await restRequest("POST", "/exports", {
+          query: { projectId: args.projectId },
+          body: {
+            format: "svg",
+            ...(args.view === undefined ? {} : { view: args.view }),
+            ...(args.shapeIds === undefined ? {} : { shapeIds: args.shapeIds }),
+            ...(args.name === undefined ? {} : { name: args.name }),
+          },
+          baseUrl,
+        })
+        : await bridgeCommand("export_scene", args, 60000, baseUrl);
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
         const destination = path.resolve(args.outputPath);
         writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
@@ -645,7 +697,7 @@ function toolResult(value) {
   if (value?.dataUrl?.startsWith?.("data:image/png;base64,")) {
     return {
       content: [
-        textContent({ face: value.face, bytesApprox: value.bytesApprox }),
+        textContent({ face: value.face, ...(value.view === undefined ? {} : { view: value.view }), bytesApprox: value.bytesApprox }),
         {
           type: "image",
           data: value.dataUrl.slice("data:image/png;base64,".length),

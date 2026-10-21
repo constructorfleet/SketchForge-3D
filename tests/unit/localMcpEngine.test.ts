@@ -128,8 +128,21 @@ describe("local MCP engine mode", () => {
     const image = capture[1].result.content.find((item: { type: string }) => item.type === "image");
     expect(image?.mimeType).toBe("image/png");
     expect(Buffer.from(image.data, "base64").subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    expect(JSON.parse(capture[1].result.content[0].text)).toMatchObject({ face: "top", view: "top" });
 
-    for (const format of ["stl", "obj", "3mf"]) {
+    const drawing = callMcp(projectsDir, 2, "sketchforge_project_view", { projectId: "case" });
+    expect(drawing[1].result.isError, JSON.stringify(drawing[1].result.content)).toBeUndefined();
+    const projected = JSON.parse(drawing[1].result.content[0].text);
+    expect(projected).toMatchObject({ view: "multiview", mimeType: "image/svg+xml", shapeCount: 2 });
+    expect(projected.svg.startsWith("<svg")).toBe(true);
+    for (const label of ["Front", "Top", "Right", "Iso"]) expect(projected.svg).toContain(`>${label}</text>`);
+
+    const drawingPath = path.join(projectsDir, "Local case.svg");
+    const singleView = callMcp(projectsDir, 2, "sketchforge_project_view", { projectId: "case", view: "front", shapeIds: [plate.id], outputPath: drawingPath });
+    expect(JSON.parse(singleView[1].result.content[0].text)).toMatchObject({ view: "front", savedTo: drawingPath, shapeCount: 1 });
+    expect(fs.readFileSync(drawingPath, "utf8")).not.toContain(">Front</text>");
+
+    for (const format of ["stl", "obj", "3mf", "svg"]) {
       const target = path.join(projectsDir, `Local case.${format}`);
       const result = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format, shapeIds: [plate.id], outputPath: target });
       expect(JSON.parse(result[1].result.content[0].text)).toMatchObject({ savedTo: target, shapeCount: 1 });
@@ -162,6 +175,9 @@ describe("local MCP engine mode", () => {
 
     const tools = listMcpTools(projectsDir);
     const listEditors = tools.find((tool: { name: string }) => tool.name === "sketchforge_list_editors");
+    expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_export_scene").inputSchema.properties.format.enum).toContain("svg");
+    const projectView = tools.find((tool: { name: string }) => tool.name === "sketchforge_project_view");
+    expect(projectView.inputSchema.properties.view.enum).toEqual(["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]);
     expect(listEditors.inputSchema.properties.url).toMatchObject({ type: "string" });
     for (const tool of tools.filter((candidate: { name: string }) => candidate.name !== "sketchforge_list_macros")) {
       expect(tool.inputSchema.properties.url).toMatchObject({ type: "string" });

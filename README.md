@@ -538,4 +538,4 @@ After restarting Claude Desktop, ask:
 Use the SketchForge MCP tools to list open editors, inspect the scene, and modify the selected object.
 ```
 
-The main tool names are `sketchforge_list_editors`, `sketchforge_read_scene`, `sketchforge_list_objects`, `sketchforge_create_shape`, `sketchforge_update_object`, `sketchforge_list_edges`, `sketchforge_apply_edge_treatment`, and `sketchforge_capture_image`.
+The main tool names are `sketchforge_list_editors`, `sketchforge_read_scene`, `sketchforge_list_objects`, `sketchforge_create_shape`, `sketchforge_update_object`, `sketchforge_list_edges`, `sketchforge_apply_edge_treatment`, `sketchforge_capture_image`, and `sketchforge_project_view`.

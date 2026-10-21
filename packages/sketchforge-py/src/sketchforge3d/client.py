@@ -24,6 +24,7 @@ from .types import (
     DistributeResult,
     EdgeSummary,
     ExportFormat,
+    ExportView,
     ExportResult,
     FaceSummary,
     MeasurementEnd,
@@ -688,18 +689,32 @@ class Exports:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
+    @staticmethod
+    def _body(
+        format: ExportFormat,
+        shape_ids: Optional[Sequence[str]],
+        name: Optional[str],
+        view: Optional[ExportView],
+    ) -> Dict[str, Any]:
+        body: Dict[str, Any] = {"format": format}
+        if shape_ids is not None:
+            body["shapeIds"] = list(shape_ids)
+        if name is not None:
+            body["name"] = name
+        if view is not None:
+            body["view"] = view
+        return body
+
     def export(
         self,
         project_id: str,
         format: ExportFormat,
         shape_ids: Optional[Sequence[str]] = None,
         name: Optional[str] = None,
+        view: Optional[ExportView] = None,
     ) -> ExportResult:
-        body: Dict[str, Any] = {"format": format}
-        if shape_ids is not None:
-            body["shapeIds"] = list(shape_ids)
-        if name is not None:
-            body["name"] = name
+        """``view`` chooses what an ``svg`` shows; the server refuses it on any other format."""
+        body = self._body(format, shape_ids, name, view)
         payload = self._transport.send(
             "POST", "/exports", {"projectId": project_id}, body, retryable=False
         ) or {}
@@ -720,12 +735,9 @@ class Exports:
         path: Union[str, "os.PathLike[str]"],
         shape_ids: Optional[Sequence[str]] = None,
         name: Optional[str] = None,
+        view: Optional[ExportView] = None,
     ) -> ExportResult:
-        body: Dict[str, Any] = {"format": format}
-        if shape_ids is not None:
-            body["shapeIds"] = list(shape_ids)
-        if name is not None:
-            body["name"] = name
+        body = self._body(format, shape_ids, name, view)
         headers = self._transport.download_to_file(
             "POST",
             "/exports",
@@ -858,9 +870,10 @@ class ProjectHandle:
         format: ExportFormat,
         shape_ids: Optional[Sequence[str]] = None,
         name: Optional[str] = None,
+        view: Optional[ExportView] = None,
     ) -> ExportResult:
-        """Returns an exported scene artifact as bytes."""
-        return self._client.exports.export(self.id, format, shape_ids, name)
+        """Returns an exported scene artifact as bytes; ``view`` picks what an ``svg`` shows."""
+        return self._client.exports.export(self.id, format, shape_ids, name, view)
 
     def export_file(
         self,
@@ -868,9 +881,10 @@ class ProjectHandle:
         path: Union[str, "os.PathLike[str]"],
         shape_ids: Optional[Sequence[str]] = None,
         name: Optional[str] = None,
+        view: Optional[ExportView] = None,
     ) -> ExportResult:
         """Exports a scene and writes its bytes to a local path."""
-        return self._client.exports.file(self.id, format, path, shape_ids, name)
+        return self._client.exports.file(self.id, format, path, shape_ids, name, view)
 
     def cut(self, solid_ids: Sequence[str], hole_ids: Sequence[str]) -> BooleanCutResult:
         """Subtracts the named holes from the named solids."""

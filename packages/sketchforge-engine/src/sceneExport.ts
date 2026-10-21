@@ -2,10 +2,12 @@ import { zipSync, strToU8 } from "fflate";
 import { meshProjectShapes } from "./projectMeshes.js";
 import { exportShapesToStep } from "./stepExport.js";
 import { exportSkfProject } from "./skfProject.js";
+import { projectShapesToSvg } from "./serverCadProjection.js";
+import type { ProjectionLayout } from "./cadProjection.js";
 import type { ProjectDocument } from "./serverProjectDocument.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
-export const PROJECT_EXPORT_FORMATS = ["stl", "obj", "3mf", "step", "skf", "zip"] as const;
+export const PROJECT_EXPORT_FORMATS = ["stl", "obj", "3mf", "step", "skf", "zip", "svg"] as const;
 export type ProjectExportFormat = (typeof PROJECT_EXPORT_FORMATS)[number];
 
 export type ProjectExportArtifact = {
@@ -85,9 +87,21 @@ function skfBytes(document: ProjectDocument, shapes: WorkplaneShape[]) {
   });
 }
 
+export type ProjectExportOptions = {
+  format: ProjectExportFormat;
+  shapeIds?: string[];
+  name?: string;
+  /**
+   * What an SVG shows: one of the kernel's named views, or the four-view grid
+   * (the default). Meaningless for every other format, and the route refuses
+   * it there rather than ignoring it.
+   */
+  view?: ProjectionLayout;
+};
+
 export async function exportProjectScene(
   document: ProjectDocument,
-  options: { format: ProjectExportFormat; shapeIds?: string[]; name?: string },
+  options: ProjectExportOptions,
 ): Promise<ProjectExportArtifact> {
   const requested = options.shapeIds?.length ? new Set(options.shapeIds) : null;
   const shapes = document.shapes.filter((shape) => !requested || requested.has(shape.id));
@@ -106,6 +120,12 @@ export async function exportProjectScene(
 
   const visible: WorkplaneShape[] = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
   if (!visible.length) throw new Error("No visible solid objects to export.");
+  if (format === "svg") {
+    // Drawn from the exact solids by hidden-line removal, not from the meshes
+    // below: a projected circle stays a circle.
+    const svg = await projectShapesToSvg(visible, { view: options.view });
+    return { format, filename: `${baseName}.svg`, mimeType: "image/svg+xml", data: new TextEncoder().encode(svg), shapeCount: visible.length };
+  }
   const meshes = await meshProjectShapes(visible);
   if (!meshes.length) throw new Error("No visible solid objects could be meshed.");
   const stl = () => stlBytes(meshes);
