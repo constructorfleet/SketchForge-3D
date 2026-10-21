@@ -22,6 +22,10 @@ client, translation, and capability documents.
 ## Follow-up phases
 
 - **Phase 2:** package references and executable examples merged in PR #118.
+- **Python client:** reference type checks and source links (#136) and stable-
+  face identity parity (#145) have merged. The latter adds stable face IDs,
+  face colors, and a source-backed example; package examples run against the
+  local API.
 - **Phase 3:** the initial typed REST operation inventory and route parity
   check merged in PR #112; `GET /faces` and `PATCH /shapes` stable face color
   contracts merged in PRs #120 and #125. PR #144 added generated OpenAPI for
@@ -39,11 +43,6 @@ client, translation, and capability documents.
   guide/check in PR #132. Built-site browser smoke checks merged in PR #141;
   the scheduled non-blocking external-link report merged in PR #143. Coverage
   rules and a complete accessibility audit remain outstanding.
-
-- **Open PR #145:** adds stable face IDs, face-color fields, and a source-backed
-  example to the Python client. It is rebased onto `d045fe8` and GitHub reports
-  it mergeable; local checks pass while required hosted checks finish. The
-  package example CI is its live-server verification seam.
 
 The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
