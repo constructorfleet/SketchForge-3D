@@ -27,9 +27,11 @@ export function shapeTransformShouldRemainEditable(shape: WorkplaneShape) {
 }
 
 export function cloneWorkplaneShapeTreeWithFreshIds(shape: WorkplaneShape, suffix: string): WorkplaneShape {
+  const id = createLocalId(`${shape.id}-${suffix}`);
   return {
     ...shape,
-    id: createLocalId(`${shape.id}-${suffix}`),
+    id,
+    ...(shape.sketchSourceId ? { sketchSourceId: `sketch/${id}` } : {}),
     groupedShapes: shape.groupedShapes?.map((child) => cloneWorkplaneShapeTreeWithFreshIds(child, suffix)),
   };
 }
