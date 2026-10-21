@@ -2,13 +2,17 @@
 
 `@constructorfleet/sketchforge-engine` is the TypeScript package for SketchForge's project model and geometry operations. It is intended for Node.js applications that need to read or change SketchForge projects, construct parameterized shapes, or import and export geometry without running the web editor.
 
+## Node compatibility
+
+The package manifest declares Node.js 20 or newer, but that range is broader than the runtime supported by its full geometry stack: the locked `brepjs` dependency requires Node.js 24 or newer. Use Node.js 24+ for the complete engine, including exact CAD and kernel-backed operations. On Node.js 20–23, npm may warn about the dependency engine requirement, and full engine behavior is unsupported. The package's engine range should be aligned with this dependency in a future package release.
+
 ## Installation
 
 ```sh
 npm install @constructorfleet/sketchforge-engine
 ```
 
-The package is ECMAScript modules (ESM) and requires Node.js 20 or newer. TypeScript declarations ship with the package; no separate `@types` package is needed.
+The package is ECMAScript modules (ESM). TypeScript declarations ship with the package; no separate `@types` package is needed.
 
 ## Quick start
 
@@ -41,9 +45,21 @@ Set `SKETCHFORGE_PROJECTS_DIR` to the directory already used by SketchForge, and
 
 ## Public API
 
-The main entry point exports these API areas:
+The package root is the supported import surface. Its main engine facade is `Engine`, created with `createEngine(store)`. Every operation returns an `EngineResult<T>`; check `ok` before reading `value` or `failure`.
 
-- **Projects and operations:** `directoryProjectStore`, `createEngine`, `Engine`, `EngineResult`, `EngineFailure`, project and operation request/result types. The engine supports project reads, adding/changing/removing shapes, align/distribute/pattern, mesh import, groups and cuts, exact CAD operations, measurements, properties, and interference checks.
+| Area | `Engine` methods | What they do |
+| --- | --- | --- |
+| Read and edit a project | `project`, `addShapes`, `changeShape`, `removeShape` | Read placed shapes and project metadata; add parameterized shapes or change/remove an existing shape. |
+| Arrange and repeat | `align`, `distribute`, `pattern`, `mirrorBaked` | Place selected shapes on a shared axis, spread them, create linear/circular copies, or mirror supported solids. |
+| Import and combine | `importMesh`, `cut`, `group`, `ungroup`, `separate`, `explode` | Import model files, subtract/group solids, split groups/bodies, or explode a retained STEP assembly. |
+| Inspect and measure | `edges`, `faces`, `measurements`, `properties`, `measureBetween`, `interference` | Query exact geometry topology, shape properties, distances/angles, and gaps/overlaps. |
+| Modify exact geometry | `treat`, `draftPrism`, `shell` | Apply edge treatments, draft an extruded prism, or hollow a shape. |
+
+These operations address an **existing project ID** in a `ProjectStore`; this package does not create projects, project records, or initialize a project directory. `addShapes` is the first write operation for a project that already exists. All writes persist to the configured store.
+
+The main entry point also exports these API areas:
+
+- **Projects and operations:** `directoryProjectStore`, `createEngine`, `Engine`, `EngineResult`, `EngineFailure`, project and operation request/result types.
 - **Shape requests:** `shapeFromRequest`, `shapeWithRequestedChanges`, `REQUESTABLE_SHAPE_KINDS`, plus types describing parameterized shapes.
 - **Project files and exchange:** `.skf` import/export and inspection; mesh import; STEP and scene export; SVG/DXF section output; STEP assembly explosion.
 - **Geometry and CAD:** primitive builders, exact solids, sectioning, topology analysis, shape bounds, CAD measurements, shelling, edge treatments, wall thickness, and projection layouts.
