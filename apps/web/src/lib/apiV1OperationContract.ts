@@ -7,10 +7,10 @@
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
 export type ApiV1FieldSchema = {
-  type: "number" | "integer" | "boolean" | "string" | "object" | "array";
+  type?: "number" | "integer" | "boolean" | "string" | "object" | "array";
   nullable?: true;
   required?: readonly string[];
-  enum?: readonly string[];
+  enum?: readonly (string | null)[];
   default?: string;
   minimum?: number;
   maximum?: number;
@@ -20,6 +20,7 @@ export type ApiV1FieldSchema = {
   minItems?: number;
   maxItems?: number;
   oneOf?: readonly ApiV1FieldSchema[];
+  not?: ApiV1FieldSchema;
   additionalProperties?: boolean | ApiV1FieldSchema;
   description?: string;
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
@@ -198,6 +199,37 @@ const faceItemSchema = {
   additionalProperties: false,
 } as const;
 const faceListSchema = { type: "object", required: ["faces"], properties: { faces: { type: "array", items: faceItemSchema } }, additionalProperties: false } as const;
+const measurementItemSchema = {
+  type: "object",
+  required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
+  properties: {
+    entity: { type: "string", enum: ["edge", "face"] },
+    index: { type: "integer", minimum: 0 },
+    geometryType: str,
+    length: { type: "number", nullable: true },
+    area: { type: "number", nullable: true },
+    radius: { type: "number", nullable: true },
+    diameter: { type: "number", nullable: true },
+    sweepDegrees: { type: "number", nullable: true },
+    radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
+  },
+} as const;
+const measurementListSchema = { type: "object", required: ["measurements"], properties: { measurements: { type: "array", items: measurementItemSchema } } } as const;
+const measurementEndSchema = {
+  type: "object",
+  oneOf: [
+    { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string", pattern: "\\S", description: "Whitespace is trimmed; the remaining value must not be empty." } }, not: { type: "object", required: ["entity"] } },
+    { type: "object", required: ["shapeId", "entity"], properties: { shapeId: { type: "string", pattern: "\\S" }, entity: { type: "string", enum: ["shape"] } } },
+    { type: "object", required: ["shapeId", "entity", "index"], properties: { shapeId: { type: "string", pattern: "\\S" }, entity: { type: "string", enum: ["edge", "face"] }, index: { type: "integer", minimum: 0, description: "Zero-based edge or face index." } } },
+  ],
+} as const;
+const measurementBetweenResponseSchema = {
+  type: "object",
+  oneOf: [
+    { type: "object", required: ["distance", "angleDegrees", "angleUnavailable"], properties: { distance: { type: "number", minimum: 0 }, angleDegrees: { type: "number", minimum: 0, maximum: 180 }, angleUnavailable: { type: "string", nullable: true, enum: [] } } },
+    { type: "object", required: ["distance", "angleDegrees", "angleUnavailable"], properties: { distance: { type: "number", minimum: 0 }, angleDegrees: { type: "number", nullable: true, enum: [null] }, angleUnavailable: { type: "string", enum: ["notPlanar", "degenerateNormal"] } } },
+  ],
+} as const;
 const projectDetail = { type: "object", required: ["project"], properties: { project: { type: "object", required: ["id", "name", "createdAt", "snapGrid", "workspace", "shapes"], properties: { id: str, name: str, createdAt: num, snapGrid: str, workspace: { type: "object", additionalProperties: true }, shapes: { type: "array", items: shapeSummary } } } } } as const;
 const projectList = { type: "object", required: ["projects"], properties: { projects: { type: "array", items: projectSummary } } } as const;
 const shapesList = { type: "object", required: ["shapes"], properties: { shapes: { type: "array", items: shapeSummary } } } as const;
@@ -212,8 +244,10 @@ const projectOperations = [
 ] as const satisfies readonly ApiV1Operation[];
 
 export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): boolean {
-  if (schema.oneOf) return schema.oneOf.some((candidate) => validateApiV1Schema(value, candidate));
+  if (schema.oneOf && schema.oneOf.filter((candidate) => validateApiV1Schema(value, candidate)).length !== 1) return false;
+  if (schema.not && validateApiV1Schema(value, schema.not)) return false;
   if (schema.nullable && value === null) return true;
+  if (schema.enum && !schema.enum.includes(value as string | null)) return false;
   if (schema.type === "array") return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.items || value.every((item) => validateApiV1Schema(item, schema.items!)));
   if (schema.type === "object") {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -224,10 +258,10 @@ export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): b
     if (typeof schema.additionalProperties === "object" && Object.entries(object).some(([name, child]) => !(name in (schema.properties ?? {})) && !validateApiV1Schema(child, schema.additionalProperties as ApiV1FieldSchema))) return false;
     return true;
   }
-  if (schema.type === "string") return typeof value === "string" && (!schema.enum || schema.enum.includes(value)) && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
+  if (schema.type === "string") return typeof value === "string" && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
   if (schema.type === "boolean") return typeof value === "boolean";
   if (schema.type === "number" || schema.type === "integer") return typeof value === "number" && Number.isFinite(value) && (schema.type !== "integer" || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum);
-  return false;
+  return schema.type === undefined;
 }
 
 export function validateApiV1RequestBody(key: string, value: unknown): boolean {
@@ -277,7 +311,7 @@ export function withApiV1Contract(key: string, handler: (request: Request) => Pr
 }
 const sketchSweepProfileRequest = { type: "object", required: ["points", "segments"], properties: { points: { type: "array", items: { type: "object", additionalProperties: true } }, segments: { type: "array", items: { type: "object", additionalProperties: true } }, sweepFrames: { type: "object", additionalProperties: true } }, additionalProperties: true } as const;
 const revolveProfileRequest = { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } } as const;
-const shapeRequest = { type: "object", required: ["kind"], properties: { kind: str, profile: { type: "object", oneOf: [sketchSweepProfileRequest, revolveProfileRequest] } }, additionalProperties: true } as const;
+const shapeRequest = { type: "object", required: ["kind"], properties: { kind: str, profile: { oneOf: [sketchSweepProfileRequest, revolveProfileRequest] } }, additionalProperties: true } as const;
 const shapeOperations = [
   { ...operation("GET", "/api/v1/shapes", "listShapes", [200, ...commonErrors]), query: projectQuery, responseSchemas: { 200: shapesList, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/shapes", "createShapes", [201, ...commonErrors, 413, 422]), query: projectQuery, requestBody: json({ type: "object", oneOf: [shapeRequest, { type: "object", required: ["shapes"], properties: { shapes: { type: "array", minItems: 1, maxItems: 200, items: shapeRequest } }, additionalProperties: false }] }), responseSchemas: { 201: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 413: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
@@ -320,40 +354,22 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/imports", "importGeometry"),
   operation("POST", "/api/v1/interference", "analyzeInterference"),
   {
-    ...operation("GET", "/api/v1/measurements", "listMeasurements", [200, 400, 401, 404, 409, 422, 500, 503]),
+    ...operation("GET", "/api/v1/measurements", "listMeasurements", [200, 400, 401, 404, 409, 500, 503]),
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true },
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
-    response: {
-      required: ["measurements"],
-      schema: {
-        type: "object",
-        required: ["measurements"],
-        properties: {
-          measurements: {
-            type: "array",
-            items: {
-              type: "object",
-              required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
-              properties: {
-                entity: { type: "string", enum: ["edge", "face"] },
-                index: { type: "integer" },
-                geometryType: { type: "string" },
-                length: { type: "number", nullable: true },
-                area: { type: "number", nullable: true },
-                radius: { type: "number", nullable: true },
-                diameter: { type: "number", nullable: true },
-                sweepDegrees: { type: "number", nullable: true },
-                radiusUnavailable: { type: "string", nullable: true, enum: ["notCircular", "ellipseHasNoSingleRadius", "degenerateCurve", "notCurved", "radiusVariesOverSurface", "radiusNotReportedByKernel", "degenerateSurface"] },
-              },
-            },
-          },
-        },
-      },
+    responseSchemas: {
+      200: measurementListSchema,
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      409: faceError("project_busy"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
     },
   },
   {
@@ -364,8 +380,8 @@ export const API_V1_OPERATIONS = [
         type: "object",
         required: ["from", "to"],
         properties: {
-          from: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
-          to: { type: "object", required: ["shapeId"], properties: { shapeId: { type: "string" }, entity: { type: "string", enum: ["edge", "face", "shape"], default: "shape" }, index: { type: "integer", minimum: 0, description: "Required when entity is edge or face." } } },
+          from: measurementEndSchema,
+          to: measurementEndSchema,
         },
       },
     }),
@@ -373,17 +389,15 @@ export const API_V1_OPERATIONS = [
       required: ["projectId"],
       properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } },
     },
-    response: {
-      required: ["distance", "angleDegrees", "angleUnavailable"],
-      schema: {
-        type: "object",
-        required: ["distance", "angleDegrees", "angleUnavailable"],
-        properties: {
-          distance: { type: "number", minimum: 0 },
-          angleDegrees: { type: "number", nullable: true, minimum: 0, maximum: 180 },
-          angleUnavailable: { type: "string", nullable: true, enum: ["notPlanar", "degenerateNormal"] },
-        },
-      },
+    responseSchemas: {
+      200: measurementBetweenResponseSchema,
+      400: faceError("invalid_project_id", "invalid_body", "invalid_request"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      409: faceError("project_busy"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
     },
   },
   operation("POST", "/api/v1/mirrors", "mirrorShapes"),

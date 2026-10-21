@@ -314,6 +314,732 @@
         ]
       }
     },
+    "/api/v1/measurements": {
+      "get": {
+        "operationId": "listMeasurements",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "measurements"
+                  ],
+                  "properties": {
+                    "measurements": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "entity",
+                          "index",
+                          "geometryType",
+                          "length",
+                          "area",
+                          "radius",
+                          "diameter",
+                          "sweepDegrees",
+                          "radiusUnavailable"
+                        ],
+                        "properties": {
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "edge",
+                              "face"
+                            ]
+                          },
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "geometryType": {
+                            "type": "string"
+                          },
+                          "length": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "area": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "radius": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "diameter": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "sweepDegrees": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "radiusUnavailable": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "notCircular",
+                              "ellipseHasNoSingleRadius",
+                              "degenerateCurve",
+                              "notCurved",
+                              "radiusVariesOverSurface",
+                              "radiusNotReportedByKernel",
+                              "degenerateSurface",
+                              null
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_project_id",
+                        "invalid_shape_id"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unauthorized"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "project_not_found",
+                        "shape_not_found"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "project_busy"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "storage_unconfigured"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "description": "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "shapeId",
+            "in": "query",
+            "required": true,
+            "description": "Whitespace is trimmed; the remaining value must not be empty.",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "measureEntities",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "distance",
+                        "angleDegrees",
+                        "angleUnavailable"
+                      ],
+                      "properties": {
+                        "distance": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "angleDegrees": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 180
+                        },
+                        "angleUnavailable": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            null
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "distance",
+                        "angleDegrees",
+                        "angleUnavailable"
+                      ],
+                      "properties": {
+                        "distance": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "angleDegrees": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "enum": [
+                            null,
+                            null
+                          ]
+                        },
+                        "angleUnavailable": {
+                          "type": "string",
+                          "enum": [
+                            "notPlanar",
+                            "degenerateNormal"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_project_id",
+                        "invalid_body",
+                        "invalid_request"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unauthorized"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "project_not_found",
+                        "shape_not_found"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "project_busy"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "cad_failed"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "storage_unconfigured"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "properties": {
+                  "from": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "not": {
+                          "type": "object",
+                          "required": [
+                            "entity"
+                          ]
+                        },
+                        "required": [
+                          "shapeId"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S",
+                            "description": "Whitespace is trimmed; the remaining value must not be empty."
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "entity"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S"
+                          },
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "shape"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "entity",
+                          "index"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S"
+                          },
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "edge",
+                              "face"
+                            ]
+                          },
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Zero-based edge or face index."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "to": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "not": {
+                          "type": "object",
+                          "required": [
+                            "entity"
+                          ]
+                        },
+                        "required": [
+                          "shapeId"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S",
+                            "description": "Whitespace is trimmed; the remaining value must not be empty."
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "entity"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S"
+                          },
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "shape"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "entity",
+                          "index"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string",
+                            "pattern": "\\S"
+                          },
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "edge",
+                              "face"
+                            ]
+                          },
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Zero-based edge or face index."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects": {
       "get": {
         "operationId": "listProjectsOrGetProject",
@@ -5152,18 +5878,6 @@
       "method": "POST",
       "path": "/api/v1/interference",
       "operationId": "analyzeInterference",
-      "reason": "Response schemas or verified response statuses are not declared."
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/measurements",
-      "operationId": "listMeasurements",
-      "reason": "Response schemas or verified response statuses are not declared."
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/measurements",
-      "operationId": "measureEntities",
       "reason": "Response schemas or verified response statuses are not declared."
     },
     {

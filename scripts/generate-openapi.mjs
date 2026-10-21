@@ -103,6 +103,7 @@ function omissionReason(operation) {
 function toJsonSchema(schema) {
   if (schema.oneOf) return { oneOf: schema.oneOf.map(toJsonSchema) };
   const result = { type: schema.nullable ? [schema.type, "null"] : schema.type };
+  if (schema.not) result.not = toJsonSchema(schema.not);
   if (schema.required) result.required = [...schema.required];
   if (schema.enum) result.enum = [...schema.enum, ...(schema.nullable ? [null] : [])];
   if (schema.default !== undefined) result.default = schema.default;
