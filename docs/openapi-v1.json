@@ -1,0 +1,2619 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SketchForge REST API v1 (contracted subset)",
+    "version": "1",
+    "description": "Generated from the runtime-facing API operation registry. This document contains only operations whose request, query, and response metadata can be represented accurately. See x-sketchforge-omitted-operations for the registered operations that still need contract work."
+  },
+  "paths": {
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "listProjectsOrGetProject",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "projects"
+                      ],
+                      "properties": {
+                        "projects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "name",
+                              "shapes",
+                              "revision",
+                              "updatedAt",
+                              "packageBytes"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "shapes": {
+                                "type": "integer"
+                              },
+                              "revision": {
+                                "type": "number"
+                              },
+                              "updatedAt": {
+                                "type": "number"
+                              },
+                              "packageBytes": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "project"
+                      ],
+                      "properties": {
+                        "project": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name",
+                            "createdAt",
+                            "snapGrid",
+                            "workspace",
+                            "shapes"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "number"
+                            },
+                            "snapGrid": {
+                              "type": "string"
+                            },
+                            "workspace": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "shapes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "kind",
+                                  "color",
+                                  "hole",
+                                  "locked",
+                                  "hidden",
+                                  "x",
+                                  "z",
+                                  "elevation",
+                                  "width",
+                                  "depth",
+                                  "rotation",
+                                  "rotationX",
+                                  "rotationZ"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string"
+                                  },
+                                  "requestKind": {
+                                    "type": "string"
+                                  },
+                                  "sketchOperation": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "faceIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "faceColors": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "hole": {
+                                    "type": "boolean"
+                                  },
+                                  "locked": {
+                                    "type": "boolean"
+                                  },
+                                  "hidden": {
+                                    "type": "boolean"
+                                  },
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  },
+                                  "elevation": {
+                                    "type": "number"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "depth": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  },
+                                  "rotation": {
+                                    "type": "number"
+                                  },
+                                  "rotationX": {
+                                    "type": "number"
+                                  },
+                                  "rotationZ": {
+                                    "type": "number"
+                                  },
+                                  "groupedCount": {
+                                    "type": "integer"
+                                  },
+                                  "revolve": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                  },
+                                  "profile": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "array",
+                                      "minItems": 2,
+                                      "maxItems": 2,
+                                      "items": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createProject",
+        "responses": {
+          "201": {
+            "description": "Resource created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "project"
+                  ],
+                  "properties": {
+                    "project": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "shapes",
+                        "revision",
+                        "updatedAt",
+                        "packageBytes"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "shapes": {
+                          "type": "integer"
+                        },
+                        "revision": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        },
+                        "packageBytes": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProject",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted",
+                    "id"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/shapes": {
+      "get": {
+        "operationId": "listShapes",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "shapes"
+                  ],
+                  "properties": {
+                    "shapes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "color",
+                          "hole",
+                          "locked",
+                          "hidden",
+                          "x",
+                          "z",
+                          "elevation",
+                          "width",
+                          "depth",
+                          "rotation",
+                          "rotationX",
+                          "rotationZ"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "requestKind": {
+                            "type": "string"
+                          },
+                          "sketchOperation": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "faceIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "faceColors": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "hole": {
+                            "type": "boolean"
+                          },
+                          "locked": {
+                            "type": "boolean"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          },
+                          "x": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          },
+                          "elevation": {
+                            "type": "number"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "rotation": {
+                            "type": "number"
+                          },
+                          "rotationX": {
+                            "type": "number"
+                          },
+                          "rotationZ": {
+                            "type": "number"
+                          },
+                          "groupedCount": {
+                            "type": "integer"
+                          },
+                          "revolve": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "profile": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createShapes",
+        "responses": {
+          "201": {
+            "description": "Resource created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "shapes",
+                    "revision"
+                  ],
+                  "properties": {
+                    "shapes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "color",
+                          "hole",
+                          "locked",
+                          "hidden",
+                          "x",
+                          "z",
+                          "elevation",
+                          "width",
+                          "depth",
+                          "rotation",
+                          "rotationX",
+                          "rotationZ"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "requestKind": {
+                            "type": "string"
+                          },
+                          "sketchOperation": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "faceIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "faceColors": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "hole": {
+                            "type": "boolean"
+                          },
+                          "locked": {
+                            "type": "boolean"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          },
+                          "x": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          },
+                          "elevation": {
+                            "type": "number"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "rotation": {
+                            "type": "number"
+                          },
+                          "rotationX": {
+                            "type": "number"
+                          },
+                          "rotationZ": {
+                            "type": "number"
+                          },
+                          "groupedCount": {
+                            "type": "integer"
+                          },
+                          "revolve": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "profile": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "shapes"
+                    ],
+                    "properties": {
+                      "shapes": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 200,
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": true
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteShape",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted",
+                    "id",
+                    "revision"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "shapeId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "sketchForgeToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-SketchForge-Token"
+      }
+    }
+  },
+  "x-sketchforge-source": "apps/web/src/lib/apiV1OperationContract.ts",
+  "x-sketchforge-omitted-operations": [
+    {
+      "method": "POST",
+      "path": "/api/v1/align",
+      "operationId": "alignShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/booleans",
+      "operationId": "booleanShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/distribute",
+      "operationId": "distributeShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/draft-prism",
+      "operationId": "draftPrism",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/edges",
+      "operationId": "listEdges",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/api/v1/edges",
+      "operationId": "edgeRouteOptions",
+      "reason": "Preflight-only operation; omitted from the resource API document."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/explode",
+      "operationId": "explodeAssembly",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/exports",
+      "operationId": "exportProject",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faces",
+      "operationId": "listFaces",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/api/v1/faces",
+      "operationId": "faceRouteOptions",
+      "reason": "Preflight-only operation; omitted from the resource API document."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/groups",
+      "operationId": "groupShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/groups",
+      "operationId": "ungroupShape",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/imports",
+      "operationId": "importGeometry",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/interference",
+      "operationId": "analyzeInterference",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/measurements",
+      "operationId": "listMeasurements",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/measurements",
+      "operationId": "measureEntities",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mirrors",
+      "operationId": "mirrorShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/parts",
+      "operationId": "splitParts",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patterns",
+      "operationId": "patternShapes",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/properties",
+      "operationId": "getShapeProperties",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/api/v1/properties",
+      "operationId": "propertyRouteOptions",
+      "reason": "Preflight-only operation; omitted from the resource API document."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/shapes",
+      "operationId": "updateShape",
+      "reason": "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/shell",
+      "operationId": "shellShape",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/thickness",
+      "operationId": "estimateThickness",
+      "reason": "Response schemas or verified response statuses are not declared."
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/api/v1/thickness",
+      "operationId": "thicknessRouteOptions",
+      "reason": "Preflight-only operation; omitted from the resource API document."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/treatments",
+      "operationId": "treatShape",
+      "reason": "Response schemas or verified response statuses are not declared."
+    }
+  ]
+}

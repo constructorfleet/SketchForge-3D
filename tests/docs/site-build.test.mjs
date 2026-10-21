@@ -36,6 +36,11 @@ test("built docs emit the project-site shell, imported README, and local search"
   assert.match(html, /docs\/SKF_FORMAT_REFERENCE/, ".skf reference should be reachable from site navigation");
   assert.match(html, /docs\/OPERATOR_CONFIGURATION/, "operator configuration reference should be reachable from site navigation");
   assert.match(html, /docs\/mcp\/TOOLS_REFERENCE/, "MCP tool reference should be reachable from site navigation");
+  const openapiPath = path.join(output, "openapi-v1.json");
+  assert.ok(existsSync(openapiPath), "the generated OpenAPI document should be published as a downloadable asset");
+  assert.deepEqual(JSON.parse(readFileSync(openapiPath, "utf8")), JSON.parse(readFileSync(path.join(rootPath, "docs/openapi-v1.json"), "utf8")));
+  const restApi = readFileSync(path.join(output, "docs/REST_API.html"), "utf8");
+  assert.match(restApi, /href="\/SketchForge-3D\/openapi-v1\.json"/, "the REST reference should link to the OpenAPI download under the project-site prefix");
 });
 
 test("built pages identify their release and link to source at the represented revision", () => {

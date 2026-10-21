@@ -11,6 +11,7 @@ if (!repository) throw new Error("Cannot derive GitHub repository for canonical 
 const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const packageMetadata = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const documentationVersion = packageMetadata.version;
+const pagesBase = `/${repository.split("/").at(-1)}`;
 const trackedMarkdown = execFileSync("git", ["ls-files", "-z", "--", "*.md"], {
   cwd: root,
   encoding: "utf8",
@@ -44,6 +45,7 @@ await cp(
   path.join(output, "assets/sketchforge/sketchforge-logo-transparent.png"),
 );
 await cp(path.join(root, "docs/site-assets/favicon.svg"), path.join(output, "public/favicon.svg"));
+await cp(path.join(root, "docs/openapi-v1.json"), path.join(output, "public/openapi-v1.json"));
 
 for (const sourceRelative of markdownSources) {
   if (sourceRelative === "README.md" || sourceRelative === "docs/index.md") continue;
@@ -94,6 +96,7 @@ for (const generatedPath of markdownFiles) {
     return whole;
   });
   contents = contents
+    .replaceAll('href="/openapi-v1.json"', `href="${pagesBase}/openapi-v1.json"`)
     .replace(/!\[([^\]]*)\]\(https?:\/\/[^)]+\)/g, "$1")
     .replace(
       'src="https://sketchforge3d.com/assets/sketchforge/sketchforge-logo-transparent.png"',

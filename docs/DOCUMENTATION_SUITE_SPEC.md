@@ -252,12 +252,13 @@ its Ubuntu system dependencies before running the build.
 
 ### Phase 3: make the REST reference authoritative
 
-- **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract or OpenAPI source.
+- **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract; the generated OpenAPI currently covers only operations with faithful schemas.
 - **Merged PRs #120 and #125:** stable application-owned IDs are included in `GET /faces` and are the persisted `faceColors` keys for `PATCH /shapes`. The operation inventory still lacks complete schemas for the rest of the REST surface.
+- **This slice:** `docs/openapi-v1.json` is generated from the runtime operation registry and currently documents six project/shape CRUD operations whose request/query/status schemas can be represented accurately. The document enumerates omitted operations with reasons; this partial output does not make the REST reference authoritative for the whole API.
 - Define the typed operation contract and migrate routes incrementally.
-- Generate OpenAPI and REST pages from that contract.
+- Expand the generated OpenAPI coverage as operation metadata becomes a faithful description of runtime validation and response behavior; generate endpoint pages from the same source.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
-- Replace endpoint/schema tables in `docs/REST_API.md` with generated output or a compatibility link to the site.
+- Replace endpoint/schema tables in `docs/REST_API.md` with generated output or a compatibility link to the site after full operation coverage exists. Until then, keep generated and hand-written coverage boundaries explicit.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
