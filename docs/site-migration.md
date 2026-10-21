@@ -41,8 +41,9 @@ client, translation, and capability documents.
   rules and a complete accessibility audit remain outstanding.
 
 - **Open PR #145:** adds stable face IDs, face-color fields, and a source-backed
-  example to the Python client. The package example CI is its live-server
-  verification seam.
+  example to the Python client. Its GitHub head is stale (`fc10ea9`) and
+  conflicts with `main`; the pushed branch is at `1feb9da` and needs rebasing.
+  The package example CI is its live-server verification seam.
 
 The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
