@@ -37,6 +37,8 @@
 
 ### Documentation
 
+- Added a tested editor quick start that walks through sketching, extrusion, browser autosave, and exporting an editable `.skf` project.
+
 - Document the Release Please workflow and verify package release versions and publish dispatches in `docs:check`.
 
 - Merged PR #116 added the VitePress documentation site with repository-derived

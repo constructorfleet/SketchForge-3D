@@ -38,6 +38,8 @@ jobs:
         run: npm run docs:check
       - name: Install Chromium for built-site browser smoke checks
         run: npx playwright install --with-deps --only-shell chromium
+      - name: Verify the editor quick-start workflow in a browser
+        run: npm run test:browser
       - name: Build static documentation
         run: npm run docs:build
       - name: Upload Pages artifact
