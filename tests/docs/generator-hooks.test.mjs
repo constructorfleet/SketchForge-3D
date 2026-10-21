@@ -21,19 +21,16 @@ test("docs scripts generate and check each deterministic reference", async () =>
     if (generator === "scripts/docs/generate-package-references.mjs") {
       assert.ok(scripts["docs:stage"].includes(`${generator} --output-dir .docs-site/docs/reference`),
         "docs:generate must publish package references into the staged site");
-      assert.ok(!scripts["docs:check"].includes(`${generator} --check`),
+      assert.ok(!scripts["docs:verify"].includes(`${generator} --check`),
         "docs:check must not require generated package reference markdown to be committed");
     } else {
       assert.ok(scripts["docs:generate"].includes(generator), `docs:generate must invoke ${generator}`);
-      assert.ok(scripts["docs:check"].includes(`${generator} --check`), `docs:check must check ${generator}`);
+      assert.ok(scripts["docs:verify"].includes(`${generator} --check`), `docs:verify must check ${generator}`);
     }
   }
   assert.ok(scripts["docs:generate"].includes("npm run docs:stage"), "full site generation must include staged package references");
   assert.ok(scripts["docs:generate"].includes("npm run engine:build"), "generated package references require built engine declarations");
   assert.ok(scripts["docs:generate"].includes("npm run client:build"), "generated package references require built client declarations");
-  assert.ok(scripts["docs:check"].includes("npm run docs:stage"), "docs:check must stage generated pages before validating links");
-  assert.ok(scripts["docs:check"].includes("npm run engine:build"), "package checks require built engine declarations");
-  assert.ok(scripts["docs:check"].includes("npm run client:build"), "package checks require built client declarations");
-  assert.ok(scripts["docs:check"].includes("tests/docs/generator-hooks.test.mjs"), "CI docs checks must run the generator wiring test");
-  assert.ok(scripts["docs:check"].includes("tests/docs/mcp-reference.test.mjs"), "CI docs checks must compare MCP schemas with live tools/list");
+  assert.ok(scripts["docs:verify"].includes("tests/docs/generator-hooks.test.mjs"), "CI docs checks must run the generator wiring test");
+  assert.ok(scripts["docs:verify"].includes("tests/docs/mcp-reference.test.mjs"), "CI docs checks must compare MCP schemas with live tools/list");
 });

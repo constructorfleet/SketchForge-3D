@@ -69,6 +69,6 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {
   const { scripts } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
   assert.ok(scripts["docs:generate"].includes("scripts/generate-openapi.mjs"));
-  assert.ok(scripts["docs:check"].includes("scripts/generate-openapi.mjs --check"));
-  assert.ok(scripts["docs:check"].includes("tests/docs/openapi-reference.test.mjs"));
+  assert.ok(scripts["docs:verify"].includes("scripts/generate-openapi.mjs --check"));
+  assert.ok(scripts["docs:verify"].includes("tests/docs/openapi-reference.test.mjs"));
 });
