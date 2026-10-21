@@ -54,6 +54,8 @@ test("Pages artifact contains generated TypeScript and Python package references
   for (const [filename, title, symbol] of references) {
     const pagePath = path.join(output, filename);
     assert.ok(existsSync(pagePath), `${filename} must be included in the Pages artifact`);
+    assert.equal(existsSync(path.join(output, filename.replace(/\.html$/, ".md"))), false,
+      `${filename} must publish as rendered HTML rather than a Markdown source file`);
     const html = readFileSync(pagePath, "utf8");
     assert.match(html, title, `${filename} should render its generated package title`);
     assert.match(html, symbol, `${filename} should expose an expected current package symbol`);

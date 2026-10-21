@@ -53,7 +53,7 @@ for (const sourceRelative of sources) {
       continue;
     }
     try {
-      const targetText = await readFile(target, "utf8");
+      const targetText = await readLocalTarget(target);
       const fragmentText = fragment?.replace(/^[?#]/, "");
       if (fragmentText && target.endsWith(".md") && !hasHeading(targetText, fragmentText)) {
         failures.push(`${sourceRelative}: heading #${fragmentText} not found in ${path.relative(root, target)}`);
@@ -78,7 +78,7 @@ for (const sourceRelative of sources) {
       continue;
     }
     try {
-      const targetText = await readFile(target, "utf8");
+      const targetText = await readLocalTarget(target);
       const fragmentText = fragment?.replace(/^[?#]/, "");
       if (fragmentText && target.endsWith(".md") && !hasHeading(targetText, fragmentText)) {
         failures.push(`${sourceRelative}: heading #${fragmentText} not found in ${path.relative(root, target)}`);
@@ -108,4 +108,13 @@ function hasHeading(contents, fragment) {
       .replace(/\s+/g, "-");
     return slug === wanted;
   });
+}
+
+async function readLocalTarget(target) {
+  try {
+    return await readFile(target, "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT" || !target.startsWith(`${root}${path.sep}`)) throw error;
+    return readFile(path.join(root, ".docs-site", path.relative(root, target)), "utf8");
+  }
 }

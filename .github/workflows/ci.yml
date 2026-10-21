@@ -31,11 +31,8 @@ jobs:
       - name: Build public packages
         run: npm run engine:build && npm run client:build
 
-      - name: Stage documentation sources
-        run: node scripts/docs-generate.mjs
-
-      - name: Generate package references into the site artifact
-        run: node scripts/docs/generate-package-references.mjs --output-dir .docs-site/docs/reference
+      - name: Stage source and generated package documentation
+        run: npm run docs:stage
 
       - name: Check staged package references
         run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference

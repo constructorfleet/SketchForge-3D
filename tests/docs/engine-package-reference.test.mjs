@@ -37,7 +37,7 @@ test("the published engine package includes the declared AGPL license text", asy
 });
 
 test("the generated engine API leads with the package guide and links API areas", async () => {
-  const reference = await readFile(new URL("docs/reference/typescript-engine.md", root), "utf8");
+  const reference = await readFile(new URL(".docs-site/docs/reference/typescript-engine.md", root), "utf8");
   assert.match(reference, /^# Engine API/m);
   assert.ok(reference.indexOf("## Installation") < reference.indexOf("## Exported API"));
   assert.match(reference, /\.\.\/packages\/engine\.md/);

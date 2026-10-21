@@ -1,12 +1,27 @@
-import { existsSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(path, "utf8");
+let generatedReferences: string;
 
 describe("package documentation contract", () => {
+  beforeAll(() => {
+    generatedReferences = mkdtempSync(path.join(os.tmpdir(), "sketchforge-package-docs-"));
+    const result = spawnSync(process.execPath, ["scripts/docs/generate-package-references.mjs", "--output-dir", generatedReferences], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    if (result.status !== 0) throw new Error(result.stderr || "Package reference generation failed");
+  });
+
+  afterAll(() => rmSync(generatedReferences, { recursive: true, force: true }));
+
   it("publishes TypeScript and engine exports from built declarations", () => {
-    const client = read("docs/reference/typescript-client.md");
-    const engine = read("docs/reference/typescript-engine.md");
+    const client = read(path.join(generatedReferences, "typescript-client.md"));
+    const engine = read(path.join(generatedReferences, "typescript-engine.md"));
 
     expect(client).toContain("SketchForgeClient");
     expect(client).toContain("export declare function clientFromEnvironment");
@@ -18,7 +33,7 @@ describe("package documentation contract", () => {
   });
 
   it("publishes Python names from the package public export list", () => {
-    const python = read("docs/reference/python-client.md");
+    const python = read(path.join(generatedReferences, "python-client.md"));
     expect(python).toContain("SketchForgeClient");
     expect(python).toContain("client_from_environment");
     expect(python).toContain("BoxShapeRequest");
