@@ -16,3 +16,10 @@ hero:
 ---
 
 !!!include(../README.md)!!!
+
+## Choose a task
+
+- **Call the REST API:** start with [API setup, operations, and errors](/docs/REST_API.md), then inspect the [OpenAPI contract](/openapi-v1.json) or use the [TypeScript client reference](/docs/reference/typescript-client.md) and [Python client reference](/docs/reference/python-client.md).
+- **Automate a design:** follow the [command-line reference](/docs/CLI_REFERENCE.md) and run the [client package examples](/docs/guides/package-examples.md).
+- **Use MCP tools:** run the [local MCP project example](/docs/mcp/EXAMPLES.md) and browse the [MCP tool reference](/docs/mcp/TOOLS_REFERENCE.md).
+- **Inspect or exchange a project:** read the [editable `.skf` project guide](/docs/SKF_PROJECT_FORMAT.md) and its [generated format reference](/docs/SKF_FORMAT_REFERENCE.md).

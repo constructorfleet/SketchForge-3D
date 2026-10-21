@@ -3,6 +3,8 @@
 
 This page covers command-line entry points published by the JavaScript and Python client packages. Repository npm scripts are development tasks and are not package CLI commands.
 
+For the server setup and endpoint behavior behind these commands, see the [REST API guide](./REST_API.md). To see complete macro workflows, run the [package examples](./guides/package-examples.md); exported library types are listed in the [TypeScript](./reference/typescript-client.md) and [Python](./reference/python-client.md) references.
+
 ## JavaScript package
 
 Install `@constructorfleet/sketchforge3d` (requires Node.js >=20). Its published binaries are registered in `packages/sketchforge-client/package.json`.

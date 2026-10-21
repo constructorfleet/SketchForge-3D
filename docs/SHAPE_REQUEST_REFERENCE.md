@@ -3,6 +3,8 @@
 
 This reference lists shape kinds accepted by parameter based shape creation and the additional fields each kind accepts. Placement and dimensions common to all kinds are omitted. The engine request registry is the source of truth.
 
+For placement, shared fields, defaults, and request behavior, see the [REST API shape guide](./REST_API.md#describing-a-shape). Use the [OpenAPI contract](./openapi-v1.json) for the documented project and shape CRUD schemas.
+
 | Kind | Additional request fields |
 | --- | --- |
 | `box` | `taperTopWidth`, `taperTopDepth`, `taperBottomWidth`, `taperBottomDepth` |

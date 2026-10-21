@@ -2,6 +2,8 @@
 
 `.skf` is SketchForge's native, editable project format. It is an additional backup, transfer, and sharing mechanism; IndexedDB autosave remains the normal local persistence system, and STL, OBJ, STEP, and SVG remain geometry exports.
 
+For exact serialized field types and reader limits, use the [generated `.skf` format reference](./SKF_FORMAT_REFERENCE.md). To create an `.skf` through server-side automation, see the [REST export endpoint](./REST_API.md#endpoints) and its `POST /exports` operation.
+
 ## Architecture decision
 
 SketchForge uses a packaged container (format option B). A `.skf` file is a ZIP archive containing `project.json` and deduplicated files below `assets/`.
