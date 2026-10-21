@@ -1023,9 +1023,9 @@
       },
       "draftFace": {
         "title": "Draft face",
-        "hint": "Taper one face of exact B-rep geometry. The pull direction is local CAD +Z, relative to the shape's coordinate frame. Incompatible faces or angles are rejected by the kernel.",
+        "hint": "Taper one face of exact B-rep geometry. Choose a pull axis in the shape's local CAD coordinate frame. Incompatible face, axis, or angle combinations are rejected by the kernel.",
         "index": "CAD face index",
-        "axis": "Local CAD pull axis: +Z",
+        "axis": "Local CAD pull axis",
         "angle": "Draft angle",
         "apply": "Apply face draft",
         "applying": "Applying face draft…",

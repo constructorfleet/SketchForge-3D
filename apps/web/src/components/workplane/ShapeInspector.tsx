@@ -19,7 +19,7 @@ import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
 import { updateFaceColor } from "@/lib/faceColorEditor";
 import { draftPrismControlForShape, draftPrismRequestForShape, isDraftPrismAngle } from "@/lib/draftPrismEditor";
-import { draftFaceRequestForShape, isDraftFaceAngle } from "@/lib/draftFaceEditor";
+import { DRAFT_FACE_PULL_AXES, applyDraftFaceSelection, draftFaceRequestForShape, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -168,6 +168,7 @@ export function ShapeInspector({
   const [drafting, setDrafting] = useState(false);
   const [draftFaceIndex, setDraftFaceIndex] = useState("0");
   const [draftFaceAngle, setDraftFaceAngle] = useState("5");
+  const [draftFacePullAxis, setDraftFacePullAxis] = useState<DraftFacePullAxis>("z");
   const [draftFaceApplying, setDraftFaceApplying] = useState(false);
   const [faceColorIndex, setFaceColorIndex] = useState("0");
   const selectedFaceIndex = Number(faceColorIndex);
@@ -442,20 +443,26 @@ export function ShapeInspector({
                 value={draftFaceIndex} disabled={locked || draftFaceApplying}
                 onChange={(event) => setDraftFaceIndex(event.currentTarget.value)} />
             </label>
-            <p>{t("panels.inspector.draftFace.axis")}</p>
+            <label>
+              <span>{t("panels.inspector.draftFace.axis")}</span>
+              <select aria-label={t("panels.inspector.draftFace.axis")} value={draftFacePullAxis}
+                disabled={locked || draftFaceApplying}
+                onChange={(event) => setDraftFacePullAxis(event.currentTarget.value as DraftFacePullAxis)}>
+                {DRAFT_FACE_PULL_AXES.map((axis) => <option key={axis} value={axis}>+{axis.toUpperCase()}</option>)}
+              </select>
+            </label>
             <label>
               <span>{t("panels.inspector.draftFace.angle")}</span>
               <input type="number" min="-44.9" max="44.9" step="0.1" value={draftFaceAngle}
                 disabled={locked || draftFaceApplying} onChange={(event) => setDraftFaceAngle(event.currentTarget.value)} />
             </label>
             <button className="inspector-action-button" type="button"
-              disabled={locked || draftFaceApplying || !draftFaceRequestForShape(shape, Number(draftFaceIndex), Number(draftFaceAngle), "z")}
+              disabled={locked || draftFaceApplying || !draftFaceRequestForShape(shape, Number(draftFaceIndex), Number(draftFaceAngle), draftFacePullAxis)}
               onClick={async () => {
                 const faceIndex = Number(draftFaceIndex);
                 const angle = Number(draftFaceAngle);
-                if (!Number.isInteger(faceIndex) || !isDraftFaceAngle(angle)) return;
                 setDraftFaceApplying(true);
-                try { await onApplyDraftFace(faceIndex, angle, "z"); }
+                try { await applyDraftFaceSelection(shape, faceIndex, angle, draftFacePullAxis, onApplyDraftFace); }
                 finally { setDraftFaceApplying(false); }
               }}>
               <span>{t(draftFaceApplying ? "panels.inspector.draftFace.applying" : "panels.inspector.draftFace.apply")}</span>

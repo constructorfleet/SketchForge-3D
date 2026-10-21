@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent } from "@/lib/draftFaceEditor";
+import { describe, expect, it, vi } from "vitest";
+import { DRAFT_FACE_PULL_AXES, applyDraftFaceSelection, draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent } from "@/lib/draftFaceEditor";
 import { projectShapesFingerprint } from "@/lib/engine/editorHistory";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -19,11 +19,26 @@ const base = {
 } as WorkplaneShape;
 
 describe("face draft editor request", () => {
+  it("offers all kernel pull axes to the inspector", () => {
+    expect(DRAFT_FACE_PULL_AXES).toEqual(["x", "y", "z"]);
+  });
+
   it("sends the selected stable face ID with the chosen local CAD axis", () => {
     expect(draftFaceRequestForShape(base, 1, -5, "z")).toMatchObject({
       brep: "CASCADE Topology",
       faceIds: ["stable-a", "stable-b", "stable-c"], faceId: "stable-b", angle: -5, pullDirection: "z",
     });
+  });
+
+  it("preserves a user-selected X or Y pull axis in the kernel request", () => {
+    expect(draftFaceRequestForShape(base, 1, 5, "x")).toMatchObject({ faceId: "stable-b", pullDirection: "x" });
+    expect(draftFaceRequestForShape(base, 1, 5, "y")).toMatchObject({ faceId: "stable-b", pullDirection: "y" });
+  });
+
+  it("passes the selected axis through the editor apply operation", async () => {
+    const apply = vi.fn();
+    await expect(applyDraftFaceSelection(base, 1, -5, "x", apply)).resolves.toBe(true);
+    expect(apply).toHaveBeenCalledWith(1, -5, "x");
   });
 
   it("rejects missing exact B-rep, invalid face indices, and invalid angles", () => {

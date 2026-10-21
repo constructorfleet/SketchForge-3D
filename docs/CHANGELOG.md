@@ -24,7 +24,7 @@
 
 - Regular STEP imports preserve available component colors on the combined mesh. The editor preview and `.skf` projects use stable face IDs for those assignments. Color extraction is limited to imports up to 200 solids and 8 MiB; ambiguous or unavailable component colors keep the shape's default color.
 
-- Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and local CAD +Z pull axis, reports incompatible selections, and replaces the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured support currently covers specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.
+- Added face-based drafting for exact B-rep solids in the shape inspector. The operation uses a stable face selection and lets users choose local CAD +X, +Y, or +Z as the pull axis. The kernel rejects incompatible face, axis, and angle combinations; successful results replace the source with baked geometry. Output faces receive fresh IDs and do not inherit face colors or edge treatments. Measured geometry support remains limited to specific extrusion and box face/angle combinations documented in `UNEXPLORED_KERNEL_CAPABILITIES.md`.
 
 - Added a Chromium smoke test against the built `/SketchForge-3D/` artifact for
   skip navigation, visible keyboard focus, the keyboard-operated mobile menu,
