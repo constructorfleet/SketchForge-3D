@@ -1,6 +1,6 @@
 # Documentation suite specification
 
-**Status:** Phase 1 and its first GitHub Pages deployment are complete (PR #116 merged). Package and example documentation is in PR #118 (open; all CI checks green). Operator configuration, MCP, and `.skf` references are in separate open PRs and are not shipped. Remaining acceptance criteria are in progress.
+**Status (2026-10-21):** The site is deployed after PR #116. Package/example references merged in PR #118; stable-face `GET /faces` contract merged in PR #120; operator configuration reference merged in PR #121; and `.skf` reference merged in PR #123. MCP reference PR #122, STEP documentation PR #119, and `PATCH faceColors` contract PR #125 remain open and are not shipped. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
@@ -33,9 +33,9 @@ CLI.
 | Audited gap or contradiction | Evidence and consequence for the first implementation phases |
 | --- | --- |
 | The initial audit found no complete REST operation contract; route behavior lived in individual `apps/web/src/app/api/v1/*/route.ts` handlers and `docs/REST_API.md` was explanatory prose and tables. | The initial route inventory and first runtime-consumed request contract merged in PR #112. Full request/response schemas and OpenAPI generation remain incomplete; do not describe the inventory as a complete contract. |
-| Configuration has no central schema. Environment reads and defaults are distributed across API, storage, MCP, macro, and desktop modules. | A configuration reference is in a separate open PR and is not shipped. The work must still distinguish public operator settings from internal build/test variables before claiming a central schema; never publish every `process.env` use as supported configuration. |
+| Configuration has no central schema. Environment reads and defaults are distributed across API, storage, MCP, macro, and desktop modules. | The operator configuration reference merged in PR #121. It documents supported operator settings; it does not establish one central schema or make every `process.env` use a supported setting. |
 | The version source was inconsistent in the initial audit. Root and package manifests now report `1.13.0`, while the README badge still displays `1.0.9`. | The release authority is the root/package manifests. The badge remains stale and should be reconciled; it is not an alternate version source. |
-| Project-format documentation contains a camera-state contradiction. `docs/SKF_PROJECT_FORMAT.md` says saved camera position, target, and zoom are preserved, then later says camera position is intentionally omitted. The engine workspace model, editor persistence, and `.skf` round-trip test include `cameraView`. | A `.skf` reference update is in a separate open PR and is not shipped. Preserve supported `cameraView` behavior and remove or rewrite the stale limitation when that PR is reviewed; do not add a duplicate generated camera reference. |
+| Project-format documentation contained a camera-state contradiction. `docs/SKF_PROJECT_FORMAT.md` said camera state is preserved, then later said camera position is omitted, despite `cameraView` in the workspace model and round-trip test. | The `.skf` reference update merged in PR #123 and resolves the stale format description. |
 | The public CLI surface differs from root developer scripts. `packages/sketchforge-client/package.json` declares `sketchforge-macro` and `sketchforge-mcp`; `packages/sketchforge-py/pyproject.toml` declares its `sketchforge-macro`. | `docs/CLI_REFERENCE.md` is now generated from the published entry points and actual usage/help output (merged in PR #117). Keep root npm scripts separate as contributor commands. |
 | At the initial audit, GitHub Actions did not publish documentation to Pages; it built/tests the app and deployed app content to Cloudflare separately. | PR #116 added the Pages workflow and was merged; the first deployment succeeded. Pages publication is no longer an unverified or outstanding setup decision. |
 
@@ -223,21 +223,24 @@ Deliver the suite in small steps while retaining current published docs until re
 - [x] Configure the repository Pages publishing source as GitHub Actions and verify the first published deployment. The first deployment succeeded after PR #116 merged.
 
 Phase 1 established and deployed the site shell. Package references and
-executable examples are under review in PR #118; the initial REST inventory
-and the shape and CLI references have merged. Full API schemas, operator
-configuration, MCP, project-format coverage, and the remaining accessibility
-and behavioral smoke checks are incomplete.
+executable examples (#118), the stable-face `GET /faces` contract (#120),
+operator configuration (#121), and project-format reference (#123) have merged.
+The initial REST inventory and shape and CLI references have also merged. MCP
+reference (#122), STEP docs (#119), and `PATCH faceColors` contract (#125) are
+open. Full API schemas/OpenAPI and the remaining accessibility and behavioral
+smoke checks are incomplete.
 
 ### Phase 2: generate package and example documentation
 
-- **PR #118 (open; all CI checks green, not merged):** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
-- This slice does not yet add a Python static type checker or symbol-level source links for every generated item. Those remain Phase 2 work.
+- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
+- This slice does not add a Python static type checker or symbol-level source links for every generated item. Those remain Phase 2 work.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
 - Reuse package README content for package registries and the site from a shared source or generated subset.
 
 ### Phase 3: make the REST reference authoritative
 
 - **Initial slice merged in PR #112:** `apps/web/src/lib/apiV1OperationContract.ts` registers each public route method with its method, path, operation ID, and auth mode (including unauthenticated `OPTIONS`). A parity test discovers route handlers and fails on missing or duplicate registrations. `POST /projects` is the first route with a runtime-consumed request contract and verified response-status set. The inventory is not yet a full schema contract or OpenAPI source.
+- **Merged PR #120:** stable application-owned IDs are included in `GET /faces`; the `PATCH faceColors` contract remains under review in PR #125.
 - Define the typed operation contract and migrate routes incrementally.
 - Generate OpenAPI and REST pages from that contract.
 - Assert all public `/api/v1` routes are registered and execute representative contract cases against the local app.
@@ -245,7 +248,7 @@ and behavioral smoke checks are incomplete.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
-- **Merged slices:** Parameterized shape requests are generated from the engine request registry and checked for drift (PR #115); the CLI reference is generated from published package entry points and actual usage/help output (PR #117). Project-format, operator configuration, and MCP references are in separate open PRs and are not shipped. Broader workflow guides remain outstanding.
+- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), and `.skf` format (PR #123) references. MCP is in open PR #122; STEP documentation is in open PR #119. Broader workflow guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
