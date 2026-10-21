@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { parseShapePatchRequest } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -79,8 +80,14 @@ export async function PATCH(request: Request) {
 
   const body = await apiJsonBody(request);
   if (!body) return apiErrors.jsonBodyRequired();
+  const parsed = parseShapePatchRequest(body);
+  if (!parsed.ok) {
+    return parsed.error === "invalid_face_color_key"
+      ? apiError("A face color key must be a stable face ID or legacy numeric index.", 400, "invalid_request")
+      : apiError("faceColors must be an object of six or eight digit hex colors.", 422, "unapplicable_fields", { fields: ["faceColors"] });
+  }
 
-  const changed = await apiEngine(context.root).changeShape(projectId, shapeId, body);
+  const changed = await apiEngine(context.root).changeShape(projectId, shapeId, parsed.body);
   if (!changed.ok) {
     return apiEngineError(changed.failure, { oneShape: true, locked: () => LOCKED_FOR_CHANGE });
   }
