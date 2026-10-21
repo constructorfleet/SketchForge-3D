@@ -117,7 +117,7 @@ describe("the REST API over HTTP", () => {
   it("builds a standard thread and gives back what it built", async () => {
     const created = await api(`/shapes?projectId=${projectId}`, {
       method: "POST",
-      body: JSON.stringify({ shapes: [{ kind: "thread", thread: "M8", length: 16, name: "Bolt" }] }),
+      body: JSON.stringify({ shapes: [{ kind: "thread", size: "M8", length: 16, name: "Bolt" }] }),
     });
     expect(created.status).toBe(201);
     const [shape] = created.body.shapes as Array<Record<string, any>>;
@@ -126,6 +126,17 @@ describe("the REST API over HTTP", () => {
     expect(shape.revolve.pitch).toBeCloseTo(1.25, 5);
     // An M8 thread is 8mm across, whatever the mesh tessellation rounds to.
     expect(shape.width).toBeCloseTo(8, 1);
+  });
+
+  it("builds an explicitly selected fine-pitch thread", async () => {
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [{ kind: "thread", size: "M8x1", length: 8, name: "Fine bolt" }] }),
+    });
+    expect(created.status).toBe(201);
+    const [shape] = created.body.shapes as Array<Record<string, any>>;
+    expect(shape.name).toBe("Fine bolt");
+    expect(shape.revolve.pitch).toBe(1);
   });
 
   it("keeps the kind-specific fields on the shape list, not just on the reply", async () => {

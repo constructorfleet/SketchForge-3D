@@ -10542,7 +10542,7 @@ function SecondaryToolbar({
                   <div className="thread-catalog-help">
                     {t(threadAsHole ? "editor.toolbar.threadHoleHint" : "editor.toolbar.threadSolidHint")}
                   </div>
-                  {(["metric", "unified"] as const).map((series) => (
+                  {(["metric", "metric-fine", "unified", "unified-fine"] as const).map((series) => (
                     <div className="thread-catalog-series" key={series}>
                       <div className="thread-catalog-series-title">{t(`editor.toolbar.threadSeries.${series}`)}</div>
                       <div className="thread-catalog-sizes">
@@ -10551,7 +10551,7 @@ function SecondaryToolbar({
                             key={size.designation}
                             type="button"
                             role="menuitem"
-                            title={t("editor.toolbar.threadSizeHint", { pitch: size.pitch })}
+                            title={t("editor.toolbar.threadSizeHint", { pitch: Number(size.pitch.toFixed(4)) })}
                             onClick={() => {
                               setThreadCatalogOpen(false);
                               setShapesOpen(false);
@@ -10559,7 +10559,7 @@ function SecondaryToolbar({
                             }}
                           >
                             <strong>{size.designation}</strong>
-                            <small>{t("editor.toolbar.threadPitch", { pitch: size.pitch })}</small>
+                            <small>{t("editor.toolbar.threadPitch", { pitch: Number(size.pitch.toFixed(4)) })}</small>
                           </button>
                         ))}
                       </div>

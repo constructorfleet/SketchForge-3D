@@ -198,7 +198,7 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | `turns` | How many full turns to sweep (0.1–20). |
 | `startAngle` | Rotation the sweep starts at. |
 | `sweepAngle` | How far round to revolve when there is no pitch (±360). |
-| `size` | `thread` only: a catalog designation that carries its own pitch. Metric coarse `M2`–`M20`, imperial UNC `#4-40`–`1/2-13`. Default `M8`. An unknown size is refused with the list of known ones. |
+| `size` | `thread` only: a catalog designation that carries its own pitch. Includes ISO metric coarse sizes, selected ISO metric fine sizes (such as `M8x1`, `M10x1.25`), Unified UNC sizes, and selected UNF sizes (such as `1/4-28 UNF`). Coarse defaults are unchanged; default `M8`. An unknown size is refused with the list of known ones. |
 | `diameter` | `thread` only: outside diameter, for a size the catalog does not list. With `pitch`, it gives the ISO 60-degree profile. |
 | `length` | `thread` only: how long the thread should be, instead of counting turns. |
 | `hole` | `thread` only: cut the form wider by a clearance so a bolt of that size fits, and mark the shape as a hole -- so grouping it with a solid taps that solid. |
@@ -206,6 +206,8 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | `core` | `thread` only: `false` leaves the bare helix with no shank or drilled hole. On by default, because a thread without its core is a floating ribbon rather than a bolt or a tapped hole. |
 
 A thread comes with its core: a bolt is the thread standing on its shank, and a tapped hole is the thread plus the hole it is cut into, so neither is useful as a bare helix. The core's radius is the thread's root, is fused into one solid, and appears as **Core radius** in the object panel -- set it to 0 there, or pass `core: false`, for the ribbon on its own (a spring, say).
+
+Catalog pitches and nominal diameters reference ISO 261 / ISO 262 for metric threads and ASME B1.1 for Unified threads. UNF pitches in millimetres are calculated from the standard threads-per-inch values using 25.4 mm per inch. The generated geometry is a simplified nominal 60-degree model; it does not encode thread classes, tolerance limits, or gaging dimensions and is not a manufacturing acceptance model. See [ISO 261](https://www.iso.org/standard/4165.html), [ISO 262:2023](https://www.iso.org/standard/85105.html), [ASME B1.1](https://www.asme.org/codes-standards/find-codes-standards/b1-1-unified-inch-screw-threads-un-unr-thread-form), and the [NIST federal screw-thread standards handbook](https://nvlpubs.nist.gov/nistpubs/Legacy/hb/nbshandbook28supp1963.pdf).
 
 A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable afterwards** -- in the editor's inspector, and over this API: a thread reads back with its sweep under `revolve`, and a `PATCH` changing the pitch sweeps it again.
 

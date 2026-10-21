@@ -611,10 +611,12 @@
       "threadSolidHint": "A threaded rod at the size's own diameter.",
       "threadHoleHint": "Cut 0.2 mm wider so a bolt of that size fits. Group it with a solid to tap the hole.",
       "threadPitch": "{pitch} mm",
-      "threadSizeHint": "Coarse pitch {pitch} mm",
+      "threadSizeHint": "Pitch {pitch} mm",
       "threadSeries": {
         "metric": "Metric (ISO coarse)",
-        "unified": "Imperial (UNC)"
+        "metric-fine": "Metric (ISO fine)",
+        "unified": "Imperial (UNC)",
+        "unified-fine": "Imperial (UNF)"
       },
       "pattern": "Repeat",
       "patternHint": "Repeat the selection in a row or around a ring",
