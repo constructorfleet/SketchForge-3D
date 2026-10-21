@@ -1,6 +1,6 @@
 # Documentation suite specification
 
-**Status:** Phase 1 site shell and guardrails implemented; generated references remain planned
+**Status:** Phase 1 site shell implemented; initial Phase 2 package references and examples implemented; remaining acceptance criteria are in progress
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
@@ -228,9 +228,9 @@ the final acceptance criteria. Those are explicitly deferred to later phases.
 
 ### Phase 2: generate package and example documentation
 
-- Build TypeScript and engine declaration references from the package build.
-- Generate Python references from public exports and annotations/docstrings.
-- Convert current client examples into source includes and run them in CI.
+- **Initial slice implemented:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
+- This slice does not yet add a Python static type checker or symbol-level source links for every generated item. Those remain Phase 2 work.
+- Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
 - Reuse package README content for package registries and the site from a shared source or generated subset.
 
 ### Phase 3: make the REST reference authoritative
@@ -243,6 +243,7 @@ the final acceptance criteria. Those are explicitly deferred to later phases.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
+- **Initial slices implemented:** Parameterized shape requests are generated from the engine request registry and checked for drift. `docs/CLI_REFERENCE.md` is generated from published package entry points and actual CLI usage/help output, and is included by the docs-site build and reference navigation. Remaining: project-format inventory, supported operator configuration, MCP tool schemas, and broader workflow guides.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.

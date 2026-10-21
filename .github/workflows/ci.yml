@@ -6,6 +6,95 @@ on:
   pull_request:
 
 jobs:
+  package-reference:
+    name: Package reference generation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build public packages
+        run: npm run engine:build && npm run client:build
+
+      - name: Generate package references
+        run: node scripts/docs/generate-package-references.mjs
+
+      - name: Check generated references are current
+        run: git diff --exit-code -- docs/reference
+
+  package-examples:
+    name: Package examples against local API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SKETCHFORGE_API_TOKEN: docs-example-token
+      SKETCHFORGE_PROJECTS_DIR: /tmp/sketchforge-doc-example-projects
+      SKETCHFORGE_URL: http://127.0.0.1:3100
+      PORT: 3100
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build public engine package
+        run: npm run engine:build
+
+      - name: Start local server
+        run: |
+          mkdir -p "$SKETCHFORGE_PROJECTS_DIR"
+          npx next dev apps/web -p "$PORT" > "$RUNNER_TEMP/sketchforge-doc-example-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/sketchforge-doc-example-server.pid"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent -H "Authorization: Bearer $SKETCHFORGE_API_TOKEN" "$SKETCHFORGE_URL/api/v1/projects" >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/sketchforge-doc-example-server.log"
+          exit 1
+
+      - name: Run TypeScript package examples
+        run: npm run test:integration
+
+      - name: Run Python package examples
+        run: npm run client:test:py:integration
+
+      - name: Stop local server
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/sketchforge-doc-example-server.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/sketchforge-doc-example-server.pid")" || true
+          fi
+
   checks:
     name: Typecheck and unit tests
     runs-on: ubuntu-latest
