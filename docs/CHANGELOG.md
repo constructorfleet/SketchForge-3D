@@ -23,8 +23,11 @@
 - Merged PR #122 added the generated MCP tool schema reference and navigation.
   PR #126 added version, revision, and pinned source links to the generated site.
 
-- Open documentation PRs: #119 clarifies STEP color fallback and #128 wires
-  every deterministic generated reference into `docs:generate` and `docs:check`.
+- Merged PR #128 wired deterministic package, shape, CLI, operator-config,
+  `.skf`, and MCP references into `docs:generate` and drift checks into
+  `docs:check`.
+
+- Open documentation PR: #119 clarifies STEP color fallback.
 
 - Merged PR #117 added a generated reference for published TypeScript and
   Python CLI commands, including options from their actual help/parser sources.
