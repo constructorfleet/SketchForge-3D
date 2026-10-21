@@ -179,7 +179,7 @@ next one runs.
 
 ```mermaid
 graph TD;
-  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>copy docs into .docs-site"];
+  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>stage docs and generate package refs"];
   B --> C["vitepress build<br/>docs-site-dist"];
   C --> D["site-build tests<br/>provenance, accessibility, search"];
   D --> E["GitHub Pages deploy<br/>main only"];
@@ -190,13 +190,13 @@ graph TD;
 Expose stable repository scripts, independent of the chosen site generator:
 
 ```text
-npm run docs:generate   # build generated references and include executable examples
-npm run docs:check      # links, source directives, schema parity, API coverage, and generated diff checks
+npm run docs:generate   # stage docs, generate package refs into .docs-site, and include executable examples
+npm run docs:check      # links, source directives, schema parity, API coverage, and maintained generated diff checks
 npm run docs:build      # produce the static Pages artifact
 npm run docs:preview    # serve the artifact locally under the project-site base path
 ```
 
-The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. Generated files should either live only in the build directory or be checked in only when the repository already requires generated artifacts; the policy must be consistent and documented.
+The build must be deterministic: two clean builds from the same commit and dependency lockfile produce equivalent output. TypeScript and Python package references are generated into `.docs-site/docs/reference/` after canonical Markdown is staged, so current declarations and package docs are included in the Pages artifact without committing generated reference diffs. The source copies under `docs/reference/` remain useful compatibility pages on GitHub; the generated staged copies are authoritative for the built site. Other generated references remain checked against their committed sources where the repository maintains them.
 
 ### Pull request checks
 
@@ -264,7 +264,7 @@ its Ubuntu system dependencies before running the build.
 
 ### Phase 2: generate package and example documentation
 
-- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Generated pages live under `docs/reference/`, are built by `docs:generate`, and are linked from the docs site's reference navigation. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
+- **Merged PR #118:** `scripts/docs/generate-package-references.mjs` builds deterministic Markdown references from the built TypeScript client and engine declaration entry points; `scripts/docs/generate-python-reference.py` lists the Python package's `__all__` exports with available signatures and summaries. Current package references are generated into `.docs-site/docs/reference/` for the Pages artifact and linked from the docs site's reference navigation; the tracked source copies remain as compatibility pages for repository browsers. The three `docs/packages/*.md` pages recursively include the registry-facing package READMEs as their canonical prose source. `docs/guides/package-examples.md` includes the six existing client and Python macro example files directly. The TypeScript and Python integration suites exercise those same files against a local server; dedicated CI jobs generate references and execute the examples.
 - **Merged PR #136:** adds Python static type checking and symbol-level source links. PR #137 adds the complete REST measurement listing contract, #139 adds API reference source links, and #140 adds face-based drafting documentation.
 - **Merged PR #145:** adds stable face IDs, face-color fields, and a source-backed example to the Python client. Package example CI verifies it against the local API.
 - Build TypeScript and engine declaration references from the package build; generate Python references from public exports and annotations/docstrings; convert examples into source includes and execute them in CI.
