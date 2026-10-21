@@ -1,5 +1,6 @@
 /** Bounded product-tree metadata recovered from an XCAF GLB and STEP labels. */
-import { readGlbSceneDocument } from "./stepGlbDocument.js";
+import * as THREE from "three";
+import { readGlbScene, readGlbSceneDocument, type GlbSceneDocument } from "./stepGlbDocument.js";
 
 export type StepAssemblyNode = { id?: string; name: string; children: StepAssemblyNode[] };
 
@@ -63,7 +64,7 @@ function stepString(value: string | undefined) {
   return match?.[1]?.replaceAll("''", "'").trim() ?? "";
 }
 
-function componentNamesByOccurrence(step: string) {
+export function stepComponentNamesByOccurrence(step: string) {
   const records = entities(step);
   const productNameById = new Map<number, string>();
   const productByFormationId = new Map<number, string>();
@@ -114,7 +115,7 @@ export function stepAssemblyHierarchyFromGlb(glb: Uint8Array, step: string): Ste
   const document = readGlbSceneDocument(glb);
   const nodes = document?.nodes;
   if (!nodes?.length || nodes.length > MAX_HIERARCHY_NODES) return undefined;
-  const namesByOccurrence = componentNamesByOccurrence(step);
+  const namesByOccurrence = stepComponentNamesByOccurrence(step);
   if (!namesByOccurrence.size) return undefined;
 
   const sceneNodes = document?.scenes?.[document.scene ?? 0]?.nodes;
@@ -158,4 +159,94 @@ export function stepAssemblyHierarchyFromGlb(glb: Uint8Array, step: string): Ste
     result = result[0]!.children;
   }
   return result.some((root) => root.children.length > 0) ? result : undefined;
+}
+
+export type StepOccurrenceGeometry = {
+  occurrenceId: string;
+  name: string;
+  bounds: { xmin: number; ymin: number; zmin: number; xmax: number; ymax: number; zmax: number };
+};
+
+function nodeTransform(node: NonNullable<GlbSceneDocument["nodes"]>[number]) {
+  if (node.matrix?.length === 16) return new THREE.Matrix4().fromArray(node.matrix);
+  const translation = node.translation ?? [0, 0, 0];
+  const rotation = node.rotation ?? [0, 0, 0, 1];
+  const scale = node.scale ?? [1, 1, 1];
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(translation[0] ?? 0, translation[1] ?? 0, translation[2] ?? 0),
+    new THREE.Quaternion(rotation[0] ?? 0, rotation[1] ?? 0, rotation[2] ?? 0, rotation[3] ?? 1),
+    new THREE.Vector3(scale[0] ?? 1, scale[1] ?? 1, scale[2] ?? 1),
+  );
+}
+
+function meshBounds(document: NonNullable<ReturnType<typeof readGlbSceneDocument>>, meshIndex: number) {
+  const mesh = document.meshes?.[meshIndex];
+  const minimum = [Infinity, Infinity, Infinity];
+  const maximum = [-Infinity, -Infinity, -Infinity];
+  let found = false;
+  for (const primitive of mesh?.primitives ?? []) {
+    const positionIndex = primitive.attributes?.POSITION;
+    const accessor = typeof positionIndex === "number" ? document.accessors?.[positionIndex] : undefined;
+    if (accessor?.type !== "VEC3" || accessor.min?.length !== 3 || accessor.max?.length !== 3
+      || !accessor.min.every(Number.isFinite) || !accessor.max.every(Number.isFinite)) continue;
+    found = true;
+    for (let axis = 0; axis < 3; axis += 1) {
+      minimum[axis] = Math.min(minimum[axis]!, accessor.min[axis]!);
+      maximum[axis] = Math.max(maximum[axis]!, accessor.max[axis]!);
+    }
+  }
+  return found ? { minimum, maximum } : undefined;
+}
+
+function transformedBounds(bounds: { minimum: number[]; maximum: number[] }, transform: THREE.Matrix4) {
+  const result = { xmin: Infinity, ymin: Infinity, zmin: Infinity, xmax: -Infinity, ymax: -Infinity, zmax: -Infinity };
+  for (const x of [bounds.minimum[0]!, bounds.maximum[0]!]) {
+    for (const y of [bounds.minimum[1]!, bounds.maximum[1]!]) {
+      for (const z of [bounds.minimum[2]!, bounds.maximum[2]!]) {
+        const point = new THREE.Vector3(x, y, z).applyMatrix4(transform).multiplyScalar(1_000);
+        result.xmin = Math.min(result.xmin, point.x);
+        result.ymin = Math.min(result.ymin, point.y);
+        result.zmin = Math.min(result.zmin, point.z);
+        result.xmax = Math.max(result.xmax, point.x);
+        result.ymax = Math.max(result.ymax, point.y);
+        result.zmax = Math.max(result.zmax, point.z);
+      }
+    }
+  }
+  return result;
+}
+
+/** Map bounded GLB mesh extents to the closest named source occurrence. */
+export function stepOccurrenceGeometryFromGlb(glb: Uint8Array, step: string): StepOccurrenceGeometry[] {
+  const document = readGlbScene(glb)?.document;
+  const nodes = document?.nodes;
+  if (!document || !nodes?.length || nodes.length > MAX_HIERARCHY_NODES) return [];
+  const namesByOccurrence = stepComponentNamesByOccurrence(step);
+  if (!namesByOccurrence.size) return [];
+  const hasChild = new Set(nodes.flatMap((node) => node.children ?? []));
+  const roots = document.scenes?.[document.scene ?? 0]?.nodes?.length
+    ? document.scenes[document.scene ?? 0]!.nodes!
+    : nodes.flatMap((_, index) => hasChild.has(index) ? [] : [index]);
+  const result: StepOccurrenceGeometry[] = [];
+  let visited = 0;
+  const visit = (index: number, parent: THREE.Matrix4, parentOccurrence?: string, depth = 0, path = new Set<number>()) => {
+    if (depth > MAX_HIERARCHY_DEPTH || index < 0 || index >= nodes.length || path.has(index)) return;
+    visited += 1;
+    if (visited > MAX_HIERARCHY_NODES) return;
+    const node = nodes[index]!;
+    const world = parent.clone().multiply(nodeTransform(node));
+    const rawName = node.name?.trim() ?? "";
+    // Mesh nodes are geometry leaves and may coincidentally reuse a STEP
+    // relationship number. Only non-mesh nodes represent occurrences.
+    const occurrence = typeof node.mesh !== "number" && namesByOccurrence.has(rawName) ? rawName : parentOccurrence;
+    if (typeof node.mesh === "number" && occurrence) {
+      const bounds = meshBounds(document, node.mesh);
+      const name = namesByOccurrence.get(occurrence);
+      if (bounds && name) result.push({ occurrenceId: `step-occurrence:${occurrence}`, name, bounds: transformedBounds(bounds, world) });
+    }
+    const nextPath = new Set(path).add(index);
+    for (const child of node.children ?? []) visit(child, world, occurrence, depth + 1, nextPath);
+  };
+  for (const root of roots) visit(root, new THREE.Matrix4(), undefined);
+  return result;
 }

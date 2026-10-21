@@ -4,6 +4,7 @@ import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
 import { explodeStepAssembly } from "@constructorfleet/sketchforge-engine/serverStepExplode";
+import { restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 import { shapeProperties } from "@constructorfleet/sketchforge-engine/serverCadProperties";
 import { createEngine, type EngineResult } from "@constructorfleet/sketchforge-engine";
 import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforge-engine/projectStore";
@@ -12,22 +13,36 @@ import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engi
 import type { ProjectAsset } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
-  it("omits ancestry when STEP label data cannot identify a solid's leaf occurrence", async () => {
+  it("rebuilds a real STEP product tree as editable nested project groups", async () => {
     const step = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
     const bytes = new TextEncoder().encode(step);
     const source: ProjectAsset = { id: "source", name: "nested-assembly.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
     const imported = await importedShapeFromStepOnKernel(source.name, step);
     imported.shape.importedMesh!.assetId = source.id;
 
-    const parts = await explodeStepAssembly(imported.shape, source);
+    const result = await explodeStepAssembly(imported.shape, source);
 
-    expect(parts).toHaveLength(3);
-    expect(parts.every((part) => part.stepComponent === undefined)).toBe(true);
-    expect(new Set(parts.map((part) => part.x)).size).toBeGreaterThan(1);
-    expect(parts.every((part) => part.importedMesh?.positions.length && part.importedMesh.brepStep)).toBe(true);
+    expect(imported.shape.stepAssembly?.[0]?.name).toBe("MainAssembly");
+    expect(result).toHaveLength(1);
+    const root = result[0]!;
+    expect(root.name).toBe("MainAssembly");
+    expect(root.groupedShapes?.map((part) => part.name)).toEqual(["Frame", "Sensors"]);
+    const sensors = root.groupedShapes?.find((part) => part.name === "Sensors");
+    expect(sensors?.groupedShapes?.map((part) => part.name)).toEqual(["SensorLeft", "SensorRight"]);
+
+    const leaves = [root.groupedShapes?.[0], ...sensors?.groupedShapes ?? []].filter((part) => part && !part.groupedShapes?.length);
+    expect(leaves).toHaveLength(3);
+    expect(leaves.every((part) => part!.importedMesh?.positions.length && part!.importedMesh.brepStep)).toBe(true);
+    expect(leaves.every((part) => part!.stepComponent?.path.length === 2 || part!.stepComponent?.path.length === 3)).toBe(true);
+    expect(leaves.map((part) => part!.stepComponent?.path.at(-1)?.name).sort()).toEqual(["Frame", "SensorLeft", "SensorRight"]);
+
+    const flat = await explodeStepAssembly({ ...imported.shape, stepAssembly: undefined }, source);
+    const restored = restoreGroupedChildren(root).flatMap((part) => part.groupedShapes?.length ? restoreGroupedChildren(part) : [part]);
+    expect(restored.map(({ name, x, z, elevation }) => ({ name, x, z, elevation })).sort((a, b) => a.name.localeCompare(b.name)))
+      .toEqual(flat.map(({ name, x, z, elevation }) => ({ name, x, z, elevation })).sort((a, b) => a.name.localeCompare(b.name)));
   });
 
-  it("never assigns ancestry by matching list lengths when stored order differs", async () => {
+  it("uses stable occurrence ids when stored tree order differs", async () => {
     const step = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
     const bytes = new TextEncoder().encode(step);
     const source: ProjectAsset = { id: "source", name: "nested-assembly.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
@@ -41,9 +56,26 @@ describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     sensors!.children.reverse();
 
     const parts = await explodeStepAssembly(imported.shape, source);
+    expect(parts).toHaveLength(1);
+    const restored = restoreGroupedChildren(parts[0]!).flatMap((part) => part.groupedShapes?.length ? restoreGroupedChildren(part) : [part]);
+    expect(restored.map((part) => [part.name, part.stepComponent?.path.at(-1)?.name]).sort())
+      .toEqual([["Frame", "Frame"], ["SensorLeft", "SensorLeft"], ["SensorRight", "SensorRight"]]);
+    expect(restored.every((part) => part.importedMesh?.positions.length && part.importedMesh.brepStep)).toBe(true);
+  });
+
+  it("falls back to flat solids when an occurrence cannot be matched to the stored source tree", async () => {
+    const step = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
+    const bytes = new TextEncoder().encode(step);
+    const source: ProjectAsset = { id: "source", name: "nested-assembly.step", mediaType: "model/step", sourceFormat: "step", bytes, byteLength: bytes.byteLength, sha256: "test" };
+    const imported = await importedShapeFromStepOnKernel(source.name, step);
+    imported.shape.importedMesh!.assetId = source.id;
+    imported.shape.stepAssembly![0]!.children[0]!.id = "step-occurrence:missing";
+
+    const parts = await explodeStepAssembly(imported.shape, source);
+
     expect(parts).toHaveLength(3);
-    expect(parts.every((part) => part.stepComponent === undefined)).toBe(true);
     expect(parts.every((part) => part.importedMesh?.positions.length && part.importedMesh.brepStep)).toBe(true);
+    expect(parts.every((part) => !part.groupedShapes?.length)).toBe(true);
   });
 
   it("preserves STEP product names when exploding a multi-product STEP file", async () => {

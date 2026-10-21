@@ -1,9 +1,9 @@
 /** Component labels and colors shared by regular STEP import and assembly explosion. */
 import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
 import { componentColorsFromGlb } from "./stepGlbColors.js";
-import { stepAssemblyHierarchyFromGlb, type StepAssemblyNode } from "./stepAssemblyHierarchy.js";
+import { stepAssemblyHierarchyFromGlb, stepOccurrenceGeometryFromGlb, type StepAssemblyNode } from "./stepAssemblyHierarchy.js";
 
-export type StepComponentMetadata = { name?: string; color?: string };
+export type StepComponentMetadata = { name?: string; occurrenceId?: string; color?: string };
 export type StepComponentMetadataResult = {
   bySolid: Map<string, StepComponentMetadata[]>;
   assembly?: StepAssemblyNode[];
@@ -25,12 +25,21 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
   const metadataBySolid = new Map<string, StepComponentMetadata[]>();
   const document = cad.importXCAFFromSTEP(step);
   let assembly: StepAssemblyNode[] | undefined;
+  const occurrenceGeometry = new Map<string, ReturnType<typeof stepOccurrenceGeometryFromGlb>[number][]>();
   try {
     let colorsByName = new Map<string, { count: number; color?: string }>();
     try {
       const glb = document.exportGLTF();
       colorsByName = componentColorsFromGlb(glb);
       assembly = stepAssemblyHierarchyFromGlb(glb, step);
+      for (const occurrence of stepOccurrenceGeometryFromGlb(glb, step)) {
+        const key = [occurrence.bounds.xmin, occurrence.bounds.ymin, occurrence.bounds.zmin,
+          occurrence.bounds.xmax, occurrence.bounds.ymax, occurrence.bounds.zmax]
+          .map((value) => value.toFixed(2)).join(":");
+        const matches = occurrenceGeometry.get(key) ?? [];
+        matches.push(occurrence);
+        occurrenceGeometry.set(key, matches);
+      }
     } catch {
       // XCAF label data remains usable when the optional color view cannot be exported.
     }
@@ -74,6 +83,30 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
         });
         metadataBySolid.set(key, metadata);
       }
+    }
+
+    // Some OCCT builds flatten XCAF leaf labels to the assembly root. Recover
+    // product identity only when GLB world-space bounds uniquely identify one
+    // source solid and one occurrence. Ambiguous coincident geometry stays flat.
+    const solids = cad.getSubShapes(cad.importStep(step), "solid");
+    const solidByBounds = new Map<string, ShapeHandle[]>();
+    const boundsKey = (bounds: ReturnType<OcctKernel["getBoundingBox"]>) =>
+      [bounds.xmin, bounds.ymin, bounds.zmin, bounds.xmax, bounds.ymax, bounds.zmax]
+        .map((value) => value.toFixed(2)).join(":");
+    for (const solid of solids) {
+      const key = boundsKey(cad.getBoundingBox(solid, false));
+      const matches = solidByBounds.get(key) ?? [];
+      matches.push(solid);
+      solidByBounds.set(key, matches);
+    }
+    for (const [key, candidates] of occurrenceGeometry) {
+      const solidsAtBounds = solidByBounds.get(key);
+      if (candidates.length !== 1 || solidsAtBounds?.length !== 1) continue;
+      const solid = solidsAtBounds[0]!;
+      const solidKey = stepShapeKey(cad, solid);
+      const existing = metadataBySolid.get(solidKey) ?? [];
+      const color = existing.length === 1 ? existing[0]?.color : undefined;
+      metadataBySolid.set(solidKey, [{ name: candidates[0]!.name, occurrenceId: candidates[0]!.occurrenceId, ...(color ? { color } : {}) }]);
     }
   } finally {
     document.close();

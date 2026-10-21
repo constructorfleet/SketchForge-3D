@@ -5,6 +5,7 @@ import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
 import { stepComponentMetadata, stepShapeKey } from "./stepComponentMetadata.js";
 import { withCadKernel } from "./serverCadKernel.js";
+import { groupedShapeFromSelection } from "./serverShapeGroups.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import type { ProjectAsset, StepAssemblyNode, StepAssemblyPathNode, WorkplaneShape } from "./domain/sketchforge.js";
 import { meshYawDegrees } from "./workplaneShapes.js";
@@ -27,6 +28,51 @@ function leafPaths(nodes: StepAssemblyNode[], parentPath: StepAssemblyPathNode[]
 function uniqueNamedPath(paths: StepAssemblyPathNode[][], name: string) {
   const matches = paths.filter((path) => path.at(-1)?.name === name);
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+function groupExplodedHierarchy(parts: WorkplaneShape[], roots: StepAssemblyNode[]) {
+  const partsByOccurrence = new Map<string, WorkplaneShape[]>();
+  for (const part of parts) {
+    const occurrenceId = part.stepComponent?.occurrenceId;
+    if (!occurrenceId) return parts;
+    const matches = partsByOccurrence.get(occurrenceId) ?? [];
+    matches.push(part);
+    partsByOccurrence.set(occurrenceId, matches);
+  }
+
+  const consumed = new Set<WorkplaneShape>();
+  let complete = true;
+  const namedGroup = (name: string, children: WorkplaneShape[]) => {
+    const group = groupedShapeFromSelection(children, { allowSingle: true, name });
+    if (!group) {
+      complete = false;
+      return children;
+    }
+    return [group];
+  };
+  const visit = (node: StepAssemblyNode): WorkplaneShape[] => {
+    if (!node.children.length) {
+      if (!node.id) {
+        complete = false;
+        return [];
+      }
+      const matches = partsByOccurrence.get(node.id);
+      if (!matches?.length) {
+        complete = false;
+        return [];
+      }
+      matches.forEach((part) => consumed.add(part));
+      return matches.length > 1 ? namedGroup(node.name, matches) : matches;
+    }
+    const children = node.children.flatMap(visit);
+    if (!children.length) return [];
+    return namedGroup(node.name, children);
+  };
+
+  const grouped = roots.flatMap(visit);
+  // Keep the proven flat behavior when even one source solid cannot be
+  // associated to a product occurrence. A partial tree would hide geometry.
+  return complete && consumed.size === parts.length && grouped.length ? grouped : parts;
 }
 
 /** Turn a STEP-imported mesh shape into one exact mesh/B-rep-backed shape per solid. */
@@ -61,16 +107,19 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     const paths = leafPaths(shape.stepAssembly ?? []);
     const occurrencePartIndexes = new Map<string, number>();
 
-    return solids.map((solid, index) => {
+    const parts = solids.map((solid, index) => {
       const candidates = componentMetadata.bySolid.get(stepShapeKey(cad, solid)) ?? [];
       const firstCandidate = candidates[0];
       const metadata = firstCandidate ? {
         ...(candidates.length === 1 && firstCandidate.name ? { name: firstCandidate.name } : {}),
+        ...(candidates.length === 1 && firstCandidate.occurrenceId ? { occurrenceId: firstCandidate.occurrenceId } : {}),
         ...(candidates.every((candidate) => candidate.color === firstCandidate.color) && firstCandidate.color
           ? { color: firstCandidate.color }
           : {}),
       } : undefined;
-      const path = metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined;
+      const path = metadata?.occurrenceId
+        ? paths.find((candidate) => candidate.at(-1)?.id === metadata.occurrenceId)
+        : metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined;
       const occurrenceId = path?.at(-1)?.id;
       const occurrencePartIndex = occurrenceId ? (occurrencePartIndexes.get(occurrenceId) ?? 0) : 0;
       if (occurrenceId) occurrencePartIndexes.set(occurrenceId, occurrencePartIndex + 1);
@@ -117,5 +166,6 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
       }
       return child;
     });
+    return groupExplodedHierarchy(parts, shape.stepAssembly ?? []);
   });
 }
