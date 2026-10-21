@@ -245,6 +245,8 @@ export type WorkplaneShape = {
    * A value this build does not recognise is kept as-is rather than coerced.
    */
   material?: string;
+  /** General surface appearance for viewport rendering; separate from print material estimates. */
+  appearance?: ShapeAppearance;
   hole?: boolean;
   x: number;
   z: number;
@@ -333,4 +335,16 @@ export type WorkplaneShape = {
   groupOperation?: "group" | "intersection";
   locked?: boolean;
   hidden?: boolean;
+};
+
+/** Persisted per-shape surface appearance. Values are normalized to [0, 1] by the renderer. */
+export type ShapeAppearance = {
+  /** Reusable built-in starting point such as wood, fabric, ceramic, or metal. */
+  presetId?: string;
+  /** Optional color override. When absent, a preset color or legacy shape.color is used. */
+  baseColor?: string;
+  roughness?: number;
+  metalness?: number;
+  /** Three.js physical-material sheen intensity, useful for fabric-like surfaces. */
+  sheen?: number;
 };

@@ -25,6 +25,7 @@ import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/camer
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
 import { createLoftGeometry } from "@/lib/loftGeometry";
+import { resolveShapeAppearance } from "@/lib/shapeAppearance";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { createMoveDimensionOverlay, type MoveDimensionAxis, type MoveDimensionOverlayData } from "@/lib/moveDimensionLines";
 import {
@@ -149,7 +150,7 @@ const MAX_SHARED_SHAPE_GEOMETRIES = 192;
 const MAX_SHARED_SHAPE_MATERIALS = 128;
 const sharedShapeGeometryCache = new Map<string, { geometry: THREE.BufferGeometry; users: number }>();
 const sharedEdgesGeometryCache = new WeakMap<THREE.BufferGeometry, Map<number, THREE.EdgesGeometry>>();
-const sharedShapeMaterialCache = new Map<string, { material: THREE.MeshStandardMaterial; users: number }>();
+const sharedShapeMaterialCache = new Map<string, { material: THREE.MeshPhysicalMaterial; users: number }>();
 const sharedLineMaterialCache = new Map<string, THREE.LineBasicMaterial>();
 const shapeResourceIds = new WeakMap<object, number>();
 let nextShapeResourceId = 1;
@@ -961,8 +962,12 @@ function shapeTransformSignature(shape: WorkplaneShape) {
 }
 
 function shapeMaterialSignature(shape: WorkplaneShape): string {
+  const appearance = resolveShapeAppearance(shape);
   return JSON.stringify({
-    color: shape.color,
+    color: appearance.baseColor,
+    roughness: appearance.roughness,
+    metalness: appearance.metalness,
+    sheen: appearance.sheen,
     hole: Boolean(shape.hole),
     imagePlate: shapeResourceId(shape.imagePlate),
     imageData: shape.imagePlate?.dataUrl ?? "",
@@ -7839,11 +7844,18 @@ function releaseSharedShapeGeometry(mesh: THREE.Mesh | THREE.LineSegments) {
 }
 
 function sharedShapeMaterial(shape: WorkplaneShape) {
+  const appearance = resolveShapeAppearance(shape);
+  const color = shape.hole ? "#b7c0c9" : appearance.baseColor;
+  const roughness = shape.hole ? 0.88 : appearance.roughness;
+  const metalness = shape.hole ? 0.02 : appearance.metalness;
+  const sheen = shape.hole ? 0 : appearance.sheen;
   const key = JSON.stringify({
-    color: shape.hole ? "#b7c0c9" : shape.color,
+    color,
     transparent: Boolean(shape.hole),
     opacity: shape.hole ? (shape.importedMesh ? 0.34 : 0.52) : 1,
-    roughness: shape.hole ? 0.88 : 0.57,
+    roughness,
+    metalness,
+    sheen,
     side: "double",
   });
   const cached = sharedShapeMaterialCache.get(key);
@@ -7852,12 +7864,15 @@ function sharedShapeMaterial(shape: WorkplaneShape) {
     sharedShapeMaterialCache.set(key, cached);
     return cached.material;
   }
-  const material = new THREE.MeshStandardMaterial({
-    color: shape.hole ? "#b7c0c9" : shape.color,
+  const material = new THREE.MeshPhysicalMaterial({
+    color,
     transparent: Boolean(shape.hole),
     opacity: shape.hole ? (shape.importedMesh ? 0.34 : 0.52) : 1,
-    roughness: shape.hole ? 0.88 : 0.57,
-    metalness: 0.02,
+    roughness,
+    metalness,
+    sheen,
+    sheenColor: color,
+    sheenRoughness: roughness,
     side: THREE.DoubleSide,
   });
   material.userData.cached = true;
@@ -8287,7 +8302,7 @@ function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared:
   if ((group.userData.showEdges || complexEdges) && !skipHeavyImportedEdges) {
     const selectedOutline = Boolean(group.userData.showEdges);
     const selectedRoundedBox = selectedOutline && shape.kind === "box" && Boolean(shape.radius && shape.radius > 0);
-    const edgeColor = selectedOutline ? "#00aeea" : shape.hole ? "#697989" : complexEdges ? "#141b21" : darkenHex(shape.color, 0.34);
+    const edgeColor = selectedOutline ? "#00aeea" : shape.hole ? "#697989" : complexEdges ? "#141b21" : darkenHex(resolveShapeAppearance(shape).baseColor, 0.34);
     const edgeOpacity = selectedRoundedBox ? 0 : selectedOutline ? 0.98 : shape.hole ? 0.44 : complexEdges ? 0.38 : shape.kind === "text" ? 0.86 : 0.2;
     if (selectedOutline && shape.importedMesh && shape.cadDisplayEdgesVersion === 2 && Boolean(shape.cadDisplayEdges?.length)) {
       addCadDisplayEdges(group, shape, edgeColor, edgeOpacity);

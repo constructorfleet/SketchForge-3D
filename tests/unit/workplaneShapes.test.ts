@@ -57,6 +57,14 @@ describe("workplane shape helpers", () => {
     expect(cleanRotationDegrees(12.34)).toBe(12.3);
   });
 
+  it("treats appearance changes as shape changes", () => {
+    const wood = shape({ appearance: { presetId: "wood", roughness: 0.78 } });
+    const ceramic = shape({ appearance: { presetId: "ceramic", roughness: 0.22 } });
+
+    expect(workplaneShapesEqual(wood, { ...wood, appearance: { ...wood.appearance } })).toBe(true);
+    expect(workplaneShapesEqual(wood, ceramic)).toBe(false);
+  });
+
   it("preserves the meaningful yaw of low-sided circular primitives", () => {
     const triangularPrism = shape({ kind: "cylinder", width: 10, depth: 10, sides: 3 });
 

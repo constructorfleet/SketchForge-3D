@@ -14,8 +14,9 @@ import {
   shapeMaterialEstimate,
   type MaterialId,
 } from "@/lib/materialPresets";
-import { unitLabel, useTranslations } from "@/i18n";
+import { unitLabel, useTranslations, type MessageKey } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
+import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -68,6 +69,13 @@ const SOLID_COLORS = [
   "#4b5563",
   "#111111",
 ];
+const APPEARANCE_PRESET_LABELS: Record<string, MessageKey> = {
+  painted: "panels.appearance.presets.painted",
+  wood: "panels.appearance.presets.wood",
+  fabric: "panels.appearance.presets.fabric",
+  ceramic: "panels.appearance.presets.ceramic",
+  metal: "panels.appearance.presets.metal",
+};
 
 function formatPropertyNumber(value: number, accuracy: MeasurementAccuracy, step: number) {
   if (step >= 1) return String(Math.round(value));
@@ -119,6 +127,7 @@ export function ShapeInspector({
 }) {
   const t = useTranslations();
   const solidColor = shape.color;
+  const surfaceAppearance = resolveShapeAppearance(shape);
   const locked = Boolean(shape.locked);
   const properties = getShapeProperties(shape, onUpdate, workspace);
   const gearType = shape.kind === "gear" ? normalizeGearType(shape.gearType) : null;
@@ -162,7 +171,7 @@ export function ShapeInspector({
     // every movement in the picker. Commit only the native change event, which
     // fires after the user finishes choosing, so dragging stays responsive.
     const commitCustomColor = () => {
-      onUpdate({ color: input.value, hole: false });
+      onUpdate({ color: input.value, appearance: { ...shape.appearance, baseColor: input.value }, hole: false });
     };
     input.addEventListener("change", commitCustomColor);
     return () => input.removeEventListener("change", commitCustomColor);
@@ -242,7 +251,7 @@ export function ShapeInspector({
                 aria-label={t("panels.inspector.color.set", { color })}
                 disabled={locked}
                 onClick={() => {
-                  onUpdate({ color, hole: false });
+                  onUpdate({ color, appearance: { ...shape.appearance, baseColor: color }, hole: false });
                   setColorOpen(false);
                 }}
               />
@@ -259,6 +268,55 @@ export function ShapeInspector({
               />
               <span>{t("panels.inspector.color.custom")}</span>
             </label>
+          </div>
+          <div className="surface-appearance-controls">
+            <label className="surface-appearance-title" htmlFor={`surface-appearance-${shape.id}`}>
+              {t("panels.appearance.title")}
+            </label>
+            <p>{t("panels.appearance.hint")}</p>
+            <select
+              id={`surface-appearance-${shape.id}`}
+              aria-label={t("panels.appearance.title")}
+              value={shape.appearance?.presetId ?? ""}
+              disabled={locked}
+              onChange={(event) => {
+                const preset = shapeAppearancePreset(event.currentTarget.value);
+                if (!preset) {
+                  onUpdate({ color: surfaceAppearance.baseColor, appearance: {
+                    baseColor: surfaceAppearance.baseColor,
+                    roughness: surfaceAppearance.roughness,
+                    metalness: surfaceAppearance.metalness,
+                    sheen: surfaceAppearance.sheen,
+                  } });
+                  return;
+                }
+                onUpdate({ color: preset.baseColor, appearance: { presetId: preset.id }, hole: false });
+              }}
+            >
+              <option value="">{t("panels.appearance.custom")}</option>
+              {shape.appearance?.presetId && !shapeAppearancePreset(shape.appearance.presetId) ? <option value={shape.appearance.presetId}>{shape.appearance.presetId}</option> : null}
+              {SHAPE_APPEARANCE_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{t(APPEARANCE_PRESET_LABELS[preset.id])}</option>)}
+            </select>
+            {([
+              { property: "roughness", label: t("panels.appearance.roughness") },
+              { property: "metalness", label: t("panels.appearance.metalness") },
+              { property: "sheen", label: t("panels.appearance.sheen") },
+            ] as const).map(({ property, label }) => (
+              <label className="surface-appearance-range" key={property}>
+                <span>{label}</span>
+                <span>{surfaceAppearance[property].toFixed(2)}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={surfaceAppearance[property]}
+                  disabled={locked}
+                  aria-label={label}
+                  onChange={(event) => onUpdate({ appearance: { ...shape.appearance, [property]: Number(event.currentTarget.value) } })}
+                />
+              </label>
+            ))}
           </div>
         </div>
       ) : null}

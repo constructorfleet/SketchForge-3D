@@ -961,6 +961,21 @@
       "gearType": "Gear Type",
       "placement": "Placement"
     },
+    "appearance": {
+      "title": "Surface appearance",
+      "hint": "Viewport shading only; no texture or physical material simulation.",
+      "custom": "Custom surface",
+      "roughness": "Roughness",
+      "metalness": "Metalness",
+      "sheen": "Sheen",
+      "presets": {
+        "painted": "Painted surface",
+        "wood": "Wood",
+        "fabric": "Fabric",
+        "ceramic": "Ceramic",
+        "metal": "Metal"
+      }
+    },
     "material": {
       "title": "Material",
       "label": "Shape material",
