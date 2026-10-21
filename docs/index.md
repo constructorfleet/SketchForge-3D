@@ -19,6 +19,7 @@ hero:
 
 ## Choose a task
 
+- **Create, edit, save, and export a model:** follow the [editable model workflow](/docs/guides/edit-and-export-model.md), then keep the [`.skf` project format guide](/docs/SKF_PROJECT_FORMAT.md) nearby.
 - **Call the REST API:** start with [API setup, operations, and errors](/docs/REST_API.md), then inspect the [OpenAPI contract](/openapi-v1.json) or use the [TypeScript client reference](/docs/reference/typescript-client.md) and [Python client reference](/docs/reference/python-client.md).
 - **Taper a CAD face:** follow the [face-drafting guide](/docs/guides/face-drafting.md) for selectable pull axes and measured kernel support.
 - **Automate a design:** follow the [command-line reference](/docs/CLI_REFERENCE.md) and run the [client package examples](/docs/guides/package-examples.md).

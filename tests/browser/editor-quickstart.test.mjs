@@ -63,8 +63,13 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
 
     await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
     await page.getByRole("button", { name: "Finish sketch", exact: true }).waitFor({ state: "visible" });
-    await page.screenshot({ path: "docs/screenshots/parametric-extrusion-edit-sketch.png" });
+    const sketchSegments = page.locator('[data-sketch-entity="segment"]');
+    assert.equal(await sketchSegments.count(), 4, "the initial rectangle is made of four sketch segments");
+    await page.getByRole("button", { name: "Add sketch shape" }).click();
+    await page.getByRole("menuitem", { name: "Circle" }).click();
+    assert.ok(await sketchSegments.count() > 4, "adding a circle should add sketch segments");
     await page.getByRole("button", { name: "Finish sketch", exact: true }).click();
+    await page.getByRole("status").getByText("Sketch updated", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
     await page.getByRole("button", { name: "Finish sketch", exact: true }).waitFor({ state: "hidden", timeout: 30_000 });
     await page.screenshot({ path: "docs/screenshots/parametric-extrusion-rebuilt-solid.png" });
 
@@ -96,6 +101,12 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
 
     await page.getByRole("button", { name: "Sketch extrusion", exact: true }).click();
     await page.getByRole("button", { name: "Center view on selection" }).click();
+    await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
+    await page.getByRole("button", { name: "Finish sketch", exact: true }).waitFor({ state: "visible" });
+    assert.ok(await page.locator('[data-sketch-entity="segment"]').count() > 4, "the added circle should remain after reloading the saved project");
+    await page.screenshot({ path: "docs/screenshots/parametric-extrusion-edit-sketch.png" });
+    await page.getByRole("button", { name: "Finish sketch", exact: true }).click();
+    await page.getByRole("status").getByText("Sketch updated", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
     await page.mouse.click(160, 170);
     await page.screenshot({ path: "docs/screenshots/editor-quickstart-solid.png" });
 
