@@ -66,7 +66,7 @@ The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
 | `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
 | `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF. |
-| `POST` | `/explode?projectId=&shapeId=` | Splits a retained STEP assembly into separately positioned exact solids, preserving component names, available XCAF colors, and unambiguous occurrence ancestry (up to 200 solids and 8 MiB source). |
+| `POST` | `/explode?projectId=&shapeId=` | Converts a retained STEP assembly into editable nested groups when every exact solid has an unambiguous product occurrence; otherwise returns separately positioned exact solids. Preserves available names, XCAF colors, and occurrence ancestry (up to 200 solids and 8 MiB source). |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `GET` | `/edges?projectId=&shapeId=` | Lists edges by their current numeric index, with geometric measurements and filletability. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |

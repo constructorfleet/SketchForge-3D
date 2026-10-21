@@ -166,9 +166,12 @@ export function shapeAsGroupChild(shape: WorkplaneShape, centerX: number, center
  * A group of nothing but holes is itself a hole, so grouping a set of cutters
  * and then grouping that with a solid cuts all of them.
  */
-export function groupedShapeFromSelection(selection: WorkplaneShape[]): WorkplaneShape | null {
+export function groupedShapeFromSelection(
+  selection: WorkplaneShape[],
+  options: { allowSingle?: boolean; name?: string } = {},
+): WorkplaneShape | null {
   const groupable = selection.filter((shape) => !shape.locked);
-  if (groupable.length < 2) return null;
+  if (groupable.length < (options.allowSingle ? 1 : 2)) return null;
 
   const bounds = boundsForShapes(groupable);
   const centerX = (bounds.minX + bounds.maxX) / 2;
@@ -180,7 +183,7 @@ export function groupedShapeFromSelection(selection: WorkplaneShape[]): Workplan
 
   return canonicalizeShape({
     id: createLocalId("group"),
-    name: "Group",
+    name: options.name ?? "Group",
     kind: "mesh",
     color: firstSolid.color,
     hole: groupable.every((shape) => shape.hole),
