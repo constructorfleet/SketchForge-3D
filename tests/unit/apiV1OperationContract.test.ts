@@ -77,15 +77,57 @@ describe("REST API v1 operation contract", () => {
       query: { required: ["projectId", "shapeId"] },
       response: { required: ["faces"], faceFields: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"], faceIdSemantics: "stable identity for a face while its identity is preserved by the model", colorAssignmentKey: "face id in PATCH /api/v1/shapes faceColors" },
     });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
       .toEqual({ ok: true, projectId: "part_1", shapeId: "solid" });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=../bad&shapeId=x")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=../bad&shapeId=x")))
       .toEqual({ ok: false, error: "invalid_project_id" });
-    expect(contract.parseListFacesQuery(new Request("https://example.test/api/v1/faces?projectId=p")))
+    expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=p")))
       .toEqual({ ok: false, error: "invalid_shape_id" });
     expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] }))
       .toEqual({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] });
     expect(contract.parseListFacesResponse({ faces: [{ index: "0" }] })).toBeNull();
+  });
+
+  it("declares and validates GET /properties against the complete mass-properties response", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/properties");
+    expect(operation).toMatchObject({
+      operationId: "getShapeProperties",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+      response: {
+        kind: "shape-properties",
+        required: ["properties"],
+        fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+        provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
+        schema: {
+          type: "object",
+          required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+          properties: {
+            volume: { type: "number" },
+            area: { type: "number" },
+            centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+            bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
+            isValid: { type: "boolean" },
+            provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+          },
+        },
+      },
+    });
+    const properties = {
+      volume: 120,
+      area: 148,
+      centerOfMass: { x: 10, y: 3, z: 0 },
+      bbox: { xmin: 8, ymin: 0, zmin: -2.5, xmax: 12, ymax: 6, zmax: 2.5 },
+      isValid: true,
+      provenance: { source: "parametric", precision: "exact" },
+    };
+    expect(contract.parseShapePropertiesResponse({ properties })).toEqual({ properties });
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, area: "148" } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, centerOfMass: { x: 0, y: Number.NaN, z: 0 } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, bbox: { ...properties.bbox, xmax: Infinity } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { source: "step", precision: "exact" } } })).toBeNull();
   });
 
   it("declares and validates PATCH /shapes faceColors using stable IDs and legacy numeric keys", async () => {

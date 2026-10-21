@@ -6,6 +6,13 @@
 
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
+export type ApiV1FieldSchema = {
+  type: "number" | "boolean" | "string" | "object";
+  required?: readonly string[];
+  enum?: readonly string[];
+  properties?: Readonly<Record<string, ApiV1FieldSchema>>;
+};
+
 export type ApiV1Operation = {
   operationId: string;
   method: ApiV1Method;
@@ -19,9 +26,13 @@ export type ApiV1Operation = {
   };
   response?: {
     required: readonly string[];
-    faceFields: readonly string[];
+    faceFields?: readonly string[];
     faceIdSemantics?: string;
     colorAssignmentKey?: string;
+    kind?: "shape-properties";
+    fields?: readonly string[];
+    provenance?: { source: readonly string[]; precision: readonly string[] };
+    schema?: ApiV1FieldSchema;
   };
   requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody;
 };
@@ -98,7 +109,34 @@ export const API_V1_OPERATIONS = [
   operation("GET", "/api/v1/projects", "listProjectsOrGetProject"),
   operation("POST", "/api/v1/projects", "createProject", [201, 400, 401, 404, 409, 503], createProjectRequestBody),
   operation("DELETE", "/api/v1/projects", "deleteProject"),
-  operation("GET", "/api/v1/properties", "getShapeProperties"),
+  {
+    ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 409, 500, 503]),
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true },
+      },
+    },
+    response: {
+      required: ["properties"],
+      kind: "shape-properties",
+      fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+      provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
+      schema: {
+        type: "object",
+        required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+        properties: {
+          volume: { type: "number" },
+          area: { type: "number" },
+          centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+          bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
+          isValid: { type: "boolean" },
+          provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+        },
+      },
+    },
+  },
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
   operation("GET", "/api/v1/shapes", "listShapes"),
   operation("POST", "/api/v1/shapes", "createShapes"),
@@ -152,7 +190,7 @@ export type ListFacesResponse = {
 };
 
 /** Apply the same normalization and project-id validation as the GET /faces handler. */
-export function parseListFacesQuery(request: Request):
+export function parseApiTargetQuery(request: Request):
   | { ok: true; projectId: string; shapeId: string }
   | { ok: false; error: "invalid_project_id" | "invalid_shape_id" } {
   const params = new URL(request.url).searchParams;
@@ -186,6 +224,38 @@ export function parseListFacesResponse(value: unknown): ListFacesResponse | null
     if (!(item.facing === null || (typeof item.facing === "string" && directions.has(item.facing)))) return null;
   }
   return value as ListFacesResponse;
+}
+
+export type ShapePropertiesResponse = {
+  properties: {
+    volume: number;
+    area: number;
+    centerOfMass: { x: number; y: number; z: number };
+    bbox: { xmin: number; ymin: number; zmin: number; xmax: number; ymax: number; zmax: number };
+    isValid: boolean;
+    provenance: { source: "parametric" | "brep" | "mesh"; precision: "exact" | "tessellated" };
+  };
+};
+
+/** Reject malformed kernel values before returning them as a public API response. */
+export function parseShapePropertiesResponse(value: unknown): ShapePropertiesResponse | null {
+  if (!value || typeof value !== "object") return null;
+  const properties = (value as { properties?: unknown }).properties;
+  if (!properties || typeof properties !== "object") return null;
+  const item = properties as Record<string, unknown>;
+  const bbox = item.bbox;
+  if (typeof item.volume !== "number" || !Number.isFinite(item.volume) || typeof item.area !== "number" || !Number.isFinite(item.area)) return null;
+  if (!isPoint(item.centerOfMass) || typeof item.isValid !== "boolean") return null;
+  if (!bbox || typeof bbox !== "object") return null;
+  const bounds = bbox as Record<string, unknown>;
+  if (!["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"].every((key) => typeof bounds[key] === "number" && Number.isFinite(bounds[key]))) return null;
+  const provenance = item.provenance;
+  if (!provenance || typeof provenance !== "object") return null;
+  const source = (provenance as Record<string, unknown>).source;
+  const precision = (provenance as Record<string, unknown>).precision;
+  if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
+  if (!(precision === "exact" || precision === "tessellated")) return null;
+  return value as ShapePropertiesResponse;
 }
 
 
