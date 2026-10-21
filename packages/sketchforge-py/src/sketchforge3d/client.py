@@ -240,6 +240,26 @@ class Treatments:
         return self.apply(project_id, shape_id, "chamfer", distance, angle=angle, edges=edges)
 
 
+class DraftPrisms:
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def apply(self, project_id: str, shape_id: str, angle: float) -> TreatmentResult:
+        """Draft a retained straight polygon sketch extrusion on the server."""
+        payload = self._transport.send(
+            "POST",
+            "/draft-prism",
+            {"projectId": project_id, "shapeId": shape_id},
+            {"angle": angle},
+            retryable=True,
+        ) or {}
+        return TreatmentResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            triangles=int(payload.get("triangles") or 0),
+            revision=int(payload.get("revision") or 0),
+        )
+
+
 class Faces:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
@@ -839,6 +859,7 @@ class SketchForgeClient:
         self.properties = Properties(self._transport)
         self.interference = Interference(self._transport)
         self.treatments = Treatments(self._transport)
+        self.draft_prisms = DraftPrisms(self._transport)
         self.shell = Shell(self._transport)
         self.booleans = Booleans(self._transport)
         self.groups = Groups(self._transport)
@@ -1015,6 +1036,10 @@ class ProjectHandle:
     ) -> ShellResult:
         """Hollows the shape out, sealed unless ``open_faces`` names faces to leave off."""
         return self._client.shell.apply(self.id, shape_id, thickness, open_faces)
+
+    def draft_prism(self, shape_id: str, angle: float) -> TreatmentResult:
+        """Draft a retained straight polygon sketch extrusion."""
+        return self._client.draft_prisms.apply(self.id, shape_id, angle)
 
     def hollow(self, shape_id: str, thickness: float) -> ShellResult:
         return self._client.shell.hollow(self.id, shape_id, thickness)

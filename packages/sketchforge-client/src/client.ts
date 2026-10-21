@@ -10,6 +10,7 @@ import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Align, Distribute, Patterns } from "./resources/arrange.js";
 import { Drawings } from "./resources/drawings.js";
+import { DraftPrism } from "./resources/draft-prism.js";
 import { Edges } from "./resources/edges.js";
 import { Explosions } from "./resources/explosions.js";
 import { Faces } from "./resources/faces.js";
@@ -68,6 +69,7 @@ export class SketchForgeClient {
   readonly properties: Properties;
   readonly treatments: Treatments;
   readonly drawings: Drawings;
+  readonly draftPrism: DraftPrism;
   readonly shell: Shell;
   readonly align: Align;
   readonly distribute: Distribute;
@@ -89,6 +91,7 @@ export class SketchForgeClient {
     this.properties = new Properties(this.transport);
     this.treatments = new Treatments(this.transport);
     this.drawings = new Drawings(this.transport);
+    this.draftPrism = new DraftPrism(this.transport);
     this.shell = new Shell(this.transport);
     this.align = new Align(this.transport);
     this.distribute = new Distribute(this.transport);
@@ -240,6 +243,11 @@ export class ProjectHandle {
   /** Hollows the shape out, sealed unless `openFaces` names faces to leave off. */
   shell(shapeId: string, request: ShellRequest): Promise<ShellResult> {
     return this.client.shell.apply(this.id, shapeId, request);
+  }
+
+  /** Draft a retained straight polygon sketch extrusion and store the exact result. */
+  draftPrism(shapeId: string, angle: number): Promise<TreatmentResult> {
+    return this.client.draftPrism.apply(this.id, shapeId, angle);
   }
 
   hollow(shapeId: string, thickness: number) {

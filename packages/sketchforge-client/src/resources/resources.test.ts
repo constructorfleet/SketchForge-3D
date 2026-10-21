@@ -164,6 +164,15 @@ describe("faces and shell", () => {
   });
 });
 
+describe("draft prisms", () => {
+  it("sends a draft angle to the shape operation", async () => {
+    const server = fakeServer({ body: { shape: shapeSummary("s1"), triangles: 24, revision: 5 } });
+    await client(server).draftPrism.apply("p1", "s1", 5);
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/draft-prism?projectId=p1&shapeId=s1");
+    expect(server.calls[0]?.body).toEqual({ angle: 5 });
+  });
+});
+
 describe("measurements", () => {
   const measurement = (overrides: Partial<MeasurementSummary>): MeasurementSummary => ({
     entity: "edge",

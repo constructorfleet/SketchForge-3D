@@ -426,6 +426,59 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
   });
 }
 
+/**
+ * Apply a prism draft along the shape's vertical extrusion axis.
+ *
+ * This is intentionally a baked operation: the project does not yet retain
+ * the source extrusion as a parametric feature. The exact BREP and viewport
+ * mesh are persisted together, as with shell and edge treatments.
+ */
+export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number }): Promise<ServerCadResult> {
+  if (!Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
+    return Promise.reject(new ServerCadError("The draft angle must be non-zero and between -45 and 45 degrees.", 400));
+  }
+  if (shape.sketchOperation !== "extrude" || !shape.sketchProfile) {
+    return Promise.reject(new ServerCadError("Draft prism requires a sketch extrusion with its source profile retained.", 400));
+  }
+  const { points, segments } = shape.sketchProfile;
+  if (points.length < 3 || segments.length !== points.length
+    || segments.some((segment, index) => segment.kind && segment.kind !== "line"
+      || segment.startId !== points[index].id
+      || segment.endId !== points[(index + 1) % points.length].id)
+    || points.some((point) => point.handleIn || point.handleOut || !Number.isFinite(point.x) || !Number.isFinite(point.z))) {
+    return Promise.reject(new ServerCadError("Draft prism currently requires one closed polygonal sketch profile made from straight segments.", 400));
+  }
+
+  return withCadKernel((cad) => {
+    const minX = Math.min(...points.map(({ x }) => x));
+    const maxX = Math.max(...points.map(({ x }) => x));
+    const minZ = Math.min(...points.map(({ z }) => z));
+    const maxZ = Math.max(...points.map(({ z }) => z));
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const edges = points.map((point, index) => {
+      const next = points[(index + 1) % points.length];
+      return cad.makeLineEdge(
+        { x: point.x - centerX, y: 0, z: point.z - centerZ },
+        { x: next.x - centerX, y: 0, z: next.z - centerZ },
+      );
+    });
+    const face = cad.makeFace(cad.makeWire(edges));
+    let drafted: ShapeHandle;
+    try {
+      drafted = cad.draftPrism(face, 0, shape.height, 0, request.angle);
+    } catch {
+      throw new ServerCadError("The shape cannot be drafted along its vertical extrusion axis.");
+    }
+    const solids = cad.getSubShapes(drafted, "solid");
+    const result = solids.length === 1 ? solids[0] : drafted;
+    if (!cadResultIsValid(cad, result) || !cad.isSolid(result)) {
+      throw new ServerCadError("The draft did not produce a valid solid.");
+    }
+    return meshedCadResult(cad, result);
+  });
+}
+
 /** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */
 export function meshedCadResult(cad: OcctKernel, result: ShapeHandle): ServerCadResult {
   const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });

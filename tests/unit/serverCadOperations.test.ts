@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
-import { applyEdgeTreatment, applyBakedMirror, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { applyEdgeTreatment, applyBakedMirror, applyDraftPrism, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -10,8 +10,36 @@ function box(overrides: Record<string, unknown> = {}) {
   return shapeFromRequest({ kind: "box", width: 40, depth: 40, height: 10, ...overrides }) as WorkplaneShape;
 }
 
+function sketchExtrusion() {
+  const points = [
+    { id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: -20 },
+    { id: "c", x: 20, z: 20 }, { id: "d", x: -20, z: 20 },
+  ];
+  return {
+    ...box(),
+    sketchOperation: "extrude",
+    sketchProfile: {
+      points,
+      segments: points.map((point, index) => ({ id: `edge-${index}`, startId: point.id, endId: points[(index + 1) % points.length].id, kind: "line" as const })),
+    },
+  } as WorkplaneShape;
+}
+
 // See the note in serverCadSolids.test.ts: the kernel, not the test, needs the time.
 describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("drafts an exact solid along its extrusion axis and returns persistable geometry", async () => {
+    const result = await applyDraftPrism(sketchExtrusion(), { angle: 5 });
+
+    expect(result.brep).toContain("CASCADE Topology");
+    expect(result.triangleCount).toBeGreaterThan(0);
+    expect(result.positions.length).toBe(result.triangleCount * 9);
+  });
+
+  it("rejects zero and excessive draft angles before invoking the kernel", async () => {
+    await expect(applyDraftPrism(box(), { angle: 45 })).rejects.toThrow(/between -45 and 45/);
+    await expect(applyDraftPrism(box(), { angle: 5 })).rejects.toThrow(/source profile retained/);
+  });
+
   it("bakes an exact selected-axis reflection into BREP and clears placement flags", async () => {
     const source = shapeFromRequest({
       kind: "wedge", width: 30, depth: 18, height: 12,

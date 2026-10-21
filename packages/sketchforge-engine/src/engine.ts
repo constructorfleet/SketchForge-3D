@@ -18,6 +18,7 @@
 import {
   applyEdgeTreatment,
   applyBakedMirror,
+  applyDraftPrism,
   shapeEdges,
   shapeWithCadResult,
   ServerCadError,
@@ -284,6 +285,8 @@ export type Engine = {
   faces(projectId: string, shapeId: string): Promise<EngineResult<ServerCadFace[]>>;
   /** Round or cut a shape's edges. */
   treat(projectId: string, shapeId: string, treatment: ServerCadTreatment): Promise<EngineResult<ShapeWritten>>;
+  /** Draft a solid along its vertical extrusion axis and store exact geometry. */
+  draftPrism(projectId: string, shapeId: string, angle: number): Promise<EngineResult<ShapeWritten>>;
   /** Reflect selected parameter-built solids across their selection bounds and bake the exact result. */
   mirrorBaked(projectId: string, ids: string[], axis: "x" | "y" | "z"): Promise<EngineResult<ShapesArranged>>;
   /** Hollow a shape out, optionally leaving faces open. */
@@ -925,6 +928,10 @@ export function createEngine(store: ProjectStore): Engine {
 
     treat: (projectId, shapeId, treatment) => cadTreatment(projectId, shapeId, async (shape) => (
       shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment))
+    )),
+
+    draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, async (shape) => (
+      shapeWithCadResult(shape, await applyDraftPrism(shape, { angle }))
     )),
 
     mirrorBaked: (projectId, ids, axis) => mutating(projectId, async (document) => {

@@ -418,6 +418,17 @@ class EdgesAndTreatmentsTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].body, {"kind": "chamfer", "amount": 2, "angle": 30, "edges": [0, 1]})
 
 
+class DraftPrismTests(unittest.TestCase):
+    def test_sends_angle_to_draft_prism_endpoint(self) -> None:
+        opener = FakeOpener({"shape": shape_payload(), "triangles": 100, "revision": 4})
+        client(opener).draft_prisms.apply("p1", "s1", 5)
+        self.assertEqual(opener.calls[0].body, {"angle": 5})
+        self.assertEqual(
+            opener.calls[0].url,
+            "http://localhost:3100/api/v1/draft-prism?projectId=p1&shapeId=s1",
+        )
+
+
 class FacesAndShellTests(unittest.TestCase):
     @staticmethod
     def _face(index: int, facing):

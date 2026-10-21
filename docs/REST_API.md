@@ -61,6 +61,7 @@ All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "err
 | `POST` | `/explode?projectId=&shapeId=` | Splits a retained STEP assembly into separately positioned exact solids, preserving STEP product names and XCAF colors where present (up to 200 solids and 8 MiB source). |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
+| `POST` | `/draft-prism?projectId=&shapeId=` | Rebuilds a retained straight sketch extrusion with a draft angle. |
 | `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
 | `POST` | `/measurements?projectId=` | The distance between two entities, and the angle if both are flat faces. |
 | `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
@@ -243,6 +244,10 @@ curl -X POST "$HOST/treatments?projectId=$PROJECT&shapeId=$SHAPE" \
 ```
 
 `kind` is `fillet` or `chamfer`; `amount` is the radius or distance in mm; `angle` applies to chamfers (45 degrees, the default, is symmetric); `edges` is a list of indexes, or omitted for all of them.
+
+### Drafting a sketch extrusion
+
+`POST /draft-prism?projectId=&shapeId=` accepts `{ "angle": 5 }`, in degrees. It rebuilds a sketch extrusion whose straight polygon profile is retained on the shape, using OCCT's prism draft operation, and persists the result as an exact BREP plus viewport mesh. Positive and negative angles taper in opposite directions; the accepted range is greater than -45 and less than 45 degrees, excluding zero. The source sketch must be one closed polygon made from straight segments; curved, multiple-loop, or missing profiles are refused. The TypeScript and Python clients expose this request. This first slice does not yet add a draft control to the editor or a re-editable parametric feature.
 
 The treated shape keeps its place and its size, and stores the exact geometry alongside the mesh -- so STEP export writes true surfaces rather than triangles, and a further treatment builds on the real solid.
 

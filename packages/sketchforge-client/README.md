@@ -101,6 +101,7 @@ client.drawings.dxf(projectId, { plane, offset, shapeIds?, name? }): Promise<Sec
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
 client.shell.tray(projectId, shapeId, thickness, openFaces?): Promise<ShellResult>
+client.draftPrism.apply(projectId, shapeId, angle): Promise<TreatmentResult>
 
 client.align.apply(projectId, { ids, axis, target, anchorId? }): Promise<AlignResult>
 client.align.tops(projectId, ids, anchorId?) | bottoms(...) | centers(projectId, ids, axis, anchorId?)
@@ -128,6 +129,7 @@ project.sectionDrawing({ plane: "xy", offset: 3, shapeIds? })
 project.sectionDxf({ plane: "xy", offset: 3, shapeIds? }) | estimateWallThickness(id) | explodeStepAssembly(id)
 project.mirrorBaked(ids, axis)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
+project.draftPrism(id, angle)
 project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
 project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)
 project.importMesh({ fileName, bytes })

@@ -53,6 +53,7 @@ client.edges.filletable_indexes(project_id, shape_id) -> list[int]
 client.treatments.apply(project_id, shape_id, kind, amount, angle=None, edges=None) -> TreatmentResult
 client.treatments.fillet(project_id, shape_id, radius, edges=None) -> TreatmentResult
 client.treatments.chamfer(project_id, shape_id, distance, angle=None, edges=None) -> TreatmentResult
+client.draft_prisms.apply(project_id, shape_id, angle) -> TreatmentResult
 
 client.faces.list(project_id, shape_id) -> list[FaceSummary]
 client.faces.facing(project_id, shape_id, direction) -> list[int]
@@ -129,6 +130,7 @@ project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges
 project.faces(id) | faces_facing(id, direction)
 project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to) | properties_of(id) | check_interference(ids=None, clearance=None)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
+project.draft_prism(id, angle)
 project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id)
 project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None) | mirror_baked(ids, axis)
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)

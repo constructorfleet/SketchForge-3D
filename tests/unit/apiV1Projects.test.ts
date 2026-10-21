@@ -6,6 +6,7 @@ import { DELETE as deleteProject, GET as getProjects, POST as createProject } fr
 import { DELETE as deleteShape, GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { GET as edges } from "@/app/api/v1/edges/route";
 import { POST as treatments } from "@/app/api/v1/treatments/route";
+import { POST as draftPrism } from "@/app/api/v1/draft-prism/route";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { readProjectDocument, writeProjectDocument } from "@constructorfleet/sketchforge-engine/serverProjectDocument";
@@ -441,6 +442,39 @@ describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     return treatments(
       authorized(`/api/v1/treatments?projectId=${projectId}&shapeId=${shapeId}`, { method: "POST", body: JSON.stringify(body) }));
   }
+
+  it("drafts a solid and persists exact geometry through the API", async () => {
+    const { projectId, shapeId } = await boxProject();
+    const sourceDocument = await readProjectDocument(projectsRoot, projectId);
+    const sourceShape = sourceDocument?.shapes.find((candidate) => candidate.id === shapeId);
+    expect(sourceDocument && sourceShape).toBeTruthy();
+    const points = [
+      { id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: -20 },
+      { id: "c", x: 20, z: 20 }, { id: "d", x: -20, z: 20 },
+    ];
+    Object.assign(sourceShape!, {
+      kind: "mesh",
+      sketchOperation: "extrude",
+      sketchProfile: {
+        points,
+        segments: points.map((point, index) => ({ id: `edge-${index}`, startId: point.id, endId: points[(index + 1) % points.length].id, kind: "line" })),
+      },
+    });
+    await writeProjectDocument(projectsRoot, projectId, sourceDocument!, sourceDocument!.shapes);
+    const response = await draftPrism(authorized(`/api/v1/draft-prism?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "POST",
+      body: JSON.stringify({ angle: 5 }),
+    }));
+    const payload = await response.json() as { shape: { kind: string }; triangles: number; revision: number };
+
+    expect(response.status).toBe(200);
+    expect(payload.shape.kind).toBe("mesh");
+    expect(payload.triangles).toBeGreaterThan(0);
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const shape = document?.shapes.find((candidate) => candidate.id === shapeId);
+    expect(shape?.cadBrep).toContain("CASCADE Topology");
+    expect(shape?.importedMesh?.triangleCount).toBe(payload.triangles);
+  });
 
   it("lists a box's edges", async () => {
     const { projectId, shapeId } = await boxProject();

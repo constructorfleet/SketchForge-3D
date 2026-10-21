@@ -120,6 +120,7 @@ export {
 export { exactSolidForShape, EXACT_SOLID_KINDS, UnbuildableShapeError } from "./cadSolids.js";
 export {
   ServerCadError,
+  applyDraftPrism,
   type ServerCadEdge,
   type ServerCadResult,
   type ServerCadTreatment,
