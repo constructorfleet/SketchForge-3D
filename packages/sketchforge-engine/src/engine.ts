@@ -36,6 +36,7 @@ import {
   type ServerCadMeasurement,
   type ServerCadMeasurementPair,
 } from "./serverCadMeasure.js";
+import { shapeProperties, type ServerCadShapeProperties } from "./serverCadProperties.js";
 import {
   alignShifts,
   effectiveAlignAnchorId,
@@ -281,6 +282,8 @@ export type Engine = {
   shell(projectId: string, shapeId: string, request: ServerCadShellRequest): Promise<EngineResult<ShapeWritten>>;
   /** Every edge and face of a shape, measured from its exact geometry. */
   measurements(projectId: string, shapeId: string): Promise<EngineResult<ServerCadMeasurement[]>>;
+  /** Volume, area, center of mass, bounds and provenance for one placed shape. */
+  properties(projectId: string, shapeId: string): Promise<EngineResult<ServerCadShapeProperties>>;
   /**
    * The distance between two entities, and the angle between them if both are flat faces.
    *
@@ -848,6 +851,16 @@ export function createEngine(store: ProjectStore): Engine {
       if (!found.ok) return found;
       try {
         return ok(await shapeMeasurements(found.value));
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+    }),
+
+    properties: (projectId, shapeId) => reading(projectId, async (document) => {
+      const found = oneShape(document, shapeId);
+      if (!found.ok) return found;
+      try {
+        return ok(await shapeProperties(found.value));
       } catch (error) {
         return failed(cadFailure(error));
       }

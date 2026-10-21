@@ -23,6 +23,7 @@ export {
   type ShapeWritten,
   type ShapesWritten,
 } from "./engine.js";
+export type { ServerCadShapeProperties, ShapeGeometryProvenance } from "./serverCadProperties.js";
 
 // --- arranging what is already there -----------------------------------------
 //
