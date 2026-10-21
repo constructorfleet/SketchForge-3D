@@ -6,11 +6,10 @@ This executable workflow uses the local project store. It creates a temporary pr
 
 For the `.skf` file's archive layout, validation, and compatibility behavior, see the [project format guide](../SKF_PROJECT_FORMAT.md) and [generated format reference](../SKF_FORMAT_REFERENCE.md). REST-based automation is covered separately in the [REST API guide](../REST_API.md).
 
-Build the engine once, then run the example from the repository root:
+From the repository root, run the checked command below. It builds the engine and then runs the isolated workflow:
 
 ```sh
-npm run engine:build
-node docs/mcp/examples/local-project.mjs
+!!!include(./examples/run-local-project.sh)!!!
 ```
 
 The [example source](./examples/local-project.mjs) starts the repository MCP server, reads the current `tools/list` registry, validates each tool argument against its advertised input schema, and then invokes those tools over JSON-RPC. The [MCP tool reference](./TOOLS_REFERENCE.md) lists the complete current registry and schemas. The executable contract is checked by [`tests/docs/mcp-examples.test.mjs`](../../tests/docs/mcp-examples.test.mjs).

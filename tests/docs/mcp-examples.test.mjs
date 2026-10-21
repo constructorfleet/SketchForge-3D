@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const example = path.join(root, "docs/mcp/examples/local-project.mjs");
+const guide = path.join(root, "docs/mcp/EXAMPLES.md");
+const runner = path.join(root, "docs/mcp/examples/run-local-project.sh");
 
 test("the documented local MCP workflow validates its calls against tools/list and runs on a temporary project", () => {
-  const run = spawnSync(process.execPath, [example], {
+  const guideText = readFileSync(guide, "utf8");
+  assert.match(guideText, /```sh\s*\n!!!include\(\.\/examples\/run-local-project\.sh\)!!!\s*\n```/);
+  const run = spawnSync("bash", [runner], {
     cwd: root,
     encoding: "utf8",
     timeout: 60_000,
