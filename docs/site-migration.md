@@ -55,6 +55,10 @@ The merged site includes generated package, example, shape, CLI, operator
 configuration, `.skf`, and MCP references. Deterministic reference-generator
 checks merged in PR #128; STEP color guidance merged in PR #119.
 
+The current repository-controlled inbound links and historical published
+paths, including their canonical destinations and compatibility behavior, are
+listed in the [inbound-link inventory](HISTORICAL_INBOUND_LINKS.md).
+
 ## Newly identified documentation gaps
 
 - Merged PR #156 resolves the publishing-clients version gap with a generated,
