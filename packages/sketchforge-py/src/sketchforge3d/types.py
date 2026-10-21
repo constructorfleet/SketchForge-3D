@@ -12,7 +12,7 @@ client built against an older server still round-trips what a newer one sends.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict, Union, get_args
+from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict, Union, cast, get_args
 
 PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "box",
@@ -223,7 +223,7 @@ class _ThreadShapeRequestBase(_ShapePlacement):
 
 
 class ThreadShapeRequest(_ThreadShapeRequestBase, total=False):
-    size: str
+    size: str  # type: ignore[misc]  # Thread designation replaces numeric placement size.
     diameter: float
     length: float
     pitch: float
@@ -788,8 +788,8 @@ class ShapeGeometryProvenance:
         source = _text(payload, "source")
         precision = _text(payload, "precision")
         return cls(
-            source=source if source in ("parametric", "brep", "mesh") else "parametric",
-            precision=precision if precision in ("exact", "tessellated") else "exact",
+            source=cast(Literal["parametric", "brep", "mesh"], source) if source in ("parametric", "brep", "mesh") else "parametric",
+            precision=cast(Literal["exact", "tessellated"], precision) if precision in ("exact", "tessellated") else "exact",
         )
 
 

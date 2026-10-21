@@ -12,7 +12,7 @@ import base64
 import json
 import os
 import urllib.parse
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, overload
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, cast, overload
 
 from ._http import DEFAULT_RETRY_ON_BUSY, DEFAULT_TIMEOUT_SECONDS, Transport
 from .errors import SketchForgeApiError, SketchForgeTransportError
@@ -792,8 +792,11 @@ class Exports:
         payload = self._transport.send(
             "POST", "/exports", {"projectId": project_id}, body, retryable=False
         ) or {}
+        export_format = payload.get("format") or format
+        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg"):
+            export_format = format
         return ExportResult(
-            format=str(payload.get("format") or format),
+            format=cast(ExportFormat, export_format),
             filename=str(payload.get("filename") or "export"),
             mime_type=str(payload.get("mimeType") or "application/octet-stream"),
             data=base64.b64decode(payload.get("base64") or "", validate=True),
@@ -822,8 +825,11 @@ class Exports:
         )
         metadata_raw = urllib.parse.unquote(headers.get("x-sketchforge-metadata", ""))
         metadata = json.loads(metadata_raw) if metadata_raw else {}
+        export_format = metadata.get("format") or format
+        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg"):
+            export_format = format
         return ExportResult(
-            format=str(metadata.get("format") or format),
+            format=cast(ExportFormat, export_format),
             filename=str(metadata.get("filename") or os.path.basename(os.fspath(path))),
             mime_type=str(metadata.get("mimeType") or headers.get("content-type") or "application/octet-stream"),
             data=b"",

@@ -115,7 +115,7 @@ class Transport:
         import uuid
 
         boundary = "sketchforge-" + uuid.uuid4().hex
-        chunks = []
+        chunks: list[bytes] = []
         for name, value in fields.items():
             chunks.extend((
                 f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n".encode(),
