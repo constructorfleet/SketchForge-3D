@@ -962,6 +962,16 @@ function validateSketchProfile(value: unknown, label: string) {
     if (point.sweepRole !== undefined && point.sweepRole !== "section" && point.sweepRole !== "spine") {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].sweepRole` });
     }
+    for (const name of ["handleIn", "handleOut"] as const) {
+      if (point[name] === undefined) continue;
+      const handle = objectRecord(point[name], `${label}.points[${index}].${name}`);
+      finiteNumber(handle.x, `${label}.points[${index}].${name}.x`);
+      finiteNumber(handle.z, `${label}.points[${index}].${name}.z`);
+      if (handle.sweepDepth !== undefined) {
+        finiteNumber(handle.sweepDepth, `${label}.points[${index}].${name}.sweepDepth`);
+        if (point.sweepRole !== "spine") throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].${name}.sweepDepth` });
+      }
+    }
   });
   if (profile.sweepFrames !== undefined) {
     const frames = objectRecord(profile.sweepFrames, `${label}.sweepFrames`);

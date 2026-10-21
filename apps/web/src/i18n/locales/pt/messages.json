@@ -744,7 +744,9 @@
         "smoothTitle": "Transformar em ponto suave",
         "split": "Separar",
         "splitTitle": "Separar as alças",
-        "sweepDepth": "Profundidade 3D (mm)"
+        "sweepDepth": "Profundidade 3D (mm)",
+        "sweepHandleInDepth": "Profundidade 3D da alça de entrada (mm)",
+        "sweepHandleOutDepth": "Profundidade 3D da alça de saída (mm)"
       },
       "notice": {
         "shapeMoved": "Forma do esboço movida",

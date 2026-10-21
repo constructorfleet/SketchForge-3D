@@ -12,8 +12,8 @@ function pathWire(cad: OcctKernel, path: OrderedCadSketchPath, map: (point: Pick
     if (segment.kind !== "line" && first && second) {
       return cad.makeBezierEdge([
         map(from),
-        map({ ...first, sweepDepth: from.sweepDepth }),
-        map({ ...second, sweepDepth: to.sweepDepth }),
+        map({ ...first, sweepDepth: first.sweepDepth ?? from.sweepDepth }),
+        map({ ...second, sweepDepth: second.sweepDepth ?? to.sweepDepth }),
         map(to),
       ]);
     }
@@ -55,7 +55,7 @@ export function buildCadSketchSweep(cad: OcctKernel, profile: Parameters<typeof 
 
 function orientedSpine(
   path: OrderedCadSketchPath,
-  map: (point: Pick<SketchPoint, "x" | "z">) => Vec3,
+  map: (point: Pick<SketchPoint, "x" | "z" | "sweepDepth">) => Vec3,
 ): OrderedCadSketchPath {
   if (path.steps.length === 0) throw new LocalizedError("errors.sketch.sweepNeedsSectionAndSpine");
   const reversed = reversePath(path);
@@ -72,7 +72,7 @@ function orientedSpine(
   return reverseAligned ? reversed : path;
 }
 
-function initialTangentIsNormal(path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z">) => Vec3) {
+function initialTangentIsNormal(path: OrderedCadSketchPath, map: (point: Pick<SketchPoint, "x" | "z" | "sweepDepth">) => Vec3) {
   const step = path.steps[0];
   if (!step) return false;
   const forward = step.segment.startId === step.from.id;
@@ -80,7 +80,9 @@ function initialTangentIsNormal(path: OrderedCadSketchPath, map: (point: Pick<Sk
   const secondControl = forward ? step.to.handleIn : step.to.handleOut;
   const firstHandle = step.segment.kind !== "line" && firstControl && secondControl ? firstControl : undefined;
   const start = map(step.from);
-  const tangentEnd = map(firstHandle ?? step.to);
+  const tangentEnd = firstHandle
+    ? map({ ...firstHandle, sweepDepth: firstHandle.sweepDepth ?? step.from.sweepDepth })
+    : map(step.to);
   const dx = tangentEnd.x - start.x;
   const dy = tangentEnd.y - start.y;
   const dz = tangentEnd.z - start.z;

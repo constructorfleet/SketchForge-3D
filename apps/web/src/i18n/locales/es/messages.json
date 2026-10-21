@@ -744,7 +744,9 @@
         "smoothTitle": "Convertir en punto suave",
         "split": "Separar",
         "splitTitle": "Separar los controladores",
-        "sweepDepth": "Profundidad 3D (mm)"
+        "sweepDepth": "Profundidad 3D (mm)",
+        "sweepHandleInDepth": "Profundidad 3D del tirador entrante (mm)",
+        "sweepHandleOutDepth": "Profundidad 3D del tirador saliente (mm)"
       },
       "notice": {
         "shapeMoved": "Se movió la forma del boceto",

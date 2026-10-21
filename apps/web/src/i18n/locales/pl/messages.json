@@ -744,7 +744,9 @@
         "smoothTitle": "Zmień w punkt gładki",
         "split": "Rozdziel",
         "splitTitle": "Rozdziel uchwyty",
-        "sweepDepth": "Głębokość 3D (mm)"
+        "sweepDepth": "Głębokość 3D (mm)",
+        "sweepHandleInDepth": "Głębokość 3D uchwytu wejściowego (mm)",
+        "sweepHandleOutDepth": "Głębokość 3D uchwytu wyjściowego (mm)"
       },
       "notice": {
         "shapeMoved": "Przesunięto kształt szkicu",

@@ -6939,6 +6939,21 @@ export function SketchForgeEditor({
     });
   }, [commitSketchProfile, sketchProfile]);
 
+  const setSketchSweepHandleDepth = useCallback((id: string, handle: "in" | "out", depth: number) => {
+    if (!Number.isFinite(depth)) return;
+    const current = sketchProfile.points.find((point) => point.id === id);
+    if (!current || current.sweepRole !== "spine") return;
+    const key = handle === "in" ? "handleIn" : "handleOut";
+    if (!current[key]) return;
+    const nextDepth = Math.abs(depth) < 1e-9 ? undefined : depth;
+    commitSketchProfile({
+      ...sketchProfile,
+      points: sketchProfile.points.map((point) => point.id === id
+        ? { ...point, [key]: { ...point[key]!, sweepDepth: nextDepth } }
+        : point),
+    });
+  }, [commitSketchProfile, sketchProfile]);
+
   const insertSketchPoint = useCallback((segmentId: string, _position: { x: number; z: number }, amount: number) => {
     const result = splitSketchSegment(sketchProfile, segmentId, amount, createLocalId);
     if (!result.pointId) return;
@@ -9889,6 +9904,7 @@ export function SketchForgeEditor({
             onInsertPoint={insertSketchPoint}
             onSetPointMode={setSketchPointMode}
             onSetSweepDepth={setSketchSweepDepth}
+            onSetSweepHandleDepth={setSketchSweepHandleDepth}
             onClearMeasurement={clearSketchMeasurement}
           />
         ) : (

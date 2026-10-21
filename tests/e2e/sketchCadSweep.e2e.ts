@@ -140,6 +140,81 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
     }
   });
 
+  it("uses independent incoming and outgoing Bezier handle depths in the 3D sweep path", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 20, z: 0 }]);
+    const start = profile.points.find((point) => point.id === "p1")!;
+    const end = profile.points.find((point) => point.id === "p2")!;
+    start.handleOut = { x: 13, z: 0, sweepDepth: 4 };
+    end.handleIn = { x: 17, z: 0, sweepDepth: -3 };
+    profile.segments.find((segment) => segment.id === "path1")!.kind = "bezier";
+    try {
+      const solid = buildCadSketchSweep(cad, profile);
+      expect(cad.isValid(solid)).toBe(true);
+      expect(cad.isSolid(solid)).toBe(true);
+      const bounds = cad.getBoundingBox(solid, false);
+      expect(bounds.zmax).toBeGreaterThan(2);
+      expect(bounds.zmin).toBeLessThan(-1);
+    } finally {
+      cad.releaseAll();
+    }
+  });
+
+  it("aligns cubic handle depth with the selected workplane third axis", async () => {
+    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const cad = await OcctKernel.init({ wasm });
+    const sectionFrame = {
+      origin: { x: 3, y: -2, z: 4 },
+      normal: { x: 0, y: Math.SQRT1_2, z: Math.SQRT1_2 },
+      xAxis: { x: 1, y: 0, z: 0 },
+      zAxis: { x: 0, y: -Math.SQRT1_2, z: Math.SQRT1_2 },
+    };
+    const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 20, z: 0 }], sectionFrame);
+    const first = profile.points.find((point) => point.id === "p0")!;
+    const middle = profile.points.find((point) => point.id === "p1")!;
+    const last = profile.points.find((point) => point.id === "p2")!;
+    first.handleOut = { x: 3, z: 0 };
+    middle.handleIn = { x: 7, z: 0 };
+    middle.handleOut = { x: 13, z: 0, sweepDepth: -3 };
+    last.handleIn = { x: 17, z: 0, sweepDepth: 4 };
+    profile.segments.filter((segment) => segment.id === "path0" || segment.id === "path1").forEach((segment) => { segment.kind = "bezier"; });
+    try {
+      const solid = buildCadSketchSweep(cad, profile);
+      const positions = cad.tessellate(solid).positions;
+      const bounds = [0, 1, 2].map((axis) => {
+        const values = Array.from({ length: positions.length / 3 }, (_, index) => positions[index * 3 + axis]);
+        return [Math.min(...values), Math.max(...values)];
+      });
+      const centerX = (bounds[0]![0]! + bounds[0]![1]!) / 2;
+      const centerZ = (bounds[2]![0]! + bounds[2]![1]!) / 2;
+      const height = bounds[1]![1]! - bounds[1]![0]!;
+      const minY = bounds[1]![0]!;
+      const source = {
+        id: "rotated-sweep-depth-test", name: "Rotated sweep depth test", kind: "mesh" as const, color: "#d41721",
+        x: centerX, z: centerZ, elevation: minY, size: Math.max(bounds[0]![1]! - bounds[0]![0]!, bounds[2]![1]! - bounds[2]![0]!),
+        width: bounds[0]![1]! - bounds[0]![0]!, depth: bounds[2]![1]! - bounds[2]![0]!, height, rotation: 0,
+        importedMesh: {
+          positions: Array.from({ length: positions.length }, (_, index) => positions[index]! - (index % 3 === 0 ? centerX : index % 3 === 1 ? minY : centerZ)),
+          baseWidth: bounds[0]![1]! - bounds[0]![0]!, baseDepth: bounds[2]![1]! - bounds[2]![0]!, baseHeight: height,
+          triangleCount: positions.length / 9, sourceFormat: "json" as const,
+        },
+      } satisfies WorkplaneShape;
+      const placed = placeSketchExtrusion(source, sectionFrame);
+      const rotation = new Euler(MathUtils.degToRad(placed.rotationX ?? 0), MathUtils.degToRad(placed.rotation), MathUtils.degToRad(placed.rotationZ ?? 0), "XYZ");
+      const center = new Vector3(placed.x, (placed.elevation ?? 0) + placed.height / 2, placed.z);
+      const localDepths = Array.from({ length: positions.length / 3 }, (_, index) => {
+        const point = new Vector3(positions[index * 3]! - centerX, positions[index * 3 + 1]! - minY - height / 2, positions[index * 3 + 2]! - centerZ)
+          .applyEuler(rotation).add(center).sub(new Vector3(sectionFrame.origin.x, sectionFrame.origin.y, sectionFrame.origin.z));
+        return point.x * sectionFrame.zAxis.x + point.y * sectionFrame.zAxis.y + point.z * sectionFrame.zAxis.z;
+      });
+      expect(Math.max(...localDepths)).toBeGreaterThan(2);
+      expect(Math.min(...localDepths)).toBeLessThan(-1);
+    } finally {
+      cad.releaseAll();
+    }
+  });
+
   it("derives an orthogonal spine frame from non-axis-aligned section workplanes", async () => {
     const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
