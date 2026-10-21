@@ -33,7 +33,7 @@ export const PARAMETRIC_SHAPE_KINDS = [
 export type ParametricShapeKind = (typeof PARAMETRIC_SHAPE_KINDS)[number];
 
 /** Every kind a shape request may name, including the two swept ones. */
-export type ShapeKind = ParametricShapeKind | "revolve" | "thread";
+export type ShapeKind = ParametricShapeKind | "revolve" | "thread" | "sketchSweep";
 
 /** Sampled wall-thickness estimate; not a certified minimum-thickness result. */
 export type WallThicknessEstimate = {
@@ -207,7 +207,33 @@ export type ThreadShapeRequest = {
   profile?: readonly ProfilePoint[];
 } & ShapePlacement;
 
-export type ShapeRequest = ParametricShapeRequest | RevolveShapeRequest | ThreadShapeRequest;
+export type SketchSweepPoint = {
+  id: string;
+  x: number;
+  z: number;
+  sweepDepth?: number;
+  sweepRole?: "section" | "spine";
+  handleIn?: { x: number; z: number; sweepDepth?: number };
+  handleOut?: { x: number; z: number; sweepDepth?: number };
+  mode?: "corner" | "smooth" | "split";
+};
+
+export type SketchSweepProfile = {
+  points: readonly SketchSweepPoint[];
+  segments: readonly { id: string; startId: string; endId: string; kind?: "line" | "bezier" | "smooth" }[];
+  constraints?: readonly ({ id: string; kind: "coincident"; pointIds: readonly [string, string] }
+    | { id: string; kind: "horizontal" | "vertical"; segmentId: string }
+    | { id: string; kind: "distance"; pointIds: readonly [string, string]; valueMm: number })[];
+  sweepFrames?: {
+    section: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; xAxis: { x: number; y: number; z: number }; zAxis: { x: number; y: number; z: number } };
+    spine: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; xAxis: { x: number; y: number; z: number }; zAxis: { x: number; y: number; z: number } };
+  };
+};
+
+/** A retained OCCT sweep made from closed section loops and one open spine. */
+export type SketchSweepShapeRequest = { kind: "sketchSweep"; profile: SketchSweepProfile } & ShapePlacement;
+
+export type ShapeRequest = ParametricShapeRequest | RevolveShapeRequest | ThreadShapeRequest | SketchSweepShapeRequest;
 
 /**
  * The fields a PATCH may change.
@@ -269,6 +295,8 @@ export type ShapeSummary = {
   kind: string;
   requestKind?: ShapeKind;
   sketchOperation?: SketchOperation;
+  /** Editable profile retained for a sketch sweep created through REST. */
+  sketchProfile?: SketchSweepProfile;
   color: string;
   faceIds?: string[];
   faceColors?: Record<string, string>;

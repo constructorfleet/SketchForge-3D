@@ -27,6 +27,7 @@ import type { WorkplaneShape } from "@/types/sketchforge";
  */
 export function apiShapeRequestKind(shape: WorkplaneShape) {
   if (shape.groupedShapes?.length) return undefined;
+  if (shape.sketchOperation === "sweep" && shape.sketchProfile) return "sketchSweep";
   if (isRevolveShape(shape)) return "revolve";
   return isRequestableShapeKind(shape.kind) ? shape.kind : undefined;
 }
@@ -46,6 +47,7 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     kind: shape.kind,
     ...(requestKind === undefined ? {} : { requestKind }),
     ...(shape.sketchOperation === undefined ? {} : { sketchOperation: shape.sketchOperation }),
+    ...(shape.sketchOperation === "sweep" && shape.sketchProfile ? { sketchProfile: shape.sketchProfile } : {}),
     color: shape.color,
     ...(shape.faceIds ? { faceIds: shape.faceIds } : {}),
     ...(shape.faceColors ? { faceColors: shape.faceColors } : {}),

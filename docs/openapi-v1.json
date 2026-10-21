@@ -436,6 +436,34 @@
                                   "sketchOperation": {
                                     "type": "string"
                                   },
+                                  "sketchProfile": {
+                                    "type": "object",
+                                    "required": [
+                                      "points",
+                                      "segments"
+                                    ],
+                                    "properties": {
+                                      "points": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "additionalProperties": true
+                                        }
+                                      },
+                                      "segments": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "additionalProperties": true
+                                        }
+                                      },
+                                      "sweepFrames": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                      }
+                                    },
+                                    "additionalProperties": true
+                                  },
                                   "color": {
                                     "type": "string"
                                   },
@@ -1509,6 +1537,34 @@
                           "sketchOperation": {
                             "type": "string"
                           },
+                          "sketchProfile": {
+                            "type": "object",
+                            "required": [
+                              "points",
+                              "segments"
+                            ],
+                            "properties": {
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "segments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "sweepFrames": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "additionalProperties": true
+                          },
                           "color": {
                             "type": "string"
                           },
@@ -1922,6 +1978,34 @@
                           },
                           "sketchOperation": {
                             "type": "string"
+                          },
+                          "sketchProfile": {
+                            "type": "object",
+                            "required": [
+                              "points",
+                              "segments"
+                            ],
+                            "properties": {
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "segments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "sweepFrames": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "additionalProperties": true
                           },
                           "color": {
                             "type": "string"
@@ -2390,6 +2474,49 @@
                     "properties": {
                       "kind": {
                         "type": "string"
+                      },
+                      "profile": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "points",
+                              "segments"
+                            ],
+                            "properties": {
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "segments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "sweepFrames": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "additionalProperties": true
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": true
@@ -2412,6 +2539,49 @@
                           "properties": {
                             "kind": {
                               "type": "string"
+                            },
+                            "profile": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "points",
+                                    "segments"
+                                  ],
+                                  "properties": {
+                                    "points": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                      }
+                                    },
+                                    "segments": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                      }
+                                    },
+                                    "sweepFrames": {
+                                      "type": "object",
+                                      "additionalProperties": true
+                                    }
+                                  },
+                                  "additionalProperties": true
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "number"
+                                    }
+                                  }
+                                }
+                              ]
                             }
                           },
                           "additionalProperties": true

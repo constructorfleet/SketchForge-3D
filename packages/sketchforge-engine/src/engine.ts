@@ -73,6 +73,7 @@ import { buildGroupFromSelection } from "./serverShapeBooleans.js";
 import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separateShapeParts } from "./serverShapeGroups.js";
 import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
+import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
@@ -472,6 +473,24 @@ function cadFailure(error: unknown): EngineFailure {
  * and there is no reason to hold a project busy for it.
  */
 async function builtShape(request: ShapeRequest, index: number): Promise<EngineResult<WorkplaneShape>> {
+  if (request.kind === "sketchSweep") {
+    const invalidProfile = invalidSketchSweepProfile(request.profile);
+    if (invalidProfile) return failed({ reason: "invalid_shape_request", index, message: invalidProfile });
+    try {
+      return ok(await sketchSweepShapeFromRequest(request));
+    } catch (error) {
+      return failed({ reason: "sweep_failed", index, message: error instanceof Error ? error.message : "The sketch sweep could not be built." });
+    }
+  }
+  if (request.kind === "sketchSweep") {
+    const invalidProfile = invalidSketchSweepProfile(request.profile);
+    if (invalidProfile) return failed({ reason: "invalid_shape_request", index, message: invalidProfile });
+    try {
+      return ok(await sketchSweepShapeFromRequest(request));
+    } catch (error) {
+      return failed({ reason: "sweep_failed", index, message: error instanceof Error ? error.message : "The sketch sweep could not be built." });
+    }
+  }
   if (request.kind === "revolve" || request.kind === "thread") {
     let revolveRequest = request;
     if (request.kind === "thread") {

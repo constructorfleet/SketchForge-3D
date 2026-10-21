@@ -139,6 +139,48 @@ describe("the REST API over HTTP", () => {
     expect(shape.revolve.pitch).toBe(1);
   });
 
+  it("builds a sketch sweep from a section and an orthogonal spine through the public API", async () => {
+    const profile = {
+      points: [
+        { id: "s0", x: -1, z: -1, sweepRole: "section" },
+        { id: "s1", x: 1, z: -1, sweepRole: "section" },
+        { id: "s2", x: 1, z: 1, sweepRole: "section" },
+        { id: "s3", x: -1, z: 1, sweepRole: "section" },
+        { id: "p0", x: 0, z: 0, sweepRole: "spine" },
+        { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+      ],
+      segments: [
+        { id: "s01", startId: "s0", endId: "s1" },
+        { id: "s12", startId: "s1", endId: "s2" },
+        { id: "s23", startId: "s2", endId: "s3" },
+        { id: "s30", startId: "s3", endId: "s0" },
+        { id: "p01", startId: "p0", endId: "p1" },
+      ],
+    };
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "sketchSweep", name: "API sweep", profile }),
+    });
+    expect(created.status).toBe(201);
+    const [shape] = created.body.shapes as Array<Record<string, any>>;
+    expect(shape).toMatchObject({ kind: "mesh", requestKind: "sketchSweep", sketchOperation: "sweep", name: "API sweep", sketchProfile: profile });
+    expect(shape.width).toBeGreaterThan(0);
+    expect(shape.height).toBeGreaterThan(0);
+    expect(shape.depth).toBeGreaterThan(0);
+    const listed = await api(`/shapes?projectId=${projectId}`);
+    expect((listed.body.shapes as Array<Record<string, any>>).find((candidate) => candidate.id === shape.id)?.sketchProfile).toEqual(profile);
+  });
+
+  it("rejects malformed sketch sweep topology before invoking the CAD kernel", async () => {
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "sketchSweep", profile: { points: [], segments: [] } }),
+    });
+    expect(created.status).toBe(400);
+    expect(created.body.code).toBe("invalid_request");
+    expect(created.body.error).toContain("between 5 and 5000 points");
+  });
+
   it("keeps the kind-specific fields on the shape list, not just on the reply", async () => {
     const listed = await api(`/shapes?projectId=${projectId}`);
     expect(listed.status).toBe(200);

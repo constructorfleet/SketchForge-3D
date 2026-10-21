@@ -89,7 +89,7 @@ The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` re
 { "kind": "cylinder", "width": 8, "height": 30, "sides": 6, "x": 12, "name": "Post" }
 ```
 
-`kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`, plus `revolve` and `thread` (below). A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. Only `mesh`, `sketch`, and `scribble` are left out: those need geometry or a drawn profile rather than numbers.
+`kind` is one of `box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`, plus `revolve`, `thread` and `sketchSweep` (below). A `cube` is a box whose sides match, and `size` stands in for `width`, `depth`, and `height` together. `mesh`, `sketch`, and `scribble` remain unavailable as raw kinds because they need supplied geometry or an editor drawing.
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
 
@@ -232,6 +232,31 @@ A thread comes with its core: a bolt is the thread standing on its shank, and a 
 Catalog pitches and nominal diameters reference ISO 261 / ISO 262 for metric threads and ASME B1.1 for Unified threads. UNF pitches in millimetres are calculated from the standard threads-per-inch values using 25.4 mm per inch. The generated geometry is a simplified nominal 60-degree model; it does not encode thread classes, tolerance limits, or gaging dimensions and is not a manufacturing acceptance model. See [ISO 261](https://www.iso.org/standard/4165.html), [ISO 262:2023](https://www.iso.org/standard/85105.html), [ASME B1.1](https://www.asme.org/codes-standards/find-codes-standards/b1-1-unified-inch-screw-threads-un-unr-thread-form), and the [NIST federal screw-thread standards handbook](https://nvlpubs.nist.gov/nistpubs/Legacy/hb/nbshandbook28supp1963.pdf).
 
 A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable afterwards** -- in the editor's inspector, and over this API: a thread reads back with its sweep under `revolve`, and a `PATCH` changing the pitch sweeps it again.
+
+## Sketch sweeps
+
+`sketchSweep` creates a retained OCCT sweep from a sketch profile. Send one or more closed section loops plus exactly one open spine in `profile`; the server validates the paths, builds the solid, and stores both its tessellation and editable sketch profile.
+
+```json
+{
+  "kind": "sketchSweep",
+  "name": "Square bend",
+  "profile": {
+    "points": [
+      {"id":"a","x":-1,"z":-1}, {"id":"b","x":1,"z":-1},
+      {"id":"c","x":1,"z":1}, {"id":"d","x":-1,"z":1},
+      {"id":"p0","x":0,"z":0}, {"id":"p1","x":10,"z":0}
+    ],
+    "segments": [
+      {"id":"ab","startId":"a","endId":"b"}, {"id":"bc","startId":"b","endId":"c"},
+      {"id":"cd","startId":"c","endId":"d"}, {"id":"da","startId":"d","endId":"a"},
+      {"id":"spine","startId":"p0","endId":"p1"}
+    ]
+  }
+}
+```
+
+The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`, so clients can preserve or revise the source sketch. The current API creates the sweep but does not expose a dedicated PATCH operation to edit its profile or rebuild it.
 
 Threads and springs are built by manifold rather than OCCT, so unlike a fillet they need no exact B-Rep -- but for the same reason the fillet endpoints will not treat one: a swept mesh has no analytic surface to blend. Fillet the profile instead, before sweeping it.
 

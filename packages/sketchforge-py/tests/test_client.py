@@ -194,6 +194,24 @@ class TransportTests(unittest.TestCase):
 
 
 class ShapesTests(unittest.TestCase):
+    def test_sends_a_retained_sketch_sweep_profile_unchanged(self) -> None:
+        profile = {
+            "points": [
+                {"id": "a", "x": -1, "z": -1}, {"id": "b", "x": 1, "z": -1},
+                {"id": "c", "x": 1, "z": 1}, {"id": "d", "x": -1, "z": 1},
+                {"id": "p0", "x": 0, "z": 0}, {"id": "p1", "x": 10, "z": 0},
+            ],
+            "segments": [
+                {"id": "ab", "startId": "a", "endId": "b"}, {"id": "bc", "startId": "b", "endId": "c"},
+                {"id": "cd", "startId": "c", "endId": "d"}, {"id": "da", "startId": "d", "endId": "a"},
+                {"id": "spine", "startId": "p0", "endId": "p1"},
+            ],
+        }
+        opener = FakeOpener((201, {"shapes": [shape_payload(sketchOperation="sweep", sketchProfile=profile)], "revision": 4}))
+        result = client(opener).shapes.create("p1", {"kind": "sketchSweep", "profile": profile})
+        self.assertEqual(result.sketch_operation, "sweep")
+        self.assertEqual(opener.calls[0].body, {"kind": "sketchSweep", "profile": profile})
+
     def test_sends_a_batch_as_one_request(self) -> None:
         opener = FakeOpener((201, {"shapes": [shape_payload()], "revision": 3}))
         client(opener).shapes.create_many("p1", [{"kind": "box"}] * 5)
