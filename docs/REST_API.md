@@ -258,7 +258,26 @@ A `thread` is a `revolve` with the outline filled in; pass your own `profile` to
 }
 ```
 
-The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`, so clients can preserve or revise the source sketch. The current API creates the sweep but does not expose a dedicated PATCH operation to edit its profile or rebuild it.
+The first spine tangent must be normal to the section plane. Point and Bezier-handle `sweepDepth` values support movement out of the displayed spine plane; `sweepFrames` carries the explicit section and spine workplanes for non-default orientations. `GET /shapes` returns `requestKind: "sketchSweep"`, `sketchOperation: "sweep"`, and the original `sketchProfile`. Send a replacement profile in `sketchProfile` to `PATCH /shapes`; the server rebuilds the OCCT solid while preserving the shape ID, source-sketch ID, name, and placement. Invalid profiles return `400 invalid_request`; other shape kinds return `422 unapplicable_fields`.
+
+```json
+{
+  "sketchProfile": {
+    "points": [
+      {"id":"a","x":-2,"z":-1}, {"id":"b","x":2,"z":-1},
+      {"id":"c","x":2,"z":1}, {"id":"d","x":-2,"z":1},
+      {"id":"p0","x":0,"z":0}, {"id":"p1","x":10,"z":0}
+    ],
+    "segments": [
+      {"id":"ab","startId":"a","endId":"b"}, {"id":"bc","startId":"b","endId":"c"},
+      {"id":"cd","startId":"c","endId":"d"}, {"id":"da","startId":"d","endId":"a"},
+      {"id":"spine","startId":"p0","endId":"p1"}
+    ]
+  }
+}
+```
+
+The TypeScript client accepts this as `client.shapes.update(projectId, shapeId, { sketchProfile })`. The Python client accepts the same camelCase wire field in its `changes` mapping: `client.shapes.update(project_id, shape_id, {"sketchProfile": profile})`.
 
 Threads and springs are built by manifold rather than OCCT, so unlike a fillet they need no exact B-Rep -- but for the same reason the fillet endpoints will not treat one: a swept mesh has no analytic surface to blend. Fillet the profile instead, before sweeping it.
 
