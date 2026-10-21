@@ -565,6 +565,7 @@ async function serializeShapeNode(
     definition.sketchProfile = {
       points: sketchProfile.points,
       segments: sketchProfile.segments,
+      ...(sketchProfile.sweepFrames ? { sweepFrames: sketchProfile.sweepFrames } : {}),
       ...(sketchProfile.constraints?.length ? { constraints: sketchProfile.constraints } : {}),
       ...(images.length ? { images } : {}),
     };
@@ -954,7 +955,20 @@ function validateSketchProfile(value: unknown, label: string) {
     pointIds.add(id);
     finiteNumber(point.x, `${label}.points[${index}].x`);
     finiteNumber(point.z, `${label}.points[${index}].z`);
+    if (point.sweepRole !== undefined && point.sweepRole !== "section" && point.sweepRole !== "spine") {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].sweepRole` });
+    }
   });
+  if (profile.sweepFrames !== undefined) {
+    const frames = objectRecord(profile.sweepFrames, `${label}.sweepFrames`);
+    for (const name of ["section", "spine"] as const) {
+      const frame = objectRecord(frames[name], `${label}.sweepFrames.${name}`);
+      for (const field of ["origin", "normal", "xAxis", "zAxis"] as const) {
+        const vector = objectRecord(frame[field], `${label}.sweepFrames.${name}.${field}`);
+        for (const axis of ["x", "y", "z"] as const) finiteNumber(vector[axis], `${label}.sweepFrames.${name}.${field}.${axis}`);
+      }
+    }
+  }
   const segmentIds = new Set<string>();
   profile.segments.forEach((rawSegment, index) => {
     const segment = objectRecord(rawSegment, `${label}.segments[${index}]`);

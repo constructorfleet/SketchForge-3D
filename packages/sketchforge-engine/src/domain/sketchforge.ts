@@ -129,9 +129,17 @@ export type SketchPoint = {
   id: string;
   x: number;
   z: number;
+  sweepRole?: "section" | "spine";
   handleIn?: { x: number; z: number };
   handleOut?: { x: number; z: number };
   mode?: "corner" | "smooth" | "split";
+};
+
+export type SketchSweepFrame = {
+  origin: { x: number; y: number; z: number };
+  normal: { x: number; y: number; z: number };
+  xAxis: { x: number; y: number; z: number };
+  zAxis: { x: number; y: number; z: number };
 };
 
 export type SketchSegment = {
@@ -168,6 +176,7 @@ export type SketchProfile = {
   segments: SketchSegment[];
   constraints?: SketchConstraint[];
   images?: SketchImage[];
+  sweepFrames?: { section: SketchSweepFrame; spine: SketchSweepFrame };
 };
 
 export type SketchOperation = "extrude" | "revolve" | "sweep";

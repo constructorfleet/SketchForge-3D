@@ -362,6 +362,20 @@ describe("SketchForge .skf project packages", () => {
   });
 
   it("preserves the sweep sketch operation through SKF export and import", async () => {
+    const sweepFrames = {
+      section: {
+        origin: { x: 1, y: 2, z: 3 },
+        normal: { x: 0, y: 1, z: 0 },
+        xAxis: { x: 1, y: 0, z: 0 },
+        zAxis: { x: 0, y: 0, z: 1 },
+      },
+      spine: {
+        origin: { x: 1, y: 2, z: 3 },
+        normal: { x: 0, y: 0, z: 1 },
+        xAxis: { x: 0, y: 1, z: 0 },
+        zAxis: { x: 1, y: 0, z: 0 },
+      },
+    };
     const sweep = shape("mesh", "sweep-sketch", {
       sketchOperation: "sweep",
       sketchProfile: {
@@ -373,6 +387,7 @@ describe("SketchForge .skf project packages", () => {
           { id: "s4", startId: "p4", endId: "p1", kind: "line" },
           { id: "s5", startId: "path1", endId: "path2", kind: "line" },
         ],
+        sweepFrames,
       },
       importedMesh: {
         positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -390,6 +405,7 @@ describe("SketchForge .skf project packages", () => {
     expect(document.features[0].type).toBe("sketch-sweep");
     expect(restored.shapes[0].sketchOperation).toBe("sweep");
     expect(restored.shapes[0].sketchProfile).toEqual(sweep.sketchProfile);
+    expect(restored.shapes[0].sketchProfile?.sweepFrames).toEqual(sweepFrames);
   });
 
   it("preserves nested groups, holes, intersection metadata, edge history, B-Rep, and undo/redo", async () => {
