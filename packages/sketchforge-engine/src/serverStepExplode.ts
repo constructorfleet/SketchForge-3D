@@ -1,9 +1,9 @@
 /** Split a retained STEP source into positioned, independently editable solids. Node-only. */
 
 import * as THREE from "three";
-import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
+import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
-import { componentColorsFromGlb } from "./stepGlbColors.js";
+import { stepComponentMetadata, stepShapeKey } from "./stepComponentMetadata.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
@@ -15,79 +15,6 @@ const X_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } } 
 
 function boundsOf(cad: Parameters<Parameters<typeof withCadKernel>[0]>[0], shape: ShapeHandle) {
   return cad.getBoundingBox(shape, false);
-}
-
-type ComponentMetadata = { name?: string; color?: string };
-
-function shapeKey(cad: OcctKernel, shape: ShapeHandle) {
-  const bounds = boundsOf(cad, shape);
-  const values = [
-    cad.getVolume(shape), bounds.xmin, bounds.ymin, bounds.zmin,
-    bounds.xmax, bounds.ymax, bounds.zmax,
-  ];
-  return values.map((value) => value.toFixed(5)).join(":");
-}
-
-function colorHex(color: [number, number, number]) {
-  return `#${color.map((channel) => Math.round(Math.max(0, Math.min(1, channel)) * 255).toString(16).padStart(2, "0")).join("")}`;
-}
-
-/** Read XCAF instance labels and associate leaf component metadata with its exact solid. */
-function stepComponentMetadata(cad: OcctKernel, step: string) {
-  const metadataBySolid = new Map<string, ComponentMetadata[]>();
-  const document = cad.importXCAFFromSTEP(step);
-  try {
-    let colorsByName = new Map<string, { count: number; color?: string }>();
-    try {
-      colorsByName = componentColorsFromGlb(document.exportGLTF());
-    } catch {
-      // The XCAF label data remains usable when the optional color view cannot be exported.
-    }
-    const leaves: { name: string; nameForOutput?: string; color?: string; solids: ShapeHandle[] }[] = [];
-    const visit = (label: LabelTag, inheritedColor?: string) => {
-      const info = document.getLabelInfo(label);
-      const labelColor = info.hasColor ? colorHex(info.color) : undefined;
-      const children = document.getChildren(label);
-      const inherited = labelColor ?? inheritedColor;
-      if (children.length) {
-        for (const child of children) visit(child, inherited);
-        return;
-      }
-      if (info.isAssembly || !info.shapeHandle) return;
-      const solids = cad.getSubShapes(info.shapeHandle, "solid");
-      const name = info.name.trim();
-      leaves.push({
-        name,
-        ...(name && !/^\d+$/.test(name) ? { nameForOutput: name } : {}),
-        ...(inherited ? { color: inherited } : {}),
-        solids,
-      });
-    };
-    for (const root of document.getRoots()) visit(root);
-
-    const leafCountByName = new Map<string, number>();
-    for (const leaf of leaves) {
-      if (leaf.name) leafCountByName.set(leaf.name, (leafCountByName.get(leaf.name) ?? 0) + 1);
-    }
-    for (const leaf of leaves) {
-      const glbCandidate = colorsByName.get(leaf.name);
-      const color = leaf.color ?? (leaf.name && leafCountByName.get(leaf.name) === 1 && glbCandidate?.count === 1
-        ? glbCandidate.color
-        : undefined);
-      for (const solid of leaf.solids) {
-        const key = shapeKey(cad, solid);
-        const metadata = metadataBySolid.get(key) ?? [];
-        metadata.push({
-          ...(leaf.nameForOutput ? { name: leaf.nameForOutput } : {}),
-          ...(color ? { color } : {}),
-        });
-        metadataBySolid.set(key, metadata);
-      }
-    }
-  } finally {
-    document.close();
-  }
-  return metadataBySolid;
 }
 
 /** Turn a STEP-imported mesh shape into one exact mesh/B-rep-backed shape per solid. */
@@ -121,7 +48,7 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
 
     return solids.map((solid, index) => {
-      const metadata = componentMetadata.get(shapeKey(cad, solid))?.shift();
+      const metadata = componentMetadata.get(stepShapeKey(cad, solid))?.shift();
       const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
       const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
       const bounds = boundsOf(cad, positioned);

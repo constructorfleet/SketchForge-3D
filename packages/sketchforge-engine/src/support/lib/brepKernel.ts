@@ -15,28 +15,41 @@ const OCCT_WASM_URL = "/occt/occt-wasm.wasm";
 export type Brep = typeof import("brepjs");
 export type BrepSolid = ReturnType<Brep["box"]>;
 type OcctWasmModule = typeof import("occt-wasm");
+type OcctKernel = import("occt-wasm").OcctKernel;
 
 let brepReady: Promise<Brep> | null = null;
+let kernelReady: Promise<OcctKernel> | null = null;
 
-export async function loadBrepWithOcct(): Promise<Brep> {
-  // Cache the in-flight/resolved load, but drop a rejected attempt so a transient
-  // failure (e.g. a blip fetching the 22 MB wasm) can be retried on the next call
-  // instead of poisoning STEP for the rest of the session.
-  brepReady ??= (async () => {
-    const brep = await import("brepjs");
+/** Load the registered OCCT instance for operations that need its XCAF API. */
+export async function loadOcctKernel(): Promise<OcctKernel> {
+  kernelReady ??= (async () => {
     if (typeof window !== "undefined") {
       const occt = (await import(/* webpackIgnore: true */ OCCT_INDEX_URL)) as unknown as OcctWasmModule;
-      const kernel = await occt.OcctKernel.init({ wasm: OCCT_WASM_URL });
-      brep.registerKernel("occt-wasm", brep.OcctWasmAdapter.fromKernel(kernel));
-      return brep;
+      return occt.OcctKernel.init({ wasm: OCCT_WASM_URL });
     }
     const [{ OcctKernel: KernelConstructor }, { default: createModule }] = await Promise.all([
       import(/* webpackIgnore: true */ OCCT_PACKAGE_URL),
       import(/* webpackIgnore: true */ OCCT_NODE_INDEX_URL),
     ]) as [typeof import("occt-wasm"), { default: () => Promise<unknown> }];
     const module = await createModule();
-    const Kernel = KernelConstructor as unknown as new (rawModule: unknown) => import("occt-wasm").OcctKernel;
-    brep.registerKernel("occt-wasm", brep.OcctWasmAdapter.fromKernel(new Kernel(module)));
+    const Kernel = KernelConstructor as unknown as new (rawModule: unknown) => OcctKernel;
+    return new Kernel(module);
+  })();
+  try {
+    return await kernelReady;
+  } catch (error) {
+    kernelReady = null;
+    throw error;
+  }
+}
+
+export async function loadBrepWithOcct(): Promise<Brep> {
+  // Cache the in-flight/resolved load, but drop a rejected attempt so a transient
+  // failure (e.g. a blip fetching the 22 MB wasm) can be retried on the next call
+  // instead of poisoning STEP for the rest of the session.
+  brepReady ??= (async () => {
+    const [brep, kernel] = await Promise.all([import("brepjs"), loadOcctKernel()]);
+    brep.registerKernel("occt-wasm", brep.OcctWasmAdapter.fromKernel(kernel));
     return brep;
   })().catch((error) => {
     brepReady = null;
