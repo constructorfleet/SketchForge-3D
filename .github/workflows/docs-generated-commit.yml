@@ -15,7 +15,7 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
-      actions: write
+      actions: read
       contents: write
       pull-requests: read
     steps:
@@ -80,12 +80,6 @@ jobs:
           if [[ "$generator_result" != success ]]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
             echo "Generated docs auto-commit skipped: generation step result is $generator_result." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          files=$(gh api --paginate "repos/$REPOSITORY/pulls/$pr_number/files?per_page=100" --jq '.[].filename')
-          if grep -qE '^\.github/(workflows|actions)/' <<< "$files"; then
-            echo "eligible=false" >> "$GITHUB_OUTPUT"
-            echo "Generated docs auto-commit skipped because this PR changes workflow or local action control files." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           echo "eligible=true" >> "$GITHUB_OUTPUT"

@@ -112,7 +112,7 @@ async function runWriter({ artifactDir, apiUrl, summaryPath }) {
   }
 }
 
-test("trusted docs writer commits only allowlisted files and dispatches checks for the new SHA", async () => {
+test("trusted docs writer commits only allowlisted files and dispatches the trusted verifier for the new SHA", async () => {
   await withWriter({}, async ({ artifactDir, requests, apiUrl }) => {
     const result = await runWriter({ artifactDir, apiUrl });
     assert.equal(result.status, 0, result.stderr);
@@ -120,12 +120,11 @@ test("trusted docs writer commits only allowlisted files and dispatches checks f
     assert.deepEqual(tree.body.tree.map(({ path: file }) => file), GENERATED_DOC_PATHS);
     const commit = requests.find(({ method, pathname }) => method === "POST" && pathname === "git/commits");
     assert.deepEqual(commit.body.parents, [headSha]);
-    const dispatches = requests.filter(({ method, pathname }) => method === "POST" && pathname.startsWith("actions/workflows/"));
-    assert.deepEqual(dispatches.map(({ pathname, body }) => [pathname, body.inputs.expected_sha]), [
-      ["actions/workflows/ci.yml/dispatches", newSha],
-      ["actions/workflows/docs.yml/dispatches", newSha],
-      ["actions/workflows/pr-title.yml/dispatches", newSha],
-    ]);
+    const dispatches = requests.filter(({ method, pathname }) => method === "POST" && pathname === "dispatches");
+    assert.deepEqual(dispatches.map(({ body }) => [body.event_type, body.client_payload]), [[
+      "generated_docs_pr_checks", { expected_sha: newSha, pr_number: 42 },
+    ]]);
+    assert.equal(dispatches[0].body.ref, undefined, "repository_dispatch must run the default-branch workflow definition");
   });
 });
 

@@ -43,17 +43,6 @@ function assertEnvironment() {
   if (!/^\d+$/.test(process.env.DOCS_SOURCE_RUN_ID)) throw new Error("Invalid source workflow run ID");
 }
 
-async function changedControlFiles(repo, pullRequestNumber) {
-  const changed = [];
-  for (let page = 1; ; page += 1) {
-    const files = await apiRequest(repo, `pulls/${pullRequestNumber}/files?per_page=100&page=${page}`);
-    if (!Array.isArray(files)) throw new Error("GitHub did not return pull request files");
-    changed.push(...files.map(({ filename }) => filename));
-    if (files.length < 100) break;
-  }
-  return changed.filter((filename) => filename.startsWith(".github/workflows/") || filename.startsWith(".github/actions/"));
-}
-
 async function skip(message) {
   const summary = `Generated docs auto-commit skipped: ${message}`;
   console.log(summary);
@@ -110,12 +99,6 @@ async function main() {
 
   const files = await validateGeneratedDocsArtifact(expected);
 
-  const protectedChanges = await changedControlFiles(repo, pullRequestNumber);
-  if (protectedChanges.length) {
-    console.log(`Skipping generated-docs auto-commit because this PR changes workflow controls: ${protectedChanges.join(", ")}`);
-    return;
-  }
-
   const ref = await apiRequest(repo, `git/ref/heads/${process.env.EXPECTED_BRANCH}`);
   if (ref.object?.sha !== expected.headSha) {
     await skip(`target branch for pull request #${pullRequestNumber} advanced after generation.`);
@@ -164,17 +147,14 @@ async function main() {
     targetSha = newCommit.sha;
   }
 
-  for (const [workflow, inputs] of [
-    ["ci.yml", { expected_sha: targetSha }],
-    ["docs.yml", { expected_sha: targetSha }],
-    ["pr-title.yml", { expected_sha: targetSha, pr_number: String(pullRequestNumber), pr_title: pullRequest.title }],
-  ]) {
-    await apiRequest(repo, `actions/workflows/${workflow}/dispatches`, {
+  await apiRequest(repo, "dispatches", {
       method: "POST",
-      body: { ref: process.env.EXPECTED_BRANCH, inputs },
+      body: {
+        event_type: "generated_docs_pr_checks",
+        client_payload: { expected_sha: targetSha, pr_number: pullRequestNumber },
+      },
     });
-  }
-  console.log(`Committed ${generated.length} generated documentation files${generated.length ? ` as ${targetSha}` : ""}; dispatched read-only CI and docs workflows for exact commit ${targetSha}.`);
+  console.log(`Committed ${generated.length} generated documentation files${generated.length ? ` as ${targetSha}` : ""}; dispatched trusted PR checks for exact commit ${targetSha}.`);
 }
 
 main().catch((error) => {

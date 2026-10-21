@@ -4,30 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: Exact PR commit to verify after generated docs are committed
-        required: true
-        type: string
 
 jobs:
-  validate-dispatch:
-    name: Validate dispatched commit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check dispatched commit SHA
-        env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_SHA" != "$EXPECTED_SHA" ]]; then
-            echo "workflow_dispatch selected $GITHUB_SHA, expected $EXPECTED_SHA" >&2
-            exit 1
-          fi
-
   package-reference:
     name: Package reference generation
-    needs: validate-dispatch
     runs-on: ubuntu-latest
 
     steps:
@@ -59,7 +39,6 @@ jobs:
 
   package-examples:
     name: Package examples against local API
-    needs: validate-dispatch
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -118,7 +97,6 @@ jobs:
 
   checks:
     name: Typecheck and unit tests
-    needs: validate-dispatch
     runs-on: ubuntu-latest
 
     steps:
@@ -151,7 +129,6 @@ jobs:
     # seconds, so it is deliberately not one of the required checks: it is
     # signal, not a gate.
     name: REST API end to end
-    needs: validate-dispatch
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -176,7 +153,6 @@ jobs:
     # the export build was broken for months behind a script that silently did
     # not set STATIC_EXPORT outside Windows.
     name: Static export build
-    needs: validate-dispatch
     runs-on: ubuntu-latest
 
     steps:

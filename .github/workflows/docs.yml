@@ -4,12 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: Exact PR commit for generated-docs verification
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -19,22 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate-dispatch:
-    name: Validate dispatched commit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check dispatched commit SHA
-        env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_SHA" != "$EXPECTED_SHA" ]]; then
-            echo "workflow_dispatch selected $GITHUB_SHA, expected $EXPECTED_SHA" >&2
-            exit 1
-          fi
-
   build:
     name: Check and build docs
-    needs: validate-dispatch
     runs-on: ubuntu-latest
     permissions:
       contents: read
