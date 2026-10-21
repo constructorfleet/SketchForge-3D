@@ -183,6 +183,7 @@ import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge,
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
+import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
@@ -319,6 +320,16 @@ function cloneSketchProfile(profile: SketchProfile): SketchProfile {
     segments: profile.segments.map((segment) => ({ ...segment })),
     ...(profile.constraints ? { constraints: profile.constraints.map((constraint): SketchConstraint => ({ ...constraint, ...("pointIds" in constraint ? { pointIds: [...constraint.pointIds] as [string, string] } : {}) })) } : {}),
     images: (profile.images ?? []).map((image) => ({ ...image })),
+    ...(profile.sweepFrames ? { sweepFrames: {
+      section: {
+        origin: { ...profile.sweepFrames.section.origin }, normal: { ...profile.sweepFrames.section.normal },
+        xAxis: { ...profile.sweepFrames.section.xAxis }, zAxis: { ...profile.sweepFrames.section.zAxis },
+      },
+      spine: {
+        origin: { ...profile.sweepFrames.spine.origin }, normal: { ...profile.sweepFrames.spine.normal },
+        xAxis: { ...profile.sweepFrames.spine.xAxis }, zAxis: { ...profile.sweepFrames.spine.zAxis },
+      },
+    } } : {}),
   };
 }
 
@@ -5487,6 +5498,7 @@ export function SketchForgeEditor({
     () => normalizePlacementWorkplane(initialPlacementWorkplane, initialPlacementElevation),
   );
   const [sketchOperation, setSketchOperation] = useState<SketchOperation>("extrude");
+  const [sweepStage, setSweepStage] = useState<SketchSweepStage>("section");
   const [sketchRevolveSettings, setSketchRevolveSettings] = useState<SketchRevolveSettings>(() => ({ ...DEFAULT_SKETCH_REVOLVE_SETTINGS }));
   const [sketchRevolvePreview, setSketchRevolvePreview] = useState<SketchRevolveMesh | null>(null);
   const sketchRevolvePreviewRequestRef = useRef(0);
@@ -6334,7 +6346,17 @@ export function SketchForgeEditor({
   const commitSketchProfile = useCallback(
     (next: SketchProfile, message?: Notice, anchoredPointIds?: readonly string[]) => {
       const solved = anchoredPointIds ? solveSketchConstraints(next, anchoredPointIds) : null;
-      const snapshot = cloneSketchProfile(addLineIntersectionPoints(solved?.profile ?? next, createLocalId, {
+      const candidate = solved?.profile ?? next;
+      const planeTagged = sketchOperation === "sweep"
+        ? (() => {
+            const withFrames = tagSweepProfile(candidate, sweepFramesForSectionWorkplane(activeSketchWorkplane));
+            return {
+              ...withFrames,
+              points: withFrames.points.map((point) => point.sweepRole ? point : { ...point, sweepRole: sweepStage }),
+            };
+          })()
+        : candidate;
+      const snapshot = cloneSketchProfile(addLineIntersectionPoints(planeTagged, createLocalId, {
         splitIntersections: sketchOperation !== "sweep",
       }));
       const current = sketchHistoryRef.current;
@@ -6355,7 +6377,7 @@ export function SketchForgeEditor({
       setSketchHistoryIndex(sketchHistoryIndexRef.current);
       if (!solved?.unsatisfiedConstraintIds.length && message) setNotice(message);
     },
-    [setNotice, sketchOperation],
+    [activeSketchWorkplane, setNotice, sketchOperation, sweepStage],
   );
 
   const beginSketch = useCallback((
@@ -6365,12 +6387,17 @@ export function SketchForgeEditor({
     revolveSettings?: Partial<SketchRevolveSettings>,
     workplaneOverride?: PlacementWorkplane,
   ) => {
-    const initial = cloneSketchProfile(profile ?? emptySketchProfile());
+    const nextWorkplane = normalizePlacementWorkplane(workplaneOverride ?? placementWorkplaneRef.current);
+    const initial = operation === "sweep"
+      ? tagSweepProfile(profile ?? emptySketchProfile(), sweepFramesForSectionWorkplane(nextWorkplane))
+      : cloneSketchProfile(profile ?? emptySketchProfile());
+    const initialSweepStage = getSketchSweepStage(orderedSketchPaths(initial), operation) ?? "section";
     setWorkplaneMode(false);
-    setActiveSketchWorkplane(normalizePlacementWorkplane(workplaneOverride ?? placementWorkplaneRef.current));
+    setActiveSketchWorkplane(nextWorkplane);
     setToolbarMode("sketch");
     setSketchActive(true);
     setSketchOperation(operation);
+    setSweepStage(initialSweepStage);
     setSketchRevolveSettings(normalizeSketchRevolveSettings(revolveSettings));
     setSketchRevolvePreview(null);
     setSketchTool(profile?.segments.length ? "select" : "line");
@@ -6528,12 +6555,15 @@ export function SketchForgeEditor({
       const smoothed = sketchTool === "smooth" ? withSmoothSketchHandles(next) : next;
       const closed = orderedSketchPaths(smoothed).some((path) => path.closed && path.steps.some((step) => step.segment.startId === sketchActivePointId || step.segment.endId === sketchActivePointId));
       if (!duplicate) commitSketchProfile(smoothed, notice((t) => t(closed ? "editor.sketch.profileClosed" : "editor.sketch.segmentAdded")));
+      if (closed && sketchOperation === "sweep") {
+        setSweepStage("spine");
+      }
       setSketchActivePointId(closed ? null : pointId);
       setSketchSelection({ kind: "point", id: pointId });
-      if (closed) setSketchTool("select");
+      if (closed) setSketchTool(sketchOperation === "sweep" ? "line" : "select");
       return smoothed;
     },
-    [commitSketchProfile, sketchActivePointId, sketchProfile, sketchTool, t],
+    [commitSketchProfile, sketchActivePointId, sketchOperation, sketchProfile, sketchTool, t],
   );
 
   const addSketchPlanePoint = useCallback(
@@ -6544,7 +6574,10 @@ export function SketchForgeEditor({
       }
       if (!["line", "bezier", "smooth"].includes(sketchTool)) return;
       const curveKind = sketchTool as NonNullable<SketchSegment["kind"]>;
-      const existing = sketchProfile.points.find((point) => Math.hypot(point.x - position.x, point.z - position.z) < 0.0001);
+      const expectedRole = sketchOperation === "sweep" ? sweepStage : undefined;
+      const existing = sketchProfile.points.find((point) =>
+        (!expectedRole || point.sweepRole === expectedRole) && Math.hypot(point.x - position.x, point.z - position.z) < 0.0001,
+      );
       if (existing) {
         connectSketchPoint(existing.id);
         return;
@@ -6552,6 +6585,7 @@ export function SketchForgeEditor({
       const point: SketchPoint = {
         id: createLocalId("sketch-point"),
         ...position,
+        ...(sketchOperation === "sweep" ? { sweepRole: sweepStage } : {}),
         ...(handles ?? {}),
         mode: sketchTool === "line" ? "corner" : sketchTool === "smooth" ? "smooth" : handles ? "smooth" : "corner",
       };
@@ -6564,7 +6598,7 @@ export function SketchForgeEditor({
       setSketchActivePointId(point.id);
       setSketchSelection({ kind: "point", id: point.id });
     },
-    [commitSketchProfile, connectSketchPoint, measureSketchPoint, sketchActivePointId, sketchProfile, sketchTool, t],
+    [commitSketchProfile, connectSketchPoint, measureSketchPoint, sketchActivePointId, sketchOperation, sketchProfile, sketchTool, sweepStage, t],
   );
 
   const addSketchPrimitive = useCallback(
@@ -9765,6 +9799,17 @@ export function SketchForgeEditor({
             onAddConstraint={addSketchConstraint}
             onRemoveConstraint={removeSketchConstraint}
             operation={sketchOperation}
+            sweepStage={sweepStage}
+            sweepScreenRight={formatSweepAxis(sketchProfile.sweepFrames?.spine.xAxis ?? activeSketchWorkplane.normal)}
+            sweepScreenUp={formatSweepAxis(sketchProfile.sweepFrames?.spine.zAxis ?? activeSketchWorkplane.xAxis)}
+            onSweepStageChange={(stage) => {
+              setSweepStage(stage);
+              setSketchTool("line");
+              setSketchActivePointId(null);
+              setSketchSelection(null);
+              setSketchMeasureStart(null);
+              setSketchMeasurement(null);
+            }}
             revolvePreviewPositions={sketchRevolvePreview?.positions ?? null}
             referenceShapes={sketchReferenceShapes.filter((shape) => shape.id !== editingSketchShapeId)}
             tool={sketchTool}

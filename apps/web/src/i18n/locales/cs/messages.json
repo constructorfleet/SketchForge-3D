@@ -787,7 +787,8 @@
       "sweepSectionStage": "Krok 1 ze 2 · Profil na vybrané rovině",
       "sweepSectionHelp": "Nakreslete a uzavřete profil se středem v počátku (0,0) vybrané roviny. Po uzavření se přepne na kolmou rovinu odvozenou z této pracovní roviny.",
       "sweepSpineStage": "Krok 2 ze 2 · Dráha na kolmé rovině",
-      "sweepSpineHelp": "Nakreslete otevřenou dráhu z počátku profilu (0,0). Začněte směrem doprava na obrazovce (po normále profilu) a podle potřeby pak dráhu ohněte.",
+      "sweepSpineAxes": "Na této rovině odpovídá směr doprava na obrazovce {right} a směr nahoru {up}.",
+      "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí ke směru doprava na obrazovce, aby profil zůstal kolmý k počáteční tečně; další ohyby jsou volné.",
       "sweepSectionPlane": "Upravit profil · vybraná rovina",
       "sweepSpinePlane": "Kreslit dráhu · kolmá rovina"
     }

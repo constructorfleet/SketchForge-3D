@@ -787,7 +787,8 @@
       "sweepSectionStage": "Etap 1 z 2 · Przekrój na wybranej płaszczyźnie",
       "sweepSectionHelp": "Narysuj i zamknij przekrój wyśrodkowany w początku układu (0,0) wybranej płaszczyzny. Następnie widok przełączy się na wyprowadzoną z niej płaszczyznę ortogonalną ścieżki.",
       "sweepSpineStage": "Etap 2 z 2 · Ścieżka na płaszczyźnie ortogonalnej",
-      "sweepSpineHelp": "Narysuj otwartą ścieżkę od początku przekroju (0,0). Zacznij w prawo na ekranie (wzdłuż normalnej przekroju), a potem zakrzyw ścieżkę według potrzeb.",
+      "sweepSpineAxes": "Na tej płaszczyźnie kierunek w prawo na ekranie to {right}, a w górę to {up}.",
+      "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się do kierunku w prawo na ekranie, aby przekrój pozostał prostopadły do początkowej stycznej; kolejne zakręty są swobodne.",
       "sweepSectionPlane": "Edytuj przekrój · wybrana płaszczyzna",
       "sweepSpinePlane": "Rysuj ścieżkę · płaszczyzna ortogonalna"
     }

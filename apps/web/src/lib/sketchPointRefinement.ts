@@ -129,6 +129,7 @@ export function splitSketchSegment(
     point = {
       id: newPointId,
       ...position,
+      sweepRole: start.sweepRole,
       handleIn: d,
       handleOut: e,
       mode: "smooth",
@@ -139,7 +140,7 @@ export function splitSketchSegment(
       return entry;
     });
   } else {
-    point = { id: newPointId, ...lerpPoint(start, end, amount), mode: "corner" };
+    point = { id: newPointId, ...lerpPoint(start, end, amount), sweepRole: start.sweepRole, mode: "corner" };
   }
 
   const secondSegmentId = createId("sketch-segment");

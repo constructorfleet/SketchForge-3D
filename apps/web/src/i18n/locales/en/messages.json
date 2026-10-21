@@ -885,7 +885,8 @@
       "sweepSectionStage": "Step 1 of 2 · Section on selected plane",
       "sweepSectionHelp": "Draw and close one section loop centered at the selected plane origin (0,0). Closing it switches to the orthogonal plane derived from this workplane for the spine.",
       "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
-      "sweepSpineHelp": "Draw one open spine from the section origin (0,0). Start toward screen-right (along the section normal), then bend the spine as needed.",
+      "sweepSpineAxes": "On this plane, screen-right follows {right} and screen-up follows {up}.",
+      "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent; later bends are free.",
       "sweepSectionPlane": "Edit section · selected plane",
       "sweepSpinePlane": "Draw spine · orthogonal plane"
     }

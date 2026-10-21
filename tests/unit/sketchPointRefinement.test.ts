@@ -24,8 +24,8 @@ describe("sketch point refinement", () => {
   it("splits a bezier without moving the curve at the inserted point", () => {
     const profile: SketchProfile = {
       points: [
-        { id: "a", x: 0, z: 0, handleOut: { x: 0, z: 10 }, mode: "smooth" },
-        { id: "b", x: 10, z: 0, handleIn: { x: 10, z: 10 }, mode: "smooth" },
+        { id: "a", x: 0, z: 0, sweepRole: "spine", handleOut: { x: 0, z: 10 }, mode: "smooth" },
+        { id: "b", x: 10, z: 0, sweepRole: "spine", handleIn: { x: 10, z: 10 }, mode: "smooth" },
       ],
       segments: [{ id: "curve", startId: "a", endId: "b", kind: "bezier" }],
     };
@@ -36,6 +36,7 @@ describe("sketch point refinement", () => {
     expect(inserted?.z).toBeCloseTo(7.5, 8);
     expect(inserted?.handleIn).toEqual({ x: 2.5, z: 7.5 });
     expect(inserted?.handleOut).toEqual({ x: 7.5, z: 7.5 });
+    expect(inserted?.sweepRole).toBe("spine");
     expect(result.profile.segments).toHaveLength(2);
     expect(result.profile.segments[0].endId).toBe(result.pointId);
     expect(result.profile.segments[1].startId).toBe(result.pointId);

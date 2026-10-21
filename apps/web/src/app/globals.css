@@ -3797,6 +3797,24 @@ button {
   padding: 8px 12px;
 }
 
+.sketch-plate.operation-sweep.stage-section .sketch-plate-background {
+  fill: #f8fbfc;
+}
+
+.sketch-plate.operation-sweep.stage-spine .sketch-plate-background {
+  fill: #f2f9ff;
+}
+
+.sketch-sweep-section-ghost path {
+  fill: none;
+  stroke: #00a6bd;
+  stroke-width: 4px;
+  stroke-dasharray: 6px 4px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px #ffffff);
+  vector-effect: non-scaling-stroke;
+}
+
 .sketch-sweep-legend {
   display: flex;
   align-items: center;
@@ -3811,6 +3829,35 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+.sketch-sweep-stage-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sketch-sweep-stage-controls button {
+  padding: 5px 10px;
+  color: #173b5a;
+  background: #ffffff;
+  border: 1px solid rgba(67, 126, 145, 0.42);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.sketch-sweep-stage-controls button[aria-pressed="true"] {
+  color: #ffffff;
+  background: #24718a;
+  border-color: #24718a;
+}
+
+.sketch-sweep-stage-controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .sketch-sweep-legend i {
