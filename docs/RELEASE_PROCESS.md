@@ -11,8 +11,10 @@ a breaking change.
 The root `package.json` version is the release authority. The engine, TypeScript
 client, Python package, and `.release-please-manifest.json` must carry the same
 version. Release Please reads `release-please-config.json` and opens or updates
-a release pull request on `main`. Review its version changes and generated
-release notes, then merge that release pull request to publish the release.
+a release pull request on `main`. It updates the publishing-client version table
+in that pull request as part of its version bump. Review its version changes and
+generated release notes, then merge that release pull request to publish the
+release.
 
 `docs/CHANGELOG.md` is maintained separately from the generated GitHub release
 notes. Add user-visible changes there as part of their feature or fix pull

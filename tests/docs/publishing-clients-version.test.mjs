@@ -23,7 +23,19 @@ test("publishing clients table shows the current release-please version", async 
   for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
     const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));
     assert.ok(row, `missing publishing row for ${name}`);
-    assert.ok(row.endsWith(`| \`${version}\` |`), `${name} row should show ${version}: ${row}`);
+    assert.ok(row.includes(`| \`${version}\` |`), `${name} row should show ${version}: ${row}`);
   }
   assert.doesNotMatch(guide, /the release version/i);
+
+  const releaseConfig = JSON.parse(await read("release-please-config.json"));
+  assert.ok(
+    releaseConfig.packages["."]["extra-files"].some(
+      (file) => file.type === "generic" && file.path === "docs/PUBLISHING_CLIENTS.md",
+    ),
+    "release-please should update the publishing versions as part of every release PR",
+  );
+  for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
+    const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));
+    assert.match(row, /x-release-please-version/, `${name} row needs a release-please version marker`);
+  }
 });
