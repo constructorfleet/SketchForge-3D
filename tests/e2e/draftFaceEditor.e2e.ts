@@ -5,7 +5,10 @@ import { buildFaceDraft } from "@/lib/engine/draftFace";
 import editorExtrusion from "../fixtures/face-draft-editor-extrusion.json";
 
 describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
-  async function extrusionSource() {
+  async function extrusionSource(rotation?: {
+    axis: { point: { x: number; y: number; z: number }; direction: { x: number; y: number; z: number } };
+    angleRad: number;
+  }) {
     return withCadKernel((cad) => {
       const points = [
         { x: -10, y: 0, z: -10 }, { x: 10, y: 0, z: -10 },
@@ -13,8 +16,9 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
       ];
       const edges = points.map((point, index) => cad.makeLineEdge(point, points[(index + 1) % points.length]!));
       const solid = cad.extrude(cad.makeFace(cad.makeWire(edges)), 0, 10, 0);
-      const faces = cad.getSubShapes(solid, "face");
-      return { brep: cad.toBREP(solid), faceIds: faces.map((_, index) => `face-${index}`) };
+      const oriented = rotation ? cad.rotate(solid, rotation.axis, rotation.angleRad) : solid;
+      const faces = cad.getSubShapes(oriented, "face");
+      return { brep: cad.toBREP(oriented), faceIds: faces.map((_, index) => `face-${index}`) };
     });
   }
 
@@ -55,6 +59,35 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     }));
     expect(result.brep).not.toBe(editorExtrusion.brep);
     expect(result.volume).toBeGreaterThan(0);
+  });
+
+  it("drafts verified +X and +Y cases on geometry oriented for the selected local CAD axis", async () => {
+    const cases = [
+      {
+        pullDirection: "x" as const,
+        rotation: { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angleRad: Math.PI / 2 },
+        face: 0,
+        angles: [-30, 30],
+      },
+      {
+        pullDirection: "y" as const,
+        rotation: { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, angleRad: -Math.PI / 2 },
+        face: 2,
+        angles: [10],
+      },
+    ];
+    for (const { pullDirection, rotation, face, angles } of cases) {
+      const source = await extrusionSource(rotation);
+      for (const angle of angles) {
+        const result = await withCadKernel((cad) => buildFaceDraft(cad, {
+          ...source, faceId: `face-${face}`, angle, pullDirection,
+        }));
+        expect(result.brep).toContain("CASCADE Topology");
+        expect(result.brep).not.toBe(source.brep);
+        expect(result.volume).toBeGreaterThan(0);
+        expect(result.triangleCount).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("creates a valid exact solid for a supported stable face selection", async () => {

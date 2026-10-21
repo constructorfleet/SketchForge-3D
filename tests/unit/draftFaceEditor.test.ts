@@ -37,8 +37,10 @@ describe("face draft editor request", () => {
 
   it("passes the selected axis through the editor apply operation", async () => {
     const apply = vi.fn();
-    await expect(applyDraftFaceSelection(base, 1, -5, "x", apply)).resolves.toBe(true);
-    expect(apply).toHaveBeenCalledWith(1, -5, "x");
+    for (const pullDirection of ["x", "y"] as const) {
+      await expect(applyDraftFaceSelection(base, 1, -5, pullDirection, apply)).resolves.toBe(true);
+    }
+    expect(apply.mock.calls).toEqual([[1, -5, "x"], [1, -5, "y"]]);
   });
 
   it("rejects missing exact B-rep, invalid face indices, and invalid angles", () => {
