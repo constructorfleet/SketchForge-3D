@@ -731,6 +731,43 @@ class MeasurementPair:
 
 
 @dataclass(frozen=True)
+class ShapeGeometryProvenance:
+    source: Literal["parametric", "brep", "mesh"]
+    precision: Literal["exact", "tessellated"]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ShapeGeometryProvenance":
+        source = _text(payload, "source")
+        precision = _text(payload, "precision")
+        return cls(
+            source=source if source in ("parametric", "brep", "mesh") else "parametric",
+            precision=precision if precision in ("exact", "tessellated") else "exact",
+        )
+
+
+@dataclass(frozen=True)
+class ShapeProperties:
+    volume: float
+    area: float
+    center_of_mass: Mapping[str, float]
+    bbox: Mapping[str, float]
+    is_valid: bool
+    provenance: ShapeGeometryProvenance
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ShapeProperties":
+        center = payload.get("centerOfMass")
+        bbox = payload.get("bbox")
+        return cls(
+            volume=_number(payload, "volume"), area=_number(payload, "area"),
+            center_of_mass=dict(center) if isinstance(center, Mapping) else {},
+            bbox=dict(bbox) if isinstance(bbox, Mapping) else {},
+            is_valid=bool(payload.get("isValid")),
+            provenance=ShapeGeometryProvenance.from_payload(payload.get("provenance", {})),
+        )
+
+
+@dataclass(frozen=True)
 class ShapeWriteResult:
     shapes: List[ShapeSummary]
     revision: int

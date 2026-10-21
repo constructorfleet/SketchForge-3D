@@ -266,6 +266,25 @@ describe("measurements", () => {
   });
 });
 
+describe("shape properties", () => {
+  it("returns exact properties and preserves mesh provenance", async () => {
+    const properties = {
+      volume: 120, area: 148, centerOfMass: { x: 12, y: 3, z: -4 },
+      bbox: { xmin: 10, ymin: 0, zmin: -6, xmax: 14, ymax: 6, zmax: -2 },
+      isValid: true, provenance: { source: "mesh" as const, precision: "tessellated" as const },
+    };
+    const server = fakeServer({ body: { properties } });
+    await expect(client(server).properties.get("p1", "s1")).resolves.toEqual(properties);
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/properties?projectId=p1&shapeId=s1");
+  });
+
+  it("binds the project id through a handle", async () => {
+    const server = fakeServer({ body: { properties: {} } });
+    await client(server).project("p9").propertiesOf("s1");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/properties?projectId=p9&shapeId=s1");
+  });
+});
+
 describe("align, distribute and patterns", () => {
   it("sends the axis and target, and leaves an absent anchor out", async () => {
     const server = fakeServer({ body: { moved: 2, axis: "y", target: "max", anchorId: null, shapes: [], revision: 1 } });

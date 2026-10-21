@@ -66,6 +66,19 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(created[1].result.content[0].text)).toMatchObject({ name: "Fresh project", shapeCount: 0, revision: 1 });
   });
 
+  it("lists and runs per-shape properties locally with geometry provenance", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_shape_properties");
+    expect(tool.inputSchema.required).toEqual(["projectId", "shapeId"]);
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box", width: 4, depth: 5, height: 6 });
+    const shapeId = JSON.parse(created[1].result.content[0].text).shapes[0].id;
+    const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId });
+    expect(read[1].result.isError).toBeUndefined();
+    expect(JSON.parse(read[1].result.content[0].text)).toMatchObject({ volume: 120, area: 148, provenance: { source: "parametric", precision: "exact" } });
+  }, 60_000);
+
   it("imports an SKF package as a new local project", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);

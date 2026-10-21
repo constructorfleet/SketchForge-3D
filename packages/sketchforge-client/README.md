@@ -91,6 +91,7 @@ client.faces.facing(projectId, shapeId, direction): Promise<number[]>
 client.measurements.list(projectId, shapeId): Promise<MeasurementSummary[]>
 client.measurements.withRadius(projectId, shapeId): Promise<MeasurementSummary[]>
 client.measurements.between(projectId, from, to): Promise<MeasurementPair>
+client.properties.get(projectId, shapeId): Promise<ShapeProperties>
 
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
@@ -117,7 +118,7 @@ project.get() | delete() | listShapes() | add(shape) | addMany(shapes) | update(
 project.remove(id) | clear() | edges(id) | filletableEdges(id)
 project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance, options?)
 project.faces(id) | facesFacing(id, direction)
-project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to)
+project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to) | propertiesOf(id)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
 project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)
@@ -235,4 +236,4 @@ SKETCHFORGE_PROJECTS_DIR="$HOME/SketchForgeProjects" npm run mcp:sketchforge
 
 The directory uses the same `<projectId>.json` and `<projectId>.skf` files as server-side project storage. In local mode, use `sketchforge_list_projects` to discover projects, `sketchforge_create_project` to start an empty one, or `sketchforge_import_project` with a local `.skf` `filePath` to add an existing package. These tools return the new `projectId` for other project tools. The configured directory is created when needed. `sketchforge_read_scene` accepts `shapeIds`, `excludeShapeIds`, `includeRawShapes`, and `includeRawShapeIds`; raw mesh geometry is omitted by default and can be requested for selected shapes. Mutation tools return compact shape metadata, while `sketchforge_list_objects` always returns object summaries. STL, OBJ, 3MF, ZIP-kit, SKF, STEP, and SVG exports can write to `outputPath`; the project name supplies the default filename. `sketchforge_project_view` returns the SVG drawing itself -- the kernel's hidden-line projection of the stored geometry, as the four-view grid or any one named view -- which is the readable picture of a part for an agent without vision.
 
-Local mode covers project reads and edits, shape creation/import, arranging, mirroring, grouping, booleans, edge and face operations, measurements, hollowing, mesh and STEP exports, scene topology, clearance and intersection checks, and JavaScript macros. Image capture rasterises that same drawing to a PNG (a named face is one view; `home` and `current` are the grid); it does not capture editor chrome or the live viewport camera. The npm MCP client and `@constructorfleet/sketchforge-engine` are published together by the release workflow. Editor discovery and editor error inspection require a URL and open editor. Python macros require a URL and the HTTP adapter.
+Local mode covers project reads and edits, shape creation/import, arranging, mirroring, grouping, booleans, edge and face operations, measurements and per-shape mass properties, hollowing, mesh and STEP exports, scene topology, clearance and intersection checks, and JavaScript macros. Image capture rasterises that same drawing to a PNG (a named face is one view; `home` and `current` are the grid); it does not capture editor chrome or the live viewport camera. The npm MCP client and `@constructorfleet/sketchforge-engine` are published together by the release workflow. Editor discovery and editor error inspection require a URL and open editor. Python macros require a URL and the HTTP adapter.
