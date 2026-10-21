@@ -170,8 +170,20 @@ Examples are product behavior, not decorative text.
 - No page depends on fetching live application state during build or render.
 - Support source links that point to the exact repository path and commit represented by a page.
 - Images and downloads have explicit licenses/provenance and reasonable size budgets.
+- Diagrams are authored as ```mermaid fences and rendered by the site; ASCII art is not a substitute. Fences are rendered client-side from the committed diagram source, so the diagram stays reviewable in the repository.
 
 ## 7. Build and publishing workflow
+
+The site is produced by one ordered pipeline; every stage must pass before the
+next one runs.
+
+```mermaid
+graph TD;
+  A["docs:check<br/>generators, mypy, link checks"] --> B["docs:generate<br/>copy docs into .docs-site"];
+  B --> C["vitepress build<br/>docs-site-dist"];
+  C --> D["site-build tests<br/>provenance, accessibility, search"];
+  D --> E["GitHub Pages deploy<br/>main only"];
+```
 
 ### Required commands
 

@@ -8,6 +8,7 @@
   group index ranges to triangle ranges correctly, so color assignments on any
   face are attached to their triangles.
 - The REST API and TypeScript/Python clients can create sketch sweeps from closed section paths and one open spine. The server builds and persists the OCCT solid and retains the editable sketch profile in shape summaries; profile editing through PATCH is not supported yet.
+- The documentation site renders ```mermaid fences as diagrams, so documentation no longer has to fall back to ASCII art. The diagram source stays committed markdown, which keeps it reviewable and diffable. The documentation suite plan carries the first one: the ordered docs:check -> docs:generate -> build -> deploy pipeline. Node labels are pinned to the line box mermaid measures with, because the site's wider paragraph line height otherwise pushes the last line of a multi-line label past the node border.
 
 - Sketch extrusions now persist a separate editable source-sketch node and feature input link in `.skf` packages. Editing the profile preserves source and output identities while rebuilding the solid; undo/redo and project round-trip retain the source definition. This establishes one sketch-to-extrusion dependency. Revolve history and broader feature dependency graphs remain future work.
 

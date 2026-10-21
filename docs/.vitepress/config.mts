@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { defineConfig } from "vitepress";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
 function repositoryName() {
   const configured = process.env.GITHUB_REPOSITORY;
@@ -13,7 +14,7 @@ function repositoryName() {
 
 const base = `/${repositoryName()}/`;
 
-export default defineConfig({
+const config = defineConfig({
   title: "SketchForge Docs",
   description: "User, developer, and API documentation for SketchForge.",
   base,
@@ -78,3 +79,6 @@ export default defineConfig({
     socialLinks: [{ icon: "github", link: "https://github.com/constructorfleet/SketchForge-3D" }],
   },
 });
+
+// Mermaid fences render as diagrams; see tests/docs/mermaid-rendering.test.mjs.
+export default withMermaid(config);

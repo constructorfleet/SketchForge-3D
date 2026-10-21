@@ -310,3 +310,55 @@ function walk(directory) {
     return statSync(absolute).isDirectory() ? walk(absolute) : [absolute];
   });
 }
+
+test("a mermaid diagram on a built page renders with labels that fit their nodes", async () => {
+  const output = path.join(rootPath, "docs-site-dist");
+  const server = createServer((request, response) => {
+    const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+    const relativePath = pathname.replace(/^\/SketchForge-3D\/?/, "") || "index.html";
+    const requested = path.resolve(output, relativePath);
+    if (!requested.startsWith(`${output}${path.sep}`) && requested !== path.join(output, "index.html")) {
+      response.writeHead(403).end();
+      return;
+    }
+    const file = requested.endsWith(path.sep) ? path.join(requested, "index.html") : requested;
+    try {
+      const content = readFileSync(file);
+      const extension = path.extname(file);
+      const contentType = ({ ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml" })[extension] ?? "application/octet-stream";
+      response.writeHead(200, { "content-type": contentType }).end(content);
+    } catch {
+      response.writeHead(404).end("Not found");
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    const pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.goto(`http://127.0.0.1:${address.port}/SketchForge-3D/docs/DOCUMENTATION_SUITE_SPEC.html`);
+    await page.waitForSelector(".mermaid svg", { timeout: 30000 });
+
+    const diagram = await page.$eval(".mermaid svg", (svg) => ({
+      nodes: svg.querySelectorAll(".node").length,
+      labels: [...svg.querySelectorAll(".node")].map((node) => node.textContent.trim()),
+      clipped: [...svg.querySelectorAll(".node foreignObject")]
+        .map((box) => ({
+          text: box.textContent.trim().slice(0, 40),
+          box: Number(box.getAttribute("height")),
+          content: box.firstElementChild?.scrollHeight ?? 0,
+        }))
+        .filter((label) => label.content > label.box),
+    }));
+
+    assert.equal(pageErrors.length, 0, `the diagram should render without page errors: ${pageErrors.join("; ")}`);
+    assert.equal(diagram.nodes, 5, "the documentation pipeline diagram should render every stage");
+    assert.ok(diagram.labels.some((label) => /docs:check/.test(label)), "diagram labels come from the committed fence");
+    assert.deepEqual(diagram.clipped, [], "node labels must fit inside their nodes rather than overflowing the border");
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
