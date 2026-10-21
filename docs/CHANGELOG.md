@@ -2,16 +2,20 @@
 
 ## Unreleased
 
-- Added a VitePress documentation site with repository-derived GitHub Pages
-  base path, built-in local search, canonical Markdown staging, local link and
-  source-include checks, local preview, and PR build/default-branch deploy
-  workflows. Pages repository configuration could not be verified because
-  the GitHub Pages API returned 404; a maintainer still needs to select GitHub
-  Actions as the publishing source before the first deployment.
+- Merged PR #116 added the VitePress documentation site with repository-derived
+  GitHub Pages base path, built-in local search, canonical Markdown staging,
+  local link and source-include checks, local preview, and PR build/default-
+  branch deploy workflows. The first GitHub Pages deployment after PR #116
+  merged succeeded.
 
-- Added generated TypeScript client, engine, and Python public API references to the searchable docs site, plus package pages that reuse their canonical READMEs and include macro examples from executable source files. CI runs those examples against a temporary local server.
+- PR #118 (open; all CI checks green, not merged) adds generated TypeScript
+  client, engine, and Python public API references to the searchable docs site,
+  plus package pages that reuse their canonical READMEs and include macro
+  examples from executable source files. CI runs those examples against a
+  temporary local server.
 
-- Added a generated reference for published TypeScript and Python CLI commands, including options from their actual help/parser sources.
+- Merged PR #117 added a generated reference for published TypeScript and
+  Python CLI commands, including options from their actual help/parser sources.
 
 - Exploding a STEP assembly now preserves explicit component display colors when
   the XCAF label API omits them, using the XCAF document's GLB material data
