@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added lower-case compatibility routes for the REST API, `.skf` project format, publishing clients, and shape request reference pages. The static pages redirect to canonical paths and retain a fallback link.
+
 - The REST API contract now describes `GET /properties` query parameters,
   response fields, and geometry provenance. The route rejects malformed kernel
   property results before returning a success response; the REST reference now
