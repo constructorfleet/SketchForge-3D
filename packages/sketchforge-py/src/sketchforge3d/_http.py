@@ -191,6 +191,7 @@ class Transport:
             try:
                 os.close(fd)
             except OSError:
+                # The file descriptor may already have been closed by fdopen.
                 pass
             if isinstance(error, urllib.error.URLError):
                 raise SketchForgeTransportError(method, url, error) from None

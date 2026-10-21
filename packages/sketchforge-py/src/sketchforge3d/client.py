@@ -92,10 +92,10 @@ class Shapes:
         return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])]
 
     @overload
-    def create(self, project_id: str, shape: ShapeSpec) -> ShapeSummary: ...
+    def create(self, project_id: str, shape: ShapeSpec) -> ShapeSummary: pass
 
     @overload
-    def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary: ...
+    def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary: pass
 
     def create(self, project_id: str, shape: ShapeRequest) -> ShapeSummary:
         payload = self._transport.send(
@@ -107,10 +107,10 @@ class Shapes:
         return ShapeSummary.from_payload(created[0])
 
     @overload
-    def create_many(self, project_id: str, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: ...
+    def create_many(self, project_id: str, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: pass
 
     @overload
-    def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: ...
+    def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: pass
 
     def create_many(self, project_id: str, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         """
@@ -827,19 +827,19 @@ class ProjectHandle:
         return self._client.shapes.list(self.id)
 
     @overload
-    def add(self, shape: ShapeSpec) -> ShapeSummary: ...
+    def add(self, shape: ShapeSpec) -> ShapeSummary: pass
 
     @overload
-    def add(self, shape: ShapeRequest) -> ShapeSummary: ...
+    def add(self, shape: ShapeRequest) -> ShapeSummary: pass
 
     def add(self, shape: ShapeRequest) -> ShapeSummary:
         return self._client.shapes.create(self.id, shape)
 
     @overload
-    def add_many(self, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: ...
+    def add_many(self, shapes: Iterable[ShapeSpec]) -> ShapeWriteResult: pass
 
     @overload
-    def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: ...
+    def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult: pass
 
     def add_many(self, shapes: Iterable[ShapeRequest]) -> ShapeWriteResult:
         return self._client.shapes.create_many(self.id, shapes)
