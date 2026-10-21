@@ -7,10 +7,10 @@ import type { SketchProfile } from "@/types/sketchforge";
 
 function profileWithSpine(spine: Array<{ x: number; z: number }>): SketchProfile {
   const sectionPoints = [
-    { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
-    { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+    { id: "a", x: -1, z: -1, plane: "xz" as const }, { id: "b", x: 1, z: -1, plane: "xz" as const },
+    { id: "c", x: 1, z: 1, plane: "xz" as const }, { id: "d", x: -1, z: 1, plane: "xz" as const },
   ];
-  const pathPoints = spine.map((point, index) => ({ id: `p${index}`, ...point }));
+  const pathPoints = spine.map((point, index) => ({ id: `p${index}`, ...point, plane: "xy" as const }));
   return {
     points: [...sectionPoints, ...pathPoints],
     segments: [
@@ -22,8 +22,8 @@ function profileWithSpine(spine: Array<{ x: number; z: number }>): SketchProfile
 
 describe("planar sketch sweep (real OCCT kernel)", () => {
   it.each([
-    ["straight spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }]],
-    ["bent spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }]],
+    ["straight spine", [{ x: 0, z: 0 }, { x: 0, z: 10 }]],
+    ["bent spine", [{ x: 0, z: 0 }, { x: 0, z: 10 }, { x: 10, z: 10 }]],
   ])("builds a valid positive-volume solid along a %s", async (_label, spine) => {
     const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
@@ -32,6 +32,17 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
       expect(cad.isValid(solid)).toBe(true);
       expect(cad.isSolid(solid)).toBe(true);
       expect(cad.getVolume(solid)).toBeGreaterThan(0);
+      const positions = cad.tessellate(solid).positions;
+      const bounds = [0, 1, 2].map((axis) => {
+        const values = Array.from({ length: positions.length / 3 }, (_, index) => positions[index * 3 + axis]);
+        return [Math.min(...values), Math.max(...values)];
+      });
+      expect(bounds[0][0]).toBeCloseTo(-1, 2);
+      expect(bounds[0][1]).toBeCloseTo(_label === "straight spine" ? 1 : 10, 2);
+      expect(bounds[1][0]).toBeCloseTo(0, 2);
+      expect(bounds[1][1]).toBeCloseTo(_label === "straight spine" ? 10 : 11, 2);
+      expect(bounds[2][0]).toBeCloseTo(-1, 2);
+      expect(bounds[2][1]).toBeCloseTo(1, 2);
     } finally {
       cad.releaseAll();
     }
