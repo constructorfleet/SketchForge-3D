@@ -120,6 +120,8 @@ client.imports.readable(fileName): boolean
 `shapes.create` accepts `SketchSweepShapeRequest` for server-built sketch
 sweeps. Its `profile` contains the closed section path(s), one open spine, and
 optional `sweepFrames`; the response retains that data as `sketchProfile`.
+It also returns the stable `sketchSourceId` used by project feature metadata.
+The REST API does not yet accept profile updates that trigger a sweep rebuild.
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
 

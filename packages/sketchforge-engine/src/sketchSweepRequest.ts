@@ -55,6 +55,7 @@ export async function sketchSweepShapeFromRequest(request: Record<string, unknow
       maxX = Math.max(maxX, positions[i]!); maxY = Math.max(maxY, positions[i + 1]!); maxZ = Math.max(maxZ, positions[i + 2]!);
     }
     if (![minX, minY, minZ, maxX, maxY, maxZ].every(Number.isFinite)) throw new Error("The sketch sweep produced invalid bounds");
+    const id = typeof request.id === "string" ? request.id : createLocalId("sketch-sweep");
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
     const width = Math.max(0.01, maxX - minX);
@@ -68,7 +69,7 @@ export async function sketchSweepShapeFromRequest(request: Record<string, unknow
       if (normals.length >= vertex + 3) flattenedNormals.push(normals[vertex]!, normals[vertex + 1]!, normals[vertex + 2]!);
     }
     return canonicalizeShape({
-      id: typeof request.id === "string" ? request.id : createLocalId("sketch-sweep"),
+      id,
       name: typeof request.name === "string" && request.name.trim() ? request.name.trim() : "Sketch sweep",
       kind: "mesh",
       color: typeof request.color === "string" ? request.color : "#d41721",
@@ -82,6 +83,7 @@ export async function sketchSweepShapeFromRequest(request: Record<string, unknow
       hole: request.hole === true,
       sketchProfile: structuredClone(profile),
       sketchOperation: "sweep",
+      sketchSourceId: `sketch/${id}`,
       importedMesh: {
         positions: flattenedPositions,
         normals: flattenedNormals.length === flattenedPositions.length ? flattenedNormals : undefined,

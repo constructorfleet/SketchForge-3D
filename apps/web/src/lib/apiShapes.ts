@@ -47,6 +47,7 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     kind: shape.kind,
     ...(requestKind === undefined ? {} : { requestKind }),
     ...(shape.sketchOperation === undefined ? {} : { sketchOperation: shape.sketchOperation }),
+    ...(shape.sketchSourceId === undefined ? {} : { sketchSourceId: shape.sketchSourceId }),
     ...(shape.sketchOperation === "sweep" && shape.sketchProfile ? { sketchProfile: shape.sketchProfile } : {}),
     color: shape.color,
     ...(shape.faceIds ? { faceIds: shape.faceIds } : {}),

@@ -463,6 +463,7 @@ describe("SketchForge .skf project packages", () => {
     };
     const sweep = shape("mesh", "sweep-sketch", {
       sketchOperation: "sweep",
+      sketchSourceId: "source-sketch-42",
       sketchProfile: {
         points: [{ id: "p1", x: 0, z: 0 }, { id: "p2", x: 2, z: 0 }, { id: "p3", x: 2, z: 3 }, { id: "p4", x: 0, z: 3 }, { id: "path1", x: 5, z: 0, sweepRole: "spine", handleOut: { x: 7, z: 1, sweepDepth: 2.5 } }, { id: "path2", x: 12, z: 6, sweepRole: "spine", sweepDepth: 5, handleIn: { x: 10, z: 5, sweepDepth: -1.25 } }],
         segments: [
@@ -486,14 +487,27 @@ describe("SketchForge .skf project packages", () => {
     const exported = await exportSkfProject(input([sweep]));
     const { document } = packageDocument(exported);
     const restored = await importSkfProject(exported);
+    const sourceSketchId = "source-sketch-42";
+    const sourceSketch = document.sketches.find((sketch) => sketch.id === sourceSketchId);
+    const sourceNode = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((node) => node.nodeId === sourceSketch?.sourceNodeId);
+    const sweepFeature = document.features.find((feature) => feature.type === "sketch-sweep");
+
     expect(document.sketches[0].operation).toBe("sweep");
     expect(document.features[0].type).toBe("sketch-sweep");
+    expect(sourceSketch).toMatchObject({ id: sourceSketchId, sourceObjectId: sourceSketchId, objectId: sweep.id });
+    expect(sourceNode).toMatchObject({ objectId: sourceSketchId, objectType: "sketch" });
+    expect(sourceNode?.definition.sketchProfile).toEqual(sweep.sketchProfile);
+    expect(sweepFeature?.inputObjectIds).toEqual([sourceSketchId]);
     expect(restored.shapes[0].sketchOperation).toBe("sweep");
+    expect(restored.shapes[0].sketchSourceId).toBe(sourceSketchId);
+    expect(restored.history.map((entry) => entry.shapes[0]?.sketchSourceId)).toEqual([sourceSketchId]);
     expect(restored.shapes[0].sketchProfile).toEqual(sweep.sketchProfile);
     expect(restored.shapes[0].sketchProfile?.sweepFrames).toEqual(sweepFrames);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path2")?.sweepDepth).toBe(5);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path1")?.handleOut?.sweepDepth).toBe(2.5);
     expect(restored.shapes[0].sketchProfile?.points.find((point) => point.id === "path2")?.handleIn?.sweepDepth).toBe(-1.25);
+    const repackaged = packageDocument(await exportSkfProject(input(restored.shapes))).document;
+    expect(repackaged.sketches).toContainEqual(expect.objectContaining({ id: sourceSketchId, sourceObjectId: sourceSketchId }));
 
     const invalidHandleDepth = mutateProject(exported, (document) => {
       for (const state of document.states) {

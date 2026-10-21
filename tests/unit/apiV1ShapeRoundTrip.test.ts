@@ -109,6 +109,31 @@ describe("REST API shape round trip", () => {
     expect(thread.sketchOperation).toBe("revolve");
   });
 
+  it("reports a sweep's stable source sketch identity", async () => {
+    const projectId = await makeProject();
+    const sweep = await addShape(projectId, {
+      kind: "sketchSweep",
+      profile: {
+        points: [
+          { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+          { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+          { id: "p0", x: 0, z: 0 }, { id: "p1", x: 10, z: 0 },
+        ],
+        segments: [
+          { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+          { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          { id: "spine", startId: "p0", endId: "p1" },
+        ],
+      },
+    });
+
+    expect(sweep.sketchSourceId).toBe(`sketch/${sweep.id}`);
+    expect((await readShape(projectId, sweep.id)).sketchSourceId).toBe(`sketch/${sweep.id}`);
+    const changed = await patch(projectId, sweep.id, { sketchSourceId: "sketch/replaced" });
+    expect(changed.status).toBe(200);
+    expect(changed.payload.shape?.sketchSourceId).toBe(`sketch/${sweep.id}`);
+  });
+
   it("reports a thread's sweep and the outline it ran round", async () => {
     const projectId = await makeProject();
     const thread = await addShape(projectId, { kind: "thread", size: "M8", turns: 3 });
@@ -175,7 +200,7 @@ describe("REST API shape round trip", () => {
     const thread = await addShape(projectId, { kind: "thread", size: "M6", turns: 3, x: 12, z: -4, name: "Stud" });
 
     const changed = await patch(projectId, thread.id, { turns: 5 });
-    expect(changed.payload.shape).toMatchObject({ id: thread.id, name: "Stud", x: 12, z: -4 });
+    expect(changed.payload.shape).toMatchObject({ id: thread.id, sketchSourceId: thread.sketchSourceId, name: "Stud", x: 12, z: -4 });
   });
 
   it("refuses a sweep setting on a shape that has no sweep", async () => {

@@ -1162,6 +1162,9 @@
                                   "sketchOperation": {
                                     "type": "string"
                                   },
+                                  "sketchSourceId": {
+                                    "type": "string"
+                                  },
                                   "sketchProfile": {
                                     "type": "object",
                                     "required": [
@@ -2976,6 +2979,9 @@
                           "sketchOperation": {
                             "type": "string"
                           },
+                          "sketchSourceId": {
+                            "type": "string"
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -4129,6 +4135,9 @@
                             "type": "string"
                           },
                           "sketchOperation": {
+                            "type": "string"
+                          },
+                          "sketchSourceId": {
                             "type": "string"
                           },
                           "sketchProfile": {

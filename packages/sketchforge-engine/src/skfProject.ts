@@ -573,6 +573,7 @@ async function serializeShapeNode(
     // identity derived from the output object when they are next packaged.
     const hasSketchExtrusionSource = shape.sketchOperation === "extrude"
       || shape.sketchOperation === "revolve"
+      || shape.sketchOperation === "sweep"
       || (shape.sketchOperation === undefined && shape.kind !== "sketch");
     if (shape.sketchSourceId || hasSketchExtrusionSource) {
       definition.sketchSourceId = shape.sketchSourceId ?? `sketch/${safeNodeToken(shape.id)}`;
@@ -728,6 +729,7 @@ function activeProjectIndexes(state: SkfStateV1) {
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${featureType}`;
       const hasSourceDependency = node.definition.sketchOperation === "extrude"
         || node.definition.sketchOperation === "revolve"
+        || node.definition.sketchOperation === "sweep"
         || (node.definition.sketchOperation === undefined && node.definition.kind !== "sketch");
       features.push({
         id: featureId,

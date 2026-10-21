@@ -300,6 +300,8 @@ export type ShapeSummary = {
   kind: string;
   requestKind?: ShapeKind;
   sketchOperation?: SketchOperation;
+  /** Stable source sketch identity for editable sketch-derived geometry. */
+  sketchSourceId?: string;
   /** Editable profile retained for a sketch sweep created through REST. */
   sketchProfile?: SketchSweepProfile;
   color: string;
