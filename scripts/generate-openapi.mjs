@@ -31,12 +31,14 @@ for (const operation of API_V1_OPERATIONS) {
     },
   ]));
   const generated = { operationId: operation.operationId, responses };
+  if (operation.description) generated.description = operation.description;
   if (operation.auth === "bearer") generated.security = [{ bearerAuth: [] }, { sketchForgeToken: [] }];
   if (operation.query) {
     generated.parameters = Object.entries(operation.query.properties).map(([name, rule]) => ({
       name,
       in: "query",
       required: operation.query.required.includes(name),
+      ...(rule.description ? { description: rule.description } : {}),
       schema: {
         type: rule.type,
         ...(rule.pattern ? { pattern: rule.pattern } : {}),
@@ -102,7 +104,7 @@ function toJsonSchema(schema) {
   if (schema.oneOf) return { oneOf: schema.oneOf.map(toJsonSchema) };
   const result = { type: schema.nullable ? [schema.type, "null"] : schema.type };
   if (schema.required) result.required = [...schema.required];
-  if (schema.enum) result.enum = [...schema.enum];
+  if (schema.enum) result.enum = [...schema.enum, ...(schema.nullable ? [null] : [])];
   if (schema.default !== undefined) result.default = schema.default;
   if (schema.minimum !== undefined) result.minimum = schema.minimum;
   if (schema.maximum !== undefined) result.maximum = schema.maximum;

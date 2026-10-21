@@ -13,7 +13,21 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(spec.paths["/api/v1/projects"].post);
   assert.ok(spec.paths["/api/v1/shapes"].get);
   assert.equal(spec.paths["/api/v1/shapes"].patch, undefined, "PATCH has custom validation that its current broad schema does not express");
-  assert.equal(spec.paths["/api/v1/faces"], undefined, "face response metadata is not yet a complete runtime schema");
+  const faces = spec.paths["/api/v1/faces"].get;
+  assert.ok(faces, "GET /faces should be present once its runtime contract is complete");
+  assert.deepEqual(Object.keys(faces.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
+  assert.equal(faces.responses["409"], undefined, "read-only face listing does not take the project write lock");
+  assert.deepEqual(faces.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.match(faces.parameters[0].description, /trimmed before validation/);
+  const faceSchema = faces.responses["200"].content["application/json"].schema;
+  assert.deepEqual(faceSchema.required, ["faces"]);
+  const face = faceSchema.properties.faces.items;
+  assert.deepEqual(face.required, ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"]);
+  assert.equal(face.additionalProperties, false);
+  assert.deepEqual(face.properties.normal.type, ["object", "null"]);
+  assert.deepEqual(face.properties.facing.type, ["string", "null"]);
+  assert.deepEqual(face.properties.facing.enum, ["top", "bottom", "right", "left", "front", "back", null]);
+  assert.deepEqual(faces.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
   assert.ok(spec.paths["/api/v1/projects"].post.requestBody.content["application/json"].schema.properties.name);
   assert.equal(spec.paths["/api/v1/projects"].post.requestBody.content["application/json"].schema.properties.name.maxLength, 80);
   assert.ok(spec.paths["/api/v1/projects"].post.responses["201"].content["application/json"].schema);
@@ -22,7 +36,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     name: "projectId", in: "query", required: false,
     schema: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
   });
-  assert.ok(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listFaces"));
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listFaces"), false);
   assert.ok(spec["x-sketchforge-omitted-operations"].some(({ operationId, reason }) => operationId === "updateShape" && reason.includes("custom validation")));
 });
 

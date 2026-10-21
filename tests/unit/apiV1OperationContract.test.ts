@@ -99,18 +99,71 @@ describe("REST API v1 operation contract", () => {
     }
   });
 
-  it("declares and parses the verified GET /faces query and response contract", async () => {
+  it("declares the GET /faces query, exact response schema, and reachable statuses", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/faces");
     expect(operation).toMatchObject({
       operationId: "listFaces",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 500, 503],
-      query: { required: ["projectId", "shapeId"] },
-      response: { required: ["faces"], faceFields: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"], faceIdSemantics: "stable identity for a face while its identity is preserved by the model", colorAssignmentKey: "face id in PATCH /api/v1/shapes faceColors" },
+      responses: [200, 400, 401, 404, 422, 500, 503],
+      query: {
+        required: ["projectId", "shapeId"],
+        properties: {
+          projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+          shapeId: { type: "string", trim: true, minLength: 1 },
+        },
+      },
+      responseSchemas: {
+        200: {
+          type: "object", required: ["faces"], additionalProperties: false,
+          properties: {
+            faces: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["index", "id", "surfaceType", "area", "centroid", "normal", "facing"],
+                additionalProperties: false,
+                properties: {
+                  index: { type: "integer", minimum: 0 },
+                  id: { type: "string" },
+                  surfaceType: { type: "string" },
+                  area: { type: "number", minimum: 0 },
+                  centroid: { type: "object", required: ["x", "y", "z"], additionalProperties: false, properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+                  normal: { type: "object", nullable: true, required: ["x", "y", "z"], additionalProperties: false, properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+                  facing: { type: "string", nullable: true, enum: ["top", "bottom", "right", "left", "front", "back"] },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(operation?.responseSchemas).toMatchObject({
+      400: { type: "object", properties: { code: { enum: ["invalid_project_id", "invalid_shape_id"] } } },
+      401: { type: "object", properties: { code: { enum: ["unauthorized"] } } },
+      404: { type: "object", properties: { code: { enum: ["api_disabled", "project_not_found", "shape_not_found"] } } },
+      422: { type: "object", properties: { code: { enum: ["cad_failed"] } } },
+      500: { type: "object", properties: { code: { enum: ["cad_failed", "internal_error"] } } },
+      503: { type: "object", properties: { code: { enum: ["storage_unconfigured"] } } },
     });
     expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/faces?projectId= part_1 &shapeId= solid ")))
       .toEqual({ ok: true, projectId: "part_1", shapeId: "solid" });
+    expect(contract.parseApiV1Query("GET /api/v1/faces", new Request("https://example.test/api/v1/faces?projectId=%20part_1%20&shapeId=%20solid%20")))
+      .toEqual({ ok: true, values: { projectId: "part_1", shapeId: "solid" } });
+    for (const query of [
+      "projectId=../bad&shapeId=solid",
+      `projectId=${"p".repeat(121)}&shapeId=solid`,
+      "projectId=part_1&shapeId=%20",
+    ]) {
+      expect(contract.parseApiV1Query("GET /api/v1/faces", new Request(`https://example.test/api/v1/faces?${query}`)).ok).toBe(false);
+    }
+    for (const [status, code] of [
+      [400, "invalid_shape_id"], [401, "unauthorized"], [404, "shape_not_found"],
+      [422, "cad_failed"], [500, "internal_error"], [503, "storage_unconfigured"],
+    ] as const) {
+      expect(contract.validateApiV1Response("GET /api/v1/faces", status, { error: "request failed", code })).toBe(true);
+    }
+    expect(contract.validateApiV1Response("GET /api/v1/faces", 409, { error: "busy", code: "project_busy" })).toBe(false);
     expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=../bad&shapeId=x")))
       .toEqual({ ok: false, error: "invalid_project_id" });
     expect(contract.parseApiTargetQuery(new Request("https://example.test/api/v1/properties?projectId=p")))
@@ -118,6 +171,10 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] }))
       .toEqual({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] });
     expect(contract.parseListFacesResponse({ faces: [{ index: "0" }] })).toBeNull();
+    expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null, unexpected: true }] })).toBeNull();
+    expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: [0, 1, 0], facing: null }] })).toBeNull();
+    expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: 1, centroid: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, facing: "top" }] })).not.toBeNull();
+    expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: -1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] })).toBeNull();
   });
 
   it("declares and validates GET /properties against the complete mass-properties response", async () => {
