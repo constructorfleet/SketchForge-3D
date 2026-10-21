@@ -30,6 +30,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Learn", link: "/" },
+      { text: "Quick start", link: "/docs/guides/editor-quickstart" },
       { text: "REST API", link: "/docs/REST_API" },
       { text: "Project format", link: "/docs/SKF_PROJECT_FORMAT" },
       { text: "Clients", link: "/docs/PUBLISHING_CLIENTS" },
@@ -41,6 +42,7 @@ export default defineConfig({
         text: "Documentation",
         items: [
           { text: "Overview", link: "/" },
+          { text: "Editor quick start", link: "/docs/guides/editor-quickstart" },
           { text: "REST API", link: "/docs/REST_API" },
           { text: ".skf project format", link: "/docs/SKF_PROJECT_FORMAT" },
           { text: "Publishing clients", link: "/docs/PUBLISHING_CLIENTS" },
