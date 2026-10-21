@@ -6,9 +6,13 @@ All three are published by `.github/workflows/release.yml`, from the same `v<ver
 
 | Package | Registry | Version |
 | --- | --- | --- |
-| `@constructorfleet/sketchforge3d` | npm | the release version |
-| `@constructorfleet/sketchforge-engine` | npm | the release version |
-| `sketchforge3d` | PyPI | the release version |
+<!-- publishing-version-table:start -->
+| `@constructorfleet/sketchforge3d` | npm | `1.14.0` |
+| `@constructorfleet/sketchforge-engine` | npm | `1.14.0` |
+| `sketchforge3d` | PyPI | `1.14.0` |
+<!-- publishing-version-table:end -->
+
+The table is generated from `.release-please-manifest.json`, the release-please source of truth, after verifying that the app, engine, TypeScript client, and Python package manifests all match it. Regenerate it with `node scripts/docs/generate-publishing-clients.mjs`; `npm run docs:check` detects stale versions.
 
 The packages carry the app's version rather than their own. The npm job publishes `@constructorfleet/sketchforge-engine` before `@constructorfleet/sketchforge3d`, whose local MCP mode depends on that exact engine version. The workflow also runs from the Actions tab (`workflow_dispatch`) with the version typed in, and has switches there to publish only some artifacts -- which is how to recover from a release where one registry upload failed after the Docker image succeeded.
 
