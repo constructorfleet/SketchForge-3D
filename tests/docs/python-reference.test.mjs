@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 test("Python API entries link to their defining source lines", async () => {
-  const reference = await readFile(path.join(root, "docs/reference/python-client.md"), "utf8");
+  const reference = await readFile(path.join(root, ".docs-site/docs/reference/python-client.md"), "utf8");
   const entries = reference.split(/^## /m).slice(1);
   assert.ok(entries.length > 0);
   for (const entry of entries) {
