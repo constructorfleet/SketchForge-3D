@@ -970,6 +970,10 @@
       "volume": "Volume",
       "grams": "{grams} g",
       "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "Weight and cost use the shape's exact volume.",
+        "tessellated": "Weight and cost are estimates from a tessellated shape."
+      },
       "holeHint": "A hole removes material, so it has no weight of its own.",
       "name": {
         "pla": "PLA",

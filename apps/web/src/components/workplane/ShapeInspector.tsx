@@ -10,6 +10,7 @@ import {
   materialLabel,
   materialPreset,
   materialPricePerKg,
+  materialVolumePrecisionMessage,
   shapeMaterialEstimate,
   type MaterialId,
 } from "@/lib/materialPresets";
@@ -674,24 +675,27 @@ function MaterialProperties({
       ) : null}
       {preset && shape.hole ? <p className="material-readout-hint">{t("panels.material.holeHint")}</p> : null}
       {estimate ? (
-        <dl className="material-readout">
-          <div>
-            <dt>{t("panels.material.volume")}</dt>
-            <dd>{t("panels.material.cubicCentimeters", { volume: formatMaterialNumber(estimate.volumeCm3, 2) })}</dd>
-          </div>
-          <div>
-            <dt>{t("panels.material.weight")}</dt>
-            <dd>{t("panels.material.grams", { grams: formatMaterialNumber(estimate.grams, 2) })}</dd>
-          </div>
-          <div>
-            <dt>{t("panels.material.cost")}</dt>
-            <dd>{formatMaterialNumber(estimate.cost, 2)}</dd>
-          </div>
-          <div>
-            <dt>{t("panels.material.title")}</dt>
-            <dd>{t("panels.material.density", { density: formatMaterialNumber(estimate.density, 2) })}</dd>
-          </div>
-        </dl>
+        <>
+          <p className="material-readout-hint">{t(materialVolumePrecisionMessage("tessellated"))}</p>
+          <dl className="material-readout">
+            <div>
+              <dt>{t("panels.material.volume")}</dt>
+              <dd>{t("panels.material.cubicCentimeters", { volume: formatMaterialNumber(estimate.volumeCm3, 2) })}</dd>
+            </div>
+            <div>
+              <dt>{t("panels.material.weight")}</dt>
+              <dd>{t("panels.material.grams", { grams: formatMaterialNumber(estimate.grams, 2) })}</dd>
+            </div>
+            <div>
+              <dt>{t("panels.material.cost")}</dt>
+              <dd>{formatMaterialNumber(estimate.cost, 2)}</dd>
+            </div>
+            <div>
+              <dt>{t("panels.material.title")}</dt>
+              <dd>{t("panels.material.density", { density: formatMaterialNumber(estimate.density, 2) })}</dd>
+            </div>
+          </dl>
+        </>
       ) : null}
     </>
   );
