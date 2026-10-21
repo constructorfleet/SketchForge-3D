@@ -104,6 +104,40 @@ describe("REST API v1 stable face identity", () => {
     expect(Object.entries(colored).every(([id, color]) => after.faces.some((face) => face.id === id) && color === RED)).toBe(true);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("keeps a uniquely matchable face ID and its color after a box dimension edit", async () => {
+    const projectId = await project();
+    const shapeId = await shape(projectId);
+    const before = await (await faces(projectId, shapeId)).json() as {
+      faces: Array<{ id?: string; normal: { x: number; y: number; z: number } | null }>;
+    };
+    const topFace = before.faces.find((face) => face.normal?.y === 1);
+    expect(topFace?.id).toBeTruthy();
+
+    const painted = await updateShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ faceColors: { [topFace!.id!]: RED } }),
+    }));
+    expect(painted.status).toBe(200);
+
+    const resized = await updateShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ width: 60 }),
+    }));
+    expect(resized.status).toBe(200);
+
+    const after = await (await faces(projectId, shapeId)).json() as {
+      faces: Array<{ id?: string; normal: { x: number; y: number; z: number } | null }>;
+    };
+    const saved = await (await listShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as {
+      shapes: Array<{ id: string; faceIds?: string[]; faceColors?: Record<string, string> }>;
+    };
+    const edited = saved.shapes.find((entry) => entry.id === shapeId)!;
+
+    expect(after.faces.some((face) => face.id === topFace!.id)).toBe(true);
+    expect(edited.faceColors).toEqual({ [topFace!.id!]: RED });
+    expect(edited.faceIds).toContain(topFace!.id);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("returns contract-valid errors for missing or invalid target query values", async () => {
     for (const [url, expectedCode] of [
       ["/api/v1/faces?shapeId=shape", "invalid_project_id"],

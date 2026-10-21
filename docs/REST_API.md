@@ -93,7 +93,7 @@ The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` re
 
 Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`, `hole`.
 
-`GET /faces?projectId=&shapeId=` returns a positional `index` for compatibility and an app-owned `id` for each face. Use the `id` as the key in `faceColors` when updating a shape, for example `{ "faceColors": { "face_…": "#ff0000" } }`; numeric index keys remain accepted for existing callers. Face IDs are persisted with the shape and colors. When a CAD operation can match an unchanged face unambiguously, its ID and color are retained; generated or ambiguous faces receive new IDs and do not inherit a color. Face colors are previewed on B-rep-backed geometry and included in 3MF per-triangle material assignments.
+`GET /faces?projectId=&shapeId=` returns a positional `index` for compatibility and an app-owned `id` for each face. Use the `id` as the key in `faceColors` when updating a shape, for example `{ "faceColors": { "face_…": "#ff0000" } }`; numeric index keys remain accepted for existing callers. Face IDs are persisted with the shape and colors. Across a shape-parameter edit, the engine retains an ID and its color only when the face has a unique counterpart with the same surface type and outward normal on both sides. Treatment operations use their own geometric matching. Generated or ambiguous faces receive new IDs and do not inherit a color. Face colors are previewed on B-rep-backed geometry and included in 3MF per-triangle material assignments.
 
 `format: "dxf"` requires `section: { "plane": "xy", "offset": 4 }` (also `xz` or `yz`). It exports sampled section polylines. SVG section export uses the same contours.
 
