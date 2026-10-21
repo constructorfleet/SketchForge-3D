@@ -79,6 +79,7 @@ const MUTATION_TOOLS = new Set([
   "sketchforge_apply_edge_treatment",
   "sketchforge_hollow_shape",
   "sketchforge_mirror_objects",
+  "sketchforge_mirror_baked",
 ]);
 
 function stlBytesFromPositions(positions) {
@@ -434,6 +435,11 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return projectView(args);
     case "sketchforge_section_view":
       return sectionView(args);
+    case "sketchforge_mirror_baked": {
+      const ids = Array.isArray(args.ids) ? args.ids : [];
+      if (!ids.length || !["x", "y", "z"].includes(args.axis)) throw new Error("mirror_baked requires object ids and axis x, y, or z.");
+      return { ...await unwrap(await engine.mirrorBaked(id, ids, args.axis)), axis: args.axis };
+    }
     case "sketchforge_mirror_objects": {
       const ids = Array.isArray(args.ids) && args.ids.length ? args.ids : selectedObjectIds;
       if (!ids.length || !["x", "y", "z"].includes(args.axis)) throw new Error("mirror_objects requires object ids or a local selection, and axis x, y, or z.");

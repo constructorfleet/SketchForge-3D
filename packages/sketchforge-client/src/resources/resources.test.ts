@@ -309,6 +309,18 @@ describe("section drawings", () => {
   });
 });
 
+describe("exact baked mirrors", () => {
+  it("sends a required selection and axis to the BREP mirror route", async () => {
+    const server = fakeServer({ body: { moved: 2, axis: "x", shapes: [], revision: 4 } });
+
+    const result = await client(server).mirrors.bake("p1", ["a", "b"], "x");
+
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/mirrors?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b"], axis: "x" });
+    expect(result.moved).toBe(2);
+  });
+});
+
 describe("align, distribute and patterns", () => {
   it("sends the axis and target, and leaves an absent anchor out", async () => {
     const server = fakeServer({ body: { moved: 2, axis: "y", target: "max", anchorId: null, shapes: [], revision: 1 } });

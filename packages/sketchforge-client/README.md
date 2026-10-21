@@ -93,6 +93,7 @@ client.measurements.withRadius(projectId, shapeId): Promise<MeasurementSummary[]
 client.measurements.between(projectId, from, to): Promise<MeasurementPair>
 client.properties.get(projectId, shapeId): Promise<ShapeProperties>
 client.interference.check(projectId, { ids?, clearance? }): Promise<InterferenceReport>
+client.mirrors.bake(projectId, ids, axis): Promise<BakedMirrorResult>
 
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
@@ -121,6 +122,7 @@ project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance
 project.faces(id) | facesFacing(id, direction)
 project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to) | propertiesOf(id) | interferenceReport({ ids?, clearance? })
 project.sectionDrawing({ plane: "xy", offset: 3, shapeIds? })
+project.mirrorBaked(ids, axis)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
 project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)

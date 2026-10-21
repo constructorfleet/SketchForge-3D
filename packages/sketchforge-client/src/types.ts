@@ -551,6 +551,16 @@ export type AlignResult = {
   revision: number;
 };
 
+export type MirrorAxis = "x" | "y" | "z";
+
+/** Result of reflecting exact parameter-built solids across their selection bounds plane. */
+export type BakedMirrorResult = {
+  moved: number;
+  axis: MirrorAxis;
+  shapes: ShapeSummary[];
+  revision: number;
+};
+
 export const DISTRIBUTE_SPACINGS = ["gaps", "centers"] as const;
 
 /** `gaps` leaves equal clear space; `centers` puts the centres at an equal pitch. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
-import { applyEdgeTreatment, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { applyEdgeTreatment, applyBakedMirror, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -12,6 +12,33 @@ function box(overrides: Record<string, unknown> = {}) {
 
 // See the note in serverCadSolids.test.ts: the kernel, not the test, needs the time.
 describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("bakes an exact selected-axis reflection into BREP and clears placement flags", async () => {
+    const source = shapeFromRequest({
+      kind: "wedge", width: 30, depth: 18, height: 12,
+      x: 14, z: -7, elevation: 3, rotation: 25, mirrorX: true,
+    }) as WorkplaneShape;
+
+    const mirrored = await applyBakedMirror(source, "z", 5);
+
+    expect(mirrored).toMatchObject({
+      kind: "mesh", elevation: 3, rotation: 0,
+      mirrorX: undefined, mirrorY: undefined, mirrorZ: undefined,
+    });
+    expect(mirrored.x).toBeCloseTo(14, 4);
+    expect(mirrored.z).toBeCloseTo(17, 4);
+    expect(mirrored.cadBrep).toContain("CASCADE Topology");
+    expect(mirrored.importedMesh?.triangleCount).toBeGreaterThan(0);
+  });
+
+  it("refuses baked mirrors for mesh-only geometry instead of silently losing exactness", async () => {
+    const source = {
+      ...box(),
+      kind: "mesh",
+      importedMesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], baseWidth: 1, baseDepth: 1, baseHeight: 1, triangleCount: 1 },
+    } as WorkplaneShape;
+    await expect(applyBakedMirror(source, "x", 0)).rejects.toThrow(/exact parameter geometry/);
+  });
+
   it("lists a box's twelve edges", async () => {
     const edges = await shapeEdges(box());
 

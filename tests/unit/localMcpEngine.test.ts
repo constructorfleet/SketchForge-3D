@@ -145,6 +145,14 @@ describe("local MCP engine mode", () => {
     const mirrored = callMcp(projectsDir, 2, "sketchforge_mirror_objects", { projectId: "case", ids: [plate.id], axis: "x" });
     expect(JSON.parse(mirrored[1].result.content[0].text)).toMatchObject({ moved: 1, axis: "x" });
 
+    const baked = callMcp(projectsDir, 2, "sketchforge_mirror_baked", { projectId: "case", ids: [plate.id], axis: "y" });
+    expect(baked[1].result.isError).toBeUndefined();
+    expect(JSON.parse(baked[1].result.content[0].text)).toMatchObject({
+      moved: 1,
+      axis: "y",
+      shapes: [expect.objectContaining({ id: plate.id, hasCadBrep: true, kind: "mesh" })],
+    });
+
     const validation = callMcp(projectsDir, 2, "sketchforge_validate_scene", { projectId: "case" });
     expect(JSON.parse(validation[1].result.content[0].text)).toMatchObject({
       objectsChecked: 2,

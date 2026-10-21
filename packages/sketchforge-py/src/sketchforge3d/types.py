@@ -913,6 +913,25 @@ class AlignResult:
 
 
 @dataclass(frozen=True)
+class BakedMirrorResult:
+    """Exact reflection of selected parameter-built solids across their shared bounds plane."""
+
+    moved: int
+    axis: str
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "BakedMirrorResult":
+        return cls(
+            moved=int(_number(payload, "moved")),
+            axis=_text(payload, "axis"),
+            shapes=[ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])],
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
 class DistributeResult:
     """What a distribution did, and along which axis it decided to work.
 

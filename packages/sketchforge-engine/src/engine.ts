@@ -17,6 +17,7 @@
 
 import {
   applyEdgeTreatment,
+  applyBakedMirror,
   shapeEdges,
   shapeWithCadResult,
   ServerCadError,
@@ -67,7 +68,7 @@ import {
   REVOLVE_ONLY_FIELDS,
 } from "./revolveRequests.js";
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { restoreGroupedChildren, separateShapeParts } from "./serverShapeGroups.js";
+import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separateShapeParts } from "./serverShapeGroups.js";
 import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
@@ -280,6 +281,8 @@ export type Engine = {
   faces(projectId: string, shapeId: string): Promise<EngineResult<ServerCadFace[]>>;
   /** Round or cut a shape's edges. */
   treat(projectId: string, shapeId: string, treatment: ServerCadTreatment): Promise<EngineResult<ShapeWritten>>;
+  /** Reflect selected parameter-built solids across their selection bounds and bake the exact result. */
+  mirrorBaked(projectId: string, ids: string[], axis: "x" | "y" | "z"): Promise<EngineResult<ShapesArranged>>;
   /** Hollow a shape out, optionally leaving faces open. */
   shell(projectId: string, shapeId: string, request: ServerCadShellRequest): Promise<EngineResult<ShapeWritten>>;
   /** Every edge and face of a shape, measured from its exact geometry. */
@@ -903,6 +906,32 @@ export function createEngine(store: ProjectStore): Engine {
     treat: (projectId, shapeId, treatment) => cadTreatment(projectId, shapeId, async (shape) => (
       shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment))
     )),
+
+    mirrorBaked: (projectId, ids, axis) => mutating(projectId, async (document) => {
+      if (ids.length < 1) return failed({ reason: "selection_too_small", needed: 1, given: 0 });
+      const resolved = shapesByIds(document, ids);
+      if (!resolved.ok) return resolved;
+      const locked = lockedIds(resolved.value);
+      if (locked) return failed({ reason: "shape_locked", ids: locked });
+
+      const bounds = boundsForMirroring(resolved.value);
+      const pivot = axis === "x" ? (bounds.minX + bounds.maxX) / 2
+        : axis === "y" ? (bounds.minY + bounds.maxY) / 2
+          : (bounds.minZ + bounds.maxZ) / 2;
+      const changed: WorkplaneShape[] = [];
+      try {
+        for (const shape of resolved.value) changed.push(await applyBakedMirror(shape, axis, pivot));
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+      const byId = new Map(changed.map((shape) => [shape.id, shape]));
+      const shapes = document.shapes.map((shape) => byId.get(shape.id) ?? shape);
+      return ok({
+        shapes: resolved.value.map((shape) => byId.get(shape.id) as WorkplaneShape),
+        moved: changed.length,
+        revision: await writeShapes(projectId, document, shapes),
+      });
+    }),
 
     shell: (projectId, shapeId, request) => cadTreatment(projectId, shapeId, async (shape) => (
       shapeWithCadResult(shape, await applyShell(shape, request))

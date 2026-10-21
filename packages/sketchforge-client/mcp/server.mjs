@@ -96,6 +96,11 @@ const tools = [
     inputSchema: { ...editorTargetSchema, required: ["axis"], properties: { ...editorTargetSchema.properties, ids: { type: "array", items: { type: "string" }, description: "Object ids; defaults to the current selection." }, axis: { type: "string", enum: ["x", "y", "z"] } } },
   },
   {
+    name: "sketchforge_mirror_baked",
+    description: "Reflect exact parameter-built solids across their shared bounds plane and bake the result to BREP. Imported meshes, groups, and previously treated shapes are refused.",
+    inputSchema: { ...editorTargetSchema, required: ["projectId", "ids", "axis"], properties: { ...editorTargetSchema.properties, projectId: { type: "string" }, ids: { type: "array", minItems: 1, items: { type: "string" } }, axis: { type: "string", enum: ["x", "y", "z"] } } },
+  },
+  {
     name: "sketchforge_delete_objects",
     description: "Delete objects by id, or delete the current selection when ids are omitted.",
     inputSchema: {
@@ -594,6 +599,12 @@ async function callRemoteTool(name, args, baseUrl) {
       return bridgeCommand("select_objects", args, 15000, baseUrl);
     case "sketchforge_mirror_objects":
       return bridgeCommand("mirror_objects", args, 15000, baseUrl);
+    case "sketchforge_mirror_baked":
+      return restRequest("POST", "/mirrors", {
+        query: { projectId: args.projectId },
+        body: { ids: args.ids, axis: args.axis },
+        baseUrl,
+      });
     case "sketchforge_delete_objects":
       return bridgeCommand("delete_objects", args, 15000, baseUrl);
     case "sketchforge_create_shape":

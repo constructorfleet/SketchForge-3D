@@ -20,6 +20,7 @@ from .types import (
     IMPORTABLE_MESH_FORMATS,
     MAX_SHAPES_PER_REQUEST,
     AlignResult,
+    BakedMirrorResult,
     BooleanCutResult,
     DistributeResult,
     EdgeSummary,
@@ -519,6 +520,20 @@ class Align:
         return self.apply(project_id, ids, axis, "center", anchor_id)
 
 
+class Mirrors:
+    """Exact CAD mirror operations for parameter-built solids."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def bake(self, project_id: str, ids: Sequence[str], axis: str) -> BakedMirrorResult:
+        """Reflects named solids over their combined bounds midpoint and stores exact BREP."""
+        payload = self._transport.send(
+            "POST", "/mirrors", {"projectId": project_id}, {"ids": list(ids), "axis": axis}, retryable=True
+        ) or {}
+        return BakedMirrorResult.from_payload(payload)
+
+
 class Distribute:
     """Spreads three or more shapes evenly along an axis.
 
@@ -829,6 +844,7 @@ class SketchForgeClient:
         self.groups = Groups(self._transport)
         self.parts = Parts(self._transport)
         self.align = Align(self._transport)
+        self.mirrors = Mirrors(self._transport)
         self.distribute = Distribute(self._transport)
         self.patterns = Patterns(self._transport)
         self.imports = Imports(self._transport)
@@ -1010,6 +1026,10 @@ class ProjectHandle:
         open_faces: Optional[Sequence[Union[str, int]]] = None,
     ) -> ShellResult:
         return self._client.shell.tray(self.id, shape_id, thickness, open_faces)
+
+    def mirror_baked(self, ids: Sequence[str], axis: str) -> BakedMirrorResult:
+        """Reflects exact parameter-built solids across their selection bounds plane."""
+        return self._client.mirrors.bake(self.id, ids, axis)
 
     def align(
         self,

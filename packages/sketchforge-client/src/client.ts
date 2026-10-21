@@ -15,6 +15,7 @@ import { Faces } from "./resources/faces.js";
 import { Imports } from "./resources/imports.js";
 import { Interference } from "./resources/interference.js";
 import { Measurements } from "./resources/measurements.js";
+import { Mirrors } from "./resources/mirrors.js";
 import { Projects } from "./resources/projects.js";
 import { Properties } from "./resources/properties.js";
 import { Shapes } from "./resources/shapes.js";
@@ -22,6 +23,8 @@ import { Shell } from "./resources/shell.js";
 import { Treatments } from "./resources/treatments.js";
 import type {
   AlignRequest,
+  BakedMirrorResult,
+  MirrorAxis,
   AlignResult,
   DistributeRequest,
   DistributeResult,
@@ -57,6 +60,7 @@ export class SketchForgeClient {
   readonly edges: Edges;
   readonly faces: Faces;
   readonly measurements: Measurements;
+  readonly mirrors: Mirrors;
   readonly properties: Properties;
   readonly treatments: Treatments;
   readonly drawings: Drawings;
@@ -75,6 +79,7 @@ export class SketchForgeClient {
     this.edges = new Edges(this.transport);
     this.faces = new Faces(this.transport);
     this.measurements = new Measurements(this.transport);
+    this.mirrors = new Mirrors(this.transport);
     this.properties = new Properties(this.transport);
     this.treatments = new Treatments(this.transport);
     this.drawings = new Drawings(this.transport);
@@ -210,6 +215,11 @@ export class ProjectHandle {
   /** Exact gaps and penetration volumes between selected project solids. */
   interferenceReport(request: import("./types.js").InterferenceRequest = {}) {
     return this.client.interference.check(this.id, request);
+  }
+
+  /** Reflects exact parameter-built solids across the selected bounds plane. */
+  mirrorBaked(ids: readonly string[], axis: MirrorAxis): Promise<BakedMirrorResult> {
+    return this.client.mirrors.bake(this.id, ids, axis);
   }
 
   /** Hollows the shape out, sealed unless `openFaces` names faces to leave off. */
