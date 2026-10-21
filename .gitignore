@@ -10,6 +10,8 @@ node_modules/
 out/
 build/
 dist/
+/.docs-site/
+/docs-site-dist/
 
 # Environment files
 .env
