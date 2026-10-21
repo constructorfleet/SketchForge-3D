@@ -242,7 +242,7 @@ export function revolvedShapeFromRequest(
   base: { name?: string; color?: string; x?: number; z?: number; elevation?: number; hole?: boolean; rotation?: number },
 ) {
   const mesh = buildSketchRevolveMesh(runtime, parsed.profile, parsed.settings);
-  return sceneShape({
+  const shape = sceneShape({
     name: base.name?.trim() || (parsed.settings.pitch === 0 ? "Revolve" : "Thread"),
     kind: "mesh",
     color: base.color?.trim() || "#78b96b",
@@ -267,6 +267,7 @@ export function revolvedShapeFromRequest(
     sketchOperation: "revolve",
     sketchRevolve: parsed.settings,
   });
+  return { ...shape, sketchSourceId: `sketch/${shape.id}` };
 }
 
 /**
@@ -306,6 +307,7 @@ export function rebuiltRevolveShape(
   return canonicalizeShape({
     ...rebuilt,
     id: shape.id,
+    sketchSourceId: shape.sketchSourceId ?? `sketch/${shape.id}`,
     width,
     depth,
     height: Math.max(0.01, rebuilt.height * heightScale),

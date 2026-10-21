@@ -769,6 +769,7 @@ async function shapeFromRevolvedSketchProfile(
     },
     sketchProfile: cloneSketchProfile(profile),
     sketchOperation: "revolve",
+    sketchSourceId: existing?.sketchSourceId ?? createLocalId("sketch"),
     sketchRevolve: normalizedSettings,
     locked: existing?.locked ?? false,
     hidden: existing?.hidden ?? false,

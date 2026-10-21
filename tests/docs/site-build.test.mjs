@@ -43,6 +43,23 @@ test("built docs emit the project-site shell, imported README, and local search"
   assert.match(restApi, /href="\/SketchForge-3D\/openapi-v1\.json"/, "the REST reference should link to the OpenAPI download under the project-site prefix");
 });
 
+test("Pages artifact contains generated TypeScript and Python package references", () => {
+  const output = path.join(rootPath, "docs-site-dist/docs/reference");
+  const references = [
+    ["typescript-client.html", /TypeScript client API/, /SketchForgeClient/],
+    ["typescript-engine.html", /Engine API/, /createEngine/],
+    ["python-client.html", /Python client API/, /SketchForgeClient/],
+  ];
+
+  for (const [filename, title, symbol] of references) {
+    const pagePath = path.join(output, filename);
+    assert.ok(existsSync(pagePath), `${filename} must be included in the Pages artifact`);
+    const html = readFileSync(pagePath, "utf8");
+    assert.match(html, title, `${filename} should render its generated package title`);
+    assert.match(html, symbol, `${filename} should expose an expected current package symbol`);
+  }
+});
+
 test("built pages identify their release and link to source at the represented revision", () => {
   const output = path.join(rootPath, "docs-site-dist");
   const home = readFileSync(path.join(output, "index.html"), "utf8");
@@ -73,51 +90,29 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
   assert.match(spec, /first GitHub Pages deployment after PR #116 merged succeeded/i);
-  assert.match(spec, /Package\/examples \(#118\)/i);
-  assert.match(spec, /stable-face REST contracts \(#120, #125\)/i);
-  assert.match(spec, /operator configuration \(#121\)/i);
-  assert.match(spec, /`\.skf` format \(#123\)/i);
-  assert.match(spec, /MCP schemas\/navigation \(#122\)/i);
-  assert.match(spec, /static provenance \(#126\)/i);
-  assert.match(spec, /deterministic reference-generator wiring \(#128\)/i);
-  assert.match(spec, /verified at `6fa14b0`/i);
-  assert.match(spec, /built-site accessibility smoke checks \(#141\).*merged/i);
-  assert.match(spec, /external-link availability report \(#143\).*merged/i);
-  assert.match(spec, /sketch-constraint degree-of-freedom estimate \(#146\).*merged/i);
-  assert.match(spec, /six-operation generated OpenAPI slice \(#144\).*merged/i);
-  assert.match(spec, /Merged PR #151 adds runtime-backed OpenAPI coverage.*7 operations.*25 still omitted/i);
-  assert.match(spec, /Resolved by merged PR #156:.*\.release-please-manifest\.json/i);
-  assert.match(spec, /Resolved by merged PR #157.*contextual paths/i);
-  assert.match(spec, /Resolved by merged PR #158.*engine package listing/i);
-  assert.match(spec, /Merged PR #153 adds a bounded deterministic least-squares solve for supported coupled sketch constraints/i);
-  assert.match(spec, /built-site accessibility improvements \(#154\).*merged/i);
-  assert.match(spec, /Merged PR #156 generates concrete publishing client versions/i);
-  assert.match(spec, /Merged PR #157 adds contextual cross-links between task guides and references/i);
-  assert.match(spec, /Merged PR #158 expands the engine npm listing and generated API guide/i);
-  assert.match(spec, /Resolved by merged PR #158/i);
-  assert.match(spec, /PR #147's STEP component-color import support has merged/i);
-  assert.match(spec, /stable face identity in the Python client \(#145\).*merged/i);
-  assert.match(spec, /STEP color guidance \(#119\)/i);
-  assert.match(spec, /merged in PR #112/i);
-  assert.match(spec, /PR #115/i);
-  assert.match(spec, /PR #117/i);
+  assert.match(spec, /verified against `origin\/main` at `1c8e820` and live PR state/i);
+  assert.match(spec, /runtime-backed `GET \/faces` contract \(#151\)/i);
+  assert.match(spec, /PR #162 renders Mermaid fences/i);
+  assert.match(spec, /PR #168 remains open and its current branch includes #181 .* and #183 .* both merged into the #168 branch; these commits are not yet on `main`/i);
+  assert.match(spec, /PR #182 remains open against `main`.*9 of 32 registered operations/i);
+  assert.match(spec, /Publishing clients version row — closed by #156 and #167/i);
+  assert.match(spec, /Cross-links between documentation and references — closed by #157/i);
+  assert.match(spec, /Engine npm listing and generated reference — closed by #158/i);
   assert.match(spec, /Remote failures are advisory; internal broken links stay blocking/i);
   assert.match(spec, /REST reference authoritative for the whole API/i);
-  assert.match(spec, /Merged PR #144 covers six schema-backed operations and records 26 omitted operations/i);
-  assert.match(capabilities, /refreshed against `main` at `6fa14b0`/i);
-  assert.match(capabilities, /degree-of-freedom\s+estimate is a local rank estimate, not a solvability test/i);
-  assert.match(capabilities, /bounded\s+deterministic damped least-squares solve/i);
-  assert.match(capabilities, /reports unsatisfied constraint IDs/i);
-  assert.doesNotMatch(capabilities, /deterministic local projection|does not move geometry to satisfy constraints/i);
-  assert.match(capabilities, /app-owned face IDs on its combined mesh.*?These IDs persist with the\s+imported shape/is);
-  assert.match(capabilities, /component colors, using\s+explicit\/inherited XCAF colors and the conservative GLB fallback/i);
-  assert.match(capabilities, /new spine's first point snaps to\s+the section origin/i);
-  assert.match(capabilities, /source sketch profile,\s+which remains editable/i);
-  assert.match(capabilities, /`?GET \/faces`? returns an ID and index/i);
-  assert.match(capabilities, /response derives them from the shape ID and\s+current face index/i);
-  assert.match(capabilities, /shape-parameter edits also clear face IDs and colors/i);
-  assert.match(capabilities, /draft prism assigns\s+fresh IDs to every result face/i);
-  assert.match(capabilities, /PR #147\s+preserved STEP component colors/i);
+  assert.match(spec, /Main currently covers seven operations and records 25 of 32 registered operations as omitted/i);
+  assert.match(capabilities, /shipped capabilities verified against `origin\/main` at `1c8e820`/i);
+  assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);
+  assert.match(capabilities, /report unsatisfied constraint IDs/i);
+  assert.match(capabilities, /does not guarantee global solvability/i);
+  assert.match(capabilities, /shape-parameter edits and supported CAD\s+treatments when faces can be matched uniquely/i);
+  assert.match(capabilities, /new or ambiguous faces get\s+fresh IDs and do not inherit colors/i);
+  assert.match(capabilities, /separate source-sketch nodes and explicit feature inputs for\s+sketch extrusions and revolves/i);
+  assert.match(capabilities, /Sweep profiles can be reopened\s+and edited in the editor, and REST\/clients can\s+create sweeps from profiles, but the API cannot update a sweep profile and\s+request a rebuild/i);
+  assert.match(capabilities, /STEP imports can expose bounded product names and nested `stepAssembly`\s+hierarchy metadata/i);
+  assert.match(capabilities, /`POST \/explode` creates independently\s+selectable and movable top-level shapes; this PR adds `stepComponent` metadata/i);
+  assert.match(capabilities, /PR #180 also verifies face 0 at ±30° along \+X.*face 2 at \+10° along \+Y/is);
+  assert.match(capabilities, /selectable local CAD pull axis/i);
   assert.doesNotMatch(spec, /before the first deployment|first published deployment.*not verified|Pages publishing source.*not changed/i);
 
   assert.match(changelog, /first GitHub Pages deployment after PR #116\s+merged succeeded/i);

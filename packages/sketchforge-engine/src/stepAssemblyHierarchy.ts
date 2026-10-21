@@ -1,7 +1,7 @@
 /** Bounded product-tree metadata recovered from an XCAF GLB and STEP labels. */
 import { readGlbSceneDocument } from "./stepGlbDocument.js";
 
-export type StepAssemblyNode = { name: string; children: StepAssemblyNode[] };
+export type StepAssemblyNode = { id?: string; name: string; children: StepAssemblyNode[] };
 
 const MAX_HIERARCHY_NODES = 2_000;
 const MAX_HIERARCHY_DEPTH = 32;
@@ -146,7 +146,7 @@ export function stepAssemblyHierarchyFromGlb(glb: Uint8Array, step: string): Ste
     if (occurrenceName) mapped += 1;
     const name = occurrenceName ?? rawName;
     if (!name) return children.length === 1 ? children[0]! : null;
-    return { name, children };
+    return { id: occurrenceName ? `step-occurrence:${rawName}` : `step-node:${index}`, name, children };
   };
 
   let result = roots.map((root) => visit(root, 0, new Set())).filter((node): node is StepAssemblyNode => node !== null);

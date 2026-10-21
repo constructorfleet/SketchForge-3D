@@ -406,7 +406,7 @@ export const SHAPE_CHANGE_FIELDS = [
  * API, and refusing a shape's own id for being unsettable would make that an
  * error.
  */
-export const SHAPE_DESCRIPTION_FIELDS = ["id", "kind", "requestKind", "sketchOperation", "groupedCount", "stepAssembly"] as const;
+export const SHAPE_DESCRIPTION_FIELDS = ["id", "kind", "requestKind", "sketchOperation", "groupedCount", "stepAssembly", "stepComponent"] as const;
 
 export type ShapeChangeResult =
   | { ok: true; shape: WorkplaneShape }

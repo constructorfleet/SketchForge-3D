@@ -30,7 +30,10 @@ describe("STEP import on the kernel", () => {
     const text = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
     const result = await importedShapeFromStepOnKernel("nested-assembly.step", text);
 
-    expect(result.shape.stepAssembly).toEqual([
+    const hierarchy = result.shape.stepAssembly ?? [];
+    const productNames = (nodes: typeof hierarchy): unknown[] => nodes.map(({ name, children }) => ({ name, children: productNames(children) }));
+    const occurrenceIds = (nodes: typeof hierarchy): string[] => nodes.flatMap((node) => [node.id ?? "", ...occurrenceIds(node.children)]);
+    expect(productNames(hierarchy)).toEqual([
       {
         name: "MainAssembly",
         children: [
@@ -45,6 +48,8 @@ describe("STEP import on the kernel", () => {
         ],
       },
     ]);
+    expect(occurrenceIds(hierarchy).every(Boolean)).toBe(true);
+    expect(new Set(occurrenceIds(hierarchy)).size).toBe(5);
   }, 120_000);
 
   it("reads a single solid and reports what it found", async () => {

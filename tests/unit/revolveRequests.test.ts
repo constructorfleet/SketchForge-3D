@@ -7,6 +7,7 @@ import {
   parseRevolveRequest,
   profileFromOutline,
   resolveThreadRequest,
+  rebuiltRevolveShape,
   revolvedShapeFromRequest,
 } from "@constructorfleet/sketchforge-engine/revolveRequests";
 
@@ -93,9 +94,23 @@ describe("building a revolve request", () => {
     expect(shape.x).toBe(10);
     // The shape stays editable as a revolve: the inspector reads these back.
     expect(shape.sketchOperation).toBe("revolve");
+    expect(shape.sketchSourceId).toBe(`sketch/${shape.id}`);
     expect(shape.sketchRevolve).toMatchObject({ pitch: 1.25, turns: 6 });
     expect(shape.sketchProfile?.points).toHaveLength(3);
     expect(shape.importedMesh?.triangleCount).toBeGreaterThan(100);
+  });
+
+  it("keeps the source sketch identity when rebuilding an edited revolve", () => {
+    const original = parseRevolveRequest({ profile: [[4, 0], [6, 0], [6, 3], [4, 3]], pitch: 0 });
+    const edited = parseRevolveRequest({ profile: [[4, 0], [7, 0], [7, 4], [4, 4]], pitch: 0 });
+    if (!original.ok || !edited.ok) throw new Error("expected both profiles to parse");
+    const source = revolvedShapeFromRequest(runtime, original, {});
+    const rebuilt = rebuiltRevolveShape(runtime, { ...source, sketchSourceId: "user/sketch-17" }, edited);
+
+    expect(rebuilt.id).toBe(source.id);
+    expect(rebuilt.sketchSourceId).toBe("user/sketch-17");
+    expect(rebuilt.sketchProfile).toEqual(edited.profile);
+    expect(rebuilt.width).toBeGreaterThan(source.width);
   });
 
   it("builds a bolt as one solid: a shank with the thread standing on it", () => {

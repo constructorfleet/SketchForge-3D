@@ -278,8 +278,10 @@ export type WorkplaneShape = {
   faceIds?: string[];
   /** Face colors keyed by stable face ID; numeric keys remain readable for old projects. */
   faceColors?: Record<string, string>;
-  /** Bounded STEP product hierarchy metadata; imported geometry remains one mesh. */
+  /** Bounded STEP product hierarchy from the retained source, when available. */
   stepAssembly?: StepAssemblyNode[];
+  /** Source occurrence identity and ancestry for an independently selectable exploded STEP component. */
+  stepComponent?: StepComponent;
   hole?: boolean;
   x: number;
   z: number;
@@ -376,7 +378,19 @@ export type WorkplaneShape = {
 };
 
 /** Product label and its direct assembly children as read from a STEP source. */
-export type StepAssemblyNode = { name: string; children: StepAssemblyNode[] };
+export type StepAssemblyNode = { id?: string; name: string; children: StepAssemblyNode[] };
+
+export type StepAssemblyPathNode = { id?: string; name: string };
+
+/** Persisted ancestry for a selectable solid produced by exploding a STEP assembly. */
+export type StepComponent = {
+  /** Unique solid identity within this imported occurrence. */
+  id: string;
+  /** Product occurrence identity in the original STEP hierarchy. */
+  occurrenceId: string;
+  /** Root-to-component path, including the component itself. */
+  path: StepAssemblyPathNode[];
+};
 
 /** Persisted per-shape surface appearance. Values are normalized to [0, 1] by the renderer. */
 export type ShapeAppearance = {

@@ -5,7 +5,10 @@ import ts from "typescript";
 import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const outputDir = path.join(root, "docs/reference");
+const outputIndex = process.argv.indexOf("--output-dir");
+const outputDirArg = outputIndex === -1 ? "docs/reference" : process.argv[outputIndex + 1];
+if (!outputDirArg || outputDirArg.startsWith("--")) throw new Error("--output-dir requires a directory path");
+const outputDir = path.resolve(root, outputDirArg);
 
 const ENGINE_API_GROUPS = [
   { title: "Projects and engine operations", test: /^(createEngine|directoryProjectStore|Engine|EngineFailure|EngineResult|Project|ShapeWritten|ShapesWritten|ShapeRemoved|ShapesArranged|AlignOutcome|DistributeOutcome|CutRequest|AlignRequest|DistributeRequest|PatternRequest|MeshImportRequest|Interference|ServerCad|Measurement)/ },
@@ -79,6 +82,16 @@ generated.set("python-client.md", pythonResult.stdout);
 const docs = await readFile(path.join(root, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
 if (!docs.includes("### Phase 2: generate package and example documentation")) throw new Error("Documentation suite Phase 2 heading is missing");
 
+const repositoryUrl = spawnSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" }).stdout.trim();
+const repository = repositoryUrl.match(/(?:github\.com[:/])([^/]+\/[^/.]+?)(?:\.git)?$/)?.[1];
+if (!repository) throw new Error("Cannot derive GitHub repository for generated reference provenance");
+const revision = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+const documentationVersion = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")).version;
+for (const [filename, markdown] of generated) {
+  const sourceUrl = `https://github.com/${repository}/blob/${revision}/scripts/docs/generate-package-references.mjs`;
+  generated.set(filename, `${markdown}\n\n---\n\nDocumentation version: \`${documentationVersion}\` · Repository revision: [\`${revision}\`](https://github.com/${repository}/tree/${revision}) · [View source](${sourceUrl})\n`);
+}
+
 const check = process.argv.includes("--check");
 if (!check) await mkdir(outputDir, { recursive: true });
 for (const [filename, markdown] of generated) {
@@ -92,4 +105,4 @@ for (const [filename, markdown] of generated) {
     await writeFile(outputPath, markdown);
   }
 }
-console.log(`${check ? "Checked" : "Generated"} package references in docs/reference/`);
+console.log(`${check ? "Checked" : "Generated"} package references in ${path.relative(root, outputDir)}/`);

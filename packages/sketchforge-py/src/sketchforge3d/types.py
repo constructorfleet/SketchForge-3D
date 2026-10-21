@@ -437,6 +437,7 @@ SHAPE_DESCRIPTION_FIELDS: Tuple[str, ...] = (
     "sketchOperation",
     "groupedCount",
     "stepAssembly",
+    "stepComponent",
 )
 
 
@@ -446,12 +447,31 @@ class StepAssemblyNode:
 
     name: str
     children: List["StepAssemblyNode"] = field(default_factory=list)
+    id: Optional[str] = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "StepAssemblyNode":
         return cls(
             name=str(payload.get("name", "")),
             children=[cls.from_payload(child) for child in payload.get("children", []) if isinstance(child, Mapping)],
+            id=payload.get("id") if isinstance(payload.get("id"), str) else None,
+        )
+
+
+@dataclass(frozen=True)
+class StepComponent:
+    """STEP source occurrence identity and ancestry for an exploded solid."""
+
+    id: str
+    occurrence_id: str
+    path: List[StepAssemblyNode]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "StepComponent":
+        return cls(
+            id=str(payload.get("id", "")),
+            occurrence_id=str(payload.get("occurrenceId", "")),
+            path=[StepAssemblyNode.from_payload(node) for node in payload.get("path", []) if isinstance(node, Mapping)],
         )
 
 
@@ -503,6 +523,7 @@ class ShapeSummary:
     #: rather than guessed at, because the server still accepts them.
     face_colors: Dict[str, str] = field(default_factory=dict)
     step_assembly: List[StepAssemblyNode] = field(default_factory=list)
+    step_component: Optional[StepComponent] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
@@ -530,6 +551,7 @@ class ShapeSummary:
         "faceIds",
         "faceColors",
         "stepAssembly",
+        "stepComponent",
     ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
@@ -564,6 +586,7 @@ class ShapeSummary:
                 if isinstance(value, str)
             },
             step_assembly=[StepAssemblyNode.from_payload(node) for node in payload.get("stepAssembly", []) if isinstance(node, Mapping)],
+            step_component=StepComponent.from_payload(payload["stepComponent"]) if isinstance(payload.get("stepComponent"), Mapping) else None,
             revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
             profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},

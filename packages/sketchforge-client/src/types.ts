@@ -277,7 +277,9 @@ export type RevolveSummary = {
 export type SketchOperation = "extrude" | "revolve" | "loft" | "sweep";
 
 /** A named STEP product and its nested component occurrences. */
-export type StepAssemblyNode = { name: string; children: StepAssemblyNode[] };
+export type StepAssemblyNode = { id?: string; name: string; children: StepAssemblyNode[] };
+export type StepAssemblyPathNode = { id?: string; name: string };
+export type StepComponent = { id: string; occurrenceId: string; path: StepAssemblyPathNode[] };
 
 /**
  * A shape as the server reports it.
@@ -305,6 +307,8 @@ export type ShapeSummary = {
   faceColors?: Record<string, string>;
   /** Product hierarchy from an imported STEP assembly, when available. */
   stepAssembly?: StepAssemblyNode[];
+  /** Source occurrence identity and ancestry for a STEP solid made selectable by explosion. */
+  stepComponent?: StepComponent;
   hole: boolean;
   locked: boolean;
   hidden: boolean;

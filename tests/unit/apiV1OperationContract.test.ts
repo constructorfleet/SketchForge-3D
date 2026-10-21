@@ -40,8 +40,13 @@ describe("REST API v1 operation contract", () => {
                 items: {
                   type: "object",
                   required: ["name", "children"],
-                  properties: { name: { type: "string" }, children: { type: "array" } },
+                  properties: { id: { type: "string" }, name: { type: "string" }, children: { type: "array" } },
                 },
+              },
+              stepComponent: {
+                type: "object",
+                required: ["id", "occurrenceId", "path"],
+                properties: { id: { type: "string" }, occurrenceId: { type: "string" }, path: { type: "array" } },
               },
             },
           },
