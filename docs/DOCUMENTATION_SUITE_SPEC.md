@@ -1,6 +1,6 @@
 # Documentation suite specification
 
-**Status (2026-10-21):** The site is deployed after PR #116. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), and static provenance (#126) have merged. STEP documentation PR #119 and deterministic reference-generator wiring PR #128 remain open. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
+**Status (2026-10-21):** The site is deployed after PR #116. Package/examples (#118), stable-face REST contracts (#120, #125), operator configuration (#121), `.skf` format (#123), MCP schemas/navigation (#122), static provenance (#126), and deterministic reference-generator wiring (#128) have merged. STEP documentation PR #119 remains open. Full REST schemas/OpenAPI and remaining acceptance criteria are in progress.
 **Scope:** Public product, developer, API, package, and operator documentation
 **Hosting target:** GitHub Pages
 **Canonical URL:** `https://constructorfleet.github.io/SketchForge-3D/` unless the repository is later configured with a custom domain
@@ -226,8 +226,8 @@ Phase 1 established and deployed the site shell. Package references and
 executable examples (#118), stable-face `GET /faces` and `PATCH faceColors`
 contracts (#120, #125), operator configuration (#121), project-format
 reference (#123), MCP reference/navigation (#122), and source provenance (#126)
-have merged. STEP docs (#119) and deterministic generator-hook integration
-(#128) remain open. Full API schemas/OpenAPI and the remaining accessibility
+have merged. Deterministic generator-hook integration (#128) has also merged;
+STEP docs (#119) remain open. Full API schemas/OpenAPI and the remaining accessibility
 and behavioral smoke checks are incomplete.
 
 ### Phase 2: generate package and example documentation
@@ -248,7 +248,7 @@ and behavioral smoke checks are incomplete.
 
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
-- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), and MCP schemas/navigation (PR #122). STEP documentation is in open PR #119. Generator hooks for deterministic format/config/MCP drift checks are in open PR #128. Broader workflow guides remain outstanding.
+- **Merged slices:** Parameterized shape requests (PR #115), published CLI (PR #117), operator configuration (PR #121), `.skf` format (PR #123), and MCP schemas/navigation (PR #122). STEP documentation is in open PR #119. Generator hooks for deterministic package, format, config, and MCP drift checks merged in PR #128. Broader workflow guides remain outstanding.
 - Extract structured registries for shape kinds, project formats, environment variables, CLI options, and MCP tool schemas.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.

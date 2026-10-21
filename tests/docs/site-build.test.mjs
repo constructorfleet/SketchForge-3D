@@ -71,7 +71,7 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(spec, /`\.skf` format \(#123\)/i);
   assert.match(spec, /MCP schemas\/navigation \(#122\)/i);
   assert.match(spec, /static provenance \(#126\)/i);
-  assert.match(spec, /generator wiring PR #128 remain open/i);
+  assert.match(spec, /deterministic reference-generator wiring \(#128\) have merged/i);
   assert.match(spec, /STEP[^\n]*PR #119[^\n]*open/i);
   assert.match(spec, /merged in PR #112/i);
   assert.match(spec, /PR #115/i);
@@ -83,11 +83,11 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(changelog, /Merged PRs #120 and #125/i);
   assert.match(changelog, /Merged PR #121/i);
   assert.match(changelog, /Merged PR #123/i);
-  assert.match(changelog, /open documentation PRs: #119/i);
+  assert.match(changelog, /open documentation PR: #119/i);
   assert.match(changelog, /MCP tool schema reference/i);
   assert.match(changelog, /Merged PR #122/i);
   assert.match(changelog, /PR #126 added version, revision, and pinned source links/i);
-  assert.match(changelog, /#128 wires/i);
+  assert.match(changelog, /Merged PR #128 wired/i);
   assert.match(changelog, /Merged PR #116/i);
   assert.match(changelog, /Merged PR #117/i);
   assert.doesNotMatch(changelog, /before the first deployment|must select GitHub Actions as the publishing source/i);
@@ -96,7 +96,8 @@ test("documentation suite status distinguishes merged work from open PRs", () =>
   assert.match(migration, /package references and executable examples merged in PR #118/i);
   assert.match(migration, /`GET \/faces` and `PATCH \/shapes` stable face color\s+contracts merged in PRs #120 and #125/i);
   assert.match(migration, /operator configuration \(#121\), `\.skf` format \(#123\), and MCP schema\/navigation\s+\(#122\) references have merged/i);
-  assert.match(migration, /STEP documentation PR #119 and generator-hook\s+wiring PR #128 remain open/i);
+  assert.match(migration, /STEP documentation PR #119 remains open/i);
+  assert.match(migration, /deterministic reference-generator\s+checks merged in PR #128/i);
   assert.match(migration, /site version\/revision stamps and pinned source links merged in\s+PR #126/i);
   assert.doesNotMatch(migration, /still needs to be set|before the first deployment|could not be confirmed/i);
 });
