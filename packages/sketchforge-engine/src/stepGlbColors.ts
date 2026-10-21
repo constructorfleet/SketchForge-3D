@@ -1,8 +1,4 @@
-type GlbColorDocument = {
-  nodes?: Array<{ name?: string; mesh?: number }>;
-  meshes?: Array<{ name?: string; primitives?: Array<{ material?: number }> }>;
-  materials?: Array<{ pbrMetallicRoughness?: { baseColorFactor?: number[] } }>;
-};
+import { readGlbSceneDocument } from "./stepGlbDocument.js";
 
 export type NamedGlbColor = { count: number; color?: string };
 
@@ -14,28 +10,7 @@ function colorHex(color: readonly number[]) {
 export function componentColorsFromGlb(glb: Uint8Array): Map<string, NamedGlbColor> {
   const candidates = new Map<string, { count: number; colors: Set<string> }>();
   const empty = () => new Map<string, NamedGlbColor>();
-  if (glb.byteLength < 20) return empty();
-  const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
-  if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) return empty();
-
-  let json: GlbColorDocument | null = null;
-  let offset = 12;
-  while (offset + 8 <= glb.byteLength) {
-    const length = view.getUint32(offset, true);
-    const type = view.getUint32(offset + 4, true);
-    const start = offset + 8;
-    const end = start + length;
-    if (end > glb.byteLength) return empty();
-    if (type === 0x4e4f534a) {
-      try {
-        json = JSON.parse(new TextDecoder().decode(glb.subarray(start, end)).trim()) as GlbColorDocument;
-      } catch {
-        return empty();
-      }
-      break;
-    }
-    offset = end;
-  }
+  const json = readGlbSceneDocument(glb);
   if (!json) return empty();
 
   for (const node of json.nodes ?? []) {

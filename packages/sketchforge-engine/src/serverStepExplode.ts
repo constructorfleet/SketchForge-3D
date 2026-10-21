@@ -48,7 +48,7 @@ export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset)
     const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
 
     return solids.map((solid, index) => {
-      const metadata = componentMetadata.get(stepShapeKey(cad, solid))?.shift();
+      const metadata = componentMetadata.bySolid.get(stepShapeKey(cad, solid))?.shift();
       const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
       const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
       const bounds = boundsOf(cad, positioned);

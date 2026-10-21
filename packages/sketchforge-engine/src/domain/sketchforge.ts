@@ -278,6 +278,8 @@ export type WorkplaneShape = {
   faceIds?: string[];
   /** Face colors keyed by stable face ID; numeric keys remain readable for old projects. */
   faceColors?: Record<string, string>;
+  /** Bounded STEP product hierarchy metadata; imported geometry remains one mesh. */
+  stepAssembly?: StepAssemblyNode[];
   hole?: boolean;
   x: number;
   z: number;
@@ -372,6 +374,9 @@ export type WorkplaneShape = {
   locked?: boolean;
   hidden?: boolean;
 };
+
+/** Product label and its direct assembly children as read from a STEP source. */
+export type StepAssemblyNode = { name: string; children: StepAssemblyNode[] };
 
 /** Persisted per-shape surface appearance. Values are normalized to [0, 1] by the renderer. */
 export type ShapeAppearance = {

@@ -436,7 +436,23 @@ SHAPE_DESCRIPTION_FIELDS: Tuple[str, ...] = (
     "requestKind",
     "sketchOperation",
     "groupedCount",
+    "stepAssembly",
 )
+
+
+@dataclass(frozen=True)
+class StepAssemblyNode:
+    """A named STEP product and its nested component occurrences."""
+
+    name: str
+    children: List["StepAssemblyNode"] = field(default_factory=list)
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "StepAssemblyNode":
+        return cls(
+            name=str(payload.get("name", "")),
+            children=[cls.from_payload(child) for child in payload.get("children", []) if isinstance(child, Mapping)],
+        )
 
 
 @dataclass(frozen=True)
@@ -486,6 +502,7 @@ class ShapeSummary:
     #: keys them by face index instead, and those keys are kept as they are
     #: rather than guessed at, because the server still accepts them.
     face_colors: Dict[str, str] = field(default_factory=dict)
+    step_assembly: List[StepAssemblyNode] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
@@ -512,6 +529,7 @@ class ShapeSummary:
         "profile",
         "faceIds",
         "faceColors",
+        "stepAssembly",
     ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
@@ -545,6 +563,7 @@ class ShapeSummary:
                 for key, value in (payload.get("faceColors") or {}).items()
                 if isinstance(value, str)
             },
+            step_assembly=[StepAssemblyNode.from_payload(node) for node in payload.get("stepAssembly", []) if isinstance(node, Mapping)],
             revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
             profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},

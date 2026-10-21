@@ -97,7 +97,68 @@ const str = { type: "string" } as const;
 const num = { type: "number" } as const;
 const int = { type: "integer" } as const;
 const projectSummary = { type: "object", required: ["id", "name", "shapes", "revision", "updatedAt", "packageBytes"], properties: { id: str, name: str, shapes: int, revision: num, updatedAt: num, packageBytes: int } } as const;
-const shapeSummary = { type: "object", required: ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"], properties: { id: str, name: str, kind: str, requestKind: str, sketchOperation: str, sketchProfile: { type: "object", required: ["points", "segments"], properties: { points: { type: "array", items: { type: "object", additionalProperties: true } }, segments: { type: "array", items: { type: "object", additionalProperties: true } }, sweepFrames: { type: "object", additionalProperties: true } }, additionalProperties: true }, color: str, faceIds: { type: "array", items: str }, faceColors: { type: "object", additionalProperties: str }, hole: { type: "boolean" }, locked: { type: "boolean" }, hidden: { type: "boolean" }, x: num, z: num, elevation: num, width: num, depth: num, height: num, rotation: num, rotationX: num, rotationZ: num, groupedCount: int, revolve: { type: "object", additionalProperties: true }, profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } } } } as const;
+function stepAssemblyNodeSchema(remainingDepth: number): ApiV1FieldSchema {
+  return {
+    type: "object",
+    required: ["name", "children"],
+    properties: {
+      name: str,
+      children: {
+        type: "array",
+        maxItems: 2000,
+        description: "Direct product children; hierarchy depth is capped at 32.",
+        ...(remainingDepth > 1
+          ? { items: stepAssemblyNodeSchema(remainingDepth - 1) }
+          : { maxItems: 0 }),
+      },
+    },
+    additionalProperties: false,
+  };
+}
+const shapeSummary = {
+  type: "object",
+  required: ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"],
+  properties: {
+    id: str,
+    name: str,
+    kind: str,
+    requestKind: str,
+    sketchOperation: str,
+    sketchProfile: {
+      type: "object",
+      required: ["points", "segments"],
+      properties: {
+        points: { type: "array", items: { type: "object", additionalProperties: true } },
+        segments: { type: "array", items: { type: "object", additionalProperties: true } },
+        sweepFrames: { type: "object", additionalProperties: true },
+      },
+      additionalProperties: true,
+    },
+    color: str,
+    faceIds: { type: "array", items: str },
+    faceColors: { type: "object", additionalProperties: str },
+    stepAssembly: {
+      type: "array",
+      description: "Optional STEP product hierarchy metadata. The imported geometry remains a single mesh.",
+      items: stepAssemblyNodeSchema(32),
+    },
+    hole: { type: "boolean" },
+    locked: { type: "boolean" },
+    hidden: { type: "boolean" },
+    x: num,
+    z: num,
+    elevation: num,
+    width: num,
+    depth: num,
+    height: num,
+    rotation: num,
+    rotationX: num,
+    rotationZ: num,
+    groupedCount: int,
+    revolve: { type: "object", additionalProperties: true },
+    profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
+  },
+} as const;
 const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
 const faceError = (...codes: string[]): ApiV1FieldSchema => ({ type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: codes } }, additionalProperties: false });
 const vector3Schema = { type: "object", required: ["x", "y", "z"], properties: { x: num, y: num, z: num }, additionalProperties: false } as const;

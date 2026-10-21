@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 
@@ -25,6 +26,27 @@ function stepTextFor(boxes: Array<[Corner, Corner]>) {
 }
 
 describe("STEP import on the kernel", () => {
+  it("preserves named nested assembly relationships from an external STEP export", async () => {
+    const text = await readFile(new URL("../fixtures/step/nested-assembly.step", import.meta.url), "utf8");
+    const result = await importedShapeFromStepOnKernel("nested-assembly.step", text);
+
+    expect(result.shape.stepAssembly).toEqual([
+      {
+        name: "MainAssembly",
+        children: [
+          { name: "Frame", children: [] },
+          {
+            name: "Sensors",
+            children: [
+              { name: "SensorLeft", children: [] },
+              { name: "SensorRight", children: [] },
+            ],
+          },
+        ],
+      },
+    ]);
+  }, 120_000);
+
   it("reads a single solid and reports what it found", async () => {
     // 40 wide, 20 deep, 10 tall in Y-up terms: Z-up height becomes Y.
     const text = await stepTextFor([[{ x: -20, y: -10, z: 0 }, { x: 20, y: 10, z: 10 }]]);

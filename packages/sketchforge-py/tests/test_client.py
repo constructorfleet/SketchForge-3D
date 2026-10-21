@@ -21,6 +21,7 @@ from sketchforge3d import (
 from sketchforge3d._http import Transport, build_url, normalize_base_url
 from sketchforge3d.types import (
     MAX_SHAPES_PER_REQUEST,
+    SHAPE_DESCRIPTION_FIELDS,
     MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
     MEASUREMENT_RADIUS_UNAVAILABLE_CODES,
     MEASUREMENT_UNAVAILABLE_CODES,
@@ -827,6 +828,12 @@ class ImportTests(unittest.TestCase):
 
 
 class ShapeSummaryTests(unittest.TestCase):
+    def test_step_assembly_hierarchy_is_typed_and_description_only(self):
+        summary = ShapeSummary.from_payload({**shape_payload(), "stepAssembly": [{"name": "MainAssembly", "children": [{"name": "Sensors", "children": []}]}]})
+        self.assertEqual(summary.step_assembly[0].name, "MainAssembly")
+        self.assertEqual(summary.step_assembly[0].children[0].name, "Sensors")
+        self.assertIn("stepAssembly", SHAPE_DESCRIPTION_FIELDS)
+
     def test_collects_the_per_kind_parameters(self) -> None:
         summary = ShapeSummary.from_payload(
             shape_payload(kind="cylinder", requestKind="cylinder", sides=12, bevel=2)
