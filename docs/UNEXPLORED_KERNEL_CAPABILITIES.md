@@ -78,8 +78,12 @@ the generated fixture path; arbitrary external STEP variants still need
 representative coverage. Regular STEP import still creates a combined mesh
 with the default color, and does not preserve assembly component colors. The
 operation refuses sources above 200 solids or 8 MiB. Nested assembly hierarchy
-is still flattened into independent parts; representing it losslessly needs a
-project-model decision.
+is still flattened into independent parts. The current `occt-wasm` XCAF
+authoring API can create only the single-level fixtures covered here: attempts
+to make a child component a nested assembly fail, and compound-based exports
+round-trip as unnamed flat leaves. A representative externally authored nested
+STEP fixture, plus a project-model decision about editable assembly nodes,
+is required before hierarchy preservation can be implemented and verified.
 
 ### 3. Stable face identity and broader preview mapping
 
