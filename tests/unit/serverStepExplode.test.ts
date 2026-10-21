@@ -36,6 +36,10 @@ describe("STEP assembly explosion", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     const parts = await explodeStepAssembly(imported.shape, source);
 
     expect(parts.map((part) => part.name).sort()).toEqual(["Blue Pin", "Red Housing"]);
+    expect(Object.fromEntries(parts.map(({ name, color }) => [name, color]))).toEqual({
+      "Blue Pin": "#1a33e5",
+      "Red Housing": "#cc1a33",
+    });
   });
 
   it("returns separately positioned solids with exact BREP geometry", async () => {

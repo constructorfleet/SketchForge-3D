@@ -69,10 +69,14 @@ drafting, and dependency-ordered editable feature history.
 
 ### 2. STEP assembly hierarchy and color verification
 
-Explosion now preserves XCAF product names and the per-component colors
-available from the STEP reader, with inherited color fallback. The installed
-kernel fixture does not round-trip explicit XCAF colors, so the positive color
-path still needs verification with a representative real STEP file. The
+Explosion preserves XCAF product names and explicit per-component colors in a
+generated STEP assembly fixture. When the installed XCAF label API does not
+expose those colors, the server reads the display materials from the XCAF
+document's GLB export and matches them to named component labels. Existing
+XCAF label colors and inherited parent colors take precedence. This verifies
+the generated fixture path; arbitrary external STEP variants still need
+representative coverage. Regular STEP import still creates a combined mesh
+with the default color, and does not preserve assembly component colors. The
 operation refuses sources above 200 solids or 8 MiB. Nested assembly hierarchy
 is still flattened into independent parts; representing it losslessly needs a
 project-model decision.

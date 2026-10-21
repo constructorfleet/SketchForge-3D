@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Exploding a STEP assembly now preserves explicit component display colors when
+  the XCAF label API omits them, using the XCAF document's GLB material data.
+  Named red and blue components are covered by an OCCT-generated STEP fixture.
+  Regular STEP import still combines the assembly into a default-colored mesh.
+
 - Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide describes the two-stage workflow: draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The generated section is oriented perpendicular to the spine's initial direction.
 
 - The Sketch workspace can sweep one closed section loop along one open spine on the orthogonal plane derived from the selected section workplane. The section is placed at the spine's first point and oriented perpendicular to its initial direction; line and cubic Bezier paths use OCCT rounded-corner transitions. The editor retains the sketch profile for reopening and editing, while the generated solid is baked rather than kept as an editable feature-history node. Multiple section loops and arbitrary 3D spines are not supported.
