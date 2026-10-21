@@ -501,7 +501,13 @@
       "revolveCreated": "Revolved sketch created",
       "revolvePreviewUpdating": "Updating revolve preview…",
       "revolveShapeUpdated": "Revolve updated",
-      "revolveSettingsFailed": "The revolve settings could not be applied"
+      "revolveSettingsFailed": "The revolve settings could not be applied",
+      "sweepStarted": "Sweep sketch started: draw the closed section on the selected workplane, then switch to an orthogonal plane derived from it and draw one open spine",
+      "editingSweep": "Editing sweep sketch profile",
+      "buildingSweep": "Building planar sweep",
+      "cannotSweep": "Could not create the planar sweep",
+      "sweepCreated": "Planar sweep created",
+      "sweepUpdated": "Planar sweep updated"
     },
     "export": {
       "needSolidSelected": "Select at least one solid shape before exporting",
@@ -650,7 +656,10 @@
       "patternCenterZ": "Centre Z",
       "patternSweep": "Sweep",
       "patternRotate": "Turn copies to follow the ring",
-      "patternApply": "Repeat"
+      "patternApply": "Repeat",
+      "finishSweep": "Finish sweep",
+      "sweepSketch": "Sweep sketch",
+      "sweepSketchHint": "Draw the section on the selected workplane, then its spine on the derived orthogonal plane"
     },
     "panel": {
       "import": "Import",
@@ -817,7 +826,8 @@
     "sketch": {
       "badge": {
         "extrude": "Sketch view",
-        "revolve": "Revolve sketch"
+        "revolve": "Revolve sketch",
+        "sweep": "Planar sweep"
       },
       "viewControls": "Sketch view controls",
       "resetView": "Reset sketch view",
@@ -867,7 +877,18 @@
         "label": "Revolve 3D preview",
         "title": "3D preview",
         "empty": "Draw a closed profile left of the axis"
-      }
+      },
+      "sweepHelp": "First draw exactly one closed section loop on the selected workplane. Then switch to the orthogonal plane derived from it and draw exactly one open spine, starting near the section origin.",
+      "sweepSectionLabel": "Section",
+      "sweepSpineLabel": "Spine",
+      "sweepPlaneHint": "Draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The finished section is oriented perpendicular to the spine’s initial direction.",
+      "sweepSectionStage": "Step 1 of 2 · Section on selected plane",
+      "sweepSectionHelp": "Draw and close one section loop centered at the selected plane origin (0,0). Closing it switches to the orthogonal plane derived from this workplane for the spine.",
+      "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
+      "sweepSpineAxes": "On this plane, screen-right follows {right} and screen-up follows {up}.",
+      "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent; later bends are free.",
+      "sweepSectionPlane": "Edit section · selected plane",
+      "sweepSpinePlane": "Draw spine · orthogonal plane"
     }
   },
   "panels": {
@@ -1362,7 +1383,9 @@
       "allPathsOpen": "All profile paths are open. Close at least one loop before finishing the sketch.",
       "noClosedProfile": "No closed profile found. Draw at least one closed loop and ensure it has no degenerate (zero-area) geometry.",
       "invalidTopology": "OpenCascade produced invalid sketch topology",
-      "buildFailed": "The CAD kernel could not build this sketch"
+      "buildFailed": "The CAD kernel could not build this sketch",
+      "sweepNeedsSectionAndSpine": "A planar sweep needs exactly one closed section loop and one open spine.",
+      "sweepSpineDirection": "The first spine segment must follow screen-right, perpendicular to the section plane. Redraw that first segment."
     },
     "skf": {
       "fileEmpty": ".skf file is empty",

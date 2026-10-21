@@ -24,8 +24,8 @@ describe("sketch point refinement", () => {
   it("splits a bezier without moving the curve at the inserted point", () => {
     const profile: SketchProfile = {
       points: [
-        { id: "a", x: 0, z: 0, handleOut: { x: 0, z: 10 }, mode: "smooth" },
-        { id: "b", x: 10, z: 0, handleIn: { x: 10, z: 10 }, mode: "smooth" },
+        { id: "a", x: 0, z: 0, sweepRole: "spine", handleOut: { x: 0, z: 10 }, mode: "smooth" },
+        { id: "b", x: 10, z: 0, sweepRole: "spine", handleIn: { x: 10, z: 10 }, mode: "smooth" },
       ],
       segments: [{ id: "curve", startId: "a", endId: "b", kind: "bezier" }],
     };
@@ -36,6 +36,7 @@ describe("sketch point refinement", () => {
     expect(inserted?.z).toBeCloseTo(7.5, 8);
     expect(inserted?.handleIn).toEqual({ x: 2.5, z: 7.5 });
     expect(inserted?.handleOut).toEqual({ x: 7.5, z: 7.5 });
+    expect(inserted?.sweepRole).toBe("spine");
     expect(result.profile.segments).toHaveLength(2);
     expect(result.profile.segments[0].endId).toBe(result.pointId);
     expect(result.profile.segments[1].startId).toBe(result.pointId);
@@ -60,6 +61,49 @@ describe("sketch point refinement", () => {
     expect(next.points).toHaveLength(5);
     expect(next.segments).toHaveLength(4);
     expect(next.segments.filter((segment) => segment.startId === intersection?.id || segment.endId === intersection?.id)).toHaveLength(4);
+  });
+
+  it("keeps two components in a center-starting sweep profile when the spine crosses the section", () => {
+    const profile: SketchProfile = {
+      points: [
+        { id: "section-a", x: 0, z: 0 },
+        { id: "section-b", x: 20, z: 0 },
+        { id: "section-c", x: 20, z: 20 },
+        { id: "section-d", x: 0, z: 20 },
+        { id: "spine-start", x: 10, z: 10 },
+        { id: "spine-end", x: 10, z: -10 },
+      ],
+      segments: [
+        // Deliberately interleave the closing edge to guard against path maps that
+        // reset a point's parent while processing a later segment.
+        { id: "section-ab", startId: "section-a", endId: "section-b", kind: "line" },
+        { id: "section-cd", startId: "section-c", endId: "section-d", kind: "line" },
+        { id: "section-bc", startId: "section-b", endId: "section-c", kind: "line" },
+        { id: "section-da", startId: "section-d", endId: "section-a", kind: "line" },
+        { id: "spine", startId: "spine-start", endId: "spine-end", kind: "line" },
+      ],
+    };
+
+    const refined = addLineIntersectionPoints(profile, idFactory(), { splitIntersections: false });
+    expect(refined.points).toHaveLength(6);
+    expect(refined.points.some((point) => point.x === 10 && point.z === 0)).toBe(false);
+    const adjacency = new Map<string, string[]>();
+    for (const segment of refined.segments) {
+      adjacency.set(segment.startId, [...(adjacency.get(segment.startId) ?? []), segment.endId]);
+      adjacency.set(segment.endId, [...(adjacency.get(segment.endId) ?? []), segment.startId]);
+    }
+    const unseen = new Set(adjacency.keys());
+    let componentCount = 0;
+    while (unseen.size) {
+      componentCount += 1;
+      const queue = [unseen.values().next().value as string];
+      while (queue.length) {
+        const pointId = queue.pop()!;
+        if (!unseen.delete(pointId)) continue;
+        queue.push(...(adjacency.get(pointId) ?? []));
+      }
+    }
+    expect(componentCount).toBe(2);
   });
 
   it("carries an axis constraint onto every piece when intersection points split a segment", () => {

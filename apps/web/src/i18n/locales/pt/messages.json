@@ -459,7 +459,13 @@
       "revolveCreated": "Sólido de revolução criado a partir do esboço",
       "revolvePreviewUpdating": "Atualizando a pré-visualização da revolução…",
       "revolveShapeUpdated": "Sólido de revolução atualizado",
-      "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução"
+      "revolveSettingsFailed": "Não foi possível aplicar as configurações da revolução",
+      "sweepStarted": "Esboço de varredura iniciado: desenhe a seção fechada no plano de trabalho selecionado, depois mude para o plano ortogonal derivado dele e desenhe um caminho aberto",
+      "editingSweep": "Editando o perfil de varredura",
+      "buildingSweep": "Criando varredura plana",
+      "cannotSweep": "Não foi possível criar a varredura plana",
+      "sweepCreated": "Varredura plana criada",
+      "sweepUpdated": "Varredura plana atualizada"
     },
     "export": {
       "needSolidSelected": "Selecione pelo menos uma forma sólida antes de exportar",
@@ -572,7 +578,10 @@
       "edit": "Editar",
       "editorMode": "Modo do editor",
       "geometry": "Modelo 3D",
-      "sketch": "Esboço"
+      "sketch": "Esboço",
+      "finishSweep": "Concluir varredura",
+      "sweepSketch": "Varredura de esboço",
+      "sweepSketchHint": "Desenhe a seção no plano selecionado e depois o caminho no plano ortogonal derivado"
     },
     "panel": {
       "import": "Importar",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Modo esboço",
-        "revolve": "Esboço de revolução"
+        "revolve": "Esboço de revolução",
+        "sweep": "Varredura plana"
       },
       "viewControls": "Controles da vista do esboço",
       "resetView": "Redefinir a vista do esboço",
@@ -769,7 +779,18 @@
         "label": "Pré-visualização 3D da revolução",
         "title": "Pré-visualização 3D",
         "empty": "Desenhe um perfil fechado à esquerda do eixo"
-      }
+      },
+      "sweepHelp": "Desenhe primeiro exatamente uma seção fechada no plano de trabalho selecionado. Depois mude para o plano ortogonal derivado dele e desenhe exatamente um caminho aberto que comece perto da origem da seção.",
+      "sweepSectionLabel": "Seção",
+      "sweepSpineLabel": "Trajetória",
+      "sweepPlaneHint": "Desenhe a seção no plano de trabalho selecionado e depois mude para o plano ortogonal derivado para traçar o caminho. A seção final fica perpendicular à direção inicial do caminho.",
+      "sweepSectionStage": "Etapa 1 de 2 · Seção no plano selecionado",
+      "sweepSectionHelp": "Desenhe e feche uma seção centralizada na origem (0,0) do plano selecionado. Ao fechar, a vista muda para o plano ortogonal derivado para o caminho.",
+      "sweepSpineStage": "Etapa 2 de 2 · Caminho no plano ortogonal",
+      "sweepSpineAxes": "Neste plano, a direita da tela segue {right} e a parte superior segue {up}.",
+      "sweepSpineHelp": "Comece o caminho na origem da seção (0,0). O primeiro segmento se ajusta à direita da tela para manter a seção perpendicular à tangente inicial; as curvas seguintes ficam livres.",
+      "sweepSectionPlane": "Editar seção · plano selecionado",
+      "sweepSpinePlane": "Desenhar caminho · plano ortogonal"
     }
   },
   "panels": {
@@ -1159,7 +1180,9 @@
       "allPathsOpen": "Todas as linhas do perfil estão abertas. Feche pelo menos uma antes de concluir o esboço.",
       "noClosedProfile": "Nenhum perfil fechado encontrado. Desenhe pelo menos uma linha fechada e verifique se ela não tem partes de área zero.",
       "invalidTopology": "O módulo OpenCascade gerou um esboço inválido",
-      "buildFailed": "O módulo CAD não conseguiu construir este esboço"
+      "buildFailed": "O módulo CAD não conseguiu construir este esboço",
+      "sweepNeedsSectionAndSpine": "Uma varredura plana precisa de exatamente uma seção fechada e um caminho aberto.",
+      "sweepSpineDirection": "O primeiro segmento do percurso deve seguir para a direita no ecrã, perpendicular ao plano da secção. Desenhe esse segmento novamente."
     },
     "skf": {
       "fileEmpty": "O arquivo .skf está vazio",

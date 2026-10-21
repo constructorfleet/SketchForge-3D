@@ -10,6 +10,11 @@ These are implemented and should not be filed as missing features:
 
 - Exact B-rep volume, surface area, centre of mass, and bounds are available
   through shape properties. Mesh-backed imports report tessellated precision.
+- Edge and face measurements, plus minimum distances and planar-face angles
+  between entities, are exposed through `/measurements` and the TypeScript and
+  Python clients. Values use the kernel representation; mesh imports remain
+  limited to their tessellated geometry, and undefined measurements include a
+  reason.
 - Interference checking is available through the engine and REST API, with an
   AABB candidate prefilter and bounded pair count; wall thickness is available
   as a sampled estimate with its sampling method disclosed.
@@ -30,30 +35,37 @@ These are implemented and should not be filed as missing features:
   retained straight, single-loop sketch extrusion in its local CAD worker and
   stores exact geometry; the result is baked without an editable feature node.
 - OBJ import is supported alongside STL, SVG, and STEP, and imported source
-  assets are preserved in `.skf` projects. The format documentation had lagged
-  behind the implementation.
-- Camera view orientation, target, and zoom are now saved with the project and
+  assets are preserved in `.skf` projects.
+- Camera view orientation, target, and zoom are saved with the project and
   restored when it is reopened. Older projects without camera data retain the
   default view.
 - Server-side project reads regenerate source-backed STEP meshes with the
   server kernel, so STEP imports can reopen from server-backed storage.
 
 Relevant implementation seams include `serverCadProperties.ts`,
-`serverCadInterference.ts`, `serverCadThickness.ts`, `serverStepExplode.ts`,
-`serverCadProjection.ts`, and `serverCadSection.ts` in
+`serverCadMeasure.ts`, `serverCadInterference.ts`, `serverCadThickness.ts`,
+`serverStepExplode.ts`, `serverCadProjection.ts`, and `serverCadSection.ts` in
 `packages/sketchforge-engine/src/`.
 
 ## Remaining gaps
 
 ### 1. Sweep and broader draft modeling operations
 
-SketchForge has no general profile-along-path sweep workflow; its revolve and
-helical revolve remain specialized sketch operations. Draft prism is available
-in the editor, REST, and client libraries, but supports one straight closed
-sketch loop and stores baked geometry without an editable feature-history node.
-Next steps are curved or multi-loop draft profiles and a first planar sweep
-that reuses existing sketch profiles. Arbitrary 3D paths and face-associated
-editable drafts need additional model support.
+The Sketch workspace now has a planar sketch sweep alongside extrusion and
+revolve. The workflow has two stages: draw exactly one closed section loop on
+the selected workplane, then switch to the orthogonal plane derived from it
+and draw exactly one open, planar spine. Start the spine near the section
+origin. The section is positioned at the spine's first point and oriented
+perpendicular to its initial tangent; the spine may use line or cubic Bezier segments, and OCCT
+uses rounded-corner transitions. The editor retains the source sketch profile
+and marks the result as a `sketch-sweep`, but the resulting geometry is baked
+rather than represented by an editable feature-history node. This is a local
+editor operation, not a REST or client-library operation.
+
+Draft prism remains available in the editor, REST, and client libraries, but
+supports one straight closed sketch loop and also stores baked geometry. More
+work remains for multiple section loops/holes, arbitrary 3D paths, face-based
+drafting, and dependency-ordered editable feature history.
 
 ### 2. STEP assembly hierarchy and color verification
 

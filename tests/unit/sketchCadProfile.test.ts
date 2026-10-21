@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cadSketchRegions, orderedCadSketchPaths } from "@/lib/sketchCadProfile";
+import { cadSketchRegions, cadSketchSweepPaths, orderedCadSketchPaths } from "@/lib/sketchCadProfile";
 import type { SketchPoint, SketchProfile, SketchSegment } from "@/types/sketchforge";
 
 function rectangle(id: string, x: number, z: number, width: number, depth: number) {
@@ -26,6 +26,38 @@ function profile(...rectangles: ReturnType<typeof rectangle>[]): SketchProfile {
 }
 
 describe("OCCT sketch profile preparation", () => {
+  it("separates one closed sweep section from one open planar spine", () => {
+    const section = rectangle("section", 0, 0, 2, 3);
+    const spine: SketchProfile = {
+      points: [
+        { id: "spine-a", x: 5, z: 0 },
+        { id: "spine-b", x: 15, z: 0, handleOut: { x: 17, z: 0 } },
+        { id: "spine-c", x: 20, z: 5, handleIn: { x: 20, z: 2 } },
+      ],
+      segments: [
+        { id: "spine-1", kind: "line", startId: "spine-a", endId: "spine-b" },
+        { id: "spine-2", kind: "bezier", startId: "spine-b", endId: "spine-c" },
+      ],
+    };
+    const result = cadSketchSweepPaths({
+      points: [...section.points, ...spine.points],
+      segments: [...section.segments, ...spine.segments],
+    });
+    expect(result.section.closed).toBe(true);
+    expect(result.section.steps).toHaveLength(4);
+    expect(result.spine.closed).toBe(false);
+    expect(result.spine.steps.map(({ segment }) => segment.kind).sort()).toEqual(["bezier", "line"]);
+  });
+
+  it("rejects sweep profiles without exactly one section and one spine", () => {
+    const section = rectangle("section", 0, 0, 2, 3);
+    expect(() => cadSketchSweepPaths(profile(section))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
+    const open = rectangle("open", 5, 0, 4, 4);
+    open.segments.pop();
+    expect(() => cadSketchSweepPaths(profile(open))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
+    expect(() => cadSketchSweepPaths(profile(section, rectangle("second", 8, 0, 2, 3), open))).toThrow(expect.objectContaining({ key: "errors.sketch.sweepNeedsSectionAndSpine" }));
+  });
+
   it("orders a closed loop even when its segments arrive out of order", () => {
     const square = rectangle("outer", 0, 0, 20, 10);
     const paths = orderedCadSketchPaths({ ...profile(square), segments: [...square.segments].reverse() });

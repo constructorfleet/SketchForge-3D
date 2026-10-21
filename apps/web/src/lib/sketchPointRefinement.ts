@@ -129,6 +129,7 @@ export function splitSketchSegment(
     point = {
       id: newPointId,
       ...position,
+      sweepRole: start.sweepRole,
       handleIn: d,
       handleOut: e,
       mode: "smooth",
@@ -139,7 +140,7 @@ export function splitSketchSegment(
       return entry;
     });
   } else {
-    point = { id: newPointId, ...lerpPoint(start, end, amount), mode: "corner" };
+    point = { id: newPointId, ...lerpPoint(start, end, amount), sweepRole: start.sweepRole, mode: "corner" };
   }
 
   const secondSegmentId = createId("sketch-segment");
@@ -172,7 +173,12 @@ function cross(ax: number, az: number, bx: number, bz: number) {
   return ax * bz - az * bx;
 }
 
-export function addLineIntersectionPoints(profile: SketchProfile, createId: IdFactory) {
+export function addLineIntersectionPoints(
+  profile: SketchProfile,
+  createId: IdFactory,
+  options: { splitIntersections?: boolean } = {},
+) {
+  if (options.splitIntersections === false) return profile;
   const pointById = new Map(profile.points.map((point) => [point.id, point]));
   const lines = profile.segments.filter((segment) => isStraightSegment(segment) && pointById.has(segment.startId) && pointById.has(segment.endId));
   const splits = new Map<string, SegmentSplit[]>();

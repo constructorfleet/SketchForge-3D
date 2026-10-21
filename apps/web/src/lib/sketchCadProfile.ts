@@ -151,3 +151,13 @@ export function cadSketchRegions(profile: SketchProfile): CadSketchRegion[] {
   }
   return regions;
 }
+
+export function cadSketchSweepPaths(profile: SketchProfile): { section: OrderedCadSketchPath; spine: OrderedCadSketchPath } {
+  const paths = orderedCadSketchPaths(profile);
+  const sections = paths.filter((path) => path.closed && sampledPath(path).length >= 3 && Math.abs(signedArea(sampledPath(path))) > 1e-8);
+  const spines = paths.filter((path) => !path.closed);
+  if (sections.length !== 1 || spines.length !== 1 || paths.length !== 2) {
+    throw new LocalizedError("errors.sketch.sweepNeedsSectionAndSpine");
+  }
+  return { section: sections[0], spine: spines[0] };
+}

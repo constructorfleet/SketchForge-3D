@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Sweep sketching now distinguishes the closed section from the open spine with separate colors, line styles, and point markers. Its guide describes the two-stage workflow: draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The generated section is oriented perpendicular to the spine's initial direction.
+
+- The Sketch workspace can sweep one closed section loop along one open spine on the orthogonal plane derived from the selected section workplane. The section is placed at the spine's first point and oriented perpendicular to its initial direction; line and cubic Bezier paths use OCCT rounded-corner transitions. The editor retains the sketch profile for reopening and editing, while the generated solid is baked rather than kept as an editable feature-history node. Multiple section loops and arbitrary 3D spines are not supported.
+
 - The viewport remembers its last settled camera position, target, and zoom in the project workspace, so reopening a design returns to the view you were using. Camera movement is saved after orbiting, panning, or zooming settles; older projects without a saved view still open at the usual home view.
 
 - Sketch profiles can carry coincident, horizontal, vertical, and fixed-distance constraints. The Sketch workspace can add or remove these constraints from selected points or segments, and dragging geometry projects it back toward its constraints while keeping dragged points anchored. Unsatisfied constraint IDs appear in the editor notice, and `.skf` saves the declarations while continuing to open older unconstrained profiles. This is a local projection solver; sketches still bake into shapes and do not participate in a parametric feature tree.

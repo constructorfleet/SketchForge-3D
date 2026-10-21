@@ -459,7 +459,13 @@
       "revolveCreated": "Se creó el sólido de revolución del boceto",
       "revolvePreviewUpdating": "Actualizando la vista previa de la revolución…",
       "revolveShapeUpdated": "Revolución actualizada",
-      "revolveSettingsFailed": "No se pudieron aplicar los valores de la revolución"
+      "revolveSettingsFailed": "No se pudieron aplicar los valores de la revolución",
+      "sweepStarted": "Boceto de barrido iniciado: dibuja la sección cerrada en el plano de trabajo seleccionado, cambia después al plano ortogonal derivado de este y dibuja una trayectoria abierta",
+      "editingSweep": "Editando el perfil del barrido",
+      "buildingSweep": "Creando barrido plano",
+      "cannotSweep": "No se pudo crear el barrido plano",
+      "sweepCreated": "Barrido plano creado",
+      "sweepUpdated": "Barrido plano actualizado"
     },
     "export": {
       "needSolidSelected": "Selecciona al menos una forma sólida antes de exportar",
@@ -572,7 +578,10 @@
       "edit": "Editar",
       "editorMode": "Modo del editor",
       "geometry": "Modelo 3D",
-      "sketch": "Boceto"
+      "sketch": "Boceto",
+      "finishSweep": "Finalizar barrido",
+      "sweepSketch": "Barrido de boceto",
+      "sweepSketchHint": "Dibuja la sección en el plano seleccionado y después su trayectoria en el plano ortogonal derivado"
     },
     "panel": {
       "import": "Importar",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Vista de boceto",
-        "revolve": "Boceto de revolución"
+        "revolve": "Boceto de revolución",
+        "sweep": "Barrido plano"
       },
       "viewControls": "Controles de la vista del boceto",
       "resetView": "Restablecer la vista del boceto",
@@ -769,7 +779,18 @@
         "label": "Vista previa 3D de la revolución",
         "title": "Vista previa 3D",
         "empty": "Dibuja un perfil cerrado a la izquierda del eje"
-      }
+      },
+      "sweepHelp": "Dibuja primero exactamente una sección cerrada en el plano de trabajo seleccionado. Después cambia al plano ortogonal derivado de este y dibuja exactamente una trayectoria abierta que empiece cerca del origen de la sección.",
+      "sweepSectionLabel": "Sección",
+      "sweepSpineLabel": "Trayectoria",
+      "sweepPlaneHint": "Dibuja la sección en el plano de trabajo seleccionado y después cambia al plano ortogonal derivado para la trayectoria. La sección final se orienta perpendicularmente a la dirección inicial de la trayectoria.",
+      "sweepSectionStage": "Paso 1 de 2 · Sección en el plano seleccionado",
+      "sweepSectionHelp": "Dibuja y cierra una sección centrada en el origen (0,0) del plano seleccionado. Al cerrarla, se cambia al plano ortogonal derivado para la trayectoria.",
+      "sweepSpineStage": "Paso 2 de 2 · Trayectoria en el plano ortogonal",
+      "sweepSpineAxes": "En este plano, la derecha de la pantalla sigue {right} y la parte superior sigue {up}.",
+      "sweepSpineHelp": "Inicia la trayectoria en el origen de la sección (0,0). El primer segmento se ajusta hacia la derecha de la pantalla para mantener la sección perpendicular a la tangente inicial; los siguientes giros quedan libres.",
+      "sweepSectionPlane": "Editar sección · plano seleccionado",
+      "sweepSpinePlane": "Dibujar trayectoria · plano ortogonal"
     }
   },
   "panels": {
@@ -1159,7 +1180,9 @@
       "allPathsOpen": "Todos los trazados del perfil están abiertos. Cierra al menos uno antes de terminar el boceto.",
       "noClosedProfile": "No se encontró ningún perfil cerrado. Dibuja al menos una línea cerrada y comprueba que no tenga partes de área cero.",
       "invalidTopology": "No se pudo crear un sólido correcto a partir del boceto (error de OpenCascade)",
-      "buildFailed": "No se pudo crear el sólido a partir de este boceto"
+      "buildFailed": "No se pudo crear el sólido a partir de este boceto",
+      "sweepNeedsSectionAndSpine": "Un barrido plano necesita exactamente un contorno cerrado y una trayectoria abierta.",
+      "sweepSpineDirection": "El primer segmento de la trayectoria debe ir hacia la derecha de la pantalla, perpendicular al plano de la sección. Vuelve a dibujar ese segmento."
     },
     "skf": {
       "fileEmpty": "El archivo .skf está vacío",

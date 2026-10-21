@@ -459,7 +459,13 @@
       "revolveCreated": "Z náčrtu vytvořeno rotační těleso",
       "revolvePreviewUpdating": "Aktualizace náhledu rotace…",
       "revolveShapeUpdated": "Rotační těleso aktualizováno",
-      "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít"
+      "revolveSettingsFailed": "Nastavení rotace se nepodařilo použít",
+      "sweepStarted": "Náčrt tažení zahájen: nakreslete uzavřený profil na vybrané pracovní rovině, potom přepněte na kolmou rovinu odvozenou z této roviny a nakreslete jednu otevřenou dráhu",
+      "editingSweep": "Úprava profilu tažení",
+      "buildingSweep": "Vytváření rovinného tažení",
+      "cannotSweep": "Rovinné tažení se nepodařilo vytvořit",
+      "sweepCreated": "Rovinné tažení vytvořeno",
+      "sweepUpdated": "Rovinné tažení aktualizováno"
     },
     "export": {
       "needSolidSelected": "Před exportem vyberte alespoň jedno těleso",
@@ -572,7 +578,10 @@
       "edit": "Upravit",
       "editorMode": "Režim editoru",
       "geometry": "3D model",
-      "sketch": "Náčrt"
+      "sketch": "Náčrt",
+      "finishSweep": "Dokončit tažení",
+      "sweepSketch": "Tažení náčrtu",
+      "sweepSketchHint": "Nakreslete profil na vybrané pracovní rovině a potom dráhu na odvozené kolmé rovině"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Režim náčrtu",
-        "revolve": "Náčrt pro rotaci"
+        "revolve": "Náčrt pro rotaci",
+        "sweep": "Rovinné tažení"
       },
       "viewControls": "Ovládání pohledu na náčrt",
       "resetView": "Obnovit pohled na náčrt",
@@ -769,7 +779,18 @@
         "label": "3D náhled rotace",
         "title": "3D náhled",
         "empty": "Nakreslete uzavřený profil vlevo od osy"
-      }
+      },
+      "sweepHelp": "Nejprve nakreslete přesně jeden uzavřený profil na vybrané pracovní rovině. Potom přepněte na kolmou rovinu odvozenou z této roviny a nakreslete přesně jednu otevřenou dráhu, která začíná blízko počátku profilu.",
+      "sweepSectionLabel": "Průřez",
+      "sweepSpineLabel": "Dráha",
+      "sweepPlaneHint": "Nakreslete profil na vybrané pracovní rovině a potom přepněte na kolmou rovinu odvozenou z ní a nakreslete dráhu. Výsledný profil je orientován kolmo k počátečnímu směru dráhy.",
+      "sweepSectionStage": "Krok 1 ze 2 · Profil na vybrané rovině",
+      "sweepSectionHelp": "Nakreslete a uzavřete profil se středem v počátku (0,0) vybrané roviny. Po uzavření se přepne na kolmou rovinu odvozenou z této pracovní roviny.",
+      "sweepSpineStage": "Krok 2 ze 2 · Dráha na kolmé rovině",
+      "sweepSpineAxes": "Na této rovině odpovídá směr doprava na obrazovce {right} a směr nahoru {up}.",
+      "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí ke směru doprava na obrazovce, aby profil zůstal kolmý k počáteční tečně; další ohyby jsou volné.",
+      "sweepSectionPlane": "Upravit profil · vybraná rovina",
+      "sweepSpinePlane": "Kreslit dráhu · kolmá rovina"
     }
   },
   "panels": {
@@ -1159,7 +1180,9 @@
       "allPathsOpen": "Všechny čáry náčrtu jsou otevřené. Před dokončením náčrtu alespoň jednu uzavřete.",
       "noClosedProfile": "Nebyl nalezen žádný uzavřený profil. Nakreslete alespoň jednu uzavřenou čáru a zkontrolujte, že nemá části s nulovým obsahem.",
       "invalidTopology": "Z náčrtu se nepodařilo vytvořit platné těleso (chyba OpenCascade)",
-      "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso"
+      "buildFailed": "Z náčrtu se nepodařilo vytvořit těleso",
+      "sweepNeedsSectionAndSpine": "Rovinné tažení vyžaduje přesně jednu uzavřenou oblast a jednu otevřenou dráhu.",
+      "sweepSpineDirection": "První úsek osy musí vést doprava po obrazovce, kolmo k rovině řezu. První úsek překreslete."
     },
     "skf": {
       "fileEmpty": "Soubor .skf je prázdný",

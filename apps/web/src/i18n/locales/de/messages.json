@@ -459,7 +459,13 @@
       "revolveCreated": "Rotationskörper aus der Skizze erstellt",
       "revolvePreviewUpdating": "Vorschau der Rotation wird aktualisiert…",
       "revolveShapeUpdated": "Rotationskörper aktualisiert",
-      "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden"
+      "revolveSettingsFailed": "Die Einstellungen der Rotation konnten nicht angewendet werden",
+      "sweepStarted": "Sweep-Skizze gestartet: Zeichne den geschlossenen Querschnitt auf der ausgewählten Arbeitsebene, wechsle dann zu der daraus abgeleiteten orthogonalen Ebene und zeichne einen offenen Pfad",
+      "editingSweep": "Sweep-Skizzenprofil bearbeiten",
+      "buildingSweep": "Planarer Sweep wird erstellt",
+      "cannotSweep": "Planarer Sweep konnte nicht erstellt werden",
+      "sweepCreated": "Planarer Sweep erstellt",
+      "sweepUpdated": "Planarer Sweep aktualisiert"
     },
     "export": {
       "needSolidSelected": "Wählen Sie vor dem Export mindestens einen Volumenkörper aus",
@@ -572,7 +578,10 @@
       "edit": "Bearbeiten",
       "editorMode": "Editormodus",
       "geometry": "3D-Modell",
-      "sketch": "Skizze"
+      "sketch": "Skizze",
+      "finishSweep": "Sweep abschließen",
+      "sweepSketch": "Skizze sweepen",
+      "sweepSketchHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und dann den Pfad auf der abgeleiteten orthogonalen Ebene"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Skizzenmodus",
-        "revolve": "Skizze für die Rotation"
+        "revolve": "Skizze für die Rotation",
+        "sweep": "Planarer Sweep"
       },
       "viewControls": "Ansicht der Skizze steuern",
       "resetView": "Ansicht der Skizze zurücksetzen",
@@ -769,7 +779,18 @@
         "label": "3D-Vorschau der Rotation",
         "title": "3D-Vorschau",
         "empty": "Zeichnen Sie links von der Achse ein geschlossenes Profil"
-      }
+      },
+      "sweepHelp": "Zeichne zuerst genau einen geschlossenen Querschnitt auf der ausgewählten Arbeitsebene. Wechsle dann zu der daraus abgeleiteten orthogonalen Ebene und zeichne genau einen offenen Pfad, der nahe am Ursprung des Querschnitts beginnt.",
+      "sweepSectionLabel": "Querschnitt",
+      "sweepSpineLabel": "Pfad",
+      "sweepPlaneHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und wechsle dann für den Pfad zur daraus abgeleiteten orthogonalen Ebene. Der fertige Querschnitt wird senkrecht zur Anfangsrichtung des Pfads ausgerichtet.",
+      "sweepSectionStage": "Schritt 1 von 2 · Querschnitt auf ausgewählter Ebene",
+      "sweepSectionHelp": "Zeichne und schließe einen am Ursprung (0,0) der ausgewählten Ebene zentrierten Querschnitt. Danach wechselt die Ansicht zur daraus abgeleiteten orthogonalen Ebene für den Pfad.",
+      "sweepSpineStage": "Schritt 2 von 2 · Pfad auf orthogonaler Ebene",
+      "sweepSpineAxes": "Auf dieser Ebene zeigt der Bildschirm nach rechts entlang {right} und nach oben entlang {up}.",
+      "sweepSpineHelp": "Der Pfad beginnt im Profilursprung (0,0). Das erste Segment rastet in Bildschirmrichtung rechts ein, damit der Querschnitt senkrecht zur anfänglichen Tangente bleibt; spätere Biegungen sind frei.",
+      "sweepSectionPlane": "Querschnitt bearbeiten · ausgewählte Ebene",
+      "sweepSpinePlane": "Pfad zeichnen · orthogonale Ebene"
     }
   },
   "panels": {
@@ -1159,7 +1180,9 @@
       "allPathsOpen": "Alle Pfade des Profils sind offen. Schließen Sie mindestens einen, bevor Sie die Skizze fertigstellen.",
       "noClosedProfile": "Kein geschlossenes Profil gefunden. Zeichnen Sie mindestens eine geschlossene Linie und achten Sie darauf, dass sie keine Abschnitte ohne Flächeninhalt hat.",
       "invalidTopology": "Aus der Skizze ist eine ungültige Form entstanden (Fehler in OpenCascade)",
-      "buildFailed": "Aus dieser Skizze konnte keine Form erstellt werden"
+      "buildFailed": "Aus dieser Skizze konnte keine Form erstellt werden",
+      "sweepNeedsSectionAndSpine": "Ein planarer Sweep benötigt genau eine geschlossene Kontur und einen offenen Pfad.",
+      "sweepSpineDirection": "Das erste Segment der Leitkurve muss auf dem Bildschirm nach rechts verlaufen und senkrecht zur Schnittebene stehen. Zeichnen Sie dieses Segment neu."
     },
     "skf": {
       "fileEmpty": "Die .skf-Datei ist leer",

@@ -459,7 +459,13 @@
       "revolveCreated": "Utworzono bryłę obrotową ze szkicu",
       "revolvePreviewUpdating": "Aktualizowanie podglądu bryły obrotowej…",
       "revolveShapeUpdated": "Zaktualizowano bryłę obrotową",
-      "revolveSettingsFailed": "Nie udało się zastosować ustawień bryły obrotowej"
+      "revolveSettingsFailed": "Nie udało się zastosować ustawień bryły obrotowej",
+      "sweepStarted": "Rozpoczęto szkic wyciągnięcia: narysuj zamknięty przekrój na wybranej płaszczyźnie roboczej, następnie przejdź do wyprowadzonej z niej płaszczyzny ortogonalnej i narysuj otwartą ścieżkę",
+      "editingSweep": "Edycja profilu wyciągnięcia",
+      "buildingSweep": "Tworzenie płaskiego wyciągnięcia",
+      "cannotSweep": "Nie udało się utworzyć płaskiego wyciągnięcia",
+      "sweepCreated": "Utworzono płaskie wyciągnięcie",
+      "sweepUpdated": "Zaktualizowano płaskie wyciągnięcie"
     },
     "export": {
       "needSolidSelected": "Przed eksportem zaznacz co najmniej jedną bryłę",
@@ -572,7 +578,10 @@
       "edit": "Edytuj",
       "editorMode": "Tryb edytora",
       "geometry": "Model 3D",
-      "sketch": "Szkic"
+      "sketch": "Szkic",
+      "finishSweep": "Zakończ wyciąganie po ścieżce",
+      "sweepSketch": "Wyciągnij szkic po ścieżce",
+      "sweepSketchHint": "Narysuj przekrój na wybranej płaszczyźnie, a potem ścieżkę na wyprowadzonej płaszczyźnie ortogonalnej"
     },
     "panel": {
       "import": "Import",
@@ -719,7 +728,8 @@
     "sketch": {
       "badge": {
         "extrude": "Tryb szkicu",
-        "revolve": "Szkic bryły obrotowej"
+        "revolve": "Szkic bryły obrotowej",
+        "sweep": "Płaskie wyciągnięcie"
       },
       "viewControls": "Sterowanie widokiem szkicu",
       "resetView": "Przywróć widok szkicu",
@@ -769,7 +779,18 @@
         "label": "Podgląd 3D bryły obrotowej",
         "title": "Podgląd 3D",
         "empty": "Narysuj zamknięty profil po lewej stronie osi"
-      }
+      },
+      "sweepHelp": "Najpierw narysuj dokładnie jeden zamknięty przekrój na wybranej płaszczyźnie roboczej. Następnie przejdź do wyprowadzonej z niej płaszczyzny ortogonalnej i narysuj dokładnie jedną otwartą ścieżkę zaczynającą się blisko początku przekroju.",
+      "sweepSectionLabel": "Przekrój",
+      "sweepSpineLabel": "Ścieżka",
+      "sweepPlaneHint": "Narysuj przekrój na wybranej płaszczyźnie roboczej, a potem przejdź do wyprowadzonej z niej płaszczyzny ortogonalnej, aby narysować ścieżkę. Gotowy przekrój jest ustawiany prostopadle do początkowego kierunku ścieżki.",
+      "sweepSectionStage": "Etap 1 z 2 · Przekrój na wybranej płaszczyźnie",
+      "sweepSectionHelp": "Narysuj i zamknij przekrój wyśrodkowany w początku układu (0,0) wybranej płaszczyzny. Następnie widok przełączy się na wyprowadzoną z niej płaszczyznę ortogonalną ścieżki.",
+      "sweepSpineStage": "Etap 2 z 2 · Ścieżka na płaszczyźnie ortogonalnej",
+      "sweepSpineAxes": "Na tej płaszczyźnie kierunek w prawo na ekranie to {right}, a w górę to {up}.",
+      "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się do kierunku w prawo na ekranie, aby przekrój pozostał prostopadły do początkowej stycznej; kolejne zakręty są swobodne.",
+      "sweepSectionPlane": "Edytuj przekrój · wybrana płaszczyzna",
+      "sweepSpinePlane": "Rysuj ścieżkę · płaszczyzna ortogonalna"
     }
   },
   "panels": {
@@ -1159,7 +1180,9 @@
       "allPathsOpen": "Wszystkie linie szkicu są otwarte. Aby zakończyć szkic, zamknij co najmniej jedną z nich.",
       "noClosedProfile": "Nie znaleziono zamkniętego profilu. Narysuj co najmniej jedną zamkniętą linię i sprawdź, czy nie ma w niej fragmentów o zerowym polu.",
       "invalidTopology": "Nie udało się utworzyć poprawnej bryły ze szkicu (błąd OpenCascade)",
-      "buildFailed": "Nie udało się utworzyć bryły ze szkicu"
+      "buildFailed": "Nie udało się utworzyć bryły ze szkicu",
+      "sweepNeedsSectionAndSpine": "Płaskie wyciągnięcie wymaga dokładnie jednego zamkniętego przekroju i jednej otwartej ścieżki.",
+      "sweepSpineDirection": "Pierwszy odcinek ścieżki musi biec w prawo na ekranie, prostopadle do płaszczyzny przekroju. Narysuj ten odcinek ponownie."
     },
     "skf": {
       "fileEmpty": "Plik .skf jest pusty",

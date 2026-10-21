@@ -36,7 +36,7 @@ const SHAPE_KINDS = new Set([
 const LOFT_PROFILE_SHAPES = new Set(["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"]);
 
 const FEATURE_TYPES = new Set([
-  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "fillet", "chamfer",
+  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer",
 ]);
 
 type SkfAssetKind = "source" | "derived-mesh" | "brep" | "image" | "display-edges";
@@ -565,6 +565,7 @@ async function serializeShapeNode(
     definition.sketchProfile = {
       points: sketchProfile.points,
       segments: sketchProfile.segments,
+      ...(sketchProfile.sweepFrames ? { sweepFrames: sketchProfile.sweepFrames } : {}),
       ...(sketchProfile.constraints?.length ? { constraints: sketchProfile.constraints } : {}),
       ...(images.length ? { images } : {}),
     };
@@ -689,8 +690,8 @@ function activeProjectIndexes(state: SkfStateV1) {
     (node.groupedShapeNodeIds ?? []).forEach(visit);
     let previous: string | undefined;
     if (node.definition.sketchProfile) {
-      const operation = node.definition.sketchOperation === "revolve" ? "revolve" : "extrude";
-      const featureType = operation === "revolve" ? "sketch-revolve" : "sketch-extrusion";
+      const operation = (node.definition.sketchOperation as SketchOperation | undefined) ?? "extrude";
+      const featureType = operation === "revolve" ? "sketch-revolve" : operation === "sweep" ? "sketch-sweep" : "sketch-extrusion";
       const featureId = `feature/${safeNodeToken(node.nodeId)}/${featureType}`;
       features.push({
         id: featureId,
@@ -700,7 +701,7 @@ function activeProjectIndexes(state: SkfStateV1) {
         dependsOnFeatureIds: [],
         parameters: operation === "revolve"
           ? { ...(node.definition.sketchRevolve as Record<string, unknown> | undefined), axis: "vertical-sketch-axis", mode: "create" }
-          : { depth: node.definition.height, direction: "positive-y", mode: "create" },
+          : operation === "sweep" ? { mode: "create" } : { depth: node.definition.height, direction: "positive-y", mode: "create" },
       });
       sketches.push({
         id: `sketch/${safeNodeToken(node.objectId)}`,
@@ -954,7 +955,20 @@ function validateSketchProfile(value: unknown, label: string) {
     pointIds.add(id);
     finiteNumber(point.x, `${label}.points[${index}].x`);
     finiteNumber(point.z, `${label}.points[${index}].z`);
+    if (point.sweepRole !== undefined && point.sweepRole !== "section" && point.sweepRole !== "spine") {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.points[${index}].sweepRole` });
+    }
   });
+  if (profile.sweepFrames !== undefined) {
+    const frames = objectRecord(profile.sweepFrames, `${label}.sweepFrames`);
+    for (const name of ["section", "spine"] as const) {
+      const frame = objectRecord(frames[name], `${label}.sweepFrames.${name}`);
+      for (const field of ["origin", "normal", "xAxis", "zAxis"] as const) {
+        const vector = objectRecord(frame[field], `${label}.sweepFrames.${name}.${field}`);
+        for (const axis of ["x", "y", "z"] as const) finiteNumber(vector[axis], `${label}.sweepFrames.${name}.${field}.${axis}`);
+      }
+    }
+  }
   const segmentIds = new Set<string>();
   profile.segments.forEach((rawSegment, index) => {
     const segment = objectRecord(rawSegment, `${label}.segments[${index}]`);
@@ -1032,7 +1046,7 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     throw new LocalizedError("errors.skf.inlinePackageFields", { label });
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
-  if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve") {
+  if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve" && definition.sketchOperation !== "sweep") {
     throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.sketchOperation` });
   }
   if (definition.sketchRevolve !== undefined) {
