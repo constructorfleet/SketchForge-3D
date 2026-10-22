@@ -362,6 +362,11 @@ export type WorkplaneShape = {
   /** Stable identity of the editable sketch consumed by this sketch feature. */
   sketchSourceId?: string;
   sketchRevolve?: SketchRevolveSettings;
+  /** Non-zero prism draft angle retained so source sketch edits can rebuild the feature. */
+  draftPrismAngle?: number;
+  /** Sketch extrusion dimensions/frame before draft, retained as rebuild inputs. */
+  draftPrismSourceHeight?: number;
+  draftPrismSourceFrame?: CadBrepFrame;
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];
   cadDisplayEdges?: CadDisplayEdge[];

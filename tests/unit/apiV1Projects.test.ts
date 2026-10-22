@@ -483,6 +483,46 @@ describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     expect(shape?.importedMesh?.triangleCount).toBe(payload.triangles);
   });
 
+  it("edits a persisted draft-prism angle by the sketch source ID and reports it in shape summaries", async () => {
+    const { projectId, shapeId } = await boxProject();
+    const document = await readProjectDocument(projectsRoot, projectId);
+    const sourceShape = document?.shapes.find((candidate) => candidate.id === shapeId);
+    expect(document && sourceShape).toBeTruthy();
+    const points = [
+      { id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: -20 },
+      { id: "c", x: 20, z: 20 }, { id: "d", x: -20, z: 20 },
+    ];
+    Object.assign(sourceShape!, {
+      kind: "mesh",
+      sketchOperation: "extrude",
+      sketchSourceId: "sketch/api-draft-prism",
+      sketchProfile: {
+        points,
+        segments: points.map((point, index) => ({ id: `edge-${index}`, startId: point.id, endId: points[(index + 1) % points.length]!.id, kind: "line" })),
+      },
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 40, depth: 40, height: 10 },
+    });
+    await writeProjectDocument(projectsRoot, projectId, document!, document!.shapes);
+    const drafted = await draftPrism(authorized(`/api/v1/draft-prism?projectId=${projectId}&shapeId=${shapeId}`, {
+      method: "POST",
+      body: JSON.stringify({ angle: 5 }),
+    }));
+    expect(drafted.status).toBe(200);
+
+    const changed = await patchShape(authorized(
+      `/api/v1/shapes?projectId=${projectId}&shapeId=sketch%2Fapi-draft-prism`,
+      { method: "PATCH", body: JSON.stringify({ draftPrismAngle: 12 }) },
+    ));
+    const payload = await changed.json() as { shape?: { id: string; sketchSourceId: string; draftPrismAngle: number } };
+    expect(changed.status).toBe(200);
+    expect(payload.shape).toMatchObject({ id: shapeId, sketchSourceId: "sketch/api-draft-prism", draftPrismAngle: 12 });
+
+    const listing = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as {
+      shapes: Array<{ id: string; draftPrismAngle?: number }>;
+    };
+    expect(listing.shapes.find((shape) => shape.id === shapeId)?.draftPrismAngle).toBe(12);
+  });
+
   it("lists a box's edges", async () => {
     const { projectId, shapeId } = await boxProject();
 

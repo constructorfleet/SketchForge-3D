@@ -54,8 +54,10 @@ These are implemented and should not be filed as missing features:
   indexes remain supported for older projects and callers.
 - A bounded draft-prism operation is available in the shape inspector, over
   REST, and in the TypeScript and Python clients. It accepts a retained
-  straight, single-loop sketch extrusion and stores exact geometry; the result
-  is baked without an editable draft-feature node.
+  straight, single-loop sketch extrusion and stores exact geometry plus its
+  angle and original extrusion frame/height. `changeShape` can update the angle
+  by `sketchSourceId`; source profile edits reapply the draft and recompute
+  retained boolean ancestors atomically. Face drafts remain baked.
 - Face-based drafting is available in the shape inspector for exact B-rep
   solids, with a selector for all six signed local CAD pull axes. The engine
   canonicalizes the selected direction before invoking the kernel and maps the
@@ -131,8 +133,10 @@ or sweep rebuilds it inside retained boolean groups, bottom-up, and writes the
 updated result atomically; source-ID edits to revolve profiles and operation
 settings such as side count follow the same path.
 Invalid profiles or failed dependent booleans leave the project unchanged.
-Drafts and other operation types do not yet recompute, and draft prism/face
-draft remain baked rather than editable feature nodes. A general
+Draft prism angles on sketch extrusions now participate in this bounded path:
+their persisted source angle, source height, and source frame are reapplied
+when the source profile changes, and the angle itself can be changed by source
+ID. Face drafts and other operation types do not yet recompute. A general
 dependency-ordered graph with consistent failure propagation remains the
 highest-value foundation before expanding editable downstream operations.
 
@@ -141,10 +145,12 @@ highest-value foundation before expanding editable downstream operations.
 Face drafting is selectable along local X, Y, or Z, but verification covers
 only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
-kernel. Both draft-prism and face-draft results are baked; neither can be
-reopened as an editable operation or recomputed after its source changes.
-Broader fixture coverage should establish the supported geometric envelope;
-editable draft history depends on the feature-recompute work in gap 1.
+kernel. Face-draft results are baked and cannot be reopened as an editable
+operation or recomputed after source changes. Prism drafts are editable only
+as a retained angle on a straight, single-loop sketch extrusion; draft face
+selection, other draft operations, and general editable draft history remain
+unsupported. Broader fixture coverage should establish the supported
+geometric envelope.
 
 ### 3. Editable STEP assembly hierarchy and robust component association
 
