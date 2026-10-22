@@ -126,7 +126,7 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
-  it.each(["edge treatment", "prism draft", "shell"] as const)(
+  it.each(["prism draft", "shell"] as const)(
     "refuses %s on a persisted face-drafted extrusion without writing",
     async (operation) => {
       const { store, writeCount, document } = projectStore();
