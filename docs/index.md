@@ -1,4 +1,7 @@
 ---
+owner: "Documentation"
+audience: "Contributors"
+slug: "/"
 layout: home
 title: SketchForge documentation
 titleTemplate: false

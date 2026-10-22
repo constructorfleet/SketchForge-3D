@@ -1,3 +1,10 @@
+---
+slug: "/docs/HISTORICAL_INBOUND_LINKS"
+title: "Documentation inbound-link inventory"
+audience: "Contributors"
+owner: "Contributors"
+---
+
 # Documentation inbound-link inventory
 
 This inventory records repository-controlled links into public documentation and

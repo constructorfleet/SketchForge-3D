@@ -50,6 +50,15 @@ export function renderReference(tools) {
     "```",
   ].join("\n"));
   return [
+    "---",
+    "slug: /docs/mcp/TOOLS_REFERENCE",
+    "title: MCP tool reference",
+    "audience: MCP users",
+    "owner: MCP",
+    "sources:",
+    "  - packages/sketchforge-client/mcp/**",
+    "---",
+    "",
     "# MCP tool reference",
     "",
     "Generated from the running `tools/list` registry in `packages/sketchforge-client/mcp/server.mjs`.",

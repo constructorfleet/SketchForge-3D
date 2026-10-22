@@ -1,3 +1,13 @@
+---
+slug: "/docs/guides/package-examples"
+title: "Package examples"
+audience: "Contributors"
+owner: "Packages"
+sources:
+  - "packages/sketchforge-client/src/**"
+  - "packages/sketchforge-py/src/**"
+---
+
 # Package examples
 
 These examples are included from the package files that the integration suites execute. The TypeScript macros run through the published client macro runner; the Python examples run through `sketchforge3d`. Both suites create projects on a temporary local server and remove the projects after each run.

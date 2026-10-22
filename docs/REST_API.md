@@ -1,3 +1,12 @@
+---
+slug: "/docs/REST_API"
+title: "REST API"
+audience: "API users"
+owner: "API"
+sources:
+  - "apps/web/src/app/api/v1/**"
+---
+
 # REST API
 
 A scripting surface for SketchForge projects (upstream issue [#55](https://github.com/Formsmith746/SketchForge-3D/issues/55)). Shapes are described as data, so an LLM or a build script can generate a parameterised design -- a plate with a computed row of holes, a family of brackets at four sizes -- without driving the editor.

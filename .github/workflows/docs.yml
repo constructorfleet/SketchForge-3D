@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -53,6 +55,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Verify generated documentation
+        env:
+          DOCS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: npm run docs:verify
       - name: Build static documentation
         run: npm run docs:site-build

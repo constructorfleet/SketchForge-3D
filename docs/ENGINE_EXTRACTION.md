@@ -1,3 +1,12 @@
+---
+slug: "/docs/ENGINE_EXTRACTION"
+title: "Scoping an extracted geometry engine"
+audience: "Contributors"
+owner: "Engine"
+sources:
+  - "packages/sketchforge-engine/src/**"
+---
+
 # Scoping an extracted geometry engine
 
 Status: core extraction and local MCP mode implemented in the current branch. Sections 1–5 and most of 7–8 are the original architecture audit and historical rationale; check the implementation status below for what is now live.

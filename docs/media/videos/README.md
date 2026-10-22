@@ -1,3 +1,10 @@
+---
+slug: "/docs/media/videos"
+title: "SketchForge Demo Video Shot List"
+audience: "Contributors"
+owner: "Editor"
+---
+
 # SketchForge Demo Video Shot List
 
 Record short clips for the main README. Aim for 10-30 seconds per clip.

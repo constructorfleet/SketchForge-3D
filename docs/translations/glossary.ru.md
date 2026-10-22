@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.ru"
+title: "Russian (ru) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # Russian (ru) language guide
 
 Binding for the Russian catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

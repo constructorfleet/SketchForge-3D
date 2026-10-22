@@ -1,3 +1,10 @@
+---
+slug: "/docs/DOCUMENTATION_SUITE_SPEC"
+title: "Documentation suite specification"
+audience: "Contributors"
+owner: "Contributors"
+---
+
 # Documentation suite specification
 
 **Current implementation status:** The searchable VitePress site is published on GitHub Pages at the canonical URL below. It includes generated TypeScript, Python, and engine references in the Pages artifact, source-linked package guides, tested editor quick-start and edit/export workflows, generated format/configuration/CLI/MCP references, Mermaid rendering, accessibility and browser smoke checks, and a repository-controlled historical inbound-link inventory. The configuration registry/reference covers supported server/container, TypeScript/Python client, and local MCP runtime settings; omission checks compare the declared rows with the tracked readers in those scopes. Desktop configuration and broader page ownership and source-to-page diagnostics remain open. Pull-request docs CI generates references before validation and build; trusted writers refresh allowlisted outputs on eligible same-repository PR branches and create a repair PR when a successful default-branch docs run finds stale tracked output. Fork PRs and PRs changing workflow-control files use the generated artifact fallback and do not get an automated branch update. The REST operation registry contains 32 operations; generated OpenAPI describes 18 and explains why 14 remain omitted. `PATCH /api/v1/shapes` can rebuild a persisted sketch sweep from an updated profile, but this operation remains outside OpenAPI because the combined face-color and profile validation is not fully represented there. Broader task-oriented workflows, complete REST contracts, complete configuration coverage, and complete example and content/source ownership checks remain open requirements. See the phases and acceptance criteria below for durable scope and evidence.

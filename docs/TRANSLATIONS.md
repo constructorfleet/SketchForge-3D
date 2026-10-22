@@ -1,3 +1,10 @@
+---
+slug: "/docs/TRANSLATIONS"
+title: "Translations"
+audience: "Contributors"
+owner: "Localization"
+---
+
 # Translations
 
 The interface text lives in per-language JSON catalogs in the [use-intl](https://next-intl.dev/docs/environments/core-library)
