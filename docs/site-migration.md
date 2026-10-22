@@ -64,9 +64,14 @@ so stale tracked output alone does not fail the docs check.
   run against a local API. Python package references and examples are checked
   with mypy and integration tests. The MCP example is checked against the
   server's current advertised tool schemas.
-- The editor quick-start and the create/edit/save/reload/export guide are tested
-  through browser acceptance. Broader task-oriented guides and corresponding
-  workflow checks remain incomplete.
+- Browser acceptance covers the editor quick-start and the edit-and-export
+  guide's create, edit, save, reload, and export workflow. The face-drafting
+  guide covers one inspector case (face 1, local +Z, -5°) with screenshot
+  evidence, and the sketch-constraints guide covers one Parallel workflow with
+  screenshot evidence. These
+  cases do not establish broad face-drafting, sketch-constraint, or task-workflow
+  coverage; broader task-oriented guides and corresponding workflow checks
+  remain incomplete.
 
 ## REST API coverage
 
@@ -121,10 +126,12 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   example trees. The mapping is path-based and is not symbol-level or complete
   repository coverage. The local-project MCP shell command is included from and
   executed as the same source fixture; package examples are sourced and tested.
-  Remaining work is to expand source/test coverage to runnable content outside
-  this bounded set, and to cover editor/UI sources, other examples, and all
-  content sources with ownership diagnostics.
+  The only editor source mapped so far is
+  `apps/web/src/components/SketchForgeEditor.tsx`, which maps to the
+  edit-and-export guide. Other editor/UI sources, other examples, and all
+  content sources remain open for ownership diagnostics.
 - **Task workflows:** expand tested task guides beyond the editor quick-start,
+  edit-and-export, one face-drafting case, one Parallel constraint workflow,
   package examples, and current REST/MCP workflows.
 - **Inbound links:** local links, compatibility paths, and repository history
   are inventoried. External backlinks outside repository history cannot be
