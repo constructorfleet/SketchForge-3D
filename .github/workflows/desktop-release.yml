@@ -1,10 +1,10 @@
 name: Desktop Release
 run-name: Desktop Release ${{ inputs.version || github.ref_name }}
 
+# No tag trigger. release-please.yml dispatches this run, and since
+# release-please holds a GitHub App identity its tag push starts workflows
+# too -- a tag trigger here would build and upload every release twice.
 on:
-  push:
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:

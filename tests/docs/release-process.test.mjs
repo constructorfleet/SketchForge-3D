@@ -46,3 +46,28 @@ test("release metadata versions and release-please package coverage stay aligned
   assert.match(workflow, /gh workflow run release\.yml/);
   assert.match(workflow, /gh workflow run desktop-release\.yml/);
 });
+
+test("the release pull request is opened by the app, so its own checks run", async () => {
+  const workflow = await read(".github/workflows/release-please.yml");
+
+  assert.match(workflow, /uses:\s*actions\/create-github-app-token@v\d/,
+    "release-please needs an identity other than GITHUB_TOKEN: GitHub starts no workflow run for an event its own token created, so the release pull request would never be checked");
+  assert.match(workflow, /app-id:\s*\$\{\{\s*secrets\.APP_ID\s*\}\}/);
+  assert.match(workflow, /private-key:\s*\$\{\{\s*secrets\.APP_KEY\s*\}\}/);
+
+  const releaseStep = workflow.match(/uses:\s*googleapis\/release-please-action@v4[\s\S]*?(?=\n\s{6}- |\n\s{2}\w)/);
+  assert.ok(releaseStep, "the release-please step should still be present");
+  assert.match(releaseStep[0], /token:\s*\$\{\{\s*steps\.[\w-]+\.outputs\.token\s*\}\}/,
+    "release-please must run with the app token, not the default one");
+});
+
+test("a release runs once: the app-pushed tag does not duplicate the dispatched runs", async () => {
+  for (const file of [".github/workflows/release.yml", ".github/workflows/desktop-release.yml"]) {
+    const workflow = await read(file);
+    const triggers = workflow.match(/^on:\n([\s\S]*?)^\w/m);
+    assert.ok(triggers, `${file} should declare triggers`);
+    assert.doesNotMatch(triggers[1], /tags:/,
+      `${file} is dispatched by release-please.yml. Once release-please holds an app identity its tag push starts workflows too, so a tag trigger here would publish every release twice.`);
+    assert.match(triggers[1], /workflow_dispatch:/, `${file} must stay dispatchable`);
+  }
+});

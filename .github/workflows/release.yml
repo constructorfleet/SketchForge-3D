@@ -18,10 +18,10 @@ run-name: Release ${{ inputs.version || github.ref_name }}
 # OIDC claim of the top-level workflow, so being called from another workflow
 # makes the publish fail as an unrecognised publisher. release-please.yml
 # dispatches this workflow instead.
+# No tag trigger. release-please.yml dispatches this run, and since
+# release-please holds a GitHub App identity its tag push starts workflows
+# too -- a tag trigger here would publish every release a second time.
 on:
-  push:
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
