@@ -423,6 +423,7 @@ it is forced by Emscripten.
 **The plan: the engine package never loads a kernel.** It declares what it needs
 and the host supplies it.
 
+<!-- runnable-exempt: This illustrative type sketch belongs to an architectural extraction proposal and is not a compiled source example. -->
 ```ts
 export type EngineKernels = {
   occt: () => Promise<OcctKernel>;
@@ -463,6 +464,7 @@ is to make it the rule rather than the exception.
 Judged against the two real consumers. The surface is deliberately small; the
 engine's job is geometry and format, not transport.
 
+<!-- runnable-exempt: These API signatures illustrate the proposal boundary and intentionally do not claim to match a compilable source file. -->
 ```ts
 // --- the project, as a document on disk -------------------------------------
 type ProjectStore = {
@@ -557,6 +559,7 @@ Add `apps/web/src/lib/geometry/primitiveGeometry.ts`. Move the eight builders
 from `WorkplaneViewport.tsx:8431-8630` into it verbatim, plus `putGeometryOnBase`
 (`:8431-8437`), parameterised by two options:
 
+<!-- runnable-exempt: This options type is a proposal-era illustration, not an executable or source-backed example. -->
 ```ts
 type PrimitiveGeometryOptions = {
   indexed?: boolean;              // editor copies keep the index buffer

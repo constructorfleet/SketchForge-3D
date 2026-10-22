@@ -40,6 +40,7 @@ const publicSourceScopes = [
   "packages/sketchforge-py/examples/**",
 ];
 const markdownLink = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
+const runnableLanguages = new Set(["bash", "js", "python", "sh", "ts"]);
 
 for (const sourceRelative of sources) {
   const sourcePath = path.join(root, sourceRelative);
@@ -67,6 +68,9 @@ for (const sourceRelative of sources) {
   if ((sourceRelative.startsWith("docs/") || sourceRelative.startsWith(".docs-site/docs/reference/")) && sourceRelative.endsWith(".md")) {
     const metadata = validatePageOwnership(sourceRelative, contents, failures, pageSlugs, trackedFiles);
     if (metadata) ownerPages.push({ path: sourceRelative, slug: metadata.slug, title: metadata.title, sources: metadata.sources });
+    if (sourceRelative.startsWith("docs/") && !sourceRelative.startsWith("docs/reference/")) {
+      await validateRunnableBlocks(sourceRelative, contents, failures, trackedFiles);
+    }
   }
 
   for (const match of contents.matchAll(/!!!include\(([^)]+)\)!!!/g)) {
@@ -245,6 +249,98 @@ function escapeRegExp(value) {
 
 function cleanYamlScalar(value) {
   return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+async function validateRunnableBlocks(sourceRelative, contents, failures, trackedFiles) {
+  const lines = contents.split("\n");
+  let activeFence;
+  for (let index = 0; index < lines.length; index += 1) {
+    const fence = lines[index].match(/^\s*(`{3,}|~{3,})(.*)$/);
+    if (!fence) continue;
+    if (!activeFence) {
+      activeFence = {
+        marker: fence[1][0],
+        length: fence[1].length,
+        language: fence[2].trim().split(/\s+/, 1)[0].toLowerCase(),
+        start: index,
+      };
+      continue;
+    }
+    if (fence[1][0] !== activeFence.marker || fence[1].length < activeFence.length) continue;
+    if (runnableLanguages.has(activeFence.language)) {
+      await validateRunnableBlock(sourceRelative, lines, activeFence, index, failures, trackedFiles);
+    }
+    activeFence = undefined;
+  }
+}
+
+async function validateRunnableBlock(sourceRelative, lines, fence, endIndex, failures, trackedFiles) {
+  const location = `${sourceRelative}:${fence.start + 1}`;
+  const declaration = lines[fence.start - 1]?.trim();
+  const exemption = declaration?.match(/^<!--\s*runnable-exempt:\s*(.*?)\s*-->$/);
+  if (exemption) {
+    if (exemption[1].length < 20) failures.push(`${location}: runnable-exempt metadata needs a concrete reason`);
+    return;
+  }
+
+  const sourceDeclaration = declaration?.match(/^<!--\s*runnable-source:\s*([^;]+);\s*tested-by:\s*([^;]+);\s*ci:\s*([^>]+?)\s*-->$/);
+  if (!sourceDeclaration) {
+    failures.push(`${location}: runnable ${fence.language} block needs runnable-source or runnable-exempt metadata`);
+    return;
+  }
+
+  const source = sourceDeclaration[1].trim();
+  const testedBy = sourceDeclaration[2].trim();
+  const ciCommand = sourceDeclaration[3].trim();
+  if (!isSafeSourcePattern(source) || source.includes("*") || !trackedFiles.includes(source)) {
+    failures.push(`${location}: runnable source must name an existing tracked file: ${source}`);
+    return;
+  }
+
+  const includedSource = lines.slice(fence.start + 1, endIndex).join("\n").trim()
+    .match(/^!!!include\(([^)]+)\)!!!$/)?.[1];
+  const resolvedSource = includedSource && path.relative(root, path.resolve(path.dirname(path.join(root, sourceRelative)), includedSource)).split(path.sep).join("/");
+  if (resolvedSource !== source) {
+    const includePath = path.relative(path.dirname(path.join(root, sourceRelative)), path.join(root, source)).split(path.sep).join("/");
+    failures.push(`${location}: runnable source block must include its declared source with a matching \`!!!include(${includePath})!!!\` directive`);
+    return;
+  }
+
+  if (!trackedFiles.includes(testedBy)) {
+    failures.push(`${location}: runnable source test is missing or untracked: ${testedBy}`);
+    return;
+  }
+  const testContents = await readFile(path.join(root, testedBy), "utf8");
+  if (!testContents.includes(path.posix.basename(source))) {
+    failures.push(`${location}: runnable source test does not reference ${source}: ${testedBy}`);
+    return;
+  }
+  if (!(await runnableTestIsWired(testedBy, ciCommand, trackedFiles))) {
+    failures.push(`${location}: runnable source test is not wired to CI command ${ciCommand}: ${testedBy}`);
+  }
+}
+
+async function runnableTestIsWired(testedBy, ciCommand, trackedFiles) {
+  const workflowPaths = trackedFiles.filter((file) => file.startsWith(".github/workflows/") && file.endsWith(".yml"));
+  const workflows = await Promise.all(workflowPaths.map((file) => readFile(path.join(root, file), "utf8")));
+  if (!workflows.some((workflow) => workflow.split("\n").some((line) => /^-?\s*run:\s*/.test(line.trim()) && line.trim().endsWith(ciCommand)))) return false;
+
+  const packageManifest = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+  if (ciCommand === "npm run test:integration") {
+    const integrationConfig = await readFile(path.join(root, "tests/vitest.integration.config.ts"), "utf8").catch(() => "");
+    return packageManifest.scripts?.["test:integration"]?.includes("tests/vitest.integration.config.ts")
+      && integrationConfig.includes("packages/**/tests/**/*.integration.ts")
+      && testedBy.endsWith(".integration.ts");
+  }
+  if (ciCommand === "npm run client:test:py:integration") {
+    return packageManifest.scripts?.["client:test:py:integration"]?.includes("unittest discover -s tests/integration")
+      && testedBy.startsWith("packages/sketchforge-py/tests/integration/");
+  }
+  if (ciCommand === "npm run docs:verify") {
+    return packageManifest.scripts?.["docs:verify"]?.includes(testedBy)
+      && workflows.some((workflow) => workflow.includes("npm run docs:verify"));
+  }
+  return false;
 }
 
 function reportChangedSourceOwners(baseRef, ownerPages, failures) {

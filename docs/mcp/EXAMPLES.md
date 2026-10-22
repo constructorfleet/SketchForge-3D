@@ -17,6 +17,7 @@ For the `.skf` file's archive layout, validation, and compatibility behavior, se
 
 From the repository root, run the checked command below. It builds the engine and then runs the isolated workflow:
 
+<!-- runnable-source: docs/mcp/examples/run-local-project.sh; tested-by: tests/docs/mcp-examples.test.mjs; ci: npm run docs:verify -->
 ```sh
 !!!include(./examples/run-local-project.sh)!!!
 ```

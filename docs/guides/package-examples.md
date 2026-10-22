@@ -20,6 +20,7 @@ Use the [REST API guide](../REST_API.md) for server setup and endpoint semantics
 
 Source: `packages/sketchforge-client/examples/bolt-plate.macro.mjs`.
 
+<!-- runnable-source: packages/sketchforge-client/examples/bolt-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->
 ```js
 !!!include(../../packages/sketchforge-client/examples/bolt-plate.macro.mjs)!!!
 ```
@@ -28,6 +29,7 @@ Source: `packages/sketchforge-client/examples/bolt-plate.macro.mjs`.
 
 Source: `packages/sketchforge-client/examples/bolt-circle.macro.mjs`.
 
+<!-- runnable-source: packages/sketchforge-client/examples/bolt-circle.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->
 ```js
 !!!include(../../packages/sketchforge-client/examples/bolt-circle.macro.mjs)!!!
 ```
@@ -36,6 +38,7 @@ Source: `packages/sketchforge-client/examples/bolt-circle.macro.mjs`.
 
 Source: `packages/sketchforge-client/examples/filleted-box.macro.mjs`.
 
+<!-- runnable-source: packages/sketchforge-client/examples/filleted-box.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->
 ```js
 !!!include(../../packages/sketchforge-client/examples/filleted-box.macro.mjs)!!!
 ```
@@ -44,6 +47,7 @@ Source: `packages/sketchforge-client/examples/filleted-box.macro.mjs`.
 
 Source: `packages/sketchforge-py/examples/bolt_plate.py`.
 
+<!-- runnable-source: packages/sketchforge-py/examples/bolt_plate.py; tested-by: packages/sketchforge-py/tests/integration/test_examples.py; ci: npm run client:test:py:integration -->
 ```python
 !!!include(../../packages/sketchforge-py/examples/bolt_plate.py)!!!
 ```
@@ -52,6 +56,7 @@ Source: `packages/sketchforge-py/examples/bolt_plate.py`.
 
 Source: `packages/sketchforge-py/examples/bolt_circle.py`.
 
+<!-- runnable-source: packages/sketchforge-py/examples/bolt_circle.py; tested-by: packages/sketchforge-py/tests/integration/test_examples.py; ci: npm run client:test:py:integration -->
 ```python
 !!!include(../../packages/sketchforge-py/examples/bolt_circle.py)!!!
 ```
@@ -60,6 +65,7 @@ Source: `packages/sketchforge-py/examples/bolt_circle.py`.
 
 Source: `packages/sketchforge-py/examples/filleted_box.py`.
 
+<!-- runnable-source: packages/sketchforge-py/examples/filleted_box.py; tested-by: packages/sketchforge-py/tests/integration/test_examples.py; ci: npm run client:test:py:integration -->
 ```python
 !!!include(../../packages/sketchforge-py/examples/filleted_box.py)!!!
 ```
@@ -68,6 +74,7 @@ Source: `packages/sketchforge-py/examples/filleted_box.py`.
 
 The repository CI runs these same example files against an isolated local server:
 
+<!-- runnable-exempt: This command invokes the integration suite; the source examples and their tests are included above, not duplicated as shell code. -->
 ```sh
 npm run test:integration
 npm run client:test:py:integration

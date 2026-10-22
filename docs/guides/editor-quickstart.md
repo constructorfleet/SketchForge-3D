@@ -45,6 +45,7 @@ The same dialog can export mesh or CAD formats such as STL, 3MF, OBJ, and STEP. 
 
 The browser acceptance test starts from an empty dashboard, creates a project, adds the rectangle through the sketch toolbar, finishes the extrusion, renames and reloads the project, then downloads the `.skf` file. Run it with:
 
+<!-- runnable-exempt: This command runs the browser acceptance workflow; its maintained implementation is tests/browser/editor-quickstart.test.mjs, not a standalone script block. -->
 ```sh
 npm run test:browser
 ```
