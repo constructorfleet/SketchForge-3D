@@ -106,5 +106,8 @@ describe("CAD modifier runtime state", () => {
     expect(cadModifierSelectionIsAllEdges([1], edges, 25)).toBe(false);
     expect(cadModifierSelectionIsAllEdges([1, 2], edges, 0)).toBe(true);
     expect(cadModifierSelectionIsAllEdges([1, 2, 3], edges, 0)).toBe(false);
+    expect(cadModifierSelectionIsAllEdges([3], [
+      { id: 3, display: true, selectable: true, manifold: true, boundary: false, angle: 90, points: [0, 0, 0] },
+    ], 0)).toBe(false);
   });
 });

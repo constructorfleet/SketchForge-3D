@@ -375,8 +375,10 @@ describe("dependency-ordered feature recomputation", () => {
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { sketchProfile: extrusionProfile(2) });
+    const changedDraftAngle = await engine.changeShape("recompute", persisted.sketchSourceId!, { draftPrismAngle: 8 });
 
     expect(changed.ok).toBe(false);
+    expect(changedDraftAngle.ok).toBe(false);
     expect(writeCount()).toBe(writesBeforeEdit);
     expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
   });
