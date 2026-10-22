@@ -511,6 +511,8 @@ class ShapeSummary:
     sketch_operation: Optional[str] = None
     sketch_source_id: Optional[str] = None
     sketch_profile: Optional[Dict[str, Any]] = None
+    #: One editable face draft retained on a sketch extrusion.
+    face_draft: Optional[Dict[str, Any]] = None
     #: The per-kind parameters this shape carries, under the server's own names.
     parameters: Dict[str, Any] = field(default_factory=dict)
     #: Present on a revolve or a thread: the sweep that built it.
@@ -535,6 +537,7 @@ class ShapeSummary:
         "sketchOperation",
         "sketchSourceId",
         "sketchProfile",
+        "faceDraft",
         "color",
         "hole",
         "locked",
@@ -568,6 +571,7 @@ class ShapeSummary:
             sketch_operation=payload.get("sketchOperation") if isinstance(payload.get("sketchOperation"), str) else None,
             sketch_source_id=payload.get("sketchSourceId") if isinstance(payload.get("sketchSourceId"), str) else None,
             sketch_profile=dict(payload["sketchProfile"]) if isinstance(payload.get("sketchProfile"), Mapping) else None,
+            face_draft=dict(payload["faceDraft"]) if isinstance(payload.get("faceDraft"), Mapping) else None,
             color=_text(payload, "color"),
             hole=bool(payload.get("hole")),
             locked=bool(payload.get("locked")),
@@ -639,6 +643,8 @@ class ShapeSummary:
             patch["profile"] = [list(point) for point in self.profile]
         if self.sketch_profile is not None:
             patch["sketchProfile"] = self.sketch_profile
+        if self.face_draft is not None:
+            patch["faceDraft"] = dict(self.face_draft)
         patch.update(changes)
         return patch
 

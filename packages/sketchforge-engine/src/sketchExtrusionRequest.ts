@@ -80,6 +80,7 @@ export async function sketchExtrusionShapeFromRequest(request: Record<string, un
         triangleCount: Math.floor(mesh.indices.length / 3), sourceFormat: "json",
       },
       cadBrep: cad.toBREP(solid),
+      faceIds: cad.getSubShapes(solid, "face").map((_, index) => `face_${createLocalId(`${id}-face-${index}`)}`),
       cadBrepFrame: { x: centerX, z: centerZ, elevation: minY, width, depth, height: builtHeight },
     });
   });

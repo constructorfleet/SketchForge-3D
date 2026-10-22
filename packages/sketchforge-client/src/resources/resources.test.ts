@@ -11,6 +11,7 @@ import {
   type MeasurementSummary,
   type ShapeRequest,
   type ShapeSummary,
+  type SketchFaceDraft,
   type SketchSweepProfile,
 } from "../types.js";
 import { meshBytesToBase64 } from "./imports.js";
@@ -35,6 +36,17 @@ describe("chunk", () => {
 
   it("refuses a size of zero rather than looping forever", () => {
     expect(() => chunk([1], 0)).toThrow(/at least 1/);
+  });
+});
+
+describe("retained face draft patches", () => {
+  it("sends a selected source face, angle, and signed pull axis", async () => {
+    const draft: SketchFaceDraft = { sourceFaceId: "face_shape_1", angle: 5, pullDirection: "-z" };
+    const server = fakeServer({ status: 200, body: { shape: { ...shapeSummary("s1"), faceDraft: draft }, revision: 2 } });
+
+    await client(server).shapes.update("p1", "sketch/s1", { faceDraft: draft });
+
+    expect(server.calls[0]?.body).toEqual({ faceDraft: draft });
   });
 });
 

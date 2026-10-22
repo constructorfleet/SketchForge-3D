@@ -45,6 +45,22 @@ class ShapeRequestTypeTests(unittest.TestCase):
         self.assertNotIn("sketchProfile", summary.extra)
         self.assertNotIn("sketchSourceId", summary.extra)
 
+    def test_face_draft_is_a_named_summary_field_and_round_trips_in_patch(self):
+        face_draft = {
+            "sourceFaceId": "face_s1_1", "angle": 5, "pullDirection": "z",
+            "sourceFaceNormal": {"x": 1, "y": 0, "z": 0},
+        }
+        summary = sketchforge3d.ShapeSummary.from_payload({
+            "id": "s1", "name": "Draft", "kind": "mesh", "color": "#d41721",
+            "hole": False, "locked": False, "hidden": False, "x": 0, "z": 0,
+            "elevation": 0, "width": 2, "depth": 2, "height": 3,
+            "rotation": 0, "rotationX": 0, "rotationZ": 0, "faceDraft": face_draft,
+        })
+
+        self.assertEqual(summary.face_draft, face_draft)
+        self.assertEqual(summary.as_patch()["faceDraft"], face_draft)
+        self.assertNotIn("faceDraft", summary.extra)
+
 
 if __name__ == "__main__":
     unittest.main()

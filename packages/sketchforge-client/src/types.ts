@@ -260,6 +260,8 @@ export type ShapePatch = ShapePlacement &
     profile?: readonly ProfilePoint[];
     /** Replaces a sketch sweep's editable source profile and rebuilds its mesh. */
     sketchProfile?: SketchSweepProfile;
+    /** Creates, updates, or clears one persisted face draft on a sketch extrusion. */
+    faceDraft?: SketchFaceDraft | null;
     /** The sweep's settings as one object, for a caller that keeps them together. */
     revolve?: RevolveSettings;
   };
@@ -279,6 +281,13 @@ export type RevolveSummary = {
 
 /** The operation a shape's geometry came out of, for the ones that have one. */
 export type SketchOperation = "extrude" | "revolve" | "loft" | "sweep";
+export type SketchFaceDraft = {
+  sourceFaceId: string;
+  angle: number;
+  pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z";
+  /** Included in responses as matching evidence; patches may omit it. */
+  sourceFaceNormal?: { x: number; y: number; z: number };
+};
 
 /** A named STEP product and its nested component occurrences. */
 export type StepAssemblyNode = { id?: string; name: string; children: StepAssemblyNode[] };
@@ -306,6 +315,7 @@ export type ShapeSummary = {
   sketchOperation?: SketchOperation;
   /** Stable source sketch identity for editable sketch-derived geometry. */
   sketchSourceId?: string;
+  faceDraft?: SketchFaceDraft;
   /** Editable profile retained for a sketch sweep created through REST. */
   sketchProfile?: SketchSweepProfile;
   color: string;

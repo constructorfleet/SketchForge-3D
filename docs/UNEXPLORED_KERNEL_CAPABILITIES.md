@@ -57,7 +57,7 @@ These are implemented and should not be filed as missing features:
   straight, single-loop sketch extrusion and stores exact geometry plus its
   angle and original extrusion frame/height. `changeShape` can update the angle
   by `sketchSourceId`; source profile edits reapply the draft and recompute
-  retained boolean ancestors atomically. Face drafts remain baked.
+  retained boolean ancestors atomically.
 - Face-based drafting is available in the shape inspector for exact B-rep
   solids, with a selector for all six signed local CAD pull axes. The engine
   canonicalizes the selected direction before invoking the kernel and maps the
@@ -71,8 +71,13 @@ These are implemented and should not be filed as missing features:
   +30° along -Y. The box face 0/+5°/+X case is rejected because the pull axis
   is parallel to that face. These are measured cases, not broad support for
   other faces, solids, or angles. Other unsupported combinations return a
-  localized error. Draft output is baked, gets fresh face IDs, and clears
-  face colors and edge-treatment metadata.
+  localized error. The editor's arbitrary-shape draft remains baked. The
+  engine/API can retain one face draft on a sketch extrusion, storing the
+  selected source face ID, signed pull axis, angle, unique planar-normal
+  matching evidence, and original source frame. Source edits replay that draft
+  only when exactly one planar face matches; missing or ambiguous matches and
+  failed dependent booleans roll back atomically. Face drafts cannot yet be
+  combined with prism drafts or edge treatments.
 - The Sketch workspace supports planar sweeps with one or more closed section
   loops and one open spine on the derived orthogonal plane. Nested section
   loops become holes; disjoint loops become separate solids. Spine points and
@@ -145,22 +150,29 @@ Invalid profiles or failed dependent booleans leave the project unchanged.
 Draft prism angles on sketch extrusions now participate in this bounded path:
 their persisted source angle, source height, and source frame are reapplied
 when the source profile changes, and the angle itself can be changed by source
-ID. Face drafts and other operation types do not yet recompute. A general
-dependency-ordered graph with consistent failure propagation remains the
-highest-value foundation before expanding editable downstream operations.
+ID. A single retained face draft on a sketch extrusion now recomputes when its
+selected planar face has exactly one normal match; missing or ambiguous matches
+fail atomically. Other downstream operation types do not yet recompute. A
+general dependency-ordered graph with consistent failure propagation remains
+the highest-value foundation before expanding editable downstream operations.
 
 ### 2. Broader and editable drafting
 
 Face drafting is selectable along local X, Y, or Z, but verification covers
 only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
-kernel. Face-draft results are baked and cannot be reopened as an editable
-operation or recomputed after source changes. Prism drafts are editable only
-as a retained angle on a straight, single-loop sketch extrusion. Face selection
-is available in the inspector, but the selected face is not persisted as an
-editable draft feature; other draft operations and general editable draft
-history remain unsupported. Broader fixture coverage should establish the
-supported geometric envelope.
+kernel. The editor's general face-draft results remain baked. The engine/API
+retains one editable face draft on a sketch extrusion, replaying it after a
+source edit only when exactly one planar face matches the stored local normal;
+it refuses missing or ambiguous matches and prism-draft or edge-treatment
+combinations. Updating angle or axis keeps the same source face ID; clear the
+draft before selecting another face. This bounded support does not define
+semantic lineage across arbitrary topology changes. Prism drafts are editable
+only as a retained angle on a straight, single-loop sketch extrusion. The
+editor does not yet create or edit the persisted face-draft feature; its
+arbitrary-shape results remain baked. Other draft operations and general
+editable draft history remain unsupported. Broader fixture coverage should
+establish the supported geometric envelope.
 
 ### 3. Editable STEP assembly hierarchy and robust component association
 
@@ -207,7 +219,10 @@ placement remain open.
 
 ## Verification baseline
 
-Focused coverage includes sweep creation and profile rebuilding
+Focused coverage includes retained face-draft creation, `.skf` round trip,
+source-profile replay, missing-match rollback, and dependent-boolean rollback
+(`tests/unit/engineParametricRecompute.test.ts`,
+`tests/unit/apiV1ShapeRoundTrip.test.ts`), sweep creation and profile rebuilding
 (`tests/e2e/sketchCadSweep.e2e.ts`, `tests/e2e/restApi.e2e.ts`,
 `tests/unit/apiV1ShapeRoundTrip.test.ts`), source-driven extrusion and revolve
 recompute and boolean rollback (`tests/unit/engineParametricRecompute.test.ts`,

@@ -8,6 +8,7 @@ import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/a
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
+import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 
 const TOKEN = "test-token-value";
 
@@ -259,6 +260,39 @@ describe("REST API shape round trip", () => {
     expect(rebuilt.sketchProfile).toEqual(editedProfile);
     expect(rebuilt.cadBrep).not.toBe(previousBrep);
   });
+
+  it("exposes a persisted face draft through PATCH and shape summaries", async () => {
+    const projectId = await makeProject();
+    const placeholder = await addShape(projectId, { kind: "box", name: "Draftable", width: 2, depth: 2, height: 3 });
+    const packagePath = path.join(projectsRoot, `${projectId}.skf`);
+    const project = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const profile = {
+      points: [
+        { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+        { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+      ],
+    };
+    const extrusion = await sketchExtrusionShapeFromRequest({
+      id: placeholder.id, sketchSourceId: `sketch/${placeholder.id}`, name: "Draftable", profile, height: 3,
+    });
+    await fs.writeFile(packagePath, await exportSkfProject({
+      projectId, projectName: project.projectName, createdAt: project.createdAt, modifiedAt: project.modifiedAt,
+      shapes: [extrusion], history: [], historyIndex: -1, assets: project.assets, workspace: project.workspace,
+      snapGrid: project.snapGrid, placementElevation: project.placementElevation,
+    }));
+    const face = (await readFaces(projectId, placeholder.id)).faces.find((candidate) => candidate.index === 1)!;
+    const draft = { sourceFaceId: face.id, angle: 5, pullDirection: "z" };
+
+    const changed = await patch(projectId, `sketch/${placeholder.id}`, { faceDraft: draft });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape?.faceDraft).toMatchObject(draft);
+    expect((await readShape(projectId, placeholder.id)).faceDraft).toMatchObject(draft);
+  }, 60_000);
 
   it("rebuilds a persisted revolve through its source sketch and keeps the source and placement", async () => {
     const projectId = await makeProject();
