@@ -7,7 +7,7 @@ import {
   shapeWithCadResult,
 } from "./serverCadOperations.js";
 import { shapeFaces } from "./serverCadShell.js";
-import { cadSketchRegions } from "./sketchCadProfile.js";
+import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -56,17 +56,26 @@ export async function replaySingleAllEdgeTreatment(
     && extrusionRegions.length === 1
     && extrusionRegions[0]?.holes.length === 0
     && feature?.kind === "fillet";
+  let supportedFaceDraftSweepFillet = false;
+  if (original.sketchOperation === "sweep" && original.sketchProfile && feature?.kind === "fillet") {
+    try {
+      const { sections, spine } = cadSketchSweepPaths(original.sketchProfile);
+      supportedFaceDraftSweepFillet = sections.length === 1 && sections[0]?.holes.length === 0 && spine.steps.length > 0;
+    } catch {
+      supportedFaceDraftSweepFillet = false;
+    }
+  }
   const supportedFaceDraftTreatment = original.faceDraft !== undefined
     && features.length === 1
     && history.length === 1
     && historyFeature?.kind === feature?.kind
     && feature?.allEdges === true
     && historyFeature.allEdges === true
-    && (supportedFaceDraftRevolve || supportedFaceDraftExtrusionFillet)
+    && (supportedFaceDraftRevolve || supportedFaceDraftExtrusionFillet || supportedFaceDraftSweepFillet)
     && (feature.kind !== "chamfer" || Math.abs((feature.chamferAngle ?? 45) - 45) < 0.001)
     && (historyFeature.kind !== "chamfer" || Math.abs((historyFeature.chamferAngle ?? 45) - 45) < 0.001);
   if (original.faceDraft !== undefined && !supportedFaceDraftTreatment) {
-    throw new Error("A face draft can replay one all-edge fillet on a single-loop sketch extrusion or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
+    throw new Error("A face draft can replay one all-edge fillet on a single-loop sketch extrusion or single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
   }
   if (features.length !== 1 || history.length !== 1
     || !feature || !historyFeature
