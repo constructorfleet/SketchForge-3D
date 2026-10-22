@@ -1,5 +1,13 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { allEdgeTreatmentEdgeCount, applyDraftPrism, applyEdgeTreatment, shapeWithCadResult } from "./serverCadOperations.js";
+import {
+  allEdgeTreatmentEdgeCount,
+  applyDraftPrism,
+  applyEdgeTreatment,
+  applySketchFaceDraft,
+  shapeWithCadResult,
+} from "./serverCadOperations.js";
+import { shapeFaces } from "./serverCadShell.js";
+import { cadSketchRegions } from "./sketchCadProfile.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -35,22 +43,30 @@ export async function replaySingleAllEdgeTreatment(
   const feature = features[0];
   const historyFeature = history[0]?.feature;
   const revolveSettings = original.sketchRevolve;
-  const supportedFaceDraftTreatment = original.faceDraft !== undefined
-    && original.sketchOperation === "revolve"
+  const supportedFaceDraftRevolve = original.sketchOperation === "revolve"
     && revolveSettings !== undefined
     && Math.abs(Math.abs(revolveSettings.sweepAngle) - 360) < 1e-6
     && (revolveSettings.pitch ?? 0) === 0
     && (revolveSettings.coreRadius ?? 0) === 0
+    && (feature?.kind === "chamfer" || feature?.kind === "fillet");
+  const extrusionRegions = original.sketchOperation === "extrude" && original.sketchProfile
+    ? cadSketchRegions(original.sketchProfile)
+    : [];
+  const supportedFaceDraftExtrusionFillet = original.sketchOperation === "extrude"
+    && extrusionRegions.length === 1
+    && extrusionRegions[0]?.holes.length === 0
+    && feature?.kind === "fillet";
+  const supportedFaceDraftTreatment = original.faceDraft !== undefined
     && features.length === 1
     && history.length === 1
-    && (feature?.kind === "chamfer" || feature?.kind === "fillet")
-    && historyFeature?.kind === feature.kind
-    && feature.allEdges === true
+    && historyFeature?.kind === feature?.kind
+    && feature?.allEdges === true
     && historyFeature.allEdges === true
+    && (supportedFaceDraftRevolve || supportedFaceDraftExtrusionFillet)
     && (feature.kind !== "chamfer" || Math.abs((feature.chamferAngle ?? 45) - 45) < 0.001)
     && (historyFeature.kind !== "chamfer" || Math.abs((historyFeature.chamferAngle ?? 45) - 45) < 0.001);
   if (original.faceDraft !== undefined && !supportedFaceDraftTreatment) {
-    throw new Error("A face draft can only replay one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
+    throw new Error("A face draft can replay one all-edge fillet on a single-loop sketch extrusion or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
   }
   if (features.length !== 1 || history.length !== 1
     || !feature || !historyFeature
@@ -74,6 +90,23 @@ export async function replaySingleAllEdgeTreatment(
       ...(original.draftPrismSourceFrame ?? rebuilt.draftPrismSourceFrame
         ? { draftPrismSourceFrame: original.draftPrismSourceFrame ?? rebuilt.draftPrismSourceFrame }
         : {}),
+    };
+  }
+  if (original.faceDraft !== undefined && treatmentSource.faceDraft === undefined) {
+    const sourceNormal = original.faceDraft.sourceFaceNormal;
+    if (!sourceNormal) throw new Error("The selected source face has no stable planar reference.");
+    const matchingFaces = (await shapeFaces(treatmentSource)).filter((face) => face.surfaceType === "plane"
+      && face.normal
+      && Math.hypot(face.normal.x - sourceNormal.x, face.normal.y - sourceNormal.y, face.normal.z - sourceNormal.z) <= 1e-5);
+    if (matchingFaces.length !== 1) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+    const faceDraft = original.faceDraft;
+    treatmentSource = {
+      ...shapeWithCadResult(treatmentSource, await applySketchFaceDraft(treatmentSource, {
+        ...faceDraft,
+        sourceFaceId: matchingFaces[0]!.id,
+      })),
+      faceDraft,
+      faceDraftSourceFrame: original.faceDraftSourceFrame ?? treatmentSource.cadBrepFrame,
     };
   }
   const result = await applyEdgeTreatment(treatmentSource, {

@@ -164,6 +164,23 @@ describe("SketchForge .skf project packages", () => {
     const filletFeature = draftedFilletDocument.features.find((feature) => feature.type === "fillet");
     expect(filletFeature?.dependsOnFeatureIds).toContain(filletDraftFeature?.id);
 
+    const draftedFilletExtrusion = shape("mesh", "drafted-fillet-extrusion", {
+      ...draftedExtrusion,
+      id: "drafted-fillet-extrusion",
+      edgeTreatments: [fillet],
+      edgeTreatmentHistory: [{ id: "drafted-fillet-extrusion-history", createdAt: 1, feature: fillet, before: draftedExtrusion }],
+    });
+    const draftedFilletExtrusionArchive = await exportSkfProject(input([draftedFilletExtrusion]));
+    const restoredDraftedFilletExtrusion = await importSkfProject(draftedFilletExtrusionArchive);
+    expect(restoredDraftedFilletExtrusion.shapes[0]?.faceDraft).toEqual(draftedExtrusion.faceDraft);
+    expect(restoredDraftedFilletExtrusion.shapes[0]?.edgeTreatments).toEqual([fillet]);
+    expect(restoredDraftedFilletExtrusion.shapes[0]?.edgeTreatmentHistory?.[0]?.before.faceDraft)
+      .toEqual(draftedExtrusion.faceDraft);
+    const { document: draftedFilletExtrusionDocument } = packageDocument(draftedFilletExtrusionArchive);
+    const extrusionDraftFeature = draftedFilletExtrusionDocument.features.find((feature) => feature.type === "face-draft");
+    const extrusionFilletFeature = draftedFilletExtrusionDocument.features.find((feature) => feature.type === "fillet");
+    expect(extrusionFilletFeature?.dependsOnFeatureIds).toContain(extrusionDraftFeature?.id);
+
     const tolerantChamfer = { ...chamfer, chamferAngle: 45.0005 };
     const tolerantArchive = await exportSkfProject(input([shape("mesh", "tolerant-draft-chamfer", {
       ...draftedRevolve,

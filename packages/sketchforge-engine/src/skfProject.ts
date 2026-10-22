@@ -1195,6 +1195,29 @@ function validateShapeDefinition(
       && historyFeature.amount === treatment.amount
       && historyFeature.edgeCount === treatment.edgeCount
     );
+    const extrusionRegions = definition.sketchOperation === "extrude" && definition.sketchProfile !== undefined
+      ? cadSketchRegions(definition.sketchProfile as SketchProfile)
+      : [];
+    const isPersistedExtrusionDraftFillet = Boolean(
+      definition.sketchOperation === "extrude"
+      && extrusionRegions.length === 1
+      && extrusionRegions[0]?.holes.length === 0
+      && definition.draftPrismAngle === undefined
+      && treatments.length === 1
+      && treatment?.kind === "fillet"
+      && treatment.allEdges === true
+      && treatment.edges === undefined
+      && typeof treatment.amount === "number"
+      && Number.isFinite(treatment.amount)
+      && treatment.amount > 0
+      && Number.isInteger(treatment.edgeCount)
+      && (treatment.edgeCount as number) > 0
+      && history.length === 1
+      && historyFeature?.kind === "fillet"
+      && historyFeature.allEdges === true
+      && historyFeature.amount === treatment.amount
+      && historyFeature.edgeCount === treatment.edgeCount
+    );
     if (
       kind !== "mesh"
       || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep" && !plainFullTurnRevolve)
@@ -1202,7 +1225,8 @@ function validateShapeDefinition(
       || plainFullTurnRevolve && cadSketchRegions(definition.sketchProfile as SketchProfile).length !== 1
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
-      || (treatments.length > 0 || options.hasEdgeTreatmentHistory) && !isPersistedRevolveDraftTreatment
+      || (treatments.length > 0 || options.hasEdgeTreatmentHistory)
+        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }

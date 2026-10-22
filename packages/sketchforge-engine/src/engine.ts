@@ -29,6 +29,7 @@ import {
   type ServerCadEdge,
   type ServerCadTreatment,
 } from "./serverCadOperations.js";
+import { cadSketchRegions } from "./sketchCadProfile.js";
 import {
   applyShell,
   shapeFaces,
@@ -112,6 +113,12 @@ function faceDraftInput(value: unknown): Omit<SketchFaceDraft, "sourceFaceNormal
     angle: draft.angle,
     pullDirection: draft.pullDirection as SketchFaceDraft["pullDirection"],
   };
+}
+
+function isSingleLoopSketchExtrusion(shape: WorkplaneShape) {
+  if (shape.sketchOperation !== "extrude" || !shape.sketchProfile) return false;
+  const regions = cadSketchRegions(shape.sketchProfile);
+  return regions.length === 1 && regions[0]?.holes.length === 0;
 }
 
 function revolveSourceScale(shape: WorkplaneShape) {
@@ -699,7 +706,8 @@ export function createEngine(store: ProjectStore): Engine {
       const replayableFaceDraftTreatment = (operation === "all-edge-treatment" || operation === "all-edge-chamfer-treatment")
         && !hasEdgeTreatments
         && found.value.faceDraft !== undefined
-        && isPlainFullTurnSketchRevolve(found.value);
+        && (isPlainFullTurnSketchRevolve(found.value)
+          || operation === "all-edge-treatment" && isSingleLoopSketchExtrusion(found.value));
       const incompatible = found.value.faceDraft !== undefined && !replayableFaceDraftTreatment
         || operation === "edge-treatment" && hasDraftPrism
         || (operation === "all-edge-treatment" || operation === "all-edge-chamfer-treatment")
@@ -709,7 +717,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (incompatible) {
         return failed({
           reason: "cad_refused",
-          message: "Face drafts support one symmetric all-edge chamfer or one all-edge fillet only on a plain full-turn sketch revolve; prism drafts support one all-edge treatment only on a sketch extrusion. Other draft and treatment combinations, and shelling with persisted features, are refused.",
+          message: "Face drafts support one all-edge fillet on a single-loop sketch extrusion or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn sketch revolve; prism drafts support one all-edge treatment only on a sketch extrusion. Other draft and treatment combinations, and shelling with persisted features, are refused.",
           status: 422,
         });
       }
@@ -853,7 +861,8 @@ export function createEngine(store: ProjectStore): Engine {
       const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
         && !faceDraftChanged
         && existing.draftPrismAngle === undefined
-        && isPlainFullTurnSketchRevolve(existing)
+        && (isPlainFullTurnSketchRevolve(existing)
+          || isSingleLoopSketchExtrusion(existing) && existing.edgeTreatments?.[0]?.kind === "fillet")
         && existing.edgeTreatments?.length === 1
         && (existing.edgeTreatments[0]?.kind === "chamfer" || existing.edgeTreatments[0]?.kind === "fillet")
         && existing.edgeTreatments[0]?.allEdges === true
@@ -956,7 +965,9 @@ export function createEngine(store: ProjectStore): Engine {
               draftPrismChanged ? requestedDraftPrismAngle : undefined,
             )
             : rebuiltSource;
-          if (requestedFaceDraft) {
+          if (requestedFaceDraft && replayedSource.faceDraft) {
+            swept = replayedSource;
+          } else if (requestedFaceDraft) {
             const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
               ? existing.faceDraft.sourceFaceNormal
               : undefined;

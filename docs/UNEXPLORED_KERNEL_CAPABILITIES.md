@@ -83,7 +83,9 @@ These are implemented and should not be filed as missing features:
   multi-region revolve drafts are refused. A draft on an extrusion nested in
   a retained boolean group survives `.skf` round trip and replays after a
   source-profile edit while preserving the group ID and committing one atomic
-  write. A plain single-region full-turn
+  write. A single-loop sketch extrusion may retain one all-edge fillet after
+  one face draft; `.skf` round trips preserve the sequence and source-profile
+  edits replay the draft before the fillet atomically. A plain single-region full-turn
   sketch revolve may retain one face draft followed by either one symmetric
   45° all-edge chamfer or one all-edge fillet; profile and setting edits replay
   source, draft, then treatment atomically. Adding a second treatment, a prism
@@ -195,7 +197,9 @@ draft, then treatment atomically and refresh treatment history and eligible-edge
 counts. `.skf` round trips preserve this supported sequence and allow replay
 after import. Face drafts remain incompatible with prism drafts and shelling.
 Edge treatments are supported only in the explicitly bounded full-turn revolve
-sequence above; other face-draft / treatment sequences remain refused. A
+sequence above, plus one all-edge fillet after a face draft on a single-loop
+sketch extrusion; profile edits replay draft then fillet and `.skf` preserves
+that sequence. Other face-draft / treatment sequences remain refused. A
 retained prism draft on a sketch extrusion can be followed by one all-edge
 fillet or symmetric 45° chamfer;
 source-profile and draft-angle edits replay the draft before the treatment.
