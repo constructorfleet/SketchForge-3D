@@ -7,6 +7,8 @@ const home = new URL("../../docs/index.md", import.meta.url);
 const quickstart = new URL("../../docs/guides/editor-quickstart.md", import.meta.url);
 const browserTest = new URL("../browser/editor-quickstart.test.mjs", import.meta.url);
 const siteConfig = new URL("../../docs/.vitepress/config.mts", import.meta.url);
+const faceDraftGuide = new URL("../../docs/guides/face-drafting.md", import.meta.url);
+const faceDraftBrowserTest = new URL("../browser/face-drafting.test.mjs", import.meta.url);
 
 test("editor workflow guide covers create, edit, save, and export with supporting references", async () => {
   const [guideText, homeText, quickstartText, browserTestText, siteConfigText] = await Promise.all([
@@ -35,4 +37,19 @@ test("editor workflow guide covers create, edit, save, and export with supportin
   assert.match(browserTestText, /getByRole\("menuitem", \{ name: "Circle" \}\)/);
   assert.match(browserTestText, /the added circle should remain after reloading/);
   assert.match(browserTestText, /Save SketchForge Project/);
+});
+
+test("face drafting guide links a supported editor workflow to browser acceptance and screenshot evidence", async () => {
+  const [guideText, browserTestText] = await Promise.all([
+    readFile(faceDraftGuide, "utf8"),
+    readFile(faceDraftBrowserTest, "utf8"),
+  ]);
+
+  assert.match(guideText, /Draft face/);
+  assert.match(guideText, /face-draft-browser\.png/);
+  assert.match(guideText, /face-drafting\.test\.mjs/);
+  assert.match(browserTestText, /getByRole\("region", \{ name: "Draft face" \}\)/);
+  assert.match(browserTestText, /Apply face draft/);
+  assert.match(browserTestText, /Face draft applied/);
+  assert.match(browserTestText, /face-draft-browser\.png/);
 });
