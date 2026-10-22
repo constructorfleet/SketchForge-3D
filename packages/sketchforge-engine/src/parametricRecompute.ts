@@ -31,6 +31,9 @@ export async function replayAllEdgeFillet(
   const features = original.edgeTreatments ?? [];
   const history = original.edgeTreatmentHistory ?? [];
   if (features.length === 0 && history.length === 0) return rebuilt;
+  if (original.draftPrismAngle !== undefined) {
+    throw new Error("A draft prism with an edge treatment cannot yet be recomputed safely.");
+  }
   if (features.length !== 1 || history.length !== 1
     || features[0]?.kind !== "fillet" || features[0].allEdges !== true
     || history[0]?.feature.kind !== "fillet" || history[0].feature.allEdges !== true

@@ -104,7 +104,9 @@ These are implemented and should not be filed as missing features:
   source operation types; those histories cannot yet be recomputed safely.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
-  not yet participate in a general recompute graph.
+  not yet participate in a general recompute graph. A drafted extrusion with
+  edge treatments is conservatively refused on source or draft-angle edits
+  because those operation histories cannot yet be replayed in order.
 - Coincident, horizontal, vertical, perpendicular, parallel, fixed-distance,
   and fixed-point sketch constraints are supported, including `.skf`
   persistence and TypeScript profile types. A fixed point anchors a sketch

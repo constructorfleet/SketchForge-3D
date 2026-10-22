@@ -770,6 +770,9 @@ export function createEngine(store: ProjectStore): Engine {
           message: "A draft prism angle must be non-zero and between -45 and 45 degrees on a sketch extrusion.",
         });
       }
+      if (draftPrismChanged && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0)) {
+        return failed({ reason: "invalid_shape_request", message: "A draft angle cannot be changed while edge treatments are present." });
+      }
       if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
       }
