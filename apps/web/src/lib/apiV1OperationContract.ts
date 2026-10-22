@@ -463,17 +463,18 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/exports", "exportProject"),
   {
     ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 422, 500, 503]),
-    description: "Lists each face with its shell-request index and stable application-owned ID. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",
+    description: "Lists each face with its shell-request index and stable application-owned ID. Use topology=exact to list analytic faces on supported plain full-turn sketch revolves without changing the default mesh listing. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",
     query: {
       required: ["projectId", "shapeId"],
       properties: {
         projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
         shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        topology: { type: "string", pattern: "^(mesh|exact)$", description: "Optional. Use exact to list analytic B-rep faces on a supported plain full-turn sketch revolve; the default mesh listing keeps its existing indexes." },
       },
     },
     responseSchemas: {
       200: faceListSchema,
-      400: faceError("invalid_project_id", "invalid_shape_id"),
+      400: faceError("invalid_project_id", "invalid_shape_id", "invalid_request"),
       401: faceError("unauthorized"),
       404: faceError("api_disabled", "project_not_found", "shape_not_found"),
       422: faceError("cad_failed"),

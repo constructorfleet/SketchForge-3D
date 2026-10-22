@@ -253,6 +253,7 @@ describe("REST API v1 operation contract", () => {
         properties: {
           projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
           shapeId: { type: "string", trim: true, minLength: 1 },
+          topology: { type: "string", pattern: "^(mesh|exact)$" },
         },
       },
       responseSchemas: {
@@ -281,7 +282,7 @@ describe("REST API v1 operation contract", () => {
       },
     });
     expect(operation?.responseSchemas).toMatchObject({
-      400: { type: "object", properties: { code: { enum: ["invalid_project_id", "invalid_shape_id"] } } },
+      400: { type: "object", properties: { code: { enum: ["invalid_project_id", "invalid_shape_id", "invalid_request"] } } },
       401: { type: "object", properties: { code: { enum: ["unauthorized"] } } },
       404: { type: "object", properties: { code: { enum: ["api_disabled", "project_not_found", "shape_not_found"] } } },
       422: { type: "object", properties: { code: { enum: ["cad_failed"] } } },

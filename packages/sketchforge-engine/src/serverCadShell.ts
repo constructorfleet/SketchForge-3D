@@ -29,7 +29,7 @@
 
 import type { OcctKernel, ShapeHandle, Vec3 } from "occt-wasm";
 import { withCadKernel } from "./serverCadKernel.js";
-import { meshedCadResult, orientedSolidForShape, ServerCadError, type ServerCadResult } from "./serverCadOperations.js";
+import { exactPlainSketchRevolveSolid, isPlainFullTurnSketchRevolve, meshedCadResult, orientedSolidForShape, ServerCadError, type ServerCadResult } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 /**
@@ -129,8 +129,9 @@ function reachAlong(centroid: Vec3, direction: Vec3) {
   return centroid.x * direction.x + centroid.y * direction.y + centroid.z * direction.z;
 }
 
-function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape): ServerCadFace[] {
+function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape, preferStoredIds = true): ServerCadFace[] {
   const faces = cad.getSubShapes(solid, "face");
+  const storedIds = preferStoredIds && shape.faceIds?.length === faces.length ? shape.faceIds : undefined;
   const described = faces.map((handle, index) => {
     const normal = faceOutwardNormal(cad, handle);
     let surfaceType = "unknown";
@@ -142,7 +143,7 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShap
     const centroid = cad.getSurfaceCenterOfMass(handle);
     return {
       index,
-      id: shape.faceIds?.[index] ?? `face_${encodeURIComponent(shape.id)}_${index}`,
+      id: storedIds?.[index] ?? `face_${encodeURIComponent(shape.id)}_${index}`,
       surfaceType,
       area: cad.getSurfaceArea(handle),
       centroid: { x: centroid.x, y: centroid.y, z: centroid.z },
@@ -175,8 +176,17 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShap
 }
 
 /** A shape's faces, numbered as a shell request refers to them by index. */
-export function shapeFaces(shape: WorkplaneShape): Promise<ServerCadFace[]> {
-  return withCadKernel((cad) => faceSummaries(cad, orientedSolidForShape(cad, shape), shape));
+export function shapeFaces(shape: WorkplaneShape, options: { topology?: "exact" } = {}): Promise<ServerCadFace[]> {
+  return withCadKernel((cad) => {
+    if (options.topology === "exact" && isPlainFullTurnSketchRevolve(shape)) {
+      if (shape.faceColors && Object.keys(shape.faceColors).length > 0) {
+        throw new ServerCadError("Exact revolve face listing is unavailable while legacy face colors are stored.");
+      }
+      const exact = exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
+      return faceSummaries(cad, exact, shape, false);
+    }
+    return faceSummaries(cad, orientedSolidForShape(cad, shape), shape);
+  });
 }
 
 /**

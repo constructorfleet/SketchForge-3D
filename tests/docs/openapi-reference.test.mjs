@@ -17,7 +17,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(faces, "GET /faces should be present once its runtime contract is complete");
   assert.deepEqual(Object.keys(faces.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
   assert.equal(faces.responses["409"], undefined, "read-only face listing does not take the project write lock");
-  assert.deepEqual(faces.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(faces.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true], ["topology", false]]);
+  assert.match(faces.parameters[2].description, /exact.*supported plain full-turn sketch revolve/i);
   assert.match(faces.parameters[0].description, /trimmed before validation/);
   const faceSchema = faces.responses["200"].content["application/json"].schema;
   assert.deepEqual(faceSchema.required, ["faces"]);

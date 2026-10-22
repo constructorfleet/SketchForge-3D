@@ -124,6 +124,111 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("persists one face draft on a plain full-turn sketch revolve", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Drafted revolve", profile: [[1, -2], [3, -2], [3, 2], [1, 2]], sides: 48,
+    }])).shapes[0]!;
+    const faces = await shapeFaces(created, { topology: "exact" });
+
+    expect(faces.length).toBeLessThan(20);
+    const selectedFace = faces.find((face) => face.surfaceType === "plane" && face.normal
+      && face.normal.y > 0.99)!;
+    const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" as const };
+
+    const drafted = await engine.changeShape("recompute", created.id, { faceDraft: draft });
+
+    expect(drafted.ok, JSON.stringify(drafted)).toBe(true);
+    expect(value(drafted).shape.faceDraft).toMatchObject({ ...draft, sourceFaceNormal: selectedFace.normal });
+    expect(value(drafted).shape.cadBrep).toBeDefined();
+
+    const current = await store.read("recompute");
+    const restored = await importSkfProject(await exportSkfProject({ ...current!, modifiedAt: 1 }));
+    document.shapes = restored.shapes;
+    const beforeEdit = value(await engine.project("recompute")).shapes[0]!;
+    const changedProfile = {
+      ...created.sketchProfile!,
+      points: created.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 0.8 })),
+    };
+    const writesBeforeEdit = writeCount();
+    const edited = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(edited.ok, JSON.stringify(edited)).toBe(true);
+    expect(value(edited).shape.faceDraft).toMatchObject(draft);
+    expect(value(edited).shape.sketchProfile).toEqual(changedProfile);
+    expect(value(edited).shape.cadBrep).not.toBe(beforeEdit.cadBrep);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+
+    const beforeAmbiguous = value(await engine.project("recompute")).shapes[0]!;
+    const writesBeforeAmbiguous = writeCount();
+    const steppedProfile: SketchProfile = {
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 3, z: 0 }, { id: "c", x: 3, z: 2 },
+        { id: "d", x: 2, z: 2 }, { id: "e", x: 2, z: 4 }, { id: "f", x: 0, z: 4 },
+      ],
+      segments: [
+        { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+        { id: "cd", startId: "c", endId: "d" }, { id: "de", startId: "d", endId: "e" },
+        { id: "ef", startId: "e", endId: "f" }, { id: "fa", startId: "f", endId: "a" },
+      ],
+    };
+    const ambiguous = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: steppedProfile });
+
+    expect(ambiguous.ok).toBe(false);
+    expect(ambiguous.ok ? undefined : ambiguous.failure.reason).toBe("sweep_failed");
+    expect(writeCount()).toBe(writesBeforeAmbiguous);
+    expect(value(await engine.project("recompute")).shapes[0]).toEqual(beforeAmbiguous);
+
+    const cleared = await engine.changeShape("recompute", created.sketchSourceId!, { faceDraft: null });
+    expect(cleared.ok, JSON.stringify(cleared)).toBe(true);
+    expect(value(cleared).shape.faceDraft).toBeUndefined();
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a resized full-turn revolve's dimensions when adding a face draft", async () => {
+    const { store } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Resized drafted revolve", profile: [[1, -2], [3, -2], [3, 2], [1, 2]], sides: 48,
+    }])).shapes[0]!;
+    const control = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Scale control revolve", profile: [[1, -2], [3, -2], [3, 2], [1, 2]], sides: 48,
+    }])).shapes[0]!;
+    const resized = {
+      ...created,
+      width: created.width * 1.5,
+      depth: created.depth * 0.75,
+      height: created.height * 2,
+    };
+    const document = await store.read("recompute");
+    document!.shapes[0] = resized;
+    await store.write("recompute", document!, document!.shapes);
+    const faces = await shapeFaces(resized, { topology: "exact" });
+    const selectedFace = faces.find((face) => face.surfaceType === "plane" && face.normal?.y! > 0.99)!;
+
+    const drafted = await engine.changeShape("recompute", created.id, {
+      faceDraft: { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" },
+    });
+    const controlFace = (await shapeFaces(control, { topology: "exact" })).find((face) => face.surfaceType === "plane" && face.normal?.y! > 0.99)!;
+    const controlDraft = await engine.changeShape("recompute", control.id, {
+      faceDraft: { sourceFaceId: controlFace.id, angle: 5, pullDirection: "z" },
+    });
+
+    expect(drafted.ok, JSON.stringify(drafted)).toBe(true);
+    expect(controlDraft.ok, JSON.stringify(controlDraft)).toBe(true);
+    expect(value(drafted).shape.width).toBeGreaterThan(value(controlDraft).shape.width);
+    expect(value(drafted).shape.height).toBeGreaterThan(value(controlDraft).shape.height);
+    expect(value(drafted).shape.faceDraftSourceScale).toMatchObject({ width: 1.5, depth: 0.75, height: 2 });
+
+    const changedProfile = {
+      ...created.sketchProfile!,
+      points: created.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 0.9 })),
+    };
+    const replayed = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: changedProfile });
+    expect(replayed.ok, JSON.stringify(replayed)).toBe(true);
+    expect(value(replayed).shape.faceDraftSourceScale).toEqual({ width: 1.5, depth: 0.75, height: 2 });
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("persists a face draft on a retained sketch sweep", async () => {
     const { store } = projectStore();
     const engine = createEngine(store);
@@ -780,7 +885,7 @@ describe("dependency-ordered feature recomputation", () => {
     const after = value(await engine.project("recompute"));
     expect(after.revision).toBe(before.revision);
     expect(after.shapes.find((shape) => shape.id === group.id)).toEqual(before.shapes.find((shape) => shape.id === group.id));
-  });
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("rebuilds a persisted sketch extrusion from an edited source profile", async () => {
     const { store, writeCount } = projectStore();

@@ -20,6 +20,8 @@ import {
   applyBakedMirror,
   applyDraftPrism,
   applySketchFaceDraft,
+  exactPlainSketchRevolveResult,
+  isPlainFullTurnSketchRevolve,
   shapeEdges,
   shapeWithCadResult,
   ServerCadError,
@@ -109,6 +111,25 @@ function faceDraftInput(value: unknown): Omit<SketchFaceDraft, "sourceFaceNormal
     angle: draft.angle,
     pullDirection: draft.pullDirection as SketchFaceDraft["pullDirection"],
   };
+}
+
+function revolveSourceScale(shape: WorkplaneShape) {
+  const mesh = shape.importedMesh;
+  const ratio = (drawn: number, natural: number | undefined) => natural && natural > 0 ? drawn / natural : 1;
+  return {
+    width: ratio(shape.width, mesh?.baseWidth),
+    depth: ratio(shape.depth, mesh?.baseDepth),
+    height: ratio(shape.height, mesh?.baseHeight),
+  };
+}
+
+function resizeRebuiltRevolve(shape: WorkplaneShape, scale: { width: number; depth: number; height: number }) {
+  const mesh = shape.importedMesh;
+  if (!mesh) return shape;
+  const width = Math.max(0.01, (mesh.baseWidth ?? shape.width) * scale.width);
+  const depth = Math.max(0.01, (mesh.baseDepth ?? shape.depth) * scale.depth);
+  const height = Math.max(0.01, (mesh.baseHeight ?? shape.height) * scale.height);
+  return { ...shape, width, depth, height, size: Math.max(width, depth) };
 }
 
 function faceNormalMatches(left: { x: number; y: number; z: number }, right: { x: number; y: number; z: number }) {
@@ -388,7 +409,7 @@ export type Engine = {
   /** A shape's edges, numbered as a treatment request refers to them. */
   edges(projectId: string, shapeId: string): Promise<EngineResult<ServerCadEdge[]>>;
   /** A shape's faces, numbered as a shell request refers to them. */
-  faces(projectId: string, shapeId: string): Promise<EngineResult<ServerCadFace[]>>;
+  faces(projectId: string, shapeId: string, topology?: "exact"): Promise<EngineResult<ServerCadFace[]>>;
   /** Round or cut a shape's edges. */
   treat(projectId: string, shapeId: string, treatment: ServerCadTreatment): Promise<EngineResult<ShapeWritten>>;
   /** Draft a solid along its vertical extrusion axis and store exact geometry. */
@@ -794,7 +815,9 @@ export function createEngine(store: ProjectStore): Engine {
       if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
         return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
       }
-      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)) && !isSketchExtrusion && !isSketchSweep) {
+      const isExactSketchRevolve = isPlainFullTurnSketchRevolve(existing);
+      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft))
+        && !isSketchExtrusion && !isSketchSweep && !isExactSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
       }
       if ((requestedFaceDraft || (faceDraftChanged && existing.faceDraft))
@@ -883,7 +906,8 @@ export function createEngine(store: ProjectStore): Engine {
               ? existing.faceDraft.sourceFaceNormal
               : undefined;
             const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(existing)).find((face) => face.id === requestedFaceDraft.sourceFaceId);
+              : (await shapeFaces(existing, isExactSketchRevolve ? { topology: "exact" } : undefined))
+                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
             const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
@@ -973,7 +997,8 @@ export function createEngine(store: ProjectStore): Engine {
               ? existing.faceDraft.sourceFaceNormal
               : undefined;
             const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(existing)).find((face) => face.id === requestedFaceDraft.sourceFaceId);
+              : (await shapeFaces(existing, isExactSketchRevolve ? { topology: "exact" } : undefined))
+                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
             const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
@@ -1000,7 +1025,60 @@ export function createEngine(store: ProjectStore): Engine {
           });
         }
       }
-      if (replacingSketchProfile && isSketchRevolve) {
+      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)
+        || (revolveChanges.length > 0 && existing.faceDraft)) && isSketchRevolve) {
+        try {
+          const runtime = await serverManifoldRuntime();
+          const sourceFrame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
+          const rebuildSeed = sourceFrame ? {
+            ...existing,
+            x: sourceFrame.x,
+            z: sourceFrame.z,
+            elevation: sourceFrame.elevation,
+          } : existing;
+          const rebuiltAtNaturalScale = rebuiltRevolveShape(runtime, rebuildSeed, {
+            profile: (replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile) as NonNullable<WorkplaneShape["sketchProfile"]>,
+            settings: revolveChanges.length > 0
+              ? requestedRevolveSettings(existing.sketchRevolve!, changes)
+              : existing.sketchRevolve!,
+          });
+          const sourceScale = existing.faceDraftSourceScale ?? revolveSourceScale(existing);
+          const rebuilt = resizeRebuiltRevolve(rebuiltAtNaturalScale, sourceScale);
+          if (requestedFaceDraft) {
+            const exactBase = shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt));
+            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
+              ? existing.faceDraft.sourceFaceNormal
+              : undefined;
+            const selectedOnPrior = priorReference ? undefined
+              : (await shapeFaces(existing, { topology: "exact" }))
+                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
+            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
+              throw new Error("The selected source face has no stable planar reference.");
+            }
+            const currentFace = await findUniqueDraftFace(exactBase, sourceFaceNormal);
+            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+            const result = await applySketchFaceDraft(exactBase, {
+              ...requestedFaceDraft,
+              sourceFaceId: currentFace.id,
+            });
+            swept = {
+              ...shapeWithCadResult(exactBase, result),
+              faceDraft,
+              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame ?? exactBase.cadBrepFrame,
+              faceDraftSourceScale: sourceScale,
+            };
+          } else {
+            swept = { ...rebuilt, faceDraftSourceScale: undefined };
+          }
+        } catch (error) {
+          return failed({
+            reason: "sweep_failed",
+            message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
+          });
+        }
+      } else if (replacingSketchProfile && isSketchRevolve) {
         try {
           const runtime = await serverManifoldRuntime();
           const rebuilt = rebuiltRevolveShape(runtime, existing, {
@@ -1015,7 +1093,7 @@ export function createEngine(store: ProjectStore): Engine {
           });
         }
       }
-      if (revolveChanges.length > 0 && sweptShape) {
+      if (revolveChanges.length > 0 && sweptShape && !existing.faceDraft) {
         const outline = changes.profile ?? changes.outline ?? outlineFromProfile(existing.sketchProfile!);
         if (!outline) {
           return failed({
@@ -1304,11 +1382,11 @@ export function createEngine(store: ProjectStore): Engine {
       }
     }),
 
-    faces: (projectId, shapeId) => reading(projectId, async (document) => {
+    faces: (projectId, shapeId, topology) => reading(projectId, async (document) => {
       const found = oneShape(document, shapeId);
       if (!found.ok) return found;
       try {
-        return ok(await shapeFaces(found.value));
+        return ok(await shapeFaces(found.value, topology === "exact" ? { topology } : undefined));
       } catch (error) {
         return failed(cadFailure(error));
       }
