@@ -132,6 +132,68 @@ describe("dependency-ordered feature recomputation", () => {
     expect(persisted.groupedShapes?.find((child) => child.id === sourceChild.id)?.sketchProfile).toEqual(changedProfile);
   });
 
+  it("rebuilds a retained boolean ancestor when a source revolve setting changes", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "revolve", name: "Source revolve", profile: [[0, -5], [2, -5], [2, 5], [0, 5]], sides: 48, x: 12, z: -4, elevation: 7 },
+      { kind: "box", name: "Cutter", width: 1, depth: 1, height: 12, x: 12, z: -4, elevation: 6, hole: true },
+    ]));
+    const source = created.shapes[0]!;
+    const group = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const sourceChild = group.groupedShapes!.find((child) => child.sketchSourceId === source.sketchSourceId)!;
+    const previousGroupBrep = group.cadBrep;
+    const previousMesh = sourceChild.importedMesh?.positions;
+    const previousWrites = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 64 });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: sourceChild.id, sketchSourceId: source.sketchSourceId, sketchOperation: "revolve",
+      sketchRevolve: { sides: 64 }, x: sourceChild.x, z: sourceChild.z,
+      elevation: sourceChild.elevation, rotation: sourceChild.rotation,
+      rotationX: sourceChild.rotationX, rotationZ: sourceChild.rotationZ,
+    });
+    expect(updated.importedMesh?.positions).not.toEqual(previousMesh);
+    expect(writeCount()).toBe(previousWrites + 1);
+    const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === group.id)!;
+    expect(persisted.cadBrep).not.toBe(previousGroupBrep);
+    expect(persisted.groupedShapes?.find((child) => child.id === sourceChild.id)).toMatchObject({
+      sketchSourceId: source.sketchSourceId, sketchRevolve: { sides: 64 },
+    });
+    expect(persisted).toMatchObject({ x: group.x, z: group.z, elevation: group.elevation, rotation: group.rotation });
+  });
+
+  it("rolls back a source revolve setting edit when its retained cut becomes ineffective", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "revolve", name: "Source revolve", profile: [[0, -5], [2, -5], [2, 5], [0, 5]], sides: 48 },
+      { kind: "box", name: "Cutter", width: 0.5, depth: 0.5, height: 12, x: 1.8, hole: true },
+    ]));
+    const source = created.shapes[0]!;
+    const group = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const sourceChild = group.groupedShapes!.find((child) => child.sketchSourceId === source.sketchSourceId)!;
+    const before = value(await engine.project("recompute"));
+    const previousWrites = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 64, sweepAngle: 90, startAngle: 180 });
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure).toMatchObject({
+      reason: "sweep_failed", message: expect.stringMatching(/dependent boolean/i),
+    });
+    expect(writeCount()).toBe(previousWrites);
+    const after = value(await engine.project("recompute"));
+    expect(after.revision).toBe(before.revision);
+    expect(after.shapes.find((shape) => shape.id === group.id)).toEqual(before.shapes.find((shape) => shape.id === group.id));
+    expect(after.shapes.find((shape) => shape.id === group.id)?.groupedShapes?.find((child) => child.id === sourceChild.id)?.sketchRevolve).toMatchObject({
+      sides: 48, sweepAngle: 360, startAngle: 0,
+    });
+  });
+
   it("rolls back a source revolve edit when its retained boolean can no longer be rebuilt", async () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);

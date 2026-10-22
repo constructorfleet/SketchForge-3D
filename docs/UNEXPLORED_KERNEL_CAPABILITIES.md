@@ -93,8 +93,8 @@ These are implemented and should not be filed as missing features:
   sketch-backed extrusion or sweep through its persisted source ID also
   recomputes retained boolean ancestors bottom-up, preserving output IDs and
   placement and writing the new source and dependent geometry atomically. A
-  source-driven revolve edit follows the same bottom-up rebuild and atomic-write
-  path.
+  source-driven revolve profile or operation-setting edit (for example, its
+  side count) follows the same bottom-up rebuild and atomic-write path.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph.
@@ -128,7 +128,8 @@ Sketch extrusion, revolve, and sweep persist source sketches and operation
 parameters; `.skf` also records dependency links for sketch outputs and boolean
 groups. Runtime recomputation remains narrow: editing a sketch-backed extrusion
 or sweep rebuilds it inside retained boolean groups, bottom-up, and writes the
-updated result atomically; a source-driven revolve edit follows the same path.
+updated result atomically; source-ID edits to revolve profiles and operation
+settings such as side count follow the same path.
 Invalid profiles or failed dependent booleans leave the project unchanged.
 Drafts and other operation types do not yet recompute, and draft prism/face
 draft remain baked rather than editable feature nodes. A general
