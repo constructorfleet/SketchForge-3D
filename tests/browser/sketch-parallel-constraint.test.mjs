@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { test } from "node:test";
 import { chromium } from "playwright";
+
+test("the parallel constraint workflow has an owning task guide", () => {
+  const guide = readFileSync("docs/guides/sketch-constraints.md", "utf8");
+  assert.match(guide, /select(?:ing)? (?:the )?two (?:sketch )?segments/i);
+  assert.match(guide, /Parallel/i);
+  assert.match(guide, /(?:aligns? .{0,40}directions?|directions? .{0,40}aligns?)/i);
+  assert.match(guide, /offset[\s\S]{0,60}(?:does not|doesn't|not changed|unchanged)|(?:does not|doesn't)[\s\S]{0,60}offset/i);
+  assert.match(guide, /npm run test:browser/);
+  assert.match(guide, /\.\.\/screenshots\/sketch-parallel-constraint\.png/);
+});
 
 async function unusedPort() {
   const listener = createServer();
