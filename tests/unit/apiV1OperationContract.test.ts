@@ -337,23 +337,23 @@ describe("REST API v1 operation contract", () => {
     expect(operation).toMatchObject({
       operationId: "getShapeProperties",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 500, 503],
+      responses: [200, 400, 401, 404, 422, 500, 503],
       query: { required: ["projectId", "shapeId"] },
-      response: {
-        kind: "shape-properties",
-        required: ["properties"],
-        fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
-        provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
-        schema: {
-          type: "object",
-          required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+      responseSchemas: {
+        200: {
+          type: "object", required: ["properties"], additionalProperties: false,
           properties: {
-            volume: { type: "number" },
-            area: { type: "number" },
-            centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
-            bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
-            isValid: { type: "boolean" },
-            provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+            properties: {
+              type: "object", required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"], additionalProperties: false,
+              properties: {
+                volume: { type: "number" },
+                area: { type: "number" },
+                centerOfMass: { type: "object", required: ["x", "y", "z"], additionalProperties: false, properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+                bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], additionalProperties: false, properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
+                isValid: { type: "boolean" },
+                provenance: { type: "object", required: ["source", "precision"], additionalProperties: false, properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+              },
+            },
           },
         },
       },
@@ -371,6 +371,12 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, centerOfMass: { x: 0, y: Number.NaN, z: 0 } } })).toBeNull();
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, bbox: { ...properties.bbox, xmax: Infinity } } })).toBeNull();
     expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { source: "step", precision: "exact" } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, extra: true } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, bbox: { ...properties.bbox, extra: 1 } } })).toBeNull();
+    expect(contract.parseShapePropertiesResponse({ properties: { ...properties, provenance: { ...properties.provenance, extra: true } } })).toBeNull();
+    expect(contract.validateApiV1Response("GET /api/v1/properties", 200, { properties })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/properties", 409, { error: "busy", code: "project_busy" })).toBe(false);
+    expect(contract.validateApiV1Response("GET /api/v1/properties", 422, { error: "invalid geometry", code: "cad_failed" })).toBe(true);
   });
 
   it("declares and validates GET /measurements against every edge and face result", async () => {

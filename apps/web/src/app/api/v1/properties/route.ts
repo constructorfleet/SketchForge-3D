@@ -1,18 +1,18 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson } from "@/lib/apiV1";
-import { parseApiTargetQuery, parseShapePropertiesResponse } from "@/lib/apiV1OperationContract";
+import { parseApiV1Query, parseShapePropertiesResponse, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { apiReadOnlyOptions } from "@/lib/apiV1Methods";
 
 export const runtime = "nodejs";
 export const revalidate = false;
 
 /** Exact mass properties for one shape, with the geometry source and precision. */
-export async function GET(request: Request) {
+const getProperties = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const query = parseApiTargetQuery(request);
-  if (!query.ok) return query.error === "invalid_project_id" ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
-  const { projectId, shapeId } = query;
+  const query = parseApiV1Query("GET /api/v1/properties", request);
+  if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
+  const { projectId, shapeId } = query.values;
 
   const properties = await apiEngine(context.root).properties(projectId, shapeId);
   if (!properties.ok) {
@@ -21,6 +21,8 @@ export async function GET(request: Request) {
   const response = parseShapePropertiesResponse({ properties: properties.value });
   if (!response) return apiError("The CAD kernel returned invalid shape properties.", 500, "cad_failed");
   return apiJson(response);
-}
+};
+
+export const GET = withApiV1Contract("GET /api/v1/properties", getProperties);
 
 export const OPTIONS = apiReadOnlyOptions;
