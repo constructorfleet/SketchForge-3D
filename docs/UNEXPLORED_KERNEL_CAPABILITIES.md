@@ -59,14 +59,18 @@ These are implemented and should not be filed as missing features:
 - Face-based drafting is available in the shape inspector for exact B-rep
   solids, with a selector for all six signed local CAD pull axes. The engine
   canonicalizes the selected direction before invoking the kernel and maps the
-  result back to the original orientation. Measured support remains
-  geometry-specific: the documented XZ-profile, +Y extrusion fixture accepts
-  faces 1, 3, 4, and 5 at ±5° along +Z; a 10 mm box accepts faces 0–3 at ±5°
-  along +Z; a +90° Y-rotated fixture accepts face 0 at ±30° along +X; and a
-  -90° X-rotated fixture accepts face 2 at +10° along +Y. These are narrow
-  cases, not broad support for other faces, solids, or angles. Unsupported
-  combinations return a localized error. Draft output is baked, gets fresh
-  face IDs, and clears face colors and edge-treatment metadata.
+  result back to the original orientation. Measured support is geometry-
+  specific: on the unrotated editor-plane extrusion, faces 0, 2, 4, and 5 are
+  verified at ±5° along +X; faces 0–3 at ±5° along +Y; and faces 1, 3, 4, and
+  5 at ±5° along +Z. A +90° Y-rotated fixture accepts face 0 at ±30° along
+  +X, and a -90° X-rotated fixture accepts face 2 at +10° along +Y. On a
+  10 mm box, faces 0–3 are verified at ±5° and ±30° along +Z and -Z; face 2
+  at +5° along +X; face 0 at +5° and +30° along -X; and face 2 at +5° and
+  +30° along -Y. The box face 0/+5°/+X case is rejected because the pull axis
+  is parallel to that face. These are measured cases, not broad support for
+  other faces, solids, or angles. Other unsupported combinations return a
+  localized error. Draft output is baked, gets fresh face IDs, and clears
+  face colors and edge-treatment metadata.
 - The Sketch workspace supports planar sweeps with one or more closed section
   loops and one open spine on the derived orthogonal plane. Nested section
   loops become holes; disjoint loops become separate solids. Spine points and
@@ -174,8 +178,10 @@ identity across arbitrary topology edits remains unsupported.
 The solver supports coincident, horizontal, vertical, perpendicular, and
 fixed-distance relations with a bounded deterministic least-squares solve and
 a local Jacobian-rank estimate. It also supports fixed-point relations, which
-can anchor global translation. The solver does not guarantee global solvability
-or identify every nonlinear or second-order dependency.
+can anchor global translation. Without a fixed-point anchor, sketch placement
+retains two global translation freedoms; with an anchor, the solver can
+constrain placement. It does not guarantee global solvability or identify
+every nonlinear or second-order dependency.
 Degenerate zero-length distance geometry has no determinate
 degree-of-freedom report. Additional constraint types and robust global
 placement remain open.
