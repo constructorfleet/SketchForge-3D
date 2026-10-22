@@ -99,8 +99,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Source-profile edits replay it only when exactly one planar face matches the saved source normal/i);
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
-  assert.match(spec, /A plain single-region full-turn sketch revolve can take one symmetric 45° all-edge chamfer after a face draft; source-profile and revolve-setting edits replay the revolve, draft, and chamfer atomically\. Other edge-treatment combinations, prism drafts, and shelling on a face-drafted shape are refused before writing/i);
-  assert.match(capabilities, /Adding any other edge treatment, a prism draft, or a shell to a face-drafted\s+shape is refused before writing the project/i);
+  assert.match(spec, /A plain single-region full-turn sketch revolve can take either one symmetric 45° all-edge chamfer or one all-edge fillet after a face draft; source-profile and revolve-setting edits replay the revolve, draft, then treatment atomically\. Other edge-treatment combinations, prism drafts, and shelling on a face-drafted shape are refused before writing/i);
+  assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(spec, /A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer[\s\S]*?adding a prism draft after a treatment remains refused/i);
   assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);
   assert.match(spec, /does not establish general topology lineage/i);
@@ -172,7 +172,7 @@ test("documentation status records durable capabilities and outstanding requirem
 
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /retains one editable face draft[\s\S]{0,120}plain single-region full-turn sketch revolve/i);
-  assert.match(capabilities, /Adding any other edge treatment, a prism draft, or a shell to a face-drafted\s+shape is refused before writing the project/i);
+  assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(capabilities, /one all-edge fillet or symmetric 45°\s+chamfer is now\s+supported on a sketch extrusion[\s\S]*?Adding a prism draft after a treatment/i);
   assert.match(capabilities, /Broader and editable drafting/i);
   assert.match(capabilities, /Editable STEP assembly hierarchy and robust component association/i);

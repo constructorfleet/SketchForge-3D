@@ -1172,17 +1172,17 @@ function validateShapeDefinition(
       : undefined;
     const history = options.edgeTreatmentHistory ?? [];
     const historyFeature = history[0]?.feature;
-    const isPersistedRevolveDraftChamfer = Boolean(
+    const isPersistedRevolveDraftTreatment = Boolean(
       plainFullTurnRevolve
       && definition.sketchProfile !== undefined
       && cadSketchRegions(definition.sketchProfile as SketchProfile).length === 1
       && definition.draftPrismAngle === undefined
       && treatments.length === 1
-      && treatment?.kind === "chamfer"
+      && (treatment?.kind === "chamfer" || treatment?.kind === "fillet")
       && treatment.allEdges === true
       && treatment.edges === undefined
-      && typeof treatment.chamferAngle === "number"
-      && Math.abs(treatment.chamferAngle - 45) < 0.001
+      && (treatment.kind === "fillet"
+        || typeof treatment.chamferAngle === "number" && Math.abs(treatment.chamferAngle - 45) < 0.001)
       && typeof treatment.amount === "number"
       && Number.isFinite(treatment.amount)
       && treatment.amount > 0
@@ -1191,7 +1191,7 @@ function validateShapeDefinition(
       && history.length === 1
       && historyFeature?.kind === treatment.kind
       && historyFeature.allEdges === treatment.allEdges
-      && historyFeature.chamferAngle === treatment.chamferAngle
+      && (treatment.kind === "fillet" || historyFeature.chamferAngle === treatment.chamferAngle)
       && historyFeature.amount === treatment.amount
       && historyFeature.edgeCount === treatment.edgeCount
     );
@@ -1202,7 +1202,7 @@ function validateShapeDefinition(
       || plainFullTurnRevolve && cadSketchRegions(definition.sketchProfile as SketchProfile).length !== 1
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
-      || (treatments.length > 0 || options.hasEdgeTreatmentHistory) && !isPersistedRevolveDraftChamfer
+      || (treatments.length > 0 || options.hasEdgeTreatmentHistory) && !isPersistedRevolveDraftTreatment
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }
