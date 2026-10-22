@@ -113,7 +113,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /The only editor source mapped so far is `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, which maps to the edit-and-export guide; other editor\/UI sources and symbols remain unmapped/i);
   assert.match(spec, /face-drafting guide.*browser acceptance.*face 1.*local \+Z.*-5°.*screenshot/i);
-  assert.match(spec, /more face-drafting combinations and editor workflows remain untested/i);
+  assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
   assert.match(spec, /current baseline is 22 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the remaining 10 are omitted with reasons/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
@@ -125,6 +125,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
   assert.match(spec, /The face-drafting guide has browser acceptance for one supported inspector case/i);
+  assert.match(spec, /`docs\/guides\/sketch-constraints\.md`.*browser acceptance.*Parallel/i);
+  assert.match(spec, /`tests\/browser\/sketch-parallel-constraint\.test\.mjs`.*`docs\/screenshots\/sketch-parallel-constraint\.png`/i);
+  assert.match(spec, /does not establish broader sketch-constraint or task-workflow coverage/i);
+  assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
+  assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
   assert.match(migration, /22 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 10 are listed/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
