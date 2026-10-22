@@ -42,6 +42,11 @@ const publicSourceScopes = [
 ];
 const markdownLink = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
 const runnableLanguages = new Set(["bash", "js", "python", "sh", "ts"]);
+// Agent instruction documents. AGENTS.md points agents at these and the site
+// does not publish them, so the published-page contract -- ownership
+// frontmatter and runnable-fence provenance -- does not apply. Link and
+// include checking below still covers them.
+const isAgentInstruction = (relative) => relative.startsWith("docs/agents/");
 
 for (const sourceRelative of sources) {
   const sourcePath = path.join(root, sourceRelative);
@@ -66,7 +71,7 @@ for (const sourceRelative of sources) {
     }
   }
 
-  if ((sourceRelative.startsWith("docs/") || sourceRelative.startsWith(".docs-site/docs/reference/")) && sourceRelative.endsWith(".md")) {
+  if ((sourceRelative.startsWith("docs/") || sourceRelative.startsWith(".docs-site/docs/reference/")) && sourceRelative.endsWith(".md") && !isAgentInstruction(sourceRelative)) {
     const metadata = validatePageOwnership(sourceRelative, contents, failures, pageSlugs, trackedFiles);
     if (metadata) ownerPages.push({ path: sourceRelative, slug: metadata.slug, title: metadata.title, sources: metadata.sources });
     if (sourceRelative.startsWith("docs/") && !sourceRelative.startsWith("docs/reference/")) {

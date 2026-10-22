@@ -300,3 +300,17 @@ test("docs CI fetches the base commit and supplies it to the ownership checker",
   assert.match(workflow, /fetch-depth:\s*0/);
   assert.match(workflow, /DOCS_BASE_REF:\s*\$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/);
 });
+
+test("agent instruction documents are not treated as published site pages", async (t) => {
+  // `docs/agents/` holds instructions AGENTS.md points agents at, not pages the
+  // site publishes. Holding them to the published-page contract would mean they
+  // could not be committed at all, leaving AGENTS.md citing files that are
+  // absent from a fresh checkout.
+  const root = await createRepository(
+    t,
+    "# Issue tracker\n\nUse the `gh` CLI:\n\n```sh\ngh pr list --repo constructorfleet/SketchForge-3D\n```\n",
+    "docs/agents/issue-tracker.md",
+  );
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 0, `agent instruction docs should pass unchanged:\n${result.stdout}${result.stderr}`);
+});

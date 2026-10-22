@@ -48,17 +48,43 @@ test("every npm script an agent names still exists", () => {
   }
 });
 
-test("every repository path an agent cites is tracked, not generated output", () => {
+const trackedPaths = () => {
   // Tracked rather than merely present on disk: generated directories exist in a
   // working tree that has run the generators and are absent from a fresh clone,
   // so an existence check passes locally and fails in CI.
   const tracked = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
-  const isTracked = (cited) => tracked.some((entry) => entry === cited || entry.startsWith(cited.endsWith("/") ? cited : `${cited}/`));
+  return (cited) => tracked.some((entry) => entry === cited || entry.startsWith(cited.endsWith("/") ? cited : `${cited}/`));
+};
 
+// `.claude/` is deliberately out of scope: `.claude/worktrees/` is a runtime
+// directory that is never tracked, and quality-gates.md cites it as a hazard.
+const citedPaths = (body) =>
+  [...body.matchAll(/`((?:docs|apps|packages|tests|scripts|\.github)\/[\w./-]+)`/g)]
+    .map(([, cited]) => cited)
+    .filter((cited) => !cited.includes("*"));
+
+test("every repository path an agent cites is tracked, not generated output", () => {
+  const isTracked = trackedPaths();
   for (const { file, body } of agents()) {
-    for (const [, cited] of body.matchAll(/`((?:docs|apps|packages|tests|scripts|\.github)\/[\w./-]+)`/g)) {
-      if (cited.includes("*")) continue;
+    for (const cited of citedPaths(body)) {
       assert.ok(isTracked(cited), `${file} cites ${cited}, which is not tracked in git -- a generated path is absent from a fresh checkout`);
     }
+  }
+});
+
+// Paths AGENTS.md names as conventions created on demand rather than as files
+// that should already be there. `docs/agents/domain.md` states that the
+// domain-modeling skill writes these lazily and that their absence is not a
+// defect, so requiring them would contradict the instruction they appear in.
+const lazilyCreated = new Set(["docs/adr/"]);
+
+test("every repository path AGENTS.md cites is tracked, not generated output", () => {
+  // AGENTS.md points agents at the skill documents it expects to exist. A
+  // citation added alongside files that were never committed reads as a working
+  // instruction and resolves to nothing in a fresh clone.
+  const isTracked = trackedPaths();
+  for (const cited of citedPaths(readFileSync(path.join(root, "AGENTS.md"), "utf8"))) {
+    if (lazilyCreated.has(cited)) continue;
+    assert.ok(isTracked(cited), `AGENTS.md cites ${cited}, which is not tracked in git -- it is absent from a fresh checkout`);
   }
 });
