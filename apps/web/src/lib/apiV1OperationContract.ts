@@ -215,6 +215,21 @@ const edgeItemSchema = {
   additionalProperties: false,
 } as const;
 const edgeListSchema = { type: "object", required: ["edges"], properties: { edges: { type: "array", items: edgeItemSchema } }, additionalProperties: false } as const;
+const thicknessSchema = {
+  type: "object", required: ["thickness"], additionalProperties: false,
+  properties: {
+    thickness: {
+      type: "object", required: ["minimum", "unit", "method", "samplesPerFace", "facesChecked"], additionalProperties: false,
+      properties: {
+        minimum: { type: "number", nullable: true, minimum: 0 },
+        unit: { type: "string", enum: ["mm"] },
+        method: { type: "string", enum: ["sampled-opposing-surface-distance"] },
+        samplesPerFace: { type: "integer", minimum: 1 },
+        facesChecked: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+} as const;
 const measurementItemSchema = {
   type: "object",
   required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
@@ -550,7 +565,27 @@ export const API_V1_OPERATIONS = [
   { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
   shapeOperations[3],
   ...featureOperations.slice(2, 3),
-  operation("GET", "/api/v1/thickness", "estimateThickness"),
+  {
+    ...operation("GET", "/api/v1/thickness", "estimateThickness", [200, 400, 401, 404, 413, 422, 500, 503]),
+    description: "Estimates minimum wall thickness by sampling opposing surface pairs; this is not a certified minimum-thickness result.",
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true, minLength: 1 },
+      },
+    },
+    responseSchemas: {
+      200: thicknessSchema,
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      413: faceError("geometry_failed"),
+      422: faceError("geometry_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+  },
   operation("OPTIONS", "/api/v1/thickness", "thicknessRouteOptions", [204], undefined, "none"),
   ...featureOperations.slice(1, 2),
 ] as const satisfies readonly ApiV1Operation[];
@@ -673,6 +708,29 @@ export function parseShapePropertiesResponse(value: unknown): ShapePropertiesRes
   if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
   if (!(precision === "exact" || precision === "tessellated")) return null;
   return value as ShapePropertiesResponse;
+}
+
+export type ThicknessResponse = {
+  thickness: {
+    minimum: number | null;
+    unit: "mm";
+    method: "sampled-opposing-surface-distance";
+    samplesPerFace: number;
+    facesChecked: number;
+  };
+};
+
+/** Reject malformed wall-thickness results before they cross the REST boundary. */
+export function parseThicknessResponse(value: unknown): ThicknessResponse | null {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["thickness"])) return null;
+  const thickness = (value as { thickness?: unknown }).thickness;
+  if (!thickness || typeof thickness !== "object" || Array.isArray(thickness) || !exactKeys(thickness, ["minimum", "unit", "method", "samplesPerFace", "facesChecked"])) return null;
+  const result = thickness as Record<string, unknown>;
+  if (!(result.minimum === null || (typeof result.minimum === "number" && Number.isFinite(result.minimum) && result.minimum >= 0))) return null;
+  if (result.unit !== "mm" || result.method !== "sampled-opposing-surface-distance") return null;
+  if (!Number.isInteger(result.samplesPerFace) || (result.samplesPerFace as number) < 1) return null;
+  if (!Number.isInteger(result.facesChecked) || (result.facesChecked as number) < 0) return null;
+  return value as ThicknessResponse;
 }
 
 export type MeasurementsResponse = {

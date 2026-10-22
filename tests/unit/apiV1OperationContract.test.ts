@@ -331,6 +331,27 @@ describe("REST API v1 operation contract", () => {
     expect(contract.validateApiV1Response("GET /api/v1/edges", 409, { error: "busy", code: "project_busy" })).toBe(false);
   });
 
+  it("declares and validates GET /thickness against the sampled wall estimate", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/thickness");
+    expect(operation).toMatchObject({
+      operationId: "estimateThickness",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 413, 422, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+    });
+    const result = { thickness: { minimum: 2, unit: "mm", method: "sampled-opposing-surface-distance", samplesPerFace: 25, facesChecked: 6 } };
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 200, result)).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 200, { thickness: { ...result.thickness, minimum: "thin" } })).toBe(false);
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 200, { thickness: { ...result.thickness, minimum: null } })).toBe(true);
+    expect(contract.parseThicknessResponse(result)).toEqual(result);
+    expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, minimum: Number.POSITIVE_INFINITY } })).toBeNull();
+    expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, facesChecked: 1.5 } })).toBeNull();
+    expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, extra: true } })).toBeNull();
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 413, { error: "too many faces", code: "geometry_failed" })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 409, { error: "busy", code: "project_busy" })).toBe(false);
+  });
+
   it("declares and validates GET /properties against the complete mass-properties response", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/properties");
