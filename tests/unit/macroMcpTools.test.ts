@@ -50,8 +50,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await fs.rm(macroDirectory, { recursive: true, force: true });
-  await fs.rm(outsideDirectory, { recursive: true, force: true });
+  // Windows can still hold a handle on a just-closed file, so a plain rm
+  // fails with EBUSY. These retries are Node's documented remedy.
+  const remove = (directory: string) =>
+    fs.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  await remove(macroDirectory);
+  await remove(outsideDirectory);
 });
 
 describe("macro listing", () => {
