@@ -74,7 +74,9 @@ beforeAll(async () => {
     try {
       // Ask for something that exercises the route, not just the socket: a dev
       // server answers before it has compiled anything.
-      const probe = await api("/projects");
+      // A server that accepts the connection but stalls must not keep this
+      // readiness loop blocked past its wall-clock deadline.
+      const probe = await api("/projects", { signal: AbortSignal.timeout(2_000) });
       if (probe.status === 200) break;
     } catch {
       // Connection refused while it boots.
