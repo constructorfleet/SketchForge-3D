@@ -11,9 +11,11 @@ owner: "Contributors"
 
 ## Unreleased
 
-- `GET /thickness` now has a runtime-validated query and response contract and
-  appears in the generated OpenAPI reference. The documented subset now covers
-  18 of 32 registered operations; 14 remain omitted.
+- `GET /thickness` and `POST /interference` have runtime-validated request and
+  response contracts in the generated OpenAPI reference. Interference describes
+  its bounded exact/tessellated report and 400/422 validation and limit errors.
+  The documented subset now covers 19 of 32 registered operations; 13 remain
+  omitted.
 - Exploding a STEP assembly now creates editable nested groups that follow its product tree when every solid has an unambiguous occurrence association. The exact solid geometry and project-space positions stay on the leaves; moving a group moves its subassembly, and ungrouping works one level at a time. If any association is missing or ambiguous, explosion keeps the existing flat result so no solid disappears. Native STEP transform operations and hierarchy-preserving STEP export remain unsupported.
 - Editing a sketch-backed extrusion, revolve, or sweep through its persisted `sketchSourceId` rebuilds its geometry and recomputes retained boolean ancestors bottom-up in one project write. A revolve source edit can also change operation settings such as `sides`. The source and output IDs and placement remain stable; invalid profiles or dependent booleans that fail leave the project unchanged. Other downstream operation types remain baked. See the [engine package guide](./packages/engine.md).
 - The configuration inventory now covers supported server/container, TypeScript/Python client, and local MCP runtime settings. Each setting links to all verified readers and owner guides; build, test, CI, desktop development, and pass-through environment values remain classified outside the supported runtime inventory.

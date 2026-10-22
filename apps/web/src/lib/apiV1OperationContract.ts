@@ -473,7 +473,46 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/groups", "groupShapes"),
   operation("DELETE", "/api/v1/groups", "ungroupShape"),
   operation("POST", "/api/v1/imports", "importGeometry"),
-  operation("POST", "/api/v1/interference", "analyzeInterference"),
+  {
+    ...operation("POST", "/api/v1/interference", "analyzeInterference", [200, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object",
+      properties: {
+        ids: { oneOf: [
+          { type: "string", pattern: "\\S", description: "Whitespace is trimmed; IDs must be unique after trimming." },
+          { type: "array", minItems: 1, items: { type: "string", pattern: "\\S" }, description: "IDs are trimmed and must be unique after trimming." },
+        ] },
+        clearance: { type: "number", minimum: 0, description: "Maximum exact surface gap in millimetres; defaults to zero." },
+      },
+      additionalProperties: true,
+    })),
+    description: "Reports exact gaps and overlap volumes for visible, non-cutter shapes, subject to 128-shape and 512-candidate limits.",
+    query: projectQuery,
+    responseSchemas: {
+      200: {
+        type: "object", required: ["shapesChecked", "candidatePairsChecked", "clearance", "method", "pairs"], additionalProperties: false,
+        properties: {
+          shapesChecked: { type: "integer", minimum: 0 },
+          candidatePairsChecked: { type: "integer", minimum: 0 },
+          clearance: { type: "number", minimum: 0 },
+          method: { type: "string", enum: ["OCCT exact distance and common volume; AABB candidate prefilter"] },
+          pairs: {
+            type: "array", items: {
+              type: "object", required: ["a", "b", "gap", "overlapVolume", "precision"], additionalProperties: false,
+              properties: {
+                a: { type: "object", required: ["id", "name"], properties: { id: str, name: str }, additionalProperties: false },
+                b: { type: "object", required: ["id", "name"], properties: { id: str, name: str }, additionalProperties: false },
+                gap: { type: "number", minimum: 0 },
+                overlapVolume: { type: "number", minimum: 0 },
+                precision: { type: "string", enum: ["exact", "tessellated"] },
+              },
+            },
+          },
+        },
+      },
+      400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema,
+      422: errorSchema, 500: errorSchema, 503: errorSchema,
+    },
+  },
   {
     ...operation("GET", "/api/v1/measurements", "listMeasurements", [200, 400, 401, 404, 409, 500, 503]),
     query: {

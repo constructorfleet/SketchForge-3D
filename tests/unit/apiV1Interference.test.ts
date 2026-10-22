@@ -58,6 +58,31 @@ describe("REST API v1 interference", () => {
     expect(payload.pairs).toEqual([{ a: { id: ids[0], name: "A" }, b: { id: ids[1], name: "B" }, gap: 1, overlapVolume: 0, precision: "exact" }]);
   });
 
+  it("trims non-empty IDs and rejects duplicate IDs after normalization", async () => {
+    const { projectId, ids } = await setupProject();
+    const response = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ ids: [` ${ids[0]} `, ids[1]], clearance: 1 }),
+    }));
+    const payload = await response.json() as { shapesChecked?: number; pairs?: unknown[] };
+    expect(response.status).toBe(200);
+    expect(payload.shapesChecked).toBe(2);
+    expect(payload.pairs).toHaveLength(1);
+    const duplicate = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ ids: [` ${ids[0]} `, ids[0]], clearance: 1 }),
+    }));
+    expect(duplicate.status).toBe(400);
+  });
+
+  it("rejects empty IDs and non-finite or negative clearance", async () => {
+    const { projectId } = await setupProject();
+    const emptyIds = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids: [] }) }));
+    const negative = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ clearance: -1 }) }));
+    const nonFinite = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ clearance: null }) }));
+    expect([emptyIds.status, negative.status, nonFinite.status]).toEqual([400, 400, 400]);
+  });
+
   it("rejects negative clearance and missing project id", async () => {
     expect((await interference(authorized("/api/v1/interference?projectId=p", { method: "POST", body: JSON.stringify({ clearance: -1 }) }))).status).toBe(400);
     expect((await interference(authorized("/api/v1/interference", { method: "POST", body: JSON.stringify({}) }))).status).toBe(400);
