@@ -26,6 +26,12 @@ test('public configuration registry agrees with the server and container readers
     await source('apps/web/src/app/api/app-update/route.ts'),
     await source('deploy/docker/Dockerfile'),
     await source('deploy/docker/compose.yaml'),
+    await source('packages/sketchforge-client/src/environment.ts'),
+    await source('packages/sketchforge-py/src/sketchforge3d/environment.py'),
+    await source('packages/sketchforge-client/mcp/localEngine.mjs'),
+    await source('packages/sketchforge-client/mcp/localMacroRunner.mjs'),
+    await source('packages/sketchforge-client/mcp/macroTools.mjs'),
+    await source('packages/sketchforge-client/mcp/server.mjs'),
   ].join('\n');
   const names = registry.settings.map((setting) => setting.name);
   assert.equal(new Set(names).size, names.length, 'setting names must be unique');
@@ -38,17 +44,80 @@ test('public configuration registry agrees with the server and container readers
     assert.ok(readers.includes(setting.name), `${setting.name} is not found in an authoritative reader or deployment example`);
     assert.equal(typeof setting.source, 'string', `${setting.name} needs a source reader path`);
     assert.equal(typeof setting.ownerPage, 'string', `${setting.name} needs an owning documentation page`);
-    assert.ok(await exists(`docs/${setting.source}`), `${setting.name} source reader docs/${setting.source} must exist`);
-    assert.ok(await exists(`docs/${setting.ownerPage.split('#')[0]}`), `${setting.name} owner page docs/${setting.ownerPage} must exist`);
-    const [ownerFile, ownerAnchor] = setting.ownerPage.split('#');
-    if (ownerAnchor) {
-      const ownerContent = await source(`docs/${ownerFile}`);
-      assert.ok(ownerContent.split('\n').some((line) => line.startsWith('#') && line.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9 -]/g, '').trim().replace(/ +/g, '-') === ownerAnchor), `${setting.name} owner anchor #${ownerAnchor} must exist`);
+    for (const readerPath of [setting.source, ...(setting.additionalSources ?? [])]) {
+      assert.ok(await exists(`docs/${readerPath}`), `${setting.name} source reader docs/${readerPath} must exist`);
+      assert.ok((await source(`docs/${readerPath}`)).includes(setting.name), `${setting.name} must appear in its declared authoritative reader ${readerPath}`);
+    }
+    for (const ownerPage of [setting.ownerPage, ...(setting.additionalOwnerPages ?? [])]) {
+      assert.ok(await exists(`docs/${ownerPage.split('#')[0]}`), `${setting.name} owner page docs/${ownerPage} must exist`);
+      const [ownerFile, ownerAnchor] = ownerPage.split('#');
+      if (ownerAnchor) {
+        const ownerContent = await source(`docs/${ownerFile}`);
+        assert.ok(ownerContent.split('\n').some((line) => line.startsWith('#') && line.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9 -]/g, '').trim().replace(/ +/g, '-') === ownerAnchor), `${setting.name} owner anchor #${ownerAnchor} must exist`);
+      }
     }
   }
   assert.match(await source('packages/sketchforge-engine/src/support/lib/serverProjectStore.ts'), /operatorSettingName\("SKETCHFORGE_PROJECTS_DIR"\)/);
   assert.match(await source('apps/web/src/lib/apiTokens.ts'), /operatorSettingName\("SKETCHFORGE_API_TOKEN"\)/);
   assert.match(await source('apps/web/src/app/api/shared-projects/route.ts'), /operatorSettingName\("SKETCHFORGE_SHARED_PROJECTS_DIR"\)/);
+});
+
+test('public client and MCP runtime settings have an owner and appear in the inventory', async () => {
+  const registry = JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json'));
+  const byName = new Map(registry.settings.map((setting) => [setting.name, setting]));
+  const runtimeReaders = [
+    'packages/sketchforge-client/src/environment.ts',
+    'packages/sketchforge-py/src/sketchforge3d/environment.py',
+    'packages/sketchforge-client/mcp/localEngine.mjs',
+    'packages/sketchforge-client/mcp/localMacroRunner.mjs',
+    'packages/sketchforge-client/mcp/macroTools.mjs',
+    'packages/sketchforge-client/mcp/server.mjs',
+  ];
+  const readerText = (await Promise.all(runtimeReaders.map(source))).join('\n');
+  const discovered = [...new Set(readerText.match(/SKETCHFORGE_[A-Z0-9_]+/g) ?? [])].sort();
+  const declared = [...byName.keys()].filter((name) => discovered.includes(name)).sort();
+  assert.deepEqual(declared, discovered, 'every public client and MCP runtime setting must have a registry row');
+
+  for (const name of [
+    'SKETCHFORGE_URL',
+    'SKETCHFORGE_API_TOKEN',
+    'SKETCHFORGE_PROJECT_ID',
+    'SKETCHFORGE_PROJECTS_DIR',
+    'SKETCHFORGE_MACRO_DIR',
+    'SKETCHFORGE_MACRO_TIMEOUT_MS',
+    'SKETCHFORGE_MACRO_PYTHON',
+    'SKETCHFORGE_MACRO_RUNNER_JS',
+  ]) {
+    const setting = byName.get(name);
+    assert.ok(setting, `${name} must be present in the public configuration inventory`);
+    assert.ok(setting.ownerPage, `${name} needs an owning guide`);
+    assert.ok(setting.source, `${name} needs an authoritative reader`);
+  }
+});
+
+test('the tracked server, container, client, and MCP runtime reader set has no unowned settings', async () => {
+  const registry = JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json'));
+  const readerPaths = [
+    'deploy/docker/start-server.mjs',
+    'deploy/docker/Dockerfile',
+    'deploy/docker/compose.yaml',
+    'apps/web/src/lib/serverProjectStore.ts',
+    'apps/web/src/lib/apiTokens.ts',
+    'apps/web/src/app/api/shared-projects/route.ts',
+    'apps/web/src/app/api/app-update/route.ts',
+    'packages/sketchforge-client/src/environment.ts',
+    'packages/sketchforge-py/src/sketchforge3d/environment.py',
+    'packages/sketchforge-client/mcp/localEngine.mjs',
+    'packages/sketchforge-client/mcp/localMacroRunner.mjs',
+    'packages/sketchforge-client/mcp/macroTools.mjs',
+    'packages/sketchforge-client/mcp/server.mjs',
+  ];
+  const contents = (await Promise.all(readerPaths.map(source))).join('\n');
+  const discovered = [...new Set(contents.match(/\b(?:SKETCHFORGE_[A-Z0-9_]+|PORT|HOSTNAME)\b/g) ?? [])]
+    .filter((name) => name !== 'SKETCHFORGE_DOCKER_BUILD')
+    .sort();
+  const declared = registry.settings.map((setting) => setting.name).sort();
+  assert.deepEqual(declared, discovered, 'every runtime setting in the owned reader set must have exactly one registry row');
 });
 
 async function exists(relativePath) {
@@ -63,7 +132,12 @@ async function exists(relativePath) {
 test('generated configuration reference links each setting to its implementation and owning guide', async () => {
   const reference = await source('docs/OPERATOR_CONFIGURATION.md');
   for (const setting of JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json')).settings) {
-    assert.ok(reference.includes(`](https://github.com/constructorfleet/SketchForge-3D/blob/main/${setting.source.replace(/^\.\.\//, '')})`), `${setting.name} must link its source reader`);
+    for (const readerPath of [setting.source, ...(setting.additionalSources ?? [])]) {
+      assert.ok(reference.includes(`](https://github.com/constructorfleet/SketchForge-3D/blob/main/${readerPath.replace(/^\.\.\//, '')})`), `${setting.name} must link source reader ${readerPath}`);
+    }
     assert.ok(reference.includes(`](${setting.ownerPage})`), `${setting.name} must link its owner page`);
+    for (const ownerPage of setting.additionalOwnerPages ?? []) {
+      assert.ok(reference.includes(`](${ownerPage})`), `${setting.name} must link additional owner page ${ownerPage}`);
+    }
   }
 });
