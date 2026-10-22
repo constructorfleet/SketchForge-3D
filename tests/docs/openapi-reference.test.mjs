@@ -28,6 +28,20 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(face.properties.facing.type, ["string", "null"]);
   assert.deepEqual(face.properties.facing.enum, ["top", "bottom", "right", "left", "front", "back", null]);
   assert.deepEqual(faces.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
+  const edges = spec.paths["/api/v1/edges"].get;
+  assert.ok(edges, "GET /edges should be present once its runtime contract is complete");
+  assert.deepEqual(Object.keys(edges.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
+  assert.deepEqual(edges.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.match(edges.description, /indexes can change when topology changes/);
+  const edgeSchema = edges.responses["200"].content["application/json"].schema;
+  assert.deepEqual(edgeSchema.required, ["edges"]);
+  const edge = edgeSchema.properties.edges.items;
+  assert.deepEqual(edge.required, ["index", "length", "curveType", "midpoint", "filletable"]);
+  assert.equal(edge.additionalProperties, false);
+  assert.deepEqual(edge.properties.midpoint.required, ["x", "y", "z"]);
+  assert.equal(edge.properties.filletable.type, "boolean");
+  assert.deepEqual(edges.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listEdges"), false);
   assert.ok(spec.paths["/api/v1/projects"].post.requestBody.content["application/json"].schema.properties.name);
   assert.equal(spec.paths["/api/v1/projects"].post.requestBody.content["application/json"].schema.properties.name.maxLength, 80);
   assert.ok(spec.paths["/api/v1/projects"].post.responses["201"].content["application/json"].schema);
@@ -86,8 +100,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 15);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 17);
+  assert.equal(documentedOperationCount, 16);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 16);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

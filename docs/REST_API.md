@@ -39,7 +39,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /faces`, both measurement operations, shape arrangement (`POST /align` and `POST /distribute`), and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those four operations document their accepted request fields, successful shape/revision payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges` and `/faces`, both measurement operations, shape arrangement (`POST /align` and `POST /distribute`), and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
 The shape `PATCH` operation remains omitted because its `faceColors` validation is custom; its omission entry calls out the supported `sketchProfile` rebuild and links to the [sweep update contract](#sketch-sweeps) below. An operation should appear there only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then.
 
 ### Contract validation
@@ -288,7 +288,7 @@ The editor rounds and cuts edges in a browser worker: every client downloads a 2
 
 | Method | Path | Does |
 | --- | --- | --- |
-| `GET` | `/edges?projectId=&shapeId=` | The shape's edges: index, length, curve type, midpoint. |
+| `GET` | `/edges?projectId=&shapeId=` | The shape's edges: index, length, curve type, midpoint, and filletability. |
 | `POST` | `/treatments?projectId=&shapeId=` | Applies a fillet or chamfer. |
 
 ```bash
@@ -304,6 +304,8 @@ curl -X POST "$HOST/treatments?projectId=$PROJECT&shapeId=$SHAPE" \
 ```
 
 `kind` is `fillet` or `chamfer`; `amount` is the radius or distance in mm; `angle` applies to chamfers (45 degrees, the default, is symmetric); `edges` is a list of indexes, or omitted for all of them.
+
+Edge indexes are zero-based and use the ordering returned by `GET /edges`. Topology changes can reorder edges, so an index is not a persistent identity; use the listing from the current shape revision before naming edges in a treatment request.
 
 ### Drafting a sketch extrusion
 
