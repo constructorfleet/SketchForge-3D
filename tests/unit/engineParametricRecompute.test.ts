@@ -124,6 +124,86 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("persists a face draft on a retained sketch sweep", async () => {
+    const { store } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Drafted sweep", profile: profile(), x: 12, z: -4, rotation: 90 }])).shapes[0]!;
+    expect(created.sketchOperation).toBe("sweep");
+    expect(created.sketchProfile).toBeDefined();
+    expect(value(await engine.project("recompute")).shapes[0]).toMatchObject({ id: created.id, sketchSourceId: created.sketchSourceId, sketchOperation: "sweep", sketchProfile: expect.any(Object) });
+    const planarFaces = (await shapeFaces(created)).filter((face) => face.surfaceType === "plane" && face.normal);
+    const selectedFace = planarFaces.find((face) => Math.abs(face.normal!.x) > 0.99)!;
+    const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" as const };
+
+    const result = await engine.changeShape("recompute", created.id, { faceDraft: draft });
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    expect(value(result).shape).toMatchObject({
+      id: created.id,
+      sketchSourceId: created.sketchSourceId,
+      faceDraft: { ...draft, sourceFaceNormal: selectedFace.normal },
+    });
+    expect(value(result).shape.cadBrep).not.toBe(created.cadBrep);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays and clears a persisted face draft on a retained sketch sweep", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Drafted sweep", profile: profile(), x: 12, z: -4, rotation: 90 }])).shapes[0]!;
+    const selectedFace = (await shapeFaces(created)).find((face) => face.surfaceType === "plane" && face.normal
+      && Math.abs(face.normal.x) > 0.99)!;
+    const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" as const };
+    const added = value(await engine.changeShape("recompute", created.id, { faceDraft: draft })).shape;
+    const persisted = await store.read("recompute");
+    const restored = await importSkfProject(await exportSkfProject({ ...persisted!, modifiedAt: 1 }));
+    document.shapes = restored.shapes;
+    const writesBeforeEdit = writeCount();
+    const edited = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: profile(1.5) });
+
+    expect(edited.ok, JSON.stringify(edited)).toBe(true);
+    const updated = value(edited).shape;
+    expect(updated.faceDraft).toMatchObject(draft);
+    expect(updated.faceDraft?.sourceFaceNormal?.x).toBeCloseTo(selectedFace.normal!.x);
+    expect(updated.faceDraft?.sourceFaceNormal?.y).toBeCloseTo(selectedFace.normal!.y);
+    expect(updated.faceDraft?.sourceFaceNormal?.z).toBeCloseTo(selectedFace.normal!.z);
+    expect(updated.sketchProfile).toEqual(profile(1.5));
+    expect(updated.cadBrep).not.toBe(added.cadBrep);
+    expect(updated.faceDraftSourceFrame).toEqual(added.faceDraftSourceFrame);
+    expect(updated).toMatchObject({ x: created.x, z: created.z, elevation: created.elevation });
+    expect(restored.shapes[0]?.faceDraft).toMatchObject(draft);
+    expect(restored.shapes[0]?.faceDraftSourceFrame).toEqual(added.faceDraftSourceFrame);
+    expect(restored.shapes[0]?.faceDraft?.sourceFaceNormal?.x).toBeCloseTo(selectedFace.normal!.x);
+    expect(restored.shapes[0]?.faceDraft?.sourceFaceNormal?.y).toBeCloseTo(selectedFace.normal!.y);
+    expect(restored.shapes[0]?.faceDraft?.sourceFaceNormal?.z).toBeCloseTo(selectedFace.normal!.z);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+
+    const beforeAmbiguousEdit = value(await engine.project("recompute"));
+    const writesBeforeAmbiguousEdit = writeCount();
+    const splitSide = profile(1.5);
+    const ambiguousProfile = {
+      points: [...splitSide.points, { id: "split-side", x: 1.5, z: 0, sweepRole: "section" as const }],
+      segments: [
+        ...splitSide.segments.filter((segment) => segment.id !== "bc"),
+        { id: "b-split", startId: "b", endId: "split-side" },
+        { id: "split-c", startId: "split-side", endId: "c" },
+      ],
+    };
+    const ambiguous = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: ambiguousProfile });
+
+    expect(ambiguous.ok).toBe(false);
+    expect(ambiguous.ok ? undefined : ambiguous.failure.reason).toBe("sweep_failed");
+    expect(writeCount()).toBe(writesBeforeAmbiguousEdit);
+    expect(value(await engine.project("recompute")).shapes).toEqual(beforeAmbiguousEdit.shapes);
+
+    const writesBeforeClear = writeCount();
+    const cleared = await engine.changeShape("recompute", created.sketchSourceId!, { faceDraft: null });
+
+    expect(cleared.ok, JSON.stringify(cleared)).toBe(true);
+    expect(value(cleared).shape.faceDraft).toBeUndefined();
+    expect(value(cleared).shape).toMatchObject({ x: created.x, z: created.z, elevation: created.elevation });
+    expect(writeCount()).toBe(writesBeforeClear + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("persists and replays one face draft on a retained sketch extrusion", async () => {
     const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
