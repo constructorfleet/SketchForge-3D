@@ -493,7 +493,21 @@ export const API_V1_OPERATIONS = [
     },
   },
   operation("OPTIONS", "/api/v1/edges", "edgeRouteOptions", [204], undefined, "none"),
-  operation("POST", "/api/v1/explode", "explodeAssembly"),
+  {
+    ...operation("POST", "/api/v1/explode", "explodeAssembly", [200, 400, 401, 404, 409, 422, 500, 503]),
+    description: "Explode an imported STEP assembly into editable product groups and exact component solids.",
+    query: shapeQuery,
+    responseSchemas: {
+      200: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num }, additionalProperties: false },
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      409: faceError("project_busy", "shape_locked"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+  },
   operation("POST", "/api/v1/exports", "exportProject"),
   {
     ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 422, 500, 503]),

@@ -28,6 +28,29 @@ function sourceOperations() {
 type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
 
 describe("REST API v1 operation contract", () => {
+  it("contracts STEP explosion query, resulting shape summaries, and reachable errors", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const key = "POST /api/v1/explode";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "explodeAssembly",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      query: { required: ["projectId", "shapeId"] },
+    });
+    expect(contract.parseApiV1Query(key, new Request("https://example.test/api/v1/explode?projectId=%20project-1%20&shapeId=%20assembly%20")))
+      .toEqual({ ok: true, values: { projectId: "project-1", shapeId: "assembly" } });
+    expect(contract.parseApiV1Query(key, new Request("https://example.test/api/v1/explode?projectId=project-1")))
+      .toMatchObject({ ok: false, invalid: ["shapeId"] });
+
+    const response = { shapes: [{ id: "part-1", name: "Part 1", kind: "box", color: "#fff", hole: false, locked: false, hidden: false, x: 0, z: 0, elevation: 0, width: 2, depth: 2, rotation: 0, rotationX: 0, rotationZ: 0 }], revision: 5 };
+    expect(contract.validateApiV1Response(key, 200, response)).toBe(true);
+    expect(contract.validateApiV1Response(key, 200, { ...response, revision: "5" })).toBe(false);
+    for (const [status, code] of [[400, "invalid_shape_id"], [401, "unauthorized"], [404, "shape_not_found"], [409, "shape_locked"], [422, "cad_failed"], [500, "cad_failed"], [503, "storage_unconfigured"]] as const) {
+      expect(contract.validateApiV1Response(key, status, { error: "Failure", code })).toBe(true);
+    }
+    expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+  });
+
   it("contracts interference normalization, bounded errors, and exact or tessellated reports", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const key = "POST /api/v1/interference";

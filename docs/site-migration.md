@@ -81,11 +81,11 @@ so stale tracked output alone does not fail the docs check.
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. 24 operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 8 are listed
+the registry and handlers. 25 operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 7 are listed
 with omission reasons in the generated contract; full route coverage remains
 open. `POST /mirrors` validates normalized IDs, axis selection, response shape,
-and reachable errors at the route boundary. `POST /patterns` validates normalized IDs, defaults, count limits, finite numeric options, its 201 shape-summary response, and reachable errors.
+and reachable errors at the route boundary. `POST /patterns` validates normalized IDs, defaults, count limits, finite numeric options, its 201 shape-summary response, and reachable errors. `POST /explode` validates trimmed project and shape IDs, STEP assembly summaries, revision, and reachable errors.
 
 `PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep,
 targeted by either its output shape ID or persisted `sketchSourceId`, and

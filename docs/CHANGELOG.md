@@ -13,8 +13,11 @@ owner: "Contributors"
 
 - `POST /patterns` now validates normalized IDs, defaults, integral count limits,
   finite numeric options, its 201 shape-summary response, and reachable errors.
-  The generated OpenAPI subset now covers 24 of 32 registered operations; 8
+  The generated OpenAPI subset now covers 25 of 32 registered operations; 7
   remain omitted.
+- `POST /explode` now validates trimmed project and shape query IDs, returned
+  STEP assembly shape summaries and revision, and reachable errors. The
+  generated contract includes its request parameters and response schemas.
 - `POST /mirrors` now validates normalized shape IDs, principal-axis selection,
   shape-summary responses, and reachable error responses at the route boundary.
 - A sketch extrusion with a retained prism draft can now take one all-edge fillet or symmetric 45° chamfer. Source-profile and draft-angle edits rebuild the extrusion, reapply its prism draft, then replay the treatment; attempts to add the draft after a treatment remain refused.
