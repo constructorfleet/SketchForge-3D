@@ -121,7 +121,10 @@ client.imports.readable(fileName): boolean
 sweeps. Its `profile` contains the closed section path(s), one open spine, and
 optional `sweepFrames`; the response retains that data as `sketchProfile`.
 It also returns the stable `sketchSourceId` used by project feature metadata.
-The REST API does not yet accept profile updates that trigger a sweep rebuild.
+The REST API accepts profile updates that rebuild persisted sketch sweeps. Send
+the replacement `sketchProfile` to `PATCH /api/v1/shapes`, targeting either the
+output shape ID or its `sketchSourceId`; the rebuild preserves the same shape
+and source-sketch IDs. See the [REST sweep update contract](../../docs/REST_API.md#sketch-sweeps).
 
 A `ProjectHandle` is the same surface with the project id bound, which is what a macro works through:
 

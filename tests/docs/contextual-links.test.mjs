@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), 'utf8')
 
 const pages = Object.fromEntries(await Promise.all([
+  'packages/sketchforge-client/README.md',
   'docs/index.md',
   'docs/REST_API.md',
   'docs/CLI_REFERENCE.md',
@@ -14,6 +15,13 @@ const pages = Object.fromEntries(await Promise.all([
   'docs/guides/package-examples.md',
   'docs/mcp/EXAMPLES.md',
 ].map(async (path) => [path, await read(path)])))
+
+test('TypeScript client README documents REST sketch-sweep profile updates', () => {
+  const readme = pages['packages/sketchforge-client/README.md']
+  assert.match(readme, /REST API accepts profile updates that rebuild persisted sketch sweeps/i)
+  assert.doesNotMatch(readme, /REST API does not yet accept profile updates that trigger a sweep rebuild/i)
+  assert.match(readme, /same shape and source-sketch IDs/i)
+})
 
 test('documentation gives API readers paths to contracts, shape fields, clients, and runnable examples', () => {
   const api = pages['docs/REST_API.md']
