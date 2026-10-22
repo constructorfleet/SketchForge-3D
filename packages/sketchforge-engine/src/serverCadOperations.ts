@@ -458,7 +458,7 @@ export function allEdgeTreatmentEdgeCount(shape: WorkplaneShape, kind: ServerCad
 
 function edgeTreatmentSolid(cad: OcctKernel, shape: WorkplaneShape, treatment: ServerCadTreatment) {
   if (treatment.kind === "chamfer" && !treatment.edges?.length
-    && shape.sketchOperation === "revolve" && shape.sketchProfile) {
+    && shape.sketchOperation === "revolve" && shape.sketchProfile && !shape.faceDraft) {
     return exactPlainSketchRevolveSolid(cad, shape.sketchProfile, shape.sketchRevolve, shape);
   }
   return orientedSolidForShape(cad, shape);
