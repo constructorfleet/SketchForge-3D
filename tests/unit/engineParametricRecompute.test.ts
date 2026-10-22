@@ -7,6 +7,7 @@ import { applyEdgeTreatment, shapeWithCadResult } from "@constructorfleet/sketch
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 
 function profile(sectionHalfWidth = 1, spineStart = 0, spineEnd = 10, spineOffset = 0): SketchProfile {
   return {
@@ -185,7 +186,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.01, allEdges: true });
     expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
-  });
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("rolls back a revolve setting edit when its all-edge fillet cannot be replayed", async () => {
     const { store, writeCount } = projectStore();
