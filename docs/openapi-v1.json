@@ -5662,7 +5662,8 @@
                       "type": "string",
                       "enum": [
                         "invalid_project_id",
-                        "invalid_shape_id"
+                        "invalid_shape_id",
+                        "invalid_request"
                       ]
                     }
                   },
@@ -5805,7 +5806,7 @@
             }
           }
         },
-        "description": "Lists each face with its shell-request index and stable application-owned ID. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",
+        "description": "Lists each face with its shell-request index and stable application-owned ID. Use topology=exact to list analytic faces on supported plain full-turn sketch revolves without changing the default mesh listing. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",
         "security": [
           {
             "bearerAuth": []
@@ -5834,6 +5835,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "topology",
+            "in": "query",
+            "required": false,
+            "description": "Optional. Use exact to list analytic B-rep faces on a supported plain full-turn sketch revolve; the default mesh listing keeps its existing indexes.",
+            "schema": {
+              "type": "string",
+              "pattern": "^(mesh|exact)$"
             }
           }
         ]
