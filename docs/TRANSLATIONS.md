@@ -26,6 +26,7 @@ dashboard or in the editor's Appearance settings. The choice is stored per brows
    Keep keys, `{placeholders}` and `<tags>` unchanged.
 3. Register it in `apps/web/src/i18n/locales.ts`:
 
+   <!-- runnable-exempt: This is a partial locale-registration illustration; apps/web/src/i18n/locales.ts is canonical and tests/unit/i18n.test.ts checks locale behavior. -->
    ```ts
    { code: "de", nativeName: "Deutsch", complete: false, load: () => import("./locales/de") },
    ```

@@ -15,6 +15,7 @@ Use this skill only with a local SketchForge app running in development mode.
 
 1. Start SketchForge from the repo:
 
+<!-- runnable-exempt: This starts the local development server for the user; it is an operational npm script, not a maintained standalone example. -->
 ```bash
 npm run dev
 ```
@@ -23,6 +24,7 @@ npm run dev
 
 3. Configure your MCP client to start the stdio server:
 
+<!-- runnable-exempt: This installs the published MCP command for the user; it depends on npm registry state and is not repository-owned source. -->
 ```bash
 npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp
 ```

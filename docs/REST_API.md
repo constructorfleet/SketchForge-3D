@@ -33,6 +33,7 @@ Both of these are required:
 | `SKETCHFORGE_API_TOKEN` | The API is off without it. With no token set, every route answers `404`. |
 | `SKETCHFORGE_PROJECTS_DIR` | Where projects live. See "Server-Side Project Storage" in the README. Without it the API answers `503`. |
 
+<!-- runnable-exempt: This deployment recipe uses a generated secret and a user-chosen volume; it is not a repository-owned script or source example. -->
 ```bash
 docker run -d --name sketchforge --restart unless-stopped \
   -p 3000:3000 \
@@ -204,6 +205,7 @@ A server from before codes sends only `error`, so a client should keep whatever 
 
 A revolve is described by an outline rather than by dimensions, so it has its own two kinds. This is the one shape nobody wants to place by hand: a thread's profile is three points and its pitch is a number from a table.
 
+<!-- runnable-exempt: These partial POST /shapes requests require reader-supplied HOST, PROJECT, and TOKEN values; route behavior is covered by API integration tests. -->
 ```bash
 # A standard size: "M8" carries its own pitch, and length beats counting turns
 curl -X POST "$HOST/shapes?projectId=$PROJECT" \
@@ -301,6 +303,7 @@ The editor rounds and cuts edges in a browser worker: every client downloads a 2
 | `GET` | `/edges?projectId=&shapeId=` | The shape's edges: index, length, curve type, midpoint, and filletability. |
 | `POST` | `/treatments?projectId=&shapeId=` | Applies a fillet or chamfer. |
 
+<!-- runnable-exempt: These partial POST /treatments requests require reader-supplied HOST, PROJECT, TOKEN, and SHAPE values; they document request shape rather than a standalone script. -->
 ```bash
 # Every edge
 curl -X POST "$HOST/treatments?projectId=$PROJECT&shapeId=$SHAPE" \
@@ -370,6 +373,7 @@ A solid box printed at 20mm cube costs four times the filament of the same box w
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, outward normal, direction. |
 | `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall of `thickness`, leaving `openFaces` off. |
 
+<!-- runnable-exempt: These partial POST /shell requests require reader-supplied HOST, PROJECT, TOKEN, and SHAPE values; they document request shape rather than a standalone script. -->
 ```bash
 # A sealed hollow: a wall all the way round, with the void closed in
 curl -X POST "$HOST/shell?projectId=$PROJECT&shapeId=$SHAPE" \
@@ -666,6 +670,7 @@ A row with no step and a ring with no sweep are both `422`: every copy would lan
 
 Or as a form, which is what a person at a terminal wants:
 
+<!-- runnable-exempt: This multipart POST /imports request requires a local bracket.stl file and reader-supplied HOST, PROJECT, and TOKEN values; it is not a standalone checked script. -->
 ```bash
 curl -X POST "$HOST/imports?projectId=$PROJECT" \
   -H "Authorization: Bearer $TOKEN" \
@@ -754,6 +759,7 @@ answers `404`; a project with no exportable solid geometry answers `422` with
 
 ## Example: a plate with a row of holes
 
+<!-- runnable-exempt: This API walkthrough embeds a Python heredoc and reader-supplied credentials; it illustrates sequential requests rather than a maintained executable source file. -->
 ```bash
 TOKEN=...   # SKETCHFORGE_API_TOKEN
 HOST=http://localhost:3000/api/v1
@@ -789,6 +795,7 @@ A parameterised part is rarely one shape. A bracket is a plate with holes in it,
 
 Grouping is how this app subtracts. A group is one shape carrying its members; a member marked `hole: true` is subtracted from the rest when the group is made. So `POST /groups` and `POST /booleans` are one operation with two front doors: the first takes a flat list of ids and reads each shape's own `hole` flag, the second names the two roles explicitly and does not care how the shapes were stored.
 
+<!-- runnable-exempt: These POST /booleans and POST /groups requests use placeholder ids and credentials; they document route alternatives, not a standalone script. -->
 ```bash
 # Cut: name the solid and the holes, whatever their stored hole flag says
 curl -X POST "$HOST/booleans?projectId=$PROJECT" \

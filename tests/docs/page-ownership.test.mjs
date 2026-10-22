@@ -36,10 +36,37 @@ async function createRepository(t, page, pagePath = "docs/index.md") {
   return root;
 }
 
+async function createRunnableBlockRepository(t, page) {
+  const root = await createRepository(t, page);
+  await mkdir(path.join(root, ".github/workflows"), { recursive: true });
+  await writeFile(path.join(root, ".github/workflows/ci.yml"), "      - run: npm run test:integration\n");
+  await writeFile(path.join(root, "package.json"), JSON.stringify({
+    scripts: { "test:integration": "vitest run --config tests/vitest.integration.config.ts" },
+  }));
+  await mkdir(path.join(root, "tests"), { recursive: true });
+  await writeFile(path.join(root, "tests/vitest.integration.config.ts"), 'include: ["packages/**/tests/**/*.integration.ts"]\n');
+  const source = path.join(root, "packages/sketchforge-client/examples/bolt-plate.macro.mjs");
+  await writeFile(source, "export default () => 'fixture';\n");
+  const testFile = path.join(root, "packages/sketchforge-client/tests/examples.integration.ts");
+  await mkdir(path.dirname(testFile), { recursive: true });
+  await writeFile(testFile, 'import example from "../examples/bolt-plate.macro.mjs";\n');
+  await writeFile(path.join(root, "docs/index.md"), page);
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "add runnable example fixture"], { cwd: root });
+  return root;
+}
+
 function runDocsCheck(root, ...args) {
+  return runDocsCheckWithEnvironment(root, process.env, ...args);
+}
+
+function runDocsCheckWithEnvironment(root, parentEnvironment, ...args) {
+  const env = { ...parentEnvironment };
+  delete env.DOCS_BASE_REF;
   return spawnSync(process.execPath, [path.join(repository, "scripts/docs-check.mjs"), "--root", root, ...args], {
     cwd: root,
     encoding: "utf8",
+    env,
   });
 }
 
@@ -69,6 +96,80 @@ test("canonical docs reject source mappings that match no tracked file", async (
   const result = runDocsCheck(root);
   assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
   assert.match(`${result.stdout}\n${result.stderr}`, /docs\/index\.md: source ownership pattern matches no tracked file: packages\/missing\/src\/\*\*/);
+});
+
+test("runnable code fences require source inclusion metadata or an explicit exemption", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n\`\`\`js\nconsole.log("unowned");\n\`\`\`\n`,
+  );
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /docs\/index\.md:\d+: runnable js block needs runnable-source or runnable-exempt metadata/);
+});
+
+test("documentation checker fixtures ignore the workflow's parent-repository base ref", async (t) => {
+  const root = await createRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n`,
+  );
+  const result = runDocsCheckWithEnvironment(root, { ...process.env, DOCS_BASE_REF: "unavailable-parent-commit" });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("runnable source metadata requires the fence to include the exact source and name a test", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n<!-- runnable-source: packages/sketchforge-client/examples/bolt-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->\n\`\`\`js\n!!!include(../packages/sketchforge-client/examples/bolt-plate.macro.mjs)!!!\n\`\`\`\n`,
+  );
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("runnable source metadata rejects drift from its included source", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n<!-- runnable-source: packages/sketchforge-client/examples/bolt-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->\n\`\`\`js\nconsole.log("stale copy");\n\`\`\`\n`,
+  );
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /runnable source block must include its declared source with a matching `!!!include\(\.\.\/packages\/sketchforge-client\/examples\/bolt-plate\.macro\.mjs\)!!!` directive/);
+});
+
+test("runnable source metadata requires the named test to reference the included example", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n<!-- runnable-source: packages/sketchforge-client/examples/bolt-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->\n\`\`\`js\n!!!include(../packages/sketchforge-client/examples/bolt-plate.macro.mjs)!!!\n\`\`\`\n`,
+  );
+  await writeFile(path.join(root, "packages/sketchforge-client/tests/examples.integration.ts"), "export const tested = true;\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "remove example test reference"], { cwd: root });
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /runnable source test does not reference packages\/sketchforge-client\/examples\/bolt-plate\.macro\.mjs/);
+});
+
+test("runnable source metadata requires its test command in both the runner and CI workflow", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n<!-- runnable-source: packages/sketchforge-client/examples/bolt-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->\n\`\`\`js\n!!!include(../packages/sketchforge-client/examples/bolt-plate.macro.mjs)!!!\n\`\`\`\n`,
+  );
+  await writeFile(path.join(root, ".github/workflows/ci.yml"), "      - run: npm run test:unit\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "remove integration test command"], { cwd: root });
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /runnable source test is not wired to CI command npm run test:integration/);
+});
+
+test("runnable exemptions must include a concrete reason", async (t) => {
+  const root = await createRunnableBlockRepository(
+    t,
+    `---\nslug: /\ntitle: Fixture docs\naudience: Contributors\nowner: Docs\n---\n# Fixture docs\n\n<!-- runnable-exempt: -->\n\`\`\`sh\nnpm run example\n\`\`\`\n`,
+  );
+  const result = runDocsCheck(root);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /runnable-exempt metadata needs a concrete reason/);
 });
 
 test("generated package references are checked for stable page ownership", async (t) => {

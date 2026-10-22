@@ -39,6 +39,7 @@ Choose **Export**, select **SKF: Editable project**, then choose **Save SketchFo
 
 The browser acceptance test performs these steps: it creates the rectangular extrusion, opens **Edit sketch**, adds the circle, finishes the edit, renames and reloads the project, reopens the sketch to confirm the added segments persisted, then downloads the `.skf` file. Run it with:
 
+<!-- runnable-exempt: This command runs the browser acceptance workflow; its maintained implementation is tests/browser/editor-quickstart.test.mjs, not a standalone script block. -->
 ```sh
 npm run test:browser
 ```
