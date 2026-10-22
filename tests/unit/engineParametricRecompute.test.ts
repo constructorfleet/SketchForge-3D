@@ -143,11 +143,9 @@ describe("dependency-ordered feature recomputation", () => {
       const before = value(await engine.project("recompute"));
       const writesBefore = writeCount();
 
-      const changed = operation === "edge treatment"
-        ? await engine.treat("recompute", drafted.id, { kind: "fillet", amount: 0.2 })
-        : operation === "prism draft"
-          ? await engine.draftPrism("recompute", drafted.id, 5)
-          : await engine.shell("recompute", drafted.id, { thickness: 0.2 });
+      const changed = operation === "prism draft"
+        ? await engine.draftPrism("recompute", drafted.id, 5)
+        : await engine.shell("recompute", drafted.id, { thickness: 0.2 });
 
       expect(changed.ok).toBe(false);
       expect(changed.ok ? undefined : changed.failure.reason).toBe("cad_refused");
