@@ -91,9 +91,10 @@ These are implemented and should not be filed as missing features:
   its persisted `sketchSourceId` or by output shape ID; it updates the source
   profile and rebuilds its dependent sweep before writing the project. Invalid
   profiles leave the persisted source and sweep unchanged. A profile rebuild
-  receives fresh face IDs
-  and drops face colors and edge-treatment metadata because old faces cannot
-  be assumed to correspond to the new profile.
+  receives fresh face IDs and drops face colors because old faces cannot be
+  assumed to correspond to the new profile. One supported all-edge fillet or
+  symmetric 45° chamfer is replayed against rebuilt topology; unsupported or
+  ambiguous treatment histories fail the edit atomically.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the
