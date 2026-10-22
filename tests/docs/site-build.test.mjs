@@ -111,7 +111,10 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /22 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
-  assert.match(spec, /They also map the primary `apps\/web\/src\/components\/SketchForgeEditor\.tsx` component to the edit-and-export guide; other editor\/UI sources and symbols remain outside the mapping/i);
+  assert.match(spec, /The only editor source mapped so far is `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, which maps to the edit-and-export guide; other editor\/UI sources and symbols remain unmapped/i);
+  assert.match(spec, /face-drafting guide.*browser acceptance.*face 1.*local \+Z.*-5°.*screenshot/i);
+  assert.match(spec, /more face-drafting combinations and editor workflows remain untested/i);
+  assert.match(spec, /current baseline is 22 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the remaining 10 are omitted with reasons/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
   assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
@@ -121,6 +124,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /Open PR \[#209\]|Open PR \[#214\]/i);
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
+  assert.match(spec, /The face-drafting guide has browser acceptance for one supported inspector case/i);
 
   assert.match(migration, /22 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 10 are listed/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
