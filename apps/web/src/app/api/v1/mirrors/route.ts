@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
-import { apiContext, apiError, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { parseApiV1Query, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -8,11 +9,12 @@ export const revalidate = false;
 const AXES = ["x", "y", "z"] as const;
 
 /** Reflect selected exact parameter-built solids across their shared bounds plane. */
-export async function POST(request: Request) {
+async function postMirrors(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const { projectId } = apiTarget(request);
-  if (!projectId) return apiError("Invalid project id.", 400, "invalid_project_id");
+  const query = parseApiV1Query("POST /api/v1/mirrors", request);
+  if (!query.ok) return apiErrors.invalidProjectId();
+  const { projectId } = query.values;
 
   const body = await apiJsonBody(request);
   if (!body) return apiError("Expected a JSON object body.", 400, "invalid_body");
@@ -20,6 +22,9 @@ export async function POST(request: Request) {
   if (!ids?.length) return apiError("Send ids: a list of distinct shape ids to mirror.", 400, "invalid_request");
   const axis = AXES.find((candidate) => candidate === body.axis);
   if (!axis) return apiError("Send axis as x, y, or z.", 400, "invalid_request");
+  if (!validateApiV1RequestBody("POST /api/v1/mirrors", { ids, axis })) {
+    return apiError("The mirror request does not match its contract.", 400, "invalid_request");
+  }
 
   const mirrored = await apiEngine(context.root).mirrorBaked(projectId, ids, axis);
   if (!mirrored.ok) return apiEngineError(mirrored.failure, {
@@ -34,3 +39,5 @@ export async function POST(request: Request) {
     revision: mirrored.value.revision,
   });
 }
+
+export const POST = withApiV1Contract("POST /api/v1/mirrors", postMirrors);

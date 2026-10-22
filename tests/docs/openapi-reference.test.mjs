@@ -141,6 +141,15 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(interferenceReport.required, ["shapesChecked", "candidatePairsChecked", "clearance", "method", "pairs"]);
   assert.deepEqual(interferenceReport.properties.pairs.items.properties.precision.enum, ["exact", "tessellated"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "analyzeInterference"), false);
+  const mirrors = spec.paths["/api/v1/mirrors"].post;
+  assert.equal(mirrors.operationId, "mirrorShapes");
+  assert.deepEqual(Object.keys(mirrors.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  const mirrorBody = mirrors.requestBody.content["application/json"].schema;
+  assert.deepEqual(mirrorBody.required, ["ids", "axis"]);
+  assert.deepEqual(mirrorBody.properties.axis.enum, ["x", "y", "z"]);
+  assert.equal(mirrorBody.properties.ids.oneOf.length, 2);
+  assert.deepEqual(mirrors.responses["200"].content["application/json"].schema.required, ["moved", "axis", "shapes", "revision"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "mirrorShapes"), false);
   for (const [pathName, method, operationId] of [
     ["/api/v1/booleans", "post", "booleanShapes"],
     ["/api/v1/treatments", "post", "treatShape"],
@@ -153,8 +162,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 22);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 10);
+  assert.equal(documentedOperationCount, 23);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 9);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

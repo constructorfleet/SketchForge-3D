@@ -9605,6 +9605,1324 @@
         }
       }
     },
+    "/api/v1/mirrors": {
+      "post": {
+        "operationId": "mirrorShapes",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "moved",
+                    "axis",
+                    "shapes",
+                    "revision"
+                  ],
+                  "properties": {
+                    "moved": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "axis": {
+                      "type": "string",
+                      "enum": [
+                        "x",
+                        "y",
+                        "z"
+                      ]
+                    },
+                    "shapes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "color",
+                          "hole",
+                          "locked",
+                          "hidden",
+                          "x",
+                          "z",
+                          "elevation",
+                          "width",
+                          "depth",
+                          "rotation",
+                          "rotationX",
+                          "rotationZ"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "requestKind": {
+                            "type": "string"
+                          },
+                          "sketchOperation": {
+                            "type": "string"
+                          },
+                          "sketchSourceId": {
+                            "type": "string"
+                          },
+                          "draftPrismAngle": {
+                            "type": "number"
+                          },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "sketchProfile": {
+                            "type": "object",
+                            "required": [
+                              "points",
+                              "segments"
+                            ],
+                            "properties": {
+                              "points": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "segments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "sweepFrames": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "additionalProperties": true
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "faceIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "faceColors": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "stepAssembly": {
+                            "type": "array",
+                            "description": "Optional STEP product hierarchy metadata. Imported geometry remains one mesh until exploded.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "name",
+                                "children"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "children": {
+                                  "type": "array",
+                                  "maxItems": 2000,
+                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "name",
+                                      "children"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "children": {
+                                        "type": "array",
+                                        "maxItems": 2000,
+                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "name",
+                                            "children"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "type": "string"
+                                            },
+                                            "name": {
+                                              "type": "string"
+                                            },
+                                            "children": {
+                                              "type": "array",
+                                              "maxItems": 2000,
+                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                              "items": {
+                                                "type": "object",
+                                                "required": [
+                                                  "name",
+                                                  "children"
+                                                ],
+                                                "properties": {
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "name": {
+                                                    "type": "string"
+                                                  },
+                                                  "children": {
+                                                    "type": "array",
+                                                    "maxItems": 2000,
+                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "required": [
+                                                        "name",
+                                                        "children"
+                                                      ],
+                                                      "properties": {
+                                                        "id": {
+                                                          "type": "string"
+                                                        },
+                                                        "name": {
+                                                          "type": "string"
+                                                        },
+                                                        "children": {
+                                                          "type": "array",
+                                                          "maxItems": 2000,
+                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                          "items": {
+                                                            "type": "object",
+                                                            "required": [
+                                                              "name",
+                                                              "children"
+                                                            ],
+                                                            "properties": {
+                                                              "id": {
+                                                                "type": "string"
+                                                              },
+                                                              "name": {
+                                                                "type": "string"
+                                                              },
+                                                              "children": {
+                                                                "type": "array",
+                                                                "maxItems": 2000,
+                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                "items": {
+                                                                  "type": "object",
+                                                                  "required": [
+                                                                    "name",
+                                                                    "children"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "id": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "name": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "children": {
+                                                                      "type": "array",
+                                                                      "maxItems": 2000,
+                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                      "items": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "name",
+                                                                          "children"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "id": {
+                                                                            "type": "string"
+                                                                          },
+                                                                          "name": {
+                                                                            "type": "string"
+                                                                          },
+                                                                          "children": {
+                                                                            "type": "array",
+                                                                            "maxItems": 2000,
+                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                            "items": {
+                                                                              "type": "object",
+                                                                              "required": [
+                                                                                "name",
+                                                                                "children"
+                                                                              ],
+                                                                              "properties": {
+                                                                                "id": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "name": {
+                                                                                  "type": "string"
+                                                                                },
+                                                                                "children": {
+                                                                                  "type": "array",
+                                                                                  "maxItems": 2000,
+                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                  "items": {
+                                                                                    "type": "object",
+                                                                                    "required": [
+                                                                                      "name",
+                                                                                      "children"
+                                                                                    ],
+                                                                                    "properties": {
+                                                                                      "id": {
+                                                                                        "type": "string"
+                                                                                      },
+                                                                                      "name": {
+                                                                                        "type": "string"
+                                                                                      },
+                                                                                      "children": {
+                                                                                        "type": "array",
+                                                                                        "maxItems": 2000,
+                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                        "items": {
+                                                                                          "type": "object",
+                                                                                          "required": [
+                                                                                            "name",
+                                                                                            "children"
+                                                                                          ],
+                                                                                          "properties": {
+                                                                                            "id": {
+                                                                                              "type": "string"
+                                                                                            },
+                                                                                            "name": {
+                                                                                              "type": "string"
+                                                                                            },
+                                                                                            "children": {
+                                                                                              "type": "array",
+                                                                                              "maxItems": 2000,
+                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                              "items": {
+                                                                                                "type": "object",
+                                                                                                "required": [
+                                                                                                  "name",
+                                                                                                  "children"
+                                                                                                ],
+                                                                                                "properties": {
+                                                                                                  "id": {
+                                                                                                    "type": "string"
+                                                                                                  },
+                                                                                                  "name": {
+                                                                                                    "type": "string"
+                                                                                                  },
+                                                                                                  "children": {
+                                                                                                    "type": "array",
+                                                                                                    "maxItems": 2000,
+                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                    "items": {
+                                                                                                      "type": "object",
+                                                                                                      "required": [
+                                                                                                        "name",
+                                                                                                        "children"
+                                                                                                      ],
+                                                                                                      "properties": {
+                                                                                                        "id": {
+                                                                                                          "type": "string"
+                                                                                                        },
+                                                                                                        "name": {
+                                                                                                          "type": "string"
+                                                                                                        },
+                                                                                                        "children": {
+                                                                                                          "type": "array",
+                                                                                                          "maxItems": 2000,
+                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                          "items": {
+                                                                                                            "type": "object",
+                                                                                                            "required": [
+                                                                                                              "name",
+                                                                                                              "children"
+                                                                                                            ],
+                                                                                                            "properties": {
+                                                                                                              "id": {
+                                                                                                                "type": "string"
+                                                                                                              },
+                                                                                                              "name": {
+                                                                                                                "type": "string"
+                                                                                                              },
+                                                                                                              "children": {
+                                                                                                                "type": "array",
+                                                                                                                "maxItems": 2000,
+                                                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                "items": {
+                                                                                                                  "type": "object",
+                                                                                                                  "required": [
+                                                                                                                    "name",
+                                                                                                                    "children"
+                                                                                                                  ],
+                                                                                                                  "properties": {
+                                                                                                                    "id": {
+                                                                                                                      "type": "string"
+                                                                                                                    },
+                                                                                                                    "name": {
+                                                                                                                      "type": "string"
+                                                                                                                    },
+                                                                                                                    "children": {
+                                                                                                                      "type": "array",
+                                                                                                                      "maxItems": 2000,
+                                                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                      "items": {
+                                                                                                                        "type": "object",
+                                                                                                                        "required": [
+                                                                                                                          "name",
+                                                                                                                          "children"
+                                                                                                                        ],
+                                                                                                                        "properties": {
+                                                                                                                          "id": {
+                                                                                                                            "type": "string"
+                                                                                                                          },
+                                                                                                                          "name": {
+                                                                                                                            "type": "string"
+                                                                                                                          },
+                                                                                                                          "children": {
+                                                                                                                            "type": "array",
+                                                                                                                            "maxItems": 2000,
+                                                                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                            "items": {
+                                                                                                                              "type": "object",
+                                                                                                                              "required": [
+                                                                                                                                "name",
+                                                                                                                                "children"
+                                                                                                                              ],
+                                                                                                                              "properties": {
+                                                                                                                                "id": {
+                                                                                                                                  "type": "string"
+                                                                                                                                },
+                                                                                                                                "name": {
+                                                                                                                                  "type": "string"
+                                                                                                                                },
+                                                                                                                                "children": {
+                                                                                                                                  "type": "array",
+                                                                                                                                  "maxItems": 2000,
+                                                                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                  "items": {
+                                                                                                                                    "type": "object",
+                                                                                                                                    "required": [
+                                                                                                                                      "name",
+                                                                                                                                      "children"
+                                                                                                                                    ],
+                                                                                                                                    "properties": {
+                                                                                                                                      "id": {
+                                                                                                                                        "type": "string"
+                                                                                                                                      },
+                                                                                                                                      "name": {
+                                                                                                                                        "type": "string"
+                                                                                                                                      },
+                                                                                                                                      "children": {
+                                                                                                                                        "type": "array",
+                                                                                                                                        "maxItems": 2000,
+                                                                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                        "items": {
+                                                                                                                                          "type": "object",
+                                                                                                                                          "required": [
+                                                                                                                                            "name",
+                                                                                                                                            "children"
+                                                                                                                                          ],
+                                                                                                                                          "properties": {
+                                                                                                                                            "id": {
+                                                                                                                                              "type": "string"
+                                                                                                                                            },
+                                                                                                                                            "name": {
+                                                                                                                                              "type": "string"
+                                                                                                                                            },
+                                                                                                                                            "children": {
+                                                                                                                                              "type": "array",
+                                                                                                                                              "maxItems": 2000,
+                                                                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                              "items": {
+                                                                                                                                                "type": "object",
+                                                                                                                                                "required": [
+                                                                                                                                                  "name",
+                                                                                                                                                  "children"
+                                                                                                                                                ],
+                                                                                                                                                "properties": {
+                                                                                                                                                  "id": {
+                                                                                                                                                    "type": "string"
+                                                                                                                                                  },
+                                                                                                                                                  "name": {
+                                                                                                                                                    "type": "string"
+                                                                                                                                                  },
+                                                                                                                                                  "children": {
+                                                                                                                                                    "type": "array",
+                                                                                                                                                    "maxItems": 2000,
+                                                                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                    "items": {
+                                                                                                                                                      "type": "object",
+                                                                                                                                                      "required": [
+                                                                                                                                                        "name",
+                                                                                                                                                        "children"
+                                                                                                                                                      ],
+                                                                                                                                                      "properties": {
+                                                                                                                                                        "id": {
+                                                                                                                                                          "type": "string"
+                                                                                                                                                        },
+                                                                                                                                                        "name": {
+                                                                                                                                                          "type": "string"
+                                                                                                                                                        },
+                                                                                                                                                        "children": {
+                                                                                                                                                          "type": "array",
+                                                                                                                                                          "maxItems": 2000,
+                                                                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                          "items": {
+                                                                                                                                                            "type": "object",
+                                                                                                                                                            "required": [
+                                                                                                                                                              "name",
+                                                                                                                                                              "children"
+                                                                                                                                                            ],
+                                                                                                                                                            "properties": {
+                                                                                                                                                              "id": {
+                                                                                                                                                                "type": "string"
+                                                                                                                                                              },
+                                                                                                                                                              "name": {
+                                                                                                                                                                "type": "string"
+                                                                                                                                                              },
+                                                                                                                                                              "children": {
+                                                                                                                                                                "type": "array",
+                                                                                                                                                                "maxItems": 2000,
+                                                                                                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                "items": {
+                                                                                                                                                                  "type": "object",
+                                                                                                                                                                  "required": [
+                                                                                                                                                                    "name",
+                                                                                                                                                                    "children"
+                                                                                                                                                                  ],
+                                                                                                                                                                  "properties": {
+                                                                                                                                                                    "id": {
+                                                                                                                                                                      "type": "string"
+                                                                                                                                                                    },
+                                                                                                                                                                    "name": {
+                                                                                                                                                                      "type": "string"
+                                                                                                                                                                    },
+                                                                                                                                                                    "children": {
+                                                                                                                                                                      "type": "array",
+                                                                                                                                                                      "maxItems": 2000,
+                                                                                                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                      "items": {
+                                                                                                                                                                        "type": "object",
+                                                                                                                                                                        "required": [
+                                                                                                                                                                          "name",
+                                                                                                                                                                          "children"
+                                                                                                                                                                        ],
+                                                                                                                                                                        "properties": {
+                                                                                                                                                                          "id": {
+                                                                                                                                                                            "type": "string"
+                                                                                                                                                                          },
+                                                                                                                                                                          "name": {
+                                                                                                                                                                            "type": "string"
+                                                                                                                                                                          },
+                                                                                                                                                                          "children": {
+                                                                                                                                                                            "type": "array",
+                                                                                                                                                                            "maxItems": 2000,
+                                                                                                                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                            "items": {
+                                                                                                                                                                              "type": "object",
+                                                                                                                                                                              "required": [
+                                                                                                                                                                                "name",
+                                                                                                                                                                                "children"
+                                                                                                                                                                              ],
+                                                                                                                                                                              "properties": {
+                                                                                                                                                                                "id": {
+                                                                                                                                                                                  "type": "string"
+                                                                                                                                                                                },
+                                                                                                                                                                                "name": {
+                                                                                                                                                                                  "type": "string"
+                                                                                                                                                                                },
+                                                                                                                                                                                "children": {
+                                                                                                                                                                                  "type": "array",
+                                                                                                                                                                                  "maxItems": 2000,
+                                                                                                                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                  "items": {
+                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                    "required": [
+                                                                                                                                                                                      "name",
+                                                                                                                                                                                      "children"
+                                                                                                                                                                                    ],
+                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                      "id": {
+                                                                                                                                                                                        "type": "string"
+                                                                                                                                                                                      },
+                                                                                                                                                                                      "name": {
+                                                                                                                                                                                        "type": "string"
+                                                                                                                                                                                      },
+                                                                                                                                                                                      "children": {
+                                                                                                                                                                                        "type": "array",
+                                                                                                                                                                                        "maxItems": 2000,
+                                                                                                                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                        "items": {
+                                                                                                                                                                                          "type": "object",
+                                                                                                                                                                                          "required": [
+                                                                                                                                                                                            "name",
+                                                                                                                                                                                            "children"
+                                                                                                                                                                                          ],
+                                                                                                                                                                                          "properties": {
+                                                                                                                                                                                            "id": {
+                                                                                                                                                                                              "type": "string"
+                                                                                                                                                                                            },
+                                                                                                                                                                                            "name": {
+                                                                                                                                                                                              "type": "string"
+                                                                                                                                                                                            },
+                                                                                                                                                                                            "children": {
+                                                                                                                                                                                              "type": "array",
+                                                                                                                                                                                              "maxItems": 2000,
+                                                                                                                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                              "items": {
+                                                                                                                                                                                                "type": "object",
+                                                                                                                                                                                                "required": [
+                                                                                                                                                                                                  "name",
+                                                                                                                                                                                                  "children"
+                                                                                                                                                                                                ],
+                                                                                                                                                                                                "properties": {
+                                                                                                                                                                                                  "id": {
+                                                                                                                                                                                                    "type": "string"
+                                                                                                                                                                                                  },
+                                                                                                                                                                                                  "name": {
+                                                                                                                                                                                                    "type": "string"
+                                                                                                                                                                                                  },
+                                                                                                                                                                                                  "children": {
+                                                                                                                                                                                                    "type": "array",
+                                                                                                                                                                                                    "maxItems": 2000,
+                                                                                                                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                    "items": {
+                                                                                                                                                                                                      "type": "object",
+                                                                                                                                                                                                      "required": [
+                                                                                                                                                                                                        "name",
+                                                                                                                                                                                                        "children"
+                                                                                                                                                                                                      ],
+                                                                                                                                                                                                      "properties": {
+                                                                                                                                                                                                        "id": {
+                                                                                                                                                                                                          "type": "string"
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        "name": {
+                                                                                                                                                                                                          "type": "string"
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        "children": {
+                                                                                                                                                                                                          "type": "array",
+                                                                                                                                                                                                          "maxItems": 2000,
+                                                                                                                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                          "items": {
+                                                                                                                                                                                                            "type": "object",
+                                                                                                                                                                                                            "required": [
+                                                                                                                                                                                                              "name",
+                                                                                                                                                                                                              "children"
+                                                                                                                                                                                                            ],
+                                                                                                                                                                                                            "properties": {
+                                                                                                                                                                                                              "id": {
+                                                                                                                                                                                                                "type": "string"
+                                                                                                                                                                                                              },
+                                                                                                                                                                                                              "name": {
+                                                                                                                                                                                                                "type": "string"
+                                                                                                                                                                                                              },
+                                                                                                                                                                                                              "children": {
+                                                                                                                                                                                                                "type": "array",
+                                                                                                                                                                                                                "maxItems": 2000,
+                                                                                                                                                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                                "items": {
+                                                                                                                                                                                                                  "type": "object",
+                                                                                                                                                                                                                  "required": [
+                                                                                                                                                                                                                    "name",
+                                                                                                                                                                                                                    "children"
+                                                                                                                                                                                                                  ],
+                                                                                                                                                                                                                  "properties": {
+                                                                                                                                                                                                                    "id": {
+                                                                                                                                                                                                                      "type": "string"
+                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                    "name": {
+                                                                                                                                                                                                                      "type": "string"
+                                                                                                                                                                                                                    },
+                                                                                                                                                                                                                    "children": {
+                                                                                                                                                                                                                      "type": "array",
+                                                                                                                                                                                                                      "maxItems": 2000,
+                                                                                                                                                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                                      "items": {
+                                                                                                                                                                                                                        "type": "object",
+                                                                                                                                                                                                                        "required": [
+                                                                                                                                                                                                                          "name",
+                                                                                                                                                                                                                          "children"
+                                                                                                                                                                                                                        ],
+                                                                                                                                                                                                                        "properties": {
+                                                                                                                                                                                                                          "id": {
+                                                                                                                                                                                                                            "type": "string"
+                                                                                                                                                                                                                          },
+                                                                                                                                                                                                                          "name": {
+                                                                                                                                                                                                                            "type": "string"
+                                                                                                                                                                                                                          },
+                                                                                                                                                                                                                          "children": {
+                                                                                                                                                                                                                            "type": "array",
+                                                                                                                                                                                                                            "maxItems": 0,
+                                                                                                                                                                                                                            "description": "Direct product children; hierarchy depth is capped at 32."
+                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                        "additionalProperties": false
+                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                  "additionalProperties": false
+                                                                                                                                                                                                                }
+                                                                                                                                                                                                              }
+                                                                                                                                                                                                            },
+                                                                                                                                                                                                            "additionalProperties": false
+                                                                                                                                                                                                          }
+                                                                                                                                                                                                        }
+                                                                                                                                                                                                      },
+                                                                                                                                                                                                      "additionalProperties": false
+                                                                                                                                                                                                    }
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                },
+                                                                                                                                                                                                "additionalProperties": false
+                                                                                                                                                                                              }
+                                                                                                                                                                                            }
+                                                                                                                                                                                          },
+                                                                                                                                                                                          "additionalProperties": false
+                                                                                                                                                                                        }
+                                                                                                                                                                                      }
+                                                                                                                                                                                    },
+                                                                                                                                                                                    "additionalProperties": false
+                                                                                                                                                                                  }
+                                                                                                                                                                                }
+                                                                                                                                                                              },
+                                                                                                                                                                              "additionalProperties": false
+                                                                                                                                                                            }
+                                                                                                                                                                          }
+                                                                                                                                                                        },
+                                                                                                                                                                        "additionalProperties": false
+                                                                                                                                                                      }
+                                                                                                                                                                    }
+                                                                                                                                                                  },
+                                                                                                                                                                  "additionalProperties": false
+                                                                                                                                                                }
+                                                                                                                                                              }
+                                                                                                                                                            },
+                                                                                                                                                            "additionalProperties": false
+                                                                                                                                                          }
+                                                                                                                                                        }
+                                                                                                                                                      },
+                                                                                                                                                      "additionalProperties": false
+                                                                                                                                                    }
+                                                                                                                                                  }
+                                                                                                                                                },
+                                                                                                                                                "additionalProperties": false
+                                                                                                                                              }
+                                                                                                                                            }
+                                                                                                                                          },
+                                                                                                                                          "additionalProperties": false
+                                                                                                                                        }
+                                                                                                                                      }
+                                                                                                                                    },
+                                                                                                                                    "additionalProperties": false
+                                                                                                                                  }
+                                                                                                                                }
+                                                                                                                              },
+                                                                                                                              "additionalProperties": false
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        },
+                                                                                                                        "additionalProperties": false
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                  },
+                                                                                                                  "additionalProperties": false
+                                                                                                                }
+                                                                                                              }
+                                                                                                            },
+                                                                                                            "additionalProperties": false
+                                                                                                          }
+                                                                                                        }
+                                                                                                      },
+                                                                                                      "additionalProperties": false
+                                                                                                    }
+                                                                                                  }
+                                                                                                },
+                                                                                                "additionalProperties": false
+                                                                                              }
+                                                                                            }
+                                                                                          },
+                                                                                          "additionalProperties": false
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    "additionalProperties": false
+                                                                                  }
+                                                                                }
+                                                                              },
+                                                                              "additionalProperties": false
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "additionalProperties": false
+                                                                }
+                                                              }
+                                                            },
+                                                            "additionalProperties": false
+                                                          }
+                                                        }
+                                                      },
+                                                      "additionalProperties": false
+                                                    }
+                                                  }
+                                                },
+                                                "additionalProperties": false
+                                              }
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "stepComponent": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "occurrenceId",
+                              "path"
+                            ],
+                            "description": "STEP source occurrence identity and root-to-component ancestry for a selectable exploded solid.",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "occurrenceId": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "hole": {
+                            "type": "boolean"
+                          },
+                          "locked": {
+                            "type": "boolean"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          },
+                          "x": {
+                            "type": "number"
+                          },
+                          "z": {
+                            "type": "number"
+                          },
+                          "elevation": {
+                            "type": "number"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "rotation": {
+                            "type": "number"
+                          },
+                          "rotationX": {
+                            "type": "number"
+                          },
+                          "rotationZ": {
+                            "type": "number"
+                          },
+                          "groupedCount": {
+                            "type": "integer"
+                          },
+                          "revolve": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "profile": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "description": "Mirrors selected shapes across the principal plane through the midpoint of their combined bounds.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "axis"
+                ],
+                "properties": {
+                  "ids": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "\\S",
+                        "description": "A single shape ID; whitespace is trimmed before lookup."
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "description": "Distinct shape IDs; whitespace is trimmed before lookup.",
+                        "items": {
+                          "type": "string",
+                          "pattern": "\\S"
+                        }
+                      }
+                    ]
+                  },
+                  "axis": {
+                    "type": "string",
+                    "enum": [
+                      "x",
+                      "y",
+                      "z"
+                    ],
+                    "description": "Principal plane normal to this coordinate axis."
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/parts": {
       "post": {
         "operationId": "splitParts",
@@ -18930,12 +20248,6 @@
       "method": "POST",
       "path": "/api/v1/imports",
       "operationId": "importGeometry",
-      "reason": "Response schemas or verified response statuses are not declared."
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/mirrors",
-      "operationId": "mirrorShapes",
       "reason": "Response schemas or verified response statuses are not declared."
     },
     {

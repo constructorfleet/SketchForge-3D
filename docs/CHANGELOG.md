@@ -11,6 +11,10 @@ owner: "Contributors"
 
 ## Unreleased
 
+- `POST /mirrors` now validates normalized shape IDs, principal-axis selection,
+  shape-summary responses, and reachable error responses at the route boundary.
+  The generated OpenAPI subset now covers 23 of 32 registered operations; 9
+  remain omitted.
 - A sketch extrusion with a retained prism draft can now take one all-edge fillet or symmetric 45° chamfer. Source-profile and draft-angle edits rebuild the extrusion, reapply its prism draft, then replay the treatment; attempts to add the draft after a treatment remain refused.
 - `PATCH /shapes` can retain one face draft on a sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve through the `faceDraft` value. For eligible revolves, `GET /faces?topology=exact` lists analytic B-rep faces; the default mesh listing and its compatibility indexes remain unchanged. The selected source face is referenced by stable face ID and uniquely matched planar normal during source-profile edits; `.skf` round trips preserve the draft, its source frame, and a resized revolve's scale. Ambiguous or missing matches and ineffective dependent booleans fail atomically. Partial, helical, and multi-region revolve drafts are refused. A plain single-region full-turn sketch revolve can now take one symmetric 45° all-edge chamfer after the face draft; source-profile and revolve-setting edits replay the source, draft, then chamfer atomically. Other face-draft combinations remain refused. A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer; adding a prism draft after a treatment remains refused, and shelling is refused when persisted draft or treatment metadata exists. The editor's arbitrary-shape draft remains baked.
 - `POST /groups` and `DELETE /groups` now have runtime-validated request and

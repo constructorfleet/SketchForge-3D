@@ -50,7 +50,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, shape arrangement (`POST /align` and `POST /distribute`), `POST /interference`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align` and `/distribute`), `POST /interference`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
 The shape `PATCH` operation remains omitted because its `faceColors` validation is custom; its omission entry calls out the supported `sketchProfile` rebuild and links to the [sweep update contract](#sketch-sweeps) below. The prose contract below also documents retained face drafts. An operation should appear in generated OpenAPI only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then.
 
 ### Contract validation
@@ -631,6 +631,16 @@ With no `anchorId` the reference is the box around the whole selection, so `max`
 The outermost two shapes never move: they define the span, which is the one thing you have already decided. `spacing` is `gaps` (the default) or `centers`, and these are genuinely different answers for shapes of different sizes -- `gaps` is what a rail of mixed-diameter bosses wants, `centers` is what a bolt pitch is. Leave `axis` out and it is whichever axis the shapes are already most spread along; a selection sitting at the same place on both is a `422`, because there is no row to even out.
 
 A shape in the **middle** of the span that is locked blocks the whole operation, and the reply says `moved: 0` rather than refusing: the project is as you asked for it to be, give or take what you locked. A locked shape at either end is no obstacle, since the ends do not move anyway.
+
+### Mirroring selected shapes
+
+`POST /mirrors?projectId=` reflects one or more selected shapes across the principal plane through the midpoint of their combined bounds. `ids` accepts one shape ID or a list of distinct IDs; IDs are trimmed before lookup. `axis` is the plane normal: `x`, `y`, or `z`.
+
+```json
+{ "ids": ["left-post", "right-post"], "axis": "x" }
+```
+
+The response reports how many shapes were mirrored, their updated summaries, the axis, and the new project revision. A locked shape or missing ID refuses the whole operation. The generated OpenAPI contract includes the request, success response, and reachable error statuses.
 
 ### Repeating them
 
