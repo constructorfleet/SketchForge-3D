@@ -76,7 +76,7 @@ import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
 import { sketchExtrusionShapeFromRequest } from "./sketchExtrusionRequest.js";
-import { findSketchOutput, recomputeSketchOutput, replayAllEdgeFillet } from "./parametricRecompute.js";
+import { findSketchOutput, recomputeSketchOutput, replaySingleAllEdgeTreatment } from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
@@ -876,7 +876,7 @@ export function createEngine(store: ProjectStore): Engine {
             }),
           };
           const replayedSource = replacingSketchProfile
-            ? await replayAllEdgeFillet(existing, rebuiltSource)
+            ? await replaySingleAllEdgeTreatment(existing, rebuiltSource)
             : rebuiltSource;
           if (requestedFaceDraft) {
             const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
@@ -960,7 +960,7 @@ export function createEngine(store: ProjectStore): Engine {
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceIds: refreshedFaceIds,
           };
-          swept = await replayAllEdgeFillet(existing, rebuiltSweep);
+          swept = await replaySingleAllEdgeTreatment(existing, rebuiltSweep);
         } catch (error) {
           return failed({
             reason: "sweep_failed",
@@ -975,7 +975,7 @@ export function createEngine(store: ProjectStore): Engine {
             profile: changes.sketchProfile as NonNullable<WorkplaneShape["sketchProfile"]>,
             settings: existing.sketchRevolve!,
           });
-          swept = await replayAllEdgeFillet(existing, rebuilt);
+          swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
         } catch (error) {
           return failed({
             reason: "sweep_failed",
@@ -1001,7 +1001,7 @@ export function createEngine(store: ProjectStore): Engine {
             profile: parsed.profile,
             settings: requestedRevolveSettings(existing.sketchRevolve!, changes),
           });
-          swept = await replayAllEdgeFillet(existing, rebuilt);
+          swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
         } catch (error) {
           return failed({
             reason: "sweep_failed",

@@ -104,11 +104,16 @@ These are implemented and should not be filed as missing features:
   side count) follows the same bottom-up rebuild and atomic-write path.
   A sketch extrusion, sweep, or revolve with one persisted all-edge fillet
   replays that fillet after a source-profile edit against rebuilt topology,
-  without carrying edge indices across the edit. Revolve setting edits also
-  attempt replay and roll back if the new topology cannot accept the fillet.
-  This does not cover chamfers, selected-edge treatments, multiple treatment
-  steps, or treatments on other source operation types; those histories cannot
-  yet be recomputed safely.
+  without carrying edge indices across the edit. One persisted symmetric 45°
+  all-edge chamfer now follows the same replay path on those source kinds, with
+  treatment history and the current eligible-edge count rebuilt from new
+  topology. Plain full-turn revolve chamfers are rebuilt from the retained
+  profile as exact CAD geometry and currently require exactly one closed
+  profile region; partial-turn, helical, and multi-region revolve chamfers are
+  refused. Revolve setting edits also attempt replay and roll back if the new
+  topology cannot accept the treatment. Selected-edge treatments, non-45°
+  chamfers, multiple treatment steps, draft/treatment combinations, and
+  treatments on other source operation types remain unsupported.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph. A drafted extrusion with

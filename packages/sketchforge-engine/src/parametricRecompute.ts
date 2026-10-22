@@ -1,5 +1,5 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { applyEdgeTreatment, shapeEdges, shapeWithCadResult } from "./serverCadOperations.js";
+import { allEdgeTreatmentEdgeCount, applyEdgeTreatment, shapeWithCadResult } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -23,37 +23,48 @@ function appliedFrame(shape: WorkplaneShape) {
   };
 }
 
-/** Replay one explicitly all-edge fillet on rebuilt source geometry without carrying transient edge indexes forward. */
-export async function replayAllEdgeFillet(
+/** Replay one supported all-edge treatment on rebuilt source geometry without carrying transient edge indexes forward. */
+export async function replaySingleAllEdgeTreatment(
   original: WorkplaneShape,
   rebuilt: WorkplaneShape,
 ): Promise<WorkplaneShape> {
   const features = original.edgeTreatments ?? [];
   const history = original.edgeTreatmentHistory ?? [];
   if (features.length === 0 && history.length === 0) return rebuilt;
-  if (original.draftPrismAngle !== undefined) {
-    throw new Error("A draft prism with an edge treatment cannot yet be recomputed safely.");
+  if (original.draftPrismAngle !== undefined || original.faceDraft !== undefined) {
+    throw new Error("A draft cannot yet be recomputed with an edge treatment safely.");
   }
+  const feature = features[0];
+  const historyFeature = history[0]?.feature;
   if (features.length !== 1 || history.length !== 1
-    || features[0]?.kind !== "fillet" || features[0].allEdges !== true
-    || history[0]?.feature.kind !== "fillet" || history[0].feature.allEdges !== true
-    || history[0].feature.amount !== features[0].amount) {
+    || !feature || !historyFeature
+    || feature.allEdges !== true || historyFeature.allEdges !== true
+    || historyFeature.kind !== feature.kind
+    || historyFeature.amount !== feature.amount
+    || (feature.kind === "chamfer" && feature.chamferAngle !== undefined && Math.abs(feature.chamferAngle - 45) >= 0.001)
+    || (historyFeature.kind === "chamfer" && historyFeature.chamferAngle !== undefined && Math.abs(historyFeature.chamferAngle - 45) >= 0.001)
+    || (feature.kind === "chamfer" && historyFeature.chamferAngle !== undefined && feature.chamferAngle !== undefined
+      && Math.abs(historyFeature.chamferAngle - feature.chamferAngle) >= 0.001)) {
     throw new Error("This source edit cannot safely replay its selected-edge treatments.");
   }
 
-  const previousFeature = features[0];
-  const result = await applyEdgeTreatment(rebuilt, { kind: "fillet", amount: previousFeature.amount });
+  const previousFeature = feature;
+  const result = await applyEdgeTreatment(rebuilt, {
+    kind: previousFeature.kind,
+    amount: previousFeature.amount,
+    ...(previousFeature.kind === "chamfer" ? { angle: previousFeature.chamferAngle ?? 45 } : {}),
+  });
   const treated = shapeWithCadResult(rebuilt, result);
-  const feature = {
+  const replayedFeature = {
     ...previousFeature,
-    edgeCount: (await shapeEdges(rebuilt)).filter((edge) => edge.filletable).length,
+    edgeCount: await allEdgeTreatmentEdgeCount(rebuilt, previousFeature.kind),
   };
   const before = structuredClone(rebuilt);
   const entry = history[0];
   return {
     ...treated,
-    edgeTreatments: [feature],
-    edgeTreatmentHistory: [{ ...entry, feature, before, appliedFrame: appliedFrame(treated) }],
+    edgeTreatments: [replayedFeature],
+    edgeTreatmentHistory: [{ ...entry, feature: replayedFeature, before, appliedFrame: appliedFrame(treated) }],
   };
 }
 
