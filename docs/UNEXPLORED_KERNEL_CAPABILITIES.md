@@ -80,7 +80,10 @@ These are implemented and should not be filed as missing features:
   matching evidence, original source frame, and resized revolve scale. Source edits replay that draft
   only when exactly one planar face matches; missing or ambiguous matches and
   failed dependent booleans roll back atomically. Partial-turn, helical, and
-  multi-region revolve drafts are refused. A plain single-region full-turn
+  multi-region revolve drafts are refused. A draft on an extrusion nested in
+  a retained boolean group survives `.skf` round trip and replays after a
+  source-profile edit while preserving the group ID and committing one atomic
+  write. A plain single-region full-turn
   sketch revolve may retain one face draft followed by either one symmetric
   45° all-edge chamfer or one all-edge fillet; profile and setting edits replay
   source, draft, then treatment atomically. Adding a second treatment, a prism
