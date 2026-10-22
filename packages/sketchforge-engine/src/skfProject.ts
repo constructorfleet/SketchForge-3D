@@ -8,7 +8,7 @@ import { canonicalizeShape } from "./workplaneShapes.js";
 import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvg } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
-import { cadSketchRegions } from "./sketchCadProfile.js";
+import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -1218,6 +1218,34 @@ function validateShapeDefinition(
       && historyFeature.amount === treatment.amount
       && historyFeature.edgeCount === treatment.edgeCount
     );
+    let isPersistedSweepDraftFillet = false;
+    if (definition.sketchOperation === "sweep" && definition.sketchProfile !== undefined) {
+      try {
+        const { sections, spine } = cadSketchSweepPaths(definition.sketchProfile as SketchProfile);
+        isPersistedSweepDraftFillet = Boolean(
+          sections.length === 1
+          && sections[0]?.holes.length === 0
+          && spine.steps.length > 0
+          && definition.draftPrismAngle === undefined
+          && treatments.length === 1
+          && treatment?.kind === "fillet"
+          && treatment.allEdges === true
+          && treatment.edges === undefined
+          && typeof treatment.amount === "number"
+          && Number.isFinite(treatment.amount)
+          && treatment.amount > 0
+          && Number.isInteger(treatment.edgeCount)
+          && (treatment.edgeCount as number) > 0
+          && history.length === 1
+          && historyFeature?.kind === "fillet"
+          && historyFeature.allEdges === true
+          && historyFeature.amount === treatment.amount
+          && historyFeature.edgeCount === treatment.edgeCount
+        );
+      } catch {
+        isPersistedSweepDraftFillet = false;
+      }
+    }
     if (
       kind !== "mesh"
       || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep" && !plainFullTurnRevolve)
@@ -1226,7 +1254,7 @@ function validateShapeDefinition(
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
       || (treatments.length > 0 || options.hasEdgeTreatmentHistory)
-        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet
+        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet && !isPersistedSweepDraftFillet
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }

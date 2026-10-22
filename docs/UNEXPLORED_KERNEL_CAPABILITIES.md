@@ -83,9 +83,12 @@ These are implemented and should not be filed as missing features:
   multi-region revolve drafts are refused. A draft on an extrusion nested in
   a retained boolean group survives `.skf` round trip and replays after a
   source-profile edit while preserving the group ID and committing one atomic
-  write. A single-loop sketch extrusion may retain one all-edge fillet after
-  one face draft; `.skf` round trips preserve the sequence and source-profile
-  edits replay the draft before the fillet atomically. A plain single-region full-turn
+  write. A single-loop sketch extrusion or a single-section, no-hole sketch
+  sweep may retain one all-edge fillet after one face draft; `.skf` round trips
+  preserve the sequence and source-profile edits replay the draft before the
+  fillet atomically. Sweep drafts with multiple sections or section holes,
+  chamfers, selected-edge treatments, and additional treatments remain refused.
+  A plain single-region full-turn
   sketch revolve may retain one face draft followed by either one symmetric
   45° all-edge chamfer or one all-edge fillet; profile and setting edits replay
   source, draft, then treatment atomically. Adding a second treatment, a prism
@@ -105,7 +108,11 @@ These are implemented and should not be filed as missing features:
   receives fresh face IDs and drops face colors because old faces cannot be
   assumed to correspond to the new profile. One supported all-edge fillet or
   symmetric 45° chamfer is replayed against rebuilt topology; unsupported or
-  ambiguous treatment histories fail the edit atomically.
+  ambiguous treatment histories fail the edit atomically. A single-section,
+  no-hole sweep may also retain one face draft followed by one all-edge fillet;
+  its `.skf` representation and source-profile edits replay sweep, draft, then
+  fillet, while multiple treatments and ambiguous source faces fail without a
+  project write.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the
