@@ -11,10 +11,14 @@ owner: "Contributors"
 
 ## Unreleased
 
+- `POST /imports` now documents and validates both base64 JSON and multipart
+  uploads, its shape/triangle-count/revision response, and reachable JSON
+  errors. The generated OpenAPI subset covers 26 of 32 operations; 6 remain
+  omitted.
 - `POST /patterns` now validates normalized IDs, defaults, integral count limits,
   finite numeric options, its 201 shape-summary response, and reachable errors.
-  The generated OpenAPI subset now covers 25 of 32 registered operations; 7
-  remain omitted.
+  The generated OpenAPI subset covers 26 of 32 registered operations; 6 remain
+  omitted.
 - `POST /explode` now validates trimmed project and shape query IDs, returned
   STEP assembly shape summaries and revision, and reachable errors. The
   generated contract includes its request parameters and response schemas.

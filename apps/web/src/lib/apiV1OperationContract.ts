@@ -23,9 +23,11 @@ export type ApiV1FieldSchema = {
   maxItems?: number;
   uniqueItems?: boolean;
   oneOf?: readonly ApiV1FieldSchema[];
+  anyOf?: readonly ApiV1FieldSchema[];
   not?: ApiV1FieldSchema;
   additionalProperties?: boolean | ApiV1FieldSchema;
   description?: string;
+  format?: string;
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
   items?: ApiV1FieldSchema;
 };
@@ -53,7 +55,7 @@ export type ApiV1Operation = {
     provenance?: { source: readonly string[]; precision: readonly string[] };
     schema?: ApiV1FieldSchema;
   };
-  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody | ApiV1MeasureBetweenRequestBody | { contentType: "application/json"; required: true; schema: ApiV1FieldSchema };
+  requestBody?: ApiV1CreateProjectRequestBody | ApiV1ShapePatchRequestBody | ApiV1MeasureBetweenRequestBody | { contentType?: "application/json"; content?: Readonly<Record<string, ApiV1FieldSchema>>; required: true; schema?: ApiV1FieldSchema };
 };
 
 export type ApiV1CreateProjectRequestBody = {
@@ -288,6 +290,7 @@ const projectOperations = [
 
 export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): boolean {
   if (schema.oneOf && schema.oneOf.filter((candidate) => validateApiV1Schema(value, candidate)).length !== 1) return false;
+  if (schema.anyOf && !schema.anyOf.some((candidate) => validateApiV1Schema(value, candidate))) return false;
   if (schema.not && validateApiV1Schema(value, schema.not)) return false;
   if (schema.nullable && value === null) return true;
   if (schema.enum && !schema.enum.includes(value as string | null)) return false;
@@ -554,7 +557,51 @@ export const API_V1_OPERATIONS = [
       400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema,
     },
   },
-  operation("POST", "/api/v1/imports", "importGeometry"),
+  {
+    ...operation("POST", "/api/v1/imports", "importGeometry", [201, 400, 401, 404, 409, 413, 415, 422, 500, 503], {
+      required: true,
+      content: {
+        "application/json": {
+          type: "object",
+          required: ["fileName"],
+          anyOf: [
+            { type: "object", required: ["data"] },
+            { type: "object", required: ["contents"] },
+          ],
+          properties: {
+            fileName: { type: "string", minimumLength: 1, pattern: "\\S", description: "File name is trimmed, selects the importer, and names the stored asset." },
+            data: { type: "string", minimumLength: 1, description: "Base64-encoded file bytes. Takes precedence over contents when both are sent." },
+            contents: { type: "string", minimumLength: 1, description: "Alias for data; used when data is absent." },
+            mediaType: str,
+          },
+          additionalProperties: true,
+        },
+        "multipart/form-data": {
+          type: "object",
+          required: ["file"],
+          properties: {
+            file: { type: "string", format: "binary", description: "The uploaded model file." },
+            fileName: { type: "string", minimumLength: 1, pattern: "\\S", description: "Optional trimmed importer name override; defaults to the uploaded file name." },
+          },
+          additionalProperties: true,
+        },
+      },
+    }),
+    description: "Imports an STL, OBJ, or SVG file from base64 JSON or multipart form data, stores the source asset, and returns the imported mesh summary.",
+    query: projectQuery,
+    responseSchemas: {
+      201: { type: "object", required: ["shape", "triangles", "revision"], properties: { shape: shapeSummary, triangles: int, revision: num }, additionalProperties: false },
+      400: faceError("invalid_project_id", "invalid_body", "invalid_request"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found"),
+      409: faceError("project_busy"),
+      413: faceError("invalid_request"),
+      415: faceError("unsupported_format"),
+      422: faceError("geometry_failed"),
+      500: faceError("internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+  },
   {
     ...operation("POST", "/api/v1/interference", "analyzeInterference", [200, 400, 401, 404, 409, 422, 500, 503], json({
       type: "object",

@@ -245,9 +245,31 @@ describe("POST /imports", () => {
   it("refuses a body with no file name and one with no bytes", async () => {
     const projectId = await makeProject();
 
-    expect((await jsonImport(projectId, { data: base64(plateStl(10, 10, 10)) })).status).toBe(400);
-    expect((await jsonImport(projectId, { fileName: "plate.stl" })).status).toBe(400);
-    expect((await jsonImport(projectId, { fileName: "plate.stl", data: "" })).status).toBe(400);
+    const noName = await jsonImport(projectId, { data: base64(plateStl(10, 10, 10)) });
+    const noData = await jsonImport(projectId, { fileName: "plate.stl" });
+    const emptyData = await jsonImport(projectId, { fileName: "plate.stl", data: "" });
+    for (const response of [noName, noData, emptyData]) {
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "invalid_body" });
+    }
+  });
+
+  it("returns contract-shaped authentication and project-id errors", async () => {
+    const unauthorized = await importMesh(new Request("http://localhost/api/v1/imports?projectId=project-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: "plate.stl", data: base64(plateStl(10, 10, 10)) }),
+    }));
+    expect(unauthorized.status).toBe(401);
+    expect(await unauthorized.json()).toMatchObject({ code: "unauthorized" });
+
+    const invalidProjectId = await importMesh(new Request("http://localhost/api/v1/imports?projectId=../unsafe", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: "plate.stl", data: base64(plateStl(10, 10, 10)) }),
+    }));
+    expect(invalidProjectId.status).toBe(400);
+    expect(await invalidProjectId.json()).toMatchObject({ code: "invalid_project_id" });
   });
 
   it("reads bytes that are a window onto a larger buffer", async () => {

@@ -178,6 +178,19 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(explode.responses["200"].content["application/json"].schema.properties.shapes.items.required, ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"]);
   assert.deepEqual(explode.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy", "shape_locked"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "explodeAssembly"), false);
+  const imports = spec.paths["/api/v1/imports"].post;
+  assert.equal(imports.operationId, "importGeometry");
+  assert.deepEqual(Object.keys(imports.requestBody.content).sort(), ["application/json", "multipart/form-data"]);
+  assert.deepEqual(imports.requestBody.content["application/json"].schema.required, ["fileName"]);
+  assert.deepEqual(imports.requestBody.content["application/json"].schema.anyOf.map(({ required }) => required), [["data"], ["contents"]]);
+  assert.equal(imports.requestBody.content["application/json"].schema.properties.fileName.pattern, "\\S");
+  assert.equal(imports.requestBody.content["application/json"].schema.properties.data.description, "Base64-encoded file bytes. Takes precedence over contents when both are sent.");
+  assert.deepEqual(imports.requestBody.content["multipart/form-data"].schema.properties.file, { type: "string", format: "binary", description: "The uploaded model file." });
+  assert.deepEqual(imports.requestBody.content["multipart/form-data"].schema.properties.fileName.pattern, "\\S");
+  assert.deepEqual(imports.responses["201"].content["application/json"].schema.required, ["shape", "triangles", "revision"]);
+  assert.deepEqual(Object.keys(imports.responses).sort(), ["201", "400", "401", "404", "409", "413", "415", "422", "500", "503"]);
+  assert.deepEqual(imports.responses["500"].content["application/json"].schema.properties.code.enum, ["internal_error"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "importGeometry"), false);
   for (const [pathName, method, operationId] of [
     ["/api/v1/booleans", "post", "booleanShapes"],
     ["/api/v1/treatments", "post", "treatShape"],
@@ -190,8 +203,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 25);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 7);
+  assert.equal(documentedOperationCount, 26);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 6);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

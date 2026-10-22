@@ -28,6 +28,39 @@ function sourceOperations() {
 type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
 
 describe("REST API v1 operation contract", () => {
+  it("contracts both imports upload encodings, its stable result, and reachable errors", async () => {
+    const key = "POST /api/v1/imports";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "importGeometry",
+      responses: [201, 400, 401, 404, 409, 413, 415, 422, 500, 503],
+      query: { required: ["projectId"] },
+      requestBody: { required: true, content: {
+        "application/json": { type: "object" },
+        "multipart/form-data": { type: "object" },
+      } },
+    });
+
+    const contract = await import("@/lib/apiV1OperationContract");
+    const jsonSchema = operation?.requestBody && "content" in operation.requestBody ? operation.requestBody.content?.["application/json"] : undefined;
+    const multipartSchema = operation?.requestBody && "content" in operation.requestBody ? operation.requestBody.content?.["multipart/form-data"] : undefined;
+    expect(jsonSchema && contract.validateApiV1Schema({ fileName: "part.stl", data: "YWJj" }, jsonSchema)).toBe(true);
+    expect(jsonSchema && contract.validateApiV1Schema({ fileName: "part.stl", contents: "YWJj" }, jsonSchema)).toBe(true);
+    expect(jsonSchema && contract.validateApiV1Schema({ fileName: "part.stl", data: "YWJj", contents: "ZGVm" }, jsonSchema)).toBe(true);
+    expect(jsonSchema && contract.validateApiV1Schema({ fileName: "part.stl" }, jsonSchema)).toBe(false);
+    expect(jsonSchema && contract.validateApiV1Schema({ fileName: "   ", data: "YWJj" }, jsonSchema)).toBe(false);
+    expect(multipartSchema?.properties?.file).toMatchObject({ type: "string", format: "binary" });
+    const result = { shape: { id: "mesh-1", kind: "mesh", name: "Plate", color: "#808080", hole: false, locked: false, hidden: false, x: 0, z: 0, elevation: 0, width: 10, depth: 10, height: 2, rotation: 0, rotationX: 0, rotationZ: 0 }, triangles: 12, revision: 3 };
+    expect(contract.validateApiV1Response(key, 201, result)).toBe(true);
+    expect(contract.validateApiV1Response(key, 201, { ...result, triangles: "12" })).toBe(false);
+    for (const [status, code] of [[400, "invalid_body"], [401, "unauthorized"], [404, "project_not_found"], [409, "project_busy"], [413, "invalid_request"], [415, "unsupported_format"], [422, "geometry_failed"], [503, "storage_unconfigured"]] as const) {
+      expect(contract.validateApiV1Response(key, status, { error: "Failure", code })).toBe(true);
+    }
+    expect(contract.validateApiV1Response(key, 500, { error: "Failure", code: "internal_error" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 500, { error: "Failure", code: "cad_failed" })).toBe(false);
+    expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+  });
+
   it("contracts STEP explosion query, resulting shape summaries, and reachable errors", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const key = "POST /api/v1/explode";
