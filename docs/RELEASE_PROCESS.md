@@ -23,6 +23,18 @@ in that pull request as part of its version bump. Review its version changes and
 generated release notes, then merge that release pull request to publish the
 release.
 
+Release Please authenticates as the repository's release GitHub App, using the
+`APP_ID` and `APP_KEY` secrets, rather than with the default workflow token.
+GitHub starts no workflow run for an event created by its own token, so with
+the default token the release pull request carried no check results and had to
+be approved by hand before any ran. The app is installed on this repository
+alone and holds write access only to contents and pull requests.
+
+Because the tag is pushed by that app, it would also start any workflow with a
+tag trigger. `release.yml` and `desktop-release.yml` are dispatched by
+`release-please.yml` and therefore declare no tag trigger; adding one back
+would publish every release twice.
+
 `docs/CHANGELOG.md` is maintained separately from the generated GitHub release
 notes. Add user-visible changes there as part of their feature or fix pull
 request.
@@ -31,7 +43,7 @@ request.
 
 After Release Please creates the tag and GitHub release, the release workflow
 dispatches the Docker and Python publishing workflow and the desktop installers
-workflow. The Python package uses PyPI trusted publishing; the Docker image is
+workflow. Dispatch is the only path that starts them. The Python package uses PyPI trusted publishing; the Docker image is
 published for the release version. Desktop installers require the signing and
 notarization secrets described in [repository setup](../.github/SETUP.md).
 Check all three workflow runs and the release assets before announcing a

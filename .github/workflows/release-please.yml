@@ -4,10 +4,14 @@ name: Release Please
 # updates a standing release pull request that carries the next version number
 # and the release notes for it; merging that pull request is the release.
 #
-# This workflow then starts the publishing runs itself, because the tag it
-# creates is made with GITHUB_TOKEN and GitHub does not start a workflow run
-# for a push it made on a workflow's behalf. Both are dispatched rather than
-# called: see the comment on the artifacts job.
+# release-please runs as a GitHub App rather than with GITHUB_TOKEN. GitHub
+# starts no workflow run for an event its own token created, so with the
+# default token the standing release pull request was never checked by CI.
+#
+# The same identity means the tag release-please pushes now does start runs.
+# release.yml and desktop-release.yml are therefore dispatched here and carry
+# no tag trigger of their own -- otherwise every release would publish twice.
+# Both are dispatched rather than called: see the comment on the artifacts job.
 on:
   push:
     branches:
@@ -26,9 +30,17 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Mint a token for the release app
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_KEY }}
+
       - uses: googleapis/release-please-action@v4
         id: release
         with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
