@@ -230,7 +230,7 @@ jobs:
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
           test "$(jq -r '.state' <<< "$pr")" = open
           test "$(jq -r '.head.sha' <<< "$pr")" = "$EXPECTED_SHA"
-          test "$(jq -r '.title' <<< "$pr" | base64 -w0)" = "$EXPECTED_TITLE_B64"
+          test "$(jq -rj '.title' <<< "$pr" | base64 -w0)" = "$EXPECTED_TITLE_B64"
           printf '%s' "$EXPECTED_TITLE_B64" | base64 -d > "$RUNNER_TEMP/pr-title"
       - name: Check conventional title
         env:
