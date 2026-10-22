@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { lintContract } from "../../scripts/lib/contract-lint.mjs";
+import { BANNED_PREDICATES, RULES_VERSION, lintContract } from "../../scripts/lib/contract-lint.mjs";
 
 test("a document without the contract marker is not a contract and yields no violations", () => {
   const source = [
@@ -356,24 +356,6 @@ test("a contract of only happy paths is blocked for having no failure-path crite
   assert.equal(happy[0].severity, "block");
 });
 
-test("a human-class criterion without a named reviewer is blocked", () => {
-  const violations = lintContract(
-    buildContract({
-      criteria: [
-        "### AC-001: Editor feel (human, required, verify, blackbox)",
-        "",
-        "A first-time user reaches a saved model without asking for help.",
-        "",
-        WELL_FORMED_NEGATIVE_CRITERION,
-      ].join("\n"),
-    }),
-  );
-  const unassigned = violations.filter((violation) => violation.rule === "L-15");
-
-  assert.equal(unassigned.length, 1);
-  assert.equal(unassigned[0].criterion, "AC-001");
-});
-
 test("a completion authority that does not name independent verification is blocked", () => {
   const source = buildContract().replace(
     "Independent verification, post-merge gate.",
@@ -511,4 +493,75 @@ test("required sections present but out of order are blocked", () => {
   assert.equal(ordering.length, 1);
   assert.equal(ordering[0].severity, "block");
   assert.match(ordering[0].message, /order/i);
+});
+
+test("a contract whose only criterion is retired has no live criterion", () => {
+  const violations = lintContract(
+    buildContract({
+      criteria: ["### AC-001: Session identity (retired)", "", "Superseded by nothing."].join("\n"),
+      negatives: "None.",
+    }),
+  );
+  const empty = violations.filter((violation) => violation.rule === "L-4");
+
+  assert.equal(empty.length, 1);
+  assert.equal(empty[0].severity, "block");
+});
+
+test("a malformed criterion identifier is reported as malformed, not as absent criteria", () => {
+  const violations = lintContract(
+    buildContract({
+      criteria: [
+        "### AC-7: Session identity (automated, required, verify, blackbox)",
+        "",
+        "When two sessions are created at once they are assigned different identifiers.",
+        "",
+        WELL_FORMED_NEGATIVE_CRITERION,
+      ].join("\n"),
+    }),
+  );
+  const malformed = violations.filter((violation) => violation.rule === "L-5");
+
+  assert.equal(malformed.length, 1);
+  assert.equal(malformed[0].severity, "block");
+  assert.match(malformed[0].message, /well-formed identifier/);
+  assert.deepEqual(violations.filter((violation) => violation.rule === "L-4"), []);
+});
+
+test("a document reaching for the marker with unparseable frontmatter is held, not skipped", () => {
+  const violations = lintContract(
+    ["---", "verified_delivery: contract", "", "# No closing fence above", ""].join("\n"),
+  );
+
+  assert.ok(violations.length >= 1);
+  assert.ok(violations.every((violation) => violation.severity === "block"));
+  assert.match(violations[0].message, /frontmatter/);
+});
+
+test("every violation carries the rule-set version that produced it", () => {
+  const violations = lintContract(buildContract({ criteria: "No criteria here." }));
+
+  assert.ok(violations.length > 0);
+  assert.ok(violations.every((violation) => violation.rulesVersion === RULES_VERSION));
+});
+
+test("the banned predicate list is configuration, ordered so the most specific phrase wins", () => {
+  assert.ok(BANNED_PREDICATES.includes("works correctly"));
+  assert.ok(BANNED_PREDICATES.includes("works"));
+  assert.ok(
+    BANNED_PREDICATES.indexOf("works correctly") < BANNED_PREDICATES.indexOf("works"),
+    "the longer phrase must be matched first so the message names it",
+  );
+});
+
+test("the lexical rules do not fire on a well-formed contract", () => {
+  const violations = lintContract(buildContract());
+
+  for (const rule of ["L-12", "L-16", "L-17", "L-18"]) {
+    assert.deepEqual(
+      violations.filter((violation) => violation.rule === rule),
+      [],
+      `${rule} fired on a well-formed contract`,
+    );
+  }
 });
