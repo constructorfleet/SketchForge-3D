@@ -6,6 +6,7 @@ import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforg
 import { applyEdgeTreatment, applySketchFaceDraft, shapeWithCadResult } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
+import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
@@ -93,6 +94,28 @@ async function persistAllEdgeFillet(
     ...treated,
     edgeTreatments: [feature],
     edgeTreatmentHistory: [{ id: `all-edge-fillet-${shapeId}`, createdAt: 1, feature, before: source }],
+  };
+  const after = await store.read(projectId);
+  const index = after!.shapes.findIndex((shape) => shape.id === shapeId);
+  after!.shapes[index] = persisted;
+  return persisted;
+}
+
+async function persistAllEdgeChamfer(
+  engine: ReturnType<typeof createEngine>,
+  store: ProjectStore,
+  projectId: string,
+  shapeId: string,
+  amount = 0.1,
+) {
+  const before = await store.read(projectId);
+  const source = before!.shapes.find((shape) => shape.id === shapeId)!;
+  const treated = value(await engine.treat(projectId, shapeId, { kind: "chamfer", amount })).shape;
+  const feature = { kind: "chamfer" as const, amount, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
+  const persisted = {
+    ...treated,
+    edgeTreatments: [feature],
+    edgeTreatmentHistory: [{ id: `all-edge-chamfer-${shapeId}`, createdAt: 1, feature, before: source }],
   };
   const after = await store.read(projectId);
   const index = after!.shapes.findIndex((shape) => shape.id === shapeId);
@@ -370,6 +393,25 @@ describe("dependency-ordered feature recomputation", () => {
     expect(value(await engine.project("recompute")).shapes).toEqual(beforeInvalidReplay.shapes);
   });
 
+  it("replays one symmetric all-edge chamfer after editing a retained sketch sweep", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Chamfered sweep", profile: profile() }]));
+    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = profile(1.5);
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", amount: 0.1, chamferAngle: 45, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(updated.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(updated.edgeTreatments?.[0]?.edgeCount);
+    expect(updated.cadBrep).not.toBe(updated.edgeTreatmentHistory?.[0]?.before.cadBrep);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  });
+
   it("replays an all-edge fillet after editing a retained sketch revolve", async () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);
@@ -397,6 +439,130 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.01, allEdges: true });
     expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays one symmetric all-edge chamfer after editing a retained sketch revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }]));
+    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = {
+      ...source.sketchProfile!,
+      points: source.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.25 })),
+    };
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", amount: 0.1, chamferAngle: 45, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(updated.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(updated.edgeTreatments?.[0]?.edgeCount);
+    expect(updated.cadBrep).toBeTruthy();
+    expect(updated.cadBrep).not.toBe(updated.edgeTreatmentHistory?.[0]?.before.cadBrep);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays an all-edge chamfer on a hollow single-region sketch revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Hollow chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }])).shapes[0]!;
+    const source = value(await engine.changeShape("recompute", created.sketchSourceId!, {
+      sketchProfile: {
+        ...created.sketchProfile!,
+        points: [...created.sketchProfile!.points,
+          { id: "hole-a", x: -6, z: -3 }, { id: "hole-b", x: -6, z: 3 },
+          { id: "hole-c", x: -9, z: 3 }, { id: "hole-d", x: -9, z: -3 }],
+        segments: [...created.sketchProfile!.segments,
+          { id: "hole-ab", startId: "hole-a", endId: "hole-b" },
+          { id: "hole-bc", startId: "hole-b", endId: "hole-c" },
+          { id: "hole-cd", startId: "hole-c", endId: "hole-d" },
+          { id: "hole-da", startId: "hole-d", endId: "hole-a" }],
+      },
+    })).shape;
+    expect(source.sketchProfile?.points).toHaveLength(8);
+    expect(source.sketchProfile?.segments).toHaveLength(8);
+    expect(source.sketchOperation).toBe("revolve");
+    expect(source.sketchRevolve?.sweepAngle).toBe(360);
+    expect(sketchProfileToRevolvePolygons(source.sketchProfile!, source.sketchRevolve)).toHaveLength(2);
+    const treated = await persistAllEdgeChamfer(engine, store, "recompute", source.id, 0.05);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = {
+      ...treated.sketchProfile!,
+      points: treated.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.05 })),
+    };
+
+    const changed = await engine.changeShape("recompute", treated.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", amount: 0.05, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(updated.cadBrep).toBeTruthy();
+    const faces = await shapeFaces(updated);
+    expect(faces.filter((face) => face.surfaceType === "cylinder").length).toBeGreaterThanOrEqual(4);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("rolls back an all-edge chamfer replay when a revolve edit changes it to a partial turn", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }]));
+    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const beforeEdit = value(await engine.project("recompute")).shapes;
+    const writesBeforeEdit = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, {
+      sketchProfile: {
+        ...source.sketchProfile!,
+        points: source.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.1 })),
+      },
+      sweepAngle: 180,
+    });
+
+    expect(changed.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeEdit);
+    expect(value(await engine.project("recompute")).shapes).toEqual(beforeEdit);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses an all-edge chamfer replay for a multi-region sketch revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }]));
+    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const beforeEdit = value(await engine.project("recompute")).shapes;
+    const writesBeforeEdit = writeCount();
+    const addedPoints = [
+      { id: "extra-a", x: -15, z: -5 }, { id: "extra-b", x: -12, z: -5 },
+      { id: "extra-c", x: -12, z: 5 }, { id: "extra-d", x: -15, z: 5 },
+    ];
+    const addedSegments = [
+      { id: "extra-ab", startId: "extra-a", endId: "extra-b" },
+      { id: "extra-bc", startId: "extra-b", endId: "extra-c" },
+      { id: "extra-cd", startId: "extra-c", endId: "extra-d" },
+      { id: "extra-da", startId: "extra-d", endId: "extra-a" },
+    ];
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, {
+      sketchProfile: {
+        ...source.sketchProfile!,
+        points: [...source.sketchProfile!.points, ...addedPoints],
+        segments: [...source.sketchProfile!.segments, ...addedSegments],
+      },
+    });
+
+    expect(changed.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeEdit);
+    expect(value(await engine.project("recompute")).shapes).toEqual(beforeEdit);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("rolls back a revolve setting edit when its all-edge fillet cannot be replayed", async () => {
@@ -626,6 +792,123 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.cadBrep).not.toBe(rawRebuild.cadBrep);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
   });
+
+  it("replays one retained symmetric all-edge chamfer after editing a sketch extrusion source", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Chamfered extrusion", width: 2, depth: 2, height: 3 },
+    ])).shapes[0]!;
+    const document = await store.read("recompute");
+    const source: WorkplaneShape = {
+      ...document!.shapes[0]!,
+      sketchOperation: "extrude",
+      sketchProfile: extrusionProfile(),
+      sketchSourceId: "sketch/chamfered-extrusion",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    };
+    document!.shapes[0] = source;
+    const treated = value(await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.2 })).shape;
+    const feature = { kind: "chamfer" as const, amount: 0.2, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
+    document!.shapes[0] = {
+      ...treated,
+      edgeTreatments: [feature],
+      edgeTreatmentHistory: [{ id: "all-edge-chamfer", createdAt: 1, feature, before: source }],
+    };
+    const writesBeforeEdit = writeCount();
+    const changedProfile = extrusionProfile(2);
+    const rawRebuild = await sketchExtrusionShapeFromRequest({
+      id: source.id,
+      sketchSourceId: source.sketchSourceId!,
+      name: source.name,
+      color: source.color,
+      profile: changedProfile,
+      height: source.height,
+      x: source.x,
+      z: source.z,
+      elevation: source.elevation,
+    });
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments).toEqual([feature]);
+    expect(updated.edgeTreatmentHistory).toHaveLength(1);
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(updated.edgeTreatmentHistory?.[0]?.feature.allEdges).toBe(true);
+    expect(updated.cadBrep).not.toBe(rawRebuild.cadBrep);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  });
+
+  it("does not persist a source edit when an all-edge chamfer cannot be replayed", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{ kind: "box", name: "Chamfered extrusion", width: 2, depth: 2, height: 3 }])).shapes[0]!;
+    const document = await store.read("recompute");
+    const source: WorkplaneShape = {
+      ...document!.shapes[0]!,
+      sketchOperation: "extrude",
+      sketchProfile: extrusionProfile(),
+      sketchSourceId: "sketch/rollback-chamfered-extrusion",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    };
+    document!.shapes[0] = source;
+    const treated = value(await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.2 })).shape;
+    const feature = { kind: "chamfer" as const, amount: 0.2, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
+    const persisted = {
+      ...treated,
+      edgeTreatments: [feature],
+      edgeTreatmentHistory: [{ id: "all-edge-chamfer", createdAt: 1, feature, before: source }],
+    };
+    document!.shapes[0] = persisted;
+    const writesBeforeEdit = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: extrusionProfile(0.05) });
+
+    expect(changed.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeEdit);
+    expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
+  });
+
+  it.each(["selected-edge", "multiple", "non-45"] as const)(
+    "refuses %s chamfer history when replaying an edited sketch extrusion",
+    async (unsupported) => {
+      const { store, writeCount } = projectStore();
+      const engine = createEngine(store);
+      const created = value(await engine.addShapes("recompute", [{ kind: "box", name: "Treated extrusion", width: 2, depth: 2, height: 3 }])).shapes[0]!;
+      const document = await store.read("recompute");
+      const source: WorkplaneShape = {
+        ...document!.shapes[0]!,
+        sketchOperation: "extrude",
+        sketchProfile: extrusionProfile(),
+        sketchSourceId: `sketch/unsupported-${unsupported}`,
+        cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+      };
+      const validFeature = { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
+      const unsupportedFeature = unsupported === "non-45"
+        ? { ...validFeature, chamferAngle: 30 }
+        : unsupported === "selected-edge"
+          ? { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 1 }
+          : { ...validFeature, amount: 0.2 };
+      const features = unsupported === "multiple" ? [validFeature, unsupportedFeature] : [unsupportedFeature];
+      const histories = features.map((feature, index) => ({
+        id: `unsupported-${unsupported}-${index}`,
+        createdAt: index + 1,
+        feature,
+        before: source,
+      }));
+      const persisted: WorkplaneShape = { ...source, edgeTreatments: features, edgeTreatmentHistory: histories };
+      document!.shapes[0] = persisted;
+      const writesBeforeEdit = writeCount();
+
+      const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: extrusionProfile(2) });
+
+      expect(changed.ok).toBe(false);
+      expect(writeCount()).toBe(writesBeforeEdit);
+      expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
+    },
+  );
 
   it("does not persist a source edit when the all-edge fillet cannot be replayed", async () => {
     const { store, writeCount } = projectStore();

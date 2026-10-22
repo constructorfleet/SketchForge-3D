@@ -27,7 +27,9 @@ import {
 } from "./cadSolids.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
 import { createLocalId } from "./localIds.js";
-import type { WorkplaneShape } from "./domain/sketchforge.js";
+import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
+import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
+import { sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 
 export type ServerCadEdge = {
   index: number;
@@ -389,7 +391,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
   }
 
   return withCadKernel((cad) => {
-    const solid = orientedSolidForShape(cad, shape);
+    const solid = edgeTreatmentSolid(cad, shape, treatment);
     const allEdges = cad.getSubShapes(solid, "edge");
     const requested = treatment.edges;
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
@@ -444,6 +446,70 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
 
     return meshedCadResult(cad, result, shape, evolution ? { sourceFaceHashes, evolution } : undefined);
   });
+}
+
+/** Count currently chamferable/filletable edges without preserving topology indexes. */
+export function allEdgeTreatmentEdgeCount(shape: WorkplaneShape, kind: ServerCadTreatment["kind"]): Promise<number> {
+  return withCadKernel((cad) => {
+    const solid = edgeTreatmentSolid(cad, shape, { kind, amount: 1 });
+    return cad.getSubShapes(solid, "edge").filter((edge) => adjacentFaceCount(cad, solid, edge) >= 2).length;
+  });
+}
+
+function edgeTreatmentSolid(cad: OcctKernel, shape: WorkplaneShape, treatment: ServerCadTreatment) {
+  if (treatment.kind === "chamfer" && !treatment.edges?.length
+    && shape.sketchOperation === "revolve" && shape.sketchProfile) {
+    return exactPlainSketchRevolveSolid(cad, shape.sketchProfile, shape.sketchRevolve);
+  }
+  return orientedSolidForShape(cad, shape);
+}
+
+/** Build the analytical full-turn BREP for chamfering a retained plain revolve. */
+function exactPlainSketchRevolveSolid(
+  cad: OcctKernel,
+  sketchProfile: SketchProfile,
+  sketchRevolve: WorkplaneShape["sketchRevolve"],
+) {
+  if (!sketchRevolve || sketchRevolve.pitch !== 0 || sketchRevolve.coreRadius !== 0
+    || Math.abs(Math.abs(sketchRevolve.sweepAngle) - 360) > 1e-6) {
+    throw new ServerCadError("All-edge chamfer replay currently requires a plain full-turn sketch revolve.");
+  }
+  const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
+  if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region to chamfer.");
+  const profile: SketchProfile = {
+    points: polygons.flatMap((polygon, polygonIndex) => polygon.map(([x, z], pointIndex) => ({
+      id: `revolve-${polygonIndex}-point-${pointIndex}`,
+      x,
+      z,
+    }))),
+    segments: polygons.flatMap((polygon, polygonIndex) => polygon.map((_, pointIndex) => ({
+      id: `revolve-${polygonIndex}-segment-${pointIndex}`,
+      startId: `revolve-${polygonIndex}-point-${pointIndex}`,
+      endId: `revolve-${polygonIndex}-point-${(pointIndex + 1) % polygon.length}`,
+      kind: "line" as const,
+    }))),
+  };
+  const pathWire = (path: OrderedCadSketchPath) => cad.makeWire(path.steps.map(({ from, to }) => cad.makeLineEdge(
+    { x: from.x, y: from.z, z: 0 },
+    { x: to.x, y: to.z, z: 0 },
+  )));
+  const regions = cadSketchRegions(profile);
+  if (regions.length !== 1) throw new ServerCadError("All-edge chamfer replay currently requires one closed revolve profile region.");
+  const solids = regions.map((region) => {
+    let face = cad.makeFace(pathWire(region.outer));
+    if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map(pathWire));
+    const solid = cad.revolve(face, {
+      point: { x: 0, y: 0, z: 0 },
+      direction: { x: 0, y: 1, z: 0 },
+    }, Math.PI * 2);
+    return Math.abs(sketchRevolve.startAngle) < 1e-8 ? solid : cad.rotate(solid, {
+      point: { x: 0, y: 0, z: 0 },
+      direction: { x: 0, y: 1, z: 0 },
+    }, (sketchRevolve.startAngle * Math.PI) / 180);
+  });
+  const solid = solids[0]!;
+  if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new ServerCadError("The retained sketch revolve could not be rebuilt as exact CAD geometry.");
+  return solid;
 }
 
 /**
