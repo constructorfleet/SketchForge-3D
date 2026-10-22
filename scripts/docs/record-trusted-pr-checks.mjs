@@ -44,7 +44,8 @@ async function main() {
   if (!token) throw new Error("Missing GITHUB_TOKEN");
   const title = Buffer.from(required("EXPECTED_TITLE_B64"), "base64").toString("utf8");
   const pr = await apiRequest(repo, `pulls/${prNumber}`);
-  if (pr.state !== "open" || pr.head?.repo?.full_name !== repo || pr.base?.repo?.full_name !== repo
+  const openOrMerged = pr.state === "open" || (pr.state === "closed" && pr.merged === true);
+  if (!openOrMerged || pr.head?.repo?.full_name !== repo || pr.base?.repo?.full_name !== repo
     || pr.base?.ref !== defaultBranch || pr.head?.ref === defaultBranch || pr.head?.sha !== expectedSha || pr.title !== title) {
     console.log(`Trusted PR checks not recorded: pull request #${prNumber} is closed, changed, or no longer matches expected SHA/title/base.`);
     return;

@@ -19,7 +19,7 @@ jobs:
       title_b64: ${{ steps.target.outputs.title_b64 }}
       default_branch: ${{ steps.target.outputs.default_branch }}
     steps:
-      - name: Validate dispatch against the live same-repository PR
+      - name: Validate dispatch against the live same-repository PR or its completed merge
         id: target
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,7 +32,12 @@ jobs:
           if ! [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]; then echo "Invalid expected SHA" >&2; exit 1; fi
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
           default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
-          test "$(jq -r '.state' <<< "$pr")" = open
+          state=$(jq -r '.state' <<< "$pr")
+          merged=$(jq -r '.merged' <<< "$pr")
+          if [[ "$state" != open && ! ( "$state" == closed && "$merged" == true ) ]]; then
+            echo "Pull request is neither open nor merged" >&2
+            exit 1
+          fi
           test "$(jq -r '.head.repo.full_name' <<< "$pr")" = "$REPOSITORY"
           test "$(jq -r '.base.repo.full_name' <<< "$pr")" = "$REPOSITORY"
           test "$(jq -r '.base.ref' <<< "$pr")" = "$default_branch"
@@ -218,7 +223,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate the live PR title
+      - name: Validate the live PR title, including an already-merged PR
         env:
           PR_NUMBER: ${{ needs.validate-target.outputs.pr_number }}
           EXPECTED_SHA: ${{ needs.validate-target.outputs.expected_sha }}
@@ -228,7 +233,12 @@ jobs:
         run: |
           set -euo pipefail
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
-          test "$(jq -r '.state' <<< "$pr")" = open
+          state=$(jq -r '.state' <<< "$pr")
+          merged=$(jq -r '.merged' <<< "$pr")
+          if [[ "$state" != open && ! ( "$state" == closed && "$merged" == true ) ]]; then
+            echo "Pull request is neither open nor merged" >&2
+            exit 1
+          fi
           test "$(jq -r '.head.sha' <<< "$pr")" = "$EXPECTED_SHA"
           test "$(jq -rj '.title' <<< "$pr" | base64 -w0)" = "$EXPECTED_TITLE_B64"
           printf '%s' "$EXPECTED_TITLE_B64" | base64 -d > "$RUNNER_TEMP/pr-title"
