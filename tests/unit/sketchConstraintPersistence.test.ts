@@ -19,6 +19,7 @@ const sketch: WorkplaneShape = {
       { id: "v", kind: "vertical", segmentId: "line" },
       { id: "p", kind: "perpendicular", segmentIds: ["line", "other"] },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
+      { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
     ],
   },
 };
@@ -31,4 +32,19 @@ it("round-trips sketch constraints in the native project format", async () => {
   });
   const restored = await importSkfProject(bytes);
   expect(restored.shapes[0]?.sketchProfile?.constraints).toEqual(sketch.sketchProfile?.constraints);
+});
+
+it("rejects fixed-point constraints with invalid coordinates or missing points", async () => {
+  for (const fixed of [
+    { id: "fixed-a", kind: "fixed", pointId: "missing", xMm: 0, zMm: 0 },
+    { id: "fixed-a", kind: "fixed", pointId: "a", xMm: Number.NaN, zMm: 0 },
+  ]) {
+    const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, constraints: [fixed as never] } };
+    const bytes = await exportSkfProject({
+      projectName: "Invalid fixed constraint", createdAt: 1, modifiedAt: 1, shapes: [invalid],
+      history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [],
+      workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0,
+    });
+    await expect(importSkfProject(bytes)).rejects.toThrow();
+  }
 });

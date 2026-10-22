@@ -60,6 +60,10 @@ function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, st
 }
 
 function residual(constraint: SketchConstraint, profile: SketchProfile, points: Map<string, SketchPoint>) {
+  if (constraint.kind === "fixed") {
+    const point = points.get(constraint.pointId);
+    return point ? Math.max(Math.abs(point.x - constraint.xMm), Math.abs(point.z - constraint.zMm)) : Number.POSITIVE_INFINITY;
+  }
   if (constraint.kind === "perpendicular") {
     const pair = segmentPair(constraint.segmentIds, profile);
     const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
@@ -103,6 +107,7 @@ function equationRows(
   };
 
   for (const constraint of constraints) {
+    if (constraint.kind === "fixed") continue;
     if (constraint.kind === "perpendicular") {
       const pair = segmentPair(constraint.segmentIds, profile);
       const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
@@ -253,7 +258,7 @@ function breakCollinearDistanceDegeneracy(
     } else if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (segment) connect(segment.startId, segment.endId);
-    } else {
+    } else if (constraint.kind !== "fixed") {
       connect(constraint.pointIds[0], constraint.pointIds[1]);
     }
   }
@@ -305,8 +310,10 @@ function breakCollinearDistanceDegeneracy(
 export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds: readonly string[] = []): SketchConstraintSolveResult {
   const constraints = profile.constraints ?? [];
   if (!constraints.length) return { profile, unsatisfiedConstraintIds: [] };
-  const anchors = new Set(anchoredPointIds);
+  const fixedPointConstraints = constraints.filter((constraint) => constraint.kind === "fixed");
+  const anchors = new Set([...anchoredPointIds, ...fixedPointConstraints.map((constraint) => constraint.pointId)]);
   const constrainedPointIds = new Set(constraints.flatMap((constraint) => {
+    if (constraint.kind === "fixed") return [constraint.pointId];
     if (constraint.kind === "perpendicular") return constraint.segmentIds.flatMap((id) => {
       const segment = profile.segments.find(({ id: candidate }) => candidate === id);
       return segment ? [segment.startId, segment.endId] : [];
@@ -323,6 +330,14 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
   }
   const variableCount = variableIndex.size * 2;
   let points = new Map(profile.points.map((point) => [point.id, point]));
+  const initializedFixedPointIds = new Set<string>();
+  for (const constraint of fixedPointConstraints) {
+    const point = points.get(constraint.pointId);
+    if (point && !initializedFixedPointIds.has(point.id)) {
+      points.set(point.id, movePoint(point, constraint.xMm, constraint.zMm));
+      initializedFixedPointIds.add(point.id);
+    }
+  }
   let damping = INITIAL_DAMPING;
   let currentEquations = equationRows(constraints, profile, points, variableIndex);
   let currentObjective = objective(currentEquations);
@@ -410,7 +425,8 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
 export function sketchConstraintsForProfile(profile: SketchProfile) {
   const pointIds = new Set(profile.points.map((point) => point.id));
   const segmentIds = new Set(profile.segments.map((segment) => segment.id));
-  return (profile.constraints ?? []).filter((constraint) => constraint.kind === "horizontal" || constraint.kind === "vertical"
+  return (profile.constraints ?? []).filter((constraint) => constraint.kind === "fixed" ? pointIds.has(constraint.pointId)
+    : constraint.kind === "horizontal" || constraint.kind === "vertical"
     ? segmentIds.has(constraint.segmentId)
     : constraint.kind === "perpendicular" ? constraint.segmentIds.every((id) => segmentIds.has(id))
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
@@ -428,10 +444,19 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
   const pointIndex = new Map(profile.points.map((point, index) => [point.id, index * 2]));
   const parameterCount = profile.points.reduce((count, point) => count + 2
     + (point.handleIn ? 2 : 0) + (point.handleOut ? 2 : 0) + (point.sweepDepth !== undefined ? 1 : 0), 0);
-  const equationCount = constraints.reduce((count, constraint) => count + (constraint.kind === "coincident" ? 2 : 1), 0);
+  const equationCount = constraints.reduce((count, constraint) => count + (constraint.kind === "fixed" || constraint.kind === "coincident" ? 2 : 1), 0);
   const rows: number[][] = [];
 
   for (const constraint of constraints) {
+    if (constraint.kind === "fixed") {
+      const anchorIndex = pointIndex.get(constraint.pointId)!;
+      const xRow = Array(parameterCount).fill(0) as number[];
+      const zRow = Array(parameterCount).fill(0) as number[];
+      xRow[anchorIndex] = 1;
+      zRow[anchorIndex + 1] = 1;
+      rows.push(xRow, zRow);
+      continue;
+    }
     if (constraint.kind === "perpendicular") {
       const firstSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[0])!;
       const secondSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[1])!;

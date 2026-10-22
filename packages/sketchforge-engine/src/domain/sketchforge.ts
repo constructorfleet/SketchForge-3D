@@ -152,6 +152,7 @@ export type SketchSegment = {
 };
 
 export type SketchConstraint =
+  | { id: string; kind: "fixed"; pointId: string; xMm: number; zMm: number }
   | { id: string; kind: "coincident"; pointIds: [string, string] }
   | { id: string; kind: "horizontal"; segmentId: string }
   | { id: string; kind: "vertical"; segmentId: string }

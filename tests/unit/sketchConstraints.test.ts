@@ -19,6 +19,46 @@ describe("solveSketchConstraints", () => {
     expect(source.points).toEqual(profile().points);
   });
 
+  it("adds and removes a fixed point relation", () => {
+    const source = profile();
+    const constrained = addSketchConstraint(source, { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 2, zMm: 3 });
+    expect(constrained.constraints).toEqual([{ id: "fixed-a", kind: "fixed", pointId: "a", xMm: 2, zMm: 3 }]);
+    expect(removeSketchConstraint(constrained, "fixed-a").constraints).toEqual([]);
+  });
+
+  it("globally translates a rigidly constrained sketch to a fixed workplane point", () => {
+    const source = profile({
+      points: [{ id: "a", x: 5, z: 7 }, { id: "b", x: 15, z: 7 }, { id: "c", x: 5, z: 17 }],
+      segments: [{ id: "ab", startId: "a", endId: "b" }, { id: "ac", startId: "a", endId: "c" }, { id: "bc", startId: "b", endId: "c" }],
+      constraints: [
+        { id: "ab-distance", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
+        { id: "ac-distance", kind: "distance", pointIds: ["a", "c"], valueMm: 10 },
+        { id: "bc-distance", kind: "distance", pointIds: ["b", "c"], valueMm: Math.sqrt(200) },
+        { id: "ab-horizontal", kind: "horizontal", segmentId: "ab" },
+        { id: "origin", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
+      ],
+    });
+    expect(sketchConstraintDegreesOfFreedom({ ...source, constraints: source.constraints?.filter(({ kind }) => kind !== "fixed") })).toMatchObject({ degreesOfFreedom: 2 });
+    const result = solveSketchConstraints(source);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(result.profile.points).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "a", x: expect.closeTo(0, 7), z: expect.closeTo(0, 7) }),
+      expect.objectContaining({ id: "b", x: expect.closeTo(10, 7), z: expect.closeTo(0, 7) }),
+      expect.objectContaining({ id: "c", x: expect.closeTo(0, 7), z: expect.closeTo(10, 7) }),
+    ]));
+    expect(sketchConstraintDegreesOfFreedom(result.profile)).toMatchObject({ degreesOfFreedom: 0, status: "estimated" });
+  });
+
+  it("reports incompatible fixed points and relative dimensions as unsatisfied", () => {
+    const result = solveSketchConstraints(profile({ constraints: [
+      { id: "fix-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
+      { id: "fix-b", kind: "fixed", pointId: "b", xMm: 10, zMm: 0 },
+      { id: "distance", kind: "distance", pointIds: ["a", "b"], valueMm: 5 },
+    ] }));
+    expect(result.unsatisfiedConstraintIds).toEqual(["distance"]);
+    expect(result.profile.points.map(({ x, z }) => [x, z])).toEqual([[0, 0], [10, 0]]);
+  });
+
   it("keeps coincident points together when one point is dragged", () => {
     const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 5, z: 6 }, { id: "b", x: 10, z: 0 }], constraints: [{ id: "c", kind: "coincident", pointIds: ["a", "b"] }] }), ["a"]);
     expect(result.profile.points[0]?.x).toBe(5);
