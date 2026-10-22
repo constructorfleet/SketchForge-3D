@@ -76,6 +76,28 @@ function value<T>(result: EngineResult<T>): T {
   return result.value;
 }
 
+async function persistAllEdgeFillet(
+  engine: ReturnType<typeof createEngine>,
+  store: ProjectStore,
+  projectId: string,
+  shapeId: string,
+  amount = 0.1,
+) {
+  const before = await store.read(projectId);
+  const source = before!.shapes.find((shape) => shape.id === shapeId)!;
+  const treated = value(await engine.treat(projectId, shapeId, { kind: "fillet", amount })).shape;
+  const feature = { kind: "fillet" as const, amount, edgeCount: 12, allEdges: true as const };
+  const persisted = {
+    ...treated,
+    edgeTreatments: [feature],
+    edgeTreatmentHistory: [{ id: `all-edge-fillet-${shapeId}`, createdAt: 1, feature, before: source }],
+  };
+  const after = await store.read(projectId);
+  const index = after!.shapes.findIndex((shape) => shape.id === shapeId);
+  after!.shapes[index] = persisted;
+  return persisted;
+}
+
 describe("dependency-ordered feature recomputation", () => {
   it("rebuilds a persisted sketch revolve from an edited source profile", async () => {
     const { store } = projectStore();
@@ -102,6 +124,84 @@ describe("dependency-ordered feature recomputation", () => {
     });
     expect(updated.width).toBeGreaterThan(original.width);
     expect(updated.importedMesh?.positions).not.toEqual(beforeGeometry);
+  });
+
+  it("replays an all-edge fillet after editing a retained sketch sweep", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Treated sweep", profile: profile() }]));
+    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = profile(1.5);
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: source.id, sketchSourceId: source.sketchSourceId, sketchProfile: changedProfile,
+      rotation: source.rotation, rotationX: source.rotationX, rotationZ: source.rotationZ,
+    });
+    expect(updated.x).toBeCloseTo(source.x);
+    expect(updated.z).toBeCloseTo(source.z);
+    expect(updated.elevation).toBeCloseTo(source.elevation ?? 0);
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.1, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+
+    const beforeInvalidReplay = value(await engine.project("recompute"));
+    const writesBeforeInvalidReplay = writeCount();
+    const invalidReplay = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: profile(0.01) });
+    expect(invalidReplay.ok).toBe(false);
+    expect(invalidReplay.ok ? undefined : invalidReplay.failure.reason).toBe("sweep_failed");
+    expect(writeCount()).toBe(writesBeforeInvalidReplay);
+    expect(value(await engine.project("recompute")).shapes).toEqual(beforeInvalidReplay.shapes);
+  });
+
+  it("replays an all-edge fillet after editing a retained sketch revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Treated revolve", profile: [[1, -2], [2, -2], [2, 2], [1, 2]], sides: 8,
+    }]));
+    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id, 0.01);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = {
+      ...source.sketchProfile!,
+      points: source.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.25 })),
+    };
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: source.id, sketchSourceId: source.sketchSourceId, sketchProfile: changedProfile,
+      rotation: source.rotation, rotationX: source.rotationX, rotationZ: source.rotationZ,
+    });
+    expect(updated.x).toBeCloseTo(source.x);
+    expect(updated.z).toBeCloseTo(source.z);
+    expect(updated.elevation).toBeCloseTo(source.elevation ?? 0);
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.01, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  });
+
+  it("rolls back a revolve setting edit when its all-edge fillet cannot be replayed", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Treated revolve", profile: [[1, -2], [2, -2], [2, 2], [1, 2]], sides: 8,
+    }]));
+    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id, 0.01);
+    const writesBeforeEdit = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 10 });
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
+    expect(writeCount()).toBe(writesBeforeEdit);
+    expect((await store.read("recompute"))!.shapes[0]).toEqual(source);
   });
 
   it("rebuilds a retained boolean ancestor after editing a source revolve", async () => {
