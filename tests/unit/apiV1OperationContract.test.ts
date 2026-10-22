@@ -276,6 +276,61 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseListFacesResponse({ faces: [{ index: 0, id: "face-id", surfaceType: "plane", area: -1, centroid: { x: 0, y: 0, z: 0 }, normal: null, facing: null }] })).toBeNull();
   });
 
+  it("declares and validates GET /edges against the ordered CAD edge listing", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/edges");
+    expect(operation).toMatchObject({
+      operationId: "listEdges",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 422, 500, 503],
+      query: {
+        required: ["projectId", "shapeId"],
+        properties: {
+          projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+          shapeId: { type: "string", trim: true, minLength: 1 },
+        },
+      },
+      responseSchemas: {
+        200: {
+          type: "object", required: ["edges"], additionalProperties: false,
+          properties: {
+            edges: {
+              type: "array",
+              items: {
+                type: "object", required: ["index", "length", "curveType", "midpoint", "filletable"], additionalProperties: false,
+                properties: {
+                  index: { type: "integer", minimum: 0 },
+                  length: { type: "number", minimum: 0 },
+                  curveType: { type: "string" },
+                  midpoint: { type: "object", required: ["x", "y", "z"], additionalProperties: false, properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
+                  filletable: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(operation?.responseSchemas).toMatchObject({
+      400: { properties: { code: { enum: ["invalid_project_id", "invalid_shape_id"] } } },
+      401: { properties: { code: { enum: ["unauthorized"] } } },
+      404: { properties: { code: { enum: ["api_disabled", "project_not_found", "shape_not_found"] } } },
+      422: { properties: { code: { enum: ["cad_failed"] } } },
+      500: { properties: { code: { enum: ["cad_failed", "internal_error"] } } },
+      503: { properties: { code: { enum: ["storage_unconfigured"] } } },
+    });
+    const response = { edges: [{ index: 0, length: 4, curveType: "line", midpoint: { x: 0, y: 0, z: 0 }, filletable: true }] };
+    expect(contract.validateApiV1Response("GET /api/v1/edges", 200, response)).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/edges", 200, { edges: [{ ...response.edges[0], filletable: "yes" }] })).toBe(false);
+    expect(contract.parseListEdgesResponse(response)).toEqual(response);
+    expect(contract.parseListEdgesResponse({ edges: [{ ...response.edges[0], length: Number.NaN }] })).toBeNull();
+    expect(contract.parseListEdgesResponse({ edges: [{ ...response.edges[0], midpoint: { x: 0, y: 0, z: 0, w: 1 } }] })).toBeNull();
+    expect(contract.parseListEdgesResponse({ edges: [{ ...response.edges[0], unexpected: true }] })).toBeNull();
+    expect(contract.parseApiV1Query("GET /api/v1/edges", new Request("https://example.test/api/v1/edges?projectId=%20part_1%20&shapeId=%20solid%20")))
+      .toEqual({ ok: true, values: { projectId: "part_1", shapeId: "solid" } });
+    expect(contract.validateApiV1Response("GET /api/v1/edges", 409, { error: "busy", code: "project_busy" })).toBe(false);
+  });
+
   it("declares and validates GET /properties against the complete mass-properties response", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/properties");

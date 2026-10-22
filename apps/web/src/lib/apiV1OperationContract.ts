@@ -202,6 +202,19 @@ const faceItemSchema = {
   additionalProperties: false,
 } as const;
 const faceListSchema = { type: "object", required: ["faces"], properties: { faces: { type: "array", items: faceItemSchema } }, additionalProperties: false } as const;
+const edgeItemSchema = {
+  type: "object",
+  required: ["index", "length", "curveType", "midpoint", "filletable"],
+  properties: {
+    index: { type: "integer", minimum: 0, description: "Zero-based position used by fillet and chamfer requests." },
+    length: { type: "number", minimum: 0 },
+    curveType: { type: "string", description: "Curve kind reported by the CAD kernel, or unknown when unavailable." },
+    midpoint: vector3Schema,
+    filletable: { type: "boolean", description: "Whether the edge has two adjacent faces and can be treated." },
+  },
+  additionalProperties: false,
+} as const;
+const edgeListSchema = { type: "object", required: ["edges"], properties: { edges: { type: "array", items: edgeItemSchema } }, additionalProperties: false } as const;
 const measurementItemSchema = {
   type: "object",
   required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
@@ -398,7 +411,26 @@ export const API_V1_OPERATIONS = [
   ...arrangementOperations.slice(0, 1),
   ...arrangementOperations.slice(1),
   ...featureOperations.slice(3, 4),
-  operation("GET", "/api/v1/edges", "listEdges"),
+  {
+    ...operation("GET", "/api/v1/edges", "listEdges", [200, 400, 401, 404, 422, 500, 503]),
+    description: "Lists the shape's edges in the index order used by fillet and chamfer requests; indexes can change when topology changes.",
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+      },
+    },
+    responseSchemas: {
+      200: edgeListSchema,
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+  },
   operation("OPTIONS", "/api/v1/edges", "edgeRouteOptions", [204], undefined, "none"),
   operation("POST", "/api/v1/explode", "explodeAssembly"),
   operation("POST", "/api/v1/exports", "exportProject"),
@@ -537,6 +569,15 @@ export type ListFacesResponse = {
     facing: "top" | "bottom" | "right" | "left" | "front" | "back" | null;
   }>;
 };
+export type ListEdgesResponse = {
+  edges: Array<{
+    index: number;
+    length: number;
+    curveType: string;
+    midpoint: { x: number; y: number; z: number };
+    filletable: boolean;
+  }>;
+};
 
 /** Apply the same normalization and project-id validation as the GET /faces handler. */
 export function parseApiTargetQuery(request: Request):
@@ -555,7 +596,8 @@ export function parseApiTargetQuery(request: Request):
 function isPoint(value: unknown): value is { x: number; y: number; z: number } {
   if (!value || typeof value !== "object") return false;
   const point = value as Record<string, unknown>;
-  return [point.x, point.y, point.z].every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));
+  return exactKeys(point, ["x", "y", "z"])
+    && [point.x, point.y, point.z].every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));
 }
 
 /** Validate the response shape returned by the engine before it crosses the REST boundary. */
@@ -573,6 +615,20 @@ export function parseListFacesResponse(value: unknown): ListFacesResponse | null
     if (!(item.facing === null || (typeof item.facing === "string" && directions.has(item.facing)))) return null;
   }
   return value as ListFacesResponse;
+}
+
+/** Validate the ordered CAD edges before they cross the REST boundary. */
+export function parseListEdgesResponse(value: unknown): ListEdgesResponse | null {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["edges"]) || !Array.isArray((value as { edges?: unknown }).edges)) return null;
+  const edges = (value as { edges: unknown[] }).edges;
+  for (const edge of edges) {
+    if (!edge || typeof edge !== "object" || Array.isArray(edge) || !exactKeys(edge, ["index", "length", "curveType", "midpoint", "filletable"])) return null;
+    const item = edge as Record<string, unknown>;
+    if (!Number.isInteger(item.index) || (item.index as number) < 0) return null;
+    if (typeof item.length !== "number" || !Number.isFinite(item.length) || item.length < 0) return null;
+    if (typeof item.curveType !== "string" || typeof item.filletable !== "boolean" || !isPoint(item.midpoint)) return null;
+  }
+  return value as ListEdgesResponse;
 }
 
 function exactKeys(value: object, expected: readonly string[]) {
