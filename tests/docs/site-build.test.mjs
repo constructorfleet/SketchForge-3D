@@ -121,7 +121,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /22 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
-  assert.match(spec, /The only editor source mapped so far is `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, which maps to the edit-and-export guide; other editor\/UI sources and symbols remain unmapped/i);
+  assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
   assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
   assert.match(spec, /current baseline is 22 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the remaining 10 are omitted with reasons/i);
@@ -135,9 +135,10 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
   assert.match(spec, /The face-drafting guide has browser acceptance for one supported inspector case/i);
-  assert.match(spec, /`docs\/guides\/sketch-constraints\.md`.*browser acceptance.*Parallel/i);
+  assert.match(spec, /sketch-constraints guide has browser acceptance for Parallel and Perpendicular workflows/i);
   assert.match(spec, /`tests\/browser\/sketch-parallel-constraint\.test\.mjs`.*`docs\/screenshots\/sketch-parallel-constraint\.png`/i);
-  assert.match(spec, /does not establish broader sketch-constraint or task-workflow coverage/i);
+  assert.match(spec, /`docs\/screenshots\/sketch-perpendicular-constraint\.png`.*distorted corner.*90°/i);
+  assert.match(spec, /These two cases do not establish full sketch-constraint or task-workflow coverage/i);
   assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
@@ -160,10 +161,10 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /broader task-oriented guides and corresponding\s+workflow checks\s+remain incomplete/i);
   assert.match(migration, /browser acceptance covers the editor quick-start and the edit-and-export\s+guide[’']s create, edit, save, reload, and export workflow/i);
   assert.match(migration, /face-drafting\s+guide covers one inspector case.*face 1.*local \+Z.*-5°.*screenshot/i);
-  assert.match(migration, /sketch-constraints guide covers one Parallel workflow with\s+screenshot evidence/i);
-  assert.match(migration, /only editor source mapped so far is[\s\S]*?`apps\/web\/src\/components\/SketchForgeEditor\.tsx`[\s\S]*?edit-and-export guide/i);
-  assert.match(migration, /Other editor\/UI sources, other examples, and all\s+content sources remain open for ownership diagnostics/i);
-  assert.match(spec, /Phase 4:[\s\S]*?Parallel constraint workflow.*Broader task-oriented guides and corresponding workflow checks remain outstanding/i);
+  assert.match(migration, /sketch-constraints guide covers Parallel and Perpendicular\s+workflows with screenshots/i);
+  assert.match(migration, /sketch-constraints guide maps the selected editor sources[\s\S]*?`SketchWorkspace\.tsx`[\s\S]*?`sketchConstraints\.ts`[\s\S]*?also maps to the edit-and-export guide/i);
+  assert.match(migration, /Other\s+editor\/UI sources, other examples, and all\s+content sources remain open for\s+ownership diagnostics/i);
+  assert.match(spec, /Phase 4:[\s\S]*?Parallel and Perpendicular constraint workflows.*Broader task-oriented guides and corresponding workflow checks remain outstanding/i);
 
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /retains one editable face draft[\s\S]{0,120}plain single-region full-turn sketch revolve/i);
