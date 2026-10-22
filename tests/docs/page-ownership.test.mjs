@@ -8,6 +8,17 @@ import test from "node:test";
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("documentation suite status records REST and runnable-fence coverage accurately", async () => {
+  const spec = await readFile(path.join(repository, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
+
+  assert.match(spec, /Current status is 19 of 32; 13 remain omitted/i);
+  assert.match(spec, /23 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
+  assert.match(spec, /other fence languages.*ownership coverage for other content sources remain open/i);
+  assert.match(spec, /6\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
+  assert.match(spec, /7\. \*\*Partial:\*\*.*runnable-fence check covers 23 maintained-doc fences/i);
+  assert.match(spec, /10\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
+});
+
 async function createRepository(t, page, pagePath = "docs/index.md") {
   const root = await mkdtemp(path.join(os.tmpdir(), "sketchforge-doc-ownership-"));
   t.after(() => rm(root, { recursive: true, force: true }));
