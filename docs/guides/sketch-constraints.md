@@ -4,13 +4,15 @@ title: Constrain sketch geometry
 audience: Editor users
 owner: Editor
 sources:
-  - "apps/web/src/**"
+  - apps/web/src/components/SketchForgeEditor.tsx
+  - apps/web/src/components/SketchWorkspace.tsx
+  - apps/web/src/lib/sketchConstraints.ts
 ---
 
 # Constrain sketch geometry
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
-shows the verified **Parallel** constraint on two sides of a rectangle.
+shows browser-verified **Parallel** and **Perpendicular** constraints.
 
 ## Make two segments parallel
 
@@ -26,6 +28,19 @@ The workflow below checks that the two segments are selected, applies the
 constraint, and confirms the resulting constraint in the editor.
 
 ![Two opposing sketch segments selected with the Parallel constraint applied.](../screenshots/sketch-parallel-constraint.png)
+
+## Make two segments perpendicular
+
+1. Create a rectangular sketch and choose **Edit sketch**.
+2. Drag one corner so the two adjoining sides no longer meet at 90 degrees.
+3. Drag a selection marquee around the midpoints of those two adjoining sides.
+4. Choose **Perpendicular** in the sketch constraint toolbar.
+
+The constraint solver adjusts the selected segments until they meet at 90 degrees.
+The browser acceptance flow checks the initial angle, applies the relation, and
+measures the resulting angle before capturing the editor state.
+
+![Two adjoining sketch segments selected with the Perpendicular constraint applied.](../screenshots/sketch-perpendicular-constraint.png)
 
 Run the browser acceptance flow with:
 

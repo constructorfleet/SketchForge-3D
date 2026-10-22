@@ -23,7 +23,7 @@ hero:
 ## Choose a task
 
 - **Create, edit, save, and export a model:** follow the [editable model workflow](/docs/guides/edit-and-export-model.md), then keep the [`.skf` project format guide](/docs/SKF_PROJECT_FORMAT.md) nearby.
-- **Constrain a sketch:** follow the [sketch constraints guide](/docs/guides/sketch-constraints.md) for selecting segments and applying Parallel.
+- **Constrain a sketch:** follow the [sketch constraints guide](/docs/guides/sketch-constraints.md) to select segments and apply Parallel or Perpendicular.
 - **Call the REST API:** start with [API setup, operations, and errors](/docs/REST_API.md), then inspect the [OpenAPI contract](/openapi-v1.json) or use the [TypeScript client reference](/docs/reference/typescript-client.md) and [Python client reference](/docs/reference/python-client.md).
 - **Deploy or configure SketchForge:** start with the [deployment guide](/docs/guides/deployment.md), then use the [operator configuration reference](/docs/OPERATOR_CONFIGURATION.md) for supported values, owners, and implementation readers.
 - **Taper a CAD face:** follow the [face-drafting guide](/docs/guides/face-drafting.md) for selectable pull axes and measured kernel support.

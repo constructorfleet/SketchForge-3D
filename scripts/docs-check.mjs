@@ -29,9 +29,11 @@ const failures = [];
 const warnings = [];
 const pageSlugs = new Map();
 const ownerPages = [];
-// Public API/package sources and the primary editor component map to documentation pages.
+// Public API/package sources and selected editor sources map to documentation pages.
 const publicSourceScopes = [
   "apps/web/src/components/SketchForgeEditor.tsx",
+  "apps/web/src/components/SketchWorkspace.tsx",
+  "apps/web/src/lib/sketchConstraints.ts",
   "apps/web/src/app/api/v1/**",
   "packages/sketchforge-client/src/**",
   "packages/sketchforge-client/examples/**",

@@ -9,6 +9,8 @@ const browserTest = new URL("../browser/editor-quickstart.test.mjs", import.meta
 const siteConfig = new URL("../../docs/.vitepress/config.mts", import.meta.url);
 const faceDraftGuide = new URL("../../docs/guides/face-drafting.md", import.meta.url);
 const faceDraftBrowserTest = new URL("../browser/face-drafting.test.mjs", import.meta.url);
+const sketchConstraintsGuide = new URL("../../docs/guides/sketch-constraints.md", import.meta.url);
+const sketchConstraintsBrowserTest = new URL("../browser/sketch-parallel-constraint.test.mjs", import.meta.url);
 
 test("editor workflow guide covers create, edit, save, and export with supporting references", async () => {
   const [guideText, homeText, quickstartText, browserTestText, siteConfigText] = await Promise.all([
@@ -52,4 +54,17 @@ test("face drafting guide links a supported editor workflow to browser acceptanc
   assert.match(browserTestText, /Apply face draft/);
   assert.match(browserTestText, /Face draft applied/);
   assert.match(browserTestText, /face-draft-browser\.png/);
+});
+
+test("the perpendicular constraint workflow has browser acceptance and screenshot evidence", async () => {
+  const [guideText, browserTestText] = await Promise.all([
+    readFile(sketchConstraintsGuide, "utf8"),
+    readFile(sketchConstraintsBrowserTest, "utf8"),
+  ]);
+
+  assert.match(guideText, /Perpendicular/);
+  assert.match(guideText, /90(?:°| degrees?)/i);
+  assert.match(guideText, /sketch-perpendicular-constraint\.png/);
+  assert.match(browserTestText, /a user can constrain two selected sketch segments to be perpendicular/i);
+  assert.match(browserTestText, /sketch-perpendicular-constraint\.png/);
 });

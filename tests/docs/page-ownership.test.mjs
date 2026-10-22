@@ -13,7 +13,7 @@ test("documentation suite status records REST and runnable-fence coverage accura
 
   assert.match(spec, /Current status is 22 of 32; 10 remain omitted/i);
   assert.match(spec, /23 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
-  assert.match(spec, /other fence languages.*ownership coverage for other content sources remain open/i);
+  assert.match(spec, /other fence languages[\s\S]*?ownership coverage for other content sources remain open/i);
   assert.match(spec, /6\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
   assert.match(spec, /7\. \*\*Partial:\*\*.*runnable-fence check covers 23 maintained-doc fences/i);
   assert.match(spec, /10\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
@@ -247,6 +247,105 @@ test("changed SketchForgeEditor source without an owner fails actionably", async
   assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
   const diagnostic = `${editorSource}: changed public source has no owning page; add a matching \`sources\` entry to page frontmatter`;
   assert.ok(`${result.stdout}\n${result.stderr}`.includes(diagnostic), `${result.stdout}\n${result.stderr}`);
+});
+
+for (const source of [
+  "apps/web/src/components/SketchForgeEditor.tsx",
+  "apps/web/src/components/SketchWorkspace.tsx",
+  "apps/web/src/lib/sketchConstraints.ts",
+]) {
+  test(`changed sketch constraint source ${source} reports the sketch workflow owner`, async (t) => {
+    const sources = [
+      "apps/web/src/components/SketchForgeEditor.tsx",
+      "apps/web/src/components/SketchWorkspace.tsx",
+      "apps/web/src/lib/sketchConstraints.ts",
+    ];
+    const root = await createRepository(
+      t,
+      `---\nslug: "/docs/guides/sketch-constraints"\ntitle: Constrain sketch geometry\naudience: Editor users\nowner: Editor\nsources:\n${sources.map((entry) => `  - ${entry}`).join("\n")}\n---\n# Constrain sketch geometry\n`,
+      "docs/guides/sketch-constraints.md",
+    );
+    for (const entry of sources) {
+      await mkdir(path.dirname(path.join(root, entry)), { recursive: true });
+      await writeFile(path.join(root, entry), "export const constraintSource = 'initial';\n");
+    }
+    spawnSync("git", ["add", "."], { cwd: root });
+    spawnSync("git", ["commit", "-qm", "add sketch constraint source fixture"], { cwd: root });
+    const base = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    await writeFile(path.join(root, source), "export const constraintSource = 'changed';\n");
+    spawnSync("git", ["add", "."], { cwd: root });
+    spawnSync("git", ["commit", "-qm", "change sketch constraint source"], { cwd: root });
+
+    const result = runDocsCheck(root, "--base-ref", base);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.ok(result.stdout.includes(`${source} -> /docs/guides/sketch-constraints (docs/guides/sketch-constraints.md)`), result.stdout);
+  });
+}
+
+test("changed SketchWorkspace source without the sketch workflow owner fails actionably", async (t) => {
+  const source = "apps/web/src/components/SketchWorkspace.tsx";
+  const root = await createRepository(
+    t,
+    `---\nslug: "/docs/guides/sketch-constraints"\ntitle: Constrain sketch geometry\naudience: Editor users\nowner: Editor\nsources: []\n---\n# Constrain sketch geometry\n`,
+    "docs/guides/sketch-constraints.md",
+  );
+  await mkdir(path.dirname(path.join(root, source)), { recursive: true });
+  await writeFile(path.join(root, source), "export const constraintUI = 'initial';\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "add sketch constraint source fixture"], { cwd: root });
+  const base = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  await writeFile(path.join(root, source), "export const constraintUI = 'changed';\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "change sketch constraint source"], { cwd: root });
+
+  const result = runDocsCheck(root, "--base-ref", base);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  assert.match(`${result.stdout}\n${result.stderr}`, /SketchWorkspace\.tsx: changed public source has no owning page/);
+});
+
+test("SketchForgeEditor changes report both documented editor workflows", async (t) => {
+  const constraintSources = [
+    "apps/web/src/components/SketchForgeEditor.tsx",
+    "apps/web/src/components/SketchWorkspace.tsx",
+    "apps/web/src/lib/sketchConstraints.ts",
+  ];
+  const root = await createRepository(
+    t,
+    `---\nslug: "/docs/guides/sketch-constraints"\ntitle: Constrain sketch geometry\naudience: Editor users\nowner: Editor\nsources:\n${constraintSources.map((source) => `  - ${source}`).join("\n")}\n---\n# Constrain sketch geometry\n`,
+    "docs/guides/sketch-constraints.md",
+  );
+  const editGuide = `---\nslug: "/docs/guides/edit-and-export-model"\ntitle: Create, edit, save, and export\naudience: Editor users\nowner: Editor\nsources:\n  - apps/web/src/components/SketchForgeEditor.tsx\n---\n# Create, edit, save, and export\n`;
+  await mkdir(path.join(root, "docs/guides"), { recursive: true });
+  await writeFile(path.join(root, "docs/guides/edit-and-export-model.md"), editGuide);
+  for (const source of constraintSources) {
+    await mkdir(path.dirname(path.join(root, source)), { recursive: true });
+    await writeFile(path.join(root, source), "export const editorSource = 'initial';\n");
+  }
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "add editor workflow ownership fixture"], { cwd: root });
+  const base = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  await writeFile(path.join(root, "apps/web/src/components/SketchForgeEditor.tsx"), "export const editorSource = 'changed';\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "change editor source"], { cwd: root });
+
+  const result = runDocsCheck(root, "--base-ref", base);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const editorOwnerDiagnostic = result.stdout.split("\n").find((line) => line.includes("SketchForgeEditor.tsx ->"));
+  assert.ok(editorOwnerDiagnostic?.includes("/docs/guides/sketch-constraints"), result.stdout);
+  assert.ok(editorOwnerDiagnostic?.includes("/docs/guides/edit-and-export-model"), result.stdout);
+});
+
+test("the sketch constraints guide maps only its editor, UI, and solver implementation files", async () => {
+  const guide = await readFile(path.join(repository, "docs/guides/sketch-constraints.md"), "utf8");
+  const sources = guide.match(/^sources:\n((?:\s+- .+\n)+)/m)?.[1]
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.replace(/^\s+- /, ""));
+  assert.deepEqual(sources, [
+    "apps/web/src/components/SketchForgeEditor.tsx",
+    "apps/web/src/components/SketchWorkspace.tsx",
+    "apps/web/src/lib/sketchConstraints.ts",
+  ]);
 });
 
 const packageExampleSources = [
