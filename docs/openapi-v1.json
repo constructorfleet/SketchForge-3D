@@ -5639,6 +5639,479 @@
         ]
       }
     },
+    "/api/v1/interference": {
+      "post": {
+        "operationId": "analyzeInterference",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "shapesChecked",
+                    "candidatePairsChecked",
+                    "clearance",
+                    "method",
+                    "pairs"
+                  ],
+                  "properties": {
+                    "shapesChecked": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "candidatePairsChecked": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "clearance": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": [
+                        "OCCT exact distance and common volume; AABB candidate prefilter"
+                      ]
+                    },
+                    "pairs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "a",
+                          "b",
+                          "gap",
+                          "overlapVolume",
+                          "precision"
+                        ],
+                        "properties": {
+                          "a": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "b": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "gap": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "overlapVolume": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "precision": {
+                            "type": "string",
+                            "enum": [
+                              "exact",
+                              "tessellated"
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "description": "Reports exact gaps and overlap volumes for visible, non-cutter shapes, subject to 128-shape and 512-candidate limits.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "\\S",
+                        "description": "Whitespace is trimmed; IDs must be unique after trimming."
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "IDs are trimmed and must be unique after trimming.",
+                        "items": {
+                          "type": "string",
+                          "pattern": "\\S"
+                        }
+                      }
+                    ]
+                  },
+                  "clearance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Maximum exact surface gap in millimetres; defaults to zero."
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/measurements": {
       "get": {
         "operationId": "listMeasurements",
@@ -14304,12 +14777,6 @@
       "method": "POST",
       "path": "/api/v1/imports",
       "operationId": "importGeometry",
-      "reason": "Response schemas or verified response statuses are not declared."
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/interference",
-      "operationId": "analyzeInterference",
       "reason": "Response schemas or verified response statuses are not declared."
     },
     {

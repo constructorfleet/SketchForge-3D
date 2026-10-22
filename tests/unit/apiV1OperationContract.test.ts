@@ -28,6 +28,43 @@ function sourceOperations() {
 type CreateProjectBody = Extract<NonNullable<ApiV1Operation["requestBody"]>, { normalization: readonly ["trim", "truncate:80"] }>;
 
 describe("REST API v1 operation contract", () => {
+  it("contracts interference normalization, bounded errors, and exact or tessellated reports", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const key = "POST /api/v1/interference";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "analyzeInterference",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      requestBody: { contentType: "application/json", required: true },
+    });
+    expect(contract.validateApiV1RequestBody(key, { ids: ["post-a", "post-b"], clearance: 0.4 })).toBe(true);
+    expect(contract.validateApiV1RequestBody(key, { ids: [], clearance: 0.4 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["post-a"], clearance: -0.1 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["post-a"], clearance: Number.POSITIVE_INFINITY })).toBe(false);
+
+    const report = {
+      shapesChecked: 2,
+      candidatePairsChecked: 1,
+      clearance: 0.4,
+      method: "OCCT exact distance and common volume; AABB candidate prefilter",
+      pairs: [{
+        a: { id: "post-a", name: "Post A" },
+        b: { id: "post-b", name: "Post B" },
+        gap: 0.25,
+        overlapVolume: 0,
+        precision: "exact",
+      }],
+    };
+    expect(contract.validateApiV1Response(key, 200, report)).toBe(true);
+    expect(contract.validateApiV1Response(key, 200, { ...report, pairs: [{ ...report.pairs[0], precision: "approximate" }] })).toBe(false);
+    expect(contract.validateApiV1Response(key, 200, { ...report, pairs: [{ a: { id: "a" }, b: { id: "b" }, gap: 1, overlapVolume: 0, precision: "tessellated" }] })).toBe(false);
+    expect(contract.validateApiV1Response(key, 400, { error: "Invalid request", code: "invalid_request" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 422, { error: "Too many candidates", code: "invalid_request", limit: 512, atLeast: 513 })).toBe(true);
+    expect(contract.validateApiV1Response(key, 500, { error: "CAD failure", code: "cad_failed" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+  });
+
   it("declares nested STEP product hierarchy in project shape summaries", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/shapes");
     expect((operation?.responseSchemas as Record<number, unknown> | undefined)?.[200]).toMatchObject({
