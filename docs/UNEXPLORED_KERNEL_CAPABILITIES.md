@@ -160,9 +160,11 @@ Invalid profiles or failed dependent booleans leave the project unchanged.
 Draft prism angles on sketch extrusions now participate in this bounded path:
 their persisted source angle, source height, and source frame are reapplied
 when the source profile changes, and the angle itself can be changed by source
-ID. A single retained face draft on a sketch extrusion or single-solid sketch
-sweep now recomputes when its selected planar face has exactly one normal
-match; missing or ambiguous matches fail atomically. Other downstream operation types do not yet recompute. A
+ID. A single retained face draft on a sketch extrusion, single-solid sketch
+sweep, or plain single-region full-turn sketch revolve now recomputes when its
+selected planar face has exactly one normal match; missing or ambiguous matches
+fail atomically. `GET /faces?topology=exact` lists analytic B-rep revolve faces;
+the default face listing remains mesh-based. Other downstream operation types do not yet recompute. A
 general dependency-ordered graph with consistent failure propagation remains
 the highest-value foundation before expanding editable downstream operations.
 
@@ -172,8 +174,8 @@ Face drafting is selectable along local X, Y, or Z, but verification covers
 only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
 kernel. The editor's general face-draft results remain baked. The engine/API
-retains one editable face draft on a sketch extrusion or single-solid sketch
-sweep, replaying it after a source edit only when exactly one planar face
+retains one editable face draft on a sketch extrusion, single-solid sketch
+sweep, or plain single-region full-turn sketch revolve, replaying it after a source edit only when exactly one planar face
 matches the stored local normal;
 it refuses missing or ambiguous matches and prism-draft or edge-treatment
 combinations. Updating angle or axis keeps the same source face ID; clear the
