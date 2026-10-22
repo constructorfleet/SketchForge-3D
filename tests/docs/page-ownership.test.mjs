@@ -214,6 +214,41 @@ test("changed public source without an owner fails with an actionable diagnostic
   assert.match(`${result.stdout}\n${result.stderr}`, /route\.ts: changed public source has no owning page; add a matching `sources` entry to page frontmatter/);
 });
 
+async function createChangedEditorSourceRepository(t, guide) {
+  const editorSource = "apps/web/src/components/SketchForgeEditor.tsx";
+  const root = await createRepository(t, guide, "docs/guides/edit-and-export-model.md");
+  await mkdir(path.dirname(path.join(root, editorSource)), { recursive: true });
+  await writeFile(path.join(root, editorSource), "export function SketchForgeEditor() { return null; }\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "add editor source fixture"], { cwd: root });
+  const base = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  await writeFile(path.join(root, editorSource), "export function SketchForgeEditor() { return 'changed'; }\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "change editor source"], { cwd: root });
+  return { root, base, editorSource };
+}
+
+test("changed SketchForgeEditor source reports the edit-and-export guide owner", async (t) => {
+  const { root, base, editorSource } = await createChangedEditorSourceRepository(
+    t,
+    `---\nslug: "/docs/guides/edit-and-export-model"\ntitle: Edit and export\naudience: Editor users\nowner: Editor\nsources:\n  - apps/web/src/components/SketchForgeEditor.tsx\n---\n# Edit and export\n`,
+  );
+  const result = runDocsCheck(root, "--base-ref", base);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.ok(result.stdout.includes(`${editorSource} -> /docs/guides/edit-and-export-model (docs/guides/edit-and-export-model.md)`), result.stdout);
+});
+
+test("changed SketchForgeEditor source without an owner fails actionably", async (t) => {
+  const { root, base, editorSource } = await createChangedEditorSourceRepository(
+    t,
+    `---\nslug: "/docs/guides/edit-and-export-model"\ntitle: Edit and export\naudience: Editor users\nowner: Editor\nsources: []\n---\n# Edit and export\n`,
+  );
+  const result = runDocsCheck(root, "--base-ref", base);
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  const diagnostic = `${editorSource}: changed public source has no owning page; add a matching \`sources\` entry to page frontmatter`;
+  assert.ok(`${result.stdout}\n${result.stderr}`.includes(diagnostic), `${result.stdout}\n${result.stderr}`);
+});
+
 const packageExampleSources = [
   { language: "TypeScript", path: "packages/sketchforge-client/examples/bolt-plate.macro.mjs", updated: "export default () => 'changed';\n" },
   { language: "Python", path: "packages/sketchforge-py/examples/bolt_plate.py", updated: "def main():\n    return 'changed'\n" },

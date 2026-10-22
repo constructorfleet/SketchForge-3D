@@ -29,8 +29,9 @@ const failures = [];
 const warnings = [];
 const pageSlugs = new Map();
 const ownerPages = [];
-// Only public API/package source trees are required to map to documentation pages.
+// Public API/package sources and the primary editor component map to documentation pages.
 const publicSourceScopes = [
+  "apps/web/src/components/SketchForgeEditor.tsx",
   "apps/web/src/app/api/v1/**",
   "packages/sketchforge-client/src/**",
   "packages/sketchforge-client/examples/**",

@@ -3,6 +3,8 @@ slug: /docs/guides/edit-and-export-model
 title: Create, edit, save, and export a model
 audience: New editor users
 owner: Editor
+sources:
+  - apps/web/src/components/SketchForgeEditor.tsx
 ---
 
 # Create, edit, save, and export a model
