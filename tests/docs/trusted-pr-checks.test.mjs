@@ -48,6 +48,14 @@ test("trusted PR verifier is only dispatched from default-branch repository_disp
   assert.match(await (await import("node:fs/promises")).readFile(recorderPath, "utf8"), /check-runs/);
 });
 
+test("trusted title validation compares the title without a trailing JSON newline", async () => {
+  const yaml = await import("js-yaml");
+  const workflow = yaml.load(await (await import("node:fs/promises")).readFile(workflowPath, "utf8"));
+  const titleValidation = workflow.jobs.title.steps.find(({ name }) => name === "Validate the live PR title").run;
+
+  assert.match(titleValidation, /jq -rj '\.title'/);
+});
+
 async function withReporter({ currentSha = sha, state = "open", title = "docs: refresh references", headRef = "feature/docs" } = {}, callback) {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "sketchforge-trusted-checks-"));
   const requests = [];
