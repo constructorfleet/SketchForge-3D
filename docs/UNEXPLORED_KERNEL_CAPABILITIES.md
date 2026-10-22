@@ -33,8 +33,11 @@ These are implemented and should not be filed as missing features:
   geometry and source hierarchy. Otherwise it falls back to independently
   selectable flat solids. Leaf solids retain project-space placement,
   `stepComponent` occurrence identity, and root-to-component ancestry through
-  `.skf` round trips. Native STEP transform editing and hierarchy-preserving
-  STEP export are not implemented.
+  `.skf` round trips. STEP export writes grouped project parts under a single
+  assembly level, encoding nested group paths in product names; on reimport,
+  those names can reconstruct nested groups when solid-to-occurrence matching
+  is unambiguous. Native nested STEP hierarchy export and STEP transform
+  editing are not implemented.
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section
   DXF exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
@@ -43,8 +46,10 @@ These are implemented and should not be filed as missing features:
   trips. IDs and colors survive shape-parameter edits and supported CAD
   treatments when faces can be matched uniquely. For parameter edits, uniquely
   occurring cones, spheres, tori, and cylinders can retain identity when their
-  sampled normal changes; repeated curved surfaces remain unmatched. New or
-  ambiguous faces get fresh IDs and do not inherit colors. Viewport and 3MF
+  sampled normal changes; repeated curved surfaces remain unmatched. Fillet
+  and symmetric-chamfer operations use OCCT face history for unique
+  one-to-one modified faces. New, generated, or ambiguous faces get fresh IDs
+  and do not inherit colors. Viewport and 3MF
   previews map B-rep triangle groups to the same identities. Numeric face
   indexes remain supported for older projects and callers.
 - A bounded draft-prism operation is available in the shape inspector, over
@@ -52,8 +57,9 @@ These are implemented and should not be filed as missing features:
   straight, single-loop sketch extrusion and stores exact geometry; the result
   is baked without an editable draft-feature node.
 - Face-based drafting is available in the shape inspector for exact B-rep
-  solids, with a selector for all six signed local CAD pull axes. Measured
-  support remains
+  solids, with a selector for all six signed local CAD pull axes. The engine
+  canonicalizes the selected direction before invoking the kernel and maps the
+  result back to the original orientation. Measured support remains
   geometry-specific: the documented XZ-profile, +Y extrusion fixture accepts
   faces 1, 3, 4, and 5 at ±5° along +Z; a 10 mm box accepts faces 0–3 at ±5°
   along +Z; a +90° Y-rotated fixture accepts face 0 at ±30° along +X; and a
@@ -88,9 +94,11 @@ These are implemented and should not be filed as missing features:
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph.
-- Coincident, horizontal, vertical, perpendicular, and fixed-distance sketch
-  constraints are supported, including `.skf` persistence and TypeScript
-  profile types. Perpendicular relations take part in the bounded coupled solve
+- Coincident, horizontal, vertical, perpendicular, fixed-distance, and fixed
+  point sketch constraints are supported, including `.skf` persistence and
+  TypeScript profile types. A fixed point anchors a sketch point to workplane
+  coordinates and can remove global translation freedoms. Perpendicular
+  relations take part in the bounded coupled solve
   and local degree-of-freedom estimate. Point drags keep directly dragged
   points anchored and report unsatisfied constraint IDs. The inspector also
   estimates local degrees of freedom from the supported equations' Jacobian
@@ -138,13 +146,16 @@ editable draft history depends on the feature-recompute work in gap 1.
 The engine retains source occurrence IDs and ancestry on exploded solids when
 association is unambiguous, and persists that metadata through `.skf`. The
 identifiers describe a particular STEP source and may change when the source
-file or product structure changes. `POST /explode` now reconstructs nested
-editable project groups when every exact solid can be uniquely associated with
-an occurrence using the imported GLB geometry and source hierarchy. If any
-solid cannot be mapped unambiguously, it returns flat solids rather than a
-partial hierarchy. Native STEP transform editing and hierarchy-preserving STEP
-export remain unsupported. Full assembly editing still needs more robust
-association across exporters and broader STEP fixtures.
+file or product structure changes. STEP export preserves supported grouped
+project parts as a single-level assembly and encodes nested group paths in part
+names; reimport reconstructs nested editable project groups from those paths
+when each exact solid maps unambiguously to an occurrence. `POST /explode` also
+reconstructs nested groups from source STEP hierarchy when association is
+unambiguous. If a solid cannot be mapped uniquely, the importer returns flat
+solids rather than a partial hierarchy. The STEP document itself does not
+retain native nested assembly levels, and STEP transform editing is not
+implemented. Full native hierarchy support still needs robust association
+across exporters and broader STEP fixtures.
 
 ### 4. Stable face identity across arbitrary topology changes
 
@@ -152,20 +163,22 @@ Stable IDs and color assignments survive shape-parameter edits and supported
 CAD treatments when the engine finds a unique match. Matching uses exact face
 B-rep or a unique planar support surface; for parameter edits, uniquely
 occurring cone, sphere, torus, and cylinder faces can also retain identity
-when their sampled normal changes. This is not a semantic identity contract.
-Split, merged, generated, repeated, or otherwise ambiguous faces receive new
-IDs without inherited assignments. General identity across arbitrary topology
-edits remains unsupported.
+when their sampled normal changes. Fillets and symmetric chamfers can use
+OCCT's modified-face history for a unique one-to-one mapping. This is not a
+semantic identity contract. Split, merged, generated, repeated, or otherwise
+ambiguous faces receive new IDs without inherited assignments. General
+identity across arbitrary topology edits remains unsupported.
 
 ### 5. Broader sketch constraints and globally determined solutions
 
 The solver supports coincident, horizontal, vertical, perpendicular, and
 fixed-distance relations with a bounded deterministic least-squares solve and
-a local Jacobian-rank estimate. It does not guarantee global solvability,
-identify every nonlinear or second-order dependency, or remove the two global
-translation freedoms. Degenerate zero-length distance geometry has no
-determinate degree-of-freedom report. Additional constraint types and a solver
-that can robustly determine global placement remain open.
+a local Jacobian-rank estimate. It also supports fixed-point relations, which
+can anchor global translation. The solver does not guarantee global solvability
+or identify every nonlinear or second-order dependency.
+Degenerate zero-length distance geometry has no determinate
+degree-of-freedom report. Additional constraint types and robust global
+placement remain open.
 
 ## Verification baseline
 
