@@ -4,6 +4,7 @@ title: Public runtime configuration
 audience: Operators
 owner: Operations
 sources:
+  - apps/desktop/**
   - packages/sketchforge-engine/src/support/**
   - packages/sketchforge-client/src/**
   - packages/sketchforge-client/mcp/**
@@ -12,7 +13,7 @@ sources:
 
 # Public runtime configuration
 
-This reference covers supported public runtime settings for server/container deployments, TypeScript and Python API clients, and the local MCP bridge. Build-only, test-only, CI workflow, desktop development, and pass-through environment values are intentionally classified separately and are not presented as supported application runtime settings. The registry is maintained in `packages/sketchforge-engine/src/support/lib/operator-configuration.json`; regenerate this page with `node scripts/generate-operator-configuration.mjs`.
+This reference covers supported public runtime settings for server/container deployments, the desktop app, TypeScript and Python API clients, and the local MCP bridge. Build-only, test-only, CI workflow, launcher handoff, and pass-through environment values are intentionally classified separately and are not presented as supported application runtime settings. The registry is maintained in `packages/sketchforge-engine/src/support/lib/operator-configuration.json`; regenerate this page with `node scripts/generate-operator-configuration.mjs`.
 
 `required` means required to enable the described optional feature; no setting is required for the application to start with its default behavior.
 
@@ -39,6 +40,11 @@ This reference covers supported public runtime settings for server/container dep
 | `SKETCHFORGE_MACRO_TIMEOUT_MS` | 120000 milliseconds | No | Positive number of milliseconds before an MCP macro process is stopped; invalid or non-positive values use the default. A per-call `timeoutMs` overrides it. | No | MCP macro execution | [MCP macro execution guide](guides/client-configuration.md#mcp-macro-execution) | [../packages/sketchforge-client/mcp/macroTools.mjs](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-client/mcp/macroTools.mjs) |
 | `SKETCHFORGE_MACRO_PYTHON` | python3 | No | Executable used to inspect and run Python macros through the MCP bridge. It must be available to the MCP process. | No | MCP Python macro execution | [MCP Python macro execution guide](guides/client-configuration.md#mcp-macro-execution) | [../packages/sketchforge-client/mcp/macroTools.mjs](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-client/mcp/macroTools.mjs) |
 | `SKETCHFORGE_MACRO_RUNNER_JS` | The JavaScript macro runner bundled with `@constructorfleet/sketchforge3d`. | No | Optional path to an installed `sketchforge-macro` runner used instead of the package-bundled runner. | No | MCP JavaScript macro execution | [MCP JavaScript macro execution guide](guides/client-configuration.md#mcp-macro-execution) | [../packages/sketchforge-client/mcp/macroTools.mjs](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-client/mcp/macroTools.mjs) |
+| `SKETCHFORGE_DESKTOP_PORT` | 62158 | No | Parsed as a base-10 integer and used as the loopback port for the packaged desktop web server; the parsed value is not validated before startup. Changing it changes the browser storage origin used by the desktop app. | No | Desktop application origin | [Desktop application origin guide](OPERATOR_CONFIGURATION.md#desktop-settings) | [../apps/desktop/main.cjs](https://github.com/constructorfleet/SketchForge-3D/blob/main/apps/desktop/main.cjs) |
+
+## Desktop settings
+
+`SKETCHFORGE_DESKTOP_PORT` selects the loopback port used by the packaged desktop app. Browser storage is scoped to the full origin, including its port; changing this value makes projects saved under the previous port appear in a different storage origin. The desktop development launcher injects `SKETCHFORGE_DESKTOP_DEV_URL` as an internal handoff to its temporary web server; it is not a user setting. `NODE_PATH` is forwarded to the packaged child process and is not a SketchForge desktop setting.
 
 ## Update settings
 
@@ -48,8 +54,8 @@ The update status and server-triggered update settings are read by [`apps/web/sr
 
 Compose uses `SKETCHFORGE_PORT` to choose the host port published to container port 3000. The Docker launcher currently validates `PORT` and `SKETCHFORGE_LEGACY_PORT`; invalid values fall back to their listed defaults. Other path and URL settings are validated or interpreted by their owning subsystem at runtime as described above. Keep secrets in the deployment secret store and avoid printing them in logs.
 
-The registry and documentation tests track the supported server/container, client, and local MCP runtime settings against their implementation readers. Each row links to all assigned owner pages and its authoritative reader or deployment declaration. Adding a supported runtime setting requires a registry row with a source and an owning guide; the docs verification fails when a setting in the tracked runtime reader surfaces has no row.
+The registry and documentation tests track supported server/container, desktop, client, and local MCP runtime settings against their implementation readers. Each row links to all assigned owner pages and its authoritative reader or deployment declaration. Adding a supported runtime setting requires a registry row with a source and an owning guide; the docs verification fails when a setting in the tracked runtime reader surfaces has no row.
 
 ## Environment values outside the supported runtime inventory
 
-Repository environment values also include build switches (such as `STATIC_EXPORT`, `SKETCHFORGE_DOCKER_BUILD`, and `NEXT_PUBLIC_STATIC_EXPORT`), test and performance inputs, CI workflow values, and values forwarded to child processes. These are build-only, test-only, CI-owned, or pass-through inputs; they are not application runtime settings in this supported inventory. Desktop shell configuration is an adjacent surface: `SKETCHFORGE_DESKTOP_PORT` is read by [`apps/desktop/main.cjs`](https://github.com/constructorfleet/SketchForge-3D/blob/main/apps/desktop/main.cjs), while `SKETCHFORGE_DESKTOP_DEV_URL` is injected by the development launcher. The current inventory covers server/container, client, and local MCP settings; a complete desktop configuration reference remains outside this slice.
+Repository environment values also include build switches (such as `STATIC_EXPORT`, `SKETCHFORGE_DOCKER_BUILD`, and `NEXT_PUBLIC_STATIC_EXPORT`), test and performance inputs, CI workflow values, and values forwarded to child processes. These are build-only, test-only, CI-owned, launcher handoff, or pass-through inputs; they are not supported application settings in this inventory.

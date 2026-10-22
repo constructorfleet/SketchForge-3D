@@ -215,6 +215,16 @@
       "subsystem": "MCP JavaScript macro execution",
       "source": "../packages/sketchforge-client/mcp/macroTools.mjs",
       "ownerPage": "guides/client-configuration.md#mcp-macro-execution"
+    },
+    {
+      "name": "SKETCHFORGE_DESKTOP_PORT",
+      "default": "62158",
+      "required": false,
+      "validation": "Parsed as a base-10 integer and used as the loopback port for the packaged desktop web server; the parsed value is not validated before startup. Changing it changes the browser storage origin used by the desktop app.",
+      "sensitive": false,
+      "subsystem": "Desktop application origin",
+      "source": "../apps/desktop/main.cjs",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#desktop-settings"
     }
   ]
 }
