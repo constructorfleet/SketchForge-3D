@@ -123,6 +123,48 @@ describe("sketch point refinement", () => {
     expect(next.constraints?.map((constraint) => constraint.kind === "horizontal" ? constraint.segmentId : null)).toEqual(horizontalPieces.map((segment) => segment.id));
   });
 
+  it("carries parallel relations onto every piece when intersections split a constrained segment", () => {
+    const profile: SketchProfile = {
+      points: [
+        { id: "a", x: 0, z: 5 }, { id: "b", x: 10, z: 5 },
+        { id: "c", x: 5, z: 0 }, { id: "d", x: 5, z: 10 },
+        { id: "e", x: 20, z: 0 }, { id: "f", x: 30, z: 0 },
+      ],
+      segments: [
+        { id: "horizontal", startId: "a", endId: "b", kind: "line" },
+        { id: "crossing", startId: "c", endId: "d", kind: "line" },
+        { id: "reference", startId: "e", endId: "f", kind: "line" },
+      ],
+      constraints: [{ id: "keep-parallel", kind: "parallel", segmentIds: ["horizontal", "reference"] }],
+    };
+
+    const next = addLineIntersectionPoints(profile, idFactory());
+    const horizontalPieces = next.segments.filter((segment) => segment.startId === "a" || segment.endId === "b");
+    expect(next.constraints?.filter((constraint) => constraint.kind === "parallel").map(({ segmentIds }) => segmentIds)).toEqual(
+      horizontalPieces.map((segment) => [segment.id, "reference"]),
+    );
+  });
+
+  it("carries a parallel relation to both pieces when a constrained segment is split directly", () => {
+    const profile: SketchProfile = {
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 5 }, { id: "d", x: 10, z: 5 },
+      ],
+      segments: [
+        { id: "first", startId: "a", endId: "b", kind: "line" },
+        { id: "second", startId: "c", endId: "d", kind: "line" },
+      ],
+      constraints: [{ id: "parallel", kind: "parallel", segmentIds: ["first", "second"] }],
+    };
+
+    const result = splitSketchSegment(profile, "first", 0.5, idFactory());
+    const newPiece = result.profile.segments.find((segment) => segment.startId === result.pointId);
+    expect(result.profile.constraints?.filter((constraint) => constraint.kind === "parallel").map(({ segmentIds }) => segmentIds)).toEqual([
+      ["first", "second"], [newPiece?.id, "second"],
+    ]);
+  });
+
   it("reuses an existing endpoint when it lands on the middle of another line", () => {
     const profile: SketchProfile = {
       points: [

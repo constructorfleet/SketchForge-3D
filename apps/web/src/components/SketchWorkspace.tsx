@@ -1385,6 +1385,7 @@ function SketchConstraintPanel({
         <button type="button" disabled={!selectedPoint} onClick={() => selectedPoint && addConstraint({ kind: "fixed", pointId: selectedPoint.id, xMm: selectedPoint.x, zMm: selectedPoint.z })}>{t("editor.sketch.constraints.addFixed")}</button>
         <button type="button" disabled={!segmentId} onClick={() => segmentId && addConstraint({ kind: "horizontal", segmentId })}>{t("editor.sketch.constraints.addHorizontal")}</button>
         <button type="button" disabled={!segmentId} onClick={() => segmentId && addConstraint({ kind: "vertical", segmentId })}>{t("editor.sketch.constraints.addVertical")}</button>
+        <button type="button" disabled={!selectedSegmentPair} onClick={() => selectedSegmentPair && addConstraint({ kind: "parallel", segmentIds: selectedSegmentPair })}>{t("editor.sketch.constraints.addParallel")}</button>
         <button type="button" disabled={!selectedSegmentPair} onClick={() => selectedSegmentPair && addConstraint({ kind: "perpendicular", segmentIds: selectedSegmentPair })}>{t("editor.sketch.constraints.addPerpendicular")}</button>
         <label>
           <span>{t("editor.sketch.constraints.distanceMm")}</span>
@@ -1399,7 +1400,7 @@ function SketchConstraintPanel({
               ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.pointId} (${constraint.xMm}, ${constraint.zMm}) mm`
               : constraint.kind === "distance"
                 ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm ${constraint.pointIds.join("–")}`
-                : `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}`}</span>
+                : `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" || constraint.kind === "parallel" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}`}</span>
             <button type="button" aria-label={t("editor.sketch.constraints.remove", { kind: constraint.kind })} onClick={() => onRemoveConstraint(constraint.id)}>×</button>
           </div>
         ))}

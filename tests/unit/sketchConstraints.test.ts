@@ -102,6 +102,25 @@ describe("solveSketchConstraints", () => {
     expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
   });
 
+  it("makes two selected segments parallel while anchoring the first segment", () => {
+    const result = solveSketchConstraints(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 4, z: 3 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "parallel", kind: "parallel", segmentIds: ["base", "other"] }],
+    }), ["a", "b"]);
+
+    const [c, d] = result.profile.points.slice(2);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect((d!.x - c!.x) * 0 - (d!.z - c!.z) * 10).toBeCloseTo(0, 6);
+    expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
+  });
+
   it("counts a perpendicular relation as one independent equation in the local freedom estimate", () => {
     const report = sketchConstraintDegreesOfFreedom(profile({
       points: [
@@ -119,6 +138,22 @@ describe("solveSketchConstraints", () => {
     expect(report.equationCount).toBe(1);
     expect(report.rank).toBe(1);
     expect(report.degreesOfFreedom).toBe(7);
+  });
+
+  it("counts a parallel relation as one independent equation in the local freedom estimate", () => {
+    const report = sketchConstraintDegreesOfFreedom(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 4, z: 3 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "parallel", kind: "parallel", segmentIds: ["base", "other"] }],
+    }));
+
+    expect(report).toMatchObject({ status: "estimated", equationCount: 1, rank: 1, degreesOfFreedom: 7 });
   });
 
   it("marks the freedom estimate indeterminate when a perpendicular segment has zero length", () => {

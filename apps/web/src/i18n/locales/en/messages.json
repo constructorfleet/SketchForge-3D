@@ -452,13 +452,14 @@
       "constraintRemoved": "Sketch constraint removed",
       "constraints": {
         "title": "Constraints",
-        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident or distance, one segment for horizontal or vertical, or two segments for perpendicular.",
+        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident or distance, one segment for horizontal or vertical, or two segments for parallel or perpendicular.",
         "dofEstimate": "Estimated free parameters: {count}. This local rank estimate does not guarantee the constraints are solvable.",
         "dofIndeterminate": "Free parameters: indeterminate because a constrained distance or segment is degenerate.",
         "addCoincident": "Coincident",
         "addFixed": "Fix selected point",
         "addHorizontal": "Horizontal",
         "addVertical": "Vertical",
+        "addParallel": "Parallel",
         "addPerpendicular": "Perpendicular",
         "addDistance": "Set distance",
         "distanceMm": "Distance (mm)",
@@ -469,6 +470,7 @@
           "fixed": "Fixed",
           "horizontal": "Horizontal",
           "vertical": "Vertical",
+          "parallel": "Parallel",
           "perpendicular": "Perpendicular",
           "distance": "Distance"
         }

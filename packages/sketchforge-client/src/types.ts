@@ -223,6 +223,7 @@ export type SketchSweepProfile = {
   segments: readonly { id: string; startId: string; endId: string; kind?: "line" | "bezier" | "smooth" }[];
   constraints?: readonly ({ id: string; kind: "coincident"; pointIds: readonly [string, string] }
     | { id: string; kind: "horizontal" | "vertical"; segmentId: string }
+    | { id: string; kind: "parallel"; segmentIds: readonly [string, string] }
     | { id: string; kind: "perpendicular"; segmentIds: readonly [string, string] }
     | { id: string; kind: "distance"; pointIds: readonly [string, string]; valueMm: number })[];
   sweepFrames?: {
