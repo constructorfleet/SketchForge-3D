@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { parseApiV1Query, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -14,16 +15,19 @@ export const revalidate = false;
  * booleans endpoint is the same operation with the operands named explicitly,
  * and since both go through `Engine` they are now the same code as well.
  */
-export async function POST(request: Request) {
+const postGroup = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
+  const query = parseApiV1Query("POST /api/v1/groups", request);
+  if (!query.ok) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
   if (!body) return apiErrors.jsonBodyRequired();
   const ids = apiShapeIds(body.ids);
   if (!ids) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
+  if (!validateApiV1RequestBody("POST /api/v1/groups", { ids })) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
 
   const grouped = await apiEngine(context.root).group(projectId, ids);
   if (!grouped.ok) {
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
     });
   }
   return apiJson({ shape: apiShapeSummary(grouped.value.shape), revision: grouped.value.revision }, 201);
-}
+};
 
 /**
  * Take a group apart, leaving its children where they appeared.
@@ -41,16 +45,21 @@ export async function POST(request: Request) {
  * children come back carrying all of that rather than springing back to where
  * they were when it was built.
  */
-export async function DELETE(request: Request) {
+const deleteGroup = async (request: Request) => {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId, shapeId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
   if (!shapeId) return apiErrors.shapeIdRequired();
+  const query = parseApiV1Query("DELETE /api/v1/groups", request);
+  if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
 
   const ungrouped = await apiEngine(context.root).ungroup(projectId, shapeId);
   if (!ungrouped.ok) {
     return apiEngineError(ungrouped.failure, { oneShape: true, locked: () => "That group is locked." });
   }
   return apiJson({ shapes: ungrouped.value.shapes.map(apiShapeSummary), revision: ungrouped.value.revision });
-}
+};
+
+export const POST = withApiV1Contract("POST /api/v1/groups", postGroup);
+export const DELETE = withApiV1Contract("DELETE /api/v1/groups", deleteGroup);

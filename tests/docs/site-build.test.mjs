@@ -91,7 +91,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /32 operations; generated OpenAPI describes 19 and explains why 13 remain omitted/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes 21 and explains why 11 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
@@ -108,7 +108,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /19 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /21 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
@@ -121,7 +121,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
 
-  assert.match(migration, /19 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 13 are listed/i);
+  assert.match(migration, /21 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 11 are listed/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
   assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
   assert.match(migration, /required audience\/owner metadata/i);

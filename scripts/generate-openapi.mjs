@@ -119,6 +119,7 @@ function toJsonSchema(schema) {
   if (schema.pattern !== undefined) result.pattern = schema.pattern;
   if (schema.minItems !== undefined) result.minItems = schema.minItems;
   if (schema.maxItems !== undefined) result.maxItems = schema.maxItems;
+  if (schema.uniqueItems !== undefined) result.uniqueItems = schema.uniqueItems;
   if (schema.description !== undefined) result.description = schema.description;
   if (schema.properties) result.properties = Object.fromEntries(Object.entries(schema.properties).map(([name, child]) => [name, toJsonSchema(child)]));
   if (schema.items) result.items = toJsonSchema(schema.items);

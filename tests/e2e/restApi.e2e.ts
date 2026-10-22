@@ -146,6 +146,31 @@ describe("the REST API over HTTP", () => {
     expect(shape.width).toBeCloseTo(8, 1);
   });
 
+  it("groups and ungroups through the running HTTP API with contract-shaped replies and errors", async () => {
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [
+        { kind: "box", name: "Group A", width: 10, depth: 10, height: 10 },
+        { kind: "box", name: "Group B", width: 10, depth: 10, height: 10, x: 15 },
+      ] }),
+    });
+    expect(created.status).toBe(201);
+    const ids = (created.body.shapes as Array<Record<string, string>>).map(({ id }) => id);
+
+    const grouped = await api(`/groups?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids }) });
+    expect(grouped.status).toBe(201);
+    expect(grouped.body).toMatchObject({ revision: expect.any(Number), shape: { id: expect.any(String), groupedCount: 2 } });
+    const groupId = (grouped.body.shape as Record<string, string>).id;
+
+    const ungrouped = await api(`/groups?projectId=${projectId}&shapeId=${groupId}`, { method: "DELETE" });
+    expect(ungrouped.status).toBe(200);
+    expect(ungrouped.body).toMatchObject({ revision: expect.any(Number), shapes: expect.arrayContaining([expect.objectContaining({ name: "Group A" }), expect.objectContaining({ name: "Group B" })]) });
+
+    const invalid = await api(`/groups?projectId=${projectId}&shapeId=${shapeId}`, { method: "DELETE" });
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.code).toBe("invalid_request");
+  });
+
   it("builds an explicitly selected fine-pitch thread", async () => {
     const created = await api(`/shapes?projectId=${projectId}`, {
       method: "POST",

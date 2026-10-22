@@ -21,6 +21,7 @@ export type ApiV1FieldSchema = {
   pattern?: string;
   minItems?: number;
   maxItems?: number;
+  uniqueItems?: boolean;
   oneOf?: readonly ApiV1FieldSchema[];
   not?: ApiV1FieldSchema;
   additionalProperties?: boolean | ApiV1FieldSchema;
@@ -280,7 +281,7 @@ export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): b
   if (schema.not && validateApiV1Schema(value, schema.not)) return false;
   if (schema.nullable && value === null) return true;
   if (schema.enum && !schema.enum.includes(value as string | null)) return false;
-  if (schema.type === "array") return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.items || value.every((item) => validateApiV1Schema(item, schema.items!)));
+  if (schema.type === "array") return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.uniqueItems || new Set(value).size === value.length) && (!schema.items || value.every((item) => validateApiV1Schema(item, schema.items!)));
   if (schema.type === "object") {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;
     const object = value as Record<string, unknown>;
@@ -471,8 +472,26 @@ export const API_V1_OPERATIONS = [
     },
   },
   operation("OPTIONS", "/api/v1/faces", "faceRouteOptions", [204], undefined, "none"),
-  operation("POST", "/api/v1/groups", "groupShapes"),
-  operation("DELETE", "/api/v1/groups", "ungroupShape"),
+  {
+    ...operation("POST", "/api/v1/groups", "groupShapes", [201, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object", required: ["ids"], properties: { ids: { type: "array", minItems: 2, uniqueItems: true, items: { type: "string", pattern: "\\S" } } }, additionalProperties: false,
+    })),
+    description: "Groups at least two distinct shapes; members marked hole are subtracted using the same semantics as the editor.",
+    query: projectQuery,
+    responseSchemas: {
+      201: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num }, additionalProperties: false },
+      400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema,
+    },
+  },
+  {
+    ...operation("DELETE", "/api/v1/groups", "ungroupShape", [200, 400, 401, 404, 409, 422, 500, 503]),
+    description: "Ungroups a group and returns its children with the group's current transforms applied.",
+    query: shapeQuery,
+    responseSchemas: {
+      200: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num }, additionalProperties: false },
+      400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema,
+    },
+  },
   operation("POST", "/api/v1/imports", "importGeometry"),
   {
     ...operation("POST", "/api/v1/interference", "analyzeInterference", [200, 400, 401, 404, 409, 422, 500, 503], json({
