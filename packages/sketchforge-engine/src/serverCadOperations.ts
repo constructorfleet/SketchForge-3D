@@ -15,7 +15,8 @@
  * editor from one filleted there.
  */
 
-import type { OcctKernel, ShapeHandle } from "occt-wasm";
+import type { EvolutionData, OcctKernel, ShapeHandle } from "occt-wasm";
+import { faceIdsFromEvolution } from "./faceLineage.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import {
   exactSolidForShape,
@@ -64,6 +65,7 @@ export class ServerCadError extends Error {
 
 const MESH_DEFLECTION = 0.1;
 const MIN_CAD_DIMENSION = 0.01;
+const FACE_HASH_UPPER_BOUND = 2_147_483_647;
 
 function meshPositionsOf(shape: WorkplaneShape) {
   const positions = shape.importedMesh?.positions;
@@ -400,12 +402,17 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
       );
     }
 
+    const sourceFaces = cad.getSubShapes(solid, "face");
+    const sourceFaceHashes = sourceFaces.map((face) => cad.hashCode(face, FACE_HASH_UPPER_BOUND));
     let treated: ShapeHandle;
+    let evolution: EvolutionData | undefined;
     try {
       if (treatment.kind === "fillet") {
-        treated = cad.fillet(solid, edges, treatment.amount);
+        evolution = cad.filletWithHistory(solid, edges, treatment.amount, sourceFaceHashes, FACE_HASH_UPPER_BOUND);
+        treated = evolution.result;
       } else if (treatment.angle === undefined || Math.abs(treatment.angle - 45) < 0.001) {
-        treated = cad.chamfer(solid, edges, treatment.amount);
+        evolution = cad.chamferWithHistory(solid, edges, treatment.amount, sourceFaceHashes, FACE_HASH_UPPER_BOUND);
+        treated = evolution.result;
       } else {
         treated = cad.chamferDistAngle(solid, edges, treatment.amount, treatment.angle);
       }
@@ -425,7 +432,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
     const treatedSolids = cad.getSubShapes(treated, "solid");
     const result = treatedSolids.length === 1 ? treatedSolids[0] : treated;
 
-    return meshedCadResult(cad, result, shape);
+    return meshedCadResult(cad, result, shape, evolution ? { sourceFaceHashes, evolution } : undefined);
   });
 }
 
@@ -484,7 +491,12 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
 }
 
 /** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */
-export function meshedCadResult(cad: OcctKernel, result: ShapeHandle, sourceShape?: WorkplaneShape): ServerCadResult {
+export function meshedCadResult(
+  cad: OcctKernel,
+  result: ShapeHandle,
+  sourceShape?: WorkplaneShape,
+  lineage?: { sourceFaceHashes: number[]; evolution: EvolutionData },
+): ServerCadResult {
   const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
   // The editor stores a flat triangle list, not an indexed mesh, so the
   // indices are expanded here rather than carried.
@@ -502,7 +514,17 @@ export function meshedCadResult(cad: OcctKernel, result: ShapeHandle, sourceShap
     const index = faceIndexByHash.get(mesh.faceGroups![group + 2]!);
     if (index !== undefined) faceGroups.push(mesh.faceGroups![group]!, mesh.faceGroups![group + 1]!, index);
   }
-  const faceIds = sourceShape ? faceIdsForResult(cad, sourceShape, faces) : undefined;
+  const faceIds = sourceShape
+    ? lineage
+      ? faceIdsFromEvolution(
+        sourceShape.id,
+        sourceShape.faceIds,
+        lineage.sourceFaceHashes,
+        faces.map((face) => cad.hashCode(face, FACE_HASH_UPPER_BOUND)),
+        lineage.evolution,
+      )
+      : faceIdsForResult(cad, sourceShape, faces)
+    : undefined;
   return {
     brep: cad.toBREP(result),
     positions,
