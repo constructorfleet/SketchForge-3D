@@ -565,3 +565,16 @@ test("the lexical rules do not fire on a well-formed contract", () => {
     );
   }
 });
+
+// Regression: this project's own contributing guide documents the marker in
+// prose. Naming the marker is not claiming to be a contract.
+test("prose that merely names the marker is not treated as a contract", () => {
+  const source = [
+    "# Contributing",
+    "",
+    "If a Markdown file declares `verified_delivery: contract` in its frontmatter,",
+    "`npm run docs:verify` lints it as an acceptance contract.",
+  ].join("\n");
+
+  assert.deepEqual(lintContract(source), []);
+});

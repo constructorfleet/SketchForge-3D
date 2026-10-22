@@ -14,6 +14,10 @@ export const RULES_VERSION = "1";
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 const MARKER = /^\s*verified_delivery\s*:\s*contract\s*$/m;
+const OPENS_FRONTMATTER = /^---\r?\n/;
+// Scoped to an unterminated frontmatter block at the very top of the file.
+// Prose that merely names the marker — this project's own contributing guide
+// does — is not reaching for contract status.
 const CLAIMS_MARKER = /verified_delivery/;
 
 const REQUIRED_SECTIONS = [
@@ -158,7 +162,11 @@ export function lintContract(source) {
   if (!isContract(source)) {
     // A document reaching for the marker but failing to parse is held, not
     // skipped: a silently ignored contract is worse than a rejected one.
-    if (FRONTMATTER.exec(source) === null && CLAIMS_MARKER.test(source)) {
+    if (
+      OPENS_FRONTMATTER.test(source) &&
+      FRONTMATTER.exec(source) === null &&
+      CLAIMS_MARKER.test(source.slice(0, 2000))
+    ) {
       block("L-1", 1, "", 'This document mentions "verified_delivery" but has no parseable frontmatter, so it cannot be read as a contract.');
       return violations;
     }
