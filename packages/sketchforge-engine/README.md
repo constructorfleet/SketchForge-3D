@@ -69,9 +69,9 @@ See the [generated TypeScript API reference](https://constructorfleet.github.io/
 
 ## Editing a sketch-backed feature
 
-Sketch extrusions, revolves, and sweeps expose a stable `sketchSourceId` on the generated shape. Pass that ID to `engine.changeShape(projectId, sketchSourceId, { sketchProfile })` to rebuild the feature. For a persisted sketch revolve, the same source ID also accepts operation-setting updates such as `{ sides: 64 }`. When the output is nested inside a baked boolean group, the engine updates the sketch output and recomputes its boolean ancestors from their retained operands before writing the project. The edit is atomic: invalid profiles or a failed dependent rebuild leave the stored project unchanged.
+Sketch extrusions, revolves, and sweeps expose a stable `sketchSourceId` on the generated shape. Pass that ID to `engine.changeShape(projectId, sketchSourceId, { sketchProfile })` to rebuild the feature. For a persisted sketch revolve, the same source ID also accepts operation-setting updates such as `{ sides: 64 }`. A draft prism retains its `draftPrismAngle`; source edits accept `{ draftPrismAngle: 12 }` and reapply the draft when the extrusion profile changes. When the output is nested inside a baked boolean group, the engine updates the sketch output and recomputes its boolean ancestors from their retained operands before writing the project. The edit is atomic: invalid profiles or a failed dependent rebuild leave the stored project unchanged.
 
-This recomputation currently covers sketch-backed extrusions, revolves, and sweeps nested under boolean groups. Drafts and other downstream operations remain baked or unsupported for source-driven recompute, and a general-purpose feature graph is not yet available. `.skf` export preserves the updated sketch profile and recomputed boolean result.
+This recomputation currently covers sketch-backed extrusions, revolves, and sweeps nested under boolean groups, plus a retained prism-draft angle applied to a sketch extrusion. Other downstream operations remain baked or unsupported for source-driven recompute, and a general-purpose feature graph is not yet available. `.skf` export preserves the updated sketch profile, draft angle, and recomputed boolean result.
 
 ## Limitations
 

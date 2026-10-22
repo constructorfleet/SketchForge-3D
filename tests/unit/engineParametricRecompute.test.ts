@@ -265,6 +265,124 @@ describe("dependency-ordered feature recomputation", () => {
     expect(value(await engine.project("recompute")).revision).toBe(beforeWrites + 1);
   });
 
+  it("edits a persisted draft-prism angle by sketch source ID and keeps the draft during source recompute", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Drafted extrusion", width: 2, depth: 2, height: 3, x: 12, z: -4, elevation: 7 },
+      { kind: "box", name: "Cutter", width: 0.5, depth: 0.5, height: 1, x: 12, z: -4, elevation: 8, hole: true },
+    ]));
+    const original = created.shapes[0]!;
+    const document = await store.read("recompute");
+    document!.shapes[0] = {
+      ...document!.shapes[0]!,
+      sketchOperation: "extrude",
+      sketchProfile: extrusionProfile(),
+      sketchSourceId: "sketch/source-draft-prism",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    };
+    value(await engine.draftPrism("recompute", original.id, 5));
+    const cut = value(await engine.cut("recompute", { solidIds: [original.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const sourceChild = cut.groupedShapes!.find((shape) => shape.sketchSourceId === "sketch/source-draft-prism")!;
+    const cutBeforeAngleEdit = cut.cadBrep;
+    const writesBeforeEdit = writeCount();
+
+    const changed = await engine.changeShape("recompute", "sketch/source-draft-prism", { draftPrismAngle: 12 });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: sourceChild.id,
+      sketchSourceId: "sketch/source-draft-prism",
+      sketchOperation: "extrude",
+      draftPrismAngle: 12,
+      x: sourceChild.x,
+      z: sourceChild.z,
+      elevation: sourceChild.elevation,
+    });
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+    const afterAngleEdit = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    expect(afterAngleEdit.cadBrep).not.toBe(cutBeforeAngleEdit);
+    expect(afterAngleEdit.groupedShapes?.find((shape) => shape.id === sourceChild.id)?.draftPrismAngle).toBe(12);
+    const cutBeforeProfileEdit = afterAngleEdit.cadBrep;
+
+    const editedProfile = extrusionProfile(2);
+    const writesBeforeProfileEdit = writeCount();
+    const profileChanged = await engine.changeShape("recompute", "sketch/source-draft-prism", { sketchProfile: editedProfile });
+    expect(profileChanged.ok, JSON.stringify(profileChanged)).toBe(true);
+    expect(value(profileChanged).shape).toMatchObject({
+      id: sourceChild.id,
+      sketchSourceId: "sketch/source-draft-prism",
+      sketchProfile: editedProfile,
+      draftPrismAngle: 12,
+      x: sourceChild.x,
+      z: sourceChild.z,
+      elevation: sourceChild.elevation,
+    });
+    expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
+    const afterProfileEdit = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    expect(afterProfileEdit.cadBrep).not.toBe(cutBeforeProfileEdit);
+    expect(afterProfileEdit.groupedShapes?.find((shape) => shape.id === sourceChild.id)).toMatchObject({
+      draftPrismAngle: 12,
+      draftPrismSourceHeight: 3,
+      draftPrismSourceFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    });
+
+    const bytes = await exportSkfProject({
+      projectId: "recompute",
+      projectName: "Parametric recompute",
+      createdAt: 1,
+      modifiedAt: 1,
+      shapes: [afterProfileEdit],
+      history: [],
+      historyIndex: -1,
+      assets: [],
+      workspace: DEFAULT_WORKPLANE_WORKSPACE,
+      snapGrid: DEFAULT_SNAP_GRID,
+      placementElevation: 0,
+    });
+    const restored = await importSkfProject(bytes);
+    const restoredSource = restored.shapes[0]?.groupedShapes?.find((shape) => shape.id === sourceChild.id);
+    expect(restoredSource).toMatchObject({
+      draftPrismAngle: 12,
+      draftPrismSourceHeight: 3,
+      draftPrismSourceFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    });
+
+    const restoredDatabase = projectStore();
+    const restoredDocument = await restoredDatabase.store.read("recompute");
+    await restoredDatabase.store.write("recompute", restoredDocument!, restored.shapes);
+    const restoredEngine = createEngine(restoredDatabase.store);
+    const restoredEdit = await restoredEngine.changeShape("recompute", "sketch/source-draft-prism", {
+      sketchProfile: extrusionProfile(3),
+    });
+    expect(restoredEdit.ok, JSON.stringify(restoredEdit)).toBe(true);
+    expect(value(restoredEdit).shape).toMatchObject({
+      id: sourceChild.id,
+      sketchProfile: extrusionProfile(3),
+      draftPrismAngle: 12,
+      draftPrismSourceHeight: 3,
+      draftPrismSourceFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    });
+
+    const beforeIneffectiveRebuild = value(await engine.project("recompute"));
+    const writesBeforeIneffectiveRebuild = writeCount();
+    const ineffective = await engine.changeShape("recompute", "sketch/source-draft-prism", {
+      sketchProfile: extrusionProfile(1, 100),
+    });
+    expect(ineffective.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeIneffectiveRebuild);
+    expect(value(await engine.project("recompute"))).toEqual(beforeIneffectiveRebuild);
+
+    const beforeInvalidEdit = value(await engine.project("recompute"));
+    const writesBeforeInvalidEdit = writeCount();
+    const invalid = await engine.changeShape("recompute", "sketch/source-draft-prism", { draftPrismAngle: 45 });
+    expect(invalid.ok).toBe(false);
+    expect(invalid.ok ? undefined : invalid.failure.reason).toBe("invalid_shape_request");
+    expect(writeCount()).toBe(writesBeforeInvalidEdit);
+    expect(value(await engine.project("recompute"))).toEqual(beforeInvalidEdit);
+  });
+
   it("does not persist an extrusion source edit when rebuilt geometry breaks its dependent boolean", async () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);

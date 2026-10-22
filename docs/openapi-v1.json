@@ -60,6 +60,9 @@
                         "sketchSourceId": {
                           "type": "string"
                         },
+                        "draftPrismAngle": {
+                          "type": "number"
+                        },
                         "sketchProfile": {
                           "type": "object",
                           "required": [
@@ -1350,6 +1353,9 @@
                           "sketchSourceId": {
                             "type": "string"
                           },
+                          "draftPrismAngle": {
+                            "type": "number"
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -2623,6 +2629,9 @@
                           "sketchSourceId": {
                             "type": "string"
                           },
+                          "draftPrismAngle": {
+                            "type": "number"
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -3867,6 +3876,9 @@
                         },
                         "sketchSourceId": {
                           "type": "string"
+                        },
+                        "draftPrismAngle": {
+                          "type": "number"
                         },
                         "sketchProfile": {
                           "type": "object",
@@ -6963,6 +6975,9 @@
                                   "sketchSourceId": {
                                     "type": "string"
                                   },
+                                  "draftPrismAngle": {
+                                    "type": "number"
+                                  },
                                   "sketchProfile": {
                                     "type": "object",
                                     "required": [
@@ -9095,6 +9110,9 @@
                           "sketchSourceId": {
                             "type": "string"
                           },
+                          "draftPrismAngle": {
+                            "type": "number"
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -10252,6 +10270,9 @@
                           },
                           "sketchSourceId": {
                             "type": "string"
+                          },
+                          "draftPrismAngle": {
+                            "type": "number"
                           },
                           "sketchProfile": {
                             "type": "object",
@@ -11962,6 +11983,9 @@
                         "sketchSourceId": {
                           "type": "string"
                         },
+                        "draftPrismAngle": {
+                          "type": "number"
+                        },
                         "sketchProfile": {
                           "type": "object",
                           "required": [
@@ -13505,6 +13529,9 @@
                         },
                         "sketchSourceId": {
                           "type": "string"
+                        },
+                        "draftPrismAngle": {
+                          "type": "number"
                         },
                         "sketchProfile": {
                           "type": "object",

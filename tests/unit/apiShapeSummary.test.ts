@@ -55,4 +55,28 @@ describe("API shape summaries", () => {
 
     expect(apiShapeSummary(shape).stepAssembly).toEqual(stepAssembly);
   });
+
+  it("returns the persisted draft-prism angle for source-driven edits", () => {
+    const shape = {
+      id: "drafted-extrusion",
+      name: "Drafted extrusion",
+      kind: "mesh",
+      color: "#0098c7",
+      x: 0,
+      z: 0,
+      size: 4,
+      width: 2,
+      depth: 2,
+      height: 4,
+      rotation: 0,
+      sketchOperation: "extrude",
+      sketchSourceId: "sketch/source-extrusion",
+      draftPrismAngle: 12,
+    } as WorkplaneShape;
+
+    expect(apiShapeSummary(shape)).toMatchObject({
+      sketchSourceId: "sketch/source-extrusion",
+      draftPrismAngle: 12,
+    });
+  });
 });

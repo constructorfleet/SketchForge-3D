@@ -129,6 +129,7 @@ const shapeSummary = {
     requestKind: str,
     sketchOperation: str,
     sketchSourceId: str,
+    draftPrismAngle: num,
     sketchProfile: {
       type: "object",
       required: ["points", "segments"],

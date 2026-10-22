@@ -729,6 +729,7 @@ export function createEngine(store: ProjectStore): Engine {
       // output keeps its own stable object ID; SKF export derives the source
       // node from the synchronized profile on that output.
       const sourceFeatureInputChanged = changes.sketchProfile !== undefined
+        || changes.draftPrismAngle !== undefined
         || REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined);
       const sourceOutputs = !byOutputId.ok && sourceFeatureInputChanged
         ? findSketchOutput(document.shapes, shapeId)
@@ -744,7 +745,8 @@ export function createEngine(store: ProjectStore): Engine {
       if (sourceSketchTarget) {
         const isRevolveSource = isRevolveShape(existing);
         const outputFields = Object.keys(changes).filter((field) =>
-          field !== "sketchProfile" && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
+          field !== "sketchProfile" && field !== "draftPrismAngle"
+          && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
         );
         if (outputFields.length > 0) {
           return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
@@ -759,6 +761,15 @@ export function createEngine(store: ProjectStore): Engine {
       const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
       const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
       const isSketchRevolve = isRevolveShape(existing);
+      const draftPrismChanged = changes.draftPrismAngle !== undefined;
+      const requestedDraftPrismAngle = typeof changes.draftPrismAngle === "number" ? changes.draftPrismAngle : undefined;
+      if (draftPrismChanged && (!isSketchExtrusion || requestedDraftPrismAngle === undefined || !Number.isFinite(requestedDraftPrismAngle)
+        || requestedDraftPrismAngle === 0 || Math.abs(requestedDraftPrismAngle) >= 45)) {
+        return failed({
+          reason: "invalid_shape_request",
+          message: "A draft prism angle must be non-zero and between -45 and 45 degrees on a sketch extrusion.",
+        });
+      }
       if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
       }
@@ -774,8 +785,9 @@ export function createEngine(store: ProjectStore): Engine {
       // leave a thread's pitch readable but not writable.
       const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => changes[field] !== undefined) : [];
       let swept = existing;
-      if (replacingSketchProfile && isSketchExtrusion) {
-        const frame = existing.cadBrepFrame;
+      if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)) {
+        const sourceFrame = existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
+        const sourceHeight = existing.draftPrismSourceHeight ?? existing.height;
         try {
           const rebuilt = await sketchExtrusionShapeFromRequest({
             id: existing.id,
@@ -783,11 +795,11 @@ export function createEngine(store: ProjectStore): Engine {
             name: existing.name,
             color: existing.color,
             hole: existing.hole,
-            profile: changes.sketchProfile,
-            height: existing.height,
-            x: existing.x - (frame?.x ?? 0),
-            z: existing.z - (frame?.z ?? 0),
-            elevation: (existing.elevation ?? 0) - (frame?.elevation ?? 0),
+            profile: replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile,
+            height: sourceHeight,
+            x: existing.x - (sourceFrame?.x ?? 0),
+            z: existing.z - (sourceFrame?.z ?? 0),
+            elevation: (existing.elevation ?? 0) - (sourceFrame?.elevation ?? 0),
             rotation: existing.rotation,
             rotationX: existing.rotationX,
             rotationZ: existing.rotationZ,
@@ -801,7 +813,23 @@ export function createEngine(store: ProjectStore): Engine {
             cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
             ...sourceMetadata
           } = existing;
-          swept = { ...sourceMetadata, ...rebuilt, id: existing.id, sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId };
+          const draftPrismAngle = draftPrismChanged ? requestedDraftPrismAngle : existing.draftPrismAngle;
+          const rebuiltSource = {
+            ...sourceMetadata,
+            ...rebuilt,
+            id: existing.id,
+            sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+            ...(draftPrismAngle === undefined ? {} : {
+              draftPrismSourceHeight: sourceHeight,
+              ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
+            }),
+          };
+          swept = draftPrismAngle === undefined
+            ? rebuiltSource
+            : {
+              ...shapeWithCadResult(rebuiltSource, await applyDraftPrism(rebuiltSource, { angle: draftPrismAngle })),
+              draftPrismAngle,
+            };
         } catch (error) {
           return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The sketch extrusion could not be rebuilt." });
         }
@@ -906,6 +934,7 @@ export function createEngine(store: ProjectStore): Engine {
       const sweepFields: readonly string[] = [
         ...(sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS),
         "sketchProfile",
+        "draftPrismAngle",
       ];
       // Shape summaries expose the source ID for identity; echoing a full
       // summary into PATCH must not let callers replace that identity.
@@ -1225,9 +1254,15 @@ export function createEngine(store: ProjectStore): Engine {
       shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment))
     )),
 
-    draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, async (shape) => (
-      shapeWithCadResult(shape, await applyDraftPrism(shape, { angle }))
-    )),
+    draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, async (shape) => {
+      const sourceFrame = shape.draftPrismSourceFrame ?? shape.cadBrepFrame;
+      return {
+        ...shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })),
+        draftPrismAngle: angle,
+        draftPrismSourceHeight: shape.draftPrismSourceHeight ?? shape.height,
+        ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
+      };
+    }),
 
     mirrorBaked: (projectId, ids, axis) => mutating(projectId, async (document) => {
       if (ids.length < 1) return failed({ reason: "selection_too_small", needed: 1, given: 0 });
