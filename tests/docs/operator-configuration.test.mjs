@@ -16,7 +16,7 @@ test('generated operator configuration reference is current', async () => {
   assert.equal(await source('docs/OPERATOR_CONFIGURATION.md'), expected);
 });
 
-test('public configuration registry agrees with the server and container readers', async () => {
+test('public configuration registry agrees with server, container, client, MCP, and desktop readers', async () => {
   const registry = JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json'));
   const readers = [
     await source('deploy/docker/start-server.mjs'),
@@ -32,6 +32,7 @@ test('public configuration registry agrees with the server and container readers
     await source('packages/sketchforge-client/mcp/localMacroRunner.mjs'),
     await source('packages/sketchforge-client/mcp/macroTools.mjs'),
     await source('packages/sketchforge-client/mcp/server.mjs'),
+    await source('apps/desktop/main.cjs'),
   ].join('\n');
   const names = registry.settings.map((setting) => setting.name);
   assert.equal(new Set(names).size, names.length, 'setting names must be unique');
@@ -95,7 +96,32 @@ test('public client and MCP runtime settings have an owner and appear in the inv
   }
 });
 
-test('the tracked server, container, client, and MCP runtime reader set has no unowned settings', async () => {
+test('desktop runtime settings have explicit ownership while the development URL stays an internal handoff', async () => {
+  const registry = JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json'));
+  const byName = new Map(registry.settings.map((setting) => [setting.name, setting]));
+  const main = await source('apps/desktop/main.cjs');
+  const devLauncher = await source('apps/desktop/dev.mjs');
+  const desktopReaders = `${main}\n${devLauncher}`;
+  const discovered = [...new Set(desktopReaders.match(/process\.env\.([A-Z][A-Z0-9_]*)/g) ?? [])]
+    .map((reference) => reference.slice('process.env.'.length))
+    .sort();
+
+  assert.deepEqual(discovered, ['NODE_PATH', 'SKETCHFORGE_DESKTOP_DEV_URL', 'SKETCHFORGE_DESKTOP_PORT']);
+  assert.ok(main.includes('process.env.NODE_PATH'), 'NODE_PATH is only forwarded to the packaged child process');
+  assert.ok(devLauncher.includes('SKETCHFORGE_DESKTOP_DEV_URL: url'), 'development URL must remain a launcher-injected internal handoff');
+
+  const supported = ['SKETCHFORGE_DESKTOP_PORT'];
+  for (const name of supported) {
+    const setting = byName.get(name);
+    assert.ok(setting, `${name} must have a desktop configuration registry row`);
+    assert.equal(setting.default, '62158', `${name} must document the packaged desktop origin port`);
+    assert.equal(setting.source, '../apps/desktop/main.cjs', `${name} must link its authoritative reader`);
+    assert.equal(setting.ownerPage, 'OPERATOR_CONFIGURATION.md#desktop-settings', `${name} must link the desktop settings guide`);
+  }
+  assert.equal(byName.has('SKETCHFORGE_DESKTOP_DEV_URL'), false, 'internal development handoffs are not supported user configuration');
+});
+
+test('the tracked server, container, client, MCP, and desktop reader set has no unowned settings', async () => {
   const registry = JSON.parse(await source('packages/sketchforge-engine/src/support/lib/operator-configuration.json'));
   const readerPaths = [
     'deploy/docker/start-server.mjs',
@@ -111,10 +137,16 @@ test('the tracked server, container, client, and MCP runtime reader set has no u
     'packages/sketchforge-client/mcp/localMacroRunner.mjs',
     'packages/sketchforge-client/mcp/macroTools.mjs',
     'packages/sketchforge-client/mcp/server.mjs',
+    'apps/desktop/main.cjs',
   ];
   const contents = (await Promise.all(readerPaths.map(source))).join('\n');
   const discovered = [...new Set(contents.match(/\b(?:SKETCHFORGE_[A-Z0-9_]+|PORT|HOSTNAME)\b/g) ?? [])]
-    .filter((name) => name !== 'SKETCHFORGE_DOCKER_BUILD')
+    .filter((name) => ![
+      'SKETCHFORGE_DOCKER_BUILD',
+      'SKETCHFORGE_DESKTOP',
+      'SKETCHFORGE_DESKTOP_DEV_URL',
+      'SKETCHFORGE_DESKTOP_VERSION',
+    ].includes(name))
     .sort();
   const declared = registry.settings.map((setting) => setting.name).sort();
   assert.deepEqual(declared, discovered, 'every runtime setting in the owned reader set must have exactly one registry row');
