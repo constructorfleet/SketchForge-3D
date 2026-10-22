@@ -21,6 +21,14 @@ const TOKEN = "e2e-round-trip-token";
 let server: ChildProcess | undefined;
 let projectsDir = "";
 let origin = "";
+let serverOutput = "";
+
+function captureServerOutput(chunk: Buffer | string) {
+  const text = String(chunk)
+    .replaceAll(TOKEN, "[redacted]")
+    .replace(/\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL)[A-Z0-9_]*)=([^\s]+)/gi, "$1=[redacted]");
+  serverOutput = `${serverOutput}${text}`.slice(-8_192);
+}
 
 function freePort() {
   return new Promise<number>((resolve, reject) => {
@@ -65,8 +73,11 @@ beforeAll(async () => {
       SKETCHFORGE_API_TOKEN: TOKEN,
       SKETCHFORGE_PROJECTS_DIR: projectsDir,
     },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  serverOutput = "";
+  server.stdout?.on("data", captureServerOutput);
+  server.stderr?.on("data", captureServerOutput);
 
   const deadline = Date.now() + 110_000;
   for (;;) {
@@ -74,12 +85,19 @@ beforeAll(async () => {
     try {
       // Ask for something that exercises the route, not just the socket: a dev
       // server answers before it has compiled anything.
-      const probe = await api("/projects");
+      // A server that accepts the connection but stalls must not keep this
+      // readiness loop blocked past its wall-clock deadline.
+      const probe = await api("/projects", { signal: AbortSignal.timeout(2_000) });
       if (probe.status === 200) break;
     } catch {
       // Connection refused while it boots.
     }
-    if (Date.now() > deadline) throw new Error("the dev server never answered /api/v1/projects");
+    if (Date.now() > deadline) {
+      throw new Error(
+        `the dev server never answered /api/v1/projects\n` +
+          `Last Next server output (up to 8192 characters):\n${serverOutput || "(no output)"}`,
+      );
+    }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 });
