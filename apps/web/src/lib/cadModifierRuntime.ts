@@ -67,10 +67,23 @@ export function cadModifierTopologyEdgeIsSelectable(
 }
 
 export function selectableCadModifierEdge(
-  edge: Pick<CadModifierEdge, "display" | "selectable" | "manifold" | "boundary" | "angle">,
+  edge: Pick<CadModifierEdge, "display" | "selectable" | "manifold" | "boundary" | "angle" | "points">,
   sharpAngle: number,
 ) {
-  return edge.selectable && edge.manifold && !edge.boundary && edge.angle + 1e-3 >= sharpAngle;
+  return edge.selectable && cadModifierTopologyEdgeIsSelectable(edge) && edge.angle + 1e-3 >= sharpAngle;
+}
+
+/** True only when the selection contains every edge the kernel will see as eligible. */
+export function cadModifierSelectionIsAllEdges(
+  selectedIds: number[],
+  edges: Array<Pick<CadModifierEdge, "id" | "display" | "selectable" | "manifold" | "boundary" | "angle" | "points">>,
+  sharpAngle: number,
+) {
+  const eligibleIds = edges.filter((edge) => selectableCadModifierEdge(edge, sharpAngle)).map((edge) => edge.id);
+  return eligibleIds.length > 0
+    && eligibleIds.length === edges.length
+    && selectedIds.length === eligibleIds.length
+    && eligibleIds.every((id) => selectedIds.includes(id));
 }
 
 /** English only; the edge modifier panel shows `edgeModifierSelectionMessage` through the catalog. */

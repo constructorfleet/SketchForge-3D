@@ -72,6 +72,24 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it("preserves the all-edge replay intent through export and import", async () => {
+    const feature = { kind: "fillet" as const, amount: 0.25, edgeCount: 12, allEdges: true as const };
+    const treated = shape("mesh", "treated-extrusion", {
+      edgeTreatments: [feature],
+      edgeTreatmentHistory: [{
+        id: "fillet-history",
+        createdAt: 42,
+        feature,
+        before: shape("mesh", "treated-extrusion-before"),
+      }],
+    });
+
+    const restored = await importSkfProject(await exportSkfProject(input([treated])));
+
+    expect(restored.shapes[0]?.edgeTreatments?.[0]?.allEdges).toBe(true);
+    expect(restored.shapes[0]?.edgeTreatmentHistory?.[0]?.feature.allEdges).toBe(true);
+  });
+
   it("round-trips an extrusion's editable source sketch and its feature dependency", async () => {
     const extrusion = shape("mesh", "extrusion-1", {
       sketchSourceId: "sketch-source-1",

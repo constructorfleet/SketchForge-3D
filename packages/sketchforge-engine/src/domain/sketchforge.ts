@@ -219,6 +219,8 @@ export type EdgeTreatmentFeature = {
   amount: number;
   edgeCount: number;
   chamferAngle?: number;
+  /** The operation selected every currently available edge, so it can be replayed without topology indices. */
+  allEdges?: true;
 };
 
 export type EdgeTreatmentHistoryEntry = {

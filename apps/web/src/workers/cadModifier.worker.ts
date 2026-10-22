@@ -349,9 +349,13 @@ function collectEdges(cad: OcctKernel, shape: ShapeHandle, sharpAngle: number, s
         curveType = "unknown";
       }
       return { id, points, ...classification, curveType, surfaceTypes, faceAreas };
-    }).filter((edge) => edge.points.length >= 6);
+    });
     const edges: CollectedCadEdge[] = collectedEdges.map((edge) => {
-      const display = treatmentAreaLimit > 0 ? isModifierDisplayCadEdge(edge, treatmentAreaLimit) : isDisplayCadEdge(edge);
+      // Keep unsampled kernel edges in this inventory so all-edge replay is
+      // never inferred from a wireframe-filtered subset. They remain hidden
+      // and unselectable through `cadModifierTopologyEdgeIsSelectable`.
+      const display = edge.points.length >= 6
+        && (treatmentAreaLimit > 0 ? isModifierDisplayCadEdge(edge, treatmentAreaLimit) : isDisplayCadEdge(edge));
       return {
         ...edge,
         display,

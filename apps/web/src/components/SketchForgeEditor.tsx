@@ -105,6 +105,7 @@ import {
   CAD_BOOLEAN_REQUEST_TIMEOUT_MS,
   CAD_MODIFIER_MAX_SHARP_ANGLE,
   CAD_MODIFIER_REQUEST_TIMEOUT_MS,
+  cadModifierSelectionIsAllEdges,
   cadModifierPrepareTimeoutMs,
   cadModifierTimeoutError,
   cadModifierWorkerFailureError,
@@ -7869,6 +7870,7 @@ export function SketchForgeEditor({
       kind,
       amount,
       edgeCount: selectedEdgeIds.length,
+      ...(cadModifierSelectionIsAllEdges(selectedEdgeIds, response.edges, sharpAngle) ? { allEdges: true as const } : {}),
       ...(kind === "chamfer" ? { chamferAngle } : {}),
     } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
     const session: EdgeModifierSession = {
@@ -7935,6 +7937,9 @@ export function SketchForgeEditor({
       kind: edgeModifier.kind,
       amount: edgeModifier.amount,
       edgeCount: edgeModifier.selectedEdgeIds.length,
+      ...(cadModifierSelectionIsAllEdges(edgeModifier.selectedEdgeIds, edgeModifier.edges, edgeModifier.sharpAngle)
+        ? { allEdges: true as const }
+        : {}),
       ...(edgeModifier.kind === "chamfer" ? { chamferAngle: edgeModifier.chamferAngle } : {}),
     } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
     const createdAt = Date.now();

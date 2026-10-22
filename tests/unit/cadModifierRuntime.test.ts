@@ -7,6 +7,7 @@ import {
   CAD_MODIFIER_RUNTIME_BASE,
   cadModifierPrepareTimeoutMs,
   cadModifierTopologyEdgeIsSelectable,
+  cadModifierSelectionIsAllEdges,
   cadTransformRequiresGeneralTransform,
   cadModifierTimeoutError,
   defaultCadModifierTangentChain,
@@ -94,5 +95,19 @@ describe("CAD modifier runtime state", () => {
     expect(cadModifierTopologyEdgeIsSelectable(hiddenDetailEdge)).toBe(true);
     expect(selectableCadModifierEdge(hiddenDetailEdge, 25)).toBe(true);
     expect(selectableCadModifierEdge(hiddenDetailEdge, 60)).toBe(false);
+  });
+
+  it("only records all-edge intent when every kernel edge is in the selected set", () => {
+    const edges = [
+      { id: 1, display: true, selectable: true, manifold: true, boundary: false, angle: 90, points: [0, 0, 0, 1, 0, 0] },
+      { id: 2, display: true, selectable: true, manifold: true, boundary: false, angle: 0, points: [0, 1, 0, 1, 1, 0] },
+    ];
+
+    expect(cadModifierSelectionIsAllEdges([1], edges, 25)).toBe(false);
+    expect(cadModifierSelectionIsAllEdges([1, 2], edges, 0)).toBe(true);
+    expect(cadModifierSelectionIsAllEdges([1, 2, 3], edges, 0)).toBe(false);
+    expect(cadModifierSelectionIsAllEdges([3], [
+      { id: 3, display: true, selectable: true, manifold: true, boundary: false, angle: 90, points: [0, 0, 0] },
+    ], 0)).toBe(false);
   });
 });
