@@ -170,6 +170,14 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(patterns.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy"]);
   assert.deepEqual(patterns.responses["422"].content["application/json"].schema.properties.code.enum, ["invalid_request"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "patternShapes"), false);
+  const explode = spec.paths["/api/v1/explode"].post;
+  assert.equal(explode.operationId, "explodeAssembly");
+  assert.deepEqual(explode.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(Object.keys(explode.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(explode.responses["200"].content["application/json"].schema.required, ["shapes", "revision"]);
+  assert.deepEqual(explode.responses["200"].content["application/json"].schema.properties.shapes.items.required, ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"]);
+  assert.deepEqual(explode.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy", "shape_locked"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "explodeAssembly"), false);
   for (const [pathName, method, operationId] of [
     ["/api/v1/booleans", "post", "booleanShapes"],
     ["/api/v1/treatments", "post", "treatShape"],
@@ -182,8 +190,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 24);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 8);
+  assert.equal(documentedOperationCount, 25);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 7);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {
