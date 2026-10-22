@@ -1,3 +1,12 @@
+---
+slug: "/docs/mcp/EXAMPLES"
+title: "MCP examples"
+audience: "MCP users"
+owner: "MCP"
+sources:
+  - "packages/sketchforge-client/mcp/**"
+---
+
 # MCP examples
 
 ## Build and export a local project

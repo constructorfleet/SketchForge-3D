@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.pl"
+title: "Polish (pl) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # Polish (pl) language guide
 
 Binding for the Polish catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

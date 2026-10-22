@@ -17,11 +17,19 @@ export function componentColorsFromGlb(glb: Uint8Array): Map<string, NamedGlbCol
     const mesh = typeof node.mesh === "number" ? json.meshes?.[node.mesh] : undefined;
     const nodeName = node.name?.trim();
     const meshName = mesh?.name?.trim();
-    const names = new Set([nodeName, meshName].filter((name): name is string => Boolean(name)));
+    const occurrenceNodeName = nodeName && /^\d+$/.test(nodeName) ? nodeName : undefined;
+    const names = new Set([
+      meshName,
+      nodeName && (!meshName || nodeName === meshName || occurrenceNodeName) ? nodeName : undefined,
+    ].filter((name): name is string => Boolean(name)));
     if (!names.size || !mesh?.primitives?.length) continue;
 
     const colors = new Set<string>();
-    let completeColor = !nodeName || !meshName || nodeName === meshName;
+    // XCAF glTF export names occurrence nodes with the STEP usage id while
+    // naming their mesh with the product definition. Keep arbitrary node/mesh
+    // label conflicts ambiguous, but associate numeric occurrence labels with
+    // the mesh product name.
+    let completeColor = !nodeName || !meshName || nodeName === meshName || Boolean(occurrenceNodeName);
     for (const primitive of mesh.primitives) {
       const factor = typeof primitive.material === "number"
         ? json.materials?.[primitive.material]?.pbrMetallicRoughness?.baseColorFactor

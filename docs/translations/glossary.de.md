@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.de"
+title: "German (de) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # German (de) language guide
 
 Binding for the German catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

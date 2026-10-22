@@ -1,3 +1,15 @@
+---
+slug: "/docs/PUBLISHING_CLIENTS"
+title: "Publishing the client libraries"
+audience: "Contributors"
+owner: "Packages"
+sources:
+  - ".release-please-manifest.json"
+  - "packages/sketchforge-client/package.json"
+  - "packages/sketchforge-engine/package.json"
+  - "packages/sketchforge-py/pyproject.toml"
+---
+
 # Publishing the client libraries
 
 Three packages are published from this repository, independently of the app's own version:
@@ -7,9 +19,9 @@ All three are published by `.github/workflows/release.yml`, from the same `v<ver
 | Package | Registry | Version |
 | --- | --- | --- |
 <!-- publishing-version-table:start -->
-| `@constructorfleet/sketchforge3d` | npm | `1.17.0` | <!-- x-release-please-version -->
-| `@constructorfleet/sketchforge-engine` | npm | `1.17.0` | <!-- x-release-please-version -->
-| `sketchforge3d` | PyPI | `1.17.0` | <!-- x-release-please-version -->
+| `@constructorfleet/sketchforge3d` | npm | `1.19.0` | <!-- x-release-please-version -->
+| `@constructorfleet/sketchforge-engine` | npm | `1.19.0` | <!-- x-release-please-version -->
+| `sketchforge3d` | PyPI | `1.19.0` | <!-- x-release-please-version -->
 <!-- publishing-version-table:end -->
 
 The table is generated from `.release-please-manifest.json`, the release-please source of truth, after verifying that the app, engine, TypeScript client, and Python package manifests all match it. Release Please updates its marked version rows in each release pull request; regenerate locally with `node scripts/docs/generate-publishing-clients.mjs`. `npm run docs:check` detects stale versions.

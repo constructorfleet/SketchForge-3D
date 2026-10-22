@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.fr"
+title: "French (fr) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # French (fr) language guide
 
 Binding for the French catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

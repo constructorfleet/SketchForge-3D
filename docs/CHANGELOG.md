@@ -1,12 +1,22 @@
+---
+slug: "/docs/CHANGELOG"
+title: "Changelog"
+audience: "Contributors"
+owner: "Contributors"
+---
+
 # Changelog
 
 - Sketch constraints now include a perpendicular relation between two selected segments. The solver projects both segments toward a right angle during point edits, and the constraint persists in `.skf` sketches and is represented in the TypeScript client profile type.
 
 ## Unreleased
 
+- `GET /thickness` now has a runtime-validated query and response contract and
+  appears in the generated OpenAPI reference. The documented subset now covers
+  18 of 32 registered operations; 14 remain omitted.
 - Exploding a STEP assembly now creates editable nested groups that follow its product tree when every solid has an unambiguous occurrence association. The exact solid geometry and project-space positions stay on the leaves; moving a group moves its subassembly, and ungrouping works one level at a time. If any association is missing or ambiguous, explosion keeps the existing flat result so no solid disappears. Native STEP transform operations and hierarchy-preserving STEP export remain unsupported.
-- Editing a sketch-backed sweep now recomputes retained boolean-group descendants bottom-up and persists the updated `.skf` result in one write. Invalid sketch profiles or unsuccessful dependent booleans leave the project unchanged. This is a first runtime recompute slice; other downstream operation types remain baked. See the [engine package guide](./packages/engine.md).
-- The operator configuration reference now links each supported server and container setting to its owner guide and implementation reader. Its scope notes call out client, desktop, build, browser, and test configuration that remains outside the operator registry, without presenting every environment read as a supported operator option.
+- Editing a sketch-backed extrusion, revolve, or sweep through its persisted `sketchSourceId` rebuilds its geometry and recomputes retained boolean ancestors bottom-up in one project write. The source and output IDs and placement remain stable; invalid profiles or dependent booleans that fail leave the project unchanged. Other downstream operation types remain baked. See the [engine package guide](./packages/engine.md).
+- The configuration inventory now covers supported server/container, TypeScript/Python client, and local MCP runtime settings. Each setting links to all verified readers and owner guides; build, test, CI, desktop development, and pass-through environment values remain classified outside the supported runtime inventory.
 
 - The generated OpenAPI contract now includes both measurement routes, with
   runtime validation for conditional edge and face indices and the exclusive
@@ -34,6 +44,8 @@
 
 - Sketch sweeps now persist a separate editable source-sketch node and feature input link in `.skf` packages. Editing the profile rebuilds the sweep while preserving source and output identities; undo/redo and project round-trip retain the source definition.
 - `PATCH /shapes` can target a sketch sweep by its persisted `sketchSourceId`; changing that upstream profile rebuilds the dependent sweep before the project is written. The output and source identities, placement, and resize ratios remain stable, while failed profiles leave the stored sweep unchanged.
+
+- `PATCH /shapes` can also target a persisted sketch extrusion by its source ID. The engine rebuilds exact extrusion geometry from the edited profile and re-evaluates retained boolean ancestors bottom-up in one project write. Rebuilt output identities and placement are retained; invalid extrusion profiles and booleans that become ineffective leave the project unchanged.
 
 - Small STEP assembly imports now retain their nested product names and parent/child relationships as optional `stepAssembly` metadata in project shape summaries. This remains descriptive metadata for a single combined mesh, not a set of separately editable components; extraction is bounded to 200 solids, 8 MiB, 2,000 nodes, and depth 32. The fixture under `tests/fixtures/step/` records its CadQuery provenance and regeneration path.
 - Exploding a STEP assembly now carries unambiguous source occurrence ancestry onto each independently selectable exact solid as `stepComponent` metadata. The component geometry, identity, and parent path survive `.skf` project round-trips; ambiguous associations omit ancestry rather than guess. See the [STEP assembly guide](./guides/step-assemblies.md).

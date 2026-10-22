@@ -91,7 +91,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /32 operations; generated OpenAPI describes 16 and explains why 16 remain omitted/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes 18 and explains why 14 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
@@ -108,14 +108,20 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /16 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /18 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
+  assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
+  assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
+  assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
+  assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
+  assert.match(spec, /`SKETCHFORGE_DESKTOP_DEV_URL`.*internal handoff.*`NODE_PATH`.*pass-through/i);
   assert.match(spec, /Additional runtime schemas and route response validations remain outstanding/i);
   assert.match(spec, /creates or refreshes a bot repair PR if tracked outputs differ/i);
   assert.doesNotMatch(spec, /Open PR \[#209\]|Open PR \[#214\]/i);
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
 
-  assert.match(migration, /Fifteen operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI/i);
+  assert.match(migration, /Eighteen operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 14 are listed/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
   assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
   assert.match(migration, /trusted\s+default-branch follow-up validates the artifact and PR before committing only\s+allowlisted updates to same-repository PR branches/i);
@@ -133,7 +139,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /`PATCH \/shapes` can target a sketch sweep by\s+its persisted `sketchSourceId`/i);
   assert.match(capabilities, /`sketchProfile`[\s\S]*?`PATCH \/api\/v1\/shapes`[\s\S]*?retaining shape and source IDs/i);
   assert.match(capabilities, /rebuilds nested editable project groups when every exact\s+solid maps unambiguously to a source occurrence/i);
-  assert.match(capabilities, /editing a sketch-backed sweep[\s\S]*?bottom-up[\s\S]*?do not yet recompute/i);
+  assert.match(capabilities, /editing a\s+sketch-backed extrusion or sweep[\s\S]*?boolean ancestors bottom-up[\s\S]*?do\s+not yet participate in a general recompute graph/i);
   assert.match(capabilities, /uniquely\s+occurring cones, spheres, tori, and cylinders[\s\S]*?sampled normal changes/i);
   assert.match(capabilities, /coincident, horizontal, vertical, perpendicular, and\s+fixed-distance relations/i);
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);

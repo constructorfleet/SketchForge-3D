@@ -215,6 +215,21 @@ const edgeItemSchema = {
   additionalProperties: false,
 } as const;
 const edgeListSchema = { type: "object", required: ["edges"], properties: { edges: { type: "array", items: edgeItemSchema } }, additionalProperties: false } as const;
+const thicknessSchema = {
+  type: "object", required: ["thickness"], additionalProperties: false,
+  properties: {
+    thickness: {
+      type: "object", required: ["minimum", "unit", "method", "samplesPerFace", "facesChecked"], additionalProperties: false,
+      properties: {
+        minimum: { type: "number", nullable: true, minimum: 0 },
+        unit: { type: "string", enum: ["mm"] },
+        method: { type: "string", enum: ["sampled-opposing-surface-distance"] },
+        samplesPerFace: { type: "integer", minimum: 1 },
+        facesChecked: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+} as const;
 const measurementItemSchema = {
   type: "object",
   required: ["entity", "index", "geometryType", "length", "area", "radius", "diameter", "sweepDegrees", "radiusUnavailable"],
@@ -511,31 +526,38 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/patterns", "patternShapes"),
   ...projectOperations,
   {
-    ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 409, 500, 503]),
+    ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 422, 500, 503]),
+    description: "Returns exact mass properties for the positioned shape and identifies whether the measurements came from exact CAD geometry or tessellated mesh geometry.",
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true },
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
-    response: {
-      required: ["properties"],
-      kind: "shape-properties",
-      fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
-      provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
-      schema: {
-        type: "object",
-        required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+    responseSchemas: {
+      200: {
+        type: "object", required: ["properties"], additionalProperties: false,
         properties: {
-          volume: { type: "number" },
-          area: { type: "number" },
-          centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
-          bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
-          isValid: { type: "boolean" },
-          provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+          properties: {
+            type: "object", required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"], additionalProperties: false,
+            properties: {
+              volume: num,
+              area: num,
+              centerOfMass: vector3Schema,
+              bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: num, ymin: num, zmin: num, xmax: num, ymax: num, zmax: num }, additionalProperties: false },
+              isValid: { type: "boolean" },
+              provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } }, additionalProperties: false },
+            },
+          },
         },
       },
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
     },
   },
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
@@ -543,7 +565,27 @@ export const API_V1_OPERATIONS = [
   { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
   shapeOperations[3],
   ...featureOperations.slice(2, 3),
-  operation("GET", "/api/v1/thickness", "estimateThickness"),
+  {
+    ...operation("GET", "/api/v1/thickness", "estimateThickness", [200, 400, 401, 404, 413, 422, 500, 503]),
+    description: "Estimates minimum wall thickness by sampling opposing surface pairs; this is not a certified minimum-thickness result.",
+    query: {
+      required: ["projectId", "shapeId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        shapeId: { type: "string", trim: true, minLength: 1 },
+      },
+    },
+    responseSchemas: {
+      200: thicknessSchema,
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      413: faceError("geometry_failed"),
+      422: faceError("geometry_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+  },
   operation("OPTIONS", "/api/v1/thickness", "thicknessRouteOptions", [204], undefined, "none"),
   ...featureOperations.slice(1, 2),
 ] as const satisfies readonly ApiV1Operation[];
@@ -649,23 +691,46 @@ export type ShapePropertiesResponse = {
 
 /** Reject malformed kernel values before returning them as a public API response. */
 export function parseShapePropertiesResponse(value: unknown): ShapePropertiesResponse | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["properties"])) return null;
   const properties = (value as { properties?: unknown }).properties;
-  if (!properties || typeof properties !== "object") return null;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties) || !exactKeys(properties, ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"])) return null;
   const item = properties as Record<string, unknown>;
   const bbox = item.bbox;
   if (typeof item.volume !== "number" || !Number.isFinite(item.volume) || typeof item.area !== "number" || !Number.isFinite(item.area)) return null;
   if (!isPoint(item.centerOfMass) || typeof item.isValid !== "boolean") return null;
-  if (!bbox || typeof bbox !== "object") return null;
+  if (!bbox || typeof bbox !== "object" || Array.isArray(bbox) || !exactKeys(bbox, ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"])) return null;
   const bounds = bbox as Record<string, unknown>;
   if (!["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"].every((key) => typeof bounds[key] === "number" && Number.isFinite(bounds[key]))) return null;
   const provenance = item.provenance;
-  if (!provenance || typeof provenance !== "object") return null;
+  if (!provenance || typeof provenance !== "object" || Array.isArray(provenance) || !exactKeys(provenance, ["source", "precision"])) return null;
   const source = (provenance as Record<string, unknown>).source;
   const precision = (provenance as Record<string, unknown>).precision;
   if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
   if (!(precision === "exact" || precision === "tessellated")) return null;
   return value as ShapePropertiesResponse;
+}
+
+export type ThicknessResponse = {
+  thickness: {
+    minimum: number | null;
+    unit: "mm";
+    method: "sampled-opposing-surface-distance";
+    samplesPerFace: number;
+    facesChecked: number;
+  };
+};
+
+/** Reject malformed wall-thickness results before they cross the REST boundary. */
+export function parseThicknessResponse(value: unknown): ThicknessResponse | null {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["thickness"])) return null;
+  const thickness = (value as { thickness?: unknown }).thickness;
+  if (!thickness || typeof thickness !== "object" || Array.isArray(thickness) || !exactKeys(thickness, ["minimum", "unit", "method", "samplesPerFace", "facesChecked"])) return null;
+  const result = thickness as Record<string, unknown>;
+  if (!(result.minimum === null || (typeof result.minimum === "number" && Number.isFinite(result.minimum) && result.minimum >= 0))) return null;
+  if (result.unit !== "mm" || result.method !== "sampled-opposing-surface-distance") return null;
+  if (!Number.isInteger(result.samplesPerFace) || (result.samplesPerFace as number) < 1) return null;
+  if (!Number.isInteger(result.facesChecked) || (result.facesChecked as number) < 0) return null;
+  return value as ThicknessResponse;
 }
 
 export type MeasurementsResponse = {

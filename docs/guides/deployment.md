@@ -1,3 +1,10 @@
+---
+slug: "/docs/guides/deployment"
+title: "Deployment configuration"
+audience: "Operators"
+owner: "Operations"
+---
+
 # Deployment configuration
 
 This guide covers the server and container settings operators can configure. For a complete list of supported values, defaults, sensitivity, source readers, and owning pages, see the [operator configuration reference](../OPERATOR_CONFIGURATION.md). The [Docker / FabLab Server instructions](https://github.com/constructorfleet/SketchForge-3D#docker-fablab-server-recommended) cover initial setup and compose commands.

@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.cs"
+title: "Czech (cs) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # Czech (cs) language guide
 
 Binding for the Czech catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

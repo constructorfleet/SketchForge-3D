@@ -1,3 +1,12 @@
+---
+slug: "/docs/guides/face-drafting"
+title: "Face drafting"
+audience: "Editor users"
+owner: "Editor"
+sources:
+  - "packages/sketchforge-engine/src/**"
+---
+
 # Face drafting
 
 Face drafting tapers one selected face of an exact B-rep solid. In the shape

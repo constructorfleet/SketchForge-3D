@@ -7,6 +7,7 @@ import { GET as listFaces } from "@/app/api/v1/faces/route";
 import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
+import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 
 const TOKEN = "test-token-value";
 
@@ -218,6 +219,75 @@ describe("REST API shape round trip", () => {
     expect(rejected.status).toBe(400);
     expect(rejected.payload.code).toBe("invalid_request");
     expect((await readShape(projectId, sweep.id)).sketchProfile).toEqual(editedProfile);
+  });
+
+  it("rebuilds an imported extrusion through its persisted source sketch", async () => {
+    const projectId = await makeProject();
+    const originalProfile = sweepProfile();
+    const sweep = await addShape(projectId, { kind: "sketchSweep", name: "Imported extrusion", profile: originalProfile, x: 12, z: -4, elevation: 7 });
+    const packagePath = path.join(projectsRoot, `${projectId}.skf`);
+    const project = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const output = project.shapes.find((shape) => shape.id === sweep.id)!;
+    output.sketchOperation = "extrude";
+    output.sketchProfile = originalProfile;
+    await fs.writeFile(packagePath, await exportSkfProject({
+      projectId,
+      projectName: project.projectName,
+      createdAt: project.createdAt,
+      modifiedAt: project.modifiedAt,
+      shapes: project.shapes,
+      history: project.history,
+      historyIndex: project.historyIndex,
+      assets: project.assets,
+      workspace: project.workspace,
+      snapGrid: project.snapGrid,
+      placementElevation: project.placementElevation,
+    }));
+    const editedProfile = sweepProfile(2);
+    const previousBrep = output.cadBrep;
+
+    const changed = await patch(projectId, String(sweep.sketchSourceId), { sketchProfile: editedProfile });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape).toMatchObject({
+      id: sweep.id, sketchSourceId: sweep.sketchSourceId, sketchOperation: "extrude",
+      x: 12, z: -4, elevation: 7,
+    });
+    expect(changed.payload.shape!.width).toBeGreaterThan(sweep.width as number);
+    const persisted = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const rebuilt = persisted.shapes.find((shape) => shape.id === sweep.id)!;
+    expect(rebuilt.sketchProfile).toEqual(editedProfile);
+    expect(rebuilt.cadBrep).not.toBe(previousBrep);
+  });
+
+  it("rebuilds a persisted revolve through its source sketch and keeps the source and placement", async () => {
+    const projectId = await makeProject();
+    const revolve = await addShape(projectId, {
+      kind: "revolve", name: "Source-driven revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]],
+      sides: 48, pitch: 0, x: 12, z: -4, elevation: 7,
+    });
+    expect(revolve.sketchSourceId).toBeTruthy();
+    const packagePath = path.join(projectsRoot, `${projectId}.skf`);
+    const beforeProject = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const beforeShape = beforeProject.shapes.find((shape) => shape.id === revolve.id)!;
+    const sourceProfile = beforeShape.sketchProfile!;
+    const editedProfile = {
+      ...sourceProfile,
+      points: sourceProfile.points.map((point) => ({ ...point, x: point.x * 2 })),
+    };
+
+    const changed = await patch(projectId, String(revolve.sketchSourceId), { sketchProfile: editedProfile });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape).toMatchObject({
+      id: revolve.id, sketchSourceId: revolve.sketchSourceId, name: "Source-driven revolve", x: 12, z: -4, elevation: 7,
+    });
+    expect(changed.payload.shape!.width as number).toBeGreaterThan(revolve.width as number);
+    const persisted = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const rebuilt = persisted.shapes.find((shape) => shape.id === revolve.id)!;
+    expect(rebuilt.sketchProfile).toEqual(editedProfile);
+    expect(rebuilt.sketchSourceId).toBe(revolve.sketchSourceId);
+    expect(rebuilt.importedMesh?.positions).not.toEqual(beforeShape.importedMesh?.positions);
   });
 
   it("preserves resize ratios when rebuilding an edited sweep profile", async () => {

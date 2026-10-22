@@ -1045,7 +1045,12 @@ function validateSketchProfile(value: unknown, label: string) {
       if (constraintIds.has(id)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.id` });
       constraintIds.add(id);
       const kind = stringValue(constraint.kind, `${constraintLabel}.kind`);
-      if (kind === "horizontal" || kind === "vertical") {
+      if (kind === "fixed") {
+        const pointId = stringValue(constraint.pointId, `${constraintLabel}.pointId`);
+        if (!pointIds.has(pointId)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointId` });
+        finiteNumber(constraint.xMm, `${constraintLabel}.xMm`);
+        finiteNumber(constraint.zMm, `${constraintLabel}.zMm`);
+      } else if (kind === "horizontal" || kind === "vertical") {
         if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
-import { serverCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { serverCadKernel, withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { applyEdgeTreatment, applyBakedMirror, applyDraftPrism, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
 import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -22,6 +23,19 @@ function sketchExtrusion() {
       points,
       segments: points.map((point, index) => ({ id: `edge-${index}`, startId: point.id, endId: points[(index + 1) % points.length].id, kind: "line" as const })),
     },
+  } as WorkplaneShape;
+}
+
+async function coplanarBox() {
+  const brep = await withCadKernel((cad) => {
+    const left = cad.translate(cad.makeBox(20, 10, 40), -20, 0, -20);
+    const right = cad.translate(cad.makeBox(20, 10, 40), 0, 0, -20);
+    return cad.toBREP(cad.fuse(left, right));
+  });
+  return {
+    ...box(),
+    kind: "mesh",
+    cadBrep: brep,
   } as WorkplaneShape;
 }
 
@@ -107,6 +121,55 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(Math.min(...xs)).toBeCloseTo(-20, 1);
     expect(Math.max(...xs)).toBeCloseTo(20, 1);
     expect(Math.min(...ys)).toBeCloseTo(0, 5);
+  });
+
+  it("keeps the color on an unchanged coplanar face through fillet topology changes", async () => {
+    const unpainted = await coplanarBox();
+    const sourceFaces = await shapeFaces(unpainted);
+    const topFaces = sourceFaces.filter((face) => face.surfaceType === "plane" && Math.abs(face.centroid.y - 10) < 1e-5);
+    expect(topFaces).toHaveLength(2);
+    const paintedId = topFaces[0]!.id;
+    const sourceFaceIds = sourceFaces.map((face) => face.id);
+    const sourceColors = Object.fromEntries(sourceFaceIds.map((id, index) => [id, `#${String(index + 1).padStart(6, "0")}`]));
+    const source = {
+      ...unpainted,
+      faceIds: sourceFaceIds,
+      faceColors: sourceColors,
+    } as WorkplaneShape;
+    const bottomEdge = (await shapeEdges(source)).find((edge) => edge.filletable
+      && Math.abs(edge.midpoint.y) < 1e-5 && Math.abs(edge.length - 40) < 1e-5);
+    expect(bottomEdge).toBeDefined();
+
+    const treated = shapeWithCadResult(source, await applyEdgeTreatment(source, {
+      kind: "fillet", amount: 1, edges: [bottomEdge!.index],
+    }));
+    const resultFaceIds = treated.faceIds ?? [];
+
+    expect(resultFaceIds).toContain(paintedId);
+    expect(treated.faceColors).toEqual(sourceColors);
+    expect(resultFaceIds).toHaveLength(sourceFaces.length + 1);
+    expect(resultFaceIds.filter((id) => sourceFaceIds.includes(id))).toHaveLength(sourceFaces.length);
+  });
+
+  it("keeps unchanged coplanar face colors through symmetric chamfer topology changes", async () => {
+    const unpainted = await coplanarBox();
+    const sourceFaces = await shapeFaces(unpainted);
+    const sourceFaceIds = sourceFaces.map((face) => face.id);
+    const paintedId = sourceFaces.find((face) => face.surfaceType === "plane" && Math.abs(face.centroid.y - 10) < 1e-5)!.id;
+    const source = {
+      ...unpainted,
+      faceIds: sourceFaceIds,
+      faceColors: { [paintedId]: "#ff0000" },
+    } as WorkplaneShape;
+    const bottomEdge = (await shapeEdges(source)).find((edge) => edge.filletable
+      && Math.abs(edge.midpoint.y) < 1e-5 && Math.abs(edge.length - 40) < 1e-5);
+
+    const treated = shapeWithCadResult(source, await applyEdgeTreatment(source, {
+      kind: "chamfer", amount: 1, edges: [bottomEdge!.index],
+    }));
+
+    expect(treated.faceIds).toContain(paintedId);
+    expect(treated.faceColors).toEqual({ [paintedId]: "#ff0000" });
   });
 
   it("lists a turned shape's edges where the caller can see them", async () => {
