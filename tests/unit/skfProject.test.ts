@@ -72,6 +72,48 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
+  it("rejects face drafts outside retained sketch extrusions and with unsupported draft combinations", async () => {
+    const draftedExtrusion = shape("mesh", "drafted-extrusion", {
+      sketchSourceId: "draft-source",
+      sketchOperation: "extrude",
+      sketchProfile: {
+        points: [{ id: "a", x: -5, z: -5 }, { id: "b", x: 5, z: -5 }, { id: "c", x: 5, z: 5 }, { id: "d", x: -5, z: 5 }],
+        segments: [
+          { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+          { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+        ],
+      },
+      faceDraft: {
+        sourceFaceId: "selected-face",
+        angle: 5,
+        pullDirection: "x",
+        sourceFaceNormal: { x: 1, y: 0, z: 0 },
+      },
+    });
+    const validArchive = await exportSkfProject(input([draftedExtrusion]));
+    const invalidCases: Array<[string, (definition: Record<string, unknown>) => void]> = [
+      ["non-extrusion", (definition) => { definition.sketchOperation = undefined; }],
+      ["prism draft", (definition) => { definition.draftPrismAngle = 3; }],
+      ["edge treatment", (definition) => { definition.edgeTreatments = [{ kind: "fillet", amount: 0.5, edgeCount: 1 }]; }],
+    ];
+
+    for (const [label, mutateDefinition] of invalidCases) {
+      const invalidArchive = mutateProject(validArchive, (document) => {
+        const node = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((entry) => entry.objectId === draftedExtrusion.id);
+        expect(node).toBeDefined();
+        mutateDefinition(node!.definition);
+      });
+      await expect(importSkfProject(invalidArchive), label).rejects.toThrow(/faceDraft/);
+    }
+
+    const edgeHistoryArchive = mutateProject(validArchive, (document) => {
+      const node = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((entry) => entry.objectId === draftedExtrusion.id);
+      expect(node).toBeDefined();
+      node!.edgeTreatmentHistory = [{ id: "prior-edge-treatment", beforeNodeId: "missing-before", createdAt: 1, feature: { kind: "fillet", amount: 0.5, edgeCount: 1 } }];
+    });
+    await expect(importSkfProject(edgeHistoryArchive), "edge treatment history").rejects.toThrow(/faceDraft/);
+  });
+
   it("preserves the all-edge replay intent through export and import", async () => {
     const feature = { kind: "fillet" as const, amount: 0.25, edgeCount: 12, allEdges: true as const };
     const treated = shape("mesh", "treated-extrusion", {

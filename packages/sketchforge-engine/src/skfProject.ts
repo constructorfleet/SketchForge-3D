@@ -1087,7 +1087,11 @@ function validateSketchProfile(value: unknown, label: string) {
   }
 }
 
-function validateShapeDefinition(definition: Record<string, unknown>, label: string) {
+function validateShapeDefinition(
+  definition: Record<string, unknown>,
+  label: string,
+  options: { hasEdgeTreatmentHistory?: boolean } = {},
+) {
   const id = stringValue(definition.id, `${label}.id`);
   stringValue(definition.name, `${label}.name`);
   const kind = stringValue(definition.kind, `${label}.kind`);
@@ -1150,6 +1154,17 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   }
   if (definition.faceDraft !== undefined) {
     const draft = objectRecord(definition.faceDraft, `${label}.faceDraft`);
+    if (
+      kind !== "mesh"
+      || definition.sketchOperation !== "extrude"
+      || definition.sketchProfile === undefined
+      || definition.sketchSourceId === undefined
+      || definition.draftPrismAngle !== undefined
+      || (Array.isArray(definition.edgeTreatments) && definition.edgeTreatments.length > 0)
+      || options.hasEdgeTreatmentHistory
+    ) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
+    }
     const sourceFaceId = stringValue(draft.sourceFaceId, `${label}.faceDraft.sourceFaceId`);
     if (!sourceFaceId.trim()) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft.sourceFaceId` });
     const angle = finiteNumber(draft.angle, `${label}.faceDraft.angle`);
@@ -1312,7 +1327,9 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       const nodeId = stringValue(node?.nodeId, `states[${stateIndex}].nodes[${nodeIndex}].nodeId`);
       if (nodeById.has(nodeId)) throw new LocalizedError("errors.skf.stateDuplicateNodeId", { state: stateId, id: nodeId });
       const definition = objectRecord(node.definition, `node '${nodeId}'.definition`);
-      const objectId = validateShapeDefinition(definition, `node '${nodeId}'`);
+      const objectId = validateShapeDefinition(definition, `node '${nodeId}'`, {
+        hasEdgeTreatmentHistory: Boolean(node.edgeTreatmentHistory?.length),
+      });
       if (node.objectId !== objectId) throw new LocalizedError("errors.skf.nodeObjectIdMismatch", { id: nodeId });
       if (node.importedMesh) {
         const source = node.importedMesh.sourceAssetId ? assetById.get(node.importedMesh.sourceAssetId) : undefined;
@@ -1652,7 +1669,9 @@ function validateLegacyRuntimeShape(shape: WorkplaneShape, label: string) {
   delete definition.groupedShapes;
   delete definition.edgeTreatmentHistory;
   delete definition.cadBrep;
-  validateShapeDefinition(definition, label);
+  validateShapeDefinition(definition, label, {
+    hasEdgeTreatmentHistory: Array.isArray(edgeHistory) && edgeHistory.length > 0,
+  });
   if (importedMesh) {
     const mesh = objectRecord(importedMesh, `${label}.importedMesh`);
     if (!Array.isArray(mesh.positions) || mesh.positions.length > SKF_LIMITS.meshNumbers || mesh.positions.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
