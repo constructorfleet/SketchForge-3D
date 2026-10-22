@@ -111,6 +111,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /22 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
+  assert.match(spec, /They also map the primary `apps\/web\/src\/components\/SketchForgeEditor\.tsx` component to the edit-and-export guide; other editor\/UI sources and symbols remain outside the mapping/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
   assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
