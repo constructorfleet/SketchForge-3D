@@ -30,7 +30,11 @@ test("trusted PR verifier is only dispatched from default-branch repository_disp
   const on = workflow.on ?? workflow[true];
   assert.deepEqual(Object.keys(on), ["repository_dispatch"]);
   assert.deepEqual(on.repository_dispatch.types, ["generated_docs_pr_checks"]);
-  assert.match(workflow.jobs["validate-target"].steps.map(({ run }) => run ?? "").join("\n"), /EXPECTED_SHA/);
+  const targetValidation = workflow.jobs["validate-target"].steps.map(({ run }) => run ?? "").join("\n");
+  assert.match(targetValidation, /EXPECTED_SHA/);
+  assert.match(targetValidation, /\.merged/);
+  assert.match(targetValidation, /\.head\.repo\.full_name/);
+  assert.match(targetValidation, /\.head\.sha/);
   for (const id of ["package-reference", "package-examples", "typecheck", "api-e2e", "static-export", "docs"]) {
     const job = workflow.jobs[id];
     assert.equal(job.permissions.contents, "read");
@@ -51,12 +55,13 @@ test("trusted PR verifier is only dispatched from default-branch repository_disp
 test("trusted title validation compares the title without a trailing JSON newline", async () => {
   const yaml = await import("js-yaml");
   const workflow = yaml.load(await (await import("node:fs/promises")).readFile(workflowPath, "utf8"));
-  const titleValidation = workflow.jobs.title.steps.find(({ name }) => name === "Validate the live PR title").run;
+  const titleValidation = workflow.jobs.title.steps.find(({ name }) => typeof name === "string" && name.startsWith("Validate the live PR title")).run;
 
   assert.match(titleValidation, /jq -rj '\.title'/);
+  assert.match(titleValidation, /\.merged/);
 });
 
-async function withReporter({ currentSha = sha, state = "open", title = "docs: refresh references", headRef = "feature/docs" } = {}, callback) {
+async function withReporter({ currentSha = sha, state = "open", merged = false, title = "docs: refresh references", headRef = "feature/docs", headRepo = repository, baseRepo = repository } = {}, callback) {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "sketchforge-trusted-checks-"));
   const requests = [];
   const server = createServer(async (request, response) => {
@@ -69,9 +74,10 @@ async function withReporter({ currentSha = sha, state = "open", title = "docs: r
     if (pathname === "pulls/42") {
       result = {
         state,
+        merged,
         title,
-        base: { ref: "main", repo: { full_name: repository } },
-        head: { sha: currentSha, ref: headRef, repo: { full_name: repository } },
+        base: { ref: "main", repo: { full_name: baseRepo } },
+        head: { sha: currentSha, ref: headRef, repo: { full_name: headRepo } },
       };
     } else if (pathname === "check-runs") {
       result = { id: requests.length };
@@ -131,6 +137,30 @@ test("trusted check reporter creates required check contexts on the exact live P
     assert.equal(created.find(({ body }) => body.name === "Static export build").body.conclusion, "failure");
     assert.equal(created.find(({ body }) => body.name === "Typecheck and unit tests").body.conclusion, "success");
   });
+});
+
+test("trusted check reporter accepts only a merged same-repository PR whose title and head SHA still match", async () => {
+  await withReporter({ state: "closed", merged: true }, async ({ requests, apiUrl }) => {
+    const result = await runRecorder({ apiUrl, results });
+    assert.equal(result.status, 0, result.stderr);
+    const created = requests.filter(({ method, pathname }) => method === "POST" && pathname === "check-runs");
+    assert.equal(created.length, expectedChecks.length);
+    assert.ok(created.every(({ body }) => body.head_sha === sha));
+  });
+
+  for (const scenario of [
+    { state: "closed", merged: false },
+    { state: "closed", merged: true, currentSha: "b".repeat(40) },
+    { state: "closed", merged: true, title: "chore: unrelated" },
+    { state: "closed", merged: true, headRepo: "someone/fork" },
+    { state: "closed", merged: true, baseRepo: "someone/fork" },
+  ]) {
+    await withReporter(scenario, async ({ requests, apiUrl }) => {
+      const result = await runRecorder({ apiUrl, results });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(requests.some(({ method, pathname }) => method === "POST" && pathname === "check-runs"), false);
+    });
+  }
 });
 
 test("trusted check reporter does not attach results to a closed or advanced PR", async () => {
