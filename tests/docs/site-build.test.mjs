@@ -100,8 +100,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /a face-drafted single-section sketch sweep without holes can take one all-edge fillet/i);
-  assert.match(spec, /Sweep fillet replay, including `\.skf` persistence and profile edits, is covered by `tests\/unit\/faceDraftSweepFilletRecompute\.test\.ts`/i);
-  assert.match(spec, /Sweep chamfers remain unsupported/i);
+  assert.match(spec, /Sweep fillet and chamfer replay, including `\.skf` persistence and profile edits, is covered by `tests\/unit\/faceDraftSweepFilletRecompute\.test\.ts`/i);
+  assert.match(spec, /a face-drafted single-section sketch sweep without holes can take one all-edge fillet or one symmetric 45° all-edge chamfer/i);
   assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(spec, /A retained prism draft on an extrusion can be followed by one all-edge fillet or symmetric 45° chamfer[\s\S]*?adding a prism draft after a treatment remains refused/i);
   assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);

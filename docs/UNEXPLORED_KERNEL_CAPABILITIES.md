@@ -84,10 +84,11 @@ These are implemented and should not be filed as missing features:
   a retained boolean group survives `.skf` round trip and replays after a
   source-profile edit while preserving the group ID and committing one atomic
   write. A single-loop sketch extrusion or a single-section, no-hole sketch
-  sweep may retain one all-edge fillet after one face draft; `.skf` round trips
-  preserve the sequence and source-profile edits replay the draft before the
-  fillet atomically. Sweep drafts with multiple sections or section holes,
-  chamfers, selected-edge treatments, and additional treatments remain refused.
+  sweep may retain one all-edge fillet or one symmetric 45° all-edge chamfer
+  after one face draft; `.skf` round trips preserve the sequence and
+  source-profile edits replay the draft before the treatment atomically. Sweep
+  drafts with multiple sections or section holes, selected-edge treatments,
+  non-45° chamfers, and additional treatments remain refused.
   A plain single-region full-turn
   sketch revolve may retain one face draft followed by either one symmetric
   45° all-edge chamfer or one all-edge fillet; profile and setting edits replay
@@ -203,10 +204,12 @@ full-turn sketch revolve; profile or setting edits replay the revolve, face
 draft, then treatment atomically and refresh treatment history and eligible-edge
 counts. `.skf` round trips preserve this supported sequence and allow replay
 after import. Face drafts remain incompatible with prism drafts and shelling.
-Edge treatments are supported only in the explicitly bounded full-turn revolve
+Edge treatments are supported in the explicitly bounded full-turn revolve
 sequence above, plus one all-edge fillet after a face draft on a single-loop
-sketch extrusion; profile edits replay draft then fillet and `.skf` preserves
-that sequence. Other face-draft / treatment sequences remain refused. A
+sketch extrusion, and one all-edge fillet or symmetric 45° all-edge chamfer
+after a face draft on a single-section, no-hole sketch sweep. Profile edits
+replay source, draft, then treatment; `.skf` preserves those sequences. Other
+face-draft / treatment sequences remain refused. A
 retained prism draft on a sketch extrusion can be followed by one all-edge
 fillet or symmetric 45° chamfer;
 source-profile and draft-angle edits replay the draft before the treatment.
