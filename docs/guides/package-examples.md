@@ -5,7 +5,9 @@ audience: "Contributors"
 owner: "Packages"
 sources:
   - "packages/sketchforge-client/src/**"
+  - "packages/sketchforge-client/examples/**"
   - "packages/sketchforge-py/src/**"
+  - "packages/sketchforge-py/examples/**"
 ---
 
 # Package examples
