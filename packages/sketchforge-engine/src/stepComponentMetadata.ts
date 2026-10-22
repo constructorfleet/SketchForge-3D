@@ -1,13 +1,41 @@
 /** Component labels and colors shared by regular STEP import and assembly explosion. */
 import type { LabelTag, OcctKernel, ShapeHandle } from "occt-wasm";
 import { componentColorsFromGlb } from "./stepGlbColors.js";
-import { stepAssemblyHierarchyFromGlb, stepOccurrenceGeometryFromGlb, type StepAssemblyNode } from "./stepAssemblyHierarchy.js";
+import { stepAssemblyHierarchyFromGlb, stepComponentNamesByOccurrence, stepOccurrenceGeometryFromGlb, type StepAssemblyNode } from "./stepAssemblyHierarchy.js";
 
 export type StepComponentMetadata = { name?: string; occurrenceId?: string; color?: string };
 export type StepComponentMetadataResult = {
   bySolid: Map<string, StepComponentMetadata[]>;
   assembly?: StepAssemblyNode[];
 };
+
+function expandNamedProductPaths(root: StepAssemblyNode): StepAssemblyNode {
+  const prefix = `${root.name} / `;
+  const children: StepAssemblyNode[] = [];
+  for (const component of root.children) {
+    if (component.children.length || !component.name.startsWith(prefix)) {
+      children.push(component);
+      continue;
+    }
+    const segments = component.name.slice(prefix.length).split(" / ").filter(Boolean);
+    if (segments.length < 2) {
+      children.push({ ...component, name: segments[0] ?? component.name });
+      continue;
+    }
+    let target = children;
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const name = segments[index]!;
+      let group = target.find((child) => child.name === name && child.id?.startsWith("step-path:"));
+      if (!group) {
+        group = { id: `step-path:${root.id ?? root.name}:${segments.slice(0, index + 1).join("/")}`, name, children: [] };
+        target.push(group);
+      }
+      target = group.children;
+    }
+    target.push({ ...component, name: segments.at(-1)! });
+  }
+  return { ...root, children };
+}
 
 export function stepShapeKey(cad: OcctKernel, shape: ShapeHandle) {
   const bounds = cad.getBoundingBox(shape, false);
@@ -43,7 +71,30 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
     } catch {
       // XCAF label data remains usable when the optional color view cannot be exported.
     }
-    const leaves: { name: string; nameForOutput?: string; color?: string; solids: ShapeHandle[] }[] = [];
+    const occurrenceNames = stepComponentNamesByOccurrence(step);
+    const hasProductNames = [...occurrenceNames.values()].some((name) =>
+      name.trim() && !/^(?:\d+|SOLID|COMPOUND|SHAPE|BODY)$/i.test(name.trim())
+      && !/^Open CASCADE STEP translator\b/i.test(name.trim()),
+    );
+    if (!assembly && hasProductNames) {
+      // The installed XCAF GLB exporter can omit occurrence nodes for some
+      // valid STEP assemblies. Recover the editable one-level product grouping
+      // directly from labels rather than dropping all grouping metadata.
+      const labelTree = (label: LabelTag): StepAssemblyNode => {
+        const info = document.getLabelInfo(label);
+        const rawName = info.name.trim();
+        const occurrenceId = /^\d+$/.test(rawName) ? rawName : undefined;
+        const name = occurrenceId ? occurrenceNames.get(occurrenceId) ?? rawName : rawName;
+        return {
+          id: occurrenceId ? `step-occurrence:${occurrenceId}` : `step-xcaf-label:${info.labelId}`,
+          name: name || `Component ${info.labelId}`,
+          children: document.getChildren(label).map(labelTree),
+        };
+      };
+      const roots = document.getRoots().map(labelTree).filter((root) => root.children.length > 0);
+      if (roots.length) assembly = roots.map(expandNamedProductPaths);
+    }
+    const leaves: { name: string; nameForOutput?: string; occurrenceId?: string; color?: string; solids: ShapeHandle[] }[] = [];
     const visit = (label: LabelTag, inheritedColor?: string) => {
       const info = document.getLabelInfo(label);
       const labelColor = info.hasColor ? colorHex(info.color) : undefined;
@@ -55,10 +106,13 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
       }
       if (info.isAssembly || !info.shapeHandle) return;
       const solids = cad.getSubShapes(info.shapeHandle, "solid");
-      const name = info.name.trim();
+      const rawName = info.name.trim();
+      const occurrenceId = /^\d+$/.test(rawName) && hasProductNames && occurrenceNames.has(rawName) ? rawName : undefined;
+      const name = occurrenceId ? occurrenceNames.get(occurrenceId) ?? rawName : rawName;
       leaves.push({
         name,
         ...(name && !/^\d+$/.test(name) ? { nameForOutput: name } : {}),
+        ...(occurrenceId ? { occurrenceId: `step-occurrence:${occurrenceId}` } : {}),
         ...(inherited ? { color: inherited } : {}),
         solids,
       });
@@ -79,6 +133,7 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
         const metadata = metadataBySolid.get(key) ?? [];
         metadata.push({
           ...(leaf.nameForOutput ? { name: leaf.nameForOutput } : {}),
+          ...(leaf.occurrenceId ? { occurrenceId: leaf.occurrenceId } : {}),
           ...(color ? { color } : {}),
         });
         metadataBySolid.set(key, metadata);

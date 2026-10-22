@@ -2,6 +2,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { WorkplaneShape } from "@/types/sketchforge";
+import { explodeStepAssembly } from "@constructorfleet/sketchforge-engine/serverStepExplode";
+import type { ProjectAsset } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
+import { restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 
 // Drive the REAL exporter/importer against the REAL OpenCascade kernel, loaded
 // from node_modules instead of the browser-only /occt/ URL. Everything else in
@@ -11,13 +14,15 @@ vi.mock("@/lib/brepKernel", async () => {
   const { OcctKernel } = await import("occt-wasm");
   const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
   let ready: Promise<typeof brep> | null = null;
+  let kernel: Awaited<ReturnType<typeof OcctKernel.init>> | null = null;
+  const loadKernel = async () => (kernel ??= await OcctKernel.init({ wasm }));
   return {
     loadBrepWithOcct: () =>
       (ready ??= (async () => {
-        const kernel = await OcctKernel.init({ wasm });
-        brep.registerKernel("occt-wasm", brep.OcctWasmAdapter.fromKernel(kernel));
+        brep.registerKernel("occt-wasm", brep.OcctWasmAdapter.fromKernel(await loadKernel()));
         return brep;
       })()),
+    loadOcctKernel: loadKernel,
   };
 });
 
@@ -164,6 +169,95 @@ describe("STEP import → re-export round-trip (real OCCT kernel)", () => {
     expect(reexport.exportedCount).toBe(1);
     expect(reexport.skipped).toEqual([]);
     expect(near(await reimportVolume(reexport.blob), 12 * 8 * 6)).toBe(true);
+  });
+
+  it("exports nested editable groups as a named, colored, positioned STEP assembly", async () => {
+    const main = shape({
+      id: "main",
+      name: "MainAssembly",
+      kind: "mesh",
+      x: 0,
+      elevation: 0,
+      width: 60,
+      depth: 20,
+      height: 10,
+      groupedBaseWidth: 60,
+      groupedBaseDepth: 20,
+      groupedBaseHeight: 10,
+      groupOperation: "group",
+      groupedShapes: [
+        shape({ id: "frame", name: "Frame", kind: "box", x: -20, width: 10, depth: 8, height: 6, color: "#cc1a33" }),
+        shape({
+          id: "sensors",
+          name: "Sensors",
+          kind: "mesh",
+          x: 20,
+          width: 20,
+          depth: 12,
+          height: 8,
+          groupedBaseWidth: 20,
+          groupedBaseDepth: 12,
+          groupedBaseHeight: 8,
+          groupOperation: "group",
+          groupedShapes: [
+            shape({ id: "left", name: "SensorLeft", kind: "box", x: -5, width: 4, depth: 4, height: 4, color: "#1a33e5" }),
+            shape({ id: "right", name: "SensorRight", kind: "box", x: 5, width: 4, depth: 4, height: 4, color: "#1a33e5" }),
+          ],
+        }),
+      ],
+    });
+
+    const { blob, exportedCount, skipped } = await exportShapesToStep([main]);
+    expect(exportedCount).toBe(3);
+    expect(skipped).toEqual([]);
+
+    const imported = await importedShapeFromStep("nested.step", await blob.arrayBuffer());
+    expect(imported.stepAssembly?.map(({ name, children }) => ({
+      name,
+      children: children.map(({ name, children: nested }) => ({ name, children: nested.map(({ name }) => name) })),
+    }))).toEqual([
+      { name: "MainAssembly", children: [{ name: "Frame", children: [] }, { name: "Sensors", children: ["SensorLeft", "SensorRight"] }] },
+    ]);
+    expect(imported.importedMesh?.positions.length).toBeGreaterThan(0);
+    expect(Object.values(imported.faceColors ?? {})).toContain("#cc1a33");
+    expect(Object.values(imported.faceColors ?? {})).toContain("#1a33e5");
+    const stepText = await blob.text();
+    expect(stepText).toContain("COLOUR_RGB");
+    expect(stepText).toContain("MainAssembly / Sensors / SensorLeft");
+    expect(stepText).toContain("MainAssembly / Sensors / SensorRight");
+    expect(near(await reimportVolume(blob), 10 * 8 * 6 + 2 * 4 * 4 * 4)).toBe(true);
+    const xs = imported.importedMesh!.positions.filter((_, index) => index % 3 === 0);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(40);
+
+    const sourceBytes = new Uint8Array(await blob.arrayBuffer());
+    const source: ProjectAsset = {
+      id: "nested-source",
+      name: "nested.step",
+      mediaType: "model/step",
+      sourceFormat: "step",
+      bytes: sourceBytes,
+      byteLength: sourceBytes.byteLength,
+      sha256: "round-trip-test",
+    };
+    imported.importedMesh!.assetId = source.id;
+    const editable = await explodeStepAssembly(imported, source);
+    expect(editable).toHaveLength(1);
+    expect(editable[0]?.name).toBe("MainAssembly");
+    expect(editable[0]?.groupedShapes?.map(({ name }) => name)).toEqual(["Frame", "Sensors"]);
+    expect(editable[0]?.groupedShapes?.find(({ name }) => name === "Sensors")?.groupedShapes?.map(({ name, color }) => [name, color])).toEqual([
+      ["SensorLeft", "#1a33e5"],
+      ["SensorRight", "#1a33e5"],
+    ]);
+    expect(editable[0]?.groupedShapes?.find(({ name }) => name === "Frame")?.color).toBe("#cc1a33");
+    const sensors = editable[0]?.groupedShapes?.find(({ name }) => name === "Sensors")?.groupedShapes ?? [];
+    expect(sensors[1]!.x - sensors[0]!.x).toBeCloseTo(10, 2);
+    const originalFrame = restoreGroupedChildren(main)[0]!;
+    const originalSensorGroup = restoreGroupedChildren(main)[1]!;
+    const originalLeftSensor = restoreGroupedChildren(originalSensorGroup)[0]!;
+    const reimportedSensorGroup = editable[0]!.groupedShapes!.find(({ name }) => name === "Sensors")!;
+    const reimportedLeftSensor = restoreGroupedChildren(reimportedSensorGroup)[0]!;
+    expect(reimportedLeftSensor.x - editable[0]!.groupedShapes![0]!.x)
+      .toBeCloseTo(originalLeftSensor.x - originalFrame.x, 2);
   });
 });
 
