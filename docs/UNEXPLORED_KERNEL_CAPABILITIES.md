@@ -97,11 +97,13 @@ These are implemented and should not be filed as missing features:
   placement and writing the new source and dependent geometry atomically. A
   source-driven revolve profile or operation-setting edit (for example, its
   side count) follows the same bottom-up rebuild and atomic-write path.
-  A sketch extrusion with one persisted all-edge fillet can also replay that
-  fillet after a source-profile edit against the rebuilt topology, without
-  carrying edge indices across the edit. This does not cover chamfers,
-  selected-edge treatments, multiple treatment steps, or treatments on other
-  source operation types; those histories cannot yet be recomputed safely.
+  A sketch extrusion, sweep, or revolve with one persisted all-edge fillet
+  replays that fillet after a source-profile edit against rebuilt topology,
+  without carrying edge indices across the edit. Revolve setting edits also
+  attempt replay and roll back if the new topology cannot accept the fillet.
+  This does not cover chamfers, selected-edge treatments, multiple treatment
+  steps, or treatments on other source operation types; those histories cannot
+  yet be recomputed safely.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph. A drafted extrusion with
@@ -154,10 +156,11 @@ only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
 kernel. Face-draft results are baked and cannot be reopened as an editable
 operation or recomputed after source changes. Prism drafts are editable only
-as a retained angle on a straight, single-loop sketch extrusion; draft face
-selection, other draft operations, and general editable draft history remain
-unsupported. Broader fixture coverage should establish the supported
-geometric envelope.
+as a retained angle on a straight, single-loop sketch extrusion. Face selection
+is available in the inspector, but the selected face is not persisted as an
+editable draft feature; other draft operations and general editable draft
+history remain unsupported. Broader fixture coverage should establish the
+supported geometric envelope.
 
 ### 3. Editable STEP assembly hierarchy and robust component association
 

@@ -881,13 +881,14 @@ export function createEngine(store: ProjectStore): Engine {
             cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
             ...sourceMetadata
           } = existing;
-          swept = {
+          const rebuiltSweep = {
             ...sourceMetadata,
             ...resized,
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceIds: refreshedFaceIds,
           };
+          swept = await replayAllEdgeFillet(existing, rebuiltSweep);
         } catch (error) {
           return failed({
             reason: "sweep_failed",
@@ -898,10 +899,11 @@ export function createEngine(store: ProjectStore): Engine {
       if (replacingSketchProfile && isSketchRevolve) {
         try {
           const runtime = await serverManifoldRuntime();
-          swept = rebuiltRevolveShape(runtime, existing, {
+          const rebuilt = rebuiltRevolveShape(runtime, existing, {
             profile: changes.sketchProfile as NonNullable<WorkplaneShape["sketchProfile"]>,
             settings: existing.sketchRevolve!,
           });
+          swept = await replayAllEdgeFillet(existing, rebuilt);
         } catch (error) {
           return failed({
             reason: "sweep_failed",
@@ -923,10 +925,11 @@ export function createEngine(store: ProjectStore): Engine {
         if (!parsed.ok) return failed({ reason: "invalid_shape_request", message: parsed.error });
         try {
           const runtime = await serverManifoldRuntime();
-          swept = rebuiltRevolveShape(runtime, existing, {
+          const rebuilt = rebuiltRevolveShape(runtime, existing, {
             profile: parsed.profile,
             settings: requestedRevolveSettings(existing.sketchRevolve!, changes),
           });
+          swept = await replayAllEdgeFillet(existing, rebuilt);
         } catch (error) {
           return failed({
             reason: "sweep_failed",
