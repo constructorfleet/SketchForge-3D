@@ -72,10 +72,13 @@ These are implemented and should not be filed as missing features:
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the
-  corresponding solid while retaining its shape and source identity; editing a
-  sketch-backed sweep also recomputes retained boolean descendants bottom-up
-  and persists the result atomically. Other downstream operation types do not
-  yet participate in a general recompute graph.
+  corresponding solid while retaining its shape and source identity. Editing a
+  sketch-backed extrusion or sweep through its persisted source ID also
+  recomputes retained boolean ancestors bottom-up, preserving output IDs and
+  placement and writing the new source and dependent geometry atomically.
+  Invalid extrusion profiles and dependent booleans that no longer remove
+  material leave the project unchanged. Other downstream operation types do
+  not yet participate in a general recompute graph.
 - Coincident, horizontal, vertical, perpendicular, and fixed-distance sketch
   constraints are supported, including `.skf` persistence and TypeScript
   profile types. Perpendicular relations take part in the bounded coupled solve
@@ -102,11 +105,11 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 Sketch extrusion, revolve, and sweep persist source sketches and operation
 parameters; `.skf` also records dependency links for sketch outputs and boolean
-groups. Runtime recomputation remains narrow: editing a sketch-backed sweep
-rebuilds it inside retained boolean groups, bottom-up, and writes the updated
-result atomically. Invalid sketches or failed dependent booleans leave the
-project unchanged. Extrusion/revolve descendants, drafts, and other operation
-types do not yet recompute, and draft prism/face draft remain baked rather than
+groups. Runtime recomputation remains narrow: editing a sketch-backed extrusion
+or sweep rebuilds it inside retained boolean groups, bottom-up, and writes the
+updated result atomically. Invalid profiles or failed dependent booleans leave
+the project unchanged. Revolve descendants, drafts, and other operation types
+do not yet recompute, and draft prism/face draft remain baked rather than
 editable feature nodes. A general dependency-ordered graph with consistent
 failure propagation remains the highest-value foundation before expanding
 editable downstream operations.
@@ -159,8 +162,10 @@ that can robustly determine global placement remain open.
 
 Focused coverage includes sweep creation and profile rebuilding
 (`tests/e2e/sketchCadSweep.e2e.ts`, `tests/e2e/restApi.e2e.ts`,
-`tests/unit/apiV1ShapeRoundTrip.test.ts`), sketch source and feature persistence
-(`tests/unit/skfProject.test.ts`), STEP hierarchy and component persistence
+`tests/unit/apiV1ShapeRoundTrip.test.ts`), source-driven extrusion recompute
+and boolean rollback (`tests/unit/engineParametricRecompute.test.ts`,
+`tests/unit/apiV1ShapeRoundTrip.test.ts`), sketch source and feature
+persistence (`tests/unit/skfProject.test.ts`), STEP hierarchy and component persistence
 (`tests/unit/serverStepExplode.test.ts`,
 `tests/unit/stepAssemblyProject.test.ts`), face-ID matching
 (`tests/unit/apiV1FaceIdentity.test.ts`), face-draft axis cases

@@ -26,6 +26,19 @@ function profile(sectionHalfWidth = 1, spineStart = 0, spineEnd = 10, spineOffse
   };
 }
 
+function extrusionProfile(halfWidth = 1, centerX = 0): SketchProfile {
+  return {
+    points: [
+      { id: "a", x: centerX - halfWidth, z: -1 }, { id: "b", x: centerX + halfWidth, z: -1 },
+      { id: "c", x: centerX + halfWidth, z: 1 }, { id: "d", x: centerX - halfWidth, z: 1 },
+    ],
+    segments: [
+      { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+      { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+    ],
+  };
+}
+
 function projectStore() {
   const document: ProjectDocument = {
     metadata: { revision: 0 },
@@ -62,6 +75,85 @@ function value<T>(result: EngineResult<T>): T {
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("rebuilds a persisted sketch extrusion from an edited source profile", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Source extrusion", width: 2, depth: 2, height: 3, x: 12, z: -4, elevation: 7 },
+      { kind: "box", name: "Cutter", width: 0.5, depth: 0.5, height: 4, x: 12, z: -4, elevation: 6.5, hole: true },
+    ]));
+    const original = created.shapes[0]!;
+    const document = await store.read("recompute");
+    document!.shapes[0] = {
+      ...document!.shapes[0]!,
+      sketchOperation: "extrude",
+      sketchProfile: extrusionProfile(),
+      sketchSourceId: "sketch/source-extrusion",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    };
+    const cut = value(await engine.cut("recompute", {
+      solidIds: [original.id], holeIds: [created.shapes[1]!.id],
+    })).shape;
+    const sourceChild = cut.groupedShapes!.find((shape) => shape.sketchSourceId === "sketch/source-extrusion")!;
+    const beforeBrep = cut.cadBrep;
+    const beforeWrites = writeCount();
+
+    const changed = await engine.changeShape("recompute", "sketch/source-extrusion", {
+      sketchProfile: extrusionProfile(2),
+    });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: sourceChild.id, sketchSourceId: "sketch/source-extrusion", sketchOperation: "extrude",
+      sketchProfile: extrusionProfile(2), x: sourceChild.x, z: sourceChild.z, elevation: sourceChild.elevation,
+    });
+    expect(updated.width).toBeCloseTo(4, 2);
+    expect(updated.cadBrep).not.toBe(original.cadBrep);
+    expect(writeCount()).toBe(beforeWrites + 1);
+    const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    expect(persisted.cadBrep).not.toBe(beforeBrep);
+    expect(persisted.groupedShapes?.find((shape) => shape.id === sourceChild.id)?.sketchProfile).toEqual(extrusionProfile(2));
+    expect(persisted).toMatchObject({ x: cut.x, z: cut.z, elevation: cut.elevation });
+    expect(value(await engine.project("recompute")).revision).toBe(beforeWrites + 1);
+  });
+
+  it("does not persist an extrusion source edit when rebuilt geometry breaks its dependent boolean", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Source extrusion", width: 2, depth: 2, height: 3, x: 12, z: -4, elevation: 7 },
+      { kind: "box", name: "Cutter", width: 0.5, depth: 0.5, height: 4, x: 12, z: -4, elevation: 6.5, hole: true },
+    ]));
+    const document = await store.read("recompute");
+    document!.shapes[0] = {
+      ...document!.shapes[0]!, sketchOperation: "extrude", sketchProfile: extrusionProfile(),
+      sketchSourceId: "sketch/source-extrusion", cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    };
+    const cut = value(await engine.cut("recompute", { solidIds: [created.shapes[0]!.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const before = value(await engine.project("recompute"));
+    const writesBeforeEdit = writeCount();
+
+    const changed = await engine.changeShape("recompute", "sketch/source-extrusion", {
+      sketchProfile: extrusionProfile(1, 100),
+    });
+
+    expect(changed.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeEdit);
+    const afterBooleanRefusal = value(await engine.project("recompute"));
+    expect(afterBooleanRefusal.revision).toBe(before.revision);
+    expect(afterBooleanRefusal.shapes.find((shape) => shape.id === cut.id)).toEqual(before.shapes.find((shape) => shape.id === cut.id));
+
+    const invalid = await engine.changeShape("recompute", "sketch/source-extrusion", {
+      sketchProfile: { points: [], segments: [] },
+    });
+    expect(invalid.ok).toBe(false);
+    expect(writeCount()).toBe(writesBeforeEdit);
+    const afterInvalidProfile = value(await engine.project("recompute"));
+    expect(afterInvalidProfile.revision).toBe(before.revision);
+    expect(afterInvalidProfile.shapes.find((shape) => shape.id === cut.id)).toEqual(before.shapes.find((shape) => shape.id === cut.id));
+  });
+
   it("rebuilds a boolean cut after its nested source sketch changes and persists the result", async () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);

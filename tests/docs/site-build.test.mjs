@@ -133,7 +133,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /`PATCH \/shapes` can target a sketch sweep by\s+its persisted `sketchSourceId`/i);
   assert.match(capabilities, /`sketchProfile`[\s\S]*?`PATCH \/api\/v1\/shapes`[\s\S]*?retaining shape and source IDs/i);
   assert.match(capabilities, /rebuilds nested editable project groups when every exact\s+solid maps unambiguously to a source occurrence/i);
-  assert.match(capabilities, /editing a sketch-backed sweep[\s\S]*?bottom-up[\s\S]*?do not yet recompute/i);
+  assert.match(capabilities, /editing a\s+sketch-backed extrusion or sweep[\s\S]*?boolean ancestors bottom-up[\s\S]*?do\s+not yet participate in a general recompute graph/i);
   assert.match(capabilities, /uniquely\s+occurring cones, spheres, tori, and cylinders[\s\S]*?sampled normal changes/i);
   assert.match(capabilities, /coincident, horizontal, vertical, perpendicular, and\s+fixed-distance relations/i);
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);
