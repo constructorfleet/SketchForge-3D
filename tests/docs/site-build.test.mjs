@@ -93,8 +93,9 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes 22 and explains why 10 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
-  assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion/i);
+  assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion or single-solid sketch sweep/i);
   assert.match(spec, /Source-profile edits replay it only when exactly one planar face matches the saved source normal/i);
+  assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /face drafts cannot yet be combined with prism drafts or edge treatments/i);
   assert.match(spec, /does not establish general topology lineage/i);
