@@ -6,6 +6,7 @@ import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforg
 import { applyEdgeTreatment, applySketchFaceDraft, shapeWithCadResult } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
+import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
@@ -462,6 +463,49 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(updated.edgeTreatments?.[0]?.edgeCount);
     expect(updated.cadBrep).toBeTruthy();
     expect(updated.cadBrep).not.toBe(updated.edgeTreatmentHistory?.[0]?.before.cadBrep);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays an all-edge chamfer on a hollow single-region sketch revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Hollow chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }])).shapes[0]!;
+    const source = value(await engine.changeShape("recompute", created.sketchSourceId!, {
+      sketchProfile: {
+        ...created.sketchProfile!,
+        points: [...created.sketchProfile!.points,
+          { id: "hole-a", x: -6, z: -3 }, { id: "hole-b", x: -6, z: 3 },
+          { id: "hole-c", x: -9, z: 3 }, { id: "hole-d", x: -9, z: -3 }],
+        segments: [...created.sketchProfile!.segments,
+          { id: "hole-ab", startId: "hole-a", endId: "hole-b" },
+          { id: "hole-bc", startId: "hole-b", endId: "hole-c" },
+          { id: "hole-cd", startId: "hole-c", endId: "hole-d" },
+          { id: "hole-da", startId: "hole-d", endId: "hole-a" }],
+      },
+    })).shape;
+    expect(source.sketchProfile?.points).toHaveLength(8);
+    expect(source.sketchProfile?.segments).toHaveLength(8);
+    expect(source.sketchOperation).toBe("revolve");
+    expect(source.sketchRevolve?.sweepAngle).toBe(360);
+    expect(sketchProfileToRevolvePolygons(source.sketchProfile!, source.sketchRevolve)).toHaveLength(2);
+    const treated = await persistAllEdgeChamfer(engine, store, "recompute", source.id, 0.05);
+    const writesBeforeEdit = writeCount();
+    const changedProfile = {
+      ...treated.sketchProfile!,
+      points: treated.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.05 })),
+    };
+
+    const changed = await engine.changeShape("recompute", treated.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", amount: 0.05, allEdges: true });
+    expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    expect(updated.cadBrep).toBeTruthy();
+    const faces = await shapeFaces(updated);
+    expect(faces.filter((face) => face.surfaceType === "cylinder").length).toBeGreaterThanOrEqual(4);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
   }, CAD_TEST_TIMEOUT_MS);
 

@@ -475,9 +475,7 @@ function exactPlainSketchRevolveSolid(
     throw new ServerCadError("All-edge chamfer replay currently requires a plain full-turn sketch revolve.");
   }
   const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
-  if (polygons.length !== 1) {
-    throw new ServerCadError("All-edge chamfer replay currently requires one closed revolve profile region.");
-  }
+  if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region to chamfer.");
   const profile: SketchProfile = {
     points: polygons.flatMap((polygon, polygonIndex) => polygon.map(([x, z], pointIndex) => ({
       id: `revolve-${polygonIndex}-point-${pointIndex}`,
