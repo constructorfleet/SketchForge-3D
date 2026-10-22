@@ -72,8 +72,8 @@ so stale tracked output alone does not fail the docs check.
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. 21 operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 11 are listed
+the registry and handlers. 22 operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 10 are listed
 with omission reasons in the generated contract; full route coverage remains
 open.
 

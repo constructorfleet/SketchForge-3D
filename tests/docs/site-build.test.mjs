@@ -122,7 +122,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
 
-  assert.match(migration, /21 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 11 are listed/i);
+  assert.match(migration, /22 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 10 are listed/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
   assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
   assert.match(migration, /required\s+audience\/owner metadata/i);
