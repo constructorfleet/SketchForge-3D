@@ -12700,6 +12700,285 @@
         }
       }
     },
+    "/api/v1/thickness": {
+      "get": {
+        "operationId": "estimateThickness",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "thickness"
+                  ],
+                  "properties": {
+                    "thickness": {
+                      "type": "object",
+                      "required": [
+                        "minimum",
+                        "unit",
+                        "method",
+                        "samplesPerFace",
+                        "facesChecked"
+                      ],
+                      "properties": {
+                        "minimum": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "mm"
+                          ]
+                        },
+                        "method": {
+                          "type": "string",
+                          "enum": [
+                            "sampled-opposing-surface-distance"
+                          ]
+                        },
+                        "samplesPerFace": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "facesChecked": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_project_id",
+                        "invalid_shape_id"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unauthorized"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "project_not_found",
+                        "shape_not_found"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "geometry_failed"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "geometry_failed"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "storage_unconfigured"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Estimates minimum wall thickness by sampling opposing surface pairs; this is not a certified minimum-thickness result.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "shapeId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/treatments": {
       "post": {
         "operationId": "treatShape",
@@ -14062,12 +14341,6 @@
       "path": "/api/v1/shapes",
       "operationId": "updateShape",
       "reason": "PATCH /shapes is omitted because faceColors uses custom validation not expressible in JSON Schema. It also accepts sketchProfile to rebuild a retained sketch sweep; see https://constructorfleet.github.io/SketchForge-3D/docs/REST_API#sketch-sweeps."
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/thickness",
-      "operationId": "estimateThickness",
-      "reason": "Response schemas or verified response statuses are not declared."
     },
     {
       "method": "OPTIONS",
