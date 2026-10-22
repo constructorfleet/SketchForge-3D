@@ -109,6 +109,12 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
   assert.match(spec, /18 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
+  assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
+  assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
+  assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
+  assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
+  assert.match(spec, /`SKETCHFORGE_DESKTOP_DEV_URL`.*internal handoff.*`NODE_PATH`.*pass-through/i);
   assert.match(spec, /Additional runtime schemas and route response validations remain outstanding/i);
   assert.match(spec, /creates or refreshes a bot repair PR if tracked outputs differ/i);
   assert.doesNotMatch(spec, /Open PR \[#209\]|Open PR \[#214\]/i);
