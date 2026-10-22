@@ -57,24 +57,27 @@ so stale tracked output alone does not fail the docs check.
   run against a local API. Python package references and examples are checked
   with mypy and integration tests. The MCP example is checked against the
   server's current advertised tool schemas.
-- The editor quick-start is tested in a browser from the first sketch through
-  save and export. Broader task-oriented guides and corresponding workflow
-  checks remain incomplete.
+- The editor quick-start and the create/edit/save/reload/export guide are tested
+  through browser acceptance. Broader task-oriented guides and corresponding
+  workflow checks remain incomplete.
 
 ## REST API coverage
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. Nine operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 23 are listed
+the registry and handlers. Fifteen operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 17 are listed
 with omission reasons in the generated contract; full route coverage remains
 open.
 
-`PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep and
-rebuilds the solid while preserving shape and source IDs. The operation is
-still omitted from OpenAPI because the combined custom face-color and profile
-validation is not fully represented there. Sweep source persistence and
-editing work, but downstream dependency-ordered recomputation is not available.
+`PATCH /api/v1/shapes` accepts `sketchProfile` for a retained sketch sweep,
+targeted by either its output shape ID or persisted `sketchSourceId`, and
+rebuilds the solid while preserving shape and source IDs. Editing a
+sketch-backed sweep also recomputes retained boolean descendants bottom-up and
+persists the result atomically. Other downstream operation types remain
+unsupported. The sweep-profile operation is still omitted from OpenAPI because
+the combined custom face-color and profile validation is not fully represented
+there.
 See the [REST API guide](./REST_API.md#sketch-sweeps) and the
 [kernel capability inventory](./UNEXPLORED_KERNEL_CAPABILITIES.md).
 

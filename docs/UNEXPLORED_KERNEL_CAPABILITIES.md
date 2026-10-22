@@ -21,28 +21,32 @@ These are implemented and should not be filed as missing features:
 - STEP imports can expose bounded product names and nested `stepAssembly`
   hierarchy metadata in shape summaries. Extraction is limited to inputs up to
   200 solids and 8 MiB, with at most 2,000 hierarchy nodes and depth 32.
-  `POST /explode` produces independently selectable top-level solids. When a
-  solid can be associated unambiguously, it retains `stepComponent` source
-  occurrence identity and root-to-component ancestry, which survives `.skf`
-  round trips. Ambiguous associations omit ancestry rather than guessing.
-  Exploded parts remain top-level project shapes; arbitrary nested groups and
-  source assembly transforms are not reconstructed as editable project groups.
+  `POST /explode` rebuilds nested editable project groups when every exact
+  solid maps unambiguously to a source occurrence using the imported GLB
+  geometry and source hierarchy. Otherwise it falls back to independently
+  selectable flat solids. Leaf solids retain project-space placement,
+  `stepComponent` occurrence identity, and root-to-component ancestry through
+  `.skf` round trips. Native STEP transform editing and hierarchy-preserving
+  STEP export are not implemented.
 - Kernel-backed hidden-line projection, scene SVG, section SVG, and section
   DXF exports are implemented. DXF requires an explicit section plane.
 - Baked mirrors, per-face color persistence, and per-triangle 3MF colors are
   implemented. `GET /faces` exposes stable application-owned IDs alongside
   compatibility indexes; colors use those IDs and survive project round
   trips. IDs and colors survive shape-parameter edits and supported CAD
-  treatments when faces can be matched uniquely. New or ambiguous faces get
-  fresh IDs and do not inherit colors. Viewport and 3MF previews map B-rep
-  triangle groups to the same identities. Numeric face indexes remain
-  supported for older projects and callers.
+  treatments when faces can be matched uniquely. For parameter edits, uniquely
+  occurring cones, spheres, tori, and cylinders can retain identity when their
+  sampled normal changes; repeated curved surfaces remain unmatched. New or
+  ambiguous faces get fresh IDs and do not inherit colors. Viewport and 3MF
+  previews map B-rep triangle groups to the same identities. Numeric face
+  indexes remain supported for older projects and callers.
 - A bounded draft-prism operation is available in the shape inspector, over
   REST, and in the TypeScript and Python clients. It accepts a retained
   straight, single-loop sketch extrusion and stores exact geometry; the result
   is baked without an editable draft-feature node.
 - Face-based drafting is available in the shape inspector for exact B-rep
-  solids, with a selectable local CAD pull axis. Measured support remains
+  solids, with a selector for all six signed local CAD pull axes. Measured
+  support remains
   geometry-specific: the documented XZ-profile, +Y extrusion fixture accepts
   faces 1, 3, 4, and 5 at ±5° along +Z; a 10 mm box accepts faces 0–3 at ±5°
   along +Z; a +90° Y-rotated fixture accepts face 0 at ±30° along +X; and a
@@ -58,20 +62,27 @@ These are implemented and should not be filed as missing features:
   reopening and editing. `POST /shapes` accepts `kind: "sketchSweep"`; the
   engine and TypeScript and Python clients can create sweeps and replace
   `sketchProfile` through `PATCH /api/v1/shapes`, rebuilding geometry while
-  retaining shape and source IDs. A profile rebuild receives fresh face IDs
+  retaining shape and source IDs. `PATCH /shapes` can target a sketch sweep by
+  its persisted `sketchSourceId` or by output shape ID; it updates the source
+  profile and rebuilds its dependent sweep before writing the project. Invalid
+  profiles leave the persisted source and sweep unchanged. A profile rebuild
+  receives fresh face IDs
   and drops face colors and edge-treatment metadata because old faces cannot
   be assumed to correspond to the new profile.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
-  revolves, and sweeps. The source profiles and operation parameters survive
-  project round trips; profile edits in the editor rebuild the corresponding
-  solid while retaining its shape and source identity. These operations do
-  not yet participate in a general downstream recompute graph.
-- Coincident, horizontal, vertical, and fixed-distance sketch constraints are
-  supported. Point drags use a deterministic, bounded damped least-squares
-  solve for supported coupled constraints, keep directly dragged points
-  anchored, and report unsatisfied constraint IDs. The inspector also reports
-  an estimated local degree-of-freedom count from the supported equations'
-  Jacobian rank.
+  revolves, sweeps, and boolean groups. Source profiles, operation parameters,
+  and dependency links survive project round trips. Profile edits rebuild the
+  corresponding solid while retaining its shape and source identity; editing a
+  sketch-backed sweep also recomputes retained boolean descendants bottom-up
+  and persists the result atomically. Other downstream operation types do not
+  yet participate in a general recompute graph.
+- Coincident, horizontal, vertical, perpendicular, and fixed-distance sketch
+  constraints are supported, including `.skf` persistence and TypeScript
+  profile types. Perpendicular relations take part in the bounded coupled solve
+  and local degree-of-freedom estimate. Point drags keep directly dragged
+  points anchored and report unsatisfied constraint IDs. The inspector also
+  estimates local degrees of freedom from the supported equations' Jacobian
+  rank.
 - OBJ import is supported alongside STL, SVG, and STEP, and imported source
   assets are preserved in `.skf` projects.
 - Camera view orientation, target, and zoom are saved with the project and
@@ -91,14 +102,14 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 Sketch extrusion, revolve, and sweep persist source sketches and operation
 parameters; `.skf` also records dependency links for sketch outputs and boolean
-groups. Runtime recomputation is still narrow: editing a sketch-backed sweep
-now rebuilds it inside retained boolean groups, bottom-up, and writes the
-updated result atomically. Invalid sketches or failed dependent booleans leave
-the project unchanged. Extrusion/revolve descendants, drafts, and other
-operation types do not yet recompute, and draft prism/face draft remain baked
-rather than editable feature nodes. A general dependency-ordered graph with
-consistent failure propagation remains the highest-value foundation before
-expanding editable downstream operations.
+groups. Runtime recomputation remains narrow: editing a sketch-backed sweep
+rebuilds it inside retained boolean groups, bottom-up, and writes the updated
+result atomically. Invalid sketches or failed dependent booleans leave the
+project unchanged. Extrusion/revolve descendants, drafts, and other operation
+types do not yet recompute, and draft prism/face draft remain baked rather than
+editable feature nodes. A general dependency-ordered graph with consistent
+failure propagation remains the highest-value foundation before expanding
+editable downstream operations.
 
 ### 2. Broader and editable drafting
 
@@ -115,29 +126,31 @@ editable draft history depends on the feature-recompute work in gap 1.
 The engine retains source occurrence IDs and ancestry on exploded solids when
 association is unambiguous, and persists that metadata through `.skf`. The
 identifiers describe a particular STEP source and may change when the source
-file or product structure changes. Exploded parts are top-level project shapes:
-nested assembly groups, arbitrary source transforms, and hierarchy-preserving
-editing/export are not implemented. Some source trees also cannot be
-associated reliably with imported solids, so those solids have no
-`stepComponent` ancestry. Full assembly editing depends on representing nested
-groups and transforms in the project model; improving identity matching alone
-does not provide that behavior.
+file or product structure changes. `POST /explode` now reconstructs nested
+editable project groups when every exact solid can be uniquely associated with
+an occurrence using the imported GLB geometry and source hierarchy. If any
+solid cannot be mapped unambiguously, it returns flat solids rather than a
+partial hierarchy. Native STEP transform editing and hierarchy-preserving STEP
+export remain unsupported. Full assembly editing still needs more robust
+association across exporters and broader STEP fixtures.
 
 ### 4. Stable face identity across arbitrary topology changes
 
 Stable IDs and color assignments survive shape-parameter edits and supported
 CAD treatments when the engine finds a unique match. Matching uses exact face
-B-rep or a unique planar support surface; it is not a semantic identity
-contract. Split, merged, generated, or otherwise ambiguous faces receive new
+B-rep or a unique planar support surface; for parameter edits, uniquely
+occurring cone, sphere, torus, and cylinder faces can also retain identity
+when their sampled normal changes. This is not a semantic identity contract.
+Split, merged, generated, repeated, or otherwise ambiguous faces receive new
 IDs without inherited assignments. General identity across arbitrary topology
 edits remains unsupported.
 
 ### 5. Broader sketch constraints and globally determined solutions
 
-The solver supports coincident, horizontal, vertical, and fixed-distance
-relations with a bounded deterministic least-squares solve and a local
-Jacobian-rank estimate. It does not guarantee global solvability, identify
-every nonlinear or second-order dependency, or remove the two global
+The solver supports coincident, horizontal, vertical, perpendicular, and
+fixed-distance relations with a bounded deterministic least-squares solve and
+a local Jacobian-rank estimate. It does not guarantee global solvability,
+identify every nonlinear or second-order dependency, or remove the two global
 translation freedoms. Degenerate zero-length distance geometry has no
 determinate degree-of-freedom report. Additional constraint types and a solver
 that can robustly determine global placement remain open.
