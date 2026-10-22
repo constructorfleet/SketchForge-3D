@@ -121,7 +121,12 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Generated Markdown may remain tracked/i);
   assert.match(spec, /edit-and-export guide has browser acceptance/i);
 
-  assert.match(migration, /Eighteen operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 14 are listed/i);
+  assert.match(migration, /19 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 13 are listed/i);
+  assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
+  assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
+  assert.match(migration, /required audience\/owner metadata/i);
+  assert.match(migration, /Changed-source ownership diagnostics cover selected source trees/i);
+  assert.match(migration, /mapping is path-based and is not symbol-level or complete/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
   assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
   assert.match(migration, /trusted\s+default-branch follow-up validates the artifact and PR before committing only\s+allowlisted updates to same-repository PR branches/i);
