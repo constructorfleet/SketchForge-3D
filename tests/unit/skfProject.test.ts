@@ -72,7 +72,7 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
-  it("rejects face drafts outside retained sketch extrusions or sweeps and with unsupported combinations", async () => {
+  it("accepts bounded full-turn revolve face drafts and rejects unsupported source kinds or combinations", async () => {
     const draftedExtrusion = shape("mesh", "drafted-extrusion", {
       sketchSourceId: "draft-source",
       sketchOperation: "extrude",
@@ -92,7 +92,18 @@ describe("SketchForge .skf project packages", () => {
     });
     const validArchive = await exportSkfProject(input([draftedExtrusion]));
     const invalidCases: Array<[string, (definition: Record<string, unknown>) => void]> = [
-      ["revolve", (definition) => { definition.sketchOperation = "revolve"; }],
+      ["revolve without settings", (definition) => { definition.sketchOperation = "revolve"; }],
+      ["partial revolve", (definition) => { definition.sketchOperation = "revolve"; definition.sketchRevolve = { startAngle: 0, sweepAngle: 180, sides: 48, quality: 0 }; }],
+      ["helical revolve", (definition) => { definition.sketchOperation = "revolve"; definition.sketchRevolve = { startAngle: 0, sweepAngle: 360, sides: 48, quality: 0, pitch: 1, turns: 1, coreRadius: 0 }; }],
+      ["multi-region revolve", (definition) => {
+        definition.sketchOperation = "revolve";
+        definition.sketchRevolve = { startAngle: 0, sweepAngle: 360, sides: 48, quality: 0, pitch: 0, turns: 1, coreRadius: 0 };
+        const points = [[0, 0], [2, 0], [2, 2], [0, 2], [5, 0], [7, 0], [7, 2], [5, 2]] as const;
+        definition.sketchProfile = {
+          points: points.map(([x, z], index) => ({ id: `p${index}`, x, z })),
+          segments: points.map((_, index) => ({ id: `s${index}`, startId: `p${index}`, endId: `p${(index + 1) % 4 + Math.floor(index / 4) * 4}` })),
+        };
+      }],
       ["prism draft", (definition) => { definition.draftPrismAngle = 3; }],
       ["edge treatment", (definition) => { definition.edgeTreatments = [{ kind: "fillet", amount: 0.5, edgeCount: 1 }]; }],
     ];
@@ -105,6 +116,19 @@ describe("SketchForge .skf project packages", () => {
       });
       await expect(importSkfProject(invalidArchive), label).rejects.toThrow(/faceDraft/);
     }
+
+    const draftedRevolve = shape("mesh", "drafted-revolve", {
+      sketchSourceId: "revolve-draft-source",
+      sketchOperation: "revolve",
+      sketchProfile: draftedExtrusion.sketchProfile,
+      sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 48, quality: 0, pitch: 0, turns: 1, coreRadius: 0 },
+      faceDraft: draftedExtrusion.faceDraft,
+      faceDraftSourceScale: { width: 1.5, depth: 0.75, height: 2 },
+    });
+    const revolveArchive = await exportSkfProject(input([draftedRevolve]));
+    const restoredRevolve = await importSkfProject(revolveArchive);
+    expect(restoredRevolve.shapes[0]?.faceDraft).toEqual(draftedRevolve.faceDraft);
+    expect(restoredRevolve.shapes[0]?.faceDraftSourceScale).toEqual(draftedRevolve.faceDraftSourceScale);
 
     const edgeHistoryArchive = mutateProject(validArchive, (document) => {
       const node = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((entry) => entry.objectId === draftedExtrusion.id);

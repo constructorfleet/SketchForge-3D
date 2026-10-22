@@ -6,6 +6,7 @@ import { POST as createProject } from "@/app/api/v1/projects/route";
 import { GET as listFaces } from "@/app/api/v1/faces/route";
 import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
+import { validateApiV1Response } from "@/lib/apiV1OperationContract";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
@@ -50,12 +51,14 @@ async function addShape(projectId: string, shape: Record<string, unknown>) {
 async function readShape(projectId: string, shapeId: string) {
   const response = await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`));
   const payload = await response.json() as { shapes: Summary[] };
+  if (!Array.isArray(payload.shapes)) throw new Error(`GET /shapes returned ${response.status}: ${JSON.stringify(payload)}`);
   return payload.shapes.find((shape) => shape.id === shapeId)!;
 }
 
-async function readFaces(projectId: string, shapeId: string) {
-  const response = await listFaces(authorized(`/api/v1/faces?projectId=${projectId}&shapeId=${shapeId}`));
-  return await response.json() as { faces: Array<{ id: string; index: number }> };
+async function readFaces(projectId: string, shapeId: string, topology?: "exact") {
+  const topologyQuery = topology ? `&topology=${topology}` : "";
+  const response = await listFaces(authorized(`/api/v1/faces?projectId=${projectId}&shapeId=${shapeId}${topologyQuery}`));
+  return await response.json() as { faces: Array<{ id: string; index: number; surfaceType?: string; normal?: { x: number; y: number; z: number } | null }> };
 }
 
 function sweepProfile(sectionXScale = 1, sectionZScale = 1, spineLength = 10, diamond = false) {
@@ -310,6 +313,28 @@ describe("REST API shape round trip", () => {
     expect(rebuilt.status, JSON.stringify(rebuilt.payload)).toBe(200);
     expect(rebuilt.payload.shape).toMatchObject({ sketchProfile: editedProfile, faceDraft: draft });
     expect((await readShape(projectId, sweep.id)).faceDraft).toMatchObject(draft);
+  }, 60_000);
+
+  it("lists exact revolve faces without changing the default mesh index listing", async () => {
+    const projectId = await makeProject();
+    const revolve = await addShape(projectId, {
+      kind: "revolve", name: "Draftable revolve", profile: [[1, -2], [3, -2], [3, 2], [1, 2]], sides: 48,
+    });
+    expect((await readShape(projectId, revolve.id)).id).toBe(revolve.id);
+    const meshFaces = await readFaces(projectId, revolve.id);
+    const exactFaces = await readFaces(projectId, revolve.id, "exact");
+
+    expect(meshFaces.faces.length).toBeGreaterThan(20);
+    expect(exactFaces.faces.length).toBeLessThan(20);
+    const selectedFace = exactFaces.faces.find((face) => face.surfaceType === "plane" && face.normal
+      && face.normal.y > 0.99)!;
+    const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" };
+    const drafted = await patch(projectId, revolve.id, { faceDraft: draft });
+
+    expect(drafted.status, JSON.stringify(drafted.payload)).toBe(200);
+    expect(drafted.payload.shape?.faceDraft).toMatchObject(draft);
+    expect(validateApiV1Response("GET /api/v1/shapes", 200, { shapes: [drafted.payload.shape] })).toBe(true);
+    expect((await readShape(projectId, revolve.id)).faceDraft).toMatchObject(draft);
   }, 60_000);
 
   it("rebuilds a persisted revolve through its source sketch and keeps the source and placement", async () => {

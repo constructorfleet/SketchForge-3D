@@ -383,6 +383,8 @@ export type WorkplaneShape = {
   faceDraft?: SketchFaceDraft;
   /** Original extrusion frame used to keep face-draft source edits in place. */
   faceDraftSourceFrame?: CadBrepFrame;
+  /** Original revolve resize ratios, retained for profile replay after drafting. */
+  faceDraftSourceScale?: { width: number; depth: number; height: number };
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];
   cadDisplayEdges?: CadDisplayEdge[];

@@ -8,7 +8,8 @@ import { canonicalizeShape } from "./workplaneShapes.js";
 import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvg } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
-import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import { cadSketchRegions } from "./sketchCadProfile.js";
+import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const SKF_FORMAT_VERSION = 2;
@@ -1154,10 +1155,19 @@ function validateShapeDefinition(
   }
   if (definition.faceDraft !== undefined) {
     const draft = objectRecord(definition.faceDraft, `${label}.faceDraft`);
+    const revolveSettings = definition.sketchRevolve && typeof definition.sketchRevolve === "object" && !Array.isArray(definition.sketchRevolve)
+      ? definition.sketchRevolve as Record<string, unknown>
+      : undefined;
+    const plainFullTurnRevolve = definition.sketchOperation === "revolve" && revolveSettings
+      && typeof revolveSettings.sweepAngle === "number"
+      && Math.abs(Math.abs(revolveSettings.sweepAngle) - 360) <= 1e-6
+      && (revolveSettings.pitch === undefined || revolveSettings.pitch === 0)
+      && (revolveSettings.coreRadius === undefined || revolveSettings.coreRadius === 0);
     if (
       kind !== "mesh"
-      || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep")
+      || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep" && !plainFullTurnRevolve)
       || definition.sketchProfile === undefined
+      || plainFullTurnRevolve && cadSketchRegions(definition.sketchProfile as SketchProfile).length !== 1
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
       || (Array.isArray(definition.edgeTreatments) && definition.edgeTreatments.length > 0)
@@ -1183,6 +1193,14 @@ function validateShapeDefinition(
     if (["width", "depth", "height"].some((field) => (frame[field] as number) <= 0)) {
       throw new LocalizedError("errors.skf.nonPositiveDimensions", { label: `${label}.faceDraftSourceFrame` });
     }
+  }
+  if (definition.faceDraftSourceScale !== undefined) {
+    const scale = objectRecord(definition.faceDraftSourceScale, `${label}.faceDraftSourceScale`);
+    ["width", "depth", "height"].forEach((field) => {
+      if (finiteNumber(scale[field], `${label}.faceDraftSourceScale.${field}`) <= 0) {
+        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraftSourceScale.${field}` });
+      }
+    });
   }
   if (kind === "gear") {
     const teeth = finiteNumber(definition.teeth, `${label}.teeth`);

@@ -11,7 +11,7 @@ owner: "Contributors"
 
 ## Unreleased
 
-- `PATCH /shapes` can retain one face draft on a sketch extrusion or single-solid sketch sweep through the `faceDraft` value. The selected source face is referenced by stable face ID and uniquely matched planar normal during source-profile edits; `.skf` round trips preserve the draft and its source frame. Ambiguous or missing matches and ineffective dependent booleans fail atomically. Face drafts still cannot be combined with prism drafts or edge treatments, and the editor's arbitrary-shape draft remains baked.
+- `PATCH /shapes` can retain one face draft on a sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve through the `faceDraft` value. For eligible revolves, `GET /faces?topology=exact` lists analytic B-rep faces; the default mesh listing and its compatibility indexes remain unchanged. The selected source face is referenced by stable face ID and uniquely matched planar normal during source-profile edits; `.skf` round trips preserve the draft, its source frame, and a resized revolve's scale. Ambiguous or missing matches and ineffective dependent booleans fail atomically. Partial, helical, and multi-region revolve drafts are refused. Face drafts still cannot be combined with prism drafts or edge treatments, and the editor's arbitrary-shape draft remains baked.
 - `POST /groups` and `DELETE /groups` now have runtime-validated request and
   response contracts in generated OpenAPI, including shape summaries and
   validation/engine error responses.

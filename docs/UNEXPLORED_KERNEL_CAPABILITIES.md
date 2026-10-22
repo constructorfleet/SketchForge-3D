@@ -72,12 +72,15 @@ These are implemented and should not be filed as missing features:
   is parallel to that face. These are measured cases, not broad support for
   other faces, solids, or angles. Other unsupported combinations return a
   localized error. The editor's arbitrary-shape draft remains baked. The
-  engine/API can retain one face draft on a sketch extrusion or single-solid
-  sketch sweep, storing the
+  engine/API can retain one face draft on a sketch extrusion, single-solid
+  sketch sweep, or plain single-region full-turn sketch revolve. Revolves use
+  `GET /faces?topology=exact` so analytic face selection does not change the
+  default tessellated listing or its compatibility indexes. It stores the
   selected source face ID, signed pull axis, angle, unique planar-normal
-  matching evidence, and original source frame. Source edits replay that draft
+  matching evidence, original source frame, and resized revolve scale. Source edits replay that draft
   only when exactly one planar face matches; missing or ambiguous matches and
-  failed dependent booleans roll back atomically. Face drafts cannot yet be
+  failed dependent booleans roll back atomically. Partial-turn, helical, and
+  multi-region revolve drafts are refused. Face drafts cannot yet be
   combined with prism drafts or edge treatments.
 - The Sketch workspace supports planar sweeps with one or more closed section
   loops and one open spine on the derived orthogonal plane. Nested section

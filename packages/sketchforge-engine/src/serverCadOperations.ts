@@ -459,23 +459,32 @@ export function allEdgeTreatmentEdgeCount(shape: WorkplaneShape, kind: ServerCad
 function edgeTreatmentSolid(cad: OcctKernel, shape: WorkplaneShape, treatment: ServerCadTreatment) {
   if (treatment.kind === "chamfer" && !treatment.edges?.length
     && shape.sketchOperation === "revolve" && shape.sketchProfile) {
-    return exactPlainSketchRevolveSolid(cad, shape.sketchProfile, shape.sketchRevolve);
+    return exactPlainSketchRevolveSolid(cad, shape.sketchProfile, shape.sketchRevolve, shape);
   }
   return orientedSolidForShape(cad, shape);
 }
 
 /** Build the analytical full-turn BREP for chamfering a retained plain revolve. */
-function exactPlainSketchRevolveSolid(
+export function isPlainFullTurnSketchRevolve(shape: WorkplaneShape) {
+  const settings = shape.sketchRevolve;
+  return shape.sketchOperation === "revolve" && Boolean(shape.sketchProfile) && Boolean(settings)
+    && (settings!.pitch ?? 0) === 0 && (settings!.coreRadius ?? 0) === 0
+    && Math.abs(Math.abs(settings!.sweepAngle) - 360) <= 1e-6;
+}
+
+/** Build the analytical BREP for a plain, single-region full-turn revolve. */
+export function exactPlainSketchRevolveSolid(
   cad: OcctKernel,
   sketchProfile: SketchProfile,
   sketchRevolve: WorkplaneShape["sketchRevolve"],
+  targetShape?: WorkplaneShape,
 ) {
-  if (!sketchRevolve || sketchRevolve.pitch !== 0 || sketchRevolve.coreRadius !== 0
+  if (!sketchRevolve || (sketchRevolve.pitch ?? 0) !== 0 || (sketchRevolve.coreRadius ?? 0) !== 0
     || Math.abs(Math.abs(sketchRevolve.sweepAngle) - 360) > 1e-6) {
-    throw new ServerCadError("All-edge chamfer replay currently requires a plain full-turn sketch revolve.");
+    throw new ServerCadError("Exact face drafting requires a plain full-turn sketch revolve.");
   }
   const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
-  if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region to chamfer.");
+  if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region.");
   const profile: SketchProfile = {
     points: polygons.flatMap((polygon, polygonIndex) => polygon.map(([x, z], pointIndex) => ({
       id: `revolve-${polygonIndex}-point-${pointIndex}`,
@@ -494,7 +503,7 @@ function exactPlainSketchRevolveSolid(
     { x: to.x, y: to.z, z: 0 },
   )));
   const regions = cadSketchRegions(profile);
-  if (regions.length !== 1) throw new ServerCadError("All-edge chamfer replay currently requires one closed revolve profile region.");
+  if (regions.length !== 1) throw new ServerCadError("Exact face drafting requires one closed revolve profile region.");
   const solids = regions.map((region) => {
     let face = cad.makeFace(pathWire(region.outer));
     if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map(pathWire));
@@ -507,9 +516,49 @@ function exactPlainSketchRevolveSolid(
       direction: { x: 0, y: 1, z: 0 },
     }, (sketchRevolve.startAngle * Math.PI) / 180);
   });
-  const solid = solids[0]!;
+  let solid = solids[0]!;
+  if (targetShape?.importedMesh && targetShape.width > 0 && targetShape.depth > 0 && targetShape.height > 0) {
+    const bounds = cad.getBoundingBox(solid, false);
+    const sx = targetShape.width / Math.max(bounds.xmax - bounds.xmin, 1e-9);
+    const sy = targetShape.height / Math.max(bounds.ymax - bounds.ymin, 1e-9);
+    const sz = targetShape.depth / Math.max(bounds.zmax - bounds.zmin, 1e-9);
+    solid = cad.transform(solid, [
+      sx, 0, 0, -(bounds.xmin + bounds.xmax) * sx / 2,
+      0, sy, 0, -bounds.ymin * sy,
+      0, 0, sz, -(bounds.zmin + bounds.zmax) * sz / 2,
+    ]);
+  }
   if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new ServerCadError("The retained sketch revolve could not be rebuilt as exact CAD geometry.");
   return solid;
+}
+
+function scaleRevolveResult(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape) {
+  const mesh = shape.importedMesh;
+  if (!mesh) return solid;
+  const factors = [
+    shape.width / Math.max(mesh.baseWidth ?? shape.width, 1e-9),
+    shape.height / Math.max(mesh.baseHeight ?? shape.height, 1e-9),
+    shape.depth / Math.max(mesh.baseDepth ?? shape.depth, 1e-9),
+  ];
+  if (factors.every((factor) => Math.abs(factor - 1) < 1e-8)) return solid;
+  const bounds = cad.getBoundingBox(solid, false);
+  const [sx, sy, sz] = factors as [number, number, number];
+  return cad.transform(solid, [
+    sx, 0, 0, -(bounds.xmin + bounds.xmax) * sx / 2,
+    0, sy, 0, -bounds.ymin * sy,
+    0, 0, sz, -(bounds.zmin + bounds.zmax) * sz / 2,
+  ]);
+}
+
+/** Rebuild the exact CAD representation of an eligible retained revolve. */
+export function exactPlainSketchRevolveResult(shape: WorkplaneShape): Promise<ServerCadResult> {
+  if (!shape.sketchProfile || !isPlainFullTurnSketchRevolve(shape)) {
+    return Promise.reject(new ServerCadError("Exact revolve geometry requires a plain full-turn retained sketch revolve."));
+  }
+  return withCadKernel((cad) => {
+    const solid = exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
+    return { ...meshedCadResult(cad, solid), faceIds: freshFaceIds(cad, solid, shape.id) };
+  });
 }
 
 /**
@@ -571,13 +620,19 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
   if (!Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
     return Promise.reject(new ServerCadError("The face draft angle must be non-zero and between -45 and 45 degrees.", 400));
   }
-  if ((shape.sketchOperation !== "extrude" && shape.sketchOperation !== "sweep") || !shape.sketchProfile || !shape.cadBrep) {
-    return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion or sweep.", 400));
+  const exactRevolve = isPlainFullTurnSketchRevolve(shape);
+  if ((!exactRevolve && shape.sketchOperation !== "extrude" && shape.sketchOperation !== "sweep")
+    || !shape.sketchProfile || (!shape.cadBrep && !exactRevolve)) {
+    return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion, sweep, or plain full-turn revolve.", 400));
   }
   return withCadKernel((cad) => {
-    const solid = solidFromBrep(cad, shape.cadBrep!);
+    const solid = exactRevolve
+      ? exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape)
+      : solidFromBrep(cad, shape.cadBrep!);
     const faces = cad.getSubShapes(solid, "face");
-    const ids = shape.faceIds;
+    const ids = shape.faceIds?.length === faces.length ? shape.faceIds
+      : exactRevolve && !shape.faceColors ? faces.map((_, index) => `face_${encodeURIComponent(shape.id)}_${index}`)
+        : undefined;
     if (!ids || ids.length !== faces.length || new Set(ids).size !== faces.length) {
       throw new ServerCadError("Face drafting requires a complete, unique stable face ID list.");
     }
@@ -618,7 +673,7 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     if (!cadResultIsValid(cad, drafted) || !cad.isSolid(drafted)) {
       throw new ServerCadError("The face draft did not produce a valid solid.");
     }
-    return meshedCadResult(cad, drafted, shape);
+    return meshedCadResult(cad, exactRevolve ? scaleRevolveResult(cad, drafted, shape) : drafted, shape);
   });
 }
 
