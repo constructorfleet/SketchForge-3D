@@ -413,3 +413,24 @@ test("agent instruction documents are not treated as published site pages", asyn
   const result = runDocsCheck(root);
   assert.equal(result.status, 0, `agent instruction docs should pass unchanged:\n${result.stdout}${result.stderr}`);
 });
+
+test("changed REST example source reports the REST API guide owner", async (t) => {
+  const source = "docs/examples/rest-hole-plate.mjs";
+  const root = await createRepository(
+    t,
+    `---\nslug: "/docs/REST_API"\ntitle: REST API\naudience: API users\nowner: API\nsources:\n  - ${source}\n---\n# REST API\n`,
+    "docs/REST_API.md",
+  );
+  await mkdir(path.dirname(path.join(root, source)), { recursive: true });
+  await writeFile(path.join(root, source), "export const walkthrough = 'initial';\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "add REST walkthrough source fixture"], { cwd: root });
+  const base = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  await writeFile(path.join(root, source), "export const walkthrough = 'changed';\n");
+  spawnSync("git", ["add", "."], { cwd: root });
+  spawnSync("git", ["commit", "-qm", "change REST walkthrough source"], { cwd: root });
+
+  const result = runDocsCheck(root, "--base-ref", base);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /docs\/examples\/rest-hole-plate\.mjs -> \/docs\/REST_API \(docs\/REST_API\.md\)/);
+});

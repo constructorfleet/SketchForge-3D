@@ -5,6 +5,7 @@ audience: "API users"
 owner: "API"
 sources:
   - "apps/web/src/app/api/v1/**"
+  - "docs/examples/rest-hole-plate.mjs"
 ---
 
 # REST API
@@ -767,35 +768,22 @@ answers `404`; a project with no exportable solid geometry answers `422` with
 
 ## Example: a plate with a row of holes
 
-<!-- runnable-exempt: This API walkthrough embeds a Python heredoc and reader-supplied credentials; it illustrates sequential requests rather than a maintained executable source file. -->
-```bash
-TOKEN=...   # SKETCHFORGE_API_TOKEN
-HOST=http://localhost:3000/api/v1
+The script below adds a plate and five hole cutters in one request, cuts them
+from the plate with `POST /booleans`, and reports that the resulting solid has
+less volume than the original plate. It creates a temporary project and deletes
+it after the walkthrough. Run it against a local server with a test token; it
+must not target production.
 
-PROJECT=$(curl -s -X POST "$HOST/projects" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"Hole plate"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"]["id"])')
-
-python3 - "$PROJECT" "$TOKEN" <<'PY'
-import json, sys, urllib.request
-project, token = sys.argv[1], sys.argv[2]
-shapes = [{"kind": "box", "width": 120, "depth": 40, "height": 6, "name": "Plate"}]
-for index in range(5):
-    shapes.append({
-        "kind": "cylinder", "width": 8, "depth": 8, "height": 12,
-        "x": -40 + index * 20, "elevation": -1, "hole": True,
-        "name": f"Hole {index + 1}",
-    })
-request = urllib.request.Request(
-    f"http://localhost:3000/api/v1/shapes?projectId={project}",
-    data=json.dumps({"shapes": shapes}).encode(),
-    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-)
-print(urllib.request.urlopen(request).status)
-PY
+<!-- runnable-source: docs/examples/rest-hole-plate.mjs; tested-by: packages/sketchforge-client/tests/rest-hole-plate.integration.ts; ci: npm run test:integration -->
+```js
+!!!include(./examples/rest-hole-plate.mjs)!!!
 ```
 
-Open the project in the dashboard afterwards; the holes are ordinary shapes marked as holes, so grouping the plate with them cuts them out -- or ask the server to do it, with the boolean endpoint below.
+Run `node docs/examples/rest-hole-plate.mjs` after setting
+`SKETCHFORGE_API_TOKEN`. Set `SKETCHFORGE_URL` if the local server is not at
+`http://127.0.0.1:3000`. The integration test executes the same source against
+temporary local project storage and removes the example project when it finishes.
+The script rejects URLs that do not use HTTP on localhost or a loopback address.
 
 ## Combining shapes: cut, group, separate
 
