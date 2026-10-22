@@ -178,7 +178,11 @@ retains one editable face draft on a sketch extrusion, single-solid sketch
 sweep, or plain single-region full-turn sketch revolve, replaying it after a source edit only when exactly one planar face
 matches the stored local normal;
 it refuses missing or ambiguous matches and prism-draft or edge-treatment
-combinations. Updating angle or axis keeps the same source face ID; clear the
+combinations. Engine mutation APIs reject attempts to add an edge treatment,
+prism draft, or shell to an already face-drafted shape without writing the
+project. They also reject prism-draft and edge-treatment combinations in
+either mutation order, plus shelling when persisted draft or treatment metadata
+exists. Updating angle or axis keeps the same source face ID; clear the
 draft before selecting another face. This bounded support does not define
 semantic lineage across arbitrary topology changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The

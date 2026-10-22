@@ -124,6 +124,167 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it.each(["edge treatment", "prism draft", "shell"] as const)(
+    "refuses %s on a persisted face-drafted extrusion without writing",
+    async (operation) => {
+      const { store, writeCount, document } = projectStore();
+      const engine = createEngine(store);
+      const original = await sketchExtrusionShapeFromRequest({
+        id: "drafted-extrusion", sketchSourceId: "sketch/drafted-extrusion", name: "Drafted extrusion",
+        profile: extrusionProfile(), height: 3, x: 4, z: -2, elevation: 7,
+      });
+      document.shapes = [original];
+      const face = (await shapeFaces(original)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+      const drafted = value(await engine.changeShape("recompute", original.id, {
+        faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+      })).shape;
+      const before = value(await engine.project("recompute"));
+      const writesBefore = writeCount();
+
+      const changed = operation === "edge treatment"
+        ? await engine.treat("recompute", drafted.id, { kind: "fillet", amount: 0.2 })
+        : operation === "prism draft"
+          ? await engine.draftPrism("recompute", drafted.id, 5)
+          : await engine.shell("recompute", drafted.id, { thickness: 0.2 });
+
+      expect(changed.ok).toBe(false);
+      expect(changed.ok ? undefined : changed.failure.reason).toBe("cad_refused");
+      expect(writeCount()).toBe(writesBefore);
+      expect(value(await engine.project("recompute"))).toEqual(before);
+    },
+  );
+
+  it("refuses to add a prism draft to a persisted treated extrusion without writing", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "treated-extrusion", sketchSourceId: "sketch/treated-extrusion", name: "Treated extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const treated = value(await engine.treat("recompute", original.id, { kind: "fillet", amount: 0.2 })).shape;
+    const current = await store.read("recompute");
+    const feature = { kind: "fillet" as const, amount: 0.2, edgeCount: 12, allEdges: true as const };
+    const persisted = { ...treated, edgeTreatments: [feature] };
+    await store.write("recompute", current!, [persisted]);
+    const before = value(await engine.project("recompute"));
+    const writesBefore = writeCount();
+
+    const changed = await engine.draftPrism("recompute", persisted.id, 5);
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure.reason).toBe("cad_refused");
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute"))).toEqual(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it.each(["sent in the same request", "already persisted"] as const)(
+    "refuses prism draft angles when the face draft is %s",
+    async (scenario) => {
+      const { store, writeCount, document } = projectStore();
+      const engine = createEngine(store);
+      const original = await sketchExtrusionShapeFromRequest({
+        id: "drafted-extrusion", sketchSourceId: "sketch/drafted-extrusion", name: "Drafted extrusion",
+        profile: extrusionProfile(), height: 3,
+      });
+      document.shapes = [original];
+      const face = (await shapeFaces(original)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+      const faceDraft = { sourceFaceId: face.id, angle: 5, pullDirection: "y" as const };
+      if (scenario === "already persisted") {
+        value(await engine.changeShape("recompute", original.id, { faceDraft }));
+      }
+      const before = value(await engine.project("recompute"));
+      const writesBefore = writeCount();
+
+      const changed = await engine.changeShape("recompute", original.id, scenario === "sent in the same request"
+        ? { faceDraft, draftPrismAngle: 5 }
+        : { draftPrismAngle: 5 });
+
+      expect(changed.ok).toBe(false);
+      expect(changed.ok ? undefined : changed.failure.reason).toBe("invalid_shape_request");
+      expect(writeCount()).toBe(writesBefore);
+      expect(value(await engine.project("recompute"))).toEqual(before);
+    },
+  );
+
+  it("allows clearing a face draft and adding a prism draft in the same request", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "drafted-extrusion", sketchSourceId: "sketch/drafted-extrusion", name: "Drafted extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const face = (await shapeFaces(original)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+    value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+    }));
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", original.id, { faceDraft: null, draftPrismAngle: 5 });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(value(changed).shape.faceDraft).toBeUndefined();
+    expect(value(changed).shape.draftPrismAngle).toBe(5);
+    expect(writeCount()).toBe(writesBefore + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("clears a face draft from a legacy hybrid while preserving its prism draft", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "drafted-extrusion", sketchSourceId: "sketch/drafted-extrusion", name: "Drafted extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const face = (await shapeFaces(original)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+    const drafted = value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+    })).shape;
+    document.shapes = [{ ...drafted, draftPrismAngle: 5 }];
+    const before = value(await engine.project("recompute"));
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", original.id, { faceDraft: null });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(value(changed).shape.faceDraft).toBeUndefined();
+    expect(value(changed).shape.draftPrismAngle).toBe(5);
+    expect(writeCount()).toBe(writesBefore + 1);
+    expect(value(await engine.project("recompute")).shapes[0]).not.toEqual(before.shapes[0]);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("clears a face draft from a legacy treatment hybrid and replays its treatment", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "drafted-extrusion", sketchSourceId: "sketch/drafted-extrusion", name: "Drafted extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const face = (await shapeFaces(original)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+    const drafted = value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+    })).shape;
+    document.shapes = [original];
+    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
+    document.shapes = [{
+      ...treated,
+      faceDraft: drafted.faceDraft,
+      faceDraftSourceFrame: drafted.faceDraftSourceFrame,
+      faceDraftSourceScale: drafted.faceDraftSourceScale,
+    }];
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", original.id, { faceDraft: null });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(value(changed).shape.faceDraft).toBeUndefined();
+    expect(value(changed).shape.edgeTreatments).toHaveLength(1);
+    expect(value(changed).shape.edgeTreatmentHistory).toHaveLength(1);
+    expect(writeCount()).toBe(writesBefore + 1);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("persists one face draft on a plain full-turn sketch revolve", async () => {
     const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
