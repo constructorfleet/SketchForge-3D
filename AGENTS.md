@@ -30,3 +30,32 @@ These instructions apply to all work in this repository. Follow more specific in
 - Prefer existing project patterns and keep changes focused. Preserve unrelated working-tree changes.
 - For editor/UI changes, manually verify the affected workflow and include visual evidence in the PR when useful. Call out effects on storage, import/export, grouping, and undo/redo behavior.
 - Pull requests and commits must follow conventional commit format.
+
+## Subagents
+
+`.claude/agents/` defines this repository's own agents, so a session here does
+not fall back on generic ones that know none of its gates: `implementer`
+(test-first change work), `quality-gates` (runs the real verification and
+reports what did not run), and `change-reviewer` (reviews a diff against the
+failure modes this repository has actually produced). They record the cost of
+getting things wrong here, not a restatement of the rules above.
+`tests/docs/agent-definitions.test.mjs` fails if one names a script or a path
+that no longer exists.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `constructorfleet/SketchForge-3D` via the `gh` CLI, always with
+an explicit `--repo` so nothing files against the `Formsmith746` upstream. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `GLOSSARY.md` and `docs/adr/`, both created lazily. See
+`docs/agents/domain.md`.
