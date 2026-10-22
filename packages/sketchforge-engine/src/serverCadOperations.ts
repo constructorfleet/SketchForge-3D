@@ -566,13 +566,13 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
   });
 }
 
-/** Apply one face draft to a retained exact sketch extrusion using the current stable face ID. */
+/** Apply one face draft to a retained exact sketch extrusion or sweep using the current stable face ID. */
 export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceDraftRequest): Promise<ServerCadResult> {
   if (!Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
     return Promise.reject(new ServerCadError("The face draft angle must be non-zero and between -45 and 45 degrees.", 400));
   }
-  if (shape.sketchOperation !== "extrude" || !shape.sketchProfile || !shape.cadBrep) {
-    return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion.", 400));
+  if ((shape.sketchOperation !== "extrude" && shape.sketchOperation !== "sweep") || !shape.sketchProfile || !shape.cadBrep) {
+    return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion or sweep.", 400));
   }
   return withCadKernel((cad) => {
     const solid = solidFromBrep(cad, shape.cadBrep!);

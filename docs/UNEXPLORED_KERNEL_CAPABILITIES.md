@@ -72,7 +72,8 @@ These are implemented and should not be filed as missing features:
   is parallel to that face. These are measured cases, not broad support for
   other faces, solids, or angles. Other unsupported combinations return a
   localized error. The editor's arbitrary-shape draft remains baked. The
-  engine/API can retain one face draft on a sketch extrusion, storing the
+  engine/API can retain one face draft on a sketch extrusion or single-solid
+  sketch sweep, storing the
   selected source face ID, signed pull axis, angle, unique planar-normal
   matching evidence, and original source frame. Source edits replay that draft
   only when exactly one planar face matches; missing or ambiguous matches and
@@ -155,9 +156,9 @@ Invalid profiles or failed dependent booleans leave the project unchanged.
 Draft prism angles on sketch extrusions now participate in this bounded path:
 their persisted source angle, source height, and source frame are reapplied
 when the source profile changes, and the angle itself can be changed by source
-ID. A single retained face draft on a sketch extrusion now recomputes when its
-selected planar face has exactly one normal match; missing or ambiguous matches
-fail atomically. Other downstream operation types do not yet recompute. A
+ID. A single retained face draft on a sketch extrusion or single-solid sketch
+sweep now recomputes when its selected planar face has exactly one normal
+match; missing or ambiguous matches fail atomically. Other downstream operation types do not yet recompute. A
 general dependency-ordered graph with consistent failure propagation remains
 the highest-value foundation before expanding editable downstream operations.
 
@@ -167,8 +168,9 @@ Face drafting is selectable along local X, Y, or Z, but verification covers
 only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
 kernel. The editor's general face-draft results remain baked. The engine/API
-retains one editable face draft on a sketch extrusion, replaying it after a
-source edit only when exactly one planar face matches the stored local normal;
+retains one editable face draft on a sketch extrusion or single-solid sketch
+sweep, replaying it after a source edit only when exactly one planar face
+matches the stored local normal;
 it refuses missing or ambiguous matches and prism-draft or edge-treatment
 combinations. Updating angle or axis keeps the same source face ID; clear the
 draft before selecting another face. This bounded support does not define

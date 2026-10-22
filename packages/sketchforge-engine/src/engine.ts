@@ -794,7 +794,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
         return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
       }
-      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)) && !isSketchExtrusion) {
+      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)) && !isSketchExtrusion && !isSketchSweep) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
       }
       if ((requestedFaceDraft || (faceDraftChanged && existing.faceDraft))
@@ -912,17 +912,18 @@ export function createEngine(store: ProjectStore): Engine {
           return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The sketch extrusion could not be rebuilt." });
         }
       }
-      if (replacingSketchProfile && isSketchSweep) {
-        const invalidProfile = invalidSketchSweepProfile(changes.sketchProfile);
+      if ((replacingSketchProfile || faceDraftChanged) && isSketchSweep) {
+        const profileToBuild = replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile;
+        const invalidProfile = replacingSketchProfile ? invalidSketchSweepProfile(profileToBuild) : undefined;
         if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
-        const frame = existing.cadBrepFrame;
+        const frame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
         try {
           const rebuilt = await sketchSweepShapeFromRequest({
             id: existing.id,
             name: existing.name,
             color: existing.color,
             hole: existing.hole,
-            profile: changes.sketchProfile,
+            profile: profileToBuild,
             x: existing.x - (frame?.x ?? 0),
             z: existing.z - (frame?.z ?? 0),
             elevation: (existing.elevation ?? 0) - (frame?.elevation ?? 0),
@@ -951,6 +952,8 @@ export function createEngine(store: ProjectStore): Engine {
             edgeTreatmentHistory: _edgeTreatmentHistory,
             cadDisplayEdges: _cadDisplayEdges,
             cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
+            faceDraft: _faceDraft,
+            faceDraftSourceFrame: _faceDraftSourceFrame,
             ...sourceMetadata
           } = existing;
           const rebuiltSweep = {
@@ -959,8 +962,37 @@ export function createEngine(store: ProjectStore): Engine {
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceIds: refreshedFaceIds,
+            faceDraft: undefined,
+            faceDraftSourceFrame: undefined,
           };
-          swept = await replaySingleAllEdgeTreatment(existing, rebuiltSweep);
+          const replayedSource = replacingSketchProfile
+            ? await replaySingleAllEdgeTreatment(existing, rebuiltSweep)
+            : rebuiltSweep;
+          if (requestedFaceDraft) {
+            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
+              ? existing.faceDraft.sourceFaceNormal
+              : undefined;
+            const selectedOnPrior = priorReference ? undefined
+              : (await shapeFaces(existing)).find((face) => face.id === requestedFaceDraft.sourceFaceId);
+            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
+              throw new Error("The selected source face has no stable planar reference.");
+            }
+            const currentFace = await findUniqueDraftFace(replayedSource, sourceFaceNormal);
+            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+            const result = await applySketchFaceDraft(replayedSource, {
+              ...requestedFaceDraft,
+              sourceFaceId: currentFace.id,
+            });
+            swept = {
+              ...shapeWithCadResult(replayedSource, result),
+              faceDraft,
+              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
+            };
+          } else {
+            swept = replayedSource;
+          }
         } catch (error) {
           return failed({
             reason: "sweep_failed",

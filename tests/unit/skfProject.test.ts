@@ -72,7 +72,7 @@ function mutateProject(bytes: Uint8Array, mutate: (document: SkfProjectDocumentV
 }
 
 describe("SketchForge .skf project packages", () => {
-  it("rejects face drafts outside retained sketch extrusions and with unsupported draft combinations", async () => {
+  it("rejects face drafts outside retained sketch extrusions or sweeps and with unsupported combinations", async () => {
     const draftedExtrusion = shape("mesh", "drafted-extrusion", {
       sketchSourceId: "draft-source",
       sketchOperation: "extrude",
@@ -92,7 +92,7 @@ describe("SketchForge .skf project packages", () => {
     });
     const validArchive = await exportSkfProject(input([draftedExtrusion]));
     const invalidCases: Array<[string, (definition: Record<string, unknown>) => void]> = [
-      ["non-extrusion", (definition) => { definition.sketchOperation = undefined; }],
+      ["revolve", (definition) => { definition.sketchOperation = "revolve"; }],
       ["prism draft", (definition) => { definition.draftPrismAngle = 3; }],
       ["edge treatment", (definition) => { definition.edgeTreatments = [{ kind: "fillet", amount: 0.5, edgeCount: 1 }]; }],
     ];

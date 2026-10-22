@@ -1156,7 +1156,7 @@ function validateShapeDefinition(
     const draft = objectRecord(definition.faceDraft, `${label}.faceDraft`);
     if (
       kind !== "mesh"
-      || definition.sketchOperation !== "extrude"
+      || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep")
       || definition.sketchProfile === undefined
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined

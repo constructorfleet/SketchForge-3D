@@ -294,6 +294,24 @@ describe("REST API shape round trip", () => {
     expect((await readShape(projectId, placeholder.id)).faceDraft).toMatchObject(draft);
   }, 60_000);
 
+  it("persists and recomputes a face draft on a sketch sweep through PATCH and GET", async () => {
+    const projectId = await makeProject();
+    const sweep = await addShape(projectId, { kind: "sketchSweep", name: "Draftable sweep", profile: sweepProfile() });
+    const face = (await readFaces(projectId, sweep.id)).faces.find((candidate) => candidate.index === 1)!;
+    const draft = { sourceFaceId: face.id, angle: 5, pullDirection: "z" };
+
+    const added = await patch(projectId, sweep.id, { faceDraft: draft });
+
+    expect(added.status, JSON.stringify(added.payload)).toBe(200);
+    expect(added.payload.shape?.faceDraft).toMatchObject(draft);
+    const editedProfile = sweepProfile(2);
+    const rebuilt = await patch(projectId, String(sweep.sketchSourceId), { sketchProfile: editedProfile });
+
+    expect(rebuilt.status, JSON.stringify(rebuilt.payload)).toBe(200);
+    expect(rebuilt.payload.shape).toMatchObject({ sketchProfile: editedProfile, faceDraft: draft });
+    expect((await readShape(projectId, sweep.id)).faceDraft).toMatchObject(draft);
+  }, 60_000);
+
   it("rebuilds a persisted revolve through its source sketch and keeps the source and placement", async () => {
     const projectId = await makeProject();
     const revolve = await addShape(projectId, {
