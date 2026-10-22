@@ -65,6 +65,40 @@ describe("REST API v1 operation contract", () => {
     expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
   });
 
+  it("contracts pattern defaults, bounded inputs, created summaries, and reachable errors", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const key = "POST /api/v1/patterns";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "patternShapes",
+      responses: [201, 400, 401, 404, 409, 422, 500, 503],
+      requestBody: { contentType: "application/json", required: true },
+    });
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], kind: "linear", count: 4, stepX: 10 })).toBe(true);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], kind: "circular", count: 3, sweepAngle: 90, rotateCopies: false })).toBe(true);
+    const requestSchema = operation?.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema : undefined;
+    expect(requestSchema?.properties).toMatchObject({
+      kind: { default: "linear" }, count: { default: 4 }, stepX: { default: 0 }, stepZ: { default: 0 },
+      centerX: { default: 0 }, centerZ: { default: 0 }, sweepAngle: { default: 360 }, rotateCopies: { default: true },
+    });
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], kind: "other", count: 4 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], count: 1 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], count: 201 })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], stepX: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], rotateCopies: "false" })).toBe(false);
+    const success = { created: 1, kind: "linear", shapes: [{ id: "copy", name: "Copy", kind: "box", color: "#fff", hole: false, locked: false, hidden: false, x: 10, z: 0, elevation: 0, width: 2, depth: 2, rotation: 0, rotationX: 0, rotationZ: 0 }], revision: 2 };
+    expect(contract.validateApiV1Response(key, 201, success)).toBe(true);
+    expect(contract.validateApiV1Response(key, 201, { ...success, created: "1" })).toBe(false);
+    expect(contract.validateApiV1Response(key, 400, { error: "Bad input", code: "invalid_request" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 401, { error: "No token", code: "unauthorized" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 409, { error: "Busy", code: "project_busy" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 404, { error: "Missing", code: "shape_not_found" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 422, { error: "No step", code: "invalid_request" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 500, { error: "Unexpected failure", code: "internal_error" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 503, { error: "No storage", code: "storage_unconfigured" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
+  });
+
   it("declares nested STEP product hierarchy in project shape summaries", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => method === "GET" && route === "/api/v1/shapes");
     expect((operation?.responseSchemas as Record<number, unknown> | undefined)?.[200]).toMatchObject({

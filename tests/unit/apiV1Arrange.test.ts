@@ -324,6 +324,48 @@ function boxesCenterOfMass(shapes: readonly WorkplaneShape[]) {
 }
 
 describe("POST /patterns", () => {
+  it("applies the linear kind and four-copy defaults and validates the response contract", async () => {
+    const projectId = await makeProject();
+    const [source] = await addShapes(projectId, [{ kind: "box", width: 6, depth: 4, height: 3 }]);
+
+    const response = await pattern(projectId, { ids: [` ${source} `], stepX: 10 });
+    const payload = await response.json() as { created: number; kind: string; shapes: Array<{ x: number }> };
+
+    expect(response.status).toBe(201);
+    expect(payload).toMatchObject({ created: 3, kind: "linear" });
+    expect(payload.shapes.map(({ x }) => x)).toEqual([10, 20, 30]);
+  });
+
+  it("rejects fractional counts and non-boolean copy rotation before writing", async () => {
+    const projectId = await makeProject();
+    const [source] = await addShapes(projectId, [{ kind: "box", width: 6, depth: 4, height: 3 }]);
+
+    const fractional = await pattern(projectId, { ids: [source], count: 2.5, stepX: 10 });
+    expect(fractional.status).toBe(400);
+    expect(await fractional.json()).toMatchObject({ code: "invalid_request" });
+
+    const rotation = await pattern(projectId, { ids: [source], count: 2, stepX: 10, rotateCopies: "false" });
+    expect(rotation.status).toBe(400);
+    expect(await rotation.json()).toMatchObject({ code: "invalid_request" });
+    expect(await storedShapes(projectId)).toHaveLength(1);
+  });
+
+  it("validates authentication and missing-shape errors against the contract", async () => {
+    const projectId = await makeProject();
+    const unauthorized = await patternShapesRoute(new Request(`http://localhost/api/v1/patterns?projectId=${projectId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ["ghost"], stepX: 10 }),
+    }));
+    expect(unauthorized.status).toBe(401);
+    expect(await unauthorized.json()).toMatchObject({ code: "unauthorized" });
+
+    const missing = await pattern(projectId, { ids: ["ghost"], stepX: 10 });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ code: "shape_not_found" });
+
+  });
+
   it("repeats a shape along a row at a centre-to-centre pitch", async () => {
     const projectId = await makeProject();
     const [source] = await addShapes(projectId, [
