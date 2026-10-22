@@ -724,11 +724,13 @@ export function createEngine(store: ProjectStore): Engine {
     changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
       const byOutputId = oneShape(document, shapeId);
       // A persisted sketch source is an input node, not a renderable shape.
-      // When a caller edits that node's profile, resolve its dependent sketch
-      // output and rebuild it before the single project write below. The
+      // When a caller edits that node's profile or revolve settings, resolve
+      // its dependent output and rebuild it before the single project write. The
       // output keeps its own stable object ID; SKF export derives the source
       // node from the synchronized profile on that output.
-      const sourceOutputs = !byOutputId.ok && changes.sketchProfile !== undefined
+      const sourceFeatureInputChanged = changes.sketchProfile !== undefined
+        || REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined);
+      const sourceOutputs = !byOutputId.ok && sourceFeatureInputChanged
         ? findSketchOutput(document.shapes, shapeId)
         : [];
       const sourceSketchTarget = !byOutputId.ok && sourceOutputs.length === 1;
@@ -740,7 +742,10 @@ export function createEngine(store: ProjectStore): Engine {
       if (!found.ok) return found;
       const existing = found.value;
       if (sourceSketchTarget) {
-        const outputFields = Object.keys(changes).filter((field) => field !== "sketchProfile");
+        const isRevolveSource = isRevolveShape(existing);
+        const outputFields = Object.keys(changes).filter((field) =>
+          field !== "sketchProfile" && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
+        );
         if (outputFields.length > 0) {
           return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
         }
