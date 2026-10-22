@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
-import { apiContext, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiErrors, apiJson } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { parseApiV1Query, withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -12,14 +13,16 @@ export const revalidate = false;
  * through the middle is two bars -- and until they are separate shapes a script
  * cannot move, colour or export one of them on its own.
  */
-export async function POST(request: Request) {
+async function postParts(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
-  const { projectId, shapeId } = apiTarget(request);
-  if (!projectId) return apiErrors.invalidProjectId();
-  if (!shapeId) return apiErrors.shapeIdRequired();
+  const query = parseApiV1Query("POST /api/v1/parts", request);
+  if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
+  const { projectId, shapeId } = query.values;
 
   const separated = await apiEngine(context.root).separate(projectId, shapeId);
   if (!separated.ok) return apiEngineError(separated.failure, { oneShape: true });
   return apiJson({ shapes: separated.value.shapes.map(apiShapeSummary), revision: separated.value.revision });
 }
+
+export const POST = withApiV1Contract("POST /api/v1/parts", postParts);

@@ -176,6 +176,35 @@ describe("the REST API over HTTP", () => {
     expect(invalid.body.code).toBe("invalid_request");
   });
 
+  it("splits a group through the running HTTP API with contract-shaped replies and errors", async () => {
+    const created = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [
+        { kind: "box", name: "Part A", width: 8, depth: 8, height: 8 },
+        { kind: "box", name: "Part B", width: 8, depth: 8, height: 8, x: 12 },
+      ] }),
+    });
+    expect(created.status).toBe(201);
+    const ids = (created.body.shapes as Array<Record<string, string>>).map(({ id }) => id);
+    const grouped = await api(`/groups?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids }) });
+    expect(grouped.status).toBe(201);
+    const groupId = (grouped.body.shape as Record<string, string>).id;
+
+    const split = await api(`/parts?projectId=${encodeURIComponent(` ${projectId} `)}&shapeId=${encodeURIComponent(` ${groupId} `)}`, { method: "POST" });
+    expect(split.status).toBe(200);
+    expect(split.body).toMatchObject({ revision: expect.any(Number), shapes: expect.arrayContaining([expect.objectContaining({ name: "Part A" }), expect.objectContaining({ name: "Part B" })]) });
+
+    const plain = await api(`/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: [{ kind: "box", name: "Plain body", width: 8, depth: 8, height: 8 }] }),
+    });
+    expect(plain.status).toBe(201);
+    const plainId = (plain.body.shapes as Array<Record<string, string>>)[0].id;
+    const notGroup = await api(`/parts?projectId=${projectId}&shapeId=${plainId}`, { method: "POST" });
+    expect(notGroup.status).toBe(422);
+    expect(notGroup.body.code).toBe("invalid_request");
+  });
+
   it("builds an explicitly selected fine-pitch thread", async () => {
     const created = await api(`/shapes?projectId=${projectId}`, {
       method: "POST",
