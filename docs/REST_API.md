@@ -826,9 +826,9 @@ The editor grows every cutter by 0.05mm before subtracting it, because a mesh CS
 
 ### Separating parts
 
-A cut often leaves several pieces -- a bar cut through the middle is two bars -- and until they are separate shapes a script cannot move, colour or export one of them. `POST /parts` splits a shape into the bodies that touch, or takes a plain group back into its members.
+A cut often leaves several pieces -- a bar cut through the middle is two bars -- and until they are separate shapes a script cannot move, colour or export one of them. `POST /parts?projectId=<id>&shapeId=<id>` splits a shape into the bodies that touch, or takes a plain group back into its members. The `200` response contains the resulting `shapes` array and project `revision`; each shape uses the standard shape summary schema in the generated OpenAPI contract. Project and shape IDs are trimmed before validation.
 
-A shape built from parameters is one body by construction, so it answers `422` saying so. A multi-glyph text shape is the one case the server gets wrong here: the editor can split it into letters and the server cannot see them, because the glyph outlines come from a font it does not load. Separate those in the editor.
+A shape built from parameters is one body by construction, so it answers `422` with `invalid_request`. A multi-glyph text shape is the one case the server gets wrong here: the editor can split it into letters and the server cannot see them, because the glyph outlines come from a font it does not load. Separate those in the editor. Missing or malformed query IDs answer `400`; missing project/shape references answer `404`; locked shapes and busy projects answer `409`; storage configuration failures answer `503`.
 
 ### When it refuses
 
