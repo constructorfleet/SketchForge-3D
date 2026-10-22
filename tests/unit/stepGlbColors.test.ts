@@ -55,7 +55,18 @@ describe("STEP GLB component colors", () => {
       materials: [material([1, 0, 0])],
     }));
 
-    expect(colors.get("Node label")).toEqual({ count: 1, color: undefined });
+    expect(colors.get("Node label")).toBeUndefined();
     expect(colors.get("Mesh label")).toEqual({ count: 1, color: undefined });
+  });
+
+  it("associates a uniformly colored STEP occurrence ID with its product mesh name", () => {
+    const colors = componentColorsFromGlb(glb({
+      nodes: [{ name: "1", mesh: 0 }],
+      meshes: [{ name: "Housing", primitives: [{ material: 0 }] }],
+      materials: [material([0.8, 0.1, 0.2])],
+    }));
+
+    expect(colors.get("1")).toEqual({ count: 1, color: "#cc1a33" });
+    expect(colors.get("Housing")).toEqual({ count: 1, color: "#cc1a33" });
   });
 });

@@ -3,7 +3,8 @@ import { LocalizedError } from "./support/i18n/LocalizedError.js";
 import { shapeDepth, shapeWidth } from "./workplaneShapes.js";
 import { cadBrepTransformForShape } from "./cadBakeMetadata.js";
 import { exportYawDegrees, isFacetedCylinder, planTaper, polygonRing, type ProfilePoint } from "./stepProfiles.js";
-import { loadBrepWithOcct, type Brep, type BrepSolid } from "./support/lib/brepKernel.js";
+import { loadBrepWithOcct, loadOcctKernel, type Brep, type BrepSolid } from "./support/lib/brepKernel.js";
+import { restoreGroupedChildren } from "./serverShapeGroups.js";
 
 export type SkippedShape = {
   name: string;
@@ -304,9 +305,21 @@ export function aabbsOverlap(a: Aabb, b: Aabb): boolean {
 export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<StepExportResult> {
   const brep = await loadBrepWithOcct();
 
+  type ExportEntry = { shape: WorkplaneShape; productPath: string[] };
+  const entries: ExportEntry[] = [];
+  const appendShape = (shape: WorkplaneShape, productPath: string[]) => {
+    if (shape.groupedShapes?.length) {
+      const path = [...productPath, shape.name];
+      for (const child of restoreGroupedChildren(shape)) appendShape(child, path);
+      return;
+    }
+    entries.push({ shape, productPath: [...productPath, shape.name] });
+  };
+  for (const shape of shapes) appendShape(shape, []);
+
   const skipped: SkippedShape[] = [];
   const holes: { box: Aabb; solid: BrepSolid }[] = [];
-  for (const shape of shapes.filter((s) => s.hole)) {
+  for (const { shape } of entries.filter(({ shape }) => shape.hole)) {
     if (!EXACT_KINDS.has(shape.kind)) {
       skipped.push(describe(shape, `hole ${unsupportedReason()}; cut omitted`));
       continue;
@@ -323,7 +336,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   const hasStoredCadBrep = (shape: WorkplaneShape) => typeof shape.cadBrep === "string" && shape.cadBrep.length > 0;
 
   const parts: { shape: BrepSolid; name: string; color: string }[] = [];
-  for (const shape of shapes.filter((s) => !s.hole)) {
+  for (const { shape, productPath } of entries.filter(({ shape }) => !shape.hole)) {
     let built: BuildOutcome;
     if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
@@ -353,7 +366,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
       }
     }
 
-    parts.push({ shape: toCadZUp(brep, solid), name: shape.name, color: shape.color });
+    parts.push({ shape: toCadZUp(brep, solid), name: productPath.join(" / "), color: shape.color });
   }
 
   if (parts.length === 0) {
@@ -368,10 +381,40 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
     throw new LocalizedError("errors.step.nothingToExport");
   }
 
-  const result = brep.exportAssemblySTEP(parts, { unit: "MM" });
-  if (!result.ok) {
-    throw new LocalizedError("errors.step.exportFailed", { detail: String(result.error.message ?? result.error) });
+  const kernel = await loadOcctKernel();
+  const document = kernel.createXCAFDocument();
+  try {
+    // The current XCAF wrapper can author one assembly level. A grouped project
+    // is therefore represented as a named assembly with each solid named by
+    // its full group path (for example, "Sensors / SensorLeft"). Geometry is
+    // already in world coordinates, so occurrence placements remain correct.
+    const rootName = shapes.length === 1 && shapes[0]?.groupedShapes?.length ? shapes[0].name : "SketchForge Assembly";
+    const shapeIds = parts.map(({ shape }) => (shape.wrapped as unknown as { id: number }).id);
+    const rootShape = kernel.makeCompound(shapeIds as Parameters<typeof kernel.makeCompound>[0]);
+    const root = document.addShape(rootShape, { name: rootName });
+    for (const part of parts) {
+      const color = parseHexColor(part.color);
+      const partId = (part.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1];
+      // Register the named product definition before adding its occurrence.
+      // XCAF's STEP writer otherwise writes the product as "SOLID" and emits
+      // an empty occurrence name, losing the component's identity on import.
+      document.addShape(partId, { name: part.name, color });
+      document.addChild(root, partId, {
+        name: part.name,
+        color,
+      });
+    }
+    return { blob: new Blob([document.exportSTEP()], { type: "model/step" }), exportedCount: parts.length, skipped };
+  } catch (error) {
+    throw new LocalizedError("errors.step.exportFailed", { detail: String(error instanceof Error ? error.message : error) });
+  } finally {
+    document.close();
   }
+}
 
-  return { blob: result.value, exportedCount: parts.length, skipped };
+function parseHexColor(color: string): [number, number, number] {
+  const match = /^#([\da-f]{6})$/i.exec(color);
+  if (!match) return [0.0, 0.596, 0.78];
+  const value = Number.parseInt(match[1]!, 16);
+  return [(value >> 16 & 0xff) / 255, (value >> 8 & 0xff) / 255, (value & 0xff) / 255];
 }
