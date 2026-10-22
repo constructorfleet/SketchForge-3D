@@ -201,6 +201,34 @@ describe("REST API v1 operation contract", () => {
     }
   });
 
+  it("contracts mirror IDs, axes, successful shape summaries, and reachable errors", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const key = "POST /api/v1/mirrors";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "mirrorShapes",
+      auth: "bearer",
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      requestBody: { contentType: "application/json", required: true },
+    });
+    expect(contract.validateApiV1RequestBody(key, { ids: [" left ", "right"], axis: "x" })).toBe(true);
+    expect(contract.validateApiV1RequestBody(key, { ids: " left ", axis: "z" })).toBe(true);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["same", "same"], axis: "x" })).toBe(false);
+    expect(contract.validateApiV1RequestBody(key, { ids: ["left"], axis: "q" })).toBe(false);
+
+    const summary = {
+      id: "shape-1", name: "Mirrored", kind: "mesh", color: "#ffffff", hole: false,
+      locked: false, hidden: false, x: 0, z: 0, elevation: 0, width: 10, depth: 8,
+      rotation: 0, rotationX: 0, rotationZ: 0,
+    };
+    expect(contract.validateApiV1Response(key, 200, { moved: 1, axis: "x", shapes: [summary], revision: 2 })).toBe(true);
+    expect(contract.validateApiV1Response(key, 200, { moved: -1, axis: "x", shapes: [summary], revision: 2 })).toBe(false);
+    for (const status of [400, 401, 404, 409, 422, 500, 503]) {
+      expect(contract.validateApiV1Response(key, status, { error: "request failed", code: "invalid_request" })).toBe(true);
+    }
+    expect(contract.validateApiV1Response(key, 418, { error: "request failed", code: "invalid_request" })).toBe(false);
+  });
+
   it("contracts boolean, treatment, shell, and draft-prism runtime behavior", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const keys = ["POST /api/v1/booleans", "POST /api/v1/treatments", "POST /api/v1/shell", "POST /api/v1/draft-prism"];

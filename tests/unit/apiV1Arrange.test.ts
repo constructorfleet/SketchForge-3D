@@ -108,7 +108,7 @@ describe("POST /mirrors", () => {
       { kind: "wedge", width: 30, depth: 18, height: 12, x: -20, mirrorX: true },
       { kind: "wedge", width: 30, depth: 18, height: 12, x: 20 },
     ]);
-    const response = await bakedMirrorRoute(authorized(`/api/v1/mirrors?projectId=${projectId}`, { ids: [left, right], axis: "x" }));
+    const response = await bakedMirrorRoute(authorized(`/api/v1/mirrors?projectId=%20${projectId}%20`, { ids: [` ${left} `, ` ${right} `], axis: "x" }));
     const payload = await response.json() as { moved: number; axis: string; revision: number };
 
     expect(response.status).toBe(200);
@@ -123,6 +123,17 @@ describe("POST /mirrors", () => {
       expect(shape.mirrorZ ?? false).toBe(false);
       expect(shape.rotation).toBe(0);
     }
+  });
+
+  it("returns contract-valid errors for an unsupported axis", async () => {
+    const projectId = await makeProject();
+    const [shapeId] = await addShapes(projectId, [
+      { kind: "box", width: 10, depth: 8, height: 6, name: "Block" },
+    ]);
+    const response = await bakedMirrorRoute(authorized(`/api/v1/mirrors?projectId=${projectId}`, { ids: [shapeId], axis: "q" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "invalid_request" });
   });
 });
 

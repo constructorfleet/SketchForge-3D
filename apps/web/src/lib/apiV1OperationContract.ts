@@ -594,7 +594,40 @@ export const API_V1_OPERATIONS = [
       503: faceError("storage_unconfigured"),
     },
   },
-  operation("POST", "/api/v1/mirrors", "mirrorShapes"),
+  {
+    ...operation("POST", "/api/v1/mirrors", "mirrorShapes", [200, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object",
+      required: ["ids", "axis"],
+      properties: {
+        ids: { oneOf: [
+          { type: "string", pattern: "\\S", description: "A single shape ID; whitespace is trimmed before lookup." },
+          { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", pattern: "\\S" }, description: "Distinct shape IDs; whitespace is trimmed before lookup." },
+        ] },
+        axis: { type: "string", enum: ["x", "y", "z"], description: "Principal plane normal to this coordinate axis." },
+      },
+      additionalProperties: true,
+    })),
+    description: "Mirrors selected shapes across the principal plane through the midpoint of their combined bounds.",
+    query: projectQuery,
+    responseSchemas: {
+      200: {
+        type: "object", required: ["moved", "axis", "shapes", "revision"], additionalProperties: false,
+        properties: {
+          moved: { type: "integer", minimum: 0 },
+          axis: { type: "string", enum: ["x", "y", "z"] },
+          shapes: { type: "array", items: shapeSummary },
+          revision: num,
+        },
+      },
+      400: errorSchema,
+      401: errorSchema,
+      404: errorSchema,
+      409: errorSchema,
+      422: errorSchema,
+      500: errorSchema,
+      503: errorSchema,
+    },
+  },
   {
     ...operation("POST", "/api/v1/parts", "splitParts", [200, 400, 401, 404, 409, 422, 500, 503]),
     description: "Split a shape into its separate bodies or restore a plain group to its member shapes.",
