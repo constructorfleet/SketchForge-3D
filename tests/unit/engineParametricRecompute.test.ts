@@ -75,6 +75,91 @@ function value<T>(result: EngineResult<T>): T {
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("rebuilds a persisted sketch revolve from an edited source profile", async () => {
+    const { store } = projectStore();
+    const engine = createEngine(store);
+    const original = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Source revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]],
+      sides: 48, x: 12, z: -4, elevation: 7,
+    }])).shapes[0]!;
+    expect(value(await engine.project("recompute")).shapes[0]?.sketchSourceId).toBe(original.sketchSourceId);
+    const sourceProfile = original.sketchProfile!;
+    const changedProfile = {
+      ...sourceProfile,
+      points: sourceProfile.points.map((point) => ({ ...point, x: point.x * 2 })),
+    };
+    const beforeGeometry = original.importedMesh?.positions;
+
+    const changed = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const updated = value(changed).shape;
+    expect(updated).toMatchObject({
+      id: original.id, sketchSourceId: original.sketchSourceId, sketchOperation: "revolve",
+      sketchProfile: changedProfile, x: 12, z: -4, elevation: 7,
+    });
+    expect(updated.width).toBeGreaterThan(original.width);
+    expect(updated.importedMesh?.positions).not.toEqual(beforeGeometry);
+  });
+
+  it("rebuilds a retained boolean ancestor after editing a source revolve", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "revolve", name: "Source revolve", profile: [[0, -5], [2, -5], [2, 5], [0, 5]], sides: 48, x: 12, z: -4, elevation: 7 },
+      { kind: "box", name: "Cutter", width: 1, depth: 1, height: 12, x: 12, z: -4, elevation: 6, hole: true },
+    ]));
+    const source = created.shapes[0]!;
+    const group = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const sourceChild = group.groupedShapes!.find((child) => child.sketchSourceId === source.sketchSourceId)!;
+    const previousGroupBrep = group.cadBrep;
+    const previousWrites = writeCount();
+    const changedProfile = {
+      ...sourceChild.sketchProfile!,
+      points: sourceChild.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.5 })),
+    };
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: changedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(value(changed).shape).toMatchObject({
+      id: sourceChild.id, sketchSourceId: source.sketchSourceId, sketchOperation: "revolve",
+      sketchProfile: changedProfile, x: sourceChild.x, z: sourceChild.z, elevation: sourceChild.elevation,
+    });
+    expect(writeCount()).toBe(previousWrites + 1);
+    const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === group.id)!;
+    expect(persisted.cadBrep).not.toBe(previousGroupBrep);
+    expect(persisted.groupedShapes?.find((child) => child.id === sourceChild.id)?.sketchProfile).toEqual(changedProfile);
+  });
+
+  it("rolls back a source revolve edit when its retained boolean can no longer be rebuilt", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [
+      { kind: "revolve", name: "Source revolve", profile: [[0, -5], [2, -5], [2, 5], [0, 5]], sides: 48 },
+      { kind: "box", name: "Cutter", width: 0.5, depth: 0.5, height: 12, x: 1.8, hole: true },
+    ]));
+    const source = created.shapes[0]!;
+    const group = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [created.shapes[1]!.id] })).shape;
+    const before = value(await engine.project("recompute"));
+    const previousWrites = writeCount();
+    const disjointProfile = {
+      ...source.sketchProfile!,
+      points: source.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 0.1 })),
+    };
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: disjointProfile });
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure).toMatchObject({
+      reason: "sweep_failed", message: expect.stringMatching(/dependent boolean/i),
+    });
+    expect(writeCount()).toBe(previousWrites);
+    const after = value(await engine.project("recompute"));
+    expect(after.revision).toBe(before.revision);
+    expect(after.shapes.find((shape) => shape.id === group.id)).toEqual(before.shapes.find((shape) => shape.id === group.id));
+  });
+
   it("rebuilds a persisted sketch extrusion from an edited source profile", async () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);

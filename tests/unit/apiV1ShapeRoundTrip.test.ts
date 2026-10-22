@@ -260,6 +260,36 @@ describe("REST API shape round trip", () => {
     expect(rebuilt.cadBrep).not.toBe(previousBrep);
   });
 
+  it("rebuilds a persisted revolve through its source sketch and keeps the source and placement", async () => {
+    const projectId = await makeProject();
+    const revolve = await addShape(projectId, {
+      kind: "revolve", name: "Source-driven revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]],
+      sides: 48, pitch: 0, x: 12, z: -4, elevation: 7,
+    });
+    expect(revolve.sketchSourceId).toBeTruthy();
+    const packagePath = path.join(projectsRoot, `${projectId}.skf`);
+    const beforeProject = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const beforeShape = beforeProject.shapes.find((shape) => shape.id === revolve.id)!;
+    const sourceProfile = beforeShape.sketchProfile!;
+    const editedProfile = {
+      ...sourceProfile,
+      points: sourceProfile.points.map((point) => ({ ...point, x: point.x * 2 })),
+    };
+
+    const changed = await patch(projectId, String(revolve.sketchSourceId), { sketchProfile: editedProfile });
+
+    expect(changed.status, JSON.stringify(changed.payload)).toBe(200);
+    expect(changed.payload.shape).toMatchObject({
+      id: revolve.id, sketchSourceId: revolve.sketchSourceId, name: "Source-driven revolve", x: 12, z: -4, elevation: 7,
+    });
+    expect(changed.payload.shape!.width as number).toBeGreaterThan(revolve.width as number);
+    const persisted = await importSkfProject(new Uint8Array(await fs.readFile(packagePath)));
+    const rebuilt = persisted.shapes.find((shape) => shape.id === revolve.id)!;
+    expect(rebuilt.sketchProfile).toEqual(editedProfile);
+    expect(rebuilt.sketchSourceId).toBe(revolve.sketchSourceId);
+    expect(rebuilt.importedMesh?.positions).not.toEqual(beforeShape.importedMesh?.positions);
+  });
+
   it("preserves resize ratios when rebuilding an edited sweep profile", async () => {
     const projectId = await makeProject();
     const initialProfile = sweepProfile();
