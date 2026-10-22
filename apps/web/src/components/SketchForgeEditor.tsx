@@ -7869,6 +7869,7 @@ export function SketchForgeEditor({
       kind,
       amount,
       edgeCount: selectedEdgeIds.length,
+      ...(selectedEdgeIds.length === selectableIds.length && selectableIds.every((edgeId) => selectedEdgeIds.includes(edgeId)) ? { allEdges: true as const } : {}),
       ...(kind === "chamfer" ? { chamferAngle } : {}),
     } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
     const session: EdgeModifierSession = {
@@ -7935,6 +7936,10 @@ export function SketchForgeEditor({
       kind: edgeModifier.kind,
       amount: edgeModifier.amount,
       edgeCount: edgeModifier.selectedEdgeIds.length,
+      ...(edgeModifier.selectedEdgeIds.length === modifierAvailableEdgeIds.length
+        && modifierAvailableEdgeIds.every((edgeId) => edgeModifier.selectedEdgeIds.includes(edgeId))
+        ? { allEdges: true as const }
+        : {}),
       ...(edgeModifier.kind === "chamfer" ? { chamferAngle: edgeModifier.chamferAngle } : {}),
     } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
     const createdAt = Date.now();

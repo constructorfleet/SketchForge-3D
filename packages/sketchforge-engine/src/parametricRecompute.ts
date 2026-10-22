@@ -1,9 +1,58 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
+import { applyEdgeTreatment, shapeEdges, shapeWithCadResult } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
   | { ok: true; shapes: WorkplaneShape[]; updated: WorkplaneShape; matchCount: number }
   | { ok: false; reason: "recompute_failed" | "dependency_missing" | "dependency_ambiguous"; message?: string };
+
+function appliedFrame(shape: WorkplaneShape) {
+  return {
+    x: shape.x,
+    z: shape.z,
+    elevation: shape.elevation ?? 0,
+    width: shape.width,
+    depth: shape.depth,
+    height: shape.height,
+    rotation: shape.rotation ?? 0,
+    rotationX: shape.rotationX ?? 0,
+    rotationZ: shape.rotationZ ?? 0,
+    mirrorX: Boolean(shape.mirrorX),
+    mirrorY: Boolean(shape.mirrorY),
+    mirrorZ: Boolean(shape.mirrorZ),
+  };
+}
+
+/** Replay one explicitly all-edge fillet on rebuilt source geometry without carrying transient edge indexes forward. */
+export async function replayAllEdgeFillet(
+  original: WorkplaneShape,
+  rebuilt: WorkplaneShape,
+): Promise<WorkplaneShape> {
+  const features = original.edgeTreatments ?? [];
+  const history = original.edgeTreatmentHistory ?? [];
+  if (features.length === 0 && history.length === 0) return rebuilt;
+  if (features.length !== 1 || history.length !== 1
+    || features[0]?.kind !== "fillet" || features[0].allEdges !== true
+    || history[0]?.feature.kind !== "fillet" || history[0].feature.allEdges !== true
+    || history[0].feature.amount !== features[0].amount) {
+    throw new Error("This source edit cannot safely replay its selected-edge treatments.");
+  }
+
+  const previousFeature = features[0];
+  const result = await applyEdgeTreatment(rebuilt, { kind: "fillet", amount: previousFeature.amount });
+  const treated = shapeWithCadResult(rebuilt, result);
+  const feature = {
+    ...previousFeature,
+    edgeCount: (await shapeEdges(rebuilt)).filter((edge) => edge.filletable).length,
+  };
+  const before = structuredClone(rebuilt);
+  const entry = history[0];
+  return {
+    ...treated,
+    edgeTreatments: [feature],
+    edgeTreatmentHistory: [{ ...entry, feature, before, appliedFrame: appliedFrame(treated) }],
+  };
+}
 
 /** Find a retained sketch output anywhere in the feature tree, replace it, then rebuild boolean ancestors bottom-up. */
 export async function recomputeSketchOutput(

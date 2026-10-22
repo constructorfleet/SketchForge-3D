@@ -15,6 +15,7 @@ owner: "Contributors"
   response contracts in generated OpenAPI, including shape summaries and
   validation/engine error responses. The documented subset covers 21 of 32
   registered operations; 11 remain omitted.
+- Editing the source profile of a sketch extrusion now replays one persisted all-edge fillet on the rebuilt solid, selecting the rebuilt topology instead of stale edge indices. If the new geometry cannot accept the fillet, the source edit is rejected without writing the project. Selected-edge treatments, chamfers, and multi-step treatment histories are not replayed.
 - Sketch constraints can now keep two selected segments parallel. The bounded solver projects their directions during point edits, the inspector includes the relation in its local degree-of-freedom estimate, and `.skf` persistence plus the TypeScript sketch-profile type retain it. Parallel does not constrain the segments' offset; broader constraint solving remains local and bounded.
 - `GET /thickness` and `POST /interference` have runtime-validated request and
   response contracts in the generated OpenAPI reference. Interference describes

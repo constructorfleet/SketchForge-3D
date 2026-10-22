@@ -75,7 +75,7 @@ import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
 import { sketchExtrusionShapeFromRequest } from "./sketchExtrusionRequest.js";
-import { findSketchOutput, recomputeSketchOutput } from "./parametricRecompute.js";
+import { findSketchOutput, recomputeSketchOutput, replayAllEdgeFillet } from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
@@ -824,10 +824,13 @@ export function createEngine(store: ProjectStore): Engine {
               ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
             }),
           };
+          const replayedSource = replacingSketchProfile
+            ? await replayAllEdgeFillet(existing, rebuiltSource)
+            : rebuiltSource;
           swept = draftPrismAngle === undefined
-            ? rebuiltSource
+            ? replayedSource
             : {
-              ...shapeWithCadResult(rebuiltSource, await applyDraftPrism(rebuiltSource, { angle: draftPrismAngle })),
+              ...shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
               draftPrismAngle,
             };
         } catch (error) {

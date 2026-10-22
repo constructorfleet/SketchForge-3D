@@ -97,6 +97,11 @@ These are implemented and should not be filed as missing features:
   placement and writing the new source and dependent geometry atomically. A
   source-driven revolve profile or operation-setting edit (for example, its
   side count) follows the same bottom-up rebuild and atomic-write path.
+  A sketch extrusion with one persisted all-edge fillet can also replay that
+  fillet after a source-profile edit against the rebuilt topology, without
+  carrying edge indices across the edit. This does not cover chamfers,
+  selected-edge treatments, multiple treatment steps, or treatments on other
+  source operation types; those histories cannot yet be recomputed safely.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph.
