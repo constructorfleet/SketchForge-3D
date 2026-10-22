@@ -119,7 +119,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /The only editor source mapped so far is `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, which maps to the edit-and-export guide; other editor\/UI sources and symbols remain unmapped/i);
-  assert.match(spec, /face-drafting guide.*browser acceptance.*face 1.*local \+Z.*-5°.*screenshot/i);
+  assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
   assert.match(spec, /current baseline is 22 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the remaining 10 are omitted with reasons/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
@@ -154,7 +154,13 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /Fork PRs use\s+the generated artifact fallback because their branches cannot be pushed/i);
   assert.match(migration, /Main remains\s+stale only until that repair PR is merged/i);
   assert.match(migration, /historical inbound-link inventory/i);
-  assert.match(migration, /broader task-oriented guides and corresponding\s+workflow checks remain incomplete/i);
+  assert.match(migration, /broader task-oriented guides and corresponding\s+workflow checks\s+remain incomplete/i);
+  assert.match(migration, /browser acceptance covers the editor quick-start and the edit-and-export\s+guide[’']s create, edit, save, reload, and export workflow/i);
+  assert.match(migration, /face-drafting\s+guide covers one inspector case.*face 1.*local \+Z.*-5°.*screenshot/i);
+  assert.match(migration, /sketch-constraints guide covers one Parallel workflow with\s+screenshot evidence/i);
+  assert.match(migration, /only editor source mapped so far is[\s\S]*?`apps\/web\/src\/components\/SketchForgeEditor\.tsx`[\s\S]*?edit-and-export guide/i);
+  assert.match(migration, /Other editor\/UI sources, other examples, and all\s+content sources remain open for ownership diagnostics/i);
+  assert.match(spec, /Phase 4:[\s\S]*?Parallel constraint workflow.*Broader task-oriented guides and corresponding workflow checks remain outstanding/i);
 
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /Broader and editable drafting/i);

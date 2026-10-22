@@ -292,7 +292,7 @@ its Ubuntu system dependencies before running the build.
 ### Phase 4: formats, configuration, CLI, and workflow guides
 
 - The parameterized-shape, CLI, operator-configuration, `.skf`, and MCP references are regenerated from their code or metadata inputs before validation. Eligible same-repository PRs receive changed allowlisted tracked outputs automatically; output drift alone does not fail CI. STEP color guidance describes the supported import behavior.
-- Package examples, the editor quick-start and edit/export workflow, and one supported face-drafting case are tested. Broader task-oriented guides and corresponding workflow checks remain outstanding.
+- Package examples, the editor quick-start and edit/export workflow, one supported face-drafting case, and one Parallel constraint workflow are tested. Broader task-oriented guides and corresponding workflow checks remain outstanding.
 - Structured registries and generated references cover parameterized shapes, supported server/container, desktop, client/MCP runtime settings, CLI entry points, project formats, and MCP tool schemas. The desktop inventory includes `SKETCHFORGE_DESKTOP_PORT`; launcher handoff, build/test/CI, and pass-through environment reads remain outside the supported-settings inventory.
 - Generate references and add round-trip/command/tool smoke examples.
 - Retain human-authored tutorials for context and task flow; embed live examples and generated UI labels.
