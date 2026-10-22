@@ -35,6 +35,8 @@
 - Sketch sweeps now persist a separate editable source-sketch node and feature input link in `.skf` packages. Editing the profile rebuilds the sweep while preserving source and output identities; undo/redo and project round-trip retain the source definition.
 - `PATCH /shapes` can target a sketch sweep by its persisted `sketchSourceId`; changing that upstream profile rebuilds the dependent sweep before the project is written. The output and source identities, placement, and resize ratios remain stable, while failed profiles leave the stored sweep unchanged.
 
+- `PATCH /shapes` can also target a persisted sketch extrusion by its source ID. The engine rebuilds exact extrusion geometry from the edited profile and re-evaluates retained boolean ancestors bottom-up in one project write. Rebuilt output identities and placement are retained; invalid extrusion profiles and booleans that become ineffective leave the project unchanged.
+
 - Small STEP assembly imports now retain their nested product names and parent/child relationships as optional `stepAssembly` metadata in project shape summaries. This remains descriptive metadata for a single combined mesh, not a set of separately editable components; extraction is bounded to 200 solids, 8 MiB, 2,000 nodes, and depth 32. The fixture under `tests/fixtures/step/` records its CadQuery provenance and regeneration path.
 - Exploding a STEP assembly now carries unambiguous source occurrence ancestry onto each independently selectable exact solid as `stepComponent` metadata. The component geometry, identity, and parent path survive `.skf` project round-trips; ambiguous associations omit ancestry rather than guess. See the [STEP assembly guide](./guides/step-assemblies.md).
 

@@ -46,6 +46,22 @@ export async function recomputeSketchOutput(
       name: shape.name,
       color: shape.color,
       locked: shape.locked,
+      // `children` are expressed in this group's local coordinate system.
+      // Rebuilding a new group from them produces a local origin; restore the
+      // retained group's world placement on the rebuilt ancestor.
+      x: result.group.x + shape.x,
+      z: result.group.z + shape.z,
+      elevation: (result.group.elevation ?? 0) + (shape.elevation ?? 0),
+      rotation: shape.rotation,
+      rotationX: shape.rotationX,
+      rotationZ: shape.rotationZ,
+      // The group builder creates fresh child IDs because ordinary grouping
+      // is a new operation. Recompute is different: each retained child is the
+      // same feature with new geometry, so keep its existing feature identity.
+      groupedShapes: result.group.groupedShapes?.map((child, index) => ({
+        ...child,
+        id: children[index]?.id ?? child.id,
+      })),
     };
   };
 
