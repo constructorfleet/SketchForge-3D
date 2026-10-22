@@ -89,6 +89,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const spec = readFileSync(new URL("../../docs/DOCUMENTATION_SUITE_SPEC.md", import.meta.url), "utf8");
   const migration = readFileSync(new URL("../../docs/site-migration.md", import.meta.url), "utf8");
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
+  const changelog = readFileSync(new URL("../../docs/CHANGELOG.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes 22 and explains why 10 remain omitted/i);
@@ -100,6 +101,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /Adding an edge treatment, prism draft, or shell to a face-drafted shape is refused before writing/i);
   assert.match(spec, /A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer[\s\S]*?adding a prism draft after a treatment remains refused/i);
+  assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);
   assert.match(spec, /does not establish general topology lineage/i);
   assert.match(spec, /editor's arbitrary-shape face-draft workflow remains baked/i);
   assert.match(spec, /22 of 32 operations are documented, and the shapes operation remains omitted because combined face-color and profile validation is not represented faithfully/i);
