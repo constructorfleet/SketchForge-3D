@@ -27,7 +27,7 @@ const postGroup = async (request: Request) => {
   if (!body) return apiErrors.jsonBodyRequired();
   const ids = apiShapeIds(body.ids);
   if (!ids) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
-  if (!validateApiV1RequestBody("POST /api/v1/groups", { ids })) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
+  if (!validateApiV1RequestBody("POST /api/v1/groups", body)) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
 
   const grouped = await apiEngine(context.root).group(projectId, ids);
   if (!grouped.ok) {

@@ -157,7 +157,7 @@ describe("the REST API over HTTP", () => {
     expect(created.status).toBe(201);
     const ids = (created.body.shapes as Array<Record<string, string>>).map(({ id }) => id);
 
-    const grouped = await api(`/groups?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids }) });
+    const grouped = await api(`/groups?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids, clientTag: "e2e-batch" }) });
     expect(grouped.status).toBe(201);
     expect(grouped.body).toMatchObject({ revision: expect.any(Number), shape: { id: expect.any(String), groupedCount: 2 } });
     const groupId = (grouped.body.shape as Record<string, string>).id;
@@ -165,6 +165,11 @@ describe("the REST API over HTTP", () => {
     const ungrouped = await api(`/groups?projectId=${projectId}&shapeId=${groupId}`, { method: "DELETE" });
     expect(ungrouped.status).toBe(200);
     expect(ungrouped.body).toMatchObject({ revision: expect.any(Number), shapes: expect.arrayContaining([expect.objectContaining({ name: "Group A" }), expect.objectContaining({ name: "Group B" })]) });
+
+    const ungroupedShapes = ungrouped.body.shapes as Array<Record<string, string>>;
+    const scalar = await api(`/groups?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids: ungroupedShapes[0].id }) });
+    expect(scalar.status).toBe(400);
+    expect(scalar.body.code).toBe("geometry_failed");
 
     const invalid = await api(`/groups?projectId=${projectId}&shapeId=${shapeId}`, { method: "DELETE" });
     expect(invalid.status).toBe(422);

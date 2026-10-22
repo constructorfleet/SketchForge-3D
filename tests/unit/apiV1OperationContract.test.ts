@@ -136,6 +136,12 @@ describe("REST API v1 operation contract", () => {
     expect(validateApiV1Schema({ value: 1 }, { type: "object", oneOf: [{ type: "object" }, { type: "object", required: ["value"] }] })).toBe(false);
   });
 
+  it("models the group route's scalar ID shorthand and tolerated extension fields", async () => {
+    const { validateApiV1RequestBody } = await import("@/lib/apiV1OperationContract");
+    expect(validateApiV1RequestBody("POST /api/v1/groups", { ids: "shape-a" })).toBe(true);
+    expect(validateApiV1RequestBody("POST /api/v1/groups", { ids: ["shape-a", "shape-b"], clientTag: "batch-7" })).toBe(true);
+  });
+
   it("declares schemas and runtime validators for all project and shape CRUD operations", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const keys = ["GET /api/v1/projects", "POST /api/v1/projects", "DELETE /api/v1/projects", "GET /api/v1/shapes", "POST /api/v1/shapes", "PATCH /api/v1/shapes", "DELETE /api/v1/shapes"];

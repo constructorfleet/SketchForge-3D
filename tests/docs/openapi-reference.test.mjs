@@ -99,8 +99,9 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(Object.keys(group.responses).sort(), ["201", "400", "401", "404", "409", "422", "500", "503"]);
   const groupBody = group.requestBody.content["application/json"].schema;
   assert.deepEqual(groupBody.required, ["ids"]);
-  assert.equal(groupBody.properties.ids.minItems, 2);
-  assert.equal(groupBody.properties.ids.uniqueItems, true);
+  assert.equal(groupBody.additionalProperties, undefined, "the route tolerates extension fields");
+  assert.equal(groupBody.properties.ids.oneOf.some((variant) => variant.type === "string"), true, "the route accepts its single-ID shorthand");
+  assert.equal(groupBody.properties.ids.oneOf.some((variant) => variant.type === "array" && variant.minItems === 2 && variant.uniqueItems === true), true);
   assert.deepEqual(group.responses["201"].content["application/json"].schema.required, ["shape", "revision"]);
   const ungroup = spec.paths["/api/v1/groups"].delete;
   assert.ok(ungroup, "DELETE /groups should be included once its runtime contract is complete");

@@ -474,7 +474,10 @@ export const API_V1_OPERATIONS = [
   operation("OPTIONS", "/api/v1/faces", "faceRouteOptions", [204], undefined, "none"),
   {
     ...operation("POST", "/api/v1/groups", "groupShapes", [201, 400, 401, 404, 409, 422, 500, 503], json({
-      type: "object", required: ["ids"], properties: { ids: { type: "array", minItems: 2, uniqueItems: true, items: { type: "string", pattern: "\\S" } } }, additionalProperties: false,
+      type: "object", required: ["ids"], properties: { ids: { oneOf: [
+        { type: "string", pattern: "\\S", description: "A single ID is accepted as shorthand, though grouping requires at least two shapes." },
+        { type: "array", minItems: 2, uniqueItems: true, items: { type: "string", pattern: "\\S" }, description: "IDs are trimmed and must be distinct after trimming." },
+      ] } },
     })),
     description: "Groups at least two distinct shapes; members marked hole are subtracted using the same semantics as the editor.",
     query: projectQuery,

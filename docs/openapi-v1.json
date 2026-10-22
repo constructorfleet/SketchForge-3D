@@ -6869,16 +6869,25 @@
                 ],
                 "properties": {
                   "ids": {
-                    "type": "array",
-                    "minItems": 2,
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "string",
-                      "pattern": "\\S"
-                    }
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "\\S",
+                        "description": "A single ID is accepted as shorthand, though grouping requires at least two shapes."
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "uniqueItems": true,
+                        "description": "IDs are trimmed and must be distinct after trimming.",
+                        "items": {
+                          "type": "string",
+                          "pattern": "\\S"
+                        }
+                      }
+                    ]
                   }
-                },
-                "additionalProperties": false
+                }
               }
             }
           }
