@@ -93,6 +93,13 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes 22 and explains why 10 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
+  assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion/i);
+  assert.match(spec, /Source-profile edits replay it only when exactly one planar face matches the saved source normal/i);
+  assert.match(spec, /missing or ambiguous matches fail atomically/i);
+  assert.match(spec, /face drafts cannot yet be combined with prism drafts or edge treatments/i);
+  assert.match(spec, /does not establish general topology lineage/i);
+  assert.match(spec, /editor's arbitrary-shape face-draft workflow remains baked/i);
+  assert.match(spec, /22 of 32 operations are documented, and the shapes operation remains omitted because combined face-color and profile validation is not represented faithfully/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
   assert.match(spec, /Pull-request docs CI runs `docs:generate` before generated-output verification and the site build/i);
