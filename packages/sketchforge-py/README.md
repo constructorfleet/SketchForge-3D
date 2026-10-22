@@ -185,6 +185,16 @@ edited = {
 client.shapes.update(project_id, sweep.id, sweep.as_patch(sketchProfile=edited))
 ```
 
+One face draft can be retained on a sketch extrusion and replayed after its source profile changes. Use a stable face ID from the shape's `face_ids`; the draft value accepts a signed local pull axis and an angle in degrees. The server only replays the selected face when its planar normal maps uniquely after the edit. `ShapeSummary.face_draft` is retained by `as_patch`, and `faceDraft=None` clears the operation:
+
+```python
+client.shapes.update(project_id, shape.sketch_source_id, {
+    "faceDraft": {"sourceFaceId": shape.face_ids[1], "angle": 5, "pullDirection": "z"},
+})
+```
+
+Face drafts cannot yet be combined with prism drafts or edge treatments. Missing or ambiguous face matches and ineffective dependent booleans leave the project unchanged.
+
 Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 `sketchforge3d.layout` has the arithmetic a parameterised part repeats: `row`, `grid`, `ring`, `centered_offsets`, `angle_of`, `mm`.

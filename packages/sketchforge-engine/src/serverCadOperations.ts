@@ -66,6 +66,16 @@ export class ServerCadError extends Error {
 const MESH_DEFLECTION = 0.1;
 const MIN_CAD_DIMENSION = 0.01;
 const FACE_HASH_UPPER_BOUND = 2_147_483_647;
+const DRAFT_PULL_AXES = {
+  x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 },
+  "-x": { x: -1, y: 0, z: 0 }, "-y": { x: 0, y: -1, z: 0 }, "-z": { x: 0, y: 0, z: -1 },
+} as const;
+
+export type SketchFaceDraftRequest = {
+  sourceFaceId: string;
+  angle: number;
+  pullDirection: keyof typeof DRAFT_PULL_AXES;
+};
 
 function meshPositionsOf(shape: WorkplaneShape) {
   const positions = shape.importedMesh?.positions;
@@ -488,6 +498,93 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
     const meshed = meshedCadResult(cad, result);
     return { ...meshed, faceIds: freshFaceIds(cad, result, shape.id) };
   });
+}
+
+/** Apply one face draft to a retained exact sketch extrusion using the current stable face ID. */
+export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceDraftRequest): Promise<ServerCadResult> {
+  if (!Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
+    return Promise.reject(new ServerCadError("The face draft angle must be non-zero and between -45 and 45 degrees.", 400));
+  }
+  if (shape.sketchOperation !== "extrude" || !shape.sketchProfile || !shape.cadBrep) {
+    return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion.", 400));
+  }
+  return withCadKernel((cad) => {
+    const solid = solidFromBrep(cad, shape.cadBrep!);
+    const faces = cad.getSubShapes(solid, "face");
+    const ids = shape.faceIds;
+    if (!ids || ids.length !== faces.length || new Set(ids).size !== faces.length) {
+      throw new ServerCadError("Face drafting requires a complete, unique stable face ID list.");
+    }
+    const selected = ids.flatMap((id, index) => id === request.sourceFaceId ? [index] : []);
+    if (selected.length !== 1) throw new ServerCadError("The selected source face is no longer available.");
+    const face = faces[selected[0]!];
+    if (!face) throw new ServerCadError("The selected source face is no longer available.");
+
+    const direction = DRAFT_PULL_AXES[request.pullDirection];
+    const angle = request.angle * Math.PI / 180;
+    let drafted: ShapeHandle;
+    try {
+      drafted = cad.draft(solid, face, angle, direction);
+    } catch {
+      const rotation = canonicalDraftRotation(request.pullDirection);
+      try {
+        if (!rotation) throw new Error("No canonical rotation for the selected pull axis.");
+        const rotatedSolid = cad.rotate(solid, rotation.axis, rotation.angle);
+        const oldNormal = faceNormal(cad, face);
+        if (!oldNormal) throw new Error("The selected face has no usable normal.");
+        const targetNormal = rotateVector(oldNormal, rotation.axis.direction, rotation.angle);
+        const targetCenter = rotateVector(cad.getSurfaceCenterOfMass(face), rotation.axis.direction, rotation.angle);
+        const bounds = cad.getBoundingBox(solid, false);
+        const scale = Math.max(1, Math.hypot(bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin, bounds.zmax - bounds.zmin));
+        const matches = cad.getSubShapes(rotatedSolid, "face").filter((candidate) => {
+          const normal = faceNormal(cad, candidate);
+          const center = cad.getSurfaceCenterOfMass(candidate);
+          return normal && Math.hypot(normal.x - targetNormal.x, normal.y - targetNormal.y, normal.z - targetNormal.z) <= 1e-7
+            && Math.hypot(center.x - targetCenter.x, center.y - targetCenter.y, center.z - targetCenter.z) <= scale * 1e-8;
+        });
+        if (matches.length !== 1) throw new Error("Could not uniquely identify the selected face after rotating the solid.");
+        const canonicalDraft = cad.draft(rotatedSolid, matches[0]!, angle, { x: 0, y: 0, z: 1 });
+        drafted = cad.rotate(canonicalDraft, rotation.axis, -rotation.angle);
+      } catch {
+        throw new ServerCadError("The selected source face cannot be drafted along that local pull axis and angle.");
+      }
+    }
+    if (!cadResultIsValid(cad, drafted) || !cad.isSolid(drafted)) {
+      throw new ServerCadError("The face draft did not produce a valid solid.");
+    }
+    return meshedCadResult(cad, drafted, shape);
+  });
+}
+
+function canonicalDraftRotation(direction: SketchFaceDraftRequest["pullDirection"]) {
+  switch (direction) {
+    case "x": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: -Math.PI / 2 };
+    case "-x": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: Math.PI / 2 };
+    case "y": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, angle: Math.PI / 2 };
+    case "-y": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, angle: -Math.PI / 2 };
+    case "z": return null;
+    case "-z": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: Math.PI };
+  }
+}
+
+function rotateVector(vector: { x: number; y: number; z: number }, axis: { x: number; y: number; z: number }, angle: number) {
+  const cosine = Math.cos(angle), sine = Math.sin(angle);
+  const dot = axis.x * vector.x + axis.y * vector.y + axis.z * vector.z;
+  const cross = { x: axis.y * vector.z - axis.z * vector.y, y: axis.z * vector.x - axis.x * vector.z, z: axis.x * vector.y - axis.y * vector.x };
+  return {
+    x: vector.x * cosine + cross.x * sine + axis.x * dot * (1 - cosine),
+    y: vector.y * cosine + cross.y * sine + axis.y * dot * (1 - cosine),
+    z: vector.z * cosine + cross.z * sine + axis.z * dot * (1 - cosine),
+  };
+}
+
+function faceNormal(cad: OcctKernel, face: ShapeHandle) {
+  try {
+    const bounds = cad.uvBounds(face);
+    return cad.surfaceNormal(face, (bounds.uMin + bounds.uMax) / 2, (bounds.vMin + bounds.vMax) / 2);
+  } catch {
+    return null;
+  }
 }
 
 /** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */

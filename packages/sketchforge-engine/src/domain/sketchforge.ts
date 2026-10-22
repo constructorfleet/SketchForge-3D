@@ -266,6 +266,15 @@ export type CadPrimitiveFrame = {
   frame: CadBrepFrame;
 };
 
+export type SketchFaceDraft = {
+  /** Stable application face ID selected on the undrafted source extrusion. */
+  sourceFaceId: string;
+  angle: number;
+  pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z";
+  /** Persisted matching evidence; used to resolve the source face after rebuild. */
+  sourceFaceNormal: { x: number; y: number; z: number };
+};
+
 export type WorkplaneShape = {
   id: string;
   name: string;
@@ -370,6 +379,10 @@ export type WorkplaneShape = {
   /** Sketch extrusion dimensions/frame before draft, retained as rebuild inputs. */
   draftPrismSourceHeight?: number;
   draftPrismSourceFrame?: CadBrepFrame;
+  /** One editable face draft on a retained sketch extrusion. */
+  faceDraft?: SketchFaceDraft;
+  /** Original extrusion frame used to keep face-draft source edits in place. */
+  faceDraftSourceFrame?: CadBrepFrame;
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];
   cadDisplayEdges?: CadDisplayEdge[];

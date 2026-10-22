@@ -19,6 +19,7 @@ import {
   applyEdgeTreatment,
   applyBakedMirror,
   applyDraftPrism,
+  applySketchFaceDraft,
   shapeEdges,
   shapeWithCadResult,
   ServerCadError,
@@ -92,9 +93,33 @@ import {
   withHoleMode,
 } from "./workplaneShapes.js";
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
-import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectAsset, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
 
 const UNIQUE_CURVED_FACE_SURFACES = new Set(["cone", "sphere", "torus", "cylinder"]);
+const FACE_DRAFT_AXES = new Set(["x", "y", "z", "-x", "-y", "-z"]);
+
+function faceDraftInput(value: unknown): Omit<SketchFaceDraft, "sourceFaceNormal"> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const draft = value as Record<string, unknown>;
+  if (typeof draft.sourceFaceId !== "string" || !draft.sourceFaceId.trim()
+    || typeof draft.angle !== "number" || !Number.isFinite(draft.angle) || draft.angle === 0 || Math.abs(draft.angle) >= 45
+    || typeof draft.pullDirection !== "string" || !FACE_DRAFT_AXES.has(draft.pullDirection)) return null;
+  return {
+    sourceFaceId: draft.sourceFaceId,
+    angle: draft.angle,
+    pullDirection: draft.pullDirection as SketchFaceDraft["pullDirection"],
+  };
+}
+
+function faceNormalMatches(left: { x: number; y: number; z: number }, right: { x: number; y: number; z: number }) {
+  return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z) <= 1e-5;
+}
+
+async function findUniqueDraftFace(shape: WorkplaneShape, normal: SketchFaceDraft["sourceFaceNormal"]) {
+  const matches = (await shapeFaces(shape)).filter((face) => face.surfaceType === "plane" && face.normal
+    && faceNormalMatches(face.normal, normal));
+  return matches.length === 1 ? matches[0] : null;
+}
 
 /**
  * Carry face metadata across a parameter edit only when a face has a unique
@@ -730,6 +755,7 @@ export function createEngine(store: ProjectStore): Engine {
       // node from the synchronized profile on that output.
       const sourceFeatureInputChanged = changes.sketchProfile !== undefined
         || changes.draftPrismAngle !== undefined
+        || Object.hasOwn(changes, "faceDraft")
         || REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined);
       const sourceOutputs = !byOutputId.ok && sourceFeatureInputChanged
         ? findSketchOutput(document.shapes, shapeId)
@@ -745,7 +771,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (sourceSketchTarget) {
         const isRevolveSource = isRevolveShape(existing);
         const outputFields = Object.keys(changes).filter((field) =>
-          field !== "sketchProfile" && field !== "draftPrismAngle"
+          field !== "sketchProfile" && field !== "draftPrismAngle" && field !== "faceDraft"
           && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
         );
         if (outputFields.length > 0) {
@@ -758,9 +784,28 @@ export function createEngine(store: ProjectStore): Engine {
       if (existing.locked && changes.locked !== false) return failed({ reason: "shape_locked", ids: [shapeId] });
 
       const replacingSketchProfile = changes.sketchProfile !== undefined;
+      const faceDraftChanged = Object.hasOwn(changes, "faceDraft");
+      const requestedFaceDraft = faceDraftChanged
+        ? changes.faceDraft === null ? undefined : faceDraftInput(changes.faceDraft)
+        : existing.faceDraft;
       const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
       const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
       const isSketchRevolve = isRevolveShape(existing);
+      if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
+        return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
+      }
+      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)) && !isSketchExtrusion) {
+        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
+      }
+      if ((requestedFaceDraft || (faceDraftChanged && existing.faceDraft))
+        && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0
+          || existing.draftPrismAngle !== undefined)) {
+        return failed({ reason: "invalid_shape_request", message: "Face drafts cannot be combined with prism drafts or edge treatments yet." });
+      }
+      if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
+        && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
+        return failed({ reason: "invalid_shape_request", message: "Clear the existing face draft before selecting a different source face." });
+      }
       const draftPrismChanged = changes.draftPrismAngle !== undefined;
       const requestedDraftPrismAngle = typeof changes.draftPrismAngle === "number" ? changes.draftPrismAngle : undefined;
       if (draftPrismChanged && (!isSketchExtrusion || requestedDraftPrismAngle === undefined || !Number.isFinite(requestedDraftPrismAngle)
@@ -788,9 +833,10 @@ export function createEngine(store: ProjectStore): Engine {
       // leave a thread's pitch readable but not writable.
       const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => changes[field] !== undefined) : [];
       let swept = existing;
-      if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)) {
-        const sourceFrame = existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
-        const sourceHeight = existing.draftPrismSourceHeight ?? existing.height;
+      if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)
+        || (faceDraftChanged && isSketchExtrusion)) {
+        const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
+        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height ?? existing.height;
         try {
           const rebuilt = await sketchExtrusionShapeFromRequest({
             id: existing.id,
@@ -822,6 +868,8 @@ export function createEngine(store: ProjectStore): Engine {
             ...rebuilt,
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+            faceDraft: undefined,
+            faceDraftSourceFrame: undefined,
             ...(draftPrismAngle === undefined ? {} : {
               draftPrismSourceHeight: sourceHeight,
               ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
@@ -830,12 +878,36 @@ export function createEngine(store: ProjectStore): Engine {
           const replayedSource = replacingSketchProfile
             ? await replayAllEdgeFillet(existing, rebuiltSource)
             : rebuiltSource;
-          swept = draftPrismAngle === undefined
-            ? replayedSource
-            : {
+          if (requestedFaceDraft) {
+            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
+              ? existing.faceDraft.sourceFaceNormal
+              : undefined;
+            const selectedOnPrior = priorReference ? undefined
+              : (await shapeFaces(existing)).find((face) => face.id === requestedFaceDraft.sourceFaceId);
+            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
+              throw new Error("The selected source face has no stable planar reference.");
+            }
+            const currentFace = await findUniqueDraftFace(replayedSource, sourceFaceNormal);
+            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+            const result = await applySketchFaceDraft(replayedSource, {
+              ...requestedFaceDraft,
+              sourceFaceId: currentFace.id,
+            });
+            swept = {
+              ...shapeWithCadResult(replayedSource, result),
+              faceDraft,
+              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
+            };
+          } else if (draftPrismAngle !== undefined) {
+            swept = {
               ...shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
               draftPrismAngle,
             };
+          } else {
+            swept = replayedSource;
+          }
         } catch (error) {
           return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The sketch extrusion could not be rebuilt." });
         }
@@ -944,6 +1016,7 @@ export function createEngine(store: ProjectStore): Engine {
         ...(sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS),
         "sketchProfile",
         "draftPrismAngle",
+        "faceDraft",
       ];
       // Shape summaries expose the source ID for identity; echoing a full
       // summary into PATCH must not let callers replace that identity.

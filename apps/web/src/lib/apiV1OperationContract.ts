@@ -131,6 +131,16 @@ const shapeSummary = {
     sketchOperation: str,
     sketchSourceId: str,
     draftPrismAngle: num,
+    faceDraft: {
+      type: "object",
+      required: ["sourceFaceId", "angle", "pullDirection", "sourceFaceNormal"],
+      properties: {
+        sourceFaceId: str,
+        angle: num,
+        pullDirection: { type: "string", enum: ["x", "y", "z", "-x", "-y", "-z"] },
+        sourceFaceNormal: { type: "object", required: ["x", "y", "z"], properties: { x: num, y: num, z: num } },
+      },
+    },
     sketchProfile: {
       type: "object",
       required: ["points", "segments"],

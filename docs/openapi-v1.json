@@ -63,6 +63,53 @@
                         "draftPrismAngle": {
                           "type": "number"
                         },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
+                        },
                         "sketchProfile": {
                           "type": "object",
                           "required": [
@@ -1356,6 +1403,53 @@
                           "draftPrismAngle": {
                             "type": "number"
                           },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -2632,6 +2726,53 @@
                           "draftPrismAngle": {
                             "type": "number"
                           },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -3879,6 +4020,53 @@
                         },
                         "draftPrismAngle": {
                           "type": "number"
+                        },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
                         },
                         "sketchProfile": {
                           "type": "object",
@@ -5707,6 +5895,53 @@
                         "draftPrismAngle": {
                           "type": "number"
                         },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
+                        },
                         "sketchProfile": {
                           "type": "object",
                           "required": [
@@ -6949,6 +7184,53 @@
                           },
                           "draftPrismAngle": {
                             "type": "number"
+                          },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
                           },
                           "sketchProfile": {
                             "type": "object",
@@ -9370,6 +9652,53 @@
                           "draftPrismAngle": {
                             "type": "number"
                           },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -10540,6 +10869,53 @@
                                   },
                                   "draftPrismAngle": {
                                     "type": "number"
+                                  },
+                                  "faceDraft": {
+                                    "type": "object",
+                                    "required": [
+                                      "sourceFaceId",
+                                      "angle",
+                                      "pullDirection",
+                                      "sourceFaceNormal"
+                                    ],
+                                    "properties": {
+                                      "sourceFaceId": {
+                                        "type": "string"
+                                      },
+                                      "angle": {
+                                        "type": "number"
+                                      },
+                                      "pullDirection": {
+                                        "type": "string",
+                                        "enum": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                          "-x",
+                                          "-y",
+                                          "-z"
+                                        ]
+                                      },
+                                      "sourceFaceNormal": {
+                                        "type": "object",
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   "sketchProfile": {
                                     "type": "object",
@@ -12676,6 +13052,53 @@
                           "draftPrismAngle": {
                             "type": "number"
                           },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          },
                           "sketchProfile": {
                             "type": "object",
                             "required": [
@@ -13836,6 +14259,53 @@
                           },
                           "draftPrismAngle": {
                             "type": "number"
+                          },
+                          "faceDraft": {
+                            "type": "object",
+                            "required": [
+                              "sourceFaceId",
+                              "angle",
+                              "pullDirection",
+                              "sourceFaceNormal"
+                            ],
+                            "properties": {
+                              "sourceFaceId": {
+                                "type": "string"
+                              },
+                              "angle": {
+                                "type": "number"
+                              },
+                              "pullDirection": {
+                                "type": "string",
+                                "enum": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                  "-x",
+                                  "-y",
+                                  "-z"
+                                ]
+                              },
+                              "sourceFaceNormal": {
+                                "type": "object",
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
                           },
                           "sketchProfile": {
                             "type": "object",
@@ -15549,6 +16019,53 @@
                         "draftPrismAngle": {
                           "type": "number"
                         },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
+                        },
                         "sketchProfile": {
                           "type": "object",
                           "required": [
@@ -17095,6 +17612,53 @@
                         },
                         "draftPrismAngle": {
                           "type": "number"
+                        },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
                         },
                         "sketchProfile": {
                           "type": "object",

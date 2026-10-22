@@ -143,8 +143,8 @@ describe("SketchForge .skf project packages", () => {
 
   it("round-trips stable face IDs and ID-keyed colors", async () => {
     const part = shape("box", "face-id-roundtrip", {
-      faceIds: ["face_face-id-roundtrip_0", "face_face-id-roundtrip_1"],
-      faceColors: { "face_face-id-roundtrip_1": "#ff0000" },
+      faceIds: ["surface-bottom", "surface-side-2"],
+      faceColors: { "surface-side-2": "#ff0000" },
     });
     const restored = await importSkfProject(await exportSkfProject(input([part])));
     expect(restored.shapes[0]).toMatchObject({ faceIds: part.faceIds, faceColors: part.faceColors });

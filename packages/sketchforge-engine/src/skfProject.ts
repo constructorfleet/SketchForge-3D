@@ -36,7 +36,7 @@ const SHAPE_KINDS = new Set([
 const LOFT_PROFILE_SHAPES = new Set(["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"]);
 
 const FEATURE_TYPES = new Set([
-  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer",
+  "group", "boolean-subtraction", "boolean-intersection", "mirror", "sketch-extrusion", "sketch-revolve", "sketch-sweep", "fillet", "chamfer", "face-draft",
 ]);
 
 type SkfAssetKind = "source" | "derived-mesh" | "brep" | "image" | "display-edges";
@@ -631,6 +631,8 @@ async function serializeShapeNode(
         sketchRevolve: undefined,
         sketchSourceId: undefined,
         sketchSourceNodeId: undefined,
+        faceDraft: undefined,
+        faceDraftSourceFrame: undefined,
         sketchSourceOfObjectId: shape.id,
       },
     });
@@ -792,6 +794,19 @@ function activeProjectIndexes(state: SkfStateV1) {
       });
       previous = featureId;
     });
+    const faceDraft = node.definition.faceDraft as Record<string, unknown> | undefined;
+    if (faceDraft) {
+      const featureId = `feature/${safeNodeToken(node.nodeId)}/face-draft`;
+      features.push({
+        id: featureId,
+        type: "face-draft",
+        outputObjectId: node.objectId,
+        inputObjectIds: [node.objectId],
+        dependsOnFeatureIds: previous ? [previous] : [],
+        parameters: { ...faceDraft },
+      });
+      previous = featureId;
+    }
     if (node.definition.mirrorX || node.definition.mirrorY || node.definition.mirrorZ) {
       const featureId = `feature/${safeNodeToken(node.nodeId)}/mirror`;
       features.push({
@@ -1095,14 +1110,14 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
   if (definition.faceColors !== undefined) {
     const colors = objectRecord(definition.faceColors, `${label}.faceColors`);
     for (const [faceId, color] of Object.entries(colors)) {
-      if (!(/^(?:\d+|face_.+)$/.test(faceId)) || typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color)) {
+      if (!faceId.trim() || typeof color !== "string" || !/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/.test(color)) {
         throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceColors.${faceId}` });
       }
     }
   }
   if (definition.faceIds !== undefined && (
     !Array.isArray(definition.faceIds)
-    || definition.faceIds.some((faceId) => typeof faceId !== "string" || !faceId.startsWith("face_"))
+    || definition.faceIds.some((faceId) => typeof faceId !== "string" || !faceId.trim())
     || new Set(definition.faceIds).size !== definition.faceIds.length
   )) {
     throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceIds` });
@@ -1132,6 +1147,27 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     ["pitch", "turns", "coreRadius"].forEach((field) => {
       if (settings[field] !== undefined) finiteNumber(settings[field], `${label}.sketchRevolve.${field}`);
     });
+  }
+  if (definition.faceDraft !== undefined) {
+    const draft = objectRecord(definition.faceDraft, `${label}.faceDraft`);
+    const sourceFaceId = stringValue(draft.sourceFaceId, `${label}.faceDraft.sourceFaceId`);
+    if (!sourceFaceId.trim()) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft.sourceFaceId` });
+    const angle = finiteNumber(draft.angle, `${label}.faceDraft.angle`);
+    if (angle === 0 || Math.abs(angle) >= 45) throw new LocalizedError("errors.skf.outOfRange", { label: `${label}.faceDraft.angle` });
+    if (!(["x", "y", "z", "-x", "-y", "-z"] as unknown[]).includes(draft.pullDirection)) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft.pullDirection` });
+    }
+    const normal = objectRecord(draft.sourceFaceNormal, `${label}.faceDraft.sourceFaceNormal`);
+    const coordinates = ["x", "y", "z"].map((axis) => finiteNumber(normal[axis], `${label}.faceDraft.sourceFaceNormal.${axis}`));
+    const magnitude = Math.hypot(...coordinates);
+    if (Math.abs(magnitude - 1) > 1e-4) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft.sourceFaceNormal` });
+  }
+  if (definition.faceDraftSourceFrame !== undefined) {
+    const frame = objectRecord(definition.faceDraftSourceFrame, `${label}.faceDraftSourceFrame`);
+    ["x", "z", "elevation", "width", "depth", "height"].forEach((field) => finiteNumber(frame[field], `${label}.faceDraftSourceFrame.${field}`));
+    if (["width", "depth", "height"].some((field) => (frame[field] as number) <= 0)) {
+      throw new LocalizedError("errors.skf.nonPositiveDimensions", { label: `${label}.faceDraftSourceFrame` });
+    }
   }
   if (kind === "gear") {
     const teeth = finiteNumber(definition.teeth, `${label}.teeth`);
