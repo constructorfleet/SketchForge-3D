@@ -1,3 +1,12 @@
+---
+slug: "/docs/guides/step-assemblies"
+title: "Working with STEP assemblies"
+audience: "Editor users"
+owner: "Editor"
+sources:
+  - "packages/sketchforge-engine/src/**"
+---
+
 # Working with STEP assemblies
 
 A STEP assembly import begins as one positioned mesh. When the source is within the bounded metadata extraction limits, the shape summary includes `stepAssembly`: a product tree with names, optional source occurrence IDs, and direct children. This tree describes the source assembly; it does not itself create selectable parts.

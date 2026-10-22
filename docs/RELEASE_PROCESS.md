@@ -1,3 +1,10 @@
+---
+slug: "/docs/RELEASE_PROCESS"
+title: "Release process"
+audience: "Contributors"
+owner: "Contributors"
+---
+
 # Release process
 
 SketchForge uses Conventional Commit pull request titles to drive releases.

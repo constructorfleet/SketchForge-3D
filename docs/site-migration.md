@@ -1,3 +1,10 @@
+---
+slug: "/docs/site-migration"
+title: "Documentation site status and migration map"
+audience: "Contributors"
+owner: "Contributors"
+---
+
 # Documentation site status and migration map
 
 The static VitePress site is published at

@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.es"
+title: "Spanish (es) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # Spanish (es) language guide
 
 Binding for the Spanish catalogs. General rules and audience: [../TRANSLATIONS.md](../TRANSLATIONS.md#translation-requirements).

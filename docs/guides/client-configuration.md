@@ -1,3 +1,14 @@
+---
+slug: "/docs/guides/client-configuration"
+title: "Client configuration"
+audience: "Contributors"
+owner: "Packages"
+sources:
+  - "packages/sketchforge-client/src/**"
+  - "packages/sketchforge-client/mcp/**"
+  - "packages/sketchforge-py/src/**"
+---
+
 # Client configuration
 
 This guide covers public runtime settings read by the TypeScript and Python macro clients and the `@constructorfleet/sketchforge3d` MCP bridge. For the complete inventory—including server and container settings, defaults, sensitivity, implementation readers, and documentation owners—see the [configuration reference](../OPERATOR_CONFIGURATION.md).

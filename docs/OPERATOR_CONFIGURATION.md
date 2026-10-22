@@ -1,3 +1,15 @@
+---
+slug: /docs/OPERATOR_CONFIGURATION
+title: Public runtime configuration
+audience: Operators
+owner: Operations
+sources:
+  - packages/sketchforge-engine/src/support/**
+  - packages/sketchforge-client/src/**
+  - packages/sketchforge-client/mcp/**
+  - packages/sketchforge-py/src/**
+---
+
 # Public runtime configuration
 
 This reference covers supported public runtime settings for server/container deployments, TypeScript and Python API clients, and the local MCP bridge. Build-only, test-only, CI workflow, desktop development, and pass-through environment values are intentionally classified separately and are not presented as supported application runtime settings. The registry is maintained in `packages/sketchforge-engine/src/support/lib/operator-configuration.json`; regenerate this page with `node scripts/generate-operator-configuration.mjs`.

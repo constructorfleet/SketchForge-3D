@@ -1,3 +1,15 @@
+---
+slug: "/docs/PUBLISHING_CLIENTS"
+title: "Publishing the client libraries"
+audience: "Contributors"
+owner: "Packages"
+sources:
+  - ".release-please-manifest.json"
+  - "packages/sketchforge-client/package.json"
+  - "packages/sketchforge-engine/package.json"
+  - "packages/sketchforge-py/pyproject.toml"
+---
+
 # Publishing the client libraries
 
 Three packages are published from this repository, independently of the app's own version:

@@ -1,3 +1,10 @@
+---
+slug: "/docs/translations/glossary.pt"
+title: "Brazilian Portuguese (pt) language guide"
+audience: "Documentation translators"
+owner: "Documentation"
+---
+
 # Brazilian Portuguese (pt) language guide
 
 Binding for the `pt` catalogs. The catalogs are **Brazilian Portuguese** (pt-BR); the code is plain `pt` because the

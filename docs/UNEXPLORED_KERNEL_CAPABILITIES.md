@@ -1,3 +1,10 @@
+---
+slug: "/docs/UNEXPLORED_KERNEL_CAPABILITIES"
+title: "Implementation gaps and next steps"
+audience: "Contributors"
+owner: "Engine"
+---
+
 # Implementation gaps and next steps
 
 This inventory summarizes verified user-facing behavior and durable capability

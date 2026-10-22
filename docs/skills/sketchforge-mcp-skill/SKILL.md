@@ -1,4 +1,8 @@
 ---
+owner: "MCP"
+audience: "MCP users"
+title: "SketchForge MCP"
+slug: "/docs/skills/sketchforge-mcp-skill/SKILL"
 name: sketchforge-mcp-skill
 description: Control a live local SketchForge editor through its MCP server. Use when Codex needs to list currently open SketchForge editor tabs, target a tab by editorNumber/projectName, read the current scene, list or select objects, create boxes/cubes/cylinders/sketch extrusions, update dimensions/position/rotation, align objects, group/ungroup/cut/separate parts, list exact CAD edge ids, apply chamfer/fillet to specific edges, inspect editor errors, or capture viewport images from view-cube angles.
 ---

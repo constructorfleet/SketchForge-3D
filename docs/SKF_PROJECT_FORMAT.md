@@ -1,3 +1,12 @@
+---
+slug: "/docs/SKF_PROJECT_FORMAT"
+title: "SketchForge project files (.skf)"
+audience: "API users"
+owner: "Project formats"
+sources:
+  - "packages/sketchforge-engine/src/**"
+---
+
 # SketchForge project files (`.skf`)
 
 `.skf` is SketchForge's native, editable project format. It is an additional backup, transfer, and sharing mechanism; IndexedDB autosave remains the normal local persistence system, and STL, OBJ, STEP, and SVG remain geometry exports.
