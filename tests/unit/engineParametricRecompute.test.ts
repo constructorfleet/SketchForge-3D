@@ -89,6 +89,7 @@ async function persistAllEdgeFillet(
   const before = await store.read(projectId);
   const source = before!.shapes.find((shape) => shape.id === shapeId)!;
   const treated = value(await engine.treat(projectId, shapeId, { kind: "fillet", amount })).shape;
+  if (source.draftPrismAngle !== undefined) return treated;
   const feature = { kind: "fillet" as const, amount, edgeCount: 12, allEdges: true as const };
   const persisted = {
     ...treated,
@@ -111,6 +112,7 @@ async function persistAllEdgeChamfer(
   const before = await store.read(projectId);
   const source = before!.shapes.find((shape) => shape.id === shapeId)!;
   const treated = value(await engine.treat(projectId, shapeId, { kind: "chamfer", amount })).shape;
+  if (source.draftPrismAngle !== undefined) return treated;
   const feature = { kind: "chamfer" as const, amount, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
   const persisted = {
     ...treated,
@@ -154,7 +156,7 @@ describe("dependency-ordered feature recomputation", () => {
     },
   );
 
-  it("refuses to add a prism draft to a persisted treated extrusion without writing", async () => {
+  it("replays a persisted all-edge fillet when the draft angle changes", async () => {
     const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
     const original = await sketchExtrusionShapeFromRequest({
@@ -162,15 +164,56 @@ describe("dependency-ordered feature recomputation", () => {
       profile: extrusionProfile(), height: 3,
     });
     document.shapes = [original];
-    const treated = value(await engine.treat("recompute", original.id, { kind: "fillet", amount: 0.2 })).shape;
-    const current = await store.read("recompute");
-    const feature = { kind: "fillet" as const, amount: 0.2, edgeCount: 12, allEdges: true as const };
-    const persisted = { ...treated, edgeTreatments: [feature] };
-    await store.write("recompute", current!, [persisted]);
+    const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
+    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { draftPrismAngle: 8 });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(writeCount()).toBe(writesBefore + 1);
+    expect(value(changed).shape).toMatchObject({
+      id: persisted.id,
+      sketchSourceId: persisted.sketchSourceId,
+      draftPrismAngle: 8,
+      edgeTreatments: [{ kind: "fillet", amount: 0.2, allEdges: true }],
+    });
+    expect(value(changed).shape.edgeTreatmentHistory?.[0]?.before.draftPrismAngle).toBe(8);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses to add a prism draft after a persisted all-edge fillet", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "treated-before-draft", sketchSourceId: "sketch/treated-before-draft", name: "Treated before draft",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
     const before = value(await engine.project("recompute"));
     const writesBefore = writeCount();
 
-    const changed = await engine.draftPrism("recompute", persisted.id, 5);
+    const changed = await engine.changeShape("recompute", treated.sketchSourceId!, { draftPrismAngle: 5 });
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure.reason).toBe("invalid_shape_request");
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute"))).toEqual(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses the draft-prism operation after a persisted all-edge fillet", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "route-treated-before-draft", sketchSourceId: "sketch/route-treated-before-draft", name: "Route treated before draft",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
+    const before = value(await engine.project("recompute"));
+    const writesBefore = writeCount();
+
+    const changed = await engine.draftPrism("recompute", treated.id, 5);
 
     expect(changed.ok).toBe(false);
     expect(changed.ok ? undefined : changed.failure.reason).toBe("cad_refused");
@@ -1256,30 +1299,16 @@ describe("dependency-ordered feature recomputation", () => {
     },
   );
 
-  it("does not persist a source edit when the all-edge fillet cannot be replayed", async () => {
-    const { store, writeCount } = projectStore();
+  it("does not persist a source edit when a drafted all-edge fillet cannot be replayed", async () => {
+    const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
-    const created = value(await engine.addShapes("recompute", [
-      { kind: "box", name: "Treated extrusion", width: 2, depth: 2, height: 3 },
-    ]));
-    const document = await store.read("recompute");
-    const sourceProfile = extrusionProfile();
-    const source: WorkplaneShape = {
-      ...document!.shapes[0]!,
-      sketchOperation: "extrude",
-      sketchProfile: sourceProfile,
-      sketchSourceId: "sketch/rollback-treated-extrusion",
-      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
-    };
-    document!.shapes[0] = source;
-    const treated = value(await engine.treat("recompute", created.shapes[0]!.id, { kind: "fillet", amount: 0.2 })).shape;
-    const feature = { kind: "fillet" as const, amount: 0.2, edgeCount: 12, allEdges: true as const };
-    const persisted: WorkplaneShape = {
-      ...treated,
-      edgeTreatments: [feature],
-      edgeTreatmentHistory: [{ id: "all-edge-fillet", createdAt: 1, feature, before: source }],
-    };
-    document!.shapes[0] = persisted;
+    const source = await sketchExtrusionShapeFromRequest({
+      id: "rollback-treated-extrusion", sketchSourceId: "sketch/rollback-treated-extrusion", name: "Treated extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [source];
+    const drafted = value(await engine.draftPrism("recompute", source.id, 5)).shape;
+    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: extrusionProfile(0.1) });
@@ -1289,40 +1318,58 @@ describe("dependency-ordered feature recomputation", () => {
     expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
   });
 
-  it("rejects an all-edge fillet source edit when a draft prism makes replay order ambiguous", async () => {
-    const { store, writeCount } = projectStore();
+  it("replays a drafted extrusion's all-edge fillet after a source-profile edit", async () => {
+    const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
-    const created = value(await engine.addShapes("recompute", [
-      { kind: "box", name: "Drafted treated extrusion", width: 2, depth: 2, height: 3 },
-    ]));
-    const document = await store.read("recompute");
-    const sourceProfile = extrusionProfile();
-    const feature = { kind: "fillet" as const, amount: 0.2, edgeCount: 12, allEdges: true as const };
-    const persisted: WorkplaneShape = {
-      ...document!.shapes[0]!,
-      sketchOperation: "extrude",
-      sketchProfile: sourceProfile,
-      sketchSourceId: "sketch/draft-and-fillet",
-      draftPrismAngle: 5,
-      edgeTreatments: [feature],
-      edgeTreatmentHistory: [{
-        id: "all-edge-fillet",
-        createdAt: 1,
-        feature,
-        before: document!.shapes[0]!,
-      }],
-    };
-    document!.shapes[0] = persisted;
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "drafted-treated-extrusion", sketchSourceId: "sketch/draft-and-fillet", name: "Drafted treated extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
+    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { sketchProfile: extrusionProfile(2) });
-    const changedDraftAngle = await engine.changeShape("recompute", persisted.sketchSourceId!, { draftPrismAngle: 8 });
 
-    expect(changed.ok).toBe(false);
-    expect(changedDraftAngle.ok).toBe(false);
-    expect(writeCount()).toBe(writesBeforeEdit);
-    expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+    expect(value(changed).shape).toMatchObject({
+      id: persisted.id,
+      sketchSourceId: persisted.sketchSourceId,
+      sketchProfile: extrusionProfile(2),
+      draftPrismAngle: 5,
+      edgeTreatments: [{ kind: "fillet", amount: 0.2, allEdges: true }],
+    });
+    expect(value(changed).shape.cadBrep).not.toEqual(persisted.cadBrep);
+    expect(value(changed).shape.edgeTreatmentHistory?.[0]?.before.draftPrismAngle).toBe(5);
   });
+
+  it("replays a drafted extrusion's symmetric all-edge chamfer after a source-profile edit", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "drafted-chamfer-extrusion", sketchSourceId: "sketch/draft-and-chamfer", name: "Drafted chamfer extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
+    const persisted = await persistAllEdgeChamfer(engine, store, "recompute", drafted.id, 0.1);
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { sketchProfile: extrusionProfile(2) });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(writeCount()).toBe(writesBefore + 1);
+    expect(value(changed).shape).toMatchObject({
+      id: persisted.id,
+      sketchSourceId: persisted.sketchSourceId,
+      draftPrismAngle: 5,
+      edgeTreatments: [{ kind: "chamfer", amount: 0.1, chamferAngle: 45, allEdges: true }],
+    });
+    expect(value(changed).shape.edgeTreatmentHistory?.[0]?.before.draftPrismAngle).toBe(5);
+    expect(value(changed).shape.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBeGreaterThan(0);
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("edits a persisted draft-prism angle by sketch source ID and keeps the draft during source recompute", async () => {
     const { store, writeCount } = projectStore();

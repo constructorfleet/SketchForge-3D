@@ -16,6 +16,7 @@
  */
 
 import {
+  allEdgeTreatmentEdgeCount,
   applyEdgeTreatment,
   applyBakedMirror,
   applyDraftPrism,
@@ -680,7 +681,7 @@ export function createEngine(store: ProjectStore): Engine {
   async function cadTreatment(
     projectId: string,
     shapeId: string,
-    operation: "edge-treatment" | "prism-draft" | "shell",
+    operation: "edge-treatment" | "all-edge-treatment" | "prism-draft" | "shell",
     run: (shape: WorkplaneShape) => Promise<WorkplaneShape>,
   ): Promise<EngineResult<ShapeWritten>> {
     return mutating(projectId, async (document) => {
@@ -689,14 +690,21 @@ export function createEngine(store: ProjectStore): Engine {
       if (found.value.locked) return failed({ reason: "shape_locked", ids: [shapeId] });
       const hasEdgeTreatments = (found.value.edgeTreatments?.length ?? 0) > 0
         || (found.value.edgeTreatmentHistory?.length ?? 0) > 0;
+      const hasDraftPrism = found.value.draftPrismAngle !== undefined;
+      const replayableDraftTreatment = operation === "all-edge-treatment"
+        && !hasEdgeTreatments
+        && found.value.sketchOperation === "extrude"
+        && Boolean(found.value.sketchProfile)
+        && hasDraftPrism;
       const incompatible = found.value.faceDraft !== undefined
-        || operation === "edge-treatment" && found.value.draftPrismAngle !== undefined
+        || operation === "edge-treatment" && hasDraftPrism
+        || operation === "all-edge-treatment" && hasDraftPrism && !replayableDraftTreatment
         || operation === "prism-draft" && hasEdgeTreatments
         || operation === "shell" && (found.value.draftPrismAngle !== undefined || hasEdgeTreatments);
       if (incompatible) {
         return failed({
           reason: "cad_refused",
-          message: "Face drafts cannot be combined with edge treatments, prism drafts, or shelling. Prism drafts and edge treatments cannot be combined, and shelling cannot be combined with persisted draft or treatment features.",
+          message: "Face drafts cannot be combined with edge treatments, prism drafts, or shelling. Draft prisms only support one all-edge treatment on a retained sketch extrusion; shelling cannot be combined with persisted draft or treatment features.",
           status: 422,
         });
       }
@@ -856,8 +864,9 @@ export function createEngine(store: ProjectStore): Engine {
       if (draftPrismChanged && requestedFaceDraft) {
         return failed({ reason: "invalid_shape_request", message: "Face drafts cannot be combined with prism drafts yet." });
       }
-      if (draftPrismChanged && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0)) {
-        return failed({ reason: "invalid_shape_request", message: "A draft angle cannot be changed while edge treatments are present." });
+      if (draftPrismChanged && existing.draftPrismAngle === undefined
+        && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0)) {
+        return failed({ reason: "invalid_shape_request", message: "A prism draft cannot be added after an edge treatment." });
       }
       if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
@@ -916,8 +925,17 @@ export function createEngine(store: ProjectStore): Engine {
               ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
             }),
           };
-          const replayedSource = replacingSketchProfile || clearingFaceDraft
-            ? await replaySingleAllEdgeTreatment(clearingFaceDraft ? { ...existing, faceDraft: undefined } : existing, rebuiltSource)
+          const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
+            || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+          const replayDraftAndTreatment = hasRetainedTreatments
+            && draftPrismAngle !== undefined
+            && (replacingSketchProfile || clearingFaceDraft || draftPrismChanged);
+          const replayedSource = (replacingSketchProfile || clearingFaceDraft || draftPrismChanged) && hasRetainedTreatments
+            ? await replaySingleAllEdgeTreatment(
+              clearingFaceDraft ? { ...existing, faceDraft: undefined } : existing,
+              rebuiltSource,
+              draftPrismChanged ? requestedDraftPrismAngle : undefined,
+            )
             : rebuiltSource;
           if (requestedFaceDraft) {
             const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
@@ -942,7 +960,7 @@ export function createEngine(store: ProjectStore): Engine {
               faceDraft,
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
             };
-          } else if (draftPrismAngle !== undefined) {
+          } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
             swept = {
               ...shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
               draftPrismAngle,
@@ -1468,9 +1486,40 @@ export function createEngine(store: ProjectStore): Engine {
       }
     }),
 
-    treat: (projectId, shapeId, treatment) => cadTreatment(projectId, shapeId, "edge-treatment", async (shape) => (
-      shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment))
-    )),
+    treat: (projectId, shapeId, treatment) => cadTreatment(
+      projectId,
+      shapeId,
+      (treatment.edges === undefined || treatment.edges.length === 0)
+        && (treatment.kind === "fillet" || treatment.angle === undefined || Math.abs(treatment.angle - 45) < 0.001)
+        ? "all-edge-treatment"
+        : "edge-treatment",
+      async (shape) => {
+        const treated = shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment));
+        if (shape.draftPrismAngle === undefined) return treated;
+
+        const feature = {
+          kind: treatment.kind,
+          amount: treatment.amount,
+          edgeCount: await allEdgeTreatmentEdgeCount(shape, treatment.kind),
+          allEdges: true as const,
+          ...(treatment.kind === "chamfer" ? { chamferAngle: treatment.angle ?? 45 } : {}),
+        };
+        const history = shape.edgeTreatmentHistory ?? [];
+        return {
+          ...treated,
+          edgeTreatments: [...(shape.edgeTreatments ?? []), feature],
+          edgeTreatmentHistory: [
+            ...history,
+            {
+              id: createLocalId("edge-history"),
+              createdAt: Date.now(),
+              feature,
+              before: structuredClone(shape),
+            },
+          ],
+        };
+      },
+    ),
 
     draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, "prism-draft", async (shape) => {
       const sourceFrame = shape.draftPrismSourceFrame ?? shape.cadBrepFrame;

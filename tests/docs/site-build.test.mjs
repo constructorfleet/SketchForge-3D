@@ -99,7 +99,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /Adding an edge treatment, prism draft, or shell to a face-drafted shape is refused before writing/i);
-  assert.match(spec, /Prism drafts and edge-treatment metadata are also rejected together in either mutation order/i);
+  assert.match(spec, /A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer[\s\S]*?adding a prism draft after a treatment remains refused/i);
   assert.match(spec, /does not establish general topology lineage/i);
   assert.match(spec, /editor's arbitrary-shape face-draft workflow remains baked/i);
   assert.match(spec, /22 of 32 operations are documented, and the shapes operation remains omitted because combined face-color and profile validation is not represented faithfully/i);
@@ -169,7 +169,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /retains one editable face draft[\s\S]{0,120}plain single-region full-turn sketch revolve/i);
   assert.match(capabilities, /reject attempts to add an edge treatment,[\s\S]{0,200}without writing the\s+project/i);
-  assert.match(capabilities, /reject prism-draft and edge-treatment combinations in\s+either mutation order/i);
+  assert.match(capabilities, /one all-edge fillet or symmetric 45°\s+chamfer is now\s+supported on a sketch extrusion[\s\S]*?Adding a prism draft after a treatment/i);
   assert.match(capabilities, /Broader and editable drafting/i);
   assert.match(capabilities, /Editable STEP assembly hierarchy and robust component association/i);
   assert.match(capabilities, /Stable face identity across arbitrary topology changes/i);

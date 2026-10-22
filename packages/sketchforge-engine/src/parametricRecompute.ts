@@ -1,5 +1,5 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { allEdgeTreatmentEdgeCount, applyEdgeTreatment, shapeWithCadResult } from "./serverCadOperations.js";
+import { allEdgeTreatmentEdgeCount, applyDraftPrism, applyEdgeTreatment, shapeWithCadResult } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -27,12 +27,13 @@ function appliedFrame(shape: WorkplaneShape) {
 export async function replaySingleAllEdgeTreatment(
   original: WorkplaneShape,
   rebuilt: WorkplaneShape,
+  draftPrismAngle = original.draftPrismAngle,
 ): Promise<WorkplaneShape> {
   const features = original.edgeTreatments ?? [];
   const history = original.edgeTreatmentHistory ?? [];
   if (features.length === 0 && history.length === 0) return rebuilt;
-  if (original.draftPrismAngle !== undefined || original.faceDraft !== undefined) {
-    throw new Error("A draft cannot yet be recomputed with an edge treatment safely.");
+  if (original.faceDraft !== undefined) {
+    throw new Error("A face draft cannot yet be recomputed with an edge treatment safely.");
   }
   const feature = features[0];
   const historyFeature = history[0]?.feature;
@@ -49,17 +50,28 @@ export async function replaySingleAllEdgeTreatment(
   }
 
   const previousFeature = feature;
-  const result = await applyEdgeTreatment(rebuilt, {
+  let treatmentSource = rebuilt;
+  if (draftPrismAngle !== undefined) {
+    treatmentSource = {
+      ...shapeWithCadResult(rebuilt, await applyDraftPrism(rebuilt, { angle: draftPrismAngle })),
+      draftPrismAngle,
+      draftPrismSourceHeight: original.draftPrismSourceHeight ?? rebuilt.height,
+      ...(original.draftPrismSourceFrame ?? rebuilt.draftPrismSourceFrame
+        ? { draftPrismSourceFrame: original.draftPrismSourceFrame ?? rebuilt.draftPrismSourceFrame }
+        : {}),
+    };
+  }
+  const result = await applyEdgeTreatment(treatmentSource, {
     kind: previousFeature.kind,
     amount: previousFeature.amount,
     ...(previousFeature.kind === "chamfer" ? { angle: previousFeature.chamferAngle ?? 45 } : {}),
   });
-  const treated = shapeWithCadResult(rebuilt, result);
+  const treated = shapeWithCadResult(treatmentSource, result);
   const replayedFeature = {
     ...previousFeature,
-    edgeCount: await allEdgeTreatmentEdgeCount(rebuilt, previousFeature.kind),
+    edgeCount: await allEdgeTreatmentEdgeCount(treatmentSource, previousFeature.kind),
   };
-  const before = structuredClone(rebuilt);
+  const before = structuredClone(treatmentSource);
   const entry = history[0];
   return {
     ...treated,
