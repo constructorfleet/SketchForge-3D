@@ -124,7 +124,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /21 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 11 are listed/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
   assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
-  assert.match(migration, /required audience\/owner metadata/i);
+  assert.match(migration, /required\s+audience\/owner metadata/i);
+  assert.match(migration, /all maintained[\s\S]*?`docs\/\*\*\/\*\.md` pages[\s\S]*?staged generated package references[\s\S]*?audience\/owner metadata/i);
+  assert.match(migration, /23 supported-language\s+runnable fences[\s\S]*?exact tracked source[\s\S]*?named test\s+and CI command[\s\S]*?concrete reasoned exemption/i);
+  assert.match(migration, /Exemptions do not\s+establish execution coverage[\s\S]*?other fence languages[\s\S]*?not covered/i);
+  assert.doesNotMatch(migration, /Remaining work is to require every runnable example to come from source and\s+execute in CI; add\s+consistent page audience\/owner metadata/i);
   assert.match(migration, /Changed-source ownership diagnostics cover selected source trees/i);
   assert.match(migration, /mapping is path-based and is not symbol-level or complete/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);

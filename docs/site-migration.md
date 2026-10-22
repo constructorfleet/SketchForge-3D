@@ -109,16 +109,21 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   `SKETCHFORGE_DESKTOP_DEV_URL` is an internal launcher handoff and `NODE_PATH`
   is pass-through. Build, test, CI, launcher, pass-through, and other readers
   outside the declared inventory remain out of scope.
-- **Examples and page ownership — partial:** maintained documentation pages
-  and staged generated package references have required audience/owner metadata.
+- **Examples and page ownership — partial:** all maintained
+  `docs/**/*.md` pages and staged generated package references have required
+  audience/owner metadata. A separate docs check covers 23 supported-language
+  runnable fences: each must include its exact tracked source with a named test
+  and CI command, or carry a concrete reasoned exemption. Exemptions do not
+  establish execution coverage, and other fence languages and runnable content
+  outside this set are not covered.
   Changed-source ownership diagnostics cover selected source trees, including
   REST routes, TypeScript client/MCP, engine, Python client, and the package
   example trees. The mapping is path-based and is not symbol-level or complete
   repository coverage. The local-project MCP shell command is included from and
   executed as the same source fixture; package examples are sourced and tested.
-  Remaining work is to require every runnable example to come from source and
-  execute in CI, and to cover editor/UI sources, other examples, and all content
-  sources with ownership diagnostics.
+  Remaining work is to expand source/test coverage to runnable content outside
+  this bounded set, and to cover editor/UI sources, other examples, and all
+  content sources with ownership diagnostics.
 - **Task workflows:** expand tested task guides beyond the editor quick-start,
   package examples, and current REST/MCP workflows.
 - **Inbound links:** local links, compatibility paths, and repository history
