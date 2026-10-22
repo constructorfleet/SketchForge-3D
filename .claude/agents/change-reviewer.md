@@ -23,7 +23,7 @@ A passing suite here has produced false confidence more than once. For each new 
 
 ## Repository-specific defects
 
-- **Edits to generated output.** `.docs-site/` is generated and gitignored; `docs/reference/` is written by generators that announce it at the top of each file. A diff touching either is editing the wrong layer — the fix belongs in `docs/.vitepress/` or the generator.
+- **Edits to generated output.** `.docs-site/` is generated and gitignored, and the reference pages under `docs/` are written by the generators in `scripts/docs/` — each one says so at the top of the file. Neither exists in a fresh checkout until `npm run docs:generate` runs. A diff touching either is editing the wrong layer; the fix belongs in `docs/.vitepress/` or in the generator.
 - **Clobbered rather than extended.** `docs/.vitepress/theme/custom.css` carries contrast overrides the accessibility suite enforces. A rewrite that drops them passes locally and fails the built-site suite.
 - **Workflow changes that alter what triggers.** This repository dispatches its release workflows explicitly *and* once subscribed to tag pushes; the duplicate was dormant only because the pushing identity was `GITHUB_TOKEN`. Any change to a workflow's identity or triggers needs the question: what starts twice now, and what starts never?
 - **A lockfile diff far larger than the dependency change.** Confirm whether npm is renormalising pre-existing drift rather than pulling in packages — compare the resolved package sets, not the line count.

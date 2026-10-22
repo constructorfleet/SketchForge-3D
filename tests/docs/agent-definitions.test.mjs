@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -47,11 +48,17 @@ test("every npm script an agent names still exists", () => {
   }
 });
 
-test("every repository path an agent cites still exists", () => {
+test("every repository path an agent cites is tracked, not generated output", () => {
+  // Tracked rather than merely present on disk: generated directories exist in a
+  // working tree that has run the generators and are absent from a fresh clone,
+  // so an existence check passes locally and fails in CI.
+  const tracked = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+  const isTracked = (cited) => tracked.some((entry) => entry === cited || entry.startsWith(cited.endsWith("/") ? cited : `${cited}/`));
+
   for (const { file, body } of agents()) {
     for (const [, cited] of body.matchAll(/`((?:docs|apps|packages|tests|scripts|\.github)\/[\w./-]+)`/g)) {
       if (cited.includes("*")) continue;
-      assert.ok(existsSync(path.join(root, cited)), `${file} cites ${cited}, which no longer exists`);
+      assert.ok(isTracked(cited), `${file} cites ${cited}, which is not tracked in git -- a generated path is absent from a fresh checkout`);
     }
   }
 });
