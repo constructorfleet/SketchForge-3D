@@ -11,7 +11,7 @@ export type ApiV1FieldSchema = {
   nullable?: true;
   required?: readonly string[];
   enum?: readonly (string | null)[];
-  default?: string;
+  default?: string | number | boolean | null;
   minimum?: number;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -363,6 +363,40 @@ const shapeOperations = [
 ] as const satisfies readonly ApiV1Operation[];
 
 const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
+const patternRequest = {
+  type: "object",
+  required: ["ids"],
+  properties: {
+    ids: { oneOf: [{ type: "string", pattern: "\\S" }, { type: "array", minItems: 1, items: { type: "string", pattern: "\\S" }, uniqueItems: true }], description: "A shape ID or non-empty list of IDs; surrounding whitespace is trimmed and duplicate IDs after trimming are rejected." },
+    kind: { type: "string", enum: ["linear", "circular"], default: "linear" },
+    count: { type: "integer", nullable: true, minimum: 2, maximum: 200, default: 4 },
+    stepX: { ...num, default: 0 },
+    stepZ: { ...num, default: 0 },
+    centerX: { ...num, default: 0 },
+    centerZ: { ...num, default: 0 },
+    sweepAngle: { ...num, default: 360 },
+    rotateCopies: { type: "boolean", default: true, description: "For circular patterns, rotate each copy to follow the ring; defaults to true." },
+  },
+} as const;
+const patternResponse = {
+  type: "object", required: ["created", "kind", "shapes", "revision"],
+  properties: { created: { type: "integer", minimum: 0 }, kind: { type: "string", enum: ["linear", "circular"] }, shapes: { type: "array", items: shapeSummary }, revision: num },
+} as const;
+const patternErrors = {
+  400: faceError("invalid_project_id", "invalid_body", "invalid_request"),
+  401: faceError("unauthorized"),
+  404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+  409: faceError("project_busy"),
+  422: faceError("invalid_request"),
+  500: faceError("internal_error"),
+  503: faceError("storage_unconfigured"),
+} as const;
+const patternOperation = {
+  ...operation("POST", "/api/v1/patterns", "patternShapes", [201, 400, 401, 404, 409, 422, 500, 503], json(patternRequest)),
+  description: "Create linear or circular copies of selected shapes.",
+  query: projectQuery,
+  responseSchemas: { 201: patternResponse, ...patternErrors },
+};
 const featureErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
 const changedShapeResponse = { type: "object", required: ["shape", "triangles", "revision"], properties: { shape: shapeSummary, triangles: { type: "integer", minimum: 0 }, revision: num } } as const;
 const featureOperations = [
@@ -643,7 +677,7 @@ export const API_V1_OPERATIONS = [
       503: faceError("storage_unconfigured"),
     },
   },
-  operation("POST", "/api/v1/patterns", "patternShapes"),
+  patternOperation,
   ...projectOperations,
   {
     ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 422, 500, 503]),

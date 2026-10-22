@@ -11,7 +11,7 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 test("documentation suite status records REST and runnable-fence coverage accurately", async () => {
   const spec = await readFile(path.join(repository, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
 
-  assert.match(spec, /Current status is 23 of 32; 9 remain omitted/i);
+  assert.match(spec, /Current status is 24 of 32; 8 remain omitted/i);
   assert.match(spec, /23 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
   assert.match(spec, /other fence languages[\s\S]*?ownership coverage for other content sources remain open/i);
   assert.match(spec, /6\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);

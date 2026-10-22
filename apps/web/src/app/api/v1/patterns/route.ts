@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { MAX_PATTERN_COUNT, MIN_PATTERN_COUNT } from "@/lib/engine/patternShapes";
 import type { PatternKind } from "@/lib/engine/engine";
 
@@ -31,7 +32,7 @@ function optionalNumber(value: unknown, field: string): number | undefined | str
  * sweep divides by the gaps instead, so three across 90 degrees puts one at
  * each end and one in the middle.
  */
-export async function POST(request: Request) {
+async function postPatterns(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   if (!kind) return apiError(`kind must be one of ${KINDS.join(", ")}.`, 400, "invalid_request");
 
   const count = body.count ?? 4;
-  if (typeof count !== "number" || !Number.isFinite(count)) {
+  if (typeof count !== "number" || !Number.isFinite(count) || !Number.isInteger(count)) {
     return apiError("count must be a number: the total copies including the original.", 400, "invalid_request");
   }
   if (count < MIN_PATTERN_COUNT || count > MAX_PATTERN_COUNT) {
@@ -62,6 +63,16 @@ export async function POST(request: Request) {
   };
   for (const value of Object.values(numbers)) {
     if (typeof value === "string") return apiError(value, 400, "invalid_request");
+  }
+  const contractBody = {
+    ids,
+    kind,
+    count,
+    ...Object.fromEntries(Object.entries(numbers).filter(([, value]) => value !== undefined)),
+    ...(body.rotateCopies === undefined ? {} : { rotateCopies: body.rotateCopies }),
+  };
+  if (!validateApiV1RequestBody("POST /api/v1/patterns", contractBody)) {
+    return apiError("The pattern request does not match its contract.", 400, "invalid_request");
   }
 
   const patterned = await apiEngine(context.root).pattern(projectId, {
@@ -83,3 +94,5 @@ export async function POST(request: Request) {
     revision: patterned.value.revision,
   }, 201);
 }
+
+export const POST = withApiV1Contract("POST /api/v1/patterns", postPatterns);

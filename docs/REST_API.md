@@ -50,12 +50,12 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Bodies and responses are JSON; errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align` and `/distribute`), `POST /interference`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align`, `/distribute`, and `/patterns`), `POST /interference`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes; their handlers validate requests and responses against the same contract registry. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
 The shape `PATCH` operation remains omitted because its `faceColors` validation is custom; its omission entry calls out the supported `sketchProfile` rebuild and links to the [sweep update contract](#sketch-sweeps) below. The prose contract below also documents retained face drafts. An operation should appear in generated OpenAPI only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then.
 
 ### Contract validation
 
-The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, the two arrangement operations, `POST` and `DELETE /groups`, and `POST /interference` carry request metadata and status-specific response schemas. Their handlers validate successful and error responses against those contracts; unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Other registry entries remain inventory-only and are not runtime schema-validated yet.
+The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, and `POST /interference` carry request metadata and status-specific response schemas. Their handlers validate successful and error responses against those contracts; unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Other registry entries remain inventory-only and are not runtime schema-validated yet.
 
 | Method | Path | Does |
 | --- | --- | --- |
@@ -659,10 +659,10 @@ The response reports how many shapes were mirrored, their updated summaries, the
 | --- | --- |
 | `kind` | `linear` for a row, `circular` for a ring. Default `linear`. |
 | `count` | Total copies **including** the original, so 4 adds 3. From 2 to 200. Default 4. |
-| `stepX`, `stepZ` | `linear`: centre-to-centre step along each axis, in mm. At least one must be non-zero. |
-| `centerX`, `centerZ` | `circular`: the point to turn about. Default the origin. |
+| `stepX`, `stepZ` | `linear`: centre-to-centre step along each axis, in mm. Each defaults to 0; at least one must be non-zero. |
+| `centerX`, `centerZ` | `circular`: the point to turn about. Each defaults to 0, the origin. |
 | `sweepAngle` | `circular`: how far round to spread the copies, in degrees. Default 360. |
-| `rotateCopies` | `circular`: whether each copy turns to follow the ring. On by default. |
+| `rotateCopies` | `circular`: whether each copy turns to follow the ring. Default true. |
 
 The step is centre to centre because that is what a hole pitch is: "eight at 20mm" is unambiguous, where "eight with 20mm between them" depends on how wide they are.
 
@@ -670,15 +670,19 @@ A **full turn divides by the count**, so eight copies land every 45 degrees and 
 
 `rotateCopies` matters more than it looks. A bolt hole does not care which way round it is; a spoke, a tooth or a vane does, and without it they all point the way the original did, which reads as a mistake rather than a pattern. The ring turns about its centre, so each copy keeps its distance from it.
 
-A row with no step and a ring with no sweep are both `422`: every copy would land on top of the original, and a reply saying it added shapes you cannot see is worse than a refusal.
+The count is an integer from 2 to 200; omitted count defaults to 4, and omitted kind defaults to `linear`. The response is `201` with the number created, selected kind, shape summaries, and new project revision. Invalid option types, fractional counts, or a count outside the range return `400`; a row with no step and a ring with no sweep are both `422`: every copy would land on top of the original, and a reply saying it added shapes you cannot see is worse than a refusal.
 
 ### When they refuse
 
 | Status | When |
 | --- | --- |
-| `400` | No `ids`, an `axis` or `target` that is not one of the listed words, a `count` outside 2-200, or a non-numeric step. |
-| `404` | No such project, or an id that is not in it -- and the message names which ids. |
-| `422` | Fewer shapes than the operation needs (two to align, three to distribute, one to repeat), nothing to spread along, or a pattern with no step. |
+| `400` | Missing or invalid `ids`, a kind outside `linear`/`circular`, a count outside 2-200 or not an integer, non-finite numeric options, or a non-boolean `rotateCopies`. |
+| `401` | The API token is missing or invalid. |
+| `404` | No such project or a shape ID that is not in it; the error identifies missing shapes. |
+| `409` | The project is being written by another request. |
+| `422` | A row has no non-zero step or a ring has a zero sweep, so copies would overlap the original. |
+| `500` | An unexpected server error occurred or the handler returned a response outside its contract. |
+| `503` | Project storage is not configured. |
 
 ## Importing a model file
 

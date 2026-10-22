@@ -150,6 +150,26 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(mirrorBody.properties.ids.oneOf.length, 2);
   assert.deepEqual(mirrors.responses["200"].content["application/json"].schema.required, ["moved", "axis", "shapes", "revision"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "mirrorShapes"), false);
+  const patterns = spec.paths["/api/v1/patterns"].post;
+  assert.equal(patterns.operationId, "patternShapes");
+  assert.deepEqual(Object.keys(patterns.responses).sort(), ["201", "400", "401", "404", "409", "422", "500", "503"]);
+  const patternBody = patterns.requestBody.content["application/json"].schema;
+  assert.deepEqual(patternBody.required, ["ids"]);
+  assert.deepEqual(patternBody.properties.kind.enum, ["linear", "circular"]);
+  assert.equal(patternBody.properties.count.default, 4);
+  assert.equal(patternBody.properties.count.minimum, 2);
+  assert.equal(patternBody.properties.count.maximum, 200);
+  assert.equal(patternBody.properties.stepX.default, 0);
+  assert.equal(patternBody.properties.stepZ.default, 0);
+  assert.equal(patternBody.properties.centerX.default, 0);
+  assert.equal(patternBody.properties.centerZ.default, 0);
+  assert.equal(patternBody.properties.sweepAngle.default, 360);
+  assert.equal(patternBody.properties.rotateCopies.default, true);
+  assert.deepEqual(patterns.responses["201"].content["application/json"].schema.required, ["created", "kind", "shapes", "revision"]);
+  assert.deepEqual(patterns.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
+  assert.deepEqual(patterns.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy"]);
+  assert.deepEqual(patterns.responses["422"].content["application/json"].schema.properties.code.enum, ["invalid_request"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "patternShapes"), false);
   for (const [pathName, method, operationId] of [
     ["/api/v1/booleans", "post", "booleanShapes"],
     ["/api/v1/treatments", "post", "treatShape"],
@@ -162,8 +182,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 23);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 9);
+  assert.equal(documentedOperationCount, 24);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 8);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

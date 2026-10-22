@@ -11,18 +11,19 @@ owner: "Contributors"
 
 ## Unreleased
 
+- `POST /patterns` now validates normalized IDs, defaults, integral count limits,
+  finite numeric options, its 201 shape-summary response, and reachable errors.
+  The generated OpenAPI subset now covers 24 of 32 registered operations; 8
+  remain omitted.
 - `POST /mirrors` now validates normalized shape IDs, principal-axis selection,
   shape-summary responses, and reachable error responses at the route boundary.
-  The generated OpenAPI subset now covers 23 of 32 registered operations; 9
-  remain omitted.
 - A sketch extrusion with a retained prism draft can now take one all-edge fillet or symmetric 45° chamfer. Source-profile and draft-angle edits rebuild the extrusion, reapply its prism draft, then replay the treatment; attempts to add the draft after a treatment remain refused.
 - `PATCH /shapes` can retain one face draft on a sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve through the `faceDraft` value. For eligible revolves, `GET /faces?topology=exact` lists analytic B-rep faces; the default mesh listing and its compatibility indexes remain unchanged. The selected source face is referenced by stable face ID and uniquely matched planar normal during source-profile edits; `.skf` round trips preserve the draft, its source frame, and a resized revolve's scale. Ambiguous or missing matches and ineffective dependent booleans fail atomically. Partial, helical, and multi-region revolve drafts are refused. A plain single-region full-turn sketch revolve can now take one symmetric 45° all-edge chamfer or one all-edge fillet after the face draft; source-profile and revolve-setting edits replay the source, draft, then treatment atomically. Other face-draft combinations remain refused. A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer; adding a prism draft after a treatment remains refused, and shelling is refused when persisted draft or treatment metadata exists. The editor's arbitrary-shape draft remains baked.
 - `POST /groups` and `DELETE /groups` now have runtime-validated request and
   response contracts in generated OpenAPI, including shape summaries and
   validation/engine error responses.
 - `POST /api/v1/parts` now has a runtime-validated contract for trimmed target
-  IDs, split shape summaries, and documented refusal responses. The generated
-  OpenAPI subset covers 22 of 32 registered operations; 10 remain omitted.
+  IDs, split shape summaries, and documented refusal responses.
 - Editing the source profile of a retained sketch extrusion, sweep, or revolve now replays one persisted all-edge fillet or symmetric 45° all-edge chamfer against rebuilt topology instead of carrying stale edge indexes. The engine refreshes treatment history and eligible-edge counts; revolve chamfers require a plain full turn with one closed profile region. Revolve setting edits also replay treatments, and the change is rejected without writing the project if the new geometry cannot accept them. Selected-edge treatments, non-45° chamfers, multiple treatment steps, adding a prism draft after a treatment, and draft/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported.
 - Sketch constraints can now keep two selected segments parallel. The bounded solver projects their directions during point edits, the inspector includes the relation in its local degree-of-freedom estimate, and `.skf` persistence plus the TypeScript sketch-profile type retain it. Parallel does not constrain the segments' offset; broader constraint solving remains local and bounded.
 - `GET /thickness` and `POST /interference` have runtime-validated request and
