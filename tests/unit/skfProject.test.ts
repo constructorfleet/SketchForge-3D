@@ -130,6 +130,32 @@ describe("SketchForge .skf project packages", () => {
     expect(restoredRevolve.shapes[0]?.faceDraft).toEqual(draftedRevolve.faceDraft);
     expect(restoredRevolve.shapes[0]?.faceDraftSourceScale).toEqual(draftedRevolve.faceDraftSourceScale);
 
+    const chamfer = { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 16, allEdges: true as const };
+    const draftedChamferRevolve = shape("mesh", "drafted-chamfer-revolve", {
+      ...draftedRevolve,
+      id: "drafted-chamfer-revolve",
+      edgeTreatments: [chamfer],
+      edgeTreatmentHistory: [{ id: "drafted-chamfer-history", createdAt: 1, feature: chamfer, before: draftedRevolve }],
+    });
+    const draftedChamferArchive = await exportSkfProject(input([draftedChamferRevolve]));
+    const restoredDraftedChamfer = await importSkfProject(draftedChamferArchive);
+    expect(restoredDraftedChamfer.shapes[0]?.faceDraft).toEqual(draftedRevolve.faceDraft);
+    expect(restoredDraftedChamfer.shapes[0]?.edgeTreatments).toEqual([chamfer]);
+    expect(restoredDraftedChamfer.shapes[0]?.edgeTreatmentHistory?.[0]?.before.faceDraft).toEqual(draftedRevolve.faceDraft);
+    const { document: draftedChamferDocument } = packageDocument(draftedChamferArchive);
+    const faceDraftFeature = draftedChamferDocument.features.find((feature) => feature.type === "face-draft");
+    const chamferFeature = draftedChamferDocument.features.find((feature) => feature.type === "chamfer");
+    expect(chamferFeature?.dependsOnFeatureIds).toContain(faceDraftFeature?.id);
+
+    const tolerantChamfer = { ...chamfer, chamferAngle: 45.0005 };
+    const tolerantArchive = await exportSkfProject(input([shape("mesh", "tolerant-draft-chamfer", {
+      ...draftedRevolve,
+      id: "tolerant-draft-chamfer",
+      edgeTreatments: [tolerantChamfer],
+      edgeTreatmentHistory: [{ id: "tolerant-draft-chamfer-history", createdAt: 1, feature: tolerantChamfer, before: draftedRevolve }],
+    })]));
+    await expect(importSkfProject(tolerantArchive)).resolves.toBeDefined();
+
     const edgeHistoryArchive = mutateProject(validArchive, (document) => {
       const node = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((entry) => entry.objectId === draftedExtrusion.id);
       expect(node).toBeDefined();

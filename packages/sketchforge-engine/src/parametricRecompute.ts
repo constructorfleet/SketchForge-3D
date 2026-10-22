@@ -32,11 +32,26 @@ export async function replaySingleAllEdgeTreatment(
   const features = original.edgeTreatments ?? [];
   const history = original.edgeTreatmentHistory ?? [];
   if (features.length === 0 && history.length === 0) return rebuilt;
-  if (original.faceDraft !== undefined) {
-    throw new Error("A face draft cannot yet be recomputed with an edge treatment safely.");
-  }
   const feature = features[0];
   const historyFeature = history[0]?.feature;
+  const revolveSettings = original.sketchRevolve;
+  const supportedFaceDraftChamfer = original.faceDraft !== undefined
+    && original.sketchOperation === "revolve"
+    && revolveSettings !== undefined
+    && Math.abs(Math.abs(revolveSettings.sweepAngle) - 360) < 1e-6
+    && (revolveSettings.pitch ?? 0) === 0
+    && (revolveSettings.coreRadius ?? 0) === 0
+    && features.length === 1
+    && history.length === 1
+    && feature?.kind === "chamfer"
+    && historyFeature?.kind === "chamfer"
+    && feature.allEdges === true
+    && historyFeature.allEdges === true
+    && Math.abs((feature.chamferAngle ?? 45) - 45) < 0.001
+    && Math.abs((historyFeature.chamferAngle ?? 45) - 45) < 0.001;
+  if (original.faceDraft !== undefined && !supportedFaceDraftChamfer) {
+    throw new Error("A face draft can only replay one symmetric all-edge chamfer on a plain full-turn revolve.");
+  }
   if (features.length !== 1 || history.length !== 1
     || !feature || !historyFeature
     || feature.allEdges !== true || historyFeature.allEdges !== true

@@ -681,7 +681,7 @@ export function createEngine(store: ProjectStore): Engine {
   async function cadTreatment(
     projectId: string,
     shapeId: string,
-    operation: "edge-treatment" | "all-edge-treatment" | "prism-draft" | "shell",
+    operation: "edge-treatment" | "all-edge-treatment" | "all-edge-chamfer-treatment" | "prism-draft" | "shell",
     run: (shape: WorkplaneShape) => Promise<WorkplaneShape>,
   ): Promise<EngineResult<ShapeWritten>> {
     return mutating(projectId, async (document) => {
@@ -691,20 +691,25 @@ export function createEngine(store: ProjectStore): Engine {
       const hasEdgeTreatments = (found.value.edgeTreatments?.length ?? 0) > 0
         || (found.value.edgeTreatmentHistory?.length ?? 0) > 0;
       const hasDraftPrism = found.value.draftPrismAngle !== undefined;
-      const replayableDraftTreatment = operation === "all-edge-treatment"
+      const replayablePrismTreatment = (operation === "all-edge-treatment" || operation === "all-edge-chamfer-treatment")
         && !hasEdgeTreatments
         && found.value.sketchOperation === "extrude"
         && Boolean(found.value.sketchProfile)
         && hasDraftPrism;
-      const incompatible = found.value.faceDraft !== undefined
+      const replayableFaceDraftTreatment = operation === "all-edge-chamfer-treatment"
+        && !hasEdgeTreatments
+        && found.value.faceDraft !== undefined
+        && isPlainFullTurnSketchRevolve(found.value);
+      const incompatible = found.value.faceDraft !== undefined && !replayableFaceDraftTreatment
         || operation === "edge-treatment" && hasDraftPrism
-        || operation === "all-edge-treatment" && hasDraftPrism && !replayableDraftTreatment
+        || (operation === "all-edge-treatment" || operation === "all-edge-chamfer-treatment")
+          && hasDraftPrism && !replayablePrismTreatment
         || operation === "prism-draft" && hasEdgeTreatments
         || operation === "shell" && (found.value.draftPrismAngle !== undefined || hasEdgeTreatments);
       if (incompatible) {
         return failed({
           reason: "cad_refused",
-          message: "Face drafts cannot be combined with edge treatments, prism drafts, or shelling. Draft prisms only support one all-edge treatment on a retained sketch extrusion; shelling cannot be combined with persisted draft or treatment features.",
+          message: "Face drafts support one symmetric all-edge chamfer only on a plain full-turn sketch revolve; prism drafts support one all-edge treatment only on a sketch extrusion. Other draft and treatment combinations, and shelling with persisted features, are refused.",
           status: 422,
         });
       }
@@ -843,10 +848,23 @@ export function createEngine(store: ProjectStore): Engine {
         && !isSketchExtrusion && !isSketchSweep && !isExactSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
       }
+      const hasExistingTreatment = (existing.edgeTreatments?.length ?? 0) > 0
+        || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+      const canReplayFaceDraftChamfer = existing.faceDraft !== undefined
+        && !faceDraftChanged
+        && existing.draftPrismAngle === undefined
+        && isPlainFullTurnSketchRevolve(existing)
+        && existing.edgeTreatments?.length === 1
+        && existing.edgeTreatments[0]?.kind === "chamfer"
+        && existing.edgeTreatments[0]?.allEdges === true
+        && Math.abs((existing.edgeTreatments[0].chamferAngle ?? 45) - 45) < 0.001
+        && existing.edgeTreatmentHistory?.length === 1
+        && existing.edgeTreatmentHistory[0]?.feature.kind === "chamfer"
+        && existing.edgeTreatmentHistory[0]?.feature.allEdges === true
+        && Math.abs((existing.edgeTreatmentHistory[0].feature.chamferAngle ?? 45) - 45) < 0.001;
       if (requestedFaceDraft
-        && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0
-          || existing.draftPrismAngle !== undefined)) {
-        return failed({ reason: "invalid_shape_request", message: "Face drafts cannot be combined with prism drafts or edge treatments yet." });
+        && (existing.draftPrismAngle !== undefined || hasExistingTreatment && !canReplayFaceDraftChamfer)) {
+        return failed({ reason: "invalid_shape_request", message: "This face draft cannot be combined with the requested persisted draft or treatment history." });
       }
       if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
         && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
@@ -1105,6 +1123,7 @@ export function createEngine(store: ProjectStore): Engine {
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame ?? exactBase.cadBrepFrame,
               faceDraftSourceScale: sourceScale,
             };
+            swept = await replaySingleAllEdgeTreatment(existing, swept);
           } else {
             const clearedDraft = {
               ...rebuilt,
@@ -1490,12 +1509,15 @@ export function createEngine(store: ProjectStore): Engine {
       projectId,
       shapeId,
       (treatment.edges === undefined || treatment.edges.length === 0)
-        && (treatment.kind === "fillet" || treatment.angle === undefined || Math.abs(treatment.angle - 45) < 0.001)
-        ? "all-edge-treatment"
+        && treatment.kind === "chamfer" && (treatment.angle === undefined || Math.abs(treatment.angle - 45) < 0.001)
+        ? "all-edge-chamfer-treatment"
+        : (treatment.edges === undefined || treatment.edges.length === 0)
+          && treatment.kind === "fillet"
+          ? "all-edge-treatment"
         : "edge-treatment",
       async (shape) => {
         const treated = shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment));
-        if (shape.draftPrismAngle === undefined) return treated;
+        if (shape.draftPrismAngle === undefined && shape.faceDraft === undefined) return treated;
 
         const feature = {
           kind: treatment.kind,

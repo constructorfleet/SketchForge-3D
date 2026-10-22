@@ -781,6 +781,19 @@ function activeProjectIndexes(state: SkfStateV1) {
       });
       previous = featureId;
     }
+    const faceDraft = node.definition.faceDraft as Record<string, unknown> | undefined;
+    if (faceDraft) {
+      const featureId = `feature/${safeNodeToken(node.nodeId)}/face-draft`;
+      features.push({
+        id: featureId,
+        type: "face-draft",
+        outputObjectId: node.objectId,
+        inputObjectIds: [node.objectId],
+        dependsOnFeatureIds: previous ? [previous] : [],
+        parameters: { ...faceDraft },
+      });
+      previous = featureId;
+    }
     const treatments = Array.isArray(node.definition.edgeTreatments) ? node.definition.edgeTreatments as Array<Record<string, unknown>> : [];
     treatments.forEach((treatment, index) => {
       const type = treatment.kind === "fillet" ? "fillet" : "chamfer";
@@ -795,19 +808,6 @@ function activeProjectIndexes(state: SkfStateV1) {
       });
       previous = featureId;
     });
-    const faceDraft = node.definition.faceDraft as Record<string, unknown> | undefined;
-    if (faceDraft) {
-      const featureId = `feature/${safeNodeToken(node.nodeId)}/face-draft`;
-      features.push({
-        id: featureId,
-        type: "face-draft",
-        outputObjectId: node.objectId,
-        inputObjectIds: [node.objectId],
-        dependsOnFeatureIds: previous ? [previous] : [],
-        parameters: { ...faceDraft },
-      });
-      previous = featureId;
-    }
     if (node.definition.mirrorX || node.definition.mirrorY || node.definition.mirrorZ) {
       const featureId = `feature/${safeNodeToken(node.nodeId)}/mirror`;
       features.push({
@@ -1091,7 +1091,10 @@ function validateSketchProfile(value: unknown, label: string) {
 function validateShapeDefinition(
   definition: Record<string, unknown>,
   label: string,
-  options: { hasEdgeTreatmentHistory?: boolean } = {},
+  options: {
+    hasEdgeTreatmentHistory?: boolean;
+    edgeTreatmentHistory?: Array<{ feature: Record<string, unknown> }>;
+  } = {},
 ) {
   const id = stringValue(definition.id, `${label}.id`);
   stringValue(definition.name, `${label}.name`);
@@ -1163,6 +1166,35 @@ function validateShapeDefinition(
       && Math.abs(Math.abs(revolveSettings.sweepAngle) - 360) <= 1e-6
       && (revolveSettings.pitch === undefined || revolveSettings.pitch === 0)
       && (revolveSettings.coreRadius === undefined || revolveSettings.coreRadius === 0);
+    const treatments = Array.isArray(definition.edgeTreatments) ? definition.edgeTreatments : [];
+    const treatment = treatments[0] && typeof treatments[0] === "object" && !Array.isArray(treatments[0])
+      ? treatments[0] as Record<string, unknown>
+      : undefined;
+    const history = options.edgeTreatmentHistory ?? [];
+    const historyFeature = history[0]?.feature;
+    const isPersistedRevolveDraftChamfer = Boolean(
+      plainFullTurnRevolve
+      && definition.sketchProfile !== undefined
+      && cadSketchRegions(definition.sketchProfile as SketchProfile).length === 1
+      && definition.draftPrismAngle === undefined
+      && treatments.length === 1
+      && treatment?.kind === "chamfer"
+      && treatment.allEdges === true
+      && treatment.edges === undefined
+      && typeof treatment.chamferAngle === "number"
+      && Math.abs(treatment.chamferAngle - 45) < 0.001
+      && typeof treatment.amount === "number"
+      && Number.isFinite(treatment.amount)
+      && treatment.amount > 0
+      && Number.isInteger(treatment.edgeCount)
+      && (treatment.edgeCount as number) > 0
+      && history.length === 1
+      && historyFeature?.kind === treatment.kind
+      && historyFeature.allEdges === treatment.allEdges
+      && historyFeature.chamferAngle === treatment.chamferAngle
+      && historyFeature.amount === treatment.amount
+      && historyFeature.edgeCount === treatment.edgeCount
+    );
     if (
       kind !== "mesh"
       || (definition.sketchOperation !== "extrude" && definition.sketchOperation !== "sweep" && !plainFullTurnRevolve)
@@ -1170,8 +1202,7 @@ function validateShapeDefinition(
       || plainFullTurnRevolve && cadSketchRegions(definition.sketchProfile as SketchProfile).length !== 1
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
-      || (Array.isArray(definition.edgeTreatments) && definition.edgeTreatments.length > 0)
-      || options.hasEdgeTreatmentHistory
+      || (treatments.length > 0 || options.hasEdgeTreatmentHistory) && !isPersistedRevolveDraftChamfer
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }
@@ -1347,6 +1378,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       const definition = objectRecord(node.definition, `node '${nodeId}'.definition`);
       const objectId = validateShapeDefinition(definition, `node '${nodeId}'`, {
         hasEdgeTreatmentHistory: Boolean(node.edgeTreatmentHistory?.length),
+        edgeTreatmentHistory: node.edgeTreatmentHistory,
       });
       if (node.objectId !== objectId) throw new LocalizedError("errors.skf.nodeObjectIdMismatch", { id: nodeId });
       if (node.importedMesh) {
@@ -1689,6 +1721,7 @@ function validateLegacyRuntimeShape(shape: WorkplaneShape, label: string) {
   delete definition.cadBrep;
   validateShapeDefinition(definition, label, {
     hasEdgeTreatmentHistory: Array.isArray(edgeHistory) && edgeHistory.length > 0,
+    edgeTreatmentHistory: Array.isArray(edgeHistory) ? edgeHistory as Array<{ feature: Record<string, unknown> }> : undefined,
   });
   if (importedMesh) {
     const mesh = objectRecord(importedMesh, `${label}.importedMesh`);
