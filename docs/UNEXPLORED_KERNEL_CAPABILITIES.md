@@ -117,13 +117,18 @@ These are implemented and should not be filed as missing features:
   profile region; partial-turn, helical, and multi-region revolve chamfers are
   refused. Revolve setting edits also attempt replay and roll back if the new
   topology cannot accept the treatment. Selected-edge treatments, non-45°
-  chamfers, multiple treatment steps, draft/treatment combinations, and
-  treatments on other source operation types remain unsupported.
+  chamfers, multiple treatment steps, draft/treatment combinations outside
+  the supported order below, and treatments on other source operation types
+  remain unsupported. One retained
+  prism draft followed by one all-edge fillet or symmetric 45° chamfer is now
+  supported on a sketch extrusion; source-profile and draft-angle edits replay
+  the draft first and treatment second, refreshing history and eligible-edge
+  counts. Adding a prism draft after a treatment, selected-edge treatments,
+  multiple treatments, and combinations on other source kinds remain
+  unsupported.
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
-  not yet participate in a general recompute graph. A drafted extrusion with
-  edge treatments is conservatively refused on source or draft-angle edits
-  because those operation histories cannot yet be replayed in order.
+  not yet participate in a general recompute graph.
 - Coincident, horizontal, vertical, perpendicular, parallel, fixed-distance,
   and fixed-point sketch constraints are supported, including `.skf`
   persistence and TypeScript profile types. A fixed point anchors a sketch
@@ -180,9 +185,12 @@ matches the stored local normal;
 it refuses missing or ambiguous matches and prism-draft or edge-treatment
 combinations. Engine mutation APIs reject attempts to add an edge treatment,
 prism draft, or shell to an already face-drafted shape without writing the
-project. They also reject prism-draft and edge-treatment combinations in
-either mutation order, plus shelling when persisted draft or treatment metadata
-exists. Updating angle or axis keeps the same source face ID; clear the
+project. A retained prism draft on a sketch extrusion can be followed by one
+all-edge fillet or symmetric 45° chamfer; source-profile and draft-angle edits
+replay the draft before the treatment. Adding a prism draft after an edge
+treatment remains refused, as do selected-edge or multiple treatments on a
+drafted extrusion. Shelling remains refused when persisted draft or treatment
+metadata exists. Updating angle or axis keeps the same source face ID; clear the
 draft before selecting another face. This bounded support does not define
 semantic lineage across arbitrary topology changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The
