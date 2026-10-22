@@ -33,9 +33,11 @@ const ownerPages = [];
 const publicSourceScopes = [
   "apps/web/src/app/api/v1/**",
   "packages/sketchforge-client/src/**",
+  "packages/sketchforge-client/examples/**",
   "packages/sketchforge-client/mcp/**",
   "packages/sketchforge-engine/src/**",
   "packages/sketchforge-py/src/**",
+  "packages/sketchforge-py/examples/**",
 ];
 const markdownLink = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
 
