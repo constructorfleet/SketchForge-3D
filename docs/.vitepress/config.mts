@@ -74,6 +74,7 @@ const config = defineConfig({
           { text: "CLI commands", link: "/docs/CLI_REFERENCE" },
           { text: ".skf file format", link: "/docs/SKF_FORMAT_REFERENCE" },
           { text: "Operator configuration", link: "/docs/OPERATOR_CONFIGURATION" },
+          { text: "Client configuration", link: "/docs/guides/client-configuration" },
           { text: "MCP tools", link: "/docs/mcp/TOOLS_REFERENCE" },
         ],
       },

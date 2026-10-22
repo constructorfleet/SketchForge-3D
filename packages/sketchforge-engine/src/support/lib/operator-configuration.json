@@ -68,7 +68,9 @@
       "sensitive": false,
       "subsystem": "Server project storage and REST API",
       "source": "../apps/web/src/lib/serverProjectStore.ts",
-      "ownerPage": "guides/deployment.md#server-backed-projects"
+      "ownerPage": "guides/deployment.md#server-backed-projects",
+      "additionalOwnerPages": ["guides/client-configuration.md#local-mcp-project-storage"],
+      "additionalSources": ["../packages/sketchforge-client/mcp/localEngine.mjs", "../packages/sketchforge-client/mcp/localMacroRunner.mjs"]
     },
     {
       "name": "SKETCHFORGE_API_TOKEN",
@@ -78,7 +80,9 @@
       "sensitive": true,
       "subsystem": "REST API authentication",
       "source": "../apps/web/src/lib/apiTokens.ts",
-      "ownerPage": "guides/deployment.md#rest-api-access"
+      "ownerPage": "guides/deployment.md#rest-api-access",
+      "additionalOwnerPages": ["guides/client-configuration.md#typescript-and-python-api-clients"],
+      "additionalSources": ["../packages/sketchforge-client/src/environment.ts", "../packages/sketchforge-py/src/sketchforge3d/environment.py", "../packages/sketchforge-client/mcp/server.mjs"]
     },
     {
       "name": "SKETCHFORGE_SHARED_PROJECTS_DIR",
@@ -149,6 +153,68 @@
       "subsystem": "Server-triggered updates",
       "source": "../apps/web/src/app/api/app-update/route.ts",
       "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
+    },
+    {
+      "name": "SKETCHFORGE_URL",
+      "default": "http://127.0.0.1:3000",
+      "required": false,
+      "validation": "Base URL of the SketchForge server. The TypeScript and Python macro clients use this when no explicit client option overrides it.",
+      "sensitive": false,
+      "subsystem": "TypeScript and Python API clients",
+      "source": "../packages/sketchforge-client/src/environment.ts",
+      "additionalSources": ["../packages/sketchforge-py/src/sketchforge3d/environment.py"],
+      "ownerPage": "guides/client-configuration.md#typescript-and-python-api-clients"
+    },
+    {
+      "name": "SKETCHFORGE_PROJECT_ID",
+      "default": "Unset; a target macro must receive a project id explicitly or fail.",
+      "required": false,
+      "validation": "Project identifier used by macros whose project mode is `target`; `--project` or an explicit macro option takes precedence.",
+      "sensitive": false,
+      "subsystem": "TypeScript and Python macro clients",
+      "source": "../packages/sketchforge-client/src/environment.ts",
+      "additionalSources": ["../packages/sketchforge-py/src/sketchforge3d/environment.py"],
+      "ownerPage": "guides/client-configuration.md#typescript-and-python-api-clients"
+    },
+    {
+      "name": "SKETCHFORGE_MACRO_DIR",
+      "default": "Unset; MCP macro listing and execution are disabled.",
+      "required": false,
+      "validation": "Path to a directory of reviewed `.mjs`, `.js`, or `.py` macro files exposed by the MCP macro tools.",
+      "sensitive": false,
+      "subsystem": "MCP macro discovery and execution",
+      "source": "../packages/sketchforge-client/mcp/macroTools.mjs",
+      "ownerPage": "guides/client-configuration.md#mcp-macro-execution"
+    },
+    {
+      "name": "SKETCHFORGE_MACRO_TIMEOUT_MS",
+      "default": "120000 milliseconds",
+      "required": false,
+      "validation": "Positive number of milliseconds before an MCP macro process is stopped; invalid or non-positive values use the default. A per-call `timeoutMs` overrides it.",
+      "sensitive": false,
+      "subsystem": "MCP macro execution",
+      "source": "../packages/sketchforge-client/mcp/macroTools.mjs",
+      "ownerPage": "guides/client-configuration.md#mcp-macro-execution"
+    },
+    {
+      "name": "SKETCHFORGE_MACRO_PYTHON",
+      "default": "python3",
+      "required": false,
+      "validation": "Executable used to inspect and run Python macros through the MCP bridge. It must be available to the MCP process.",
+      "sensitive": false,
+      "subsystem": "MCP Python macro execution",
+      "source": "../packages/sketchforge-client/mcp/macroTools.mjs",
+      "ownerPage": "guides/client-configuration.md#mcp-macro-execution"
+    },
+    {
+      "name": "SKETCHFORGE_MACRO_RUNNER_JS",
+      "default": "The JavaScript macro runner bundled with `@constructorfleet/sketchforge3d`.",
+      "required": false,
+      "validation": "Optional path to an installed `sketchforge-macro` runner used instead of the package-bundled runner.",
+      "sensitive": false,
+      "subsystem": "MCP JavaScript macro execution",
+      "source": "../packages/sketchforge-client/mcp/macroTools.mjs",
+      "ownerPage": "guides/client-configuration.md#mcp-macro-execution"
     }
   ]
 }
