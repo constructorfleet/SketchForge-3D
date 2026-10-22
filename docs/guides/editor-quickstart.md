@@ -10,6 +10,7 @@ owner: Editor
 This walkthrough creates a block from a rectangle, confirms that the project reopens with its model, and downloads an editable SketchForge project. It uses the editor's visible controls and the default sketch extrusion settings.
 
 For a follow-on task that edits the extrusion sketch before saving and exporting, see [create, edit, save, and export a model](./edit-and-export-model.md).
+To constrain sketch geometry while editing, see [constrain sketch geometry](./sketch-constraints.md).
 
 ## 1. Create a project
 
