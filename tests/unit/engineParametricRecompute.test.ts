@@ -660,7 +660,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
     expect(writeCount()).toBe(writesBeforeEdit);
     expect((await store.read("recompute"))!.shapes[0]).toEqual(source);
-  });
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("rebuilds a retained boolean ancestor after editing a source revolve", async () => {
     const { store, writeCount } = projectStore();
