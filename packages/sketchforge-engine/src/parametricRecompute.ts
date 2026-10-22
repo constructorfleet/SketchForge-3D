@@ -56,26 +56,30 @@ export async function replaySingleAllEdgeTreatment(
     && extrusionRegions.length === 1
     && extrusionRegions[0]?.holes.length === 0
     && feature?.kind === "fillet";
-  let supportedFaceDraftSweepFillet = false;
-  if (original.sketchOperation === "sweep" && original.sketchProfile && feature?.kind === "fillet") {
+  let supportedFaceDraftSweep = false;
+  if (original.sketchOperation === "sweep" && original.sketchProfile) {
     try {
       const { sections, spine } = cadSketchSweepPaths(original.sketchProfile);
-      supportedFaceDraftSweepFillet = sections.length === 1 && sections[0]?.holes.length === 0 && spine.steps.length > 0;
+      supportedFaceDraftSweep = sections.length === 1 && sections[0]?.holes.length === 0 && spine.steps.length > 0;
     } catch {
-      supportedFaceDraftSweepFillet = false;
+      supportedFaceDraftSweep = false;
     }
   }
+  const supportedFaceDraftTreatmentKind = feature?.kind === "fillet"
+    && supportedFaceDraftExtrusionFillet
+    || (feature?.kind === "fillet" || feature?.kind === "chamfer")
+      && (supportedFaceDraftRevolve || supportedFaceDraftSweep);
   const supportedFaceDraftTreatment = original.faceDraft !== undefined
     && features.length === 1
     && history.length === 1
     && historyFeature?.kind === feature?.kind
     && feature?.allEdges === true
     && historyFeature.allEdges === true
-    && (supportedFaceDraftRevolve || supportedFaceDraftExtrusionFillet || supportedFaceDraftSweepFillet)
+    && supportedFaceDraftTreatmentKind
     && (feature.kind !== "chamfer" || Math.abs((feature.chamferAngle ?? 45) - 45) < 0.001)
     && (historyFeature.kind !== "chamfer" || Math.abs((historyFeature.chamferAngle ?? 45) - 45) < 0.001);
   if (original.faceDraft !== undefined && !supportedFaceDraftTreatment) {
-    throw new Error("A face draft can replay one all-edge fillet on a single-loop sketch extrusion or single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
+    throw new Error("A face draft can replay one all-edge fillet on a single-loop sketch extrusion, one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
   }
   if (features.length !== 1 || history.length !== 1
     || !feature || !historyFeature

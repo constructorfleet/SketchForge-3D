@@ -1218,32 +1218,35 @@ function validateShapeDefinition(
       && historyFeature.amount === treatment.amount
       && historyFeature.edgeCount === treatment.edgeCount
     );
-    let isPersistedSweepDraftFillet = false;
+    let isPersistedSweepDraftTreatment = false;
     if (definition.sketchOperation === "sweep" && definition.sketchProfile !== undefined) {
       try {
         const { sections, spine } = cadSketchSweepPaths(definition.sketchProfile as SketchProfile);
-        isPersistedSweepDraftFillet = Boolean(
+        isPersistedSweepDraftTreatment = Boolean(
           sections.length === 1
           && sections[0]?.holes.length === 0
           && spine.steps.length > 0
           && definition.draftPrismAngle === undefined
           && treatments.length === 1
-          && treatment?.kind === "fillet"
+          && (treatment?.kind === "fillet" || treatment?.kind === "chamfer")
           && treatment.allEdges === true
           && treatment.edges === undefined
+          && (treatment.kind === "fillet"
+            || typeof treatment.chamferAngle === "number" && Math.abs(treatment.chamferAngle - 45) < 0.001)
           && typeof treatment.amount === "number"
           && Number.isFinite(treatment.amount)
           && treatment.amount > 0
           && Number.isInteger(treatment.edgeCount)
           && (treatment.edgeCount as number) > 0
           && history.length === 1
-          && historyFeature?.kind === "fillet"
+          && historyFeature?.kind === treatment.kind
           && historyFeature.allEdges === true
+          && (treatment.kind === "fillet" || historyFeature.chamferAngle === treatment.chamferAngle)
           && historyFeature.amount === treatment.amount
           && historyFeature.edgeCount === treatment.edgeCount
         );
       } catch {
-        isPersistedSweepDraftFillet = false;
+        isPersistedSweepDraftTreatment = false;
       }
     }
     if (
@@ -1254,7 +1257,7 @@ function validateShapeDefinition(
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
       || (treatments.length > 0 || options.hasEdgeTreatmentHistory)
-        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet && !isPersistedSweepDraftFillet
+        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet && !isPersistedSweepDraftTreatment
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }
