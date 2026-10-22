@@ -1,6 +1,7 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
+import { withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { IMPORTABLE_MESH_FORMATS } from "@/lib/engine/meshImport";
 
 export const runtime = "nodejs";
@@ -74,7 +75,7 @@ async function uploadFrom(request: Request): Promise<Upload | string> {
  * and for an STL it decides which way is up, because SketchForge's own older
  * exports are Y-up and are recognised by their header.
  */
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -94,3 +95,5 @@ export async function POST(request: Request) {
     revision: imported.value.revision,
   }, 201);
 }
+
+export const POST = withApiV1Contract("POST /api/v1/imports", handlePost);
