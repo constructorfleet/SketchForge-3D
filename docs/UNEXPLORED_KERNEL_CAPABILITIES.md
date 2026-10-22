@@ -193,9 +193,11 @@ or one all-edge fillet may follow a face draft only on a plain single-region
 full-turn sketch revolve; profile or setting edits replay the revolve, face
 draft, then treatment atomically and refresh treatment history and eligible-edge
 counts. `.skf` round trips preserve this supported sequence and allow replay
-after import. Face drafts still cannot combine with prism drafts or shelling,
-and other face-draft / treatment sequences remain refused. A retained prism draft on a sketch
-extrusion can be followed by one all-edge fillet or symmetric 45° chamfer;
+after import. Face drafts remain incompatible with prism drafts and shelling.
+Edge treatments are supported only in the explicitly bounded full-turn revolve
+sequence above; other face-draft / treatment sequences remain refused. A
+retained prism draft on a sketch extrusion can be followed by one all-edge
+fillet or symmetric 45° chamfer;
 source-profile and draft-angle edits replay the draft before the treatment.
 Adding a prism draft after an edge treatment remains refused, as do
 selected-edge or multiple treatments on a drafted extrusion. Shelling remains
@@ -257,6 +259,7 @@ placement remain open.
 Focused coverage includes retained face-draft creation, `.skf` round trip,
 source-profile replay, missing-match rollback, and dependent-boolean rollback
 (`tests/unit/engineParametricRecompute.test.ts`,
+`tests/unit/faceDraftFilletGroupRecompute.test.ts`,
 `tests/unit/faceDraftChamferRecompute.test.ts`,
 `tests/unit/faceDraftFilletRecompute.test.ts`,
 `tests/unit/apiV1ShapeRoundTrip.test.ts`), sweep creation and profile rebuilding
