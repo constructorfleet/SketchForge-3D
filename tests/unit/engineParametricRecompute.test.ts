@@ -723,6 +723,54 @@ describe("dependency-ordered feature recomputation", () => {
     expect(beforeEdit.shapes[0]?.id).toBe(cut.id);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("replays a retained face draft inside a boolean group after a profile edit", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const hole = await sketchExtrusionShapeFromRequest({
+      id: "drafted-hole", sketchSourceId: "sketch/drafted-hole", name: "Drafted hole",
+      profile: extrusionProfile(0.5), height: 3, hole: true,
+    });
+    const target = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Target", width: 10, depth: 10, height: 3 },
+    ])).shapes[0]!;
+    document.shapes.push(hole);
+    const cut = value(await engine.cut("recompute", { solidIds: [target.id], holeIds: [hole.id] })).shape;
+    const groupedHole = cut.groupedShapes!.find((shape) => shape.sketchSourceId === hole.sketchSourceId)!;
+    const selected = (await shapeFaces(groupedHole)).find((face) => face.normal && face.normal.x > 0.99)!;
+    const draft = { sourceFaceId: selected.id, angle: 5, pullDirection: "z" as const };
+    const created = await engine.changeShape("recompute", hole.sketchSourceId!, { faceDraft: draft });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    const beforeArchive = await store.read("recompute");
+    const restored = await importSkfProject(await exportSkfProject({ ...beforeArchive!, modifiedAt: 1 }));
+    document.shapes = restored.shapes;
+    const restoredGroup = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    const restoredHole = restoredGroup.groupedShapes!.find((shape) => shape.sketchSourceId === hole.sketchSourceId)!;
+    expect(restoredHole.id).toBe(groupedHole.id);
+    expect(restoredHole.faceDraft).toMatchObject(draft);
+    const beforeEdit = value(await engine.project("recompute"));
+    const beforeGroup = beforeEdit.shapes.find((shape) => shape.id === cut.id)!;
+    const writesBeforeEdit = writeCount();
+    const sourceProfile = extrusionProfile(0.5);
+    const editedProfile = {
+      ...sourceProfile,
+      points: sourceProfile.points.map((point) => ({ ...point, x: point.x * 1.2 })),
+    };
+
+    const changed = await engine.changeShape("recompute", hole.sketchSourceId!, { sketchProfile: editedProfile });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(value(changed).shape).toMatchObject({
+      id: restoredHole.id, sketchSourceId: restoredHole.sketchSourceId, sketchProfile: editedProfile, faceDraft: draft,
+    });
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+    const afterGroup = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    expect(afterGroup.id).toBe(beforeGroup.id);
+    expect(afterGroup.cadBrep).not.toBe(beforeGroup.cadBrep);
+    expect(afterGroup.groupedShapes?.find((shape) => shape.id === restoredHole.id)).toMatchObject({
+      sketchProfile: editedProfile, faceDraft: draft,
+    });
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("rebuilds a persisted sketch revolve from an edited source profile", async () => {
     const { store } = projectStore();
     const engine = createEngine(store);
