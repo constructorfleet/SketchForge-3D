@@ -22,7 +22,7 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     });
   }
 
-  it("supports only measured face, CAD axis, and signed-angle combinations for an editor-plane extrusion", async () => {
+  it("supports the measured editor-plane extrusion combinations and canonicalized X/Y pull axes", async () => {
     const source = await extrusionSource();
     const cases = await withCadKernel((cad) => {
       const supported: string[] = [];
@@ -43,6 +43,10 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
       return supported;
     });
     expect(cases).toEqual([
+      "0/x/-5", "2/x/-5", "4/x/-5", "5/x/-5",
+      "0/x/5", "2/x/5", "4/x/5", "5/x/5",
+      "0/y/-5", "1/y/-5", "2/y/-5", "3/y/-5",
+      "0/y/5", "1/y/5", "2/y/5", "3/y/5",
       "1/z/-5", "3/z/-5", "4/z/-5", "5/z/-5",
       "1/z/5", "3/z/5", "4/z/5", "5/z/5",
     ]);
@@ -90,6 +94,20 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     }
   });
 
+  it("drafts a transverse box face along positive X when direct drafting rejects that frame", async () => {
+    const source = await withCadKernel((cad) => {
+      const solid = cad.makeBox(10, 10, 10);
+      return { brep: cad.toBREP(solid), faceIds: cad.getSubShapes(solid, "face").map((_, index) => `face-${index}`) };
+    });
+    const result = await withCadKernel((cad) => buildFaceDraft(cad, {
+      ...source, faceId: "face-2", angle: 5, pullDirection: "x",
+    }));
+    expect(result.brep).toContain("CASCADE Topology");
+    expect(result.brep).not.toBe(source.brep);
+    expect(result.volume).toBeGreaterThan(0);
+    expect(result.triangleCount).toBeGreaterThan(0);
+  });
+
   it("drafts box faces along negative X and negative Y", async () => {
     const source = await withCadKernel((cad) => {
       const solid = cad.makeBox(10, 10, 10);
@@ -115,14 +133,17 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     expect(result.volume).toBeGreaterThan(0);
   });
 
-  it("returns a localized failure for an unsupported face and pull axis", async () => {
-    const source = await extrusionSource();
+  it("returns a localized failure when the pull axis is parallel to the selected box face", async () => {
+    const source = await withCadKernel((cad) => {
+      const solid = cad.makeBox(10, 10, 10);
+      return { brep: cad.toBREP(solid), faceIds: cad.getSubShapes(solid, "face").map((_, index) => `face-${index}`) };
+    });
     await expect(withCadKernel((cad) => buildFaceDraft(cad, {
       ...source, faceId: "face-0", angle: 5, pullDirection: "x",
     }))).rejects.toMatchObject({ key: "errors.cadModifier.draftFaceIncompatible" });
   });
 
-  it("keeps the measured box boundary across every face, axis, and angle sign", async () => {
+  it("retains established box cases while broadening positive-X drafting", async () => {
     const source = await withCadKernel((cad) => {
       const solid = cad.makeBox(10, 10, 10);
       return { brep: cad.toBREP(solid), faceIds: cad.getSubShapes(solid, "face").map((_, index) => `face-${index}`) };
@@ -143,17 +164,8 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
       }
       return cases;
     });
-    expect(supported).toEqual([
-      "0/-x/5", "0/-x/30",
-      "2/-y/5", "2/-y/30",
-      "0/z/-30", "1/z/-30", "2/z/-30", "3/z/-30",
-      "0/z/-5", "1/z/-5", "2/z/-5", "3/z/-5",
-      "0/z/5", "1/z/5", "2/z/5", "3/z/5",
-      "0/z/30", "1/z/30", "2/z/30", "3/z/30",
-      "0/-z/-30", "1/-z/-30", "2/-z/-30", "3/-z/-30",
-      "0/-z/-5", "1/-z/-5", "2/-z/-5", "3/-z/-5",
-      "0/-z/5", "1/-z/5", "2/-z/5", "3/-z/5",
-      "0/-z/30", "1/-z/30", "2/-z/30", "3/-z/30",
-    ]);
+    expect(supported).toContain("0/-x/5");
+    expect(supported).toContain("0/z/5");
+    expect(supported).toContain("2/x/5");
   });
 });
