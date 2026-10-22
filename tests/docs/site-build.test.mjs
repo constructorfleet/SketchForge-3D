@@ -122,7 +122,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /drift alone does not fail the docs build/i);
   assert.match(spec, /22 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
-  assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, TypeScript client source and MCP trees, engine source, and Python client source/i);
+  assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, the REST guide's included `docs\/examples\/rest-hole-plate\.mjs` fixture, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
   assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
@@ -153,7 +153,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /Exemptions do not\s+establish execution coverage[\s\S]*?other fence languages[\s\S]*?not covered/i);
   assert.doesNotMatch(migration, /Remaining work is to require every runnable example to come from source and\s+execute in CI; add\s+consistent page audience\/owner metadata/i);
   assert.match(migration, /Changed-source ownership diagnostics cover selected source trees/i);
-  assert.match(migration, /mapping is path-based and is not symbol-level or complete/i);
+  assert.match(migration, /mapping\s+is path-based and is not symbol-level or complete/i);
   assert.match(migration, /The OpenAPI JSON is linked directly from\s+`docs\/REST_API\.md`/i);
   assert.match(migration, /On pull requests, docs CI generates references before\s+verification and site build/i);
   assert.match(migration, /trusted\s+default-branch follow-up validates the artifact and PR before committing only\s+allowlisted updates to same-repository PR branches/i);

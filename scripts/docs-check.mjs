@@ -31,6 +31,7 @@ const pageSlugs = new Map();
 const ownerPages = [];
 // Public API/package sources and selected editor sources map to documentation pages.
 const publicSourceScopes = [
+  "docs/examples/**",
   "apps/web/src/components/SketchForgeEditor.tsx",
   "apps/web/src/components/SketchWorkspace.tsx",
   "apps/web/src/lib/sketchConstraints.ts",
