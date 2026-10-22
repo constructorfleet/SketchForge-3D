@@ -11,6 +11,10 @@ owner: "Contributors"
 
 ## Unreleased
 
+- `POST /groups` and `DELETE /groups` now have runtime-validated request and
+  response contracts in generated OpenAPI, including shape summaries and
+  validation/engine error responses. The documented subset covers 21 of 32
+  registered operations; 11 remain omitted.
 - Sketch constraints can now keep two selected segments parallel. The bounded solver projects their directions during point edits, the inspector includes the relation in its local degree-of-freedom estimate, and `.skf` persistence plus the TypeScript sketch-profile type retain it. Parallel does not constrain the segments' offset; broader constraint solving remains local and bounded.
 - `GET /thickness` and `POST /interference` have runtime-validated request and
   response contracts in the generated OpenAPI reference. Interference describes

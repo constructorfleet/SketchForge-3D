@@ -94,6 +94,20 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(fromSchema.some((variant) => variant.not?.required?.includes("entity")), "omitting entity means the route defaults it to shape");
   assert.ok(fromSchema.some((variant) => variant.required.includes("index") && variant.properties.entity.enum.includes("edge")));
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "measureEntities"), false);
+  const group = spec.paths["/api/v1/groups"].post;
+  assert.ok(group, "POST /groups should be included once its runtime contract is complete");
+  assert.deepEqual(Object.keys(group.responses).sort(), ["201", "400", "401", "404", "409", "422", "500", "503"]);
+  const groupBody = group.requestBody.content["application/json"].schema;
+  assert.deepEqual(groupBody.required, ["ids"]);
+  assert.equal(groupBody.additionalProperties, undefined, "the route tolerates extension fields");
+  assert.equal(groupBody.properties.ids.oneOf.some((variant) => variant.type === "string"), true, "the route accepts its single-ID shorthand");
+  assert.equal(groupBody.properties.ids.oneOf.some((variant) => variant.type === "array" && variant.minItems === 2 && variant.uniqueItems === true), true);
+  assert.deepEqual(group.responses["201"].content["application/json"].schema.required, ["shape", "revision"]);
+  const ungroup = spec.paths["/api/v1/groups"].delete;
+  assert.ok(ungroup, "DELETE /groups should be included once its runtime contract is complete");
+  assert.deepEqual(Object.keys(ungroup.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(ungroup.responses["200"].content["application/json"].schema.required, ["shapes", "revision"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => ["groupShapes", "ungroupShape"].includes(operationId)), false);
   const align = spec.paths["/api/v1/align"].post;
   assert.ok(align, "POST /align should be present once its runtime contract is complete");
   assert.deepEqual(align.requestBody.content["application/json"].schema.required, ["ids", "axis", "target"]);
@@ -129,8 +143,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 19);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 13);
+  assert.equal(documentedOperationCount, 21);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 11);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {
