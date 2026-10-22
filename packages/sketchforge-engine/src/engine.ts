@@ -724,7 +724,7 @@ export function createEngine(store: ProjectStore): Engine {
     changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
       const byOutputId = oneShape(document, shapeId);
       // A persisted sketch source is an input node, not a renderable shape.
-      // When a caller edits that node's profile, resolve its dependent sweep
+      // When a caller edits that node's profile, resolve its dependent sketch
       // output and rebuild it before the single project write below. The
       // output keeps its own stable object ID; SKF export derives the source
       // node from the synchronized profile on that output.
@@ -753,7 +753,8 @@ export function createEngine(store: ProjectStore): Engine {
       const replacingSketchProfile = changes.sketchProfile !== undefined;
       const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
       const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
-      if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion) {
+      const isSketchRevolve = isRevolveShape(existing);
+      if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
       }
 
@@ -852,6 +853,20 @@ export function createEngine(store: ProjectStore): Engine {
           return failed({
             reason: "sweep_failed",
             message: error instanceof Error ? error.message : "The sketch sweep could not be rebuilt",
+          });
+        }
+      }
+      if (replacingSketchProfile && isSketchRevolve) {
+        try {
+          const runtime = await serverManifoldRuntime();
+          swept = rebuiltRevolveShape(runtime, existing, {
+            profile: changes.sketchProfile as NonNullable<WorkplaneShape["sketchProfile"]>,
+            settings: existing.sketchRevolve!,
+          });
+        } catch (error) {
+          return failed({
+            reason: "sweep_failed",
+            message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
           });
         }
       }
