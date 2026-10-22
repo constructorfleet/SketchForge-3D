@@ -72,8 +72,8 @@ so stale tracked output alone does not fail the docs check.
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
-the registry and handlers. Eighteen operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 14 are listed
+the registry and handlers. 19 operations have runtime-backed request and
+response contracts and appear in generated OpenAPI. The other 13 are listed
 with omission reasons in the generated contract; full route coverage remains
 open.
 
@@ -99,15 +99,26 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   are recorded by a default-branch workflow. Fork PRs use artifact fallback.
   Successful main docs runs open or refresh a bot repair PR for stale tracked
   output; main remains stale until that repair PR is merged.
-- **Configuration ownership:** the current generated operator reference
-  documents supported server/container settings, not every environment read
-  across server, desktop, tests, build tools, and browser code. A central
-  supported-configuration schema and complete ownership checks remain open.
-- **Examples and page ownership:** the local-project MCP shell command is
-  included from and executed as the same source fixture. Remaining work is to
-  require every runnable example to come from source and execute in CI; add
-  consistent page audience/owner metadata and diagnostics mapping changed
-  sources to their owning pages.
+- **Configuration ownership — implemented for the declared supported
+  inventory:** the generated operator reference is backed by a registry of
+  supported server/container, desktop, TypeScript/Python client, and local MCP
+  settings. The desktop entry includes `SKETCHFORGE_DESKTOP_PORT`; the registry
+  links settings to their implementation readers and owning pages, and tests
+  detect unregistered readers within those tracked scopes. It does not treat
+  every environment read as a supported setting: for example,
+  `SKETCHFORGE_DESKTOP_DEV_URL` is an internal launcher handoff and `NODE_PATH`
+  is pass-through. Build, test, CI, launcher, pass-through, and other readers
+  outside the declared inventory remain out of scope.
+- **Examples and page ownership — partial:** maintained documentation pages
+  and staged generated package references have required audience/owner metadata.
+  Changed-source ownership diagnostics cover selected source trees, including
+  REST routes, TypeScript client/MCP, engine, Python client, and the package
+  example trees. The mapping is path-based and is not symbol-level or complete
+  repository coverage. The local-project MCP shell command is included from and
+  executed as the same source fixture; package examples are sourced and tested.
+  Remaining work is to require every runnable example to come from source and
+  execute in CI, and to cover editor/UI sources, other examples, and all content
+  sources with ownership diagnostics.
 - **Task workflows:** expand tested task guides beyond the editor quick-start,
   package examples, and current REST/MCP workflows.
 - **Inbound links:** local links, compatibility paths, and repository history
