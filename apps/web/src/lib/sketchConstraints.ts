@@ -74,6 +74,16 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
     const lengths = Math.hypot(ux, uz) * Math.hypot(vx, vz);
     return lengths <= CONSTRAINT_TOLERANCE_MM ** 2 ? Number.POSITIVE_INFINITY : Math.abs((ux * vx + uz * vz) / lengths);
   }
+  if (constraint.kind === "parallel") {
+    const pair = segmentPair(constraint.segmentIds, profile);
+    const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+    const second = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+    if (!first || !firstEnd || !second || !secondEnd) return Number.POSITIVE_INFINITY;
+    const ux = firstEnd.x - first.x, uz = firstEnd.z - first.z;
+    const vx = secondEnd.x - second.x, vz = secondEnd.z - second.z;
+    const lengths = Math.hypot(ux, uz) * Math.hypot(vx, vz);
+    return lengths <= CONSTRAINT_TOLERANCE_MM ** 2 ? Number.POSITIVE_INFINITY : Math.abs((ux * vz - uz * vx) / lengths);
+  }
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
     const first = segment && points.get(segment.startId);
@@ -123,6 +133,28 @@ function equationRows(
       const gvx = ux / (firstLength * secondLength) - cosine * vx / (secondLength * secondLength);
       const gvz = uz / (firstLength * secondLength) - cosine * vz / (secondLength * secondLength);
       add(cosine, [
+        { pointId: first.id, coordinate: 0, coefficient: -gux }, { pointId: first.id, coordinate: 1, coefficient: -guz },
+        { pointId: firstEnd.id, coordinate: 0, coefficient: gux }, { pointId: firstEnd.id, coordinate: 1, coefficient: guz },
+        { pointId: second.id, coordinate: 0, coefficient: -gvx }, { pointId: second.id, coordinate: 1, coefficient: -gvz },
+        { pointId: secondEnd.id, coordinate: 0, coefficient: gvx }, { pointId: secondEnd.id, coordinate: 1, coefficient: gvz },
+      ]);
+      continue;
+    }
+    if (constraint.kind === "parallel") {
+      const pair = segmentPair(constraint.segmentIds, profile);
+      const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+      const second = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+      if (!first || !firstEnd || !second || !secondEnd) continue;
+      const ux = firstEnd.x - first.x, uz = firstEnd.z - first.z;
+      const vx = secondEnd.x - second.x, vz = secondEnd.z - second.z;
+      const firstLength = Math.hypot(ux, uz), secondLength = Math.hypot(vx, vz);
+      if (firstLength <= CONSTRAINT_TOLERANCE_MM || secondLength <= CONSTRAINT_TOLERANCE_MM) continue;
+      const sine = (ux * vz - uz * vx) / (firstLength * secondLength);
+      const gux = vz / (firstLength * secondLength) - sine * ux / (firstLength * firstLength);
+      const guz = -vx / (firstLength * secondLength) - sine * uz / (firstLength * firstLength);
+      const gvx = -uz / (firstLength * secondLength) - sine * vx / (secondLength * secondLength);
+      const gvz = ux / (firstLength * secondLength) - sine * vz / (secondLength * secondLength);
+      add(sine, [
         { pointId: first.id, coordinate: 0, coefficient: -gux }, { pointId: first.id, coordinate: 1, coefficient: -guz },
         { pointId: firstEnd.id, coordinate: 0, coefficient: gux }, { pointId: firstEnd.id, coordinate: 1, coefficient: guz },
         { pointId: second.id, coordinate: 0, coefficient: -gvx }, { pointId: second.id, coordinate: 1, coefficient: -gvz },
@@ -255,6 +287,12 @@ function breakCollinearDistanceDegeneracy(
         connect(first.startId, first.endId);
         connect(second.startId, second.endId);
       }
+    } else if (constraint.kind === "parallel") {
+      const pair = segmentPair(constraint.segmentIds, profile);
+      if (pair) {
+        connect(pair[0].startId, pair[0].endId);
+        connect(pair[1].startId, pair[1].endId);
+      }
     } else if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (segment) connect(segment.startId, segment.endId);
@@ -314,7 +352,7 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
   const anchors = new Set([...anchoredPointIds, ...fixedPointConstraints.map((constraint) => constraint.pointId)]);
   const constrainedPointIds = new Set(constraints.flatMap((constraint) => {
     if (constraint.kind === "fixed") return [constraint.pointId];
-    if (constraint.kind === "perpendicular") return constraint.segmentIds.flatMap((id) => {
+    if (constraint.kind === "perpendicular" || constraint.kind === "parallel") return constraint.segmentIds.flatMap((id) => {
       const segment = profile.segments.find(({ id: candidate }) => candidate === id);
       return segment ? [segment.startId, segment.endId] : [];
     });
@@ -428,7 +466,7 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
   return (profile.constraints ?? []).filter((constraint) => constraint.kind === "fixed" ? pointIds.has(constraint.pointId)
     : constraint.kind === "horizontal" || constraint.kind === "vertical"
     ? segmentIds.has(constraint.segmentId)
-    : constraint.kind === "perpendicular" ? constraint.segmentIds.every((id) => segmentIds.has(id))
+    : constraint.kind === "perpendicular" || constraint.kind === "parallel" ? constraint.segmentIds.every((id) => segmentIds.has(id))
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
 }
 
@@ -457,7 +495,7 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
       rows.push(xRow, zRow);
       continue;
     }
-    if (constraint.kind === "perpendicular") {
+    if (constraint.kind === "perpendicular" || constraint.kind === "parallel") {
       const firstSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[0])!;
       const secondSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[1])!;
       const ids = [firstSegment.startId, firstSegment.endId, secondSegment.startId, secondSegment.endId];
@@ -466,9 +504,11 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
       const ux = b!.x - a!.x, uz = b!.z - a!.z, vx = d!.x - c!.x, vz = d!.z - c!.z;
       const lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
       if (lu <= CONSTRAINT_TOLERANCE_MM || lv <= CONSTRAINT_TOLERANCE_MM) return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-segment" };
-      const cosine = (ux * vx + uz * vz) / (lu * lv);
-      const gux = vx / (lu * lv) - cosine * ux / (lu * lu), guz = vz / (lu * lv) - cosine * uz / (lu * lu);
-      const gvx = ux / (lu * lv) - cosine * vx / (lv * lv), gvz = uz / (lu * lv) - cosine * vz / (lv * lv);
+      const relation = constraint.kind === "perpendicular" ? (ux * vx + uz * vz) / (lu * lv) : (ux * vz - uz * vx) / (lu * lv);
+      const gux = (constraint.kind === "perpendicular" ? vx : vz) / (lu * lv) - relation * ux / (lu * lu);
+      const guz = (constraint.kind === "perpendicular" ? vz : -vx) / (lu * lv) - relation * uz / (lu * lu);
+      const gvx = (constraint.kind === "perpendicular" ? ux : -uz) / (lu * lv) - relation * vx / (lv * lv);
+      const gvz = (constraint.kind === "perpendicular" ? uz : ux) / (lu * lv) - relation * vz / (lv * lv);
       const row = Array(parameterCount).fill(0) as number[];
       const coefficients = [-gux, -guz, gux, guz, -gvx, -gvz, gvx, gvz];
       ids.forEach((id, index) => {

@@ -147,6 +147,10 @@ export function splitSketchSegment(
   const constraints = profile.constraints?.reduce<SketchConstraint[]>((result, constraint) => {
     if ((constraint.kind === "horizontal" || constraint.kind === "vertical") && constraint.segmentId === segmentId) {
       result.push(constraint, { ...constraint, id: createId("sketch-constraint"), segmentId: secondSegmentId });
+    } else if (constraint.kind === "parallel" && constraint.segmentIds.includes(segmentId)) {
+      const segmentIds: [string, string] = [...constraint.segmentIds];
+      segmentIds[segmentIds.indexOf(segmentId)] = secondSegmentId;
+      result.push(constraint, { ...constraint, id: createId("sketch-constraint"), segmentIds });
     } else {
       result.push(constraint);
     }
@@ -268,6 +272,16 @@ export function addLineIntersectionPoints(
   });
 
   const constraints = profile.constraints?.reduce<SketchConstraint[]>((result, constraint) => {
+    if (constraint.kind === "parallel") {
+      const firstPieces = pieceIdsByOriginal.get(constraint.segmentIds[0]) ?? [constraint.segmentIds[0]];
+      const secondPieces = pieceIdsByOriginal.get(constraint.segmentIds[1]) ?? [constraint.segmentIds[1]];
+      firstPieces.forEach((firstId, firstIndex) => secondPieces.forEach((secondId, secondIndex) => {
+        result.push(firstIndex === 0 && secondIndex === 0
+          ? constraint
+          : { ...constraint, id: createId("sketch-constraint"), segmentIds: [firstId, secondId] });
+      }));
+      return result;
+    }
     if (constraint.kind !== "horizontal" && constraint.kind !== "vertical") {
       result.push(constraint);
       return result;

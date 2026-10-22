@@ -100,11 +100,11 @@ These are implemented and should not be filed as missing features:
   Invalid source profiles and dependent booleans that no longer remove
   material leave the project unchanged. Other downstream operation types do
   not yet participate in a general recompute graph.
-- Coincident, horizontal, vertical, perpendicular, fixed-distance, and fixed
-  point sketch constraints are supported, including `.skf` persistence and
-  TypeScript profile types. A fixed point anchors a sketch point to workplane
-  coordinates and can remove global translation freedoms. Perpendicular
-  relations take part in the bounded coupled solve
+- Coincident, horizontal, vertical, perpendicular, parallel, fixed-distance,
+  and fixed-point sketch constraints are supported, including `.skf`
+  persistence and TypeScript profile types. A fixed point anchors a sketch
+  point to workplane coordinates and can remove global translation freedoms.
+  Perpendicular and parallel relations take part in the bounded coupled solve
   and local degree-of-freedom estimate. Point drags keep directly dragged
   points anchored and report unsatisfied constraint IDs. The inspector also
   estimates local degrees of freedom from the supported equations' Jacobian
@@ -182,13 +182,15 @@ identity across arbitrary topology edits remains unsupported.
 
 ### 5. Broader sketch constraints and globally determined solutions
 
-The solver supports coincident, horizontal, vertical, perpendicular, and
-fixed-distance relations with a bounded deterministic least-squares solve and
-a local Jacobian-rank estimate. It also supports fixed-point relations, which
-can anchor global translation. Without a fixed-point anchor, sketch placement
-retains two global translation freedoms; with an anchor, the solver can
-constrain placement. It does not guarantee global solvability or identify
-every nonlinear or second-order dependency.
+The solver supports coincident, horizontal, vertical, perpendicular, parallel,
+and fixed-distance relations with a bounded deterministic least-squares solve
+and a local Jacobian-rank estimate. Parallel constrains two segment directions
+to align, allowing either the same or opposite orientation; it does not align
+their offsets. The solver also supports fixed-point relations, which can anchor
+global translation. Without a fixed-point anchor, sketch placement retains two
+global translation freedoms; with an anchor, the solver can constrain
+placement. It does not guarantee global solvability or identify every
+nonlinear or second-order dependency.
 Degenerate zero-length distance geometry has no determinate
 degree-of-freedom report. Additional constraint types and robust global
 placement remain open.

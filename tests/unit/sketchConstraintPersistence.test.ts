@@ -17,6 +17,7 @@ const sketch: WorkplaneShape = {
       { id: "c", kind: "coincident", pointIds: ["a", "b"] },
       { id: "h", kind: "horizontal", segmentId: "line" },
       { id: "v", kind: "vertical", segmentId: "line" },
+      { id: "parallel", kind: "parallel", segmentIds: ["line", "other"] },
       { id: "p", kind: "perpendicular", segmentIds: ["line", "other"] },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
       { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
@@ -47,4 +48,20 @@ it("rejects fixed-point constraints with invalid coordinates or missing points",
     });
     await expect(importSkfProject(bytes)).rejects.toThrow();
   }
+});
+
+it("rejects parallel constraints that reference a missing segment", async () => {
+  const invalid = {
+    ...sketch,
+    sketchProfile: {
+      ...sketch.sketchProfile!,
+      constraints: [{ id: "parallel", kind: "parallel" as const, segmentIds: ["line", "missing"] as [string, string] }],
+    },
+  };
+  const bytes = await exportSkfProject({
+    projectName: "Invalid parallel constraint", createdAt: 1, modifiedAt: 1, shapes: [invalid],
+    history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [],
+    workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0,
+  });
+  await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentIds/);
 });
