@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
+import { lintContract } from "./lib/contract-lint.mjs";
+
 const rootArgumentIndex = process.argv.indexOf("--root");
 const rootArgument = rootArgumentIndex >= 0 ? process.argv[rootArgumentIndex + 1] : undefined;
 if (rootArgumentIndex >= 0 && !rootArgument) throw new Error("--root requires a value");
@@ -13,6 +15,7 @@ const tracked = execFileSync("git", ["ls-files", "-z", "--", "*.md"], {
 }).split("\0").filter(Boolean);
 const sources = [...new Set([...tracked, "README.md", "docs/index.md"])];
 const failures = [];
+const warnings = [];
 const markdownLink = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
 
 for (const sourceRelative of sources) {
@@ -23,6 +26,19 @@ for (const sourceRelative of sources) {
   } catch {
     failures.push(`${sourceRelative}: canonical Markdown source is missing`);
     continue;
+  }
+
+  // A document that declares itself an acceptance contract is linted against
+  // the contract rules; every other document is untouched. Blocking violations
+  // fail this check; warnings are reported without failing it.
+  for (const violation of lintContract(contents)) {
+    const where = `${sourceRelative}:${violation.line}`;
+    const detail = violation.span ? ` (${violation.span})` : "";
+    if (violation.severity === "block") {
+      failures.push(`${where}: [${violation.rule}] ${violation.message}${detail}`);
+    } else {
+      warnings.push(`${where}: [${violation.rule}] ${violation.message}${detail}`);
+    }
   }
 
   for (const match of contents.matchAll(/!!!include\(([^)]+)\)!!!/g)) {
@@ -89,11 +105,17 @@ for (const sourceRelative of sources) {
   }
 }
 
+if (warnings.length) {
+  console.warn(
+    `Contract warnings (${warnings.length}) — reported, not blocking:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`,
+  );
+}
+
 if (failures.length) {
   console.error(`Documentation checks failed (${failures.length}):\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
   process.exitCode = 1;
 } else {
-  console.log(`Checked ${sources.length} canonical Markdown sources, local links, and includes.`);
+  console.log(`Checked ${sources.length} canonical Markdown sources, local links, includes, and acceptance contracts.`);
 }
 
 function hasHeading(contents, fragment) {
