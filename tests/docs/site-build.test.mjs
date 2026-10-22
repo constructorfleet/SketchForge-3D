@@ -91,7 +91,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /32 operations; generated OpenAPI describes 16 and explains why 16 remain omitted/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes 17 and explains why 15 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
@@ -108,7 +108,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /16 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /17 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Additional runtime schemas and route response validations remain outstanding/i);
   assert.match(spec, /creates or refreshes a bot repair PR if tracked outputs differ/i);
   assert.doesNotMatch(spec, /Open PR \[#209\]|Open PR \[#214\]/i);

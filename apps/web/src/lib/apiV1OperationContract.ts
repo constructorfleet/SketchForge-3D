@@ -511,31 +511,38 @@ export const API_V1_OPERATIONS = [
   operation("POST", "/api/v1/patterns", "patternShapes"),
   ...projectOperations,
   {
-    ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 409, 500, 503]),
+    ...operation("GET", "/api/v1/properties", "getShapeProperties", [200, 400, 401, 404, 422, 500, 503]),
+    description: "Returns exact mass properties for the positioned shape and identifies whether the measurements came from exact CAD geometry or tessellated mesh geometry.",
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true },
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
-    response: {
-      required: ["properties"],
-      kind: "shape-properties",
-      fields: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
-      provenance: { source: ["parametric", "brep", "mesh"], precision: ["exact", "tessellated"] },
-      schema: {
-        type: "object",
-        required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"],
+    responseSchemas: {
+      200: {
+        type: "object", required: ["properties"], additionalProperties: false,
         properties: {
-          volume: { type: "number" },
-          area: { type: "number" },
-          centerOfMass: { type: "object", required: ["x", "y", "z"], properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } } },
-          bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: { type: "number" }, ymin: { type: "number" }, zmin: { type: "number" }, xmax: { type: "number" }, ymax: { type: "number" }, zmax: { type: "number" } } },
-          isValid: { type: "boolean" },
-          provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } } },
+          properties: {
+            type: "object", required: ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"], additionalProperties: false,
+            properties: {
+              volume: num,
+              area: num,
+              centerOfMass: vector3Schema,
+              bbox: { type: "object", required: ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"], properties: { xmin: num, ymin: num, zmin: num, xmax: num, ymax: num, zmax: num }, additionalProperties: false },
+              isValid: { type: "boolean" },
+              provenance: { type: "object", required: ["source", "precision"], properties: { source: { type: "string", enum: ["parametric", "brep", "mesh"] }, precision: { type: "string", enum: ["exact", "tessellated"] } }, additionalProperties: false },
+            },
+          },
         },
       },
+      400: faceError("invalid_project_id", "invalid_shape_id"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      422: faceError("cad_failed"),
+      500: faceError("cad_failed", "internal_error"),
+      503: faceError("storage_unconfigured"),
     },
   },
   operation("OPTIONS", "/api/v1/properties", "propertyRouteOptions", [204], undefined, "none"),
@@ -649,18 +656,18 @@ export type ShapePropertiesResponse = {
 
 /** Reject malformed kernel values before returning them as a public API response. */
 export function parseShapePropertiesResponse(value: unknown): ShapePropertiesResponse | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value) || !exactKeys(value, ["properties"])) return null;
   const properties = (value as { properties?: unknown }).properties;
-  if (!properties || typeof properties !== "object") return null;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties) || !exactKeys(properties, ["volume", "area", "centerOfMass", "bbox", "isValid", "provenance"])) return null;
   const item = properties as Record<string, unknown>;
   const bbox = item.bbox;
   if (typeof item.volume !== "number" || !Number.isFinite(item.volume) || typeof item.area !== "number" || !Number.isFinite(item.area)) return null;
   if (!isPoint(item.centerOfMass) || typeof item.isValid !== "boolean") return null;
-  if (!bbox || typeof bbox !== "object") return null;
+  if (!bbox || typeof bbox !== "object" || Array.isArray(bbox) || !exactKeys(bbox, ["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"])) return null;
   const bounds = bbox as Record<string, unknown>;
   if (!["xmin", "ymin", "zmin", "xmax", "ymax", "zmax"].every((key) => typeof bounds[key] === "number" && Number.isFinite(bounds[key]))) return null;
   const provenance = item.provenance;
-  if (!provenance || typeof provenance !== "object") return null;
+  if (!provenance || typeof provenance !== "object" || Array.isArray(provenance) || !exactKeys(provenance, ["source", "precision"])) return null;
   const source = (provenance as Record<string, unknown>).source;
   const precision = (provenance as Record<string, unknown>).precision;
   if (!(source === "parametric" || source === "brep" || source === "mesh")) return null;
