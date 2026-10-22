@@ -39,5 +39,14 @@ faces, dimensions, solids, axes, or angles. For example, face 1 at -5° is
 rejected along +X and +Y on the unrotated extrusion fixture.
 
 Automated kernel coverage lives in `tests/e2e/draftFaceEditor.e2e.ts`. The
-inspector operation is local to the editor; it does not create a rebuildable
-feature-history node or a REST/client operation.
+editor workflow is also covered by the browser acceptance flow in
+`tests/browser/face-drafting.test.mjs`. It creates the default rectangular
+sketch extrusion, selects face index 1, chooses the local +Z pull axis and
+-5° angle, and applies the supported draft from the **Draft face** inspector.
+The test waits for the editor's success status before capturing the result.
+
+![A supported face draft applied from the editor inspector.](../screenshots/face-draft-browser.png)
+
+Run the acceptance flow after building the app with `npm run test:browser`.
+The inspector operation is local to the editor; it does not create a
+rebuildable feature-history node or a REST/client operation.
