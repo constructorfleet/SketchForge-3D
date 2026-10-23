@@ -21,10 +21,11 @@ owner: "Contributors"
   angle/axis edits, multi-region, partial-turn, and helical revolves remain
   refused.
 - A retained face draft on a single-section, hole-free sketch sweep can now
-  change its angle while preserving one all-edge fillet or symmetric 45°
-  chamfer. Recompute applies source, draft, then treatment atomically; `.skf`
-  round trips and subsequent profile edits preserve the updated draft, treatment,
-  and IDs. Pull-axis edits on treated sweeps remain refused.
+  change its angle or, independently, its signed pull axis while preserving one
+  all-edge fillet or symmetric 45° chamfer. Recompute applies source, draft,
+  then treatment atomically; `.skf` round trips and subsequent profile edits
+  preserve the updated draft, treatment, and IDs. Combined angle/axis edits and
+  unsupported sweep cases remain refused.
 - A retained face draft on a single-loop sketch extrusion can now change its
   angle while preserving one all-edge fillet or symmetric 45° chamfer. The
   engine replays source, draft, then treatment atomically and refreshes

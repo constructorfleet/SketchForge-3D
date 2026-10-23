@@ -215,8 +215,15 @@ Edge treatments are supported in the explicitly bounded full-turn revolve
 sequence above, plus one symmetric 45° all-edge chamfer after a face draft on
 a single-loop sketch extrusion, and one all-edge fillet or symmetric 45°
 all-edge chamfer after a face draft on a single-section, no-hole sketch sweep. Profile edits
-replay source, draft, then treatment; `.skf` preserves those sequences. Other
-face-draft / treatment sequences remain refused. A
+replay source, draft, then treatment; `.skf` preserves those sequences. On the
+supported sweep, changing only the retained draft angle or only its signed pull
+axis replays the treatment atomically, preserves source/output/source-face IDs,
+and refreshes treatment history and eligible-edge counts. A `.skf` round trip
+followed by a source-profile edit retains the updated axis. Invalid axes fail
+without writing. Combined angle/axis edits, source-face reselection,
+multi-section sweeps, sweeps with holes, non-45° chamfers, and selected-edge or
+multiple treatments remain refused. Other face-draft / treatment sequences
+remain refused. A
 retained prism draft on a sketch extrusion can be followed by one all-edge
 fillet or symmetric 45° chamfer;
 source-profile and draft-angle edits replay the draft before the treatment.

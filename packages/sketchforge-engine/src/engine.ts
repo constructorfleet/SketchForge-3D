@@ -879,7 +879,8 @@ export function createEngine(store: ProjectStore): Engine {
             && (requestedFaceDraft.angle === existing.faceDraft.angle
               || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
           || isSingleSectionSketchSweep(existing)
-            && requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection
+            && (requestedFaceDraft.angle === existing.faceDraft.angle
+              || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
           || isPlainFullTurnSketchRevolve(existing)
             && (requestedFaceDraft.angle === existing.faceDraft.angle
               || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)))
