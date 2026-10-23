@@ -100,7 +100,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /a single-loop sketch extrusion accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);
-  assert.match(spec, /Changing face-draft angle or axis while a treatment is retained is not yet supported/i);
+  assert.match(spec, /Changing only the face-draft angle on a treated single-loop sketch extrusion replays source, draft, then treatment atomically/i);
   assert.match(spec, /a single-section, hole-free sketch sweep accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);
   assert.match(spec, /Relevant coverage includes `tests\/unit\/faceDraftSweepFilletRecompute\.test\.ts`, `tests\/unit\/faceDraftExtrusionFilletRecompute\.test\.ts`/i);
   assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
