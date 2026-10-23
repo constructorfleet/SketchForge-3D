@@ -873,11 +873,13 @@ export function createEngine(store: ProjectStore): Engine {
         || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
       const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
         && existing.draftPrismAngle === undefined
-        && (!faceDraftChanged || isSingleLoopSketchExtrusion(existing)
-          && requestedFaceDraft !== undefined && requestedFaceDraft !== null
+        && (!faceDraftChanged || requestedFaceDraft !== undefined && requestedFaceDraft !== null
           && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId
-          && (requestedFaceDraft.angle === existing.faceDraft.angle
-            || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection))
+          && (isSingleLoopSketchExtrusion(existing)
+            && (requestedFaceDraft.angle === existing.faceDraft.angle
+              || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
+          || isSingleSectionSketchSweep(existing)
+            && requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection))
         && (isPlainFullTurnSketchRevolve(existing)
           || isSingleLoopSketchExtrusion(existing)
             && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
@@ -1082,8 +1084,16 @@ export function createEngine(store: ProjectStore): Engine {
             faceDraft: undefined,
             faceDraftSourceFrame: undefined,
           };
-          const replayedSource = replacingSketchProfile || clearingFaceDraft
-            ? await replaySingleAllEdgeTreatment(clearingFaceDraft ? { ...existing, faceDraft: undefined } : existing, rebuiltSweep)
+          const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
+            || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+          const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
+          const replayOriginal = clearingFaceDraft
+            ? { ...existing, faceDraft: undefined }
+            : replayFaceDraftAndTreatment && existing.faceDraft
+              ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
+              : existing;
+          const replayedSource = (replacingSketchProfile || clearingFaceDraft || replayFaceDraftAndTreatment) && hasRetainedTreatments
+            ? await replaySingleAllEdgeTreatment(replayOriginal, rebuiltSweep)
             : rebuiltSweep;
           if (requestedFaceDraft && replayedSource.faceDraft) {
             // `replaySingleAllEdgeTreatment` has already rebuilt the retained
