@@ -113,10 +113,14 @@ These are implemented and should not be filed as missing features:
   assumed to correspond to the new profile. One supported all-edge fillet or
   symmetric 45° chamfer is replayed against rebuilt topology; unsupported or
   ambiguous treatment histories fail the edit atomically. A single-section,
-  no-hole sweep may also retain one face draft followed by one all-edge fillet;
-  its `.skf` representation and source-profile edits replay sweep, draft, then
-  fillet, while multiple treatments and ambiguous source faces fail without a
-  project write.
+  no-hole sweep may also retain one face draft followed by one all-edge fillet
+  or symmetric 45° all-edge chamfer; its `.skf` representation and source-profile
+  edits replay sweep, draft, then treatment, while multiple treatments and
+  ambiguous source faces fail without a project write. Changing only the retained
+  face-draft angle on that treated sweep replays source, draft, then treatment
+  atomically; `.skf` round trips and later profile edits preserve the updated
+  angle, treatment, and IDs. Pull-axis and source-face edits on treated sweeps
+  remain refused.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the
