@@ -194,8 +194,10 @@ ID. A single retained face draft on a sketch extrusion, single-solid sketch
 sweep, or plain single-region full-turn sketch revolve now recomputes when its
 selected planar face has exactly one normal match; missing or ambiguous matches
 fail atomically. `GET /faces?topology=exact` lists analytic B-rep revolve faces;
-the default face listing remains mesh-based. Other downstream operation types do not yet recompute. A
-general dependency-ordered graph with consistent failure propagation remains
+the default face listing remains mesh-based. Other downstream feature nodes and
+multi-step sequences beyond these bounded replays do not yet participate in a
+general dependency graph. A dependency-ordered graph with consistent failure
+propagation remains
 the highest-value foundation before expanding editable downstream operations.
 
 ### 2. Broader and editable drafting
