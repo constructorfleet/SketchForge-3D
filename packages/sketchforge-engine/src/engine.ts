@@ -893,9 +893,22 @@ export function createEngine(store: ProjectStore): Engine {
         && (existing.draftPrismAngle !== undefined || hasExistingTreatment && !canReplayFaceDraftTreatment)) {
         return failed({ reason: "invalid_shape_request", message: "This face draft cannot be combined with the requested persisted draft or treatment history." });
       }
+      const canReselectUntreatedExtrusionFace = isSingleLoopSketchExtrusion(existing)
+        && existing.draftPrismAngle === undefined
+        && !hasExistingTreatment;
+      if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
+        && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId
+        && replacingSketchProfile) {
+        return failed({ reason: "invalid_shape_request", message: "Change the sketch profile and face draft selection in separate edits." });
+      }
       if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
         && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
-        return failed({ reason: "invalid_shape_request", message: "Clear the existing face draft before selecting a different source face." });
+        const currentOutputFaces = await shapeFaces(existing);
+        if (!canReselectUntreatedExtrusionFace
+          || !existing.faceDraftSourceFaceIds?.includes(requestedFaceDraft.sourceFaceId)
+          || currentOutputFaces.filter((face) => face.id === requestedFaceDraft.sourceFaceId && face.surfaceType === "plane").length !== 1) {
+          return failed({ reason: "invalid_shape_request", message: "Clear the existing face draft before selecting a different source face." });
+        }
       }
       const draftPrismChanged = changes.draftPrismAngle !== undefined;
       const requestedDraftPrismAngle = typeof changes.draftPrismAngle === "number" ? changes.draftPrismAngle : undefined;
@@ -965,6 +978,14 @@ export function createEngine(store: ProjectStore): Engine {
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceDraft: undefined,
             faceDraftSourceFrame: undefined,
+            faceDraftSourceFaceIds: undefined,
+            ...(faceDraftChanged && !replacingSketchProfile && !existing.faceDraft && !hasExistingTreatment
+              && existing.draftPrismAngle === undefined && existing.faceIds?.length === rebuilt.faceIds?.length
+              ? { faceIds: existing.faceIds }
+              : {}),
+            ...(!replacingSketchProfile && existing.faceDraft && existing.faceDraftSourceFaceIds?.length === rebuilt.faceIds?.length
+              ? { faceIds: existing.faceDraftSourceFaceIds }
+              : {}),
             ...(draftPrismAngle === undefined ? {} : {
               draftPrismSourceHeight: sourceHeight,
               ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
@@ -998,11 +1019,18 @@ export function createEngine(store: ProjectStore): Engine {
             const selectedOnPrior = priorReference ? undefined
               : (await shapeFaces(existing, isExactSketchRevolve ? { topology: "exact" } : undefined))
                 .find((face) => face.id === requestedFaceDraft.sourceFaceId);
-            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+            const isReselection = existing.faceDraft !== undefined
+              && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId;
+            const exactReselectedSourceFace = isReselection
+              ? (await shapeFaces(replayedSource)).find((face) => face.id === requestedFaceDraft.sourceFaceId)
+              : undefined;
+            const sourceFaceNormal = exactReselectedSourceFace?.normal ?? priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
             }
-            const currentFace = await findUniqueDraftFace(replayedSource, sourceFaceNormal);
+            const currentFace = exactReselectedSourceFace?.surfaceType === "plane"
+              ? exactReselectedSourceFace
+              : await findUniqueDraftFace(replayedSource, sourceFaceNormal);
             if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
             const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
             const result = await applySketchFaceDraft(replayedSource, {
@@ -1011,7 +1039,8 @@ export function createEngine(store: ProjectStore): Engine {
             });
             swept = {
               ...shapeWithCadResult(replayedSource, result),
-              faceDraft,
+              faceDraft: { ...faceDraft, sourceFaceId: currentFace.id },
+              faceDraftSourceFaceIds: replayedSource.faceIds,
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
             };
           } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {

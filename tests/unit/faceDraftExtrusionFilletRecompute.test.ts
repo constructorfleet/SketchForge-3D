@@ -4,6 +4,7 @@ import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforg
 import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
+import { shapeProperties } from "@constructorfleet/sketchforge-engine/serverCadProperties";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
@@ -354,6 +355,202 @@ describe("editing angle and pull axis of a retained face draft on a sketch extru
     },
     CAD_TEST_TIMEOUT_MS,
   );
+});
+
+describe("reselecting the source face of an untreated sketch-extrusion draft", () => {
+  it("rebuilds from the original extrusion, persists the new face, and replays it after import", async () => {
+    const makeOriginal = async (projectName: string, profileScale = 1) => {
+      const { store, document, writeCount } = projectStore();
+      document.projectName = projectName;
+      const original = await sketchExtrusionShapeFromRequest({
+        id: "face-reselection-extrusion", sketchSourceId: "sketch/face-reselection-extrusion",
+        name: "Face-reselection extrusion",
+        profile: {
+          points: [
+            { id: "a", x: -profileScale, z: -1 }, { id: "b", x: profileScale, z: -1 },
+            { id: "c", x: profileScale, z: 1 }, { id: "d", x: -profileScale, z: 1 },
+          ],
+          segments: [
+            { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+            { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          ],
+        },
+        height: 3, x: 0, z: 0, elevation: 0, rotation: 0,
+      });
+      document.shapes = [original];
+      return { store, document, writeCount, original };
+    };
+
+    const { store, document, writeCount, original } = await makeOriginal("Face reselection");
+    const engine = createEngine(store);
+    const sourceFaces = await shapeFaces(original);
+    const firstFace = sourceFaces.find((face) => face.surfaceType === "plane" && face.normal
+      && Math.abs(face.normal.x) > 0.99)!;
+    const newlySelectedSourceFace = sourceFaces.find((face) => face.surfaceType === "plane" && face.normal
+      && face.normal.x * firstFace.normal!.x < -0.99)!;
+
+    const originalProperties = await shapeProperties(original);
+    const firstDraft = { sourceFaceId: firstFace.id, angle: 5, pullDirection: "y" as const };
+    const initiallyDrafted = value(await engine.changeShape("recompute", original.id, {
+      faceDraft: firstDraft,
+    })).shape;
+    expect(initiallyDrafted.faceDraftSourceFaceIds).toEqual(sourceFaces.map((face) => face.id));
+    const firstDraftProperties = await shapeProperties(initiallyDrafted);
+    const faceOnDraftedShape = (await shapeFaces(initiallyDrafted))
+      .find((face) => face.id === newlySelectedSourceFace.id);
+    expect(faceOnDraftedShape).toBeDefined();
+    if (!faceOnDraftedShape) throw new Error("Expected the untouched opposite source face to retain its ID.");
+    expect(faceOnDraftedShape?.surfaceType).toBe("plane");
+    expect(faceOnDraftedShape?.id).toBe(newlySelectedSourceFace.id);
+    const writesBeforeReselection = writeCount();
+
+    const reselection = await engine.changeShape("recompute", initiallyDrafted.id, {
+      faceDraft: { sourceFaceId: faceOnDraftedShape.id, angle: 7, pullDirection: "y" },
+    });
+
+    expect(reselection.ok, JSON.stringify(reselection)).toBe(true);
+    const redrafted = value(reselection).shape;
+    expect(writeCount()).toBe(writesBeforeReselection + 1);
+    expect(redrafted.id).toBe(original.id);
+    expect(redrafted.sketchSourceId).toBe(original.sketchSourceId);
+    expect(redrafted.faceDraft).toMatchObject({
+      sourceFaceId: faceOnDraftedShape.id, angle: 7, pullDirection: "y",
+    });
+    const redraftedProperties = await shapeProperties(redrafted);
+    expect(redraftedProperties.volume).toBeGreaterThan(0);
+    expect(redraftedProperties.volume).toBeLessThan(originalProperties.volume);
+
+    const reference = projectStore();
+    reference.document.shapes = [structuredClone(original)];
+    const referenceEngine = createEngine(reference.store);
+    const referenceFace = (await shapeFaces(original)).find((face) => face.id === newlySelectedSourceFace.id)!;
+    const referenceDraft = value(await referenceEngine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: referenceFace.id, angle: 7, pullDirection: "y" },
+    })).shape;
+    const referenceProperties = await shapeProperties(referenceDraft);
+    expect(redraftedProperties.volume).toBeCloseTo(referenceProperties.volume, 6);
+    expect(redraftedProperties.centerOfMass.x).toBeCloseTo(referenceProperties.centerOfMass.x, 6);
+    expect(redraftedProperties.centerOfMass.y).toBeCloseTo(referenceProperties.centerOfMass.y, 6);
+    expect(redraftedProperties.centerOfMass.z).toBeCloseTo(referenceProperties.centerOfMass.z, 6);
+    expect(
+      Math.abs(firstDraftProperties.centerOfMass.x - redraftedProperties.centerOfMass.x)
+        + Math.abs(firstDraftProperties.centerOfMass.z - redraftedProperties.centerOfMass.z),
+    ).toBeGreaterThan(1e-6);
+
+    const archived = await exportSkfProject({ ...document, modifiedAt: 2 });
+    const restored = await importSkfProject(archived);
+    expect(restored.shapes[0]?.id).toBe(original.id);
+    expect(restored.shapes[0]?.sketchSourceId).toBe(original.sketchSourceId);
+    expect(restored.shapes[0]?.faceDraft).toMatchObject({
+      sourceFaceId: faceOnDraftedShape.id, angle: 7, pullDirection: "y",
+    });
+    expect(restored.shapes[0]?.faceDraftSourceFaceIds).toEqual(sourceFaces.map((face) => face.id));
+    document.shapes = restored.shapes;
+
+    const editedProfile = {
+      ...original.sketchProfile!,
+      points: original.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.1 })),
+    };
+    const writesBeforeProfileEdit = writeCount();
+    const profileEdit = await engine.changeShape("recompute", original.sketchSourceId!, {
+      sketchProfile: editedProfile,
+    });
+    expect(profileEdit.ok, JSON.stringify(profileEdit)).toBe(true);
+    const replayed = value(profileEdit).shape;
+    expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
+    expect(replayed.id).toBe(original.id);
+    expect(replayed.sketchSourceId).toBe(original.sketchSourceId);
+    expect(replayed.faceDraft).toMatchObject({
+      angle: 7, pullDirection: "y",
+    });
+    expect(replayed.sketchProfile).toEqual(editedProfile);
+    expect(replayed.faceDraftSourceFaceIds).toContain(replayed.faceDraft?.sourceFaceId);
+    expect(replayed.faceDraftSourceFaceIds).not.toContain(faceOnDraftedShape.id);
+    const replayedProperties = await shapeProperties(replayed);
+    expect(replayedProperties.volume).toBeGreaterThan(0);
+    const profileReference = await makeOriginal("Fresh profile replay reference", 1.1);
+    const profileReferenceEngine = createEngine(profileReference.store);
+    const profileReferenceFace = (await shapeFaces(profileReference.original)).find((face) =>
+      face.surfaceType === "plane" && face.normal
+        && face.normal.x * newlySelectedSourceFace.normal!.x > 0.99,
+    )!;
+    const profileReferenceDraft = value(await profileReferenceEngine.changeShape(
+      "recompute", profileReference.original.id,
+      { faceDraft: { sourceFaceId: profileReferenceFace.id, angle: 7, pullDirection: "y" } },
+    )).shape;
+    const profileReferenceProperties = await shapeProperties(profileReferenceDraft);
+    expect(replayedProperties.volume).toBeCloseTo(profileReferenceProperties.volume, 6);
+    expect(replayedProperties.centerOfMass.x).toBeCloseTo(profileReferenceProperties.centerOfMass.x, 6);
+    expect(replayedProperties.centerOfMass.y).toBeCloseTo(profileReferenceProperties.centerOfMass.y, 6);
+    expect(replayedProperties.centerOfMass.z).toBeCloseTo(profileReferenceProperties.centerOfMass.z, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("rejects generated face IDs and profile-plus-reselection atomically", async () => {
+    const { store, document, writeCount, original } = await (async () => {
+      const { store, document, writeCount } = projectStore();
+      const original = await sketchExtrusionShapeFromRequest({
+        id: "face-reselection-safety", sketchSourceId: "sketch/face-reselection-safety",
+        name: "Face-reselection safety",
+        profile: {
+          points: [
+            { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+            { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+          ],
+          segments: [
+            { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+            { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          ],
+        },
+        height: 3, x: 0, z: 0, elevation: 0, rotation: 0,
+      });
+      document.shapes = [original];
+      return { store, document, writeCount, original };
+    })();
+    const engine = createEngine(store);
+    const sourceFaces = await shapeFaces(original);
+    const selectedFace = sourceFaces.find((face) => face.surfaceType === "plane" && face.normal
+      && Math.abs(face.normal.x) > 0.99)!;
+    const drafted = value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "y" },
+    })).shape;
+    const draftedFaces = await shapeFaces(drafted);
+    const generatedId = draftedFaces.find((face) => !sourceFaces.some((source) => source.id === face.id))?.id;
+    expect(generatedId).toBeDefined();
+    const before = value(await engine.project("recompute"));
+    const writesBefore = writeCount();
+
+    const generatedIdResult = await engine.changeShape("recompute", drafted.id, {
+      faceDraft: { sourceFaceId: generatedId!, angle: 7, pullDirection: "y" },
+    });
+    expect(generatedIdResult.ok).toBe(false);
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute"))).toEqual(before);
+
+    const duplicateTargetId = sourceFaces.find((face) => face.id !== selectedFace.id)!.id;
+    const storedShape = document.shapes[0]!;
+    storedShape.faceIds = [...(storedShape.faceIds ?? [])];
+    storedShape.faceIds[storedShape.faceIds.length - 1] = duplicateTargetId;
+    const beforeAmbiguousReselection = value(await engine.project("recompute"));
+    const ambiguousResult = await engine.changeShape("recompute", drafted.id, {
+      faceDraft: { sourceFaceId: duplicateTargetId, angle: 7, pullDirection: "y" },
+    });
+    expect(ambiguousResult.ok).toBe(false);
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute"))).toEqual(beforeAmbiguousReselection);
+
+    const changedProfile = {
+      ...original.sketchProfile!,
+      points: original.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.1 })),
+    };
+    const combinedResult = await engine.changeShape("recompute", original.sketchSourceId!, {
+      sketchProfile: changedProfile,
+      faceDraft: { sourceFaceId: sourceFaces.find((face) => face.id !== selectedFace.id)!.id, angle: 7, pullDirection: "y" },
+    });
+    expect(combinedResult.ok).toBe(false);
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute"))).toEqual(before);
+    expect(document.shapes[0]?.faceDraft?.sourceFaceId).toBe(selectedFace.id);
+  }, CAD_TEST_TIMEOUT_MS);
 });
 
 describe("editing the pull axis of a retained face draft on a sketch extrusion", () => {

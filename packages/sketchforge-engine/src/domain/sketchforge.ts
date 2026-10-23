@@ -381,6 +381,8 @@ export type WorkplaneShape = {
   draftPrismSourceFrame?: CadBrepFrame;
   /** One editable face draft on a retained sketch extrusion. */
   faceDraft?: SketchFaceDraft;
+  /** Source face IDs available for exact face-draft reselection on this source profile. */
+  faceDraftSourceFaceIds?: string[];
   /** Original extrusion frame used to keep face-draft source edits in place. */
   faceDraftSourceFrame?: CadBrepFrame;
   /** Original revolve resize ratios, retained for profile replay after drafting. */
