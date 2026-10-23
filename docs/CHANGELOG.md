@@ -11,6 +11,10 @@ owner: "Contributors"
 
 ## Unreleased
 
+- A face-drafted single-loop sketch extrusion can now retain one symmetric 45°
+  all-edge chamfer. `.skf` round trips preserve the sequence, and source-profile
+  edits replay the extrusion, face draft, then chamfer atomically while
+  refreshing treatment history and eligible-edge counts.
 - A face-drafted single-section, hole-free sketch sweep can now retain one
   symmetric 45° all-edge chamfer. `.skf` round trips preserve the treatment,
   and source-profile edits replay the sweep, face draft, then chamfer atomically.

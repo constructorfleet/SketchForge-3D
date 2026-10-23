@@ -1198,23 +1198,26 @@ function validateShapeDefinition(
     const extrusionRegions = definition.sketchOperation === "extrude" && definition.sketchProfile !== undefined
       ? cadSketchRegions(definition.sketchProfile as SketchProfile)
       : [];
-    const isPersistedExtrusionDraftFillet = Boolean(
+    const isPersistedExtrusionDraftTreatment = Boolean(
       definition.sketchOperation === "extrude"
       && extrusionRegions.length === 1
       && extrusionRegions[0]?.holes.length === 0
       && definition.draftPrismAngle === undefined
       && treatments.length === 1
-      && treatment?.kind === "fillet"
+      && (treatment?.kind === "fillet" || treatment?.kind === "chamfer")
       && treatment.allEdges === true
       && treatment.edges === undefined
+      && (treatment.kind === "fillet"
+        || typeof treatment.chamferAngle === "number" && Math.abs(treatment.chamferAngle - 45) < 0.001)
       && typeof treatment.amount === "number"
       && Number.isFinite(treatment.amount)
       && treatment.amount > 0
       && Number.isInteger(treatment.edgeCount)
       && (treatment.edgeCount as number) > 0
       && history.length === 1
-      && historyFeature?.kind === "fillet"
+      && historyFeature?.kind === treatment.kind
       && historyFeature.allEdges === true
+      && (treatment.kind === "fillet" || historyFeature.chamferAngle === treatment.chamferAngle)
       && historyFeature.amount === treatment.amount
       && historyFeature.edgeCount === treatment.edgeCount
     );
@@ -1257,7 +1260,7 @@ function validateShapeDefinition(
       || definition.sketchSourceId === undefined
       || definition.draftPrismAngle !== undefined
       || (treatments.length > 0 || options.hasEdgeTreatmentHistory)
-        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftFillet && !isPersistedSweepDraftTreatment
+        && !isPersistedRevolveDraftTreatment && !isPersistedExtrusionDraftTreatment && !isPersistedSweepDraftTreatment
     ) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraft` });
     }
