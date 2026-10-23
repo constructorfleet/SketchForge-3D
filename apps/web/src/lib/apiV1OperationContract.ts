@@ -43,7 +43,7 @@ export type ApiV1Operation = {
   responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
   binaryResponse?: {
     status: number;
-    contentTypes: readonly string[];
+    formatContentTypes: Readonly<Record<string, string>>;
     metadataHeader: string;
     metadataSchema: ApiV1FieldSchema;
   };
@@ -335,7 +335,16 @@ const exportMetadataSchema = {
   properties: exportResultFields,
   additionalProperties: false,
 } as const;
-const exportBinaryContentTypes = ["model/stl", "text/plain", "model/3mf", "model/step", "application/vnd.sketchforge.project+zip", "application/zip", "image/svg+xml", "application/dxf"] as const;
+const exportFormatContentTypes = {
+  stl: "model/stl",
+  obj: "text/plain",
+  "3mf": "model/3mf",
+  step: "model/step",
+  skf: "application/vnd.sketchforge.project+zip",
+  zip: "application/zip",
+  svg: "image/svg+xml",
+  dxf: "application/dxf",
+} as const;
 const projectOperations = [
   { ...operation("GET", "/api/v1/projects", "listProjectsOrGetProject", [200, ...commonErrors]), query: { required: [], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } } }, responseSchemas: { 200: { type: "object", oneOf: [projectList, projectDetail] }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/projects", "createProject", [201, ...commonErrors], createProjectRequestBody), responseSchemas: { 201: { type: "object", required: ["project"], properties: { project: projectSummary } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
@@ -402,13 +411,18 @@ function isValidBinaryApiV1Response(key: string, request: Request, response: Res
   const contract = operation?.binaryResponse;
   if (!contract || response.status !== contract.status || new URL(request.url).searchParams.get("download") !== "1") return false;
   const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
-  if (!contentType || !(contract.contentTypes as readonly string[]).includes(contentType)) return false;
+  if (!contentType || !Object.values(contract.formatContentTypes).includes(contentType)) return false;
   const encodedMetadata = response.headers.get(contract.metadataHeader);
   if (!encodedMetadata) return false;
   try {
     const metadata = JSON.parse(decodeURIComponent(encodedMetadata));
+    const fields = metadata as Record<string, unknown>;
+    const expectedContentType = typeof fields.format === "string"
+      ? (contract.formatContentTypes as Readonly<Record<string, string>>)[fields.format]
+      : undefined;
     return validateApiV1Schema(metadata, contract.metadataSchema)
-      && (metadata as Record<string, unknown>).mimeType === contentType;
+      && fields.mimeType === contentType
+      && expectedContentType === contentType;
   } catch {
     return false;
   }
@@ -606,7 +620,7 @@ export const API_V1_OPERATIONS = [
       500: faceError("internal_error"),
       503: faceError("storage_unconfigured"),
     },
-    binaryResponse: { status: 200, contentTypes: exportBinaryContentTypes, metadataHeader: "X-SketchForge-Metadata", metadataSchema: exportMetadataSchema },
+    binaryResponse: { status: 200, formatContentTypes: exportFormatContentTypes, metadataHeader: "X-SketchForge-Metadata", metadataSchema: exportMetadataSchema },
   },
   {
     ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 422, 500, 503]),
