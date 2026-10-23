@@ -4,12 +4,17 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
+import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/projectAssets";
+import { exportSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
+import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
+import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 
 const root = path.resolve(__dirname, "../..");
 const server = path.join(root, "packages/sketchforge-client/mcp/server.mjs");
 const temporaryDirectories: string[] = [];
 
-function callMcp(projectsDir: string, id: number, name: string, args: Record<string, unknown>, extraEnvironment: Record<string, string> = {}) {
+function callMcp(projectsDir: string, id: number, name: string, args: Record<string, unknown>, extraEnvironment: Record<string, string> = {}, timeoutMs = 30_000) {
   const input = [
     JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } }),
     JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
@@ -19,10 +24,12 @@ function callMcp(projectsDir: string, id: number, name: string, args: Record<str
     input,
     encoding: "utf8",
     env: { ...process.env, SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "", SKETCHFORGE_URL: "http://127.0.0.1:1", ...extraEnvironment },
-    timeout: 30_000,
+    timeout: timeoutMs,
   });
   expect(run.status, run.stderr).toBe(0);
-  return run.stdout.trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  const output = run.stdout.trim();
+  expect(output, `MCP returned no JSON; stderr: ${run.stderr}; error: ${run.error}`).not.toBe("");
+  return output.split(/\r?\n/).filter((line) => line.trim().startsWith("{")).map((line) => JSON.parse(line));
 }
 
 function listMcpTools(projectsDir: string) {
@@ -111,6 +118,61 @@ describe("local MCP engine mode", () => {
     const scene = callMcp(projectsDir, 2, "sketchforge_read_scene", { projectId: importedProject.projectId });
     expect(JSON.parse(scene[1].result.content[0].text).objects).toEqual([expect.objectContaining({ id: shapeId, name: "Imported box" })]);
   });
+
+  it("imports a STEP-backed SKF project locally and explodes its nested assembly", async () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-step-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    const sourceBytes = new Uint8Array(fs.readFileSync(path.join(root, "tests/fixtures/step/nested-assembly.step")));
+    const source = await projectAssetFromBytes("nested-assembly.step", "step", sourceBytes);
+    const imported = await importedShapeFromStepOnKernel(source.name, new TextDecoder().decode(sourceBytes));
+    imported.shape.importedMesh!.assetId = source.id;
+    const packagePath = path.join(projectsDir, "step-assembly.skf");
+    fs.writeFileSync(packagePath, await exportSkfProject({
+      projectId: "step-assembly-source",
+      projectName: "Nested STEP assembly",
+      createdAt: 1,
+      modifiedAt: 1,
+      shapes: [imported.shape],
+      history: [editorHistoryEntry([imported.shape], [])],
+      historyIndex: 0,
+      assets: [source],
+      workspace: DEFAULT_WORKPLANE_WORKSPACE,
+      snapGrid: DEFAULT_SNAP_GRID,
+      placementElevation: 0,
+    }));
+
+    const importedProjectCall = callMcp(projectsDir, 2, "sketchforge_import_project", {
+      filePath: packagePath,
+      name: "Nested STEP assembly",
+    }, {}, 120_000);
+    expect(importedProjectCall[1].result.isError).toBeUndefined();
+    const project = JSON.parse(importedProjectCall[1].result.content[0].text);
+    expect(project).toMatchObject({ name: "Nested STEP assembly", shapeCount: 1, revision: 1 });
+
+    const explodedCall = callMcp(projectsDir, 3, "sketchforge_explode_step_assembly", {
+      projectId: project.projectId,
+      shapeId: imported.shape.id,
+    }, {}, 120_000);
+    expect(explodedCall[1].result.isError).toBeUndefined();
+    const exploded = JSON.parse(explodedCall[1].result.content[0].text);
+    expect(exploded.shapes).toHaveLength(1);
+    const rootGroup = exploded.shapes[0];
+    expect(rootGroup.name).toBe("MainAssembly");
+    expect(rootGroup.groupedShapes.map((part: { name: string }) => part.name)).toEqual(["Frame", "Sensors"]);
+    const sensors = rootGroup.groupedShapes.find((part: { name: string }) => part.name === "Sensors");
+    expect(sensors.groupedShapes.map((part: { name: string }) => part.name)).toEqual(["SensorLeft", "SensorRight"]);
+    const leaves = [rootGroup.groupedShapes[0], ...sensors.groupedShapes];
+    expect(leaves).toHaveLength(3);
+    expect(leaves.map((part: { stepComponent?: { path: Array<{ name: string }> } }) => part.stepComponent?.path.at(-1)?.name).sort())
+      .toEqual(["Frame", "SensorLeft", "SensorRight"]);
+    expect(leaves.every((part: { importedMesh?: { hasBrepStep?: boolean }; stepComponent?: { occurrenceId?: string; path?: unknown[] } }) =>
+      part.importedMesh?.hasBrepStep && part.stepComponent?.occurrenceId && part.stepComponent.path?.length)).toBe(true);
+    expect(fs.existsSync(path.join(projectsDir, `${project.projectId}.skf`))).toBe(true);
+    expect(fs.existsSync(path.join(projectsDir, `${project.projectId}.json`))).toBe(true);
+    fs.rmSync(projectsDir, { recursive: true, force: true });
+    temporaryDirectories.splice(temporaryDirectories.indexOf(projectsDir), 1);
+    expect(fs.existsSync(projectsDir)).toBe(false);
+  }, 180_000);
 
   it("creates and reads a project directly from its directory without a server", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
