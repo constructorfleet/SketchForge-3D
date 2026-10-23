@@ -1291,6 +1291,18 @@ function validateShapeDefinition(
       }
     });
   }
+  if (definition.faceDraftSourceFaceIds !== undefined) {
+    if (!Array.isArray(definition.faceDraftSourceFaceIds) || definition.faceDraftSourceFaceIds.length === 0) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraftSourceFaceIds` });
+    }
+    const sourceFaceIds = definition.faceDraftSourceFaceIds.map((id, index) =>
+      stringValue(id, `${label}.faceDraftSourceFaceIds[${index}]`));
+    if (sourceFaceIds.some((id) => !id.trim()) || new Set(sourceFaceIds).size !== sourceFaceIds.length
+      || typeof definition.faceDraft === "object" && definition.faceDraft !== null
+        && !sourceFaceIds.includes((definition.faceDraft as Record<string, unknown>).sourceFaceId as string)) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraftSourceFaceIds` });
+    }
+  }
   if (kind === "gear") {
     const teeth = finiteNumber(definition.teeth, `${label}.teeth`);
     if (!Number.isInteger(teeth) || teeth < 6 || teeth > 64) throw new LocalizedError("errors.skf.outOfRange", { label: `${label}.teeth` });

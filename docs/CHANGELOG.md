@@ -11,6 +11,12 @@ owner: "Contributors"
 
 ## Unreleased
 
+- An untreated face draft on a single-loop sketch extrusion can now be
+  reselected by an original source-face ID that remains uniquely planar in the
+  current output. The allowlist persists in `.skf`; generated IDs, ambiguous or
+  missing IDs, treated shapes, and profile edits combined with reselection are
+  refused atomically. Profile edits refresh IDs from rebuilt source topology
+  without transferring IDs by CAD face index.
 - A retained face draft on a plain single-region full-turn sketch revolve can
   now change its angle while preserving one all-edge fillet or symmetric 45°
   all-edge chamfer. The engine replays revolve, draft, then treatment atomically,

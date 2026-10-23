@@ -239,10 +239,15 @@ fillet or symmetric 45° all-edge chamfer, changing the retained face-draft
 angle, signed pull axis, or both together replays source, draft, then treatment
 atomically. `.skf` round trips and subsequent profile edits retain both values,
 treatment, and IDs; invalid axes or failed replay roll back without writing. An
-untreated retained face draft can update its angle or axis while keeping the
-same source face ID; clear the draft before selecting another source face. This
-bounded support does not define semantic lineage across arbitrary topology
-changes. Prism drafts are editable
+untreated retained face draft can be reselected by an ID from the original
+source-face listing only when that ID remains exactly once as a planar face in
+the current output. The source-face ID allowlist persists in `.skf` but is not
+returned in shape summaries. Generated draft-face IDs, ambiguous or missing
+IDs, reselection on treated shapes, and profile edits combined with reselection
+are refused atomically. Profile edits rebuild the allowlist from the new source
+topology rather than transferring IDs by CAD face index. Other source-face
+reselection remains unsupported; this bounded support does not define semantic
+lineage across arbitrary topology changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The
 editor does not yet create or edit the persisted face-draft feature; its
 arbitrary-shape results remain baked. Other draft operations and general

@@ -549,9 +549,12 @@ describe("dependency-ordered feature recomputation", () => {
 
     expect(changed.ok, JSON.stringify(changed)).toBe(true);
     expect(value(changed).shape).toMatchObject({
-      id: original.id, sketchSourceId: original.sketchSourceId, faceDraft: restoredDraft,
+      id: original.id, sketchSourceId: original.sketchSourceId,
+      faceDraft: { angle: restoredDraft.angle, pullDirection: restoredDraft.pullDirection },
       sketchProfile: extrusionProfile(1.5), x: original.x, z: original.z, elevation: original.elevation, rotation: 135,
     });
+    expect(value(changed).shape.faceDraft?.sourceFaceId).not.toBe(restoredDraft.sourceFaceId);
+    expect(value(changed).shape.faceDraftSourceFaceIds).toContain(value(changed).shape.faceDraft?.sourceFaceId);
     expect(value(changed).shape.cadBrep).not.toBe(rotatedDraft.cadBrep);
     expect(writeCount()).toBe(beforeEditWrites + 1);
 
@@ -612,7 +615,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect((await store.read("recompute"))?.shapes).toEqual([original]);
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("requires clearing a face draft before selecting a different source face", async () => {
+  it("rolls back when a different source face cannot be drafted at the requested angle and axis", async () => {
     const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
     const original = await sketchExtrusionShapeFromRequest({
@@ -640,7 +643,7 @@ describe("dependency-ordered feature recomputation", () => {
     });
 
     expect(changed.ok).toBe(false);
-    expect(changed.ok ? undefined : changed.failure.reason).toBe("invalid_shape_request");
+    expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
     expect(writeCount()).toBe(writesBeforeReselect);
     expect(value(await engine.project("recompute")).shapes).toEqual(beforeReselect.shapes);
   }, CAD_TEST_TIMEOUT_MS);
@@ -758,14 +761,17 @@ describe("dependency-ordered feature recomputation", () => {
 
     expect(changed.ok, JSON.stringify(changed)).toBe(true);
     expect(value(changed).shape).toMatchObject({
-      id: restoredHole.id, sketchSourceId: restoredHole.sketchSourceId, sketchProfile: editedProfile, faceDraft: draft,
+      id: restoredHole.id, sketchSourceId: restoredHole.sketchSourceId, sketchProfile: editedProfile,
+      faceDraft: { angle: draft.angle, pullDirection: draft.pullDirection },
     });
+    expect(value(changed).shape.faceDraft?.sourceFaceId).not.toBe(draft.sourceFaceId);
+    expect(value(changed).shape.faceDraftSourceFaceIds).toContain(value(changed).shape.faceDraft?.sourceFaceId);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
     const afterGroup = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
     expect(afterGroup.id).toBe(beforeGroup.id);
     expect(afterGroup.cadBrep).not.toBe(beforeGroup.cadBrep);
     expect(afterGroup.groupedShapes?.find((shape) => shape.id === restoredHole.id)).toMatchObject({
-      sketchProfile: editedProfile, faceDraft: draft,
+      sketchProfile: editedProfile, faceDraft: { angle: draft.angle, pullDirection: draft.pullDirection },
     });
   }, CAD_TEST_TIMEOUT_MS);
 
