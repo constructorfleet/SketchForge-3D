@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { API_V1_OPERATIONS, type ApiV1Operation } from "@/lib/apiV1OperationContract";
+import { API_V1_OPERATIONS, type ApiV1FieldSchema, type ApiV1Operation } from "@/lib/apiV1OperationContract";
 
 const routeRoot = path.resolve("apps/web/src/app/api/v1");
 
@@ -95,7 +95,7 @@ describe("REST API v1 operation contract", () => {
       requestBody: { schema: { type: "object", required: ["format"] } },
       binaryResponse: { status: 200, metadataHeader: "X-SketchForge-Metadata" },
     });
-    const bodySchema = operation?.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema : undefined;
+    const bodySchema = operation?.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema as ApiV1FieldSchema : undefined;
     expect(bodySchema && contract.validateApiV1Schema({ format: "svg", view: "top" }, bodySchema)).toBe(true);
     expect(bodySchema && contract.validateApiV1Schema({ format: "gcode" }, bodySchema)).toBe(false);
     expect(bodySchema && contract.validateApiV1Schema({ format: "svg", name: "x".repeat(121) }, bodySchema)).toBe(false);
@@ -679,8 +679,17 @@ describe("REST API v1 operation contract", () => {
         contentType: "application/json",
         required: true,
         faceColors: { keyKinds: ["stable-face-id", "legacy-numeric-index"], colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" },
+        schema: { type: "object", additionalProperties: true },
       },
     });
+    const bodySchema = operation?.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema as ApiV1FieldSchema : undefined;
+    expect(bodySchema?.properties?.["faceColors"]?.patternProperties).toMatchObject({
+      "^(?:[0-9]+|face_[^\\s]+)$": { type: "string", pattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" },
+    });
+    expect(bodySchema && contract.validateApiV1Schema({ faceColors: { face_abc123: "#12aBcF", "0": "#12aBcF80" }, name: "Updated" }, bodySchema)).toBe(true);
+    expect(bodySchema && contract.validateApiV1Schema({ faceColors: { other_key: "#12aBcF" } }, bodySchema)).toBe(false);
+    expect(bodySchema && contract.validateApiV1Schema({ faceColors: { face_abc123: "red" } }, bodySchema)).toBe(false);
+    expect(bodySchema && contract.validateApiV1Schema({ name: "Updated", width: 22 }, bodySchema)).toBe(true);
     expect(contract.parseShapePatchRequest({ faceColors: { face_abc123: "#12aBcF", "0": "#12aBcF80" } }))
       .toEqual({ ok: true, body: { faceColors: { face_abc123: "#12aBcF", "0": "#12aBcF80" } } });
     expect(contract.parseShapePatchRequest({ name: "Updated", faceColors: { "0": "#12aBcF" } }))

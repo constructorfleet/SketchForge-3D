@@ -108,10 +108,7 @@ function omissionReason(operation) {
   if ([...operation.responses].sort((a, b) => a - b).join(",") !== declaredStatuses.join(",")) {
     return "Not every declared response status has a response schema.";
   }
-  if (operation.operationId === "updateShape" && operation.requestBody?.faceColors) {
-    return "PATCH /shapes is omitted because faceColors uses custom validation not expressible in JSON Schema. It also accepts sketchProfile to rebuild a retained sketch sweep; see https://constructorfleet.github.io/SketchForge-3D/docs/REST_API#sketch-sweeps.";
-  }
-  if (operation.response || operation.requestBody?.faceColors) return "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema.";
+  if (operation.response) return "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema.";
   if (operation.requestBody && !operation.requestBody.schema && !operation.requestBody.content) return "Request body schema is not declared.";
   return undefined;
 }
@@ -136,6 +133,7 @@ function toJsonSchema(schema) {
   if (schema.description !== undefined) result.description = schema.description;
   if (schema.format !== undefined) result.format = schema.format;
   if (schema.properties) result.properties = Object.fromEntries(Object.entries(schema.properties).map(([name, child]) => [name, toJsonSchema(child)]));
+  if (schema.patternProperties) result.patternProperties = Object.fromEntries(Object.entries(schema.patternProperties).map(([pattern, child]) => [pattern, toJsonSchema(child)]));
   if (schema.anyOf) result.anyOf = schema.anyOf.map(toJsonSchema);
   if (schema.items) result.items = toJsonSchema(schema.items);
   if (schema.additionalProperties !== undefined) result.additionalProperties = typeof schema.additionalProperties === "boolean" ? schema.additionalProperties : toJsonSchema(schema.additionalProperties);
