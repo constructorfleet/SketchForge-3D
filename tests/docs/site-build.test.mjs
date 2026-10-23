@@ -101,7 +101,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve/i);
   assert.match(spec, /`GET \/faces\?topology=exact` lists analytic B-rep revolve faces/i);
-  assert.match(spec, /Source-profile edits replay the draft only when exactly one planar face matches the saved source normal/i);
+  assert.match(spec, /eligible straight-line, single-region, no-hole extrusion side faces replay after profile edits by exact sketch segment identity/i);
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /a single-loop sketch extrusion accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);

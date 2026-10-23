@@ -634,6 +634,7 @@ async function serializeShapeNode(
         sketchSourceNodeId: undefined,
         faceDraft: undefined,
         faceDraftSourceFrame: undefined,
+        faceDraftSourceSegmentId: undefined,
         sketchSourceOfObjectId: shape.id,
       },
     });
@@ -1301,6 +1302,32 @@ function validateShapeDefinition(
       || typeof definition.faceDraft === "object" && definition.faceDraft !== null
         && !sourceFaceIds.includes((definition.faceDraft as Record<string, unknown>).sourceFaceId as string)) {
       throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraftSourceFaceIds` });
+    }
+  }
+  if (definition.faceDraftSourceSegmentId !== undefined) {
+    const sourceSegmentId = stringValue(definition.faceDraftSourceSegmentId, `${label}.faceDraftSourceSegmentId`);
+    const profile = definition.sketchProfile as SketchProfile | undefined;
+    let regions: ReturnType<typeof cadSketchRegions> = [];
+    try {
+      if (profile) regions = cadSketchRegions(profile);
+    } catch {
+      regions = [];
+    }
+    const segments = profile?.segments ?? [];
+    const pointsById = new Map(profile?.points.map((point) => [point.id, point] as const) ?? []);
+    const sourceSegmentMatches = segments.filter((segment) => segment.id === sourceSegmentId);
+    const containsBezier = segments.some((segment) => {
+      if (segment.kind !== undefined && segment.kind !== "line") return true;
+      if (segment.kind !== undefined) return false;
+      const start = pointsById.get(segment.startId);
+      const end = pointsById.get(segment.endId);
+      return Boolean(start && end && ((start.handleOut && end.handleIn) || (start.handleIn && end.handleOut)));
+    });
+    if (!sourceSegmentId.trim() || kind !== "mesh" || definition.sketchOperation !== "extrude"
+      || definition.faceDraft === undefined || !profile || regions.length !== 1 || regions[0]?.holes.length !== 0
+      || regions[0]?.outer.steps.length !== segments.length || containsBezier
+      || sourceSegmentMatches.length !== 1) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.faceDraftSourceSegmentId` });
     }
   }
   if (kind === "gear") {

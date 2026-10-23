@@ -89,8 +89,11 @@ describe("SketchForge .skf project packages", () => {
         pullDirection: "x",
         sourceFaceNormal: { x: 1, y: 0, z: 0 },
       },
+      faceDraftSourceSegmentId: "bc",
     });
     const validArchive = await exportSkfProject(input([draftedExtrusion]));
+    const restoredDraftedExtrusion = await importSkfProject(validArchive);
+    expect(restoredDraftedExtrusion.shapes[0]?.faceDraftSourceSegmentId).toBe("bc");
     const invalidCases: Array<[string, (definition: Record<string, unknown>) => void]> = [
       ["revolve without settings", (definition) => { definition.sketchOperation = "revolve"; }],
       ["partial revolve", (definition) => { definition.sketchOperation = "revolve"; definition.sketchRevolve = { startAngle: 0, sweepAngle: 180, sides: 48, quality: 0 }; }],
@@ -106,6 +109,12 @@ describe("SketchForge .skf project packages", () => {
       }],
       ["prism draft", (definition) => { definition.draftPrismAngle = 3; }],
       ["edge treatment", (definition) => { definition.edgeTreatments = [{ kind: "fillet", amount: 0.5, edgeCount: 1 }]; }],
+      ["foreign face-draft sketch segment", (definition) => { definition.faceDraftSourceSegmentId = "does-not-exist"; }],
+      ["Bezier segment with face-draft segment lineage", (definition) => {
+        const profile = definition.sketchProfile as { points: Array<Record<string, unknown>> };
+        profile.points.find((point) => point.id === "b")!.handleOut = { x: 6, z: -4 };
+        profile.points.find((point) => point.id === "c")!.handleIn = { x: 6, z: 4 };
+      }],
     ];
 
     for (const [label, mutateDefinition] of invalidCases) {

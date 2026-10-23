@@ -11,6 +11,10 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Retained face drafts on straight-line, single-region, no-hole sketch extrusion
+  side faces now follow the same sketch segment through source-profile edits,
+  even when the face normal changes. The segment identity survives `.skf`
+  round trips; missing or ambiguous segment matches fail without writing.
 - An untreated face draft on a single-loop sketch extrusion can now be
   reselected by an original source-face ID that remains uniquely planar in the
   current output. The allowlist persists in `.skf`; generated IDs, ambiguous or

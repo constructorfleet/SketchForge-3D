@@ -383,6 +383,8 @@ export type WorkplaneShape = {
   faceDraft?: SketchFaceDraft;
   /** Source face IDs available for exact face-draft reselection on this source profile. */
   faceDraftSourceFaceIds?: string[];
+  /** Sketch profile segment identity for a straight extrusion side-face draft. */
+  faceDraftSourceSegmentId?: string;
   /** Original extrusion frame used to keep face-draft source edits in place. */
   faceDraftSourceFrame?: CadBrepFrame;
   /** Original revolve resize ratios, retained for profile replay after drafting. */

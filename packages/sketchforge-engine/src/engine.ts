@@ -29,6 +29,7 @@ import {
   type ServerCadEdge,
   type ServerCadTreatment,
 } from "./serverCadOperations.js";
+import { draftFaceForSketchSegment, legacyDraftSegmentForShape, sketchSegmentForDraftFace } from "./faceDraftSegmentLineage.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import {
   applyShell,
@@ -979,6 +980,7 @@ export function createEngine(store: ProjectStore): Engine {
             faceDraft: undefined,
             faceDraftSourceFrame: undefined,
             faceDraftSourceFaceIds: undefined,
+            faceDraftSourceSegmentId: undefined,
             ...(faceDraftChanged && !replacingSketchProfile && !existing.faceDraft && !hasExistingTreatment
               && existing.draftPrismAngle === undefined && existing.faceIds?.length === rebuilt.faceIds?.length
               ? { faceIds: existing.faceIds }
@@ -1024,23 +1026,54 @@ export function createEngine(store: ProjectStore): Engine {
             const exactReselectedSourceFace = isReselection
               ? (await shapeFaces(replayedSource)).find((face) => face.id === requestedFaceDraft.sourceFaceId)
               : undefined;
-            const sourceFaceNormal = exactReselectedSourceFace?.normal ?? priorReference ?? selectedOnPrior?.normal;
+            const exactSelectedSourceFace = !replacingSketchProfile && !existing.faceDraft
+              ? (await shapeFaces(replayedSource)).find((face) => face.id === requestedFaceDraft.sourceFaceId)
+              : undefined;
+            const legacySegmentMatch = replacingSketchProfile && existing.faceDraft && !existing.faceDraftSourceSegmentId
+              ? await legacyDraftSegmentForShape(existing)
+              : undefined;
+            if (legacySegmentMatch?.status === "ambiguous") {
+              throw new Error("The saved face draft does not identify one source sketch segment.");
+            }
+            const retainedSourceSegmentId = existing.faceDraftSourceSegmentId
+              ?? (legacySegmentMatch?.status === "matched" ? legacySegmentMatch.segmentId : undefined);
+            const retainedSegmentFace = replacingSketchProfile && retainedSourceSegmentId
+              ? await draftFaceForSketchSegment(replayedSource, retainedSourceSegmentId)
+              : undefined;
+            if (retainedSegmentFace && retainedSegmentFace.status !== "matched") {
+              throw new Error("The selected sketch segment no longer maps to exactly one extrusion side face.");
+            }
+            let currentFaceId = retainedSegmentFace?.status === "matched"
+              ? retainedSegmentFace.faceId
+              : exactReselectedSourceFace?.surfaceType === "plane" ? exactReselectedSourceFace.id
+                : exactSelectedSourceFace?.surfaceType === "plane" ? exactSelectedSourceFace.id : undefined;
+            const sourceFaceNormal = retainedSegmentFace?.status === "matched"
+              ? retainedSegmentFace.normal
+              : exactReselectedSourceFace?.normal ?? exactSelectedSourceFace?.normal ?? priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
             }
-            const currentFace = exactReselectedSourceFace?.surfaceType === "plane"
-              ? exactReselectedSourceFace
-              : await findUniqueDraftFace(replayedSource, sourceFaceNormal);
-            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+            if (!currentFaceId) currentFaceId = (await findUniqueDraftFace(replayedSource, sourceFaceNormal))?.id;
+            if (!currentFaceId) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+            const segmentMatch = retainedSegmentFace?.status === "matched"
+              ? retainedSegmentFace
+              : await sketchSegmentForDraftFace(replayedSource, currentFaceId);
+            if (segmentMatch.status === "ambiguous") {
+              throw new Error("The selected lateral face matches multiple sketch segments.");
+            }
+            if (segmentMatch.status === "missing") {
+              throw new Error("The selected extrusion side face has no exact sketch-segment boundary match.");
+            }
             const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
             const result = await applySketchFaceDraft(replayedSource, {
               ...requestedFaceDraft,
-              sourceFaceId: currentFace.id,
+              sourceFaceId: currentFaceId,
             });
             swept = {
               ...shapeWithCadResult(replayedSource, result),
-              faceDraft: { ...faceDraft, sourceFaceId: currentFace.id },
+              faceDraft: { ...faceDraft, sourceFaceId: currentFaceId },
               faceDraftSourceFaceIds: replayedSource.faceIds,
+              faceDraftSourceSegmentId: segmentMatch.status === "matched" ? segmentMatch.segmentId : undefined,
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
             };
           } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {

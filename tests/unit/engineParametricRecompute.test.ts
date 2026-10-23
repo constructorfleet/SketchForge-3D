@@ -566,7 +566,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(writeCount()).toBe(beforeClear + 1);
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("rolls back a face-draft source edit when its selected planar face has no unique match", async () => {
+  it("replays a face-draft source edit by sketch segment when its planar normal changes", async () => {
     const { store, writeCount, document } = projectStore();
     const engine = createEngine(store);
     const original = await sketchExtrusionShapeFromRequest({
@@ -579,7 +579,6 @@ describe("dependency-ordered feature recomputation", () => {
       faceDraft: { sourceFaceId: selected.id, angle: 5, pullDirection: "z" },
     });
     expect(created.ok, JSON.stringify(created)).toBe(true);
-    const beforeEdit = value(await engine.project("recompute"));
     const writesBeforeEdit = writeCount();
     const shearedProfile = {
       ...extrusionProfile(),
@@ -588,10 +587,13 @@ describe("dependency-ordered feature recomputation", () => {
 
     const changed = await engine.changeShape("recompute", "sketch/unmatched-draft", { sketchProfile: shearedProfile });
 
-    expect(changed.ok).toBe(false);
-    expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
-    expect(writeCount()).toBe(writesBeforeEdit);
-    expect(value(await engine.project("recompute")).shapes).toEqual(beforeEdit.shapes);
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const replayed = value(changed).shape;
+    expect(replayed.sketchProfile).toEqual(shearedProfile);
+    expect(replayed.faceDraft).toMatchObject({ angle: 5, pullDirection: "z" });
+    expect(replayed.faceDraft?.sourceFaceId).not.toBe(selected.id);
+    expect(replayed.faceDraftSourceSegmentId).toBe("bc");
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("rolls back when the kernel cannot draft the selected face along a parallel axis", async () => {
