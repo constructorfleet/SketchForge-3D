@@ -29,6 +29,8 @@ test("docs scripts generate and check each deterministic reference", async () =>
     }
   }
   assert.ok(scripts["docs:generate"].includes("npm run docs:stage"), "full site generation must include staged package references");
+  assert.ok(scripts["docs:stage"].includes("scripts/generate-rest-operation-pages.mjs --output-dir .docs-site/docs/rest-api"),
+    "docs:stage must publish operation pages into the VitePress tree after canonical Markdown is staged");
   assert.ok(scripts["docs:generate"].includes("npm run engine:build"), "generated package references require built engine declarations");
   assert.ok(scripts["docs:generate"].includes("npm run client:build"), "generated package references require built client declarations");
   assert.ok(scripts["docs:verify"].includes("tests/docs/generator-hooks.test.mjs"), "CI docs checks must run the generator wiring test");
