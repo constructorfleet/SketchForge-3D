@@ -10,6 +10,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   const spec = JSON.parse(await readFile(path.join(root, "docs/openapi-v1.json"), "utf8"));
 
   assert.equal(spec.openapi, "3.1.0");
+  assert.match(spec.info.description, /only omitted operations are the four preflight-only OPTIONS handlers/i);
+  assert.doesNotMatch(spec.info.description, /still need contract work/i);
   assert.ok(spec.paths["/api/v1/projects"].post);
   assert.ok(spec.paths["/api/v1/shapes"].get);
   assert.ok(spec.paths["/api/v1/shapes"].patch, "PATCH should be included once faceColors validation is represented");

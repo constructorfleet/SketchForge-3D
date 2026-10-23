@@ -3,7 +3,7 @@
   "info": {
     "title": "SketchForge REST API v1 (contracted subset)",
     "version": "1",
-    "description": "Generated from the runtime-facing API operation registry. This document contains only operations whose request, query, and response metadata can be represented accurately. See x-sketchforge-omitted-operations for the registered operations that still need contract work."
+    "description": "Generated from the runtime-facing API operation registry. This document contains only operations whose request, query, and response metadata can be represented accurately. The only omitted operations are the four preflight-only OPTIONS handlers listed in x-sketchforge-omitted-operations."
   },
   "paths": {
     "/api/v1/booleans": {
