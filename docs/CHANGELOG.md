@@ -11,6 +11,13 @@ owner: "Contributors"
 
 ## Unreleased
 
+- A retained face draft on a plain single-region full-turn sketch revolve can
+  now change its angle while preserving one all-edge fillet or symmetric 45°
+  all-edge chamfer. The engine replays revolve, draft, then treatment atomically,
+  preserving output/source/source-face IDs and refreshing treatment history and
+  eligible-edge counts. `.skf` round trips and subsequent profile or revolve
+  setting edits preserve the sequence. Pull-axis and combined angle/axis edits,
+  multi-region, partial-turn, and helical revolves remain refused.
 - A retained face draft on a single-section, hole-free sketch sweep can now
   change its angle while preserving one all-edge fillet or symmetric 45°
   chamfer. Recompute applies source, draft, then treatment atomically; `.skf`
