@@ -32,7 +32,7 @@ for (const operation of API_V1_OPERATIONS) {
   ]));
   if (operation.binaryResponse) {
     const binarySchema = { type: "string", format: "binary" };
-    for (const mediaType of operation.binaryResponse.contentTypes) responses[operation.binaryResponse.status].content[mediaType] = { schema: binarySchema };
+    for (const mediaType of new Set(Object.values(operation.binaryResponse.formatContentTypes))) responses[operation.binaryResponse.status].content[mediaType] = { schema: binarySchema };
     responses[operation.binaryResponse.status].headers = {
       [operation.binaryResponse.metadataHeader]: {
         description: "URI-encoded JSON containing the export metadata fields (format, filename, mimeType, shapeCount, and optional STEP skipped-shape details).",

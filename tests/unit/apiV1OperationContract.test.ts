@@ -99,7 +99,7 @@ describe("REST API v1 operation contract", () => {
     expect(bodySchema && contract.validateApiV1Schema({ format: "svg", view: "top" }, bodySchema)).toBe(true);
     expect(bodySchema && contract.validateApiV1Schema({ format: "gcode" }, bodySchema)).toBe(false);
     expect(bodySchema && contract.validateApiV1Schema({ format: "svg", name: "x".repeat(121) }, bodySchema)).toBe(false);
-    expect(operation?.binaryResponse?.contentTypes).toContain("application/dxf");
+    expect(operation?.binaryResponse?.formatContentTypes).toMatchObject({ stl: "model/stl", svg: "image/svg+xml", dxf: "application/dxf" });
 
     const metadata = { format: "stl", filename: "Plate.stl", mimeType: "model/stl", shapeCount: 1 };
     const valid = new Response(new Uint8Array([1, 2, 3]), { headers: {
@@ -121,6 +121,12 @@ describe("REST API v1 operation contract", () => {
       "X-SketchForge-Metadata": encodeURIComponent(JSON.stringify({ ...metadata, mimeType: "image/svg+xml" })),
     } }));
     expect((await mismatched(request)).status).toBe(500);
+
+    const wrongFormatMime = contract.withApiV1Contract(key, async () => new Response("svg bytes", { headers: {
+      "Content-Type": "image/svg+xml",
+      "X-SketchForge-Metadata": encodeURIComponent(JSON.stringify({ ...metadata, mimeType: "image/svg+xml" })),
+    } }));
+    expect((await wrongFormatMime(request)).status).toBe(500);
   });
 
   it("contracts interference normalization, bounded errors, and exact or tessellated reports", async () => {
