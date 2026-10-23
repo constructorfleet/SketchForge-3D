@@ -243,8 +243,11 @@ symmetric 45° all-edge chamfer, changing only the retained face-draft angle
 replays revolve, draft, then treatment atomically. Output, source, and
 source-face IDs remain stable; treatment history and eligible-edge counts are
 refreshed. `.skf` round trips preserve the edit and allow subsequent profile
-and revolve-setting edits. Pull-axis edits, simultaneous angle-and-axis edits,
-multi-region, partial-turn, and helical revolves remain refused.
+and revolve-setting edits. Pull-axis-only edits also replay the treatment
+atomically, preserving the same identities and refreshing treatment history and
+eligible-edge counts; `.skf` round trips retain the signed axis for later source
+edits. Combined angle-and-axis edits, multi-region, partial-turn, and helical
+revolves remain refused.
 
 ### 3. Editable STEP assembly hierarchy and robust component association
 
