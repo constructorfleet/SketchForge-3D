@@ -219,9 +219,11 @@ source-profile and draft-angle edits replay the draft before the treatment.
 Adding a prism draft after an edge treatment remains refused, as do
 selected-edge or multiple treatments on a drafted extrusion. Shelling remains
 refused when persisted draft or treatment
-metadata exists. An untreated retained face draft can update its angle or axis
-while keeping the same source face ID; edits to the face-draft parameters are
-currently refused while an edge treatment is retained. Clear the draft before
+metadata exists. On a single-loop sketch extrusion with one supported all-edge
+fillet or symmetric 45° all-edge chamfer, changing only the retained face-draft
+angle replays source, draft, then treatment atomically. Changing its pull axis
+while treated remains refused. An untreated retained face draft can update its
+angle or axis while keeping the same source face ID; clear the draft before
 selecting another source face. This bounded support does not define
 semantic lineage across arbitrary topology changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The

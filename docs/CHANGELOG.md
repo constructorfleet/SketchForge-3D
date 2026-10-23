@@ -11,6 +11,11 @@ owner: "Contributors"
 
 ## Unreleased
 
+- A retained face draft on a single-loop sketch extrusion can now change its
+  angle while preserving one all-edge fillet or symmetric 45° chamfer. The
+  engine replays source, draft, then treatment atomically and refreshes
+  treatment history; `.skf` round trips and source-profile edits preserve the
+  sequence. Changing the treated draft's axis remains refused.
 - A face-drafted single-loop sketch extrusion can now retain one symmetric 45°
   all-edge chamfer. `.skf` round trips preserve the sequence, and source-profile
   edits replay the extrusion, face draft, then chamfer atomically while
