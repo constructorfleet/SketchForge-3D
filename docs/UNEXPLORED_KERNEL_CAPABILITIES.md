@@ -86,12 +86,12 @@ These are implemented and should not be filed as missing features:
   write. A single-loop sketch extrusion or a single-section, no-hole sketch
   sweep may retain one all-edge fillet or one symmetric 45° all-edge chamfer
   after one face draft; `.skf` round trips preserve the sequence and
-  source-profile edits replay the draft before the treatment atomically. Face
-  drafted extrusion chamfers require a single-loop source; one symmetric 45°
-  all-edge chamfer is supported, while face-draft fillets, selected-edge
-  treatments, non-45° chamfers, and additional treatments remain refused. Sweep
-  drafts with multiple sections or section holes, selected-edge treatments,
-  non-45° chamfers, and additional treatments remain refused.
+  source-profile edits replay the draft before the treatment atomically. A
+  single-loop sketch extrusion supports one all-edge fillet or one symmetric
+  45° all-edge chamfer after a face draft; selected-edge treatments, non-45°
+  chamfers, and additional treatments remain refused. Sweep drafts with
+  multiple sections or section holes, selected-edge treatments, non-45°
+  chamfers, and additional treatments remain refused.
   A plain single-region full-turn
   sketch revolve may retain one face draft followed by either one symmetric
   45° all-edge chamfer or one all-edge fillet; profile and setting edits replay
@@ -118,9 +118,10 @@ These are implemented and should not be filed as missing features:
   edits replay sweep, draft, then treatment, while multiple treatments and
   ambiguous source faces fail without a project write. Changing only the retained
   face-draft angle on that treated sweep replays source, draft, then treatment
-  atomically; `.skf` round trips and later profile edits preserve the updated
-  angle, treatment, and IDs. Pull-axis and source-face edits on treated sweeps
-  remain refused.
+  atomically. Changing only its signed pull axis replays source, draft, then
+  treatment atomically as well; `.skf` round trips and later profile edits
+  preserve the updated angle or axis, treatment, and IDs. Source-face reselection
+  and combined angle/axis edits on treated sweeps remain refused.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the

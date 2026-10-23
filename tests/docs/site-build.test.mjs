@@ -90,6 +90,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const migration = readFileSync(new URL("../../docs/site-migration.md", import.meta.url), "utf8");
   const capabilities = readFileSync(new URL("../../docs/UNEXPLORED_KERNEL_CAPABILITIES.md", import.meta.url), "utf8");
   const changelog = readFileSync(new URL("../../docs/CHANGELOG.md", import.meta.url), "utf8");
+  const shippedCapabilities = capabilities.split("## Remaining gaps, ranked")[0];
 
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes 28 and explains why 4 remain omitted/i);
@@ -193,6 +194,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /Changing only the retained\s+face-draft angle on that treated sweep replays source, draft, then treatment\s+atomically/i);
   assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(capabilities, /one all-edge fillet or symmetric 45°\s+chamfer is now\s+supported on a sketch extrusion[\s\S]*?Adding a prism draft after a treatment/i);
+  assert.match(capabilities, /single-loop sketch extrusion supports one all-edge fillet or one symmetric\s+45° all-edge chamfer[\s\S]*?selected-edge treatments, non-45°\s+chamfers, and additional treatments remain refused/i);
+  assert.doesNotMatch(capabilities, /face-draft fillets, selected-edge treatments, non-45°\s+chamfers, and additional treatments remain refused/i);
+  assert.match(shippedCapabilities, /Changing only the retained\s+face-draft angle on that treated sweep replays source, draft, then treatment\s+atomically[\s\S]*?Changing only its signed pull axis replays source, draft, then\s+treatment atomically as well/i);
+  assert.doesNotMatch(shippedCapabilities, /Pull-axis and source-face edits on treated sweeps remain refused/i);
+  assert.match(shippedCapabilities, /Source-face reselection\s+and combined angle\/axis edits on treated sweeps remain refused/i);
   assert.match(capabilities, /Broader and editable drafting/i);
   assert.match(capabilities, /Editable STEP assembly hierarchy and robust component association/i);
   assert.match(capabilities, /Stable face identity across arbitrary topology changes/i);
