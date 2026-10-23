@@ -139,16 +139,25 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   is path-based and is not symbol-level or complete
   repository coverage. The local-project MCP shell command is included from and
   executed as the same source fixture; package examples and both REST
-  walkthroughs are sourced and tested. Other REST request examples remain
-  unexecuted or exempt.
+  walkthroughs are sourced and tested. The STEP assemblies guide's `.skf`
+  import and local MCP `sketchforge_import_project` →
+  `sketchforge_explode_step_assembly` sequence is exercised in
+  `tests/unit/localMcpEngine.test.ts` using
+  `tests/fixtures/step/nested-assembly.step`; it verifies nested groups and
+  occurrence metadata. The test does not automate importing the STEP file or
+  exporting `.skf` through the editor UI. Other REST request examples remain unexecuted
+  or exempt.
   The sketch-constraints guide maps the selected editor sources
   `SketchForgeEditor.tsx`, `SketchWorkspace.tsx`, and `sketchConstraints.ts`;
   `SketchForgeEditor.tsx` also maps to the edit-and-export guide. Other
   editor/UI sources, other examples, and all content sources remain open for
   ownership diagnostics.
-- **Task workflows:** expand tested task guides beyond the editor quick-start,
-  edit-and-export, one face-drafting case, Parallel and Perpendicular
-  constraint workflows, package examples, and current REST/MCP workflows.
+- **Task workflows:** the tested STEP `.skf` import and local MCP explode
+  sequence covers the package/MCP portion of the STEP assembly guide, while
+  editor import and `.skf` export still need browser acceptance. Expand tested
+  task guides beyond the editor quick-start, edit-and-export, one face-drafting
+  case, Parallel and Perpendicular constraint workflows, package examples, and
+  current REST/MCP workflows.
 - **Inbound links:** local links, compatibility paths, and repository history
   are inventoried. External backlinks outside repository history cannot be
   established by this inventory.
