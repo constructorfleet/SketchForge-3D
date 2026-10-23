@@ -7,7 +7,9 @@ sources:
   - "packages/sketchforge-engine/src/**"
   - "packages/sketchforge-client/mcp/localEngine.mjs"
   - "packages/sketchforge-client/mcp/server.mjs"
+  - "apps/web/src/app/page.tsx"
   - "tests/fixtures/step/nested-assembly.step"
+  - "tests/browser/editor-quickstart.test.mjs"
   - "tests/unit/localMcpEngine.test.ts"
 ---
 
@@ -19,7 +21,11 @@ The REST `POST /api/v1/imports` endpoint accepts STL, OBJ, and SVG uploads; it d
 
 For a supported editor-to-local workflow, import the STEP assembly in the editor, export the project as `.skf`, then use local MCP `sketchforge_import_project` to load that package and `sketchforge_explode_step_assembly` with the returned project ID and shape ID. Both tools run against local project files; see the [MCP tools reference](../mcp/TOOLS_REFERENCE.md#sketchforgeimportproject) and [MCP bridge setup](../../packages/sketchforge-client/README.md#the-mcp-bridge).
 
-The `.skf` import and local MCP steps are exercised together by the [local MCP integration test](https://github.com/constructorfleet/SketchForge-3D/blob/main/tests/unit/localMcpEngine.test.ts), which builds a package from the checked-in [nested assembly STEP fixture](https://github.com/constructorfleet/SketchForge-3D/blob/main/tests/fixtures/step/nested-assembly.step), imports it, explodes it, and checks the nested groups and occurrence metadata. The local MCP tools are implemented in [`localEngine.mjs`](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-client/mcp/localEngine.mjs), and the server STEP explosion is handled by [`serverStepExplode.ts`](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-engine/src/serverStepExplode.ts). Run the test with `npm test -- tests/unit/localMcpEngine.test.ts -t 'STEP-backed SKF'`. This test covers the package and MCP steps; it does not automate importing the STEP file or exporting `.skf` through the editor UI.
+Browser acceptance in the [editor workflow test](https://github.com/constructorfleet/SketchForge-3D/blob/main/tests/browser/editor-quickstart.test.mjs) imports the checked-in STEP fixture in the editor, saves the actual `.skf` download, and passes that exact file through local MCP project import and assembly explosion. It verifies the nested `MainAssembly` → `Frame`/`Sensors` → `SensorLeft`/`SensorRight` groups and leaf occurrence metadata, then removes its temporary files. The test captures the imported result below; run it with `npm run test:browser`.
+
+![Nested STEP assembly imported in the SketchForge editor](../screenshots/step-assembly-editor-import.png)
+
+The underlying `.skf` import and local MCP steps are also exercised by the [local MCP integration test](https://github.com/constructorfleet/SketchForge-3D/blob/main/tests/unit/localMcpEngine.test.ts), which builds a package from the checked-in [nested assembly STEP fixture](https://github.com/constructorfleet/SketchForge-3D/blob/main/tests/fixtures/step/nested-assembly.step). The local MCP tools are implemented in [`localEngine.mjs`](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-client/mcp/localEngine.mjs), and the server STEP explosion is handled by [`serverStepExplode.ts`](https://github.com/constructorfleet/SketchForge-3D/blob/main/packages/sketchforge-engine/src/serverStepExplode.ts). Run the focused test with `npm test -- tests/unit/localMcpEngine.test.ts -t 'STEP-backed SKF'`.
 
 When every exact solid can be associated with a unique product occurrence, explosion replaces the imported mesh with nested project groups matching the source product tree. Each leaf keeps its exact solid geometry, available component color, and `stepComponent` metadata:
 

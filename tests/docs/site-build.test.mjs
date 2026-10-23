@@ -158,10 +158,9 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /`docs\/screenshots\/sketch-perpendicular-constraint\.png`.*distorted corner.*90°/i);
   assert.match(spec, /These two cases do not establish full sketch-constraint or task-workflow coverage/i);
   assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
-  assert.match(spec, /STEP assembly guide covers the `.skf` import and local MCP `sketchforge_import_project` → `sketchforge_explode_step_assembly` sequence in `tests\/unit\/localMcpEngine\.test\.ts`/i);
-  assert.match(spec, /The test builds the package from `tests\/fixtures\/step\/nested-assembly\.step` and verifies nested groups and occurrence metadata/i);
-  assert.match(spec, /does not automate importing the STEP file or exporting `.skf` through the editor UI/i);
-  assert.match(spec, /6\. \*\*Partial:\*\*[\s\S]*?STEP assembly guide[\s\S]*?`tests\/unit\/localMcpEngine\.test\.ts`[\s\S]*?does not automate importing the STEP file or exporting `.skf` through the editor UI/i);
+  assert.match(spec, /STEP assemblies guide documents a workflow that now has browser acceptance in `tests\/browser\/editor-quickstart\.test\.mjs`[\s\S]*?exports the actual `.skf` download[\s\S]*?`docs\/screenshots\/step-assembly-editor-import\.png`/i);
+  assert.match(spec, /6\. \*\*Partial:\*\*[\s\S]*?STEP assembly guide[\s\S]*?browser acceptance in `tests\/browser\/editor-quickstart\.test\.mjs`[\s\S]*?actual `.skf` download[\s\S]*?`docs\/screenshots\/step-assembly-editor-import\.png`/i);
+  assert.match(spec, /`tests\/unit\/localMcpEngine\.test\.ts` separately covers the local MCP import\/explode path/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
   assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The four `OPTIONS`\s+preflights are intentionally omitted; all resource route coverage is complete/i);
@@ -186,8 +185,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /browser acceptance covers the editor quick-start and the edit-and-export\s+guide[’']s create, edit, save, reload, and export workflow/i);
   assert.match(migration, /face-drafting\s+guide covers one inspector case.*face 1.*local \+Z.*-5°.*screenshot/i);
   assert.match(migration, /sketch-constraints guide covers Parallel and Perpendicular\s+workflows with screenshots/i);
-  assert.match(migration, /Examples and page ownership — partial:[\s\S]*?STEP assemblies guide[\s\S]*?`tests\/unit\/localMcpEngine\.test\.ts`[\s\S]*?does not automate importing the STEP file or\s+exporting `.skf` through the editor UI/i);
-  assert.match(migration, /Task workflows:[\s\S]*?tested STEP `.skf` import and local MCP explode\s+sequence[\s\S]*?editor import and `.skf` export still need browser acceptance/i);
+  assert.match(migration, /Examples and page ownership — partial:[\s\S]*?STEP assemblies guide[\s\S]*?`tests\/browser\/editor-quickstart\.test\.mjs`[\s\S]*?exports the\s+actual `.skf` download[\s\S]*?`docs\/screenshots\/step-assembly-editor-import\.png`/i);
+  assert.match(migration, /Task workflows:[\s\S]*?STEP assembly guide's editor import → actual `.skf`\s+download → local MCP import\/explode path now has browser acceptance with\s+screenshot evidence/i);
   assert.match(migration, /sketch-constraints guide maps the selected editor sources[\s\S]*?`SketchWorkspace\.tsx`[\s\S]*?`sketchConstraints\.ts`[\s\S]*?also maps to the edit-and-export guide/i);
   assert.match(migration, /Other\s+editor\/UI sources, other examples, and all\s+content sources remain open for\s+ownership diagnostics/i);
   assert.match(spec, /Phase 4:[\s\S]*?Parallel and Perpendicular constraint workflows.*Broader task-oriented guides and corresponding workflow checks remain outstanding/i);

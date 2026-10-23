@@ -11,6 +11,7 @@ const faceDraftGuide = new URL("../../docs/guides/face-drafting.md", import.meta
 const faceDraftBrowserTest = new URL("../browser/face-drafting.test.mjs", import.meta.url);
 const sketchConstraintsGuide = new URL("../../docs/guides/sketch-constraints.md", import.meta.url);
 const sketchConstraintsBrowserTest = new URL("../browser/sketch-parallel-constraint.test.mjs", import.meta.url);
+const stepAssemblyGuide = new URL("../../docs/guides/step-assemblies.md", import.meta.url);
 
 test("editor workflow guide covers create, edit, save, and export with supporting references", async () => {
   const [guideText, homeText, quickstartText, browserTestText, siteConfigText] = await Promise.all([
@@ -67,4 +68,20 @@ test("the perpendicular constraint workflow has browser acceptance and screensho
   assert.match(guideText, /sketch-perpendicular-constraint\.png/);
   assert.match(browserTestText, /a user can constrain two selected sketch segments to be perpendicular/i);
   assert.match(browserTestText, /sketch-perpendicular-constraint\.png/);
+});
+
+test("STEP assembly guide links the editor-to-local-MCP workflow to browser acceptance and screenshot evidence", async () => {
+  const [guideText, browserTestText] = await Promise.all([
+    readFile(stepAssemblyGuide, "utf8"),
+    readFile(browserTest, "utf8"),
+  ]);
+
+  assert.match(guideText, /step-assembly-editor-import\.png/);
+  assert.match(guideText, /editor-quickstart\.test\.mjs/);
+  assert.match(browserTestText, /a STEP assembly exported from the editor can be imported and exploded through local MCP/i);
+  assert.match(browserTestText, /setInputFiles\(fixturePath\)/);
+  assert.match(browserTestText, /download\.saveAs\(packagePath\)/);
+  assert.match(browserTestText, /sketchforge_import_project/);
+  assert.match(browserTestText, /sketchforge_explode_step_assembly/);
+  assert.match(browserTestText, /step-assembly-editor-import\.png/);
 });
