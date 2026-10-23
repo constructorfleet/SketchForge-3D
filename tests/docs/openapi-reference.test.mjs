@@ -10,6 +10,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   const spec = JSON.parse(await readFile(path.join(root, "docs/openapi-v1.json"), "utf8"));
 
   assert.equal(spec.openapi, "3.1.0");
+  assert.match(spec.info.description, /only omitted operations are the four preflight-only OPTIONS handlers/i);
+  assert.doesNotMatch(spec.info.description, /still need contract work/i);
   assert.ok(spec.paths["/api/v1/projects"].post);
   assert.ok(spec.paths["/api/v1/shapes"].get);
   assert.ok(spec.paths["/api/v1/shapes"].patch, "PATCH should be included once faceColors validation is represented");
@@ -239,6 +241,12 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(documentedOperationCount, 28);
   assert.equal(spec["x-sketchforge-omitted-operations"].length, 4);
   assert.ok(spec["x-sketchforge-omitted-operations"].every(({ method, reason }) => method === "OPTIONS" && /preflight/i.test(reason)));
+});
+
+test("site migration identifies preflight OPTIONS as the only route-coverage omission", async () => {
+  const migration = await readFile(path.join(root, "docs/site-migration.md"), "utf8");
+  assert.match(migration, /four `OPTIONS`\s+preflights are intentionally omitted;\s+all resource route coverage is complete/i);
+  assert.doesNotMatch(migration, /full route coverage remains open/i);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

@@ -161,7 +161,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
-  assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 4 are listed as\s+`OPTIONS` preflights/i);
+  assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The four `OPTIONS`\s+preflights are intentionally omitted; all resource route coverage is complete/i);
   assert.match(migration, /REST contracts and generated operation pages — met for resource operations/i);
   assert.doesNotMatch(migration, /Complete REST reference: add runtime-backed request\/response contracts/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
