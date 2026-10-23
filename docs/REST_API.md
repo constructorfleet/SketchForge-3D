@@ -756,6 +756,10 @@ sections also currently surface as `422` with `code: "geometry_failed"`. A
 requested shape id outside the project answers `404`; a project with no
 exportable solid geometry answers `422` with `code: "geometry_failed"`.
 
+## Example: import, inspect, and export a model
+
+The [import-inspect-export walkthrough](./guides/rest-import-inspect-export.md) imports an STL into a temporary local project, reads its mass properties, and exports it again. The package integration suite runs the same source against the local API.
+
 ## Example: a plate with a row of holes
 
 The script below adds a plate and five hole cutters in one request, cuts them

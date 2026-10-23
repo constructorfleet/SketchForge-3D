@@ -33,6 +33,27 @@ test("REST hole-plate walkthrough is sourced from the API integration example", 
   assert.match(ciWorkflow, /run: npm run test:integration/);
 });
 
+test("REST import-inspect-export workflow is reflected in durable docs status", () => {
+  const spec = read("docs/DOCUMENTATION_SUITE_SPEC.md");
+  const migration = read("docs/site-migration.md");
+  const guide = read("docs/guides/rest-import-inspect-export.md");
+  const example = read("docs/examples/rest-import-inspect-export.mjs");
+  const integrationTest = read("packages/sketchforge-client/tests/rest-import-inspect-export.integration.ts");
+  const restApi = read("docs/REST_API.md");
+
+  assert.match(restApi, /import, inspect, and export[\s\S]*?guides\/rest-import-inspect-export\.md/);
+  assert.match(guide, /runnable-source: docs\/examples\/rest-import-inspect-export\.mjs; tested-by: packages\/sketchforge-client\/tests\/rest-import-inspect-export\.integration\.ts; ci: npm run test:integration/);
+  assert.match(example, /importGeometry|\/imports/);
+  assert.match(example, /getShapeProperties|\/properties/);
+  assert.match(example, /exportProject|\/exports/);
+  assert.match(integrationTest, /runImportInspectExportWalkthrough/);
+  assert.match(spec, /REST API guide and import-inspect-export guide now provide two source-backed, integration-executed workflows \(plate-and-holes and STL import/i);
+  assert.match(migration, /package examples and both REST\s+walkthroughs are sourced and tested/i);
+  assert.match(spec, /7\. \*\*Partial:\*\*[\s\S]*?docs\/examples\/rest-import-inspect-export\.mjs/);
+  assert.match(spec, /10\. \*\*Partial:\*\*[\s\S]*?docs\/examples\/rest-import-inspect-export\.mjs/);
+  assert.match(spec, /10\. \*\*Partial:\*\*[\s\S]*including both executed REST API workflows/);
+});
+
 test("REST hole-plate walkthrough deletes its project when a post-creation step fails", async () => {
   const { runHolePlateWalkthrough } = await import("../../docs/examples/rest-hole-plate.mjs");
   const requests = [];
