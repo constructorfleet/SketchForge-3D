@@ -48,47 +48,14 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 ## Endpoints
 
-All paths are under `/api/v1`. Request bodies are JSON except for multipart file imports; responses use JSON. Errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
+All paths are under `/api/v1`. Request bodies are JSON except for multipart file imports; most responses are JSON, while export downloads can return binary bytes. Errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align`, `/distribute`, and `/patterns`), STEP assembly explosion (`POST /explode`), `POST /interference`, `POST /imports`, `POST /exports`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. It now also documents `PATCH /shapes`. These operations describe accepted request fields, successful payloads, and reachable status codes. Export responses document both JSON/base64 and `download=1` binary output with its metadata header. Response bodies and export headers are checked against the contract registry; route-specific parsers validate incoming requests. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). The four omitted operations are the preflight-only OPTIONS handlers. Browse the [generated REST operation references](/docs/rest-api/) for each of the 28 contracted endpoints, including parameters, request and response schemas, authentication, and handler source. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+For the current method and path inventory, accepted parameters and bodies, response schemas, authentication, and handler source, use the [generated REST operation references](/docs/rest-api/). Those 28 pages are generated from the same OpenAPI 3.1 contract as the [OpenAPI document](./openapi-v1.json), available as a [downloadable OpenAPI JSON](/openapi-v1.json); the four preflight-only OPTIONS handlers are omitted. Export references distinguish JSON/base64 responses from `download=1` binary responses and document the metadata header. For accepted per-kind shape fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`. This guide retains deployment, client, error-handling, and workflow walkthroughs; the generated pages are the source for the endpoint listing.
 The PATCH schema describes stable face IDs and legacy numeric indexes as `faceColors` keys, six or eight digit hex values, and leaves other engine-supported patch fields extensible. The route still applies its runtime parser before forwarding the patch to the engine, including the documented [sketch sweep updates](#sketch-sweeps) and retained face drafts.
 
 ### Contract validation
 
 The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, `POST /explode`, `POST /imports`, and `POST /exports` carry request metadata and status-specific response schemas. Their handlers validate successful and error responses against those contracts; shape patches also validate `faceColors` against the pattern-key and color constraints while passing other engine-supported fields through. Export downloads validate their media type and URI-encoded metadata header, and unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, STEP assembly summaries, revision, and reachable engine errors. All 28 non-OPTIONS operations have route-backed request and response schemas and are runtime-validated. The four read-only OPTIONS preflights remain inventory-only and are omitted from generated OpenAPI.
-
-| Method | Path | Does |
-| --- | --- | --- |
-| `GET` | `/projects` | Lists projects: id, name, shape count, revision. |
-| `GET` | `/projects?projectId=` | One project with its shapes and settings. |
-| `POST` | `/projects` | Creates an empty project. Body: `{ "name": "Bracket" }`. |
-| `DELETE` | `/projects?projectId=` | Deletes the project and its geometry. |
-| `GET` | `/shapes?projectId=` | The project's shapes, including optional `stepAssembly` and `stepComponent` metadata for STEP assemblies. |
-| `GET` | `/properties?projectId=&shapeId=` | Exact mass properties and bounds, with provenance distinguishing exact CAD from tessellated mesh geometry. |
-| `POST` | `/shapes?projectId=` | Adds one shape, or a batch via `{ "shapes": [...] }` (max 200). |
-| `PATCH` | `/shapes?projectId=&shapeId=` | Changes the fields you send and leaves the rest; refuses the ones that kind cannot take. |
-| `DELETE` | `/shapes?projectId=&shapeId=` | Removes one shape. |
-| `POST` | `/booleans?projectId=` | Subtracts shapes from shapes. Body: `{ "solidIds": [...], "holeIds": [...] }`. |
-| `POST` | `/groups?projectId=` | Groups shapes into one. Body: `{ "ids": [...] }`. |
-| `DELETE` | `/groups?projectId=&shapeId=` | Takes a group apart. |
-| `POST` | `/parts?projectId=&shapeId=` | Splits a shape into its disconnected bodies. |
-| `POST` | `/mirrors?projectId=` | Mirrors selected shapes across a principal plane. |
-| `POST` | `/align?projectId=` | Lines shapes up on one coordinate. Body: `{ "ids": [...], "axis": "y", "target": "max" }`. |
-| `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
-| `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
-| `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
-| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF; JSON/base64 is the default and `download=1` returns raw bytes with metadata in `X-SketchForge-Metadata`. |
-| `POST` | `/explode?projectId=&shapeId=` | Converts a retained STEP assembly into editable nested groups when every exact solid has an unambiguous product occurrence; otherwise returns separately positioned exact solids. Preserves available names, XCAF colors, and occurrence ancestry (up to 200 solids and 8 MiB source). |
-| `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
-| `GET` | `/edges?projectId=&shapeId=` | Lists edges by their current numeric index, with geometric measurements and filletability. |
-| `POST` | `/shell?projectId=&shapeId=` | Hollows the shape out to a wall, optionally leaving faces open. |
-| `POST` | `/draft-prism?projectId=&shapeId=` | Rebuilds a retained straight sketch extrusion with a draft angle. |
-| `GET` | `/measurements?projectId=&shapeId=` | Measures every edge and face: length, radius, diameter, area. |
-| `POST` | `/measurements?projectId=` | The distance between two entities, and the angle if both are flat faces. |
-| `GET` | `/properties?projectId=&shapeId=` | One shape's volume, area, center of mass, bounds, validity and geometry provenance. |
-| `GET` | `/thickness?projectId=&shapeId=` | Sampled estimate of the minimum distance between opposing surfaces. |
-| `POST` | `/interference?projectId=` | Exact shape-to-shape gaps and overlap volumes within a requested clearance; capped at 128 shapes and 512 AABB candidates. |
-| `POST` | `/treatments?projectId=&shapeId=` | Applies a CAD treatment such as fillet or chamfer to a shape. |
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 

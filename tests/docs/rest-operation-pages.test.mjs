@@ -8,6 +8,14 @@ import test from "node:test";
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const operationPagesScript = path.join(root, "scripts/generate-rest-operation-pages.mjs");
 
+test("REST API guide links to generated operation pages without duplicating their endpoint index", () => {
+  const guide = readFileSync(path.join(root, "docs/REST_API.md"), "utf8");
+  const endpoints = guide.split("## Endpoints\n")[1]?.split("### Contract validation\n")[0] ?? "";
+  assert.match(guide, /\[generated REST operation references\]\(\/docs\/rest-api\/\)/);
+  assert.ok(endpoints, "REST API guide has an Endpoints section");
+  assert.doesNotMatch(endpoints, /^\| Method \| Path \| Does \|$/m);
+});
+
 test("REST operation reference generator publishes every OpenAPI operation with its contract details", () => {
   const output = mkdtempSync(path.join(os.tmpdir(), "sketchforge-rest-operation-pages-"));
   try {

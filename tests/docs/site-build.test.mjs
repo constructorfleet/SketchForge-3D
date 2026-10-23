@@ -93,6 +93,10 @@ test("documentation status records durable capabilities and outstanding requirem
 
   assert.match(spec, /Current implementation status/i);
   assert.match(spec, /32 operations; generated OpenAPI describes 28 and explains why 4 remain omitted/i);
+  assert.match(spec, /All 28 non-OPTIONS resource operations have runtime schemas and response validation/i);
+  assert.match(spec, /Pages reference per resource operation with operation ID, method\/path, auth, parameters, request body, responses, errors, and source links/i);
+  assert.doesNotMatch(spec, /Additional runtime schemas and route response validations remain outstanding/i);
+  assert.doesNotMatch(spec, /complete REST contracts, all-language runnable-block coverage/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve/i);
   assert.match(spec, /`GET \/faces\?topology=exact` lists analytic B-rep revolve faces/i);
@@ -121,7 +125,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Fork PRs and workflow-control changes retain the generated artifact as a fallback/i);
   assert.match(spec, /create a repair PR when a successful default-branch docs run finds stale tracked output/i);
   assert.match(spec, /output drift alone does not fail CI/i);
-  assert.match(spec, /Broader task-oriented workflows, complete REST contracts/i);
+  assert.match(spec, /Broader task-oriented workflows, all-language runnable-block coverage/i);
   assert.match(spec, /Publishing-client version — closed/i);
   assert.match(spec, /Cross-links between documentation and references — closed/i);
   assert.match(spec, /Engine package documentation — closed/i);
@@ -129,7 +133,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /28 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /all 28 non-OPTIONS resource operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, the REST guide's included `docs\/examples\/rest-hole-plate\.mjs` fixture, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
@@ -140,7 +144,9 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
   assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
   assert.match(spec, /`SKETCHFORGE_DESKTOP_DEV_URL`.*internal handoff.*`NODE_PATH`.*pass-through/i);
-  assert.match(spec, /Additional runtime schemas and route response validations remain outstanding/i);
+  assert.match(spec, /REST contracts and generated operation pages — met for resource operations/i);
+  assert.doesNotMatch(spec, /Additional runtime schemas and route response validations remain outstanding/i);
+  assert.doesNotMatch(spec, /complete REST contracts, all-language runnable-block coverage/i);
   assert.match(spec, /`POST \/mirrors` validates normalized target IDs, principal-axis selection, successful shape summaries, and its reachable error responses/i);
   assert.match(spec, /`POST \/api\/v1\/patterns` contracts normalized IDs, defaults, count limits, finite numeric options, a 201 shape-summary response, and reachable errors/i);
   assert.match(spec, /creates or refreshes a bot repair PR if tracked outputs differ/i);
@@ -156,6 +162,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
   assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 4 are listed as\s+`OPTIONS` preflights/i);
+  assert.match(migration, /REST contracts and generated operation pages — met for resource operations/i);
+  assert.doesNotMatch(migration, /Complete REST reference: add runtime-backed request\/response contracts/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
   assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
   assert.match(migration, /required\s+audience\/owner metadata/i);
