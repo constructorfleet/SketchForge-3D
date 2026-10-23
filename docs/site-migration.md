@@ -63,9 +63,11 @@ so stale tracked output alone does not fail the docs check.
 - Package guides include registry-facing README files, and package examples
   run against a local API. Python package references and examples are checked
   with mypy and integration tests. The REST guide's plate-and-holes walkthrough
-  is included from `docs/examples/rest-hole-plate.mjs` and runs in the package
-  integration job against temporary local project storage; the test verifies
-  the six starting operands and reduced volume after the boolean cut. The MCP
+  and the import-inspect-export guide's STL workflow are included from
+  `docs/examples/rest-hole-plate.mjs` and
+  `docs/examples/rest-import-inspect-export.mjs`, then run against temporary
+  local project storage. Tests verify the boolean cut or STL import → property
+  inspection → export, and project cleanup. The MCP
   example is checked against the server's current advertised tool schemas.
 - Browser acceptance covers the editor quick-start and the edit-and-export
   guide's create, edit, save, reload, and export workflow. The face-drafting
@@ -130,12 +132,13 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   establish execution coverage, and other fence languages and runnable content
   outside this set are not covered.
   Changed-source ownership diagnostics cover selected source trees, including
-  REST routes, the REST guide's included plate-and-holes fixture, TypeScript
-  client/MCP, engine, Python client, and the package example trees. The mapping
+  REST routes, the REST guide's plate-and-holes fixture, the import-inspect-export
+  guide's workflow fixture, TypeScript client/MCP, engine, Python client, and the
+  package example trees. The mapping
   is path-based and is not symbol-level or complete
   repository coverage. The local-project MCP shell command is included from and
-  executed as the same source fixture; package examples and the REST plate-and-
-  holes walkthrough are sourced and tested. Other REST request examples remain
+  executed as the same source fixture; package examples and both REST
+  walkthroughs are sourced and tested. Other REST request examples remain
   unexecuted or exempt.
   The sketch-constraints guide maps the selected editor sources
   `SketchForgeEditor.tsx`, `SketchWorkspace.tsx`, and `sketchConstraints.ts`;
