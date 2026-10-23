@@ -872,8 +872,11 @@ export function createEngine(store: ProjectStore): Engine {
       const hasExistingTreatment = (existing.edgeTreatments?.length ?? 0) > 0
         || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
       const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
-        && !faceDraftChanged
         && existing.draftPrismAngle === undefined
+        && (!faceDraftChanged || isSingleLoopSketchExtrusion(existing)
+          && requestedFaceDraft !== undefined && requestedFaceDraft !== null
+          && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId
+          && requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
         && (isPlainFullTurnSketchRevolve(existing)
           || isSingleLoopSketchExtrusion(existing)
             && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
@@ -974,9 +977,16 @@ export function createEngine(store: ProjectStore): Engine {
           const replayDraftAndTreatment = hasRetainedTreatments
             && draftPrismAngle !== undefined
             && (replacingSketchProfile || clearingFaceDraft || draftPrismChanged);
-          const replayedSource = (replacingSketchProfile || clearingFaceDraft || draftPrismChanged) && hasRetainedTreatments
+          const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
+          const replayOriginal = clearingFaceDraft
+            ? { ...existing, faceDraft: undefined }
+            : replayFaceDraftAndTreatment && existing.faceDraft
+              ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
+              : existing;
+          const replayedSource = (replacingSketchProfile || clearingFaceDraft || draftPrismChanged || replayFaceDraftAndTreatment)
+            && hasRetainedTreatments
             ? await replaySingleAllEdgeTreatment(
-              clearingFaceDraft ? { ...existing, faceDraft: undefined } : existing,
+              replayOriginal,
               rebuiltSource,
               draftPrismChanged ? requestedDraftPrismAngle : undefined,
             )
