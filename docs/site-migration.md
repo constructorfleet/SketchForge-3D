@@ -100,9 +100,12 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
 
 ## Durable gaps
 
-- **Complete REST reference:** add runtime-backed request/response contracts
-  for the remaining operations, generate endpoint pages from those contracts,
-  and replace or clearly bound hand-maintained endpoint details.
+- **REST contracts and generated operation pages — met for resource operations:**
+  all 28 non-OPTIONS resource operations have runtime-backed OpenAPI contracts
+  and generated Pages references with authentication, parameters, request and
+  response schemas, errors, and source links. The four omitted operations are
+  preflight-only `OPTIONS` handlers. The REST API guide links to the generated
+  index and retains conceptual explanations and runnable workflows.
 - **Generated-output automation — implemented with limits:** generators run
   before verification/build, and a trusted artifact-only writer commits
   allowlisted updates to same-repository PR branches before exact-SHA checks
