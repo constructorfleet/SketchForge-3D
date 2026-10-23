@@ -145,7 +145,8 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   `tests/browser/editor-quickstart.test.mjs`: it imports
   `tests/fixtures/step/nested-assembly.step` through the editor, exports the
   actual `.skf` download, passes that exact file through both MCP calls, checks
-  nested groups and leaf occurrence metadata, cleans up temporary project files,
+  nested groups, exact per-leaf occurrence IDs, and complete ordered root-to-leaf
+  paths, cleans up temporary project files,
   and captures `docs/screenshots/step-assembly-editor-import.png`.
   `tests/unit/localMcpEngine.test.ts` separately covers the package/MCP path.
   Other REST request examples remain unexecuted or exempt.

@@ -137,6 +137,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, the REST guide's included `docs\/examples\/rest-hole-plate\.mjs` fixture, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
   assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
+  assert.match(spec, /Current implementation status:[\s\S]*?STEP assembly.*browser acceptance.*actual `.skf` download.*local MCP.*`tests\/browser\/editor-quickstart\.test\.mjs`/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
   assert.match(spec, /current baseline is 28 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
@@ -190,6 +191,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(migration, /sketch-constraints guide maps the selected editor sources[\s\S]*?`SketchWorkspace\.tsx`[\s\S]*?`sketchConstraints\.ts`[\s\S]*?also maps to the edit-and-export guide/i);
   assert.match(migration, /Other\s+editor\/UI sources, other examples, and all\s+content sources remain open for\s+ownership diagnostics/i);
   assert.match(spec, /Phase 4:[\s\S]*?Parallel and Perpendicular constraint workflows.*Broader task-oriented guides and corresponding workflow checks remain outstanding/i);
+  assert.match(spec, /Phase 4:[\s\S]*?STEP assembly.*editor import.*actual `.skf` download.*local MCP.*browser acceptance.*`tests\/browser\/editor-quickstart\.test\.mjs`/i);
 
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /retains one editable face draft[\s\S]{0,120}plain single-region full-turn sketch revolve/i);

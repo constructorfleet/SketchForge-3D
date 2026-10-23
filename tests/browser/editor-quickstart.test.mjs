@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { once } from "node:events";
 import { createServer } from "node:net";
 import { test } from "node:test";
 import { chromium } from "playwright";
@@ -16,6 +15,40 @@ async function unusedPort() {
   const { port } = address;
   await new Promise((resolve, reject) => listener.close((error) => error ? reject(error) : resolve()));
   return port;
+}
+
+async function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise((resolve) => {
+    const onExit = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      child.off("exit", onExit);
+      resolve(false);
+    }, timeoutMs);
+    child.once("exit", onExit);
+  });
+}
+
+async function stopNextServer(server) {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  const signal = (name) => {
+    try {
+      if (process.platform === "win32") server.kill(name);
+      else process.kill(-server.pid, name);
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  };
+
+  signal("SIGTERM");
+  if (!(await waitForChildExit(server, 5_000))) {
+    signal("SIGKILL");
+    await waitForChildExit(server, 5_000);
+  }
+  assert.ok(server.exitCode !== null || server.signalCode !== null, "Next.js server process should exit after termination");
 }
 
 async function waitForServer(url, server, getLogs) {
@@ -126,13 +159,7 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
     await context.close();
   } finally {
     if (browser) await browser.close();
-    if (server.pid) {
-      if (process.platform === "win32") server.kill("SIGTERM");
-      else {
-        try { process.kill(-server.pid, "SIGTERM"); } catch { /* The server already exited. */ }
-      }
-      if (server.exitCode === null) await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 5_000))]);
-    }
+    if (server.pid) await stopNextServer(server);
   }
 });
 
@@ -216,20 +243,52 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
     const sensors = rootGroup.groupedShapes.find((part) => part.name === "Sensors");
     assert.deepEqual(sensors.groupedShapes.map((part) => part.name), ["SensorLeft", "SensorRight"]);
     const leaves = [rootGroup.groupedShapes[0], ...sensors.groupedShapes];
-    assert.deepEqual(leaves.map((part) => part.stepComponent?.path.at(-1)?.name).sort(), ["Frame", "SensorLeft", "SensorRight"]);
-    assert.ok(leaves.every((part) => part.importedMesh?.hasBrepStep && part.stepComponent?.occurrenceId && part.stepComponent.path?.length));
+    const leafMetadata = Object.fromEntries(leaves.map(({ name, importedMesh, stepComponent }) => [name, {
+      hasBrepStep: importedMesh?.hasBrepStep,
+      componentId: stepComponent?.id,
+      occurrenceId: stepComponent?.occurrenceId,
+      path: stepComponent?.path,
+    }]));
+    assert.deepEqual(leafMetadata, {
+      Frame: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:2/solid-1",
+        occurrenceId: "step-occurrence:2",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:2", name: "Frame" },
+        ],
+      },
+      SensorLeft: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:4/solid-1",
+        occurrenceId: "step-occurrence:4",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:7", name: "Sensors" },
+          { id: "step-occurrence:4", name: "SensorLeft" },
+        ],
+      },
+      SensorRight: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:6/solid-1",
+        occurrenceId: "step-occurrence:6",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:7", name: "Sensors" },
+          { id: "step-occurrence:6", name: "SensorRight" },
+        ],
+      },
+    });
     assert.ok(fs.existsSync(path.join(projectsDir, `${imported.projectId}.skf`)));
     assert.ok(fs.existsSync(path.join(projectsDir, `${imported.projectId}.json`)));
   } finally {
     if (browser) await browser.close();
-    if (server.pid) {
-      if (process.platform === "win32") server.kill("SIGTERM");
-      else {
-        try { process.kill(-server.pid, "SIGTERM"); } catch { /* The server already exited. */ }
-      }
-      if (server.exitCode === null) await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    try {
+      if (server.pid) await stopNextServer(server);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      assert.equal(fs.existsSync(tempDir), false, "the editor download and local MCP projects should be cleaned up");
     }
-    fs.rmSync(tempDir, { recursive: true, force: true });
-    assert.equal(fs.existsSync(tempDir), false, "the editor download and local MCP projects should be cleaned up");
   }
 });
