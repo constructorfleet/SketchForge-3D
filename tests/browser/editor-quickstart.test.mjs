@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { test } from "node:test";
 import { chromium } from "playwright";
@@ -13,6 +15,40 @@ async function unusedPort() {
   const { port } = address;
   await new Promise((resolve, reject) => listener.close((error) => error ? reject(error) : resolve()));
   return port;
+}
+
+async function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise((resolve) => {
+    const onExit = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      child.off("exit", onExit);
+      resolve(false);
+    }, timeoutMs);
+    child.once("exit", onExit);
+  });
+}
+
+async function stopNextServer(server) {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  const signal = (name) => {
+    try {
+      if (process.platform === "win32") server.kill(name);
+      else process.kill(-server.pid, name);
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  };
+
+  signal("SIGTERM");
+  if (!(await waitForChildExit(server, 5_000))) {
+    signal("SIGKILL");
+    await waitForChildExit(server, 5_000);
+  }
+  assert.ok(server.exitCode !== null || server.signalCode !== null, "Next.js server process should exit after termination");
 }
 
 async function waitForServer(url, server, getLogs) {
@@ -123,12 +159,136 @@ test("a new user can sketch, extrude, save, and export a model", { timeout: 120_
     await context.close();
   } finally {
     if (browser) await browser.close();
-    if (server.pid) {
-      if (process.platform === "win32") server.kill("SIGTERM");
-      else {
-        try { process.kill(-server.pid, "SIGTERM"); } catch { /* The server already exited. */ }
-      }
-      if (server.exitCode === null) await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    if (server.pid) await stopNextServer(server);
+  }
+});
+
+test("a STEP assembly exported from the editor can be imported and exploded through local MCP", { timeout: 300_000 }, async () => {
+  const port = await unusedPort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
+    cwd: process.cwd(),
+    detached: process.platform !== "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-step-editor-mcp-"));
+  const packagePath = path.join(tempDir, "nested-assembly.skf");
+  const projectsDir = path.join(tempDir, "mcp-projects");
+  const fixturePath = path.join(process.cwd(), "tests/fixtures/step/nested-assembly.step");
+  const mcpServer = path.join(process.cwd(), "packages/sketchforge-client/mcp/server.mjs");
+  let logs = "";
+  const keepLogs = (chunk) => { logs = `${logs}${chunk}`.slice(-8_000); };
+  server.stdout.on("data", keepLogs);
+  server.stderr.on("data", keepLogs);
+  let browser;
+
+  const callLocalMcp = (id, name, args) => {
+    const input = [
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } }),
+      JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
+    ].join("\n") + "\n";
+    const result = spawnSync(process.execPath, [mcpServer], {
+      cwd: process.cwd(),
+      input,
+      encoding: "utf8",
+      env: { ...process.env, SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "", SKETCHFORGE_URL: "http://127.0.0.1:1" },
+      timeout: 180_000,
+    });
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
+    const responses = result.stdout.split(/\r?\n/).filter((line) => line.trim().startsWith("{")).map((line) => JSON.parse(line));
+    assert.ok(responses.length > 1, `MCP returned no tool result; stdout: ${result.stdout}; stderr: ${result.stderr}`);
+    const response = responses.find((entry) => entry.id === id);
+    assert.ok(response, `MCP omitted response id ${id}: ${result.stdout}`);
+    assert.equal(response.result?.isError, undefined, response.result?.content?.[0]?.text);
+    return JSON.parse(response.result.content[0].text);
+  };
+
+  try {
+    await waitForServer(baseURL, server, () => logs);
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ acceptDownloads: true });
+    const page = await context.newPage();
+    await page.goto(baseURL);
+    await page.getByRole("button", { name: "Open SKF or import geometry" }).click();
+    await page.locator('input[type="file"][accept*=".step"]').setInputFiles(fixturePath);
+    await page.getByRole("textbox", { name: "Project name" }).waitFor({ state: "visible", timeout: 120_000 });
+    assert.equal(await page.getByRole("textbox", { name: "Project name" }).inputValue(), "nested-assembly");
+    await page.getByRole("button", { name: "nested-assembly", exact: true }).click();
+    await page.getByRole("button", { name: "Center view on selection" }).click();
+    await page.screenshot({ path: "docs/screenshots/step-assembly-editor-import.png" });
+
+    await page.getByRole("button", { name: "Export" }).click();
+    const skfFormat = page.getByRole("radio", { name: "SKF: Editable project" });
+    await skfFormat.click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save SketchForge Project" }).click();
+    const download = await downloadPromise;
+    assert.match(download.suggestedFilename(), /\.skf$/);
+    await download.saveAs(packagePath);
+    assert.ok(fs.statSync(packagePath).size > 0, "the editor should produce the package passed to MCP");
+    await context.close();
+
+    const imported = callLocalMcp(2, "sketchforge_import_project", { filePath: packagePath, name: "Nested STEP assembly" });
+    assert.equal(imported.shapeCount, 1);
+    const scene = callLocalMcp(3, "sketchforge_read_scene", { projectId: imported.projectId });
+    assert.equal(scene.objects.length, 1);
+    const exploded = callLocalMcp(4, "sketchforge_explode_step_assembly", {
+      projectId: imported.projectId,
+      shapeId: scene.objects[0].id,
+    });
+    assert.equal(exploded.shapes.length, 1);
+    const rootGroup = exploded.shapes[0];
+    assert.equal(rootGroup.name, "MainAssembly");
+    assert.deepEqual(rootGroup.groupedShapes.map((part) => part.name), ["Frame", "Sensors"]);
+    const sensors = rootGroup.groupedShapes.find((part) => part.name === "Sensors");
+    assert.deepEqual(sensors.groupedShapes.map((part) => part.name), ["SensorLeft", "SensorRight"]);
+    const leaves = [rootGroup.groupedShapes[0], ...sensors.groupedShapes];
+    const leafMetadata = Object.fromEntries(leaves.map(({ name, importedMesh, stepComponent }) => [name, {
+      hasBrepStep: importedMesh?.hasBrepStep,
+      componentId: stepComponent?.id,
+      occurrenceId: stepComponent?.occurrenceId,
+      path: stepComponent?.path,
+    }]));
+    assert.deepEqual(leafMetadata, {
+      Frame: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:2/solid-1",
+        occurrenceId: "step-occurrence:2",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:2", name: "Frame" },
+        ],
+      },
+      SensorLeft: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:4/solid-1",
+        occurrenceId: "step-occurrence:4",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:7", name: "Sensors" },
+          { id: "step-occurrence:4", name: "SensorLeft" },
+        ],
+      },
+      SensorRight: {
+        hasBrepStep: true,
+        componentId: "step-occurrence:6/solid-1",
+        occurrenceId: "step-occurrence:6",
+        path: [
+          { id: "step-node:1", name: "MainAssembly" },
+          { id: "step-occurrence:7", name: "Sensors" },
+          { id: "step-occurrence:6", name: "SensorRight" },
+        ],
+      },
+    });
+    assert.ok(fs.existsSync(path.join(projectsDir, `${imported.projectId}.skf`)));
+    assert.ok(fs.existsSync(path.join(projectsDir, `${imported.projectId}.json`)));
+  } finally {
+    if (browser) await browser.close();
+    try {
+      if (server.pid) await stopNextServer(server);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      assert.equal(fs.existsSync(tempDir), false, "the editor download and local MCP projects should be cleaned up");
     }
   }
 });
