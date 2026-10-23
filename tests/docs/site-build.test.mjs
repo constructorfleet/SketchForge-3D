@@ -159,6 +159,9 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /`docs\/screenshots\/sketch-perpendicular-constraint\.png`.*distorted corner.*90°/i);
   assert.match(spec, /These two cases do not establish full sketch-constraint or task-workflow coverage/i);
   assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
+  assert.match(spec, /STEP assembly guide covers the `.skf` import and local MCP `sketchforge_import_project` → `sketchforge_explode_step_assembly` sequence in `tests\/unit\/localMcpEngine\.test\.ts`/i);
+  assert.match(spec, /The test builds the package from `tests\/fixtures\/step\/nested-assembly\.step` and verifies nested groups and occurrence metadata/i);
+  assert.match(spec, /does not automate importing the STEP file or exporting `.skf` through the editor UI/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
   assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The four `OPTIONS`\s+preflights are intentionally omitted; all resource route coverage is complete/i);
