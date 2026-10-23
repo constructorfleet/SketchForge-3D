@@ -12,7 +12,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec.openapi, "3.1.0");
   assert.ok(spec.paths["/api/v1/projects"].post);
   assert.ok(spec.paths["/api/v1/shapes"].get);
-  assert.equal(spec.paths["/api/v1/shapes"].patch, undefined, "PATCH has custom validation that its current broad schema does not express");
+  assert.ok(spec.paths["/api/v1/shapes"].patch, "PATCH should be included once faceColors validation is represented");
   const faces = spec.paths["/api/v1/faces"].get;
   assert.ok(faces, "GET /faces should be present once its runtime contract is complete");
   assert.deepEqual(Object.keys(faces.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
@@ -71,10 +71,20 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     schema: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
   });
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listFaces"), false);
-  const patchOmission = spec["x-sketchforge-omitted-operations"].find(({ operationId }) => operationId === "updateShape");
-  assert.match(patchOmission.reason, /custom validation/);
-  assert.match(patchOmission.reason, /sketchProfile.*rebuild/i);
-  assert.match(patchOmission.reason, /https:\/\/constructorfleet\.github\.io\/SketchForge-3D\/docs\/REST_API#sketch-sweeps/);
+  const patchShape = spec.paths["/api/v1/shapes"].patch;
+  assert.equal(patchShape.operationId, "updateShape");
+  assert.deepEqual(patchShape.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(Object.keys(patchShape.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  const patchBody = patchShape.requestBody.content["application/json"].schema;
+  assert.equal(patchBody.additionalProperties, true, "other engine-supported patch fields remain pass-through");
+  const colors = patchBody.properties.faceColors;
+  assert.deepEqual(Object.keys(colors.patternProperties), ["^(?:[0-9]+|face_[^\\s]+)$"]);
+  assert.equal(colors.patternProperties["^(?:[0-9]+|face_[^\\s]+)$"].pattern, "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$");
+  assert.equal(colors.additionalProperties, false);
+  assert.deepEqual(patchShape.responses["200"].content["application/json"].schema.required, ["shape", "revision"]);
+  assert.deepEqual(patchShape.responses["400"].content["application/json"].schema.properties.code.enum, ["invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"]);
+  assert.deepEqual(patchShape.responses["422"].content["application/json"].schema.properties.code.enum, ["unapplicable_fields", "geometry_failed", "cad_failed"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "updateShape"), false);
 
   const listMeasurements = spec.paths["/api/v1/measurements"].get;
   assert.ok(listMeasurements, "GET /measurements should be present once its runtime contract is complete");
@@ -226,8 +236,9 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 27);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 5);
+  assert.equal(documentedOperationCount, 28);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 4);
+  assert.ok(spec["x-sketchforge-omitted-operations"].every(({ method, reason }) => method === "OPTIONS" && /preflight/i.test(reason)));
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {

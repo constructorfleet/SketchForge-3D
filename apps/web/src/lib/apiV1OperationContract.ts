@@ -29,6 +29,7 @@ export type ApiV1FieldSchema = {
   description?: string;
   format?: string;
   properties?: Readonly<Record<string, ApiV1FieldSchema>>;
+  patternProperties?: Readonly<Record<string, ApiV1FieldSchema>>;
   items?: ApiV1FieldSchema;
 };
 
@@ -363,8 +364,13 @@ export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): b
     const object = value as Record<string, unknown>;
     if (schema.required?.some((name) => !(name in object))) return false;
     if (Object.entries(schema.properties ?? {}).some(([name, child]) => name in object && !validateApiV1Schema(object[name], child))) return false;
-    if (schema.additionalProperties === false && Object.keys(object).some((name) => !(name in (schema.properties ?? {})))) return false;
-    if (typeof schema.additionalProperties === "object" && Object.entries(object).some(([name, child]) => !(name in (schema.properties ?? {})) && !validateApiV1Schema(child, schema.additionalProperties as ApiV1FieldSchema))) return false;
+    if (Object.entries(object).some(([name, child]) => {
+      if (name in (schema.properties ?? {})) return false;
+      const matchingPatterns = Object.entries(schema.patternProperties ?? {}).filter(([pattern]) => new RegExp(pattern).test(name));
+      if (matchingPatterns.length) return matchingPatterns.some(([, childSchema]) => !validateApiV1Schema(child, childSchema));
+      if (schema.additionalProperties === false) return true;
+      return typeof schema.additionalProperties === "object" && !validateApiV1Schema(child, schema.additionalProperties);
+    })) return false;
     return true;
   }
   if (schema.type === "string") return typeof value === "string" && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
@@ -451,7 +457,7 @@ const shapeRequest = { type: "object", required: ["kind"], properties: { kind: s
 const shapeOperations = [
   { ...operation("GET", "/api/v1/shapes", "listShapes", [200, ...commonErrors]), query: projectQuery, responseSchemas: { 200: shapesList, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/shapes", "createShapes", [201, ...commonErrors, 413, 422]), query: projectQuery, requestBody: json({ type: "object", oneOf: [shapeRequest, { type: "object", required: ["shapes"], properties: { shapes: { type: "array", minItems: 1, maxItems: 200, items: shapeRequest } }, additionalProperties: false }] }), responseSchemas: { 201: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 413: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
-  { ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]), query: shapeQuery, requestBody: json({ type: "object", additionalProperties: true }), responseSchemas: { 200: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]), query: shapeQuery, requestBody: json({ type: "object", properties: { faceColors: { type: "object", patternProperties: { "^(?:[0-9]+|face_[^\\s]+)$": { type: "string", pattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } }, additionalProperties: false } }, additionalProperties: true }), responseSchemas: { 200: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num } }, 400: faceError("invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"), 401: faceError("unauthorized"), 404: faceError("api_disabled", "project_not_found", "shape_not_found"), 409: faceError("project_busy", "shape_locked"), 422: { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["unapplicable_fields", "geometry_failed", "cad_failed"] }, fields: { type: "array", items: str } }, additionalProperties: true }, 500: faceError("geometry_failed", "cad_failed", "internal_error"), 503: faceError("storage_unconfigured") } },
   { ...operation("DELETE", "/api/v1/shapes", "deleteShape", [200, ...commonErrors]), query: shapeQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
 ] as const satisfies readonly ApiV1Operation[];
 

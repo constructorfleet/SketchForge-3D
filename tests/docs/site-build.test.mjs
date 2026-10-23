@@ -92,7 +92,7 @@ test("documentation status records durable capabilities and outstanding requirem
   const changelog = readFileSync(new URL("../../docs/CHANGELOG.md", import.meta.url), "utf8");
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /32 operations; generated OpenAPI describes 27 and explains why 5 remain omitted/i);
+  assert.match(spec, /32 operations; generated OpenAPI describes 28 and explains why 4 remain omitted/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can rebuild a persisted sketch sweep from an updated profile/i);
   assert.match(spec, /`PATCH \/api\/v1\/shapes` can store or clear one `faceDraft` on an exact retained sketch extrusion, single-solid sketch sweep, or plain single-region full-turn sketch revolve/i);
   assert.match(spec, /`GET \/faces\?topology=exact` lists analytic B-rep revolve faces/i);
@@ -110,7 +110,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);
   assert.match(spec, /does not establish general topology lineage/i);
   assert.match(spec, /editor's arbitrary-shape face-draft workflow remains baked/i);
-  assert.match(spec, /OpenAPI baseline remains 27 of 32 operations; `PATCH \/api\/v1\/shapes` remains omitted because combined face-color and profile validation is not represented faithfully/i);
+  assert.match(spec, /OpenAPI baseline (?:is|remains) 28 of 32 operations; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
   assert.match(spec, /Pull-request docs CI runs `docs:generate` before generated-output verification and the site build/i);
@@ -126,13 +126,13 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /27 of 32 operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /28 of 32 operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, the REST guide's included `docs\/examples\/rest-hole-plate\.mjs` fixture, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
   assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
-  assert.match(spec, /current baseline is 27 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the remaining 5 are omitted with reasons/i);
+  assert.match(spec, /current baseline is 28 of 32 operations with runtime-backed request\/response contracts in generated OpenAPI; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
   assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
@@ -152,7 +152,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /Task-oriented coverage and source\/example ownership — open/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
-  assert.match(migration, /27 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 5 are listed/i);
+  assert.match(migration, /28 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The other 4 are listed as\s+`OPTIONS` preflights/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);
   assert.match(migration, /does not treat\s+every environment read as a supported setting/i);
   assert.match(migration, /required\s+audience\/owner metadata/i);
