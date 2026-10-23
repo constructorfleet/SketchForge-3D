@@ -362,3 +362,126 @@ describe("editing the angle of a retained face draft on a sketch extrusion", () 
     CAD_TEST_TIMEOUT_MS,
   );
 });
+
+describe("editing the pull axis of a retained face draft on a sketch extrusion", () => {
+  it.each(["fillet", "chamfer"] as const)(
+    "replays one all-edge %s after an axis-only edit and a post-import profile edit",
+    async (kind) => {
+      const { store, document, writeCount } = projectStore();
+      const engine = createEngine(store);
+      const original = await sketchExtrusionShapeFromRequest({
+        id: `axis-edit-${kind}`, sketchSourceId: `sketch/axis-edit-${kind}`, name: "Axis-edited extrusion",
+        profile: {
+          points: [
+            { id: "a", x: -1, z: -1 }, { id: "b", x: 1, z: -1 },
+            { id: "c", x: 1, z: 1 }, { id: "d", x: -1, z: 1 },
+          ],
+          segments: [
+            { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+            { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+          ],
+        },
+        height: 3, x: 0, z: 0, elevation: 0, rotation: 0,
+      });
+      document.shapes = [original];
+      const faces = await shapeFaces(original);
+      const selectedFace = faces.find((face) => face.surfaceType === "plane" && face.normal
+        && (Math.abs(face.normal.x) > 0.99 || Math.abs(face.normal.z) > 0.99))!;
+      const otherFace = faces.find((face) => face.surfaceType === "plane" && face.id !== selectedFace.id)!;
+      const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "y" as const };
+      const drafted = value(await engine.changeShape("recompute", original.id, { faceDraft: draft })).shape;
+      const treatment = kind === "fillet"
+        ? { kind, amount: 0.1 } as const
+        : { kind, amount: 0.1, angle: 45 } as const;
+      const treated = value(await engine.treat("recompute", drafted.id, treatment)).shape;
+
+      const writesBeforeInvalidAxis = writeCount();
+      const beforeInvalidAxis = value(await engine.project("recompute"));
+      const invalidPullDirection = selectedFace.normal!.x > 0.99 ? "x"
+        : selectedFace.normal!.x < -0.99 ? "-x"
+          : selectedFace.normal!.z > 0.99 ? "z" : "-z";
+      const invalidAxis = await engine.changeShape("recompute", treated.id, {
+        faceDraft: { ...draft, pullDirection: invalidPullDirection },
+      });
+      expect(invalidAxis.ok).toBe(false);
+      expect(writeCount()).toBe(writesBeforeInvalidAxis);
+      expect(value(await engine.project("recompute"))).toEqual(beforeInvalidAxis);
+
+      const changedFace = await engine.changeShape("recompute", treated.id, {
+        faceDraft: { ...draft, sourceFaceId: otherFace.id, pullDirection: "-y" },
+      });
+      expect(changedFace.ok).toBe(false);
+      expect(changedFace.ok ? undefined : changedFace.failure.reason).toBe("invalid_shape_request");
+      expect(writeCount()).toBe(writesBeforeInvalidAxis);
+
+      const writesBeforeAxisEdit = writeCount();
+      const axisEdit = await engine.changeShape("recompute", treated.id, {
+        faceDraft: { ...draft, pullDirection: "-y" },
+      });
+      expect(axisEdit.ok, JSON.stringify(axisEdit)).toBe(true);
+      const edited = value(axisEdit).shape;
+      expect(edited.id).toBe(original.id);
+      expect(edited.sketchSourceId).toBe(original.sketchSourceId);
+      expect(edited.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(edited.cadBrep).not.toBe(treated.cadBrep);
+      expect(edited.edgeTreatments).toHaveLength(1);
+      expect(edited.edgeTreatments?.[0]).toMatchObject({
+        kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
+      });
+      expect(edited.edgeTreatmentHistory).toHaveLength(1);
+      expect(edited.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(edited.edgeTreatments?.[0]?.edgeCount).toBeGreaterThan(0);
+      expect(edited.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(edited.edgeTreatments?.[0]?.edgeCount);
+      expect(writeCount()).toBe(writesBeforeAxisEdit + 1);
+
+      const archived = await exportSkfProject({ ...document, modifiedAt: 2 });
+      const restored = await importSkfProject(archived);
+      expect(restored.shapes[0]?.id).toBe(original.id);
+      expect(restored.shapes[0]?.sketchSourceId).toBe(original.sketchSourceId);
+      expect(restored.shapes[0]?.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(restored.shapes[0]?.edgeTreatments?.[0]).toMatchObject({
+        kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
+      });
+      document.shapes = restored.shapes;
+
+      const editedProfile = {
+        ...original.sketchProfile!,
+        points: original.sketchProfile!.points.map((point) => ({ ...point, x: point.x * 1.15 })),
+      };
+      const writesBeforeProfileEdit = writeCount();
+      const profileEdit = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: editedProfile });
+      expect(profileEdit.ok, JSON.stringify(profileEdit)).toBe(true);
+      const replayed = value(profileEdit).shape;
+      expect(replayed.id).toBe(original.id);
+      expect(replayed.sketchSourceId).toBe(original.sketchSourceId);
+      expect(replayed.sketchProfile).toEqual(editedProfile);
+      expect(replayed.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(replayed.edgeTreatments).toHaveLength(1);
+      expect(replayed.edgeTreatments?.[0]).toMatchObject({
+        kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
+      });
+      expect(replayed.edgeTreatmentHistory).toHaveLength(1);
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
+      expect(replayed.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(replayed.edgeTreatments?.[0]?.edgeCount);
+      expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
+
+      const beforeFailedReplay = value(await engine.project("recompute"));
+      const writesBeforeFailedReplay = writeCount();
+      const rotatedProfile = {
+        ...editedProfile,
+        points: editedProfile.points.map((point) => ({
+          ...point,
+          x: (point.x - point.z) / Math.sqrt(2),
+          z: (point.x + point.z) / Math.sqrt(2),
+        })),
+      };
+      const failedReplay = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: rotatedProfile });
+      expect(failedReplay.ok).toBe(false);
+      expect(failedReplay.ok ? undefined : failedReplay.failure.reason).toBe("sweep_failed");
+      expect(writeCount()).toBe(writesBeforeFailedReplay);
+      expect(value(await engine.project("recompute"))).toEqual(beforeFailedReplay);
+    },
+    CAD_TEST_TIMEOUT_MS,
+  );
+});

@@ -876,7 +876,8 @@ export function createEngine(store: ProjectStore): Engine {
         && (!faceDraftChanged || isSingleLoopSketchExtrusion(existing)
           && requestedFaceDraft !== undefined && requestedFaceDraft !== null
           && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId
-          && requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
+          && (requestedFaceDraft.angle === existing.faceDraft.angle
+            || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection))
         && (isPlainFullTurnSketchRevolve(existing)
           || isSingleLoopSketchExtrusion(existing)
             && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")

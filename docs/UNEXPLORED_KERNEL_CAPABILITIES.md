@@ -221,8 +221,10 @@ selected-edge or multiple treatments on a drafted extrusion. Shelling remains
 refused when persisted draft or treatment
 metadata exists. On a single-loop sketch extrusion with one supported all-edge
 fillet or symmetric 45° all-edge chamfer, changing only the retained face-draft
-angle replays source, draft, then treatment atomically. Changing its pull axis
-while treated remains refused. An untreated retained face draft can update its
+angle replays source, draft, then treatment atomically. Changing only its pull
+axis while treated replays source, draft, then treatment atomically; `.skf`
+round trips and subsequent profile edits retain the signed axis, treatment, and
+IDs, while invalid axes roll back without writing. An untreated retained face draft can update its
 angle or axis while keeping the same source face ID; clear the draft before
 selecting another source face. This bounded support does not define
 semantic lineage across arbitrary topology changes. Prism drafts are editable
