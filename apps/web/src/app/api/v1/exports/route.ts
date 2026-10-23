@@ -3,12 +3,13 @@ import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { parseProjectionLayout, PROJECTION_LAYOUTS } from "@constructorfleet/sketchforge-engine/cadProjection";
 import { SECTION_PLANES, type SectionPlane } from "@constructorfleet/sketchforge-engine/cadSection";
 import { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "@constructorfleet/sketchforge-engine/sceneExport";
+import { withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
 export const revalidate = false;
 
 /** Export a server-stored project artifact for a macro or other API client. */
-export async function POST(request: Request) {
+async function postExport(request: Request) {
   const context = await apiContext(request);
   if (context.error) return context.error;
   const { projectId } = apiTarget(request);
@@ -104,3 +105,5 @@ export async function POST(request: Request) {
     return apiError(error instanceof Error ? error.message : "The project could not be exported.", 422, "geometry_failed");
   }
 }
+
+export const POST = withApiV1Contract("POST /api/v1/exports", postExport);

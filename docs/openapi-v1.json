@@ -6678,6 +6678,429 @@
         ]
       }
     },
+    "/api/v1/exports": {
+      "post": {
+        "operationId": "exportProject",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "format",
+                    "filename",
+                    "mimeType",
+                    "bytes",
+                    "shapeCount",
+                    "base64"
+                  ],
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": [
+                        "stl",
+                        "obj",
+                        "3mf",
+                        "step",
+                        "skf",
+                        "zip",
+                        "svg",
+                        "dxf"
+                      ]
+                    },
+                    "filename": {
+                      "type": "string"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "shapeCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "exportedCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "kind",
+                          "reason"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "base64": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "model/stl": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "model/3mf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "model/step": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.sketchforge.project+zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/dxf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-SketchForge-Metadata": {
+                "description": "URI-encoded JSON containing the export metadata fields (format, filename, mimeType, shapeCount, and optional STEP skipped-shape details).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_project_id",
+                        "invalid_body",
+                        "unsupported_format",
+                        "invalid_request"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unauthorized"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "project_not_found",
+                        "shape_not_found"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "geometry_failed"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "storage_unconfigured"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Export project geometry as JSON/base64, or return the raw artifact when download=1. Binary downloads carry result metadata in the X-SketchForge-Metadata response header.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "description": "Set download=1 to return raw artifact bytes; omitted or any other value returns JSON with base64 content.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "format"
+                ],
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "stl",
+                      "obj",
+                      "3mf",
+                      "step",
+                      "skf",
+                      "zip",
+                      "svg",
+                      "dxf"
+                    ]
+                  },
+                  "shapeIds": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "\\S",
+                        "description": "A single non-empty shape ID is accepted as shorthand."
+                      },
+                      {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "description": "IDs are trimmed and must be distinct after trimming.",
+                        "items": {
+                          "type": "string",
+                          "pattern": "\\S"
+                        }
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "Optional output basename; an empty or omitted value uses the project name."
+                  },
+                  "view": {
+                    "type": "string",
+                    "enum": [
+                      "multiview",
+                      "front",
+                      "back",
+                      "top",
+                      "bottom",
+                      "left",
+                      "right",
+                      "iso"
+                    ],
+                    "description": "SVG only; section and view are mutually exclusive."
+                  },
+                  "section": {
+                    "type": "object",
+                    "required": [
+                      "plane",
+                      "offset"
+                    ],
+                    "description": "SVG or DXF only; section and view are mutually exclusive.",
+                    "properties": {
+                      "plane": {
+                        "type": "string",
+                        "enum": [
+                          "xy",
+                          "xz",
+                          "yz"
+                        ]
+                      },
+                      "offset": {
+                        "type": "number",
+                        "minimum": -100000,
+                        "maximum": 100000,
+                        "description": "Finite section-plane coordinate in millimetres."
+                      }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/faces": {
       "get": {
         "operationId": "listFaces",
@@ -23855,12 +24278,6 @@
       "path": "/api/v1/edges",
       "operationId": "edgeRouteOptions",
       "reason": "Preflight-only operation; omitted from the resource API document."
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/exports",
-      "operationId": "exportProject",
-      "reason": "Response schemas or verified response statuses are not declared."
     },
     {
       "method": "OPTIONS",

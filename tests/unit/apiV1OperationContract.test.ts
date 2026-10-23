@@ -84,6 +84,45 @@ describe("REST API v1 operation contract", () => {
     expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
   });
 
+  it("contracts export inputs and validates binary downloads through the metadata header", async () => {
+    const contract = await import("@/lib/apiV1OperationContract");
+    const key = "POST /api/v1/exports";
+    const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
+    expect(operation).toMatchObject({
+      operationId: "exportProject",
+      responses: [200, 400, 401, 404, 422, 500, 503],
+      query: { required: ["projectId"] },
+      requestBody: { schema: { type: "object", required: ["format"] } },
+      binaryResponse: { status: 200, metadataHeader: "X-SketchForge-Metadata" },
+    });
+    const bodySchema = operation?.requestBody && "schema" in operation.requestBody ? operation.requestBody.schema : undefined;
+    expect(bodySchema && contract.validateApiV1Schema({ format: "svg", view: "top" }, bodySchema)).toBe(true);
+    expect(bodySchema && contract.validateApiV1Schema({ format: "gcode" }, bodySchema)).toBe(false);
+    expect(bodySchema && contract.validateApiV1Schema({ format: "svg", name: "x".repeat(121) }, bodySchema)).toBe(false);
+    expect(operation?.binaryResponse?.contentTypes).toContain("application/dxf");
+
+    const metadata = { format: "stl", filename: "Plate.stl", mimeType: "model/stl", shapeCount: 1 };
+    const valid = new Response(new Uint8Array([1, 2, 3]), { headers: {
+      "Content-Type": "model/stl",
+      "X-SketchForge-Metadata": encodeURIComponent(JSON.stringify(metadata)),
+    } });
+    const wrapped = contract.withApiV1Contract(key, async () => valid);
+    const request = new Request("https://example.test/api/v1/exports?projectId=p&download=1");
+    const response = await wrapped(request);
+    expect(response.status).toBe(200);
+    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([1, 2, 3]);
+
+    const invalid = contract.withApiV1Contract(key, async () => new Response("bytes", { headers: { "Content-Type": "model/stl" } }));
+    const rejected = await invalid(request);
+    expect(rejected.status).toBe(500);
+    expect(await rejected.json()).toMatchObject({ code: "internal_error" });
+    const mismatched = contract.withApiV1Contract(key, async () => new Response("bytes", { headers: {
+      "Content-Type": "model/stl",
+      "X-SketchForge-Metadata": encodeURIComponent(JSON.stringify({ ...metadata, mimeType: "image/svg+xml" })),
+    } }));
+    expect((await mismatched(request)).status).toBe(500);
+  });
+
   it("contracts interference normalization, bounded errors, and exact or tessellated reports", async () => {
     const contract = await import("@/lib/apiV1OperationContract");
     const key = "POST /api/v1/interference";

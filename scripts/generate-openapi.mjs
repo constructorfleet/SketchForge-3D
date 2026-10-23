@@ -30,6 +30,16 @@ for (const operation of API_V1_OPERATIONS) {
       content: { "application/json": { schema: toJsonSchema(schema) } },
     },
   ]));
+  if (operation.binaryResponse) {
+    const binarySchema = { type: "string", format: "binary" };
+    for (const mediaType of operation.binaryResponse.contentTypes) responses[operation.binaryResponse.status].content[mediaType] = { schema: binarySchema };
+    responses[operation.binaryResponse.status].headers = {
+      [operation.binaryResponse.metadataHeader]: {
+        description: "URI-encoded JSON containing the export metadata fields (format, filename, mimeType, shapeCount, and optional STEP skipped-shape details).",
+        schema: { type: "string" },
+      },
+    };
+  }
   const generated = { operationId: operation.operationId, responses };
   if (operation.description) generated.description = operation.description;
   if (operation.auth === "bearer") generated.security = [{ bearerAuth: [] }, { sketchForgeToken: [] }];

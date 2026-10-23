@@ -50,12 +50,12 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Request bodies are JSON except for multipart file imports; responses use JSON. Errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align`, `/distribute`, and `/patterns`), STEP assembly explosion (`POST /explode`), `POST /interference`, `POST /imports`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes. Response bodies are checked against the contract registry; route-specific parsers validate incoming requests. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
+The generated OpenAPI 3.1 document describes project and shape CRUD, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, group and ungroup, mirroring (`POST /mirrors`), shape arrangement (`POST /align`, `/distribute`, and `/patterns`), STEP assembly explosion (`POST /explode`), `POST /interference`, `POST /imports`, `POST /exports`, and the geometry modification operations `POST /booleans`, `/treatments`, `/shell`, and `/draft-prism`. Those operations document their accepted request fields, successful payloads, and reachable status codes. Export responses document both JSON/base64 and `download=1` binary output with its metadata header. Response bodies and export headers are checked against the contract registry; route-specific parsers validate incoming requests. <a href="/openapi-v1.json" download>Download the OpenAPI JSON</a> or [open the generated contract](./openapi-v1.json). It is intentionally a subset: the document lists the other registered operations and why they are omitted in `x-sketchforge-omitted-operations`. Use the prose endpoint list below for the broader API until an operation has a contract that matches its handler behavior. For accepted per-kind request fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate it with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`.
 The shape `PATCH` operation remains omitted because its `faceColors` validation is custom; its omission entry calls out the supported `sketchProfile` rebuild and links to the [sweep update contract](#sketch-sweeps) below. The prose contract below also documents retained face drafts. An operation should appear in generated OpenAPI only after its contract can describe actual handler behavior; use the prose endpoint list below for the broader API until then.
 
 ### Contract validation
 
-The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, and `POST /explode`, and `POST /imports` carry request metadata and status-specific response schemas. Their handlers validate successful and error responses against those contracts; unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, the returned shape summaries and revision, and reachable STEP and engine errors. Other registry entries remain inventory-only and are not runtime schema-validated yet.
+The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, `POST /explode`, `POST /imports`, and `POST /exports` carry request metadata and status-specific response schemas. Their handlers validate successful and error responses against those contracts; export downloads validate their media type and URI-encoded metadata header, and unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, the returned shape summaries and revision, and reachable STEP and engine errors. Other registry entries remain inventory-only and are not runtime schema-validated yet.
 
 | Method | Path | Does |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists
 | `POST` | `/distribute?projectId=` | Spreads three or more shapes evenly along an axis. |
 | `POST` | `/patterns?projectId=` | Repeats shapes in a row or around a ring, adding the copies. |
 | `POST` | `/imports?projectId=` | Adds the model an STL, OBJ or SVG file describes. |
-| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF. |
+| `POST` | `/exports?projectId=` | Exports a project or selected shapes as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings or section DXF; JSON/base64 is the default and `download=1` returns raw bytes with metadata in `X-SketchForge-Metadata`. |
 | `POST` | `/explode?projectId=&shapeId=` | Converts a retained STEP assembly into editable nested groups when every exact solid has an unambiguous product occurrence; otherwise returns separately positioned exact solids. Preserves available names, XCAF colors, and occurrence ancestry (up to 200 solids and 8 MiB source). |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, normal, direction. |
 | `GET` | `/edges?projectId=&shapeId=` | Lists edges by their current numeric index, with geometric measurements and filletability. |
@@ -736,7 +736,7 @@ An SVG needs an XML parser the Node runtime does not provide, so a server withou
 ```
 
 `shapeIds` and `name` are optional. The formats are `stl`, `obj`, `3mf`, `step`,
-`skf`, `zip`, and `svg`. The response includes the filename, MIME type, byte count,
+`skf`, `zip`, `svg`, and `dxf`. The response includes the filename, MIME type, byte count,
 shape count, and base64-encoded `base64` content, so a client can write the
 artifact locally. A ZIP kit contains an STL and the editable SKF project. An
 SKF export includes the project and its source assets. STEP export preserves
@@ -777,13 +777,17 @@ mesh triangles, and an 8,000 mm maximum span.
   "bytes": 2048, "shapeCount": 2, "base64": "..." }
 ```
 
-Unknown format names answer `400` with `code: "unsupported_format"`, and a
+`format` is required. `shapeIds` may be one ID or a list of distinct IDs;
+`name` is optional and limited to 120 characters. `view` applies only to SVG;
+`section` applies only to SVG and DXF, takes `xy`, `xz` or `yz` plus an offset
+between -100000 and 100000 mm, and cannot be combined with `view`. Unknown
+format names answer `400` with `code: "unsupported_format"`, and a
 `view` the drawing does not know, or a `view` on any format but `svg`, answers
 `400` with `code: "invalid_request"`. `section` and `view` cannot be used
 together. A plane that misses the selected scene answers `422`; oversized
-sections answer `413`. A requested shape id outside the project
-answers `404`; a project with no exportable solid geometry answers `422` with
-`code: "geometry_failed"`.
+sections also currently surface as `422` with `code: "geometry_failed"`. A
+requested shape id outside the project answers `404`; a project with no
+exportable solid geometry answers `422` with `code: "geometry_failed"`.
 
 ## Example: a plate with a row of holes
 
