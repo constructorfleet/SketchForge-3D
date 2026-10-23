@@ -15,23 +15,23 @@ owner: "Contributors"
   now change its angle while preserving one all-edge fillet or symmetric 45°
   all-edge chamfer. The engine replays revolve, draft, then treatment atomically,
   preserving output/source/source-face IDs and refreshing treatment history and
-  eligible-edge counts. `.skf` round trips and subsequent profile or revolve
-  setting edits preserve the sequence. Pull-axis-only edits have the same
-  replay guarantees, including signed-axis persistence through `.skf`; combined
-  angle/axis edits, multi-region, partial-turn, and helical revolves remain
-  refused.
+  eligible-edge counts. Angle-only, pull-axis-only, and combined angle/axis
+  edits preserve output/source/source-face IDs. `.skf` round trips and
+  subsequent profile or revolve-setting edits preserve the sequence; failed
+  replays roll back without writing. Multi-region, partial-turn, and helical
+  revolves remain refused.
 - A retained face draft on a single-section, hole-free sketch sweep can now
-  change its angle or, independently, its signed pull axis while preserving one
+  change its angle, signed pull axis, or both together while preserving one
   all-edge fillet or symmetric 45° chamfer. Recompute applies source, draft,
   then treatment atomically; `.skf` round trips and subsequent profile edits
-  preserve the updated draft, treatment, and IDs. Combined angle/axis edits and
+  preserve the updated draft, treatment, and IDs. Source-face reselection and
   unsupported sweep cases remain refused.
 - A retained face draft on a single-loop sketch extrusion can now change its
   angle while preserving one all-edge fillet or symmetric 45° chamfer. The
   engine replays source, draft, then treatment atomically and refreshes
   treatment history; `.skf` round trips and source-profile edits preserve the
-  sequence. Changing only the signed pull axis is also supported; invalid axes
-  roll back without writing.
+  sequence. Signed pull-axis-only and combined angle/axis edits are also
+  supported; invalid axes or failed replays roll back without writing.
 - A face-drafted single-loop sketch extrusion can now retain one symmetric 45°
   all-edge chamfer. `.skf` round trips preserve the sequence, and source-profile
   edits replay the extrusion, face draft, then chamfer atomically while

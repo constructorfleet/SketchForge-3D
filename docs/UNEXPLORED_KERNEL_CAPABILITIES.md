@@ -116,12 +116,13 @@ These are implemented and should not be filed as missing features:
   no-hole sweep may also retain one face draft followed by one all-edge fillet
   or symmetric 45° all-edge chamfer; its `.skf` representation and source-profile
   edits replay sweep, draft, then treatment, while multiple treatments and
-  ambiguous source faces fail without a project write. Changing only the retained
-  face-draft angle on that treated sweep replays source, draft, then treatment
-  atomically. Changing only its signed pull axis replays source, draft, then
-  treatment atomically as well; `.skf` round trips and later profile edits
-  preserve the updated angle or axis, treatment, and IDs. Source-face reselection
-  and combined angle/axis edits on treated sweeps remain refused.
+  ambiguous source faces fail without a project write. Changing the retained
+  face-draft angle, signed pull axis, or both together on that treated sweep
+  replays source, draft, then treatment atomically; `.skf` round trips and later
+  profile edits preserve the updated values, treatment, and IDs. Invalid axis or
+  downstream treatment replay failures roll back without a project write.
+  Source-face reselection and unsupported sweep geometry/treatment combinations
+  remain refused.
 - `.skf` stores source-sketch nodes and feature inputs for sketch extrusions,
   revolves, sweeps, and boolean groups. Source profiles, operation parameters,
   and dependency links survive project round trips. Profile edits rebuild the
@@ -217,11 +218,11 @@ sequence above, plus one symmetric 45° all-edge chamfer after a face draft on
 a single-loop sketch extrusion, and one all-edge fillet or symmetric 45°
 all-edge chamfer after a face draft on a single-section, no-hole sketch sweep. Profile edits
 replay source, draft, then treatment; `.skf` preserves those sequences. On the
-supported sweep, changing only the retained draft angle or only its signed pull
-axis replays the treatment atomically, preserves source/output/source-face IDs,
-and refreshes treatment history and eligible-edge counts. A `.skf` round trip
-followed by a source-profile edit retains the updated axis. Invalid axes fail
-without writing. Combined angle/axis edits, source-face reselection,
+supported sweep, changing the retained draft angle, signed pull axis, or both
+together replays the treatment atomically, preserves source/output/source-face
+IDs, and refreshes treatment history and eligible-edge counts. A `.skf` round
+trip followed by a source-profile edit retains both updated values. Invalid
+axes or failed replay roll back without writing. Source-face reselection,
 multi-section sweeps, sweeps with holes, non-45° chamfers, and selected-edge or
 multiple treatments remain refused. Other face-draft / treatment sequences
 remain refused. A
@@ -232,14 +233,14 @@ Adding a prism draft after an edge treatment remains refused, as do
 selected-edge or multiple treatments on a drafted extrusion. Shelling remains
 refused when persisted draft or treatment
 metadata exists. On a single-loop sketch extrusion with one supported all-edge
-fillet or symmetric 45° all-edge chamfer, changing only the retained face-draft
-angle replays source, draft, then treatment atomically. Changing only its pull
-axis while treated replays source, draft, then treatment atomically; `.skf`
-round trips and subsequent profile edits retain the signed axis, treatment, and
-IDs, while invalid axes roll back without writing. An untreated retained face draft can update its
-angle or axis while keeping the same source face ID; clear the draft before
-selecting another source face. This bounded support does not define
-semantic lineage across arbitrary topology changes. Prism drafts are editable
+fillet or symmetric 45° all-edge chamfer, changing the retained face-draft
+angle, signed pull axis, or both together replays source, draft, then treatment
+atomically. `.skf` round trips and subsequent profile edits retain both values,
+treatment, and IDs; invalid axes or failed replay roll back without writing. An
+untreated retained face draft can update its angle or axis while keeping the
+same source face ID; clear the draft before selecting another source face. This
+bounded support does not define semantic lineage across arbitrary topology
+changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The
 editor does not yet create or edit the persisted face-draft feature; its
 arbitrary-shape results remain baked. Other draft operations and general
@@ -247,14 +248,12 @@ editable draft history remain unsupported. Broader fixture coverage should
 establish the supported geometric envelope.
 
 On a plain single-region full-turn sketch revolve with one all-edge fillet or
-symmetric 45° all-edge chamfer, changing only the retained face-draft angle
-replays revolve, draft, then treatment atomically. Output, source, and
-source-face IDs remain stable; treatment history and eligible-edge counts are
-refreshed. `.skf` round trips preserve the edit and allow subsequent profile
-and revolve-setting edits. Pull-axis-only edits also replay the treatment
-atomically, preserving the same identities and refreshing treatment history and
-eligible-edge counts; `.skf` round trips retain the signed axis for later source
-edits. Combined angle-and-axis edits, multi-region, partial-turn, and helical
+symmetric 45° all-edge chamfer, changing the retained face-draft angle, signed
+pull axis, or both together replays revolve, draft, then treatment atomically.
+Output, source, and source-face IDs remain stable; treatment history and
+eligible-edge counts are refreshed. `.skf` round trips preserve both values and
+allow subsequent profile and revolve-setting edits. Invalid axes or failed
+replay roll back without writing. Multi-region, partial-turn, and helical
 revolves remain refused.
 
 ### 3. Editable STEP assembly hierarchy and robust component association

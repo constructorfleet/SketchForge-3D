@@ -874,16 +874,7 @@ export function createEngine(store: ProjectStore): Engine {
       const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
         && existing.draftPrismAngle === undefined
         && (!faceDraftChanged || requestedFaceDraft !== undefined && requestedFaceDraft !== null
-          && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId
-          && (isSingleLoopSketchExtrusion(existing)
-            && (requestedFaceDraft.angle === existing.faceDraft.angle
-              || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
-          || isSingleSectionSketchSweep(existing)
-            && (requestedFaceDraft.angle === existing.faceDraft.angle
-              || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)
-          || isPlainFullTurnSketchRevolve(existing)
-            && (requestedFaceDraft.angle === existing.faceDraft.angle
-              || requestedFaceDraft.pullDirection === existing.faceDraft.pullDirection)))
+          && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId)
         && (isPlainFullTurnSketchRevolve(existing)
           || isSingleLoopSketchExtrusion(existing)
             && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
