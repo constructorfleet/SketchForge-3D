@@ -717,8 +717,9 @@ export function createEngine(store: ProjectStore): Engine {
         && !hasEdgeTreatments
         && found.value.faceDraft !== undefined
         && (isPlainFullTurnSketchRevolve(found.value)
-          || operation === "all-edge-treatment"
-            && (isSingleLoopSketchExtrusion(found.value) || isSingleSectionSketchSweep(found.value))
+          || isSingleLoopSketchExtrusion(found.value)
+            && (operation === "all-edge-treatment" || operation === "all-edge-chamfer-treatment")
+          || operation === "all-edge-treatment" && isSingleSectionSketchSweep(found.value)
           || operation === "all-edge-chamfer-treatment" && isSingleSectionSketchSweep(found.value));
       const incompatible = found.value.faceDraft !== undefined && !replayableFaceDraftTreatment
         || operation === "edge-treatment" && hasDraftPrism
@@ -729,7 +730,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (incompatible) {
         return failed({
           reason: "cad_refused",
-          message: "Face drafts support one all-edge fillet on a single-loop sketch extrusion, one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn sketch revolve; prism drafts support one all-edge treatment only on a sketch extrusion. Other draft and treatment combinations, and shelling with persisted features, are refused.",
+          message: "Face drafts support one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-loop sketch extrusion, one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn sketch revolve; prism drafts support one all-edge treatment only on a sketch extrusion. Other draft and treatment combinations, and shelling with persisted features, are refused.",
           status: 422,
         });
       }
@@ -874,7 +875,8 @@ export function createEngine(store: ProjectStore): Engine {
         && !faceDraftChanged
         && existing.draftPrismAngle === undefined
         && (isPlainFullTurnSketchRevolve(existing)
-          || isSingleLoopSketchExtrusion(existing) && existing.edgeTreatments?.[0]?.kind === "fillet"
+          || isSingleLoopSketchExtrusion(existing)
+            && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
           || isSingleSectionSketchSweep(existing)
             && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer"))
         && existing.edgeTreatments?.length === 1
