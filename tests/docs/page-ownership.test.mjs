@@ -12,11 +12,11 @@ test("documentation suite status records REST and runnable-fence coverage accura
   const spec = await readFile(path.join(repository, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
 
   assert.match(spec, /Current status is 28 of 32; the four omitted operations are `OPTIONS` preflights/i);
-  assert.match(spec, /23 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
+  assert.match(spec, /25 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
   assert.match(spec, /other fence languages[\s\S]*?ownership coverage for other content sources remain open/i);
-  assert.match(spec, /6\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
-  assert.match(spec, /7\. \*\*Partial:\*\*.*runnable-fence check covers 23 maintained-doc fences/i);
-  assert.match(spec, /10\. \*\*Partial:\*\*.*23 supported-language runnable fences/i);
+  assert.match(spec, /6\. \*\*Partial:\*\*.*25 supported-language runnable fences/i);
+  assert.match(spec, /7\. \*\*Partial:\*\*.*runnable-fence check covers 25 maintained-doc fences/i);
+  assert.match(spec, /10\. \*\*Partial:\*\*.*25 supported-language runnable fences/i);
 });
 
 async function createRepository(t, page, pagePath = "docs/index.md") {

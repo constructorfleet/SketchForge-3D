@@ -126,7 +126,7 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
   outside the declared inventory remain out of scope.
 - **Examples and page ownership — partial:** all maintained
   `docs/**/*.md` pages and staged generated package references have required
-  audience/owner metadata. A separate docs check covers 23 supported-language
+  audience/owner metadata. A separate docs check covers 25 supported-language
   runnable fences: each must include its exact tracked source with a named test
   and CI command, or carry a concrete reasoned exemption. Exemptions do not
   establish execution coverage, and other fence languages and runnable content
