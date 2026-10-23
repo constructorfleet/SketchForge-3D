@@ -105,13 +105,11 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /profile rebuild\s+receives fresh face IDs and drops face colors[\s\S]*?symmetric 45° chamfer is replayed[\s\S]*?unsupported or\s+ambiguous treatment histories fail the edit atomically/i);
   assert.match(spec, /missing or ambiguous matches fail atomically/i);
   assert.match(spec, /a single-loop sketch extrusion accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);
-  assert.match(spec, /Changing only the face-draft angle on a treated single-loop sketch extrusion replays source, draft, then treatment\s+atomically/i);
-  assert.match(spec, /Changing only the pull axis while a treatment is retained on a single-loop sketch extrusion replays source, draft, then treatment atomically/i);
+  assert.match(spec, /changing the retained face-draft angle, signed pull axis, or both together replays source, draft, then treatment atomically/i);
   assert.match(spec, /a single-section, hole-free sketch sweep accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);
-  assert.match(spec, /Changing only the face-draft angle on such a treated sweep replays source, draft, then treatment atomically/i);
+  assert.match(spec, /a full-turn single-region sketch revolve accepts one all-edge fillet or symmetric 45° all-edge chamfer/i);
   assert.match(spec, /Relevant coverage includes `tests\/unit\/faceDraftSweepFilletRecompute\.test\.ts`, `tests\/unit\/faceDraftExtrusionFilletRecompute\.test\.ts`/i);
-  assert.match(capabilities, /Changing only its pull\s+axis while treated replays source, draft, then treatment atomically/i);
-  assert.match(capabilities, /Changing only the retained\s+face-draft angle on that treated sweep replays source, draft, then treatment\s+atomically/i);
+  assert.match(capabilities, /Changing the retained\s+face-draft angle, signed pull axis, or both together on that treated sweep\s+replays source, draft, then treatment atomically/i);
   assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(spec, /A retained prism draft on a sketch extrusion can be followed by one all-edge fillet or symmetric 45° chamfer[\s\S]*?adding a prism draft after a treatment remains refused/i);
   assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);
@@ -193,15 +191,14 @@ test("documentation status records durable capabilities and outstanding requirem
 
   assert.match(capabilities, /Dependency-ordered parametric recomputation/i);
   assert.match(capabilities, /retains one editable face draft[\s\S]{0,120}plain single-region full-turn sketch revolve/i);
-  assert.match(capabilities, /Changing only its pull\s+axis while treated replays source, draft, then treatment atomically/i);
-  assert.match(capabilities, /Changing only the retained\s+face-draft angle on that treated sweep replays source, draft, then treatment\s+atomically/i);
+  assert.match(capabilities, /Changing the retained\s+face-draft angle, signed pull axis, or both together on that treated sweep\s+replays source, draft, then treatment atomically/i);
   assert.match(capabilities, /Adding a second treatment, a prism\s+draft, or a shell to a face-drafted shape remains refused before writing/i);
   assert.match(capabilities, /one all-edge fillet or symmetric 45°\s+chamfer is now\s+supported on a sketch extrusion[\s\S]*?Adding a prism draft after a treatment/i);
   assert.match(capabilities, /single-loop sketch extrusion supports one all-edge fillet or one symmetric\s+45° all-edge chamfer[\s\S]*?selected-edge treatments, non-45°\s+chamfers, and additional treatments remain refused/i);
   assert.doesNotMatch(capabilities, /face-draft fillets, selected-edge treatments, non-45°\s+chamfers, and additional treatments remain refused/i);
-  assert.match(shippedCapabilities, /Changing only the retained\s+face-draft angle on that treated sweep replays source, draft, then treatment\s+atomically[\s\S]*?Changing only its signed pull axis replays source, draft, then\s+treatment atomically as well/i);
+  assert.match(shippedCapabilities, /face-draft angle, signed pull axis, or both together on that treated sweep\s+replays source, draft, then treatment atomically/i);
   assert.doesNotMatch(shippedCapabilities, /Pull-axis and source-face edits on treated sweeps remain refused/i);
-  assert.match(shippedCapabilities, /Source-face reselection\s+and combined angle\/axis edits on treated sweeps remain refused/i);
+  assert.match(shippedCapabilities, /Source-face reselection and unsupported sweep geometry\/treatment combinations\s+remain refused/i);
   assert.match(capabilities, /Broader and editable drafting/i);
   assert.match(capabilities, /Editable STEP assembly hierarchy and robust component association/i);
   assert.match(capabilities, /Stable face identity across arbitrary topology changes/i);

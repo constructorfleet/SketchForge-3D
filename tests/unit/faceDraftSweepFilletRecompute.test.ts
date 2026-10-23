@@ -116,7 +116,7 @@ describe("fillet after a retained face draft on a sketch sweep", () => {
       faceDraft: { ...draft, angle: 6, pullDirection: "x" },
     });
     expect(changedDraft.ok).toBe(false);
-    expect(changedDraft.ok ? undefined : changedDraft.failure.reason).toBe("invalid_shape_request");
+    expect(changedDraft.ok ? undefined : changedDraft.failure.reason).toBe("sweep_failed");
     expect(writeCount()).toBe(writesBeforeDraftEdit);
 
     const beforeMissingFaceReplay = value(await engine.project("recompute"));
@@ -206,9 +206,9 @@ describe("chamfer after a retained face draft on a sketch sweep", () => {
   }, CAD_TEST_TIMEOUT_MS);
 });
 
-describe("editing the angle of a retained face draft on a sketch sweep", () => {
+describe("editing angle and pull axis of a retained face draft on a sketch sweep", () => {
   it.each(["fillet", "chamfer"] as const)(
-    "replays one all-edge %s after an angle-only edit and a post-import profile edit",
+    "replays one all-edge %s after a combined edit and a post-import profile edit",
     async (kind) => {
       const { store, document, writeCount } = projectStore();
       const engine = createEngine(store);
@@ -249,31 +249,31 @@ describe("editing the angle of a retained face draft on a sketch sweep", () => {
       expect(selectedEdgeTreatment.ok ? undefined : selectedEdgeTreatment.failure.reason).toBe("cad_refused");
       expect(writeCount()).toBe(writesBeforeRefusals);
 
-      const writesBeforeAngleEdit = writeCount();
-      const angleEdit = await engine.changeShape("recompute", treated.id, {
-        faceDraft: { ...draft, angle: 8 },
+      const writesBeforeCombinedEdit = writeCount();
+      const combinedEdit = await engine.changeShape("recompute", treated.id, {
+        faceDraft: { ...draft, angle: 8, pullDirection: "-z" },
       });
-      expect(angleEdit.ok, JSON.stringify(angleEdit)).toBe(true);
-      const edited = value(angleEdit).shape;
+      expect(combinedEdit.ok, JSON.stringify(combinedEdit)).toBe(true);
+      const edited = value(combinedEdit).shape;
       expect(edited.id).toBe(original.id);
       expect(edited.sketchSourceId).toBe(original.sketchSourceId);
-      expect(edited.faceDraft).toMatchObject({ ...draft, angle: 8 });
+      expect(edited.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-z" });
       expect(edited.cadBrep).not.toBe(treated.cadBrep);
       expect(edited.edgeTreatments).toHaveLength(1);
       expect(edited.edgeTreatments?.[0]).toMatchObject({
         kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
       });
       expect(edited.edgeTreatmentHistory).toHaveLength(1);
-      expect(edited.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, angle: 8 });
+      expect(edited.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-z" });
       expect(edited.edgeTreatments?.[0]?.edgeCount).toBeGreaterThan(0);
       expect(edited.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(edited.edgeTreatments?.[0]?.edgeCount);
-      expect(writeCount()).toBe(writesBeforeAngleEdit + 1);
+      expect(writeCount()).toBe(writesBeforeCombinedEdit + 1);
 
       const archived = await exportSkfProject({ ...document, modifiedAt: 2 });
       const restored = await importSkfProject(archived);
       expect(restored.shapes[0]?.id).toBe(original.id);
       expect(restored.shapes[0]?.sketchSourceId).toBe(original.sketchSourceId);
-      expect(restored.shapes[0]?.faceDraft).toMatchObject({ ...draft, angle: 8 });
+      expect(restored.shapes[0]?.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-z" });
       expect(restored.shapes[0]?.edgeTreatments?.[0]).toMatchObject({
         kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
       });
@@ -292,13 +292,13 @@ describe("editing the angle of a retained face draft on a sketch sweep", () => {
       expect(replayed.id).toBe(original.id);
       expect(replayed.sketchSourceId).toBe(original.sketchSourceId);
       expect(replayed.sketchProfile).toEqual(editedProfile);
-      expect(replayed.faceDraft).toMatchObject({ ...draft, angle: 8 });
+      expect(replayed.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-z" });
       expect(replayed.edgeTreatments).toHaveLength(1);
       expect(replayed.edgeTreatments?.[0]).toMatchObject({
         kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
       });
       expect(replayed.edgeTreatmentHistory).toHaveLength(1);
-      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, angle: 8 });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-z" });
       expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
       expect(replayed.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(replayed.edgeTreatments?.[0]?.edgeCount);
       expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
@@ -363,7 +363,7 @@ describe("editing the pull axis of a retained face draft on a sketch sweep", () 
       const beforeRefusals = value(await engine.project("recompute"));
       const writesBeforeRefusals = writeCount();
       const combinedEdit = await engine.changeShape("recompute", edited.id, {
-        faceDraft: { ...edited.faceDraft!, angle: 6, pullDirection: "z" },
+        faceDraft: { ...edited.faceDraft!, angle: 6, pullDirection: "x" },
       });
       const invalidAxisEdit = await engine.changeShape("recompute", edited.id, {
         faceDraft: { ...edited.faceDraft!, pullDirection: "not-an-axis" as never },
