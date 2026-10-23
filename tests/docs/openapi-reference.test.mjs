@@ -243,6 +243,12 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(spec["x-sketchforge-omitted-operations"].every(({ method, reason }) => method === "OPTIONS" && /preflight/i.test(reason)));
 });
 
+test("site migration identifies preflight OPTIONS as the only route-coverage omission", async () => {
+  const migration = await readFile(path.join(root, "docs/site-migration.md"), "utf8");
+  assert.match(migration, /four `OPTIONS`\s+preflights are intentionally omitted;\s+all resource route coverage is complete/i);
+  assert.doesNotMatch(migration, /full route coverage remains open/i);
+});
+
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {
   const { scripts } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
   assert.ok(scripts["docs:generate"].includes("scripts/generate-openapi.mjs"));
