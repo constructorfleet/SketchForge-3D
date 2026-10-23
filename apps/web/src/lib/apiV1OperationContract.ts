@@ -41,6 +41,12 @@ export type ApiV1Operation = {
   /** Populated only for routes whose response set has been verified. */
   responses?: readonly number[];
   responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
+  binaryResponse?: {
+    status: number;
+    contentTypes: readonly string[];
+    metadataHeader: string;
+    metadataSchema: ApiV1FieldSchema;
+  };
   query?: {
     required: readonly string[];
     properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; minLength?: number; maxLength?: number; description?: string }>>;
@@ -282,6 +288,54 @@ const projectQuery = { required: ["projectId"], properties: { projectId: { type:
 const shapeQuery = { required: ["projectId", "shapeId"], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 }, shapeId: { type: "string", trim: true, minLength: 1 } } } as const;
 const json = (schema: ApiV1FieldSchema) => ({ contentType: "application/json" as const, required: true as const, schema });
 const commonErrors = [400, 401, 404, 409, 500, 503] as const;
+const exportFormats = ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] as const;
+const exportViews = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"] as const;
+const exportShapeIds = { oneOf: [
+  { type: "string", pattern: "\\S", description: "A single non-empty shape ID is accepted as shorthand." },
+  { type: "array", uniqueItems: true, items: { type: "string", pattern: "\\S" }, description: "IDs are trimmed and must be distinct after trimming." },
+] } as const;
+const exportRequestBody = json({
+  type: "object",
+  required: ["format"],
+  properties: {
+    format: { type: "string", enum: exportFormats },
+    shapeIds: exportShapeIds,
+    name: { type: "string", maximumLength: 120, description: "Optional output basename; an empty or omitted value uses the project name." },
+    view: { type: "string", enum: exportViews, description: "SVG only; section and view are mutually exclusive." },
+    section: {
+      type: "object",
+      required: ["plane", "offset"],
+      properties: {
+        plane: { type: "string", enum: ["xy", "xz", "yz"] },
+        offset: { type: "number", minimum: -100000, maximum: 100000, description: "Finite section-plane coordinate in millimetres." },
+      },
+      additionalProperties: true,
+      description: "SVG or DXF only; section and view are mutually exclusive.",
+    },
+  },
+  additionalProperties: true,
+});
+const exportResultFields = {
+  format: { type: "string", enum: exportFormats },
+  filename: str,
+  mimeType: str,
+  shapeCount: { type: "integer", minimum: 0 },
+  exportedCount: { type: "integer", minimum: 0 },
+  skipped: { type: "array", items: { type: "object", required: ["name", "kind", "reason"], properties: { name: str, kind: str, reason: str }, additionalProperties: false } },
+} as const;
+const exportResponseSchema = {
+  type: "object",
+  required: ["format", "filename", "mimeType", "bytes", "shapeCount", "base64"],
+  properties: { ...exportResultFields, bytes: { type: "integer", minimum: 0 }, base64: str },
+  additionalProperties: false,
+} as const;
+const exportMetadataSchema = {
+  type: "object",
+  required: ["format", "filename", "mimeType", "shapeCount"],
+  properties: exportResultFields,
+  additionalProperties: false,
+} as const;
+const exportBinaryContentTypes = ["model/stl", "text/plain", "model/3mf", "model/step", "application/vnd.sketchforge.project+zip", "application/zip", "image/svg+xml", "application/dxf"] as const;
 const projectOperations = [
   { ...operation("GET", "/api/v1/projects", "listProjectsOrGetProject", [200, ...commonErrors]), query: { required: [], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } } }, responseSchemas: { 200: { type: "object", oneOf: [projectList, projectDetail] }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/projects", "createProject", [201, ...commonErrors], createProjectRequestBody), responseSchemas: { 201: { type: "object", required: ["project"], properties: { project: projectSummary } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
@@ -343,10 +397,32 @@ export function validateApiV1Response(key: string, status: number, body: unknown
   return Boolean(schema && validateApiV1Schema(body, schema));
 }
 
+function isValidBinaryApiV1Response(key: string, request: Request, response: Response): boolean {
+  const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
+  const contract = operation?.binaryResponse;
+  if (!contract || response.status !== contract.status || new URL(request.url).searchParams.get("download") !== "1") return false;
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
+  if (!contentType || !(contract.contentTypes as readonly string[]).includes(contentType)) return false;
+  const encodedMetadata = response.headers.get(contract.metadataHeader);
+  if (!encodedMetadata) return false;
+  try {
+    const metadata = JSON.parse(decodeURIComponent(encodedMetadata));
+    return validateApiV1Schema(metadata, contract.metadataSchema)
+      && (metadata as Record<string, unknown>).mimeType === contentType;
+  } catch {
+    return false;
+  }
+}
+
 export function withApiV1Contract(key: string, handler: (request: Request) => Promise<Response>) {
   return async (request: Request): Promise<Response> => {
     try {
       const response = await handler(request);
+      const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
+      if (operation?.binaryResponse && response.status === operation.binaryResponse.status && new URL(request.url).searchParams.get("download") === "1") {
+        if (!isValidBinaryApiV1Response(key, request, response)) return Response.json({ error: "The API handler returned a response outside its contract.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+        return response;
+      }
       const body = await response.clone().json().catch(() => null);
       if (!validateApiV1Response(key, response.status, body)) return Response.json({ error: "The API handler returned a response outside its contract.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
       return response;
@@ -511,7 +587,27 @@ export const API_V1_OPERATIONS = [
       503: faceError("storage_unconfigured"),
     },
   },
-  operation("POST", "/api/v1/exports", "exportProject"),
+  {
+    ...operation("POST", "/api/v1/exports", "exportProject", [200, 400, 401, 404, 422, 500, 503], exportRequestBody),
+    description: "Export project geometry as JSON/base64, or return the raw artifact when download=1. Binary downloads carry result metadata in the X-SketchForge-Metadata response header.",
+    query: {
+      required: ["projectId"],
+      properties: {
+        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        download: { type: "string", description: "Set download=1 to return raw artifact bytes; omitted or any other value returns JSON with base64 content." },
+      },
+    },
+    responseSchemas: {
+      200: exportResponseSchema,
+      400: faceError("invalid_project_id", "invalid_body", "unsupported_format", "invalid_request"),
+      401: faceError("unauthorized"),
+      404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      422: faceError("geometry_failed"),
+      500: faceError("internal_error"),
+      503: faceError("storage_unconfigured"),
+    },
+    binaryResponse: { status: 200, contentTypes: exportBinaryContentTypes, metadataHeader: "X-SketchForge-Metadata", metadataSchema: exportMetadataSchema },
+  },
   {
     ...operation("GET", "/api/v1/faces", "listFaces", [200, 400, 401, 404, 422, 500, 503]),
     description: "Lists each face with its shell-request index and stable application-owned ID. Use topology=exact to list analytic faces on supported plain full-turn sketch revolves without changing the default mesh listing. Face IDs can be used as faceColors keys in PATCH /api/v1/shapes.",

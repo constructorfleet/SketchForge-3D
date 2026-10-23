@@ -191,6 +191,29 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(Object.keys(imports.responses).sort(), ["201", "400", "401", "404", "409", "413", "415", "422", "500", "503"]);
   assert.deepEqual(imports.responses["500"].content["application/json"].schema.properties.code.enum, ["internal_error"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "importGeometry"), false);
+  const exports = spec.paths["/api/v1/exports"].post;
+  assert.equal(exports.operationId, "exportProject");
+  assert.deepEqual(exports.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["download", false]]);
+  assert.deepEqual(Object.keys(exports.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
+  assert.deepEqual(exports.responses["400"].content["application/json"].schema.properties.code.enum, ["invalid_project_id", "invalid_body", "unsupported_format", "invalid_request"]);
+  assert.deepEqual(exports.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
+  assert.deepEqual(exports.responses["422"].content["application/json"].schema.properties.code.enum, ["geometry_failed"]);
+  assert.deepEqual(exports.responses["500"].content["application/json"].schema.properties.code.enum, ["internal_error"]);
+  assert.match(exports.parameters[1].description, /download=1.*raw artifact.*any other value.*JSON/i);
+  const exportBody = exports.requestBody.content["application/json"].schema;
+  assert.deepEqual(exportBody.required, ["format"]);
+  assert.deepEqual(exportBody.properties.format.enum, ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"]);
+  assert.equal(exportBody.properties.name.maxLength, 120);
+  assert.equal(exportBody.properties.shapeIds.oneOf[0].pattern, "\\S");
+  assert.equal(exportBody.properties.shapeIds.oneOf[1].items.pattern, "\\S");
+  assert.deepEqual(exportBody.properties.view.enum, ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]);
+  assert.deepEqual(exportBody.properties.section.properties.plane.enum, ["xy", "xz", "yz"]);
+  assert.deepEqual(exports.responses["200"].content["application/json"].schema.required, ["format", "filename", "mimeType", "bytes", "shapeCount", "base64"]);
+  for (const mediaType of ["model/stl", "text/plain", "model/3mf", "model/step", "application/vnd.sketchforge.project+zip", "application/zip", "image/svg+xml", "application/dxf"]) {
+    assert.deepEqual(exports.responses["200"].content[mediaType].schema, { type: "string", format: "binary" });
+  }
+  assert.ok(exports.responses["200"].headers["X-SketchForge-Metadata"]);
+  assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "exportProject"), false);
   for (const [pathName, method, operationId] of [
     ["/api/v1/booleans", "post", "booleanShapes"],
     ["/api/v1/treatments", "post", "treatShape"],
@@ -203,8 +226,8 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 26);
-  assert.equal(spec["x-sketchforge-omitted-operations"].length, 6);
+  assert.equal(documentedOperationCount, 27);
+  assert.equal(spec["x-sketchforge-omitted-operations"].length, 5);
 });
 
 test("docs scripts generate and check OpenAPI from the REST operation registry", async () => {
