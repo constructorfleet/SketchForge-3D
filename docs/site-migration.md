@@ -82,9 +82,8 @@ so stale tracked output alone does not fail the docs check.
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
 registers all 32 public route operations, and route tests check parity between
 the registry and handlers. 28 operations have runtime-backed request and
-response contracts and appear in generated OpenAPI. The other 4 are listed
-with omission reasons in the generated contract; full route coverage remains
-open. `POST /mirrors` validates normalized IDs, axis selection, response shape,
+response contracts and appear in generated OpenAPI. The other 4 are listed as
+`OPTIONS` preflights; full route coverage remains open. `POST /mirrors` validates normalized IDs, axis selection, response shape,
 and reachable errors at the route boundary. `POST /patterns` validates normalized IDs, defaults, count limits, finite numeric options, its 201 shape-summary response, and reachable errors. `POST /explode` validates trimmed project and shape IDs, STEP assembly summaries, revision, and reachable errors. `POST /imports` documents base64 JSON and multipart upload bodies, validates the stable shape/triangle-count/revision response, and checks reachable JSON errors at the route boundary.
 `POST /exports` documents its request constraints, JSON/base64 result, conditional raw artifact response and metadata header, and reachable errors.
 
