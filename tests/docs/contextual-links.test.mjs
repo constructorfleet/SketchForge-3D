@@ -14,6 +14,7 @@ const pages = Object.fromEntries(await Promise.all([
   'docs/SHAPE_REQUEST_REFERENCE.md',
   'docs/guides/package-examples.md',
   'docs/mcp/EXAMPLES.md',
+  'docs/guides/step-assemblies.md',
 ].map(async (path) => [path, await read(path)])))
 
 test('TypeScript client README documents REST sketch-sweep profile updates', () => {
@@ -57,4 +58,16 @@ test('documentation home provides task-oriented entry points beyond the README',
   assert.match(home, /\]\(\/docs\/SKF_PROJECT_FORMAT\.md\)/)
   assert.match(home, /\]\(\/docs\/CLI_REFERENCE\.md\)/)
   assert.match(home, /\]\(\/docs\/mcp\/EXAMPLES\.md\)/)
+})
+
+test('STEP assembly guide distinguishes editor import from REST explosion prerequisites', () => {
+  const guide = pages['docs/guides/step-assemblies.md']
+  assert.match(guide, /STEP assembly imported in the editor/i)
+  assert.match(guide, /retains the source STEP file as a project asset/i)
+  assert.match(guide, /REST `POST \/api\/v1\/imports` endpoint.*does not accept STEP/i)
+  assert.match(guide, /REST `POST \/api\/v1\/explode[^`]*` only operates on a STEP-backed shape whose source asset is already present/i)
+  assert.match(guide, /no REST upload path/i)
+  assert.match(guide, /`sketchforge_import_project`.*`sketchforge_explode_step_assembly`/s)
+  assert.match(guide, /packages\/sketchforge-client\/README\.md#the-mcp-bridge/)
+  assert.doesNotMatch(guide, /To turn an assembly into editable project components, call `POST \/api\/v1\/explode[^\n]*on a retained STEP import\./)
 })
