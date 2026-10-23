@@ -238,6 +238,14 @@ arbitrary-shape results remain baked. Other draft operations and general
 editable draft history remain unsupported. Broader fixture coverage should
 establish the supported geometric envelope.
 
+On a plain single-region full-turn sketch revolve with one all-edge fillet or
+symmetric 45° all-edge chamfer, changing only the retained face-draft angle
+replays revolve, draft, then treatment atomically. Output, source, and
+source-face IDs remain stable; treatment history and eligible-edge counts are
+refreshed. `.skf` round trips preserve the edit and allow subsequent profile
+and revolve-setting edits. Pull-axis edits, simultaneous angle-and-axis edits,
+multi-region, partial-turn, and helical revolves remain refused.
+
 ### 3. Editable STEP assembly hierarchy and robust component association
 
 The engine retains source occurrence IDs and ancestry on exploded solids when
