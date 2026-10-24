@@ -5853,7 +5853,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     const height = Math.max(1, host.clientHeight);
     renderer.setSize(width, height);
     updateCameraViewport(state.camera, width, height);
-    [state.transformGuideLayer, state.moveDimensionLayer].forEach((layer) => {
+    [state.shapeLayer, state.transformGuideLayer, state.moveDimensionLayer].forEach((layer) => {
       layer.traverse((child) => {
         const material = (child as THREE.Mesh).material;
         const materials = Array.isArray(material) ? material : material ? [material] : [];
@@ -6736,6 +6736,8 @@ function rebuildShapes(
     return;
   }
   const highlight = state.faceHighlight;
+  const viewportRect = state.renderer.domElement.getBoundingClientRect();
+  const faceOutlineResolution: [number, number] = [Math.max(1, viewportRect.width), Math.max(1, viewportRect.height)];
   clearCutPreviewOverlays(state);
   const selected = new Set(selectedIds);
   const visibleShapes = projectShapes.filter((shape) => !shape.hidden);
@@ -6747,7 +6749,7 @@ function rebuildShapes(
     visibleShapes.forEach((shape) => {
       const object = createShapeObject(shape, selected.has(shape.id), () => {
         state.needsRender = true;
-      }, false, highlight?.shapeId === shape.id ? highlight.faceIndex : null);
+      }, false, highlight?.shapeId === shape.id ? highlight.faceIndex : null, faceOutlineResolution);
       state.shapeLayer.add(object);
     });
     if (showCutPreviews) {
@@ -6789,7 +6791,7 @@ function rebuildShapes(
     if (!record) {
       const object = createShapeObject(shape, selectedShape, () => {
         state.needsRender = true;
-      }, true, faceHighlightIndex);
+      }, true, faceHighlightIndex, faceOutlineResolution);
       state.shapeLayer.add(object);
       record = {
         object,
@@ -8041,6 +8043,7 @@ function createShapeObject(
   onTextureReady?: () => void,
   acceleratedPicking = true,
   faceHighlightIndex: number | null = null,
+  faceOutlineResolution?: [number, number],
 ) {
   const group = new THREE.Group();
   group.name = shape.name;
@@ -8215,6 +8218,7 @@ function createShapeObject(
             depth / Math.max(0.001, shape.importedMesh.baseDepth),
           ),
           faceHighlightIndex,
+          faceOutlineResolution,
         );
       } else {
         addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.BoxGeometry(size, Math.max(3, height * 0.35), size * 0.72)), material, shape);
@@ -8358,6 +8362,7 @@ function addMesh(
   rotation?: THREE.Euler,
   scale?: THREE.Vector3,
   faceHighlightIndex: number | null = null,
+  faceOutlineResolution?: [number, number],
 ) {
   const based = geometry.userData.cached ? geometry : putGeometryOnBase(geometry);
   const prepared = taperGeometryForShape(based, shape);
@@ -8385,15 +8390,29 @@ function addMesh(
   if (faceHighlightIndex !== null && shape.importedMesh?.faceGroups?.length) {
     const outline = createFaceHighlightGeometry({
       positions: shape.importedMesh.positions,
+      normals: shape.importedMesh.normals,
       faceGroups: shape.importedMesh.faceGroups,
     }, faceHighlightIndex);
     if (outline.getAttribute("position").count) {
-      const lineMaterial = new THREE.LineBasicMaterial({ color: "#ffb400", depthTest: false, depthWrite: false });
-      const line = new THREE.LineSegments(outline, lineMaterial);
+      const geometry = new LineSegmentsGeometry();
+      geometry.setPositions(Array.from(outline.getAttribute("position").array));
+      outline.dispose();
+      const material = new LineMaterial({
+        color: "#ffb400",
+        linewidth: 3,
+        worldUnits: false,
+        depthTest: true,
+        depthWrite: false,
+        alphaToCoverage: false,
+      });
+      material.toneMapped = false;
+      material.resolution.set(...(faceOutlineResolution ?? [1, 1]));
+      const line = new LineSegments2(geometry, material);
       line.position.copy(mesh.position);
       line.rotation.copy(mesh.rotation);
       line.scale.copy(mesh.scale);
       line.renderOrder = 1004;
+      line.frustumCulled = false;
       line.userData.shapeDecoration = true;
       line.userData.faceHighlight = true;
       group.add(line);

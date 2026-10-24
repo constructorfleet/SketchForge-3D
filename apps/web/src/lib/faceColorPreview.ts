@@ -68,16 +68,35 @@ export function createFaceHighlightGeometry(mesh: FaceGroupedMesh, selectedFaceI
         const offset = triangle * 9 + vertex * 3;
         return [mesh.positions[offset]!, mesh.positions[offset + 1]!, mesh.positions[offset + 2]!];
       });
+      const ab = vertices[1]!.map((coordinate, axis) => coordinate - vertices[0]![axis]!);
+      const ac = vertices[2]!.map((coordinate, axis) => coordinate - vertices[0]![axis]!);
+      const cross = [
+        ab[1]! * ac[2]! - ab[2]! * ac[1]!,
+        ab[2]! * ac[0]! - ab[0]! * ac[2]!,
+        ab[0]! * ac[1]! - ab[1]! * ac[0]!,
+      ];
+      const crossLength = Math.hypot(...cross) || 1;
+      const faceNormal = cross.map((coordinate) => coordinate / crossLength);
+      const liftedVertices = vertices.map((point, vertex) => {
+        const normalOffset = triangle * 9 + vertex * 3;
+        const normal = mesh.normals && mesh.normals.length >= normalOffset + 3
+          ? [mesh.normals[normalOffset]!, mesh.normals[normalOffset + 1]!, mesh.normals[normalOffset + 2]!]
+          : faceNormal;
+        const length = Math.hypot(...normal) || 1;
+        return point.map((coordinate, axis) => coordinate + (normal[axis]! / length) * FACE_HIGHLIGHT_OFFSET_MM);
+      });
       for (let edge = 0; edge < 3; edge += 1) {
         const a = vertices[edge]!;
         const b = vertices[(edge + 1) % 3]!;
+        const liftedA = liftedVertices[edge]!;
+        const liftedB = liftedVertices[(edge + 1) % 3]!;
         const keyFor = (point: number[]) => point.map((coordinate) => Math.round(coordinate * 1e5)).join(",");
         const aKey = keyFor(a);
         const bKey = keyFor(b);
         const key = aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
         const existing = edges.get(key);
         if (existing) existing.count += 1;
-        else edges.set(key, { count: 1, points: [...a, ...b] });
+        else edges.set(key, { count: 1, points: [...liftedA, ...liftedB] });
       }
     }
   }

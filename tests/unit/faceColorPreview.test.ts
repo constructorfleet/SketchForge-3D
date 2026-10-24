@@ -71,7 +71,9 @@ describe("face highlight geometry", () => {
       faceGroups: [0, 2, 0],
     };
     const geometry = createFaceHighlightGeometry(mesh, 0);
-    expect(geometry.getAttribute("position").count).toBe(8);
+    const positions = geometry.getAttribute("position");
+    expect(positions.count).toBe(8);
+    for (let vertex = 0; vertex < positions.count; vertex += 1) expect(positions.getZ(vertex)).toBeCloseTo(0.1);
     expect(createFaceHighlightGeometry(mesh, 1).getAttribute("position").count).toBe(0);
     geometry.dispose();
   });
