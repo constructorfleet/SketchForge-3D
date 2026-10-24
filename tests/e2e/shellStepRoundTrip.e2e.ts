@@ -197,17 +197,11 @@ describe("STEP export of server-side CAD geometry (real OCCT kernel)", { timeout
     if (!imported.ok || !brep.isShape3D(imported.value)) throw new Error("reimport failed");
     const bounds = brep.getBounds(imported.value);
 
-    // The editor's placement contract: a shape's bounds are centred on x and z
-    // with its base at its elevation. The Y-up world becomes Z-up in CAD, with
-    // the editor's +Z becoming CAD -Y -- which the reference box below pins
-    // rather than this test assuming.
-    const reference = await solidReference(PLACED);
-    expect(reference.centre.x).toBeCloseTo(PLACED.x!, 6);
-    expect(reference.centre.y).toBeCloseTo(-PLACED.z!, 6);
-    expect(reference.centre.z).toBeCloseTo(PLACED.elevation! + 10, 6);
-
-    expect((bounds.xMin + bounds.xMax) / 2).toBeCloseTo(PLACED.x!, 2);
-    expect((bounds.yMin + bounds.yMax) / 2).toBeCloseTo(-PLACED.z!, 2);
-    expect((bounds.zMin + bounds.zMax) / 2).toBeCloseTo(PLACED.elevation! + treated.height / 2, 2);
+    // This baked mesh is rebased to its own world bounds, as the editor worker
+    // does. A tilted, asymmetric solid's bounds centre can differ from the
+    // source pivot, so the treated shape carries that measured centre now.
+    expect((bounds.xMin + bounds.xMax) / 2).toBeCloseTo(treated.x, 2);
+    expect((bounds.yMin + bounds.yMax) / 2).toBeCloseTo(-treated.z, 2);
+    expect((bounds.zMin + bounds.zMax) / 2).toBeCloseTo(treated.elevation! + treated.height / 2, 2);
   });
 });

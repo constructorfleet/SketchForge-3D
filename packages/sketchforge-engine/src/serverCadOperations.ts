@@ -875,6 +875,12 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
   }));
   return canonicalizeShape({
     ...shape,
+    // A baked rotation can move the bounds away from the source's pivot. The
+    // mesh is rebased to those bounds, so move its project origin by the same
+    // offset. Other results keep the source frame they were built in.
+    x: shape.x + (bakedRotation ? centerX : 0),
+    z: shape.z + (bakedRotation ? centerZ : 0),
+    elevation: (shape.elevation ?? 0) + (bakedRotation ? minY : 0),
     faceIds: result.faceIds,
     faceColors: Object.keys(survivingColors).length ? survivingColors : undefined,
     kind: "mesh",
