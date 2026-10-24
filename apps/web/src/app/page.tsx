@@ -30,6 +30,7 @@ import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenge
 import { editorHistoryForAutosave, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createLocalId } from "@/lib/engine/localIds";
+import { publicAssetPath, withAppBasePath } from "@/lib/publicAssetPath";
 import {
   horizontalPlacementWorkplane,
   normalizePlacementWorkplane,
@@ -1068,7 +1069,7 @@ export default function Home() {
     setEditorStarted(true);
     setView("editor");
     if (typeof window !== "undefined") {
-      const nextUrl = projectId ? `/?editor=1&project=${encodeURIComponent(projectId)}` : "/?editor=1";
+      const nextUrl = `${withAppBasePath("/")}?editor=1${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
       window.history.replaceState(null, "", nextUrl);
     }
   };
@@ -1995,7 +1996,7 @@ function Dashboard({
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
         <a className="dashboard-brand" href="./" aria-label={t("dashboard.topbar.homeLink")}>
-          <img src="/assets/sketchforge/sketchforge-logo-white.png" alt="" />
+          <img src={publicAssetPath("/assets/sketchforge/sketchforge-logo-white.png")} alt="" />
           <span>SketchForge</span>
         </a>
         <div className="dashboard-search">

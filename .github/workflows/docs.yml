@@ -62,6 +62,15 @@ jobs:
         run: npm run docs:site-build
       - name: Verify the editor quick-start workflow in a browser
         run: npm run test:browser
+      - name: Build and stage the GitHub Pages editor demo
+        env:
+          STATIC_EXPORT_BASE_PATH: /${{ github.event.repository.name }}/Demo
+        run: |
+          npm run export
+          mkdir -p docs-site-dist/Demo
+          cp -R apps/web/.next-export/. docs-site-dist/Demo/
+          node scripts/verify-pages-demo-artifact.mjs
+          node --test tests/browser/github-pages-demo.test.mjs
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

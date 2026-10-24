@@ -3,6 +3,7 @@
 import { AlignCenter, Box, CircleDotDashed, Group, LockKeyhole, MoveUp, Type } from "lucide-react";
 import { useTranslations } from "@/i18n";
 import type { ChallengeTutorialId } from "@/lib/challenges";
+import { publicAssetPath } from "@/lib/publicAssetPath";
 
 function KeyTagPreview() {
   const t = useTranslations();
@@ -10,12 +11,12 @@ function KeyTagPreview() {
     <>
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-light"
-        src="/assets/challenges/key-tag/card-key-tag-light.webp"
+        src={publicAssetPath("/assets/challenges/key-tag/card-key-tag-light.webp")}
         alt={t("dashboard.challenges.keyTag.altLight")}
       />
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-dark"
-        src="/assets/challenges/key-tag/card-key-tag-dark.webp"
+        src={publicAssetPath("/assets/challenges/key-tag/card-key-tag-dark.webp")}
         alt={t("dashboard.challenges.keyTag.altDark")}
       />
     </>
@@ -28,12 +29,12 @@ function NameplatePreview() {
     <>
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-light"
-        src="/assets/challenges/nameplate/card-nameplate-light.webp"
+        src={publicAssetPath("/assets/challenges/nameplate/card-nameplate-light.webp")}
         alt={t("dashboard.challenges.nameplate.altLight")}
       />
       <img
         className="challenge-key-tag-photo challenge-key-tag-photo-dark"
-        src="/assets/challenges/nameplate/card-nameplate-dark.webp"
+        src={publicAssetPath("/assets/challenges/nameplate/card-nameplate-dark.webp")}
         alt={t("dashboard.challenges.nameplate.altDark")}
       />
     </>

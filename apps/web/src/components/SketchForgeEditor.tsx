@@ -131,6 +131,7 @@ import { projectedMeshContours } from "@/lib/engine/svgMeshProjection";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
 import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
+import { publicAssetPath } from "@/lib/publicAssetPath";
 import { importedShapeFromObj } from "@/lib/engine/objImport";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { findSketchOutlineIntersection } from "@/lib/sketchProfileValidation";
@@ -10126,7 +10127,7 @@ function SketchReferenceIcon({ name }: { name: SketchReferenceIconName }) {
       className="sketch-reference-icon"
       data-sketch-icon={name}
       draggable={false}
-      src={`/assets/sketchforge/${sketchReferenceIcons[name]}`}
+      src={publicAssetPath(`/assets/sketchforge/${sketchReferenceIcons[name]}`)}
       alt=""
     />
   );

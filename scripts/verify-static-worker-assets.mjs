@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportRoot = join(repositoryRoot, "apps", "web", ".next-export");
 const chunksRoot = join(exportRoot, "_next", "static", "chunks");
+const basePath = process.env.STATIC_EXPORT_BASE_PATH?.trim() ?? "";
+if (basePath && (!basePath.startsWith("/") || basePath.endsWith("/") || basePath.includes("//"))) {
+  throw new Error("STATIC_EXPORT_BASE_PATH must start with / and must not end with /.");
+}
+const expectedWorkerPublicPath = `${basePath}/_next/`;
 
 async function listJavaScriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -39,9 +44,9 @@ if (workerChunks.length === 0) {
 }
 
 for (const { path, source } of workerChunks) {
-  if (!source.includes('.p="/_next/"') && !source.includes(".p='/_next/'")) {
-    throw new Error(`Worker runtime ${path} does not use the root-relative /_next/ public path.`);
+  if (!source.includes(`.p="${expectedWorkerPublicPath}"`) && !source.includes(`.p='${expectedWorkerPublicPath}'`)) {
+    throw new Error(`Worker runtime ${path} does not use the expected ${expectedWorkerPublicPath} public path.`);
   }
 }
 
-console.log(`Verified ${workerChunks.length} static worker runtime(s) use /_next/.`);
+console.log(`Verified ${workerChunks.length} static worker runtime(s) use ${expectedWorkerPublicPath}.`);

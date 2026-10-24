@@ -9,6 +9,10 @@ owner: "Operations"
 
 This guide covers the server and container settings operators can configure. For a complete list of supported values, defaults, sensitivity, source readers, and owning pages, see the [operator configuration reference](../OPERATOR_CONFIGURATION.md). The [Docker / FabLab Server instructions](https://github.com/constructorfleet/SketchForge-3D#docker-fablab-server-recommended) cover initial setup and compose commands.
 
+## GitHub Pages browser demo
+
+The documentation workflow also builds a static editor demo and publishes it at [`/Demo/`](https://constructorfleet.github.io/SketchForge-3D/Demo/). Its Next.js base path is set at build time to `/<repository>/Demo`, and the workflow stages the export alongside the documentation site. The editor stores each visitor's projects in that visitor's browser. Static hosting does not provide server-side project storage or the REST API; use a server deployment for those features.
+
 ## Docker listener
 
 The compose files publish container port `3000` on host port `3000` by default. Set `SKETCHFORGE_PORT` to change the host port. Inside the container, `PORT` selects the Next.js listener port, `HOSTNAME` selects its bind address, and `SKETCHFORGE_LEGACY_PORT` selects the compatibility proxy port (`80` by default). The launcher accepts ports from 1 through 65535 and falls back to its documented default for invalid values. Set the legacy port equal to `PORT` to disable the compatibility proxy. See the [port configuration example](https://github.com/constructorfleet/SketchForge-3D#use-a-different-port).
