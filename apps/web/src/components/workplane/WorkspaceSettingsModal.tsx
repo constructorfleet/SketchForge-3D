@@ -219,6 +219,23 @@ export function WorkspaceSettingsModal({
       setCustomHistoryDraft(String(workspace.historyLimit));
     }
   }, [workspace.historyLimit]);
+  // The editor's global shortcuts stand aside while this modal is open (see
+  // shouldIgnoreGlobalShortcut), so Escape has to close it from here. A nested
+  // control that handles Escape itself, such as the grid colour picker, calls
+  // preventDefault so that only the control closes.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      onCloseRef.current();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
   const patchWorkspace = (patch: Partial<WorkspaceSettings>) => {
     setDefaultSaved(false);
     const next = { ...workspace, ...patch };
@@ -868,6 +885,8 @@ function GridColorControl({ color, onChange }: { color: string; onChange: (color
         aria-label={t("panels.settings.gridColor.picker")}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
+            // Close only the picker, not the Settings modal around it.
+            event.preventDefault();
             setOpen(false);
             triggerRef.current?.focus();
           }
@@ -936,7 +955,11 @@ function GridColorControl({ color, onChange }: { color: string; onChange: (color
         className="workspace-color-control"
         ref={rootRef}
         onKeyDown={(event) => {
-          if (event.key === "Escape") setOpen(false);
+          if (event.key === "Escape" && open) {
+            // Close only the picker, not the Settings modal around it.
+            event.preventDefault();
+            setOpen(false);
+          }
         }}
       >
         <button

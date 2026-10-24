@@ -11,6 +11,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Editor keyboard shortcuts no longer act on the model while Workspace Settings, or any other modal dialog, is open. Previously Backspace or Delete with focus on a button in Settings deleted the selection underneath, and `h`, `s`, `m`, `d` and the view keys changed the model or camera. Escape now closes Workspace Settings (and leaves the selection alone); Escape inside its grid colour picker still closes only the picker.
 - The GitHub Pages documentation workflow now publishes a browser-only SketchForge editor demo at `/SketchForge-3D/Demo/`, with subpath-aware static assets and a direct navigation link.
 - README now has a dedicated installation overview for the browser app, desktop releases, Docker, source checkouts, and static exports. The documentation site's top bar groups guides and references into dropdowns and links directly to installation.
 - The local MCP now exposes `sketchforge_import_stl`, which imports an STL file from the MCP host filesystem into a chosen local project.
