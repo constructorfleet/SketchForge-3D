@@ -187,6 +187,7 @@ import {
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
+import { shellRequestForShape, shellUnavailable, shelledShapeFields, type ShellOpenFace } from "@/lib/shellEditor";
 import {
   CLEARED_RETAINED_DRAFT_FIELDS,
   hasRetainedDraft,
@@ -7016,6 +7017,13 @@ export function SketchForgeEditor({
   const finishSketch = useCallback(async () => {
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
+    // Nothing can replay a shell on a rebuilt solid, so, as on the REST path,
+    // the edit is refused rather than returning the solid body without its
+    // cavity. The sketch stays open to cancel.
+    if (existing?.shell) {
+      setNotice(notice((t) => t("editor.sketch.shellNotReplayable")));
+      return;
+    }
     let resolved: WorkplaneShape | null;
     try {
       if (sketchOperation === "revolve") {
@@ -7806,6 +7814,51 @@ export function SketchForgeEditor({
       setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
     }
   }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, runRetainedFaceDraft, selectedShape, selectedShapes.length, t]);
+
+  // Hollow the selected shape to a wall, leaving the chosen faces open (#379).
+  // The CAD worker runs the REST endpoint's shell code; the result is an exact
+  // mesh shape like a fillet's, recorded with its shell, and undoable like any
+  // other edit.
+  const applyShellToSelection = useCallback(async (thickness: number, openFaces: ShellOpenFace[]) => {
+    const source = selectedShape;
+    if (!source || source.locked || selectedShapes.length !== 1) return;
+    const unavailable = shellUnavailable(source);
+    if (unavailable) {
+      setNotice(notice((translate) => translate(unavailable)));
+      return;
+    }
+    const request = shellRequestForShape(source, thickness, openFaces);
+    if (!request) {
+      setNotice(notice((translate) => translate("errors.cadModifier.shell.thicknessInvalid")));
+      return;
+    }
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.shell.applying")));
+    try {
+      const response = await postCadModifierRequestAsync({ type: "shell", ...request }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      if (response.type === "error") {
+        setNotice(notice((translate) => errorText(translate, errorFromPayload(response), "errors.cadModifier.invalidResult")));
+        return;
+      }
+      if (response.type !== "shell") throw new Error("The CAD worker did not return a hollowed solid");
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
+      const hollowed = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
+      if (!hollowed) throw new Error("The shell did not produce a usable solid");
+      const fields = shelledShapeFields(source.id, response.faceCount, request);
+      commitShapes(
+        shapesRef.current.map((shape) => shape.id === source.id ? { ...hollowed, ...fields } : shape),
+        [source.id],
+        notice((translate) => translate("panels.inspector.shell.applied", {
+          percent: Math.round((1 - response.volume / Math.max(Number.EPSILON, response.sourceVolume)) * 100),
+        })),
+      );
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
 
   // Change the direction or angle of a retained face draft: the undrafted
   // extrusion is rebuilt from its sketch and drafted again, finding the face
@@ -10212,6 +10265,7 @@ export function SketchForgeEditor({
           onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
           onUpdateRetainedFaceDraft={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? updateRetainedFaceDraftOnSelection : undefined}
           onEnableFaceEditing={selectedShapes.length === 1 && selectedShape && faceEditingCanBeEnabled(selectedShape) ? enableFaceEditingOnSelection : undefined}
+          onApplyShell={selectedShapes.length === 1 && selectedShape && !selectedShape.hole ? applyShellToSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}
