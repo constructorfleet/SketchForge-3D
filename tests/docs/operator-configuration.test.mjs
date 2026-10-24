@@ -110,14 +110,16 @@ test('desktop runtime settings have explicit ownership while the development URL
   assert.ok(main.includes('process.env.NODE_PATH'), 'NODE_PATH is only forwarded to the packaged child process');
   assert.ok(devLauncher.includes('SKETCHFORGE_DESKTOP_DEV_URL: url'), 'development URL must remain a launcher-injected internal handoff');
 
-  const supported = ['SKETCHFORGE_DESKTOP_PORT'];
+  const supported = ['SKETCHFORGE_DESKTOP_PORT', 'SKETCHFORGE_LOCAL_DOWNLOAD_ROOT'];
   for (const name of supported) {
     const setting = byName.get(name);
     assert.ok(setting, `${name} must have a desktop configuration registry row`);
-    assert.equal(setting.default, '62158', `${name} must document the packaged desktop origin port`);
-    assert.equal(setting.source, '../apps/desktop/main.cjs', `${name} must link its authoritative reader`);
     assert.equal(setting.ownerPage, 'OPERATOR_CONFIGURATION.md#desktop-settings', `${name} must link the desktop settings guide`);
   }
+  assert.equal(byName.get('SKETCHFORGE_DESKTOP_PORT').default, '62158', 'desktop port default must stay documented');
+  assert.equal(byName.get('SKETCHFORGE_DESKTOP_PORT').source, '../apps/desktop/main.cjs');
+  assert.equal(byName.get('SKETCHFORGE_LOCAL_DOWNLOAD_ROOT').source, '../apps/web/src/app/api/local-download/route.ts');
+  assert.deepEqual(byName.get('SKETCHFORGE_LOCAL_DOWNLOAD_ROOT').additionalSources, ['../apps/desktop/main.cjs']);
   assert.equal(byName.has('SKETCHFORGE_DESKTOP_DEV_URL'), false, 'internal development handoffs are not supported user configuration');
 });
 
@@ -131,6 +133,7 @@ test('the tracked server, container, client, MCP, and desktop reader set has no 
     'apps/web/src/lib/apiTokens.ts',
     'apps/web/src/app/api/shared-projects/route.ts',
     'apps/web/src/app/api/app-update/route.ts',
+    'apps/web/src/app/api/local-download/route.ts',
     'packages/sketchforge-client/src/environment.ts',
     'packages/sketchforge-py/src/sketchforge3d/environment.py',
     'packages/sketchforge-client/mcp/localEngine.mjs',

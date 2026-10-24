@@ -33,7 +33,7 @@ const markdown = [
   '',
   '## Desktop settings',
   '',
-  '`SKETCHFORGE_DESKTOP_PORT` selects the loopback port used by the packaged desktop app. Browser storage is scoped to the full origin, including its port; changing this value makes projects saved under the previous port appear in a different storage origin. The desktop development launcher injects `SKETCHFORGE_DESKTOP_DEV_URL` as an internal handoff to its temporary web server; it is not a user setting. `NODE_PATH` is forwarded to the packaged child process and is not a SketchForge desktop setting.',
+  "`SKETCHFORGE_DESKTOP_PORT` selects the loopback port used by the packaged desktop app. Browser storage is scoped to the full origin, including its port; changing this value makes projects saved under the previous port appear in a different storage origin. `SKETCHFORGE_LOCAL_DOWNLOAD_ROOT` enables folder downloads only in the packaged desktop app and confines them to the configured root; the app sets it to the user's Downloads directory and binds its web server to `127.0.0.1`. The App Router cannot inspect the socket peer address, so do not enable this helper on a network listener. The desktop development launcher injects `SKETCHFORGE_DESKTOP_DEV_URL` as an internal handoff to its temporary web server; it is not a user setting. `NODE_PATH` is forwarded to the packaged child process and is not a SketchForge desktop setting.",
   '',
   '## Update settings',
   '',
