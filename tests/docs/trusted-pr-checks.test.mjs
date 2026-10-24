@@ -19,6 +19,7 @@ const expectedChecks = [
   "REST API end to end",
   "Static export build",
   "Check and build docs",
+  "Editor browser tests",
   "Conventional commit",
 ];
 const execFileAsync = promisify(execFile);
@@ -34,7 +35,7 @@ test("trusted PR verifier is only dispatched from default-branch repository_disp
   assert.match(targetValidation, /\.merged/);
   assert.match(targetValidation, /\.head\.repo\.full_name/);
   assert.match(targetValidation, /\.head\.sha/);
-  for (const id of ["package-examples", "typecheck", "api-e2e", "static-export", "docs"]) {
+  for (const id of ["package-examples", "typecheck", "api-e2e", "static-export", "docs", "browser"]) {
     const job = workflow.jobs[id];
     assert.equal(job.permissions.contents, "read");
     const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
@@ -122,6 +123,7 @@ const results = {
   "api-e2e": "success",
   "static-export": "success",
   docs: "success",
+  browser: "success",
   title: "success",
 };
 

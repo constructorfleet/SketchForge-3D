@@ -192,5 +192,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `output: "export"` still compiles in apps/web/.next and only writes the
+      # exported site to .next-export, so the incremental cache is in .next/cache.
+      - name: Restore the Next.js static export build cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-export-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('apps/web/**', '!apps/web/.next*/**', 'packages/sketchforge-engine/src/**') }}
+          restore-keys: |
+            next-export-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            next-export-${{ runner.os }}-
+
       - name: Build static export
         run: npm run export

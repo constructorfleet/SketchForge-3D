@@ -7,6 +7,7 @@ const checks = [
   ["api-e2e", "REST API end to end"],
   ["static-export", "Static export build"],
   ["docs", "Check and build docs"],
+  ["browser", "Editor browser tests"],
   ["title", "Conventional commit"],
 ];
 
