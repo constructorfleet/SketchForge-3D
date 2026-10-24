@@ -33,7 +33,8 @@ function runnerStage() {
 }
 
 type Step = { name?: string; uses?: string; run?: string; with?: Record<string, unknown> };
-type Job = { if?: string; "runs-on"?: string; steps: Step[] };
+// A job that calls a reusable workflow (`uses:`) has no steps of its own.
+type Job = { if?: string; "runs-on"?: string; uses?: string; steps?: Step[] };
 type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
 
 function dockerWorkflow(): Workflow {
@@ -137,7 +138,7 @@ describe("pull requests run the built image against fresh volumes", () => {
     const workflow = dockerWorkflow();
     expect(Object.keys(workflow.on)).toContain("pull_request");
     const publishing = Object.values(workflow.jobs).filter((job) =>
-      job.steps.some((step) => step.with?.push === true || step.uses?.startsWith("docker/login-action")),
+      (job.steps ?? []).some((step) => step.with?.push === true || step.uses?.startsWith("docker/login-action")),
     );
     expect(publishing.length).toBeGreaterThan(0);
     for (const job of publishing) expect(job.if ?? "").toMatch(/github\.event_name != 'pull_request'/);
@@ -147,11 +148,11 @@ describe("pull requests run the built image against fresh volumes", () => {
     const smoke = dockerWorkflow().jobs.smoke;
     expect(smoke, "docker.yml has no smoke job").toBeDefined();
     expect(smoke.if ?? "").not.toMatch(/pull_request/);
-    const build = smoke.steps.find((step) => step.uses?.startsWith("docker/build-push-action"));
+    const build = (smoke.steps ?? []).find((step) => step.uses?.startsWith("docker/build-push-action"));
     expect(build?.with?.push).toBe(false);
     expect(build?.with?.load).toBe(true);
     expect(build?.with?.platforms).toBeUndefined();
-    const script = smoke.steps.map((step) => step.run ?? "").join("\n");
+    const script = (smoke.steps ?? []).map((step) => step.run ?? "").join("\n");
     // A path the image never heard of proves the directories are prepared at run time, not baked in.
     expect(script).toMatch(/SKETCHFORGE_PROJECTS_DIR=\/srv\/[\w-]+/);
     expect(script).toMatch(/SKETCHFORGE_PROJECTS_DIR=\/data\/my-projects/);
