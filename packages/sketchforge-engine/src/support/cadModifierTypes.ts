@@ -78,6 +78,8 @@ export type CadModifierWorkerRequest =
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "draft-prism"; requestId: number; profile: SketchProfile; height: number; angle: number }
   | { type: "draft-face"; requestId: number; brep: string; faceIds: string[]; faceId: string; angle: number; pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z"; brepTransform?: number[] }
+  /** Build the parts as one exact solid, so a primitive gains B-rep faces to colour and draft. */
+  | { type: "exact"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
@@ -127,6 +129,17 @@ export type CadModifierWorkerResponse =
       volume: number;
       brep: string;
       faceGroups?: number[];
+    }
+  | {
+      type: "exact";
+      requestId: number;
+      positions: Float32Array;
+      normals: Float32Array;
+      indices: Uint32Array;
+      triangleCount: number;
+      brep: string;
+      faceCount: number;
+      faceGroups: number[];
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);

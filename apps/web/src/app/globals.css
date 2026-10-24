@@ -5931,33 +5931,207 @@ button {
   gap: 17px;
 }
 
-.face-color-card .property-card-header {
-  cursor: default;
-}
-
-.face-color-card .property-list > p {
+.face-tools-note {
   margin: 0;
   color: #586a7d;
   font-size: 13px;
   line-height: 1.45;
 }
 
-.face-color-row {
-  display: flex;
+.face-picker {
+  display: grid;
+  grid-template-columns: 92px auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #586a7d;
-  font-size: 13px;
+  gap: 10px;
+  color: #637286;
+  font-size: 15px;
+  font-weight: 650;
 }
 
-.face-color-row button {
-  min-width: 30px;
+.face-stepper {
+  display: inline-grid;
+  grid-template-columns: 31px 52px 31px;
+  align-items: center;
+  height: 31px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #cbd6e1;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 1px rgba(25, 45, 65, 0.04);
+}
+
+.face-stepper:focus-within {
+  border-color: #74bdf0;
+  box-shadow: 0 0 0 3px rgba(0, 156, 222, 0.14);
+}
+
+.face-stepper button {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0;
+  color: #526174;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.face-stepper button:hover:not(:disabled) {
+  color: #1f8ec3;
+}
+
+.face-stepper button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.face-stepper input {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: #526174;
+  font: 600 15px/1 var(--font-ui);
+  text-align: center;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.face-stepper input::-webkit-inner-spin-button,
+.face-stepper input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.face-count {
+  color: #637286;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.face-color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.face-color-control .custom-color {
+  flex: 1;
+  min-width: 0;
+}
+
+.shape-inspector .face-color-clear {
+  height: 32px;
+  padding: 0 12px;
+  color: #50677a;
+  font: 700 13px/1 var(--font-ui);
+  background: #f4f8fb;
+  border: 1px solid #d3dfe8;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.face-color-clear:hover:not(:disabled) {
+  color: #176f94;
+  border-color: #8fc9dc;
+}
+
+.face-color-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.face-color-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+
+.face-color-list li.selected {
+  background: #eaf8fc;
+}
+
+.shape-inspector .face-color-select {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
   min-height: 30px;
-  color: #586a7d;
-  background: #f6f9fb;
-  border: 1px solid #cbd7e0;
-  border-radius: 6px;
+  padding: 0 8px;
+  color: #50677a;
+  font: 650 13px/1 var(--font-ui);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.face-color-select:hover:not(:disabled) {
+  color: #176f94;
+}
+
+.face-color-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(25, 45, 65, 0.18);
+  border-radius: 50%;
+}
+
+.face-color-remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #7a8b9b;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.face-color-remove:hover:not(:disabled) {
+  color: #c4313b;
+  background: #fdeeee;
+}
+
+.face-draft {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #e3eaf0;
+}
+
+.face-draft-title {
+  color: #31465d;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.select-property input.face-draft-angle {
+  width: 100%;
+  height: 31px;
+  padding: 0 12px;
+  color: #526174;
+  font: 600 15px/1 var(--font-ui);
+  background: #fff;
+  border: 1px solid #cbd6e1;
+  border-radius: 999px;
+  outline: 0;
+  box-shadow: inset 0 1px 1px rgba(25, 45, 65, 0.04);
+}
+
+.select-property input.face-draft-angle:focus {
+  border-color: #74bdf0;
+  box-shadow: 0 0 0 3px rgba(0, 156, 222, 0.14);
 }
 
 .gear-type-property {
@@ -8288,6 +8462,47 @@ html[data-theme="dark"] .select-property,
 html[data-theme="dark"] .range-value-unit,
 html[data-theme="dark"] .color-value {
   color: #afc3d0;
+}
+
+html[data-theme="dark"] .face-tools-note,
+html[data-theme="dark"] .face-picker,
+html[data-theme="dark"] .face-count {
+  color: #afc3d0;
+}
+
+html[data-theme="dark"] .face-stepper,
+html[data-theme="dark"] .select-property input.face-draft-angle {
+  background: #0f1921;
+  border-color: #3a4e5c;
+}
+
+html[data-theme="dark"] .face-stepper button,
+html[data-theme="dark"] .face-stepper input,
+html[data-theme="dark"] .select-property input.face-draft-angle,
+html[data-theme="dark"] .face-color-select,
+html[data-theme="dark"] .face-color-clear {
+  color: #d2e1eb;
+}
+
+html[data-theme="dark"] .face-color-clear {
+  background: #0f1921;
+  border-color: #3a4e5c;
+}
+
+html[data-theme="dark"] .face-color-list li.selected {
+  background: rgba(64, 170, 208, 0.16);
+}
+
+html[data-theme="dark"] .face-color-remove:hover:not(:disabled) {
+  background: rgba(196, 49, 59, 0.2);
+}
+
+html[data-theme="dark"] .face-draft {
+  border-color: #344956;
+}
+
+html[data-theme="dark"] .face-draft-title {
+  color: #d8e6ef;
 }
 
 html[data-theme="dark"] .material-readout div {

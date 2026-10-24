@@ -445,6 +445,24 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
         releaseSession(activeCad);
       }
     }
+    if (request.type === "exact") {
+      releaseSession(activeCad);
+      try {
+        const solid = reconstructParts(activeCad, request.parts);
+        if (!cadShapeIsValid(activeCad, solid)) throw new LocalizedError("errors.cadModifier.invalidResult");
+        const mesh = meshShapeWithFaceGroups(activeCad, solid, { linearDeflection: 0.035, angularDeflection: 0.16 });
+        post({
+          type: "exact",
+          requestId: request.requestId,
+          ...mesh,
+          brep: activeCad.toBREP(solid),
+          faceCount: activeCad.getSubShapes(solid, "face").length,
+        }, [mesh.positions.buffer, mesh.normals.buffer, mesh.indices.buffer]);
+        return;
+      } finally {
+        releaseSession(activeCad);
+      }
+    }
     if (request.type === "draft-face") {
       releaseSession(activeCad);
       try {

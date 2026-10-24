@@ -74,7 +74,7 @@ test("a face colour chosen in the inspector is kept on the shape and painted in 
     await page.getByRole("button", { name: "Apply" }).click();
     await page.getByRole("status").getByText(/Filleted 12 edges/).waitFor({ state: "visible", timeout: 60_000 });
 
-    const card = page.getByRole("region", { name: "Face colors" });
+    const card = page.getByRole("region", { name: "Faces" });
     await card.waitFor({ state: "visible", timeout: 30_000 });
     // The inspector floats over the canvas, and its colour swatch is magenta too,
     // so only the part of the view left of the inspector is counted.
@@ -84,32 +84,37 @@ test("a face colour chosen in the inspector is kept on the shape and painted in 
     const modelView = () => page.screenshot({
       clip: { x: canvasBox.x, y: canvasBox.y, width: cardBox.x - 20 - canvasBox.x, height: canvasBox.height },
     });
+    // Keep the pointer off the card, whose face highlight would also paint the view.
+    const parkPointer = () => page.mouse.move(canvasBox.x + 40, canvasBox.y + canvasBox.height - 40);
+    await parkPointer();
     const before = await magentaPixels(await modelView());
 
-    await card.getByLabel("CAD face index").fill("1");
-    await card.locator('input[type="color"]').fill("#ff00ff");
-    await card.getByText("#FF00FF", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
-    assert.equal(await card.getByText("No face colors assigned.").count(), 0, "the chosen colour must be stored on the shape");
+    const faceField = card.getByRole("spinbutton", { name: "Face" });
+    const colored = card.getByRole("list", { name: "Colored faces" });
+    await faceField.fill("2");
+    await card.getByLabel("Color for face 2").fill("#ff00ff");
+    await colored.getByText("Face 2", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+    assert.equal(await card.getByText("No faces colored yet.").count(), 0, "the chosen colour must be stored on the shape");
 
     // Colour the first six faces so at least one faces the default camera.
-    for (const face of ["0", "2", "3", "4", "5"]) {
-      await card.getByLabel("CAD face index").fill(face);
-      await card.locator('input[type="color"]').fill("#ff00ff");
+    for (const face of ["1", "3", "4", "5", "6"]) {
+      await faceField.fill(face);
+      await card.getByLabel(`Color for face ${face}`).fill("#ff00ff");
     }
-    await card.getByText("#FF00FF", { exact: true }).nth(5).waitFor({ state: "visible", timeout: 10_000 });
+    await colored.getByRole("listitem").nth(5).waitFor({ state: "visible", timeout: 10_000 });
+    await parkPointer();
     await page.waitForTimeout(500);
     const after = await magentaPixels(await modelView());
     assert.ok(after > before + 2_000, `coloured faces must show in the viewport (magenta pixels ${before} before, ${after} after)`);
 
     fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-    await card.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/face-colors.png` });
 
     for (let remaining = 6; remaining > 0; remaining -= 1) {
-      await card.getByRole("button", { name: /Remove/ }).first().click();
-      await card.getByText("#FF00FF", { exact: true }).nth(remaining - 1).waitFor({ state: "detached", timeout: 10_000 });
+      await card.getByRole("button", { name: /^Remove color from face/ }).first().click();
+      await colored.getByRole("listitem").nth(remaining - 1).waitFor({ state: "detached", timeout: 10_000 });
     }
-    await card.getByText("No face colors assigned.").waitFor({ state: "visible", timeout: 10_000 });
+    await card.getByText("No faces colored yet.").waitFor({ state: "visible", timeout: 10_000 });
   } finally {
     await browser?.close();
     if (server.pid) {

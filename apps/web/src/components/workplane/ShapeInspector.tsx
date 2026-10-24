@@ -17,9 +17,10 @@ import {
 import { unitLabel, useTranslations, type MessageKey } from "@/i18n";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { resolveShapeAppearance, SHAPE_APPEARANCE_PRESETS, shapeAppearancePreset } from "@/lib/shapeAppearance";
-import { updateFaceColor } from "@/lib/faceColorEditor";
 import { draftPrismControlForShape, draftPrismRequestForShape, isDraftPrismAngle } from "@/lib/draftPrismEditor";
-import { DRAFT_FACE_PULL_AXES, applyDraftFaceSelection, draftFaceRequestForShape, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
+import type { DraftFacePullAxis } from "@/lib/draftFaceEditor";
+import { shapeHasExactFaces } from "@/lib/shapeFaces";
+import { ShapeFaceTools } from "@/components/workplane/ShapeFaceTools";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -109,6 +110,8 @@ export function ShapeInspector({
   onEditSketch,
   onApplyDraftPrism,
   onApplyDraftFace,
+  onEnableFaceEditing,
+  onHighlightFace,
   canSeparateParts = false,
   onSeparateParts,
   onInteractionActiveChange,
@@ -125,6 +128,10 @@ export function ShapeInspector({
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
+  /** Present when the shape can be rebuilt as exact geometry to gain editable faces. */
+  onEnableFaceEditing?: () => Promise<void> | void;
+  /** The face the face tools point at, or null; the viewport highlights it. */
+  onHighlightFace?: (faceIndex: number | null) => void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -166,13 +173,6 @@ export function ShapeInspector({
   const [colorOpen, setColorOpen] = useState(false);
   const [draftAngle, setDraftAngle] = useState("5");
   const [drafting, setDrafting] = useState(false);
-  const [draftFaceIndex, setDraftFaceIndex] = useState("0");
-  const [draftFaceAngle, setDraftFaceAngle] = useState("5");
-  const [draftFacePullAxis, setDraftFacePullAxis] = useState<DraftFacePullAxis>("z");
-  const [draftFaceApplying, setDraftFaceApplying] = useState(false);
-  const [faceColorIndex, setFaceColorIndex] = useState("0");
-  const selectedFaceIndex = Number(faceColorIndex);
-  const selectedFaceKey = shape.faceIds?.[selectedFaceIndex] ?? selectedFaceIndex;
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
@@ -338,52 +338,17 @@ export function ShapeInspector({
         </div>
       ) : null}
 
-      {shape.cadBrep || shape.importedMesh?.brepStep ? (
-        <section className="property-card face-color-card" aria-label={t("panels.inspector.faceColors.title")}>
-          <div className="property-card-header">
-            <span>{t("panels.inspector.faceColors.title")}</span>
-          </div>
-          <div className="property-list">
-            <p>{t("panels.inspector.faceColors.hint")}</p>
-            <label>
-              <span>{t("panels.inspector.faceColors.index")}</span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={faceColorIndex}
-                disabled={locked}
-                onChange={(event) => setFaceColorIndex(event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              <input
-                type="color"
-                aria-label={t("panels.inspector.faceColors.title")}
-                disabled={locked || faceColorIndex.trim() === "" || !Number.isInteger(Number(faceColorIndex)) || Number(faceColorIndex) < 0}
-                value={shape.faceColors?.[String(selectedFaceKey)] ?? shape.faceColors?.[selectedFaceIndex] ?? solidColor}
-                onChange={(event) => onUpdate({ faceColors: updateFaceColor(shape.faceColors, selectedFaceKey, event.currentTarget.value) })}
-              />
-              <span>{t("panels.inspector.faceColors.add")}</span>
-            </label>
-            {Object.entries(shape.faceColors ?? {}).length ? Object.entries(shape.faceColors ?? {}).sort(([a], [b]) => {
-              const ai = shape.faceIds?.indexOf(a) ?? -1;
-              const bi = shape.faceIds?.indexOf(b) ?? -1;
-              const aOrder = ai >= 0 ? ai : Number.isFinite(Number(a)) ? Number(a) : Number.POSITIVE_INFINITY;
-              const bOrder = bi >= 0 ? bi : Number.isFinite(Number(b)) ? Number(b) : Number.POSITIVE_INFINITY;
-              return aOrder - bOrder;
-            }).map(([faceKey, color]) => {
-              const faceIndex = shape.faceIds?.indexOf(faceKey) ?? -1;
-              const displayIndex = faceIndex >= 0 ? faceIndex : faceKey;
-              return (
-              <div className="face-color-row" key={faceKey}>
-                <span>{t("panels.inspector.faceColors.index")}: {displayIndex}</span>
-                <span className="color-value">{color.toUpperCase()}</span>
-                <button type="button" disabled={locked} aria-label={t("panels.inspector.faceColors.remove", { index: displayIndex })} onClick={() => onUpdate({ faceColors: updateFaceColor(shape.faceColors, faceKey, null) })}>×</button>
-              </div>
-            );}) : <p>{t("panels.inspector.faceColors.empty")}</p>}
-          </div>
-        </section>
+      {shapeHasExactFaces(shape) || onEnableFaceEditing ? (
+        <ShapeFaceTools
+          key={shape.id}
+          shape={shape}
+          locked={locked}
+          fallbackColor={solidColor}
+          onUpdateFaceColors={(faceColors) => onUpdate({ faceColors })}
+          onEnableFaceEditing={onEnableFaceEditing}
+          onApplyDraftFace={onApplyDraftFace}
+          onHighlightFace={onHighlightFace}
+        />
       ) : null}
 
       {shape.sketchProfile && onEditSketch ? (
@@ -427,45 +392,6 @@ export function ShapeInspector({
               }}
             >
               <span>{t(drafting ? "panels.inspector.draftPrism.applying" : "panels.inspector.draftPrism.apply")}</span>
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {shape.cadBrep && shape.cadBrepFrame && onApplyDraftFace ? (
-        <section className="property-card draft-face-card" aria-label={t("panels.inspector.draftFace.title")}>
-          <div className="property-card-header"><span>{t("panels.inspector.draftFace.title")}</span></div>
-          <div className="property-list">
-            <p>{t("panels.inspector.draftFace.hint")}</p>
-            <label>
-              <span>{t("panels.inspector.draftFace.index")}</span>
-              <input type="number" min="0" max={shape.faceIds?.length ? shape.faceIds.length - 1 : undefined} step="1"
-                value={draftFaceIndex} disabled={locked || draftFaceApplying}
-                onChange={(event) => setDraftFaceIndex(event.currentTarget.value)} />
-            </label>
-            <label>
-              <span>{t("panels.inspector.draftFace.axis")}</span>
-              <select aria-label={t("panels.inspector.draftFace.axis")} value={draftFacePullAxis}
-                disabled={locked || draftFaceApplying}
-                onChange={(event) => setDraftFacePullAxis(event.currentTarget.value as DraftFacePullAxis)}>
-                {DRAFT_FACE_PULL_AXES.map((axis) => <option key={axis} value={axis}>{axis.toUpperCase()}</option>)}
-              </select>
-            </label>
-            <label>
-              <span>{t("panels.inspector.draftFace.angle")}</span>
-              <input type="number" min="-44.9" max="44.9" step="0.1" value={draftFaceAngle}
-                disabled={locked || draftFaceApplying} onChange={(event) => setDraftFaceAngle(event.currentTarget.value)} />
-            </label>
-            <button className="inspector-action-button" type="button"
-              disabled={locked || draftFaceApplying || !draftFaceRequestForShape(shape, Number(draftFaceIndex), Number(draftFaceAngle), draftFacePullAxis)}
-              onClick={async () => {
-                const faceIndex = Number(draftFaceIndex);
-                const angle = Number(draftFaceAngle);
-                setDraftFaceApplying(true);
-                try { await applyDraftFaceSelection(shape, faceIndex, angle, draftFacePullAxis, onApplyDraftFace); }
-                finally { setDraftFaceApplying(false); }
-              }}>
-              <span>{t(draftFaceApplying ? "panels.inspector.draftFace.applying" : "panels.inspector.draftFace.apply")}</span>
             </button>
           </div>
         </section>
