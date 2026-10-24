@@ -1811,4 +1811,78 @@ describe("retained boolean group placement across a source recompute", () => {
     expect(Boolean(restoredSource.mirrorY)).toBe(Boolean(referenceSource.mirrorY));
     expect(Boolean(restoredSource.mirrorZ)).toBe(Boolean(referenceSource.mirrorZ));
   }, CAD_TEST_TIMEOUT_MS);
+
+  /**
+   * A pocketed source cut into an inner group, then cut again by a through-hole
+   * into an outer group, with the outer group framed after creation. Returns the
+   * outer group before and after an edit that grows the source along +X and +Z.
+   */
+  async function nestedCutAfterEdit(frame: GroupFrame) {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const sourceId = "sketch/nested-extrusion";
+    const source = await sketchExtrusionShapeFromRequest({
+      id: "nested-extrusion", sketchSourceId: sourceId, name: "Source extrusion",
+      profile: rectangle(-2, 2, -1, 1), height: SOLID_HEIGHT, x: 10, z: -3, elevation: 1,
+    });
+    document.shapes = [source];
+    const [pocket, throughHole] = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Pocket", width: 2, depth: 1.5, height: 2.5, x: 10, z: -3, elevation: 2.5, hole: true },
+      { kind: "box", name: "Through hole", width: 0.5, depth: 0.5, height: 5, x: 8.75, z: -3, elevation: 0, hole: true },
+    ])).shapes;
+    const inner = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [pocket!.id] })).shape;
+    // Grouped rather than cut: `group` reads the stored hole marks, so the
+    // inner group keeps its own pocket marked as a hole and stays a boolean.
+    const outer = value(await engine.group("recompute", [inner.id, throughHole!.id])).shape;
+    const nested = outer.groupedShapes?.find((child) => child.groupedShapes?.length);
+    expect(nested?.groupedShapes?.some((child) => child.hole)).toBe(true);
+
+    const { scale = [1, 1, 1], ...placement } = frame;
+    const framed: WorkplaneShape = {
+      ...outer,
+      ...placement,
+      width: shapeWidth(outer) * scale[0],
+      height: outer.height * scale[1],
+      depth: shapeDepth(outer) * scale[2],
+      size: Math.max(shapeWidth(outer) * scale[0], shapeDepth(outer) * scale[2]),
+    };
+    document.shapes = document.shapes.map((shape) => shape.id === outer.id ? framed : shape);
+
+    const changed = await engine.changeShape("recompute", sourceId, { sketchProfile: rectangle(-2, 6, -1, 3) });
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === outer.id)!;
+    return { before: framed, after: persisted, placement, scale };
+  }
+
+  it("keeps a nested rebuilt cut where its turned, mirrored and resized outer group puts it", async () => {
+    // The unframed run is the reference; the unturned control above checks
+    // that recompute places an unframed group correctly.
+    const natural = await nestedCutAfterEdit({});
+    const frame: GroupFrame = { rotation: 90, rotationX: 20, mirrorX: true, mirrorY: true, scale: [2, 0.5, 1.5] };
+    const { before, after, placement, scale } = await nestedCutAfterEdit(frame);
+    expect(after).toMatchObject(placement);
+
+    const naturalMeasure = worldMeasure(natural.after);
+    const throughHoleVolume = 0.5 * 0.5 * SOLID_HEIGHT;
+    expectNear(naturalMeasure.volume, EDITED_SOLID_VOLUME - POCKET_VOLUME - throughHoleVolume, "natural volume");
+
+    const naturalCenter = new THREE.Vector3(natural.before.x, (natural.before.elevation ?? 0) + natural.before.height / 2, natural.before.z);
+    const framedCenter = new THREE.Vector3(before.x, (before.elevation ?? 0) + before.height / 2, before.z);
+    const degrees = THREE.MathUtils.degToRad;
+    const expectedCentroid = new THREE.Vector3(...naturalMeasure.centroid)
+      .sub(naturalCenter)
+      .multiply(new THREE.Vector3(
+        scale[0] * (placement.mirrorX ? -1 : 1),
+        scale[1] * (placement.mirrorY ? -1 : 1),
+        scale[2] * (placement.mirrorZ ? -1 : 1),
+      ))
+      .applyEuler(new THREE.Euler(degrees(placement.rotationX ?? 0), degrees(placement.rotation ?? 0), degrees(placement.rotationZ ?? 0), "XYZ"))
+      .add(framedCenter);
+    const actual = worldMeasure(after);
+    expectNear(actual.volume, naturalMeasure.volume * scale[0] * scale[1] * scale[2], "volume");
+    expectNear(actual.centroid[0], expectedCentroid.x, "centroid x");
+    expectNear(actual.centroid[1], expectedCentroid.y, "centroid y");
+    expectNear(actual.centroid[2], expectedCentroid.z, "centroid z");
+    expectNear(shapeWidth(after) / after.groupedBaseWidth!, scale[0], "width : groupedBaseWidth", 0.001);
+  }, CAD_TEST_TIMEOUT_MS);
 });
