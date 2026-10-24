@@ -136,13 +136,25 @@
     },
     {
       "name": "SKETCHFORGE_UPDATE_ADMIN_KEY",
-      "default": "Unset; server-triggered updates are unavailable.",
+      "default": "Unset; server-triggered updates are unavailable, and a local-checkout update needs SKETCHFORGE_LOCAL_UPDATE.",
       "required": false,
-      "validation": "Secret expected by the update trigger service. Required with SKETCHFORGE_UPDATE_TRIGGER_URL.",
+      "validation": "Secret the administrator enters in the update dialog. Required with SKETCHFORGE_UPDATE_TRIGGER_URL for server-triggered updates. When the server runs from a source checkout and SKETCHFORGE_LOCAL_UPDATE is not set, it also gates the local-checkout update.",
       "sensitive": true,
-      "subsystem": "Server-triggered updates",
+      "subsystem": "Server-triggered and local-checkout updates",
       "source": "../apps/web/src/app/api/app-update/route.ts",
-      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings"
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings",
+      "additionalOwnerPages": ["guides/deployment.md#application-updates"]
+    },
+    {
+      "name": "SKETCHFORGE_LOCAL_UPDATE",
+      "default": "Unset; a local-checkout update requires SKETCHFORGE_UPDATE_ADMIN_KEY.",
+      "required": false,
+      "validation": "`1` or `true` lets a request addressed to localhost update a source-checkout install without the admin key. The route cannot see the caller's address, so set it only when the server listens on loopback alone (for example `next dev -H 127.0.0.1`). Any other value leaves it off.",
+      "sensitive": false,
+      "subsystem": "Local-checkout updates",
+      "source": "../apps/web/src/app/api/app-update/route.ts",
+      "ownerPage": "OPERATOR_CONFIGURATION.md#update-settings",
+      "additionalOwnerPages": ["guides/deployment.md#application-updates"]
     },
     {
       "name": "SKETCHFORGE_UPDATE_TRIGGER_TOKEN",

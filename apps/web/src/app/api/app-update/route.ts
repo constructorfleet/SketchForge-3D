@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
 import { appUpdateIsAvailable, OFFICIAL_UPDATE_GUIDE_URL, type AppUpdateStatus } from "@/lib/appUpdates";
+import { addressedToLoopbackHost, localOnlyOptIn } from "@/lib/localOnlyRoutes";
 import { SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 
 export const runtime = "nodejs";
@@ -35,15 +36,6 @@ function sameOriginRequest(request: Request) {
     const host = forwardedHost || request.headers.get("host") || requestUrl.host;
     const protocol = forwardedProtocol || requestUrl.protocol.replace(/:$/, "");
     return new URL(origin).origin === `${protocol}://${host}`;
-  } catch {
-    return false;
-  }
-}
-
-function loopbackRequest(request: Request) {
-  try {
-    const hostname = new URL(request.url).hostname.toLowerCase();
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
   } catch {
     return false;
   }
@@ -86,8 +78,40 @@ function currentAppVersion() {
 }
 
 function localRepoForRequest(request: Request) {
-  if (!loopbackRequest(request)) return null;
+  // Selects local mode only; it is not an authorization check. The Host header
+  // that decides it is client-controlled (see localOnlyRoutes).
+  if (!addressedToLoopbackHost(request)) return null;
   return findParentRoot(true);
+}
+
+function configuredAdminKey() {
+  return process.env.SKETCHFORGE_UPDATE_ADMIN_KEY?.trim() || "";
+}
+
+/**
+ * What authorizes a local-mode update, which runs git and npm in the checkout:
+ * an explicit operator opt-in (for a server that only this machine can reach),
+ * else the admin key, else nothing. A loopback-looking request is never enough
+ * on its own, because a LAN client can send `Host: localhost`.
+ */
+function localUpdateGate(): "opt-in" | "admin-key" | null {
+  if (localOnlyOptIn("SKETCHFORGE_LOCAL_UPDATE")) return "opt-in";
+  if (configuredAdminKey()) return "admin-key";
+  return null;
+}
+
+function suppliedKeyMatches(request: Request, adminKey: string) {
+  const suppliedKey = request.headers.get("x-sketchforge-update-key")?.trim() || "";
+  return Boolean(suppliedKey) && safeEqual(suppliedKey, adminKey);
+}
+
+function installationState(localRepo: string | null, trigger: URL | null) {
+  if (localRepo) {
+    const gate = localUpdateGate();
+    return { installationReady: gate !== null, requiresUpdateKey: gate === "admin-key", updateMode: "local" as const };
+  }
+  const serverReady = Boolean(trigger && configuredAdminKey());
+  return { installationReady: serverReady, requiresUpdateKey: serverReady, updateMode: "server" as const };
 }
 
 function updateTriggerUrl() {
@@ -130,8 +154,7 @@ function updateGuideUrl() {
 
 async function statusResponse(request: Request, force = false): Promise<AppUpdateStatus> {
   const trigger = updateTriggerUrl();
-  const adminKeyConfigured = Boolean(process.env.SKETCHFORGE_UPDATE_ADMIN_KEY?.trim());
-  const localRepo = localRepoForRequest(request);
+  const installation = installationState(localRepoForRequest(request), trigger);
   const currentVersion = currentAppVersion();
   try {
     const latestVersion = await latestOfficialVersion(force);
@@ -141,9 +164,7 @@ async function statusResponse(request: Request, force = false): Promise<AppUpdat
       updateAvailable: appUpdateIsAvailable(currentVersion, latestVersion),
       checkedAt: new Date().toISOString(),
       updateUrl: updateGuideUrl(),
-      installationReady: Boolean(localRepo || (trigger && adminKeyConfigured)),
-      requiresUpdateKey: localRepo ? false : Boolean(trigger && adminKeyConfigured),
-      updateMode: localRepo ? "local" : "server",
+      ...installation,
     };
   } catch (error) {
     const { error: checkError, errorKey: checkErrorKey, errorParams: checkErrorParams } = errorResponseFields(
@@ -155,9 +176,7 @@ async function statusResponse(request: Request, force = false): Promise<AppUpdat
       updateAvailable: false,
       checkedAt: new Date().toISOString(),
       updateUrl: updateGuideUrl(),
-      installationReady: Boolean(localRepo || (trigger && adminKeyConfigured)),
-      requiresUpdateKey: localRepo ? false : Boolean(trigger && adminKeyConfigured),
-      updateMode: localRepo ? "local" : "server",
+      ...installation,
       checkError,
       checkErrorKey,
       checkErrorParams,
@@ -212,6 +231,11 @@ export async function POST(request: Request) {
 
   const localRepo = localRepoForRequest(request);
   if (localRepo) {
+    const gate = localUpdateGate();
+    if (!gate) return errorResponse("errors.update.notConfigured", 403, { updateUrl: updateGuideUrl() });
+    if (gate === "admin-key" && !suppliedKeyMatches(request, configuredAdminKey())) {
+      return errorResponse("errors.update.keyIncorrect", 401);
+    }
     if (Date.now() < nextTriggerAt) {
       return errorResponse("errors.update.alreadyRequested", 429);
     }
@@ -241,13 +265,12 @@ export async function POST(request: Request) {
   }
 
   const trigger = updateTriggerUrl();
-  const adminKey = process.env.SKETCHFORGE_UPDATE_ADMIN_KEY?.trim() || "";
+  const adminKey = configuredAdminKey();
   if (!trigger || !adminKey) {
     return errorResponse("errors.update.notConfigured", 409, { updateUrl: updateGuideUrl() });
   }
 
-  const suppliedKey = request.headers.get("x-sketchforge-update-key")?.trim() || "";
-  if (!suppliedKey || !safeEqual(suppliedKey, adminKey)) {
+  if (!suppliedKeyMatches(request, adminKey)) {
     return errorResponse("errors.update.keyIncorrect", 401);
   }
   if (Date.now() < nextTriggerAt) {

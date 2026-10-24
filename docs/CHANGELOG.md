@@ -20,6 +20,7 @@ owner: "Contributors"
   same resize, mirror and turn that ungrouping applies to its children -- and
   keeps its `rotation`, `rotationX`, `rotationZ`, mirror flags and its
   `width`/`depth`/`height` to `groupedBase*` ratios.
+- Security: updating a git-checkout install from the dashboard now requires `SKETCHFORGE_UPDATE_ADMIN_KEY` (entered in the update dialog) or an explicit `SKETCHFORGE_LOCAL_UPDATE=1`. Previously, `POST /api/app-update` ran `git fetch`, `git merge`, and `npm install` with no key for any request addressed to `localhost`. That test reads the Host header, so any machine on the network could trigger it. With neither setting, the dialog links to the update guide and the endpoint returns 403. Docker deployments and the desktop app are unaffected. See [application updates](guides/deployment.md#application-updates).
 - Editor keyboard shortcuts no longer act on the model while Workspace Settings, or any other modal dialog, is open. Previously Backspace or Delete with focus on a button in Settings deleted the selection underneath, and `h`, `s`, `m`, `d` and the view keys changed the model or camera. Escape now closes Workspace Settings (and leaves the selection alone); Escape inside its grid colour picker still closes only the picker.
 - Editing the sketch behind a filleted or chamfered extrusion, sweep, or
   revolve through the REST API or MCP no longer silently drops the treatment.
