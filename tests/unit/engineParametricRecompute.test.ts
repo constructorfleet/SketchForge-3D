@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createEngine, type EngineResult } from "@constructorfleet/sketchforge-engine";
 import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforge-engine/projectStore";
@@ -9,7 +10,17 @@ import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-e
 import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import { buildGroupFromSelection } from "@constructorfleet/sketchforge-engine/serverShapeBooleans";
+import {
+  boundsForShapes,
+  restoreGroupedChildren,
+  shapeWorldBounds,
+  worldMeshForShape,
+  type ShapeBounds,
+} from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+import { shapeDepth, shapeWidth } from "@constructorfleet/sketchforge-engine/workplaneShapes";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
+import { measureMesh } from "./support/meshMeasure";
 
 function profile(sectionHalfWidth = 1, spineStart = 0, spineEnd = 10, spineOffset = 0): SketchProfile {
   return {
@@ -1648,4 +1659,156 @@ describe("dependency-ordered feature recomputation", () => {
     const after = value(await engine.project("recompute"));
     expect(after.shapes.find((shape) => shape.id === group.id)).toEqual(before.shapes.find((shape) => shape.id === group.id));
   });
+});
+
+describe("retained boolean group placement across a source recompute", () => {
+  type GroupFrame = Partial<Pick<WorkplaneShape, "rotation" | "rotationX" | "rotationZ" | "mirrorX" | "mirrorY" | "mirrorZ">> & {
+    /** The group resized after creation, as a multiple of its natural width, height and depth. */
+    scale?: [number, number, number];
+  };
+
+  function rectangle(minX: number, maxX: number, minZ: number, maxZ: number): SketchProfile {
+    const corners: [number, number][] = [[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]];
+    return {
+      points: corners.map(([x, z], index) => ({ id: `r${index}`, x, z })),
+      segments: corners.map((_, index) => ({ id: `e${index}`, startId: `r${index}`, endId: `r${(index + 1) % 4}` })),
+    };
+  }
+
+  /** Volume and centre of mass of the triangles the editor draws for a shape, in world space. */
+  function worldMeasure(shape: WorkplaneShape) {
+    const mesh = worldMeshForShape(shape);
+    if (!mesh) throw new Error(`${shape.name} has no mesh`);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(
+      mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]!)),
+      3,
+    ));
+    return measureMesh(geometry);
+  }
+
+  function expectNear(actual: number, expected: number, label: string, tolerance = 0.01) {
+    expect(Math.abs(actual - expected), `${label}: ${actual} vs ${expected}`).toBeLessThan(tolerance);
+  }
+
+  function expectBoundsNear(actual: ShapeBounds, expected: ShapeBounds) {
+    for (const key of ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"] as const) {
+      expectNear(actual[key], expected[key], `bounds.${key}`);
+    }
+  }
+
+  // Before the edit the solid spans local X -2..2 and Z -1..1. The edit grows
+  // it to X -2..6 and Z -1..3, so its centre moves +2 along both local axes; a
+  // blind pocket from the top makes the part asymmetric in Y too. Every turn
+  // and mirror below therefore moves the rebuilt part somewhere distinct.
+  const SOLID_HEIGHT = 3;
+  const EDITED_SOLID_VOLUME = 8 * 4 * SOLID_HEIGHT;
+  // Large enough that flipping it to the underside moves the centre of mass
+  // well past the tolerance below.
+  const POCKET_VOLUME = 2 * 1.5 * 1.5;
+
+  const cases: [string, GroupFrame][] = [
+    ["an unturned, unmirrored group", {}],
+    ["a quarter turn (rotation)", { rotation: 90 }],
+    ["an oblique turn (rotation)", { rotation: 30 }],
+    ["a tip about X (rotationX)", { rotationX: 90 }],
+    ["a roll about Z (rotationZ)", { rotationZ: 90 }],
+    ["a mirror in X", { mirrorX: true }],
+    ["a mirror in Y", { mirrorY: true }],
+    ["a mirror in Z", { mirrorZ: true }],
+    ["a compound turn and mirror", { rotation: 30, rotationX: 20, rotationZ: 45, mirrorX: true, mirrorZ: true }],
+    ["a resize after creation", { scale: [2, 0.5, 1.5] }],
+    ["a resize under a turn and mirror", { rotation: 90, mirrorZ: true, scale: [2, 0.5, 1.5] }],
+  ];
+
+  it.each(cases)("keeps the rebuilt part where %s puts it", async (_label, frame) => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const sourceId = "sketch/framed-extrusion";
+    const source = await sketchExtrusionShapeFromRequest({
+      id: "framed-extrusion", sketchSourceId: sourceId, name: "Source extrusion",
+      profile: rectangle(-2, 2, -1, 1), height: SOLID_HEIGHT, x: 10, z: -3, elevation: 1,
+    });
+    document.shapes = [source];
+    const cutter = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "Pocket", width: 2, depth: 1.5, height: 2.5, x: 10, z: -3, elevation: 2.5, hole: true },
+    ])).shapes[0]!;
+    const cut = value(await engine.cut("recompute", { solidIds: [source.id], holeIds: [cutter.id] })).shape;
+
+    // The frame is written straight into the stored record, which is how the
+    // editor persists a turned, mirrored or resized group.
+    const { scale = [1, 1, 1], ...placement } = frame;
+    const framed: WorkplaneShape = {
+      ...cut,
+      ...placement,
+      width: shapeWidth(cut) * scale[0],
+      height: cut.height * scale[1],
+      depth: shapeDepth(cut) * scale[2],
+      size: Math.max(shapeWidth(cut) * scale[0], shapeDepth(cut) * scale[2]),
+    };
+    document.shapes = document.shapes.map((shape) => shape.id === cut.id ? framed : shape);
+    expect(value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)).toMatchObject(placement);
+
+    const changed = await engine.changeShape("recompute", sourceId, { sketchProfile: rectangle(-2, 6, -1, 3) });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    const edited = value(changed).shape;
+    const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
+    expect(persisted).toMatchObject(placement);
+
+    // The children ungrouped through the group's frame as it stood before the edit.
+    const ungroupedChildren = restoreGroupedChildren({
+      ...framed,
+      groupedShapes: framed.groupedShapes!.map((child) => child.id === edited.id ? edited : child),
+    });
+
+    // The group's world box is the box of the rebuilt solid it now holds.
+    expectBoundsNear(shapeWorldBounds(persisted), boundsForShapes(ungroupedChildren.filter((child) => !child.hole)));
+
+    // Volume and centre of mass, which a box cannot vouch for: a mirrored or
+    // misplaced part can share its bounds with the right one. The reference is
+    // the edited part cut with the group left unturned, unmirrored and at its
+    // natural size, then put through the frame here with plain matrices, so it
+    // shares no placement code with the engine beyond an identity ungroup.
+    const unframed = await buildGroupFromSelection(restoreGroupedChildren({
+      ...cut,
+      groupedShapes: cut.groupedShapes!.map((child) => child.id === edited.id ? edited : child),
+    }));
+    if ("error" in unframed) throw new Error(unframed.error);
+    const natural = worldMeasure(unframed.group);
+    const scaleVolume = scale[0] * scale[1] * scale[2];
+    expectNear(natural.volume, EDITED_SOLID_VOLUME - POCKET_VOLUME, "natural volume");
+    const naturalCenter = new THREE.Vector3(cut.x, (cut.elevation ?? 0) + cut.height / 2, cut.z);
+    const framedCenter = new THREE.Vector3(framed.x, (framed.elevation ?? 0) + framed.height / 2, framed.z);
+    const degrees = THREE.MathUtils.degToRad;
+    const expectedCentroid = new THREE.Vector3(...natural.centroid)
+      .sub(naturalCenter)
+      .multiply(new THREE.Vector3(
+        scale[0] * (placement.mirrorX ? -1 : 1),
+        scale[1] * (placement.mirrorY ? -1 : 1),
+        scale[2] * (placement.mirrorZ ? -1 : 1),
+      ))
+      .applyEuler(new THREE.Euler(degrees(placement.rotationX ?? 0), degrees(placement.rotation ?? 0), degrees(placement.rotationZ ?? 0), "XYZ"))
+      .add(framedCenter);
+    const actual = worldMeasure(persisted);
+    expectNear(actual.volume, natural.volume * scaleVolume, "volume");
+    expectNear(actual.centroid[0], expectedCentroid.x, "centroid x");
+    expectNear(actual.centroid[1], expectedCentroid.y, "centroid y");
+    expectNear(actual.centroid[2], expectedCentroid.z, "centroid z");
+
+    // A group resized after creation keeps that resize relative to its new natural size.
+    expectNear(shapeWidth(persisted) / persisted.groupedBaseWidth!, scale[0], "width : groupedBaseWidth", 0.001);
+    expectNear(persisted.height / persisted.groupedBaseHeight!, scale[1], "height : groupedBaseHeight", 0.001);
+    expectNear(shapeDepth(persisted) / persisted.groupedBaseDepth!, scale[2], "depth : groupedBaseDepth", 0.001);
+
+    // Ungrouping after the recompute returns the source where the frame put it.
+    const restoredSource = restoreGroupedChildren(persisted).find((child) => child.sketchSourceId === sourceId)!;
+    const referenceSource = ungroupedChildren.find((child) => child.sketchSourceId === sourceId)!;
+    for (const key of ["x", "z", "elevation", "width", "depth", "height", "rotation", "rotationX", "rotationZ"] as const) {
+      expectNear(Number(restoredSource[key] ?? 0), Number(referenceSource[key] ?? 0), `restored source ${key}`);
+    }
+    expect(Boolean(restoredSource.mirrorX)).toBe(Boolean(referenceSource.mirrorX));
+    expect(Boolean(restoredSource.mirrorY)).toBe(Boolean(referenceSource.mirrorY));
+    expect(Boolean(restoredSource.mirrorZ)).toBe(Boolean(referenceSource.mirrorZ));
+  }, CAD_TEST_TIMEOUT_MS);
 });

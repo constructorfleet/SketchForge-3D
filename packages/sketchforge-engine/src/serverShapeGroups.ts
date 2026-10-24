@@ -256,45 +256,67 @@ export function mirrorShapes(shapes: WorkplaneShape[], selectedIds: string[], ax
 }
 
 /**
- * The children of a group, put back where they belong as shapes of their own.
+ * The frame a group's children are stored in, and how it maps into the frame
+ * the group itself sits in.
  *
- * A group can have been moved, turned, mirrored and resized since it was made,
- * and all of that has to be pushed down into the children: the stored base
- * dimensions say what the group measured when it was built, so the ratio to its
- * current size is the scale each child has silently been under.
+ * Children are held relative to the group as it was built: centred on it in X
+ * and Z, measured up from its base, at its natural size. The group can have been
+ * moved, turned, mirrored and resized since, and all of that applies to them:
+ * the stored base dimensions say what the group measured when it was built, so
+ * the ratio to its current size is the scale each child has silently been under.
+ */
+export function groupChildFrame(group: WorkplaneShape) {
+  const children = group.groupedShapes ?? [];
+  const bounds = children.length ? boundsForShapes(children) : undefined;
+  const fallback = (min?: number, max?: number) => Math.max(0.001, (max ?? 0) - (min ?? 0));
+  const baseWidth = group.groupedBaseWidth ?? fallback(bounds?.minX, bounds?.maxX);
+  const baseHeight = group.groupedBaseHeight ?? fallback(bounds?.minY, bounds?.maxY);
+  const baseDepth = group.groupedBaseDepth ?? fallback(bounds?.minZ, bounds?.maxZ);
+  const scale = new THREE.Vector3(
+    shapeWidth(group) / Math.max(0.001, baseWidth),
+    group.height / Math.max(0.001, baseHeight),
+    shapeDepth(group) / Math.max(0.001, baseDepth),
+  );
+  const quaternion = quaternionForShape(group);
+  const reflection = new THREE.Matrix4().makeScale(mirrorSign(group.mirrorX), mirrorSign(group.mirrorY), mirrorSign(group.mirrorZ));
+  const center = new THREE.Vector3(group.x, (group.elevation ?? 0) + group.height / 2, group.z);
+  return {
+    scale,
+    quaternion,
+    reflection,
+    /** Where a point given in the children's frame sits in the group's own parent frame. */
+    toParent(x: number, y: number, z: number) {
+      return center.clone().add(new THREE.Vector3(
+        x * scale.x * mirrorSign(group.mirrorX),
+        (y * scale.y - group.height / 2) * mirrorSign(group.mirrorY),
+        z * scale.z * mirrorSign(group.mirrorZ),
+      ).applyQuaternion(quaternion));
+    },
+  };
+}
+
+/**
+ * The children of a group, put back where they belong as shapes of their own,
+ * through the frame `groupChildFrame` describes.
  */
 export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] {
   const children = group.groupedShapes ?? [];
   if (children.length === 0) return [];
 
-  const bounds = boundsForShapes(children);
-  const baseWidth = group.groupedBaseWidth ?? Math.max(0.001, bounds.maxX - bounds.minX);
-  const baseHeight = group.groupedBaseHeight ?? Math.max(0.001, bounds.maxY - bounds.minY);
-  const baseDepth = group.groupedBaseDepth ?? Math.max(0.001, bounds.maxZ - bounds.minZ);
-  const scaleX = shapeWidth(group) / Math.max(0.001, baseWidth);
-  const scaleY = group.height / Math.max(0.001, baseHeight);
-  const scaleZ = shapeDepth(group) / Math.max(0.001, baseDepth);
-  const groupQuaternion = quaternionForShape(group);
-  const groupReflection = new THREE.Matrix4().makeScale(mirrorSign(group.mirrorX), mirrorSign(group.mirrorY), mirrorSign(group.mirrorZ));
-  const groupCenter = new THREE.Vector3(group.x, (group.elevation ?? 0) + group.height / 2, group.z);
+  const frame = groupChildFrame(group);
 
   return children.map((child) => {
-    const width = shapeWidth(child) * scaleX;
-    const depth = shapeDepth(child) * scaleZ;
-    const height = child.height * scaleY;
-    const localCenter = new THREE.Vector3(
-      child.x * scaleX * mirrorSign(group.mirrorX),
-      (((child.elevation ?? 0) + child.height / 2) * scaleY - group.height / 2) * mirrorSign(group.mirrorY),
-      child.z * scaleZ * mirrorSign(group.mirrorZ),
-    ).applyQuaternion(groupQuaternion);
-    const worldCenter = groupCenter.clone().add(localCenter);
+    const width = shapeWidth(child) * frame.scale.x;
+    const depth = shapeDepth(child) * frame.scale.z;
+    const height = child.height * frame.scale.y;
+    const worldCenter = frame.toParent(child.x, (child.elevation ?? 0) + child.height / 2, child.z);
     // A mirror either side of the child's own turn, so a reflected group turns
     // its children the other way rather than shearing them.
     const childRotationMatrix = new THREE.Matrix4()
-      .makeRotationFromQuaternion(groupQuaternion)
-      .multiply(groupReflection)
+      .makeRotationFromQuaternion(frame.quaternion)
+      .multiply(frame.reflection)
       .multiply(new THREE.Matrix4().makeRotationFromQuaternion(quaternionForShape(child)))
-      .multiply(groupReflection);
+      .multiply(frame.reflection);
     const childRotation = rotationFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(childRotationMatrix));
     const restored: WorkplaneShape = {
       ...child,
