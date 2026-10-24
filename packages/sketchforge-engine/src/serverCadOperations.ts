@@ -810,7 +810,7 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     if (!cadResultIsValid(cad, drafted) || !cad.isSolid(drafted)) {
       throw new ServerCadError("The face draft did not produce a valid solid.");
     }
-    return meshedCadResult(cad, drafted, shape);
+    return meshedCadResult(cad, drafted, shape, undefined, solid);
   });
 }
 
