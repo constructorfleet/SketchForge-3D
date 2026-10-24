@@ -1,171 +1,29 @@
 /** Split a retained STEP source into positioned, independently editable solids. Node-only. */
 
-import * as THREE from "three";
-import type { OcctKernel, ShapeHandle } from "occt-wasm";
-import { importedShapeFromTriangleSoup } from "./stlImport.js";
-import { stepComponentMetadata, stepShapeKey } from "./stepComponentMetadata.js";
 import { withCadKernel } from "./serverCadKernel.js";
-import { groupedShapeFromSelection } from "./serverShapeGroups.js";
 import { ServerCadError } from "./serverCadOperations.js";
-import type { ProjectAsset, StepAssemblyNode, StepAssemblyPathNode, WorkplaneShape } from "./domain/sketchforge.js";
-import { meshYawDegrees } from "./workplaneShapes.js";
+import { assertStepExplodable, explodeStepAssemblyWithKernel, StepExplodeError } from "./stepAssemblyExplode.js";
+import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
 
-export const MAX_EXPLODE_SOLIDS = 200;
-export const MAX_EXPLODE_SOURCE_BYTES = 8 * 1024 * 1024;
-const X_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } } as const;
+export { MAX_EXPLODE_SOLIDS, MAX_EXPLODE_SOURCE_BYTES } from "./stepAssemblyExplode.js";
 
-function boundsOf(cad: Parameters<Parameters<typeof withCadKernel>[0]>[0], shape: ShapeHandle) {
-  return cad.getBoundingBox(shape, false);
-}
-
-function leafPaths(nodes: StepAssemblyNode[], parentPath: StepAssemblyPathNode[] = []): StepAssemblyPathNode[][] {
-  return nodes.flatMap((node) => {
-    const path = [...parentPath, { ...(node.id ? { id: node.id } : {}), name: node.name }];
-    return node.children.length ? leafPaths(node.children, path) : [path];
-  });
-}
-
-function uniqueNamedPath(paths: StepAssemblyPathNode[][], name: string) {
-  const matches = paths.filter((path) => path.at(-1)?.name === name);
-  return matches.length === 1 ? matches[0] : undefined;
-}
-
-function groupExplodedHierarchy(parts: WorkplaneShape[], roots: StepAssemblyNode[]) {
-  const partsByOccurrence = new Map<string, WorkplaneShape[]>();
-  for (const part of parts) {
-    const occurrenceId = part.stepComponent?.occurrenceId;
-    if (!occurrenceId) return parts;
-    const matches = partsByOccurrence.get(occurrenceId) ?? [];
-    matches.push(part);
-    partsByOccurrence.set(occurrenceId, matches);
-  }
-
-  const consumed = new Set<WorkplaneShape>();
-  let complete = true;
-  const namedGroup = (name: string, children: WorkplaneShape[]) => {
-    const group = groupedShapeFromSelection(children, { allowSingle: true, name });
-    if (!group) {
-      complete = false;
-      return children;
-    }
-    return [group];
-  };
-  const visit = (node: StepAssemblyNode): WorkplaneShape[] => {
-    if (!node.children.length) {
-      if (!node.id) {
-        complete = false;
-        return [];
-      }
-      const matches = partsByOccurrence.get(node.id);
-      if (!matches?.length) {
-        complete = false;
-        return [];
-      }
-      matches.forEach((part) => consumed.add(part));
-      return matches.length > 1 ? namedGroup(node.name, matches) : matches;
-    }
-    const children = node.children.flatMap(visit);
-    if (!children.length) return [];
-    return namedGroup(node.name, children);
-  };
-
-  const grouped = roots.flatMap(visit);
-  // Keep the proven flat behavior when even one source solid cannot be
-  // associated to a product occurrence. A partial tree would hide geometry.
-  return complete && consumed.size === parts.length && grouped.length ? grouped : parts;
+function asServerCadError(error: unknown) {
+  return error instanceof StepExplodeError ? new ServerCadError(error.message, error.status) : error;
 }
 
 /** Turn a STEP-imported mesh shape into one exact mesh/B-rep-backed shape per solid. */
 export function explodeStepAssembly(shape: WorkplaneShape, source: ProjectAsset): Promise<WorkplaneShape[]> {
-  if (shape.importedMesh?.sourceFormat !== "step" || !shape.importedMesh.assetId) {
-    return Promise.reject(new ServerCadError("Only a STEP import with its original source asset can be exploded."));
-  }
-  if (source.sourceFormat !== "step" || source.byteLength > MAX_EXPLODE_SOURCE_BYTES) {
-    return Promise.reject(new ServerCadError(`STEP explosion supports source files up to ${MAX_EXPLODE_SOURCE_BYTES} bytes.`, 413));
+  // Refuse before taking the kernel: a throw inside `withCadKernel` discards it.
+  try {
+    assertStepExplodable(shape, source);
+  } catch (error) {
+    return Promise.reject(asServerCadError(error));
   }
   return withCadKernel((cad) => {
-    const imported = cad.importStep(new TextDecoder().decode(source.bytes));
-    const solids = cad.getSubShapes(imported, "solid");
-    if (solids.length < 2) throw new ServerCadError("This STEP file contains only one solid; there is nothing to explode.");
-    if (solids.length > MAX_EXPLODE_SOLIDS) throw new ServerCadError(`STEP explosion supports at most ${MAX_EXPLODE_SOLIDS} solids; this file contains ${solids.length}.`, 413);
-
-    // Match the importer's Z-up conversion and scene-wide recentering.
-    const turnedAssembly = cad.rotate(imported, X_AXIS, -Math.PI / 2);
-    const assemblyBounds = boundsOf(cad, turnedAssembly);
-    const centerX = (assemblyBounds.xmin + assemblyBounds.xmax) / 2;
-    const floorY = assemblyBounds.ymin;
-    const centerZ = (assemblyBounds.zmin + assemblyBounds.zmax) / 2;
-    const rotation = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
-      THREE.MathUtils.degToRad(shape.rotationX ?? 0),
-      THREE.MathUtils.degToRad(meshYawDegrees(shape)),
-      THREE.MathUtils.degToRad(shape.rotationZ ?? 0),
-      "XYZ",
-    ));
-    const mirrors = new THREE.Vector3(shape.mirrorX ? -1 : 1, shape.mirrorY ? -1 : 1, shape.mirrorZ ? -1 : 1);
-    const parentCenter = new THREE.Vector3(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
-    const componentMetadata = stepComponentMetadata(cad, new TextDecoder().decode(source.bytes));
-    const paths = leafPaths(shape.stepAssembly ?? []);
-    const occurrencePartIndexes = new Map<string, number>();
-
-    const parts = solids.map((solid, index) => {
-      const candidates = componentMetadata.bySolid.get(stepShapeKey(cad, solid)) ?? [];
-      const firstCandidate = candidates[0];
-      const metadata = firstCandidate ? {
-        ...(candidates.length === 1 && firstCandidate.name ? { name: firstCandidate.name } : {}),
-        ...(candidates.length === 1 && firstCandidate.occurrenceId ? { occurrenceId: firstCandidate.occurrenceId } : {}),
-        ...(candidates.every((candidate) => candidate.color === firstCandidate.color) && firstCandidate.color
-          ? { color: firstCandidate.color }
-          : {}),
-      } : undefined;
-      const path = metadata?.occurrenceId
-        ? paths.find((candidate) => candidate.at(-1)?.id === metadata.occurrenceId)
-        : metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined;
-      const occurrenceId = path?.at(-1)?.id;
-      const occurrencePartIndex = occurrenceId ? (occurrencePartIndexes.get(occurrenceId) ?? 0) : 0;
-      if (occurrenceId) occurrencePartIndexes.set(occurrenceId, occurrencePartIndex + 1);
-      const componentName = path?.at(-1)?.name ?? (paths.length === 0 ? metadata?.name : undefined);
-      const turned = cad.rotate(solid, X_AXIS, -Math.PI / 2);
-      const positioned = cad.translate(turned, -centerX, -floorY, -centerZ);
-      const bounds = boundsOf(cad, positioned);
-      const partX = (bounds.xmin + bounds.xmax) / 2;
-      const partY = bounds.ymin;
-      const partZ = (bounds.zmin + bounds.zmax) / 2;
-      const local = cad.translate(positioned, -partX, -partY, -partZ);
-      const mesh = cad.tessellate(positioned);
-      const positions: number[] = [];
-      const normals: number[] = [];
-      for (let cursor = 0; cursor < mesh.indices.length; cursor += 1) {
-        const vertex = mesh.indices[cursor]! * 3;
-        positions.push(mesh.positions[vertex]!, mesh.positions[vertex + 1]!, mesh.positions[vertex + 2]!);
-        if (mesh.normals.length === mesh.positions.length) normals.push(mesh.normals[vertex]!, mesh.normals[vertex + 1]!, mesh.normals[vertex + 2]!);
-      }
-      const child = importedShapeFromTriangleSoup(componentName ?? `${shape.name} ${index + 1}`, positions, normals.length ? normals : undefined, "step");
-      const offset = new THREE.Vector3(partX, partY - shape.height / 2, partZ).multiply(mirrors).applyMatrix4(rotation).add(parentCenter);
-      child.color = metadata?.color ?? shape.color;
-      child.material = shape.material;
-      child.appearance = shape.appearance;
-      child.hole = shape.hole;
-      child.hidden = shape.hidden;
-      child.locked = shape.locked;
-      child.rotation = shape.rotation;
-      child.rotationX = shape.rotationX;
-      child.rotationZ = shape.rotationZ;
-      child.mirrorX = shape.mirrorX;
-      child.mirrorY = shape.mirrorY;
-      child.mirrorZ = shape.mirrorZ;
-      child.x = offset.x;
-      child.elevation = offset.y;
-      child.z = offset.z;
-      child.importedMesh!.brepStep = cad.exportStep(local);
-      if (path && occurrenceId) {
-        child.stepComponent = {
-          id: `${occurrenceId}/solid-${occurrencePartIndex + 1}`,
-          occurrenceId,
-          path,
-        };
-      }
-      return child;
-    });
-    return groupExplodedHierarchy(parts, shape.stepAssembly ?? []);
+    try {
+      return explodeStepAssemblyWithKernel(cad, shape, source).shapes;
+    } catch (error) {
+      throw asServerCadError(error);
+    }
   });
 }

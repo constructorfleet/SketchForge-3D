@@ -153,6 +153,7 @@ import {
 } from "@/lib/engine/patternShapes";
 import { threadSizesInSeries } from "@/lib/engine/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
+import { canExplodeStepAssembly, explodeAssemblyInScene } from "@/lib/assemblyExplode";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { importedShapeFromStl } from "@/lib/engine/stlImport";
@@ -5920,6 +5921,10 @@ export function SketchForgeEditor({
     () => selectedShapes.length === 1 && Boolean(selectedShape && separablePartCount(selectedShape) > 1),
     [selectedShape, selectedShapes.length],
   );
+  const canExplodeSelectedAssembly = useMemo(
+    () => selectedShapes.length === 1 && Boolean(selectedShape && canExplodeStepAssembly(selectedShape)),
+    [selectedShape, selectedShapes.length],
+  );
   // The inspector's material readout needs a volume, and the export mesh is
   // the only place a volume exists for every shape kind. Tessellating is not
   // free, so it is done for the one selected shape and only while a material
@@ -8571,6 +8576,35 @@ export function SketchForgeEditor({
     );
   }, [commitShapes, selectedShape, selectedShapes.length, shapes, t]);
 
+  // One commit, so the explosion is one undo step back to the imported assembly.
+  const explodeSelectedAssembly = useCallback(async () => {
+    if (selectedShapes.length !== 1 || !selectedShape) {
+      setNotice(notice((t) => t("editor.explode.selectOne")));
+      return;
+    }
+    const target = shapesRef.current.find((shape) => shape.id === selectedShape.id);
+    if (!target) return;
+    const name = target.name;
+    const sourceProjectId = projectInfoRef.current.projectId;
+    setNotice(notice((t) => t("editor.explode.exploding", { name: shapeDisplayName(t, name) })));
+    const result = await explodeAssemblyInScene(shapesRef.current, target.id, projectAssetsRef.current);
+    if (!result.ok) {
+      setNotice(notice((t) => t(result.messageKey, result.params)));
+      return;
+    }
+    // The kernel is slow enough for the scene to move on underneath it.
+    if (projectInfoRef.current.projectId !== sourceProjectId || !shapesRef.current.includes(target)) {
+      setNotice(notice((t) => t("editor.explode.cancelled")));
+      return;
+    }
+    // Splice into the scene as it is now, keeping edits to other shapes made meanwhile.
+    commitShapes(
+      shapesRef.current.flatMap((shape) => (shape === target ? result.parts : [shape])),
+      result.parts.map((shape) => shape.id),
+      notice((t) => t(result.hierarchy === "nested" ? "editor.explode.exploded" : "editor.explode.flatFallback", { name: shapeDisplayName(t, name) })),
+    );
+  }, [commitShapes, selectedShape, selectedShapes.length]);
+
   const mcpSceneSnapshot = useCallback((params: Record<string, unknown> = {}): SketchForgeMcpSceneSummary & { rawShapes?: WorkplaneShape[] } => {
     const projectInfo = projectInfoRef.current;
     const requestedIds = mcpStringArray(params.shapeIds);
@@ -10181,6 +10215,7 @@ export function SketchForgeEditor({
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}
+          onExplodeAssembly={canExplodeSelectedAssembly ? explodeSelectedAssembly : undefined}
           onUpdateShape={updateShape}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
           onWorkplaneModeChange={closeViewportWorkplaneMode}

@@ -239,6 +239,8 @@ type WorkplaneViewportProps = {
   onEnableFaceEditing?: () => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
+  /** Present when the selected shape is an imported STEP assembly that can be exploded into groups. */
+  onExplodeAssembly?: () => Promise<void> | void;
   /** Solid volume of the selected shape, for the inspector's material readout. */
   selectedShapeVolumeMm3?: number;
   onUpdateShape: (id: string, patch: ShapeUpdatePatch) => void;
@@ -2442,6 +2444,7 @@ export function WorkplaneViewport({
   onEnableFaceEditing,
   canSeparateParts = false,
   onSeparateParts,
+  onExplodeAssembly,
   selectedShapeVolumeMm3,
   onUpdateShape,
   onWorkspaceSettingsChange,
@@ -5812,6 +5815,7 @@ export function WorkplaneViewport({
             pickedFace={pickedFace}
             canSeparateParts={canSeparateParts}
             onSeparateParts={onSeparateParts}
+            onExplodeAssembly={onExplodeAssembly}
             volumeMm3={selectedShapeVolumeMm3}
             onMaterialPriceChange={(materialId, pricePerKg) => chooseWorkspace((current) => ({
               ...current,
