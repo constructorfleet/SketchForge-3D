@@ -29,6 +29,7 @@ import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
 import { editorHistoryForAutosave, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
+import { createAutosaveNoticeController, type AutosaveNotice } from "@/lib/autosaveNotice";
 import { createLocalId } from "@/lib/engine/localIds";
 import { publicAssetPath, withAppBasePath } from "@/lib/publicAssetPath";
 import {
@@ -645,6 +646,11 @@ export default function Home() {
   const [downloadFolder, setDownloadFolder] = useState("");
   const [showProjectNameInToolbar, setShowProjectNameInToolbar] = useState(true);
   const [dashboardNotice, setDashboardNotice] = useState("");
+  const [autosaveNotice, setAutosaveNotice] = useState<AutosaveNotice | null>(null);
+  const autosaveNoticeControllerRef = useRef<ReturnType<typeof createAutosaveNoticeController> | null>(null);
+  if (autosaveNoticeControllerRef.current === null) {
+    autosaveNoticeControllerRef.current = createAutosaveNoticeController(setAutosaveNotice);
+  }
   const [projectStorageMode, setProjectStorageMode] = useState<ProjectStorageMode>("browser");
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
@@ -666,18 +672,20 @@ export default function Home() {
   if (projectSaveQueueRef.current === null) {
     projectSaveQueueRef.current = createCoalescingSaveQueue<ProjectSaveJob>({
       run: (projectId, job) => saveProjectShapesWhenIdle(projectId, job.entry, job.context),
-      onSaved: (projectId, job) => {
+      onSaved: (projectId, job, outcome) => {
         setProjects((current) => current.map((project) => (
           project.id === projectId && (project.revision ?? 0) <= job.revision
             ? { ...project, shapes: job.shapeCount, updatedAt: job.revision, revision: job.revision }
             : project
         )));
+        if (!outcome.waiting) autosaveNoticeControllerRef.current?.saved(projectId);
       },
-      onError: (_projectId, _job, error, outcome) => {
-        // A newer save is already queued behind this one; its result is what
-        // the user will see, so do not report a failure they cannot act on.
-        if (outcome.waiting) return;
-        setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveFailed"));
+      onError: (projectId, job, error) => {
+        autosaveNoticeControllerRef.current?.failed(
+          projectId,
+          job.context.projectName,
+          errorText(currentTranslator(), error, "dashboard.storage.saveFailed"),
+        );
       },
     });
   }
@@ -1178,6 +1186,7 @@ export default function Home() {
       revision,
       shapeCount: snapshot.shapes.length,
     });
+    autosaveNoticeControllerRef.current?.pending(snapshot.projectId, saveContext.projectName);
   }, []);
 
   const updateProjectWorkspace = useCallback((snapshot: {
@@ -1607,6 +1616,7 @@ export default function Home() {
             }}
             projectId={activeProjectId}
             projectName={activeProject?.name}
+            autosaveNotice={autosaveNotice?.projectId === activeProjectId ? autosaveNotice : null}
             showProjectNameInToolbar={showProjectNameInToolbar}
             onShowProjectNameInToolbarChange={setShowProjectNameInToolbar}
             projectCreatedAt={activeProject?.createdAt}

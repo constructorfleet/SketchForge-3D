@@ -126,6 +126,7 @@ import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransf
 import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
 import { projectExportFileName } from "@/lib/exportNames";
+import type { AutosaveNotice } from "@/lib/autosaveNotice";
 import { meshVolumeMm3 } from "@/lib/materialPresets";
 import { analyzeMeshTopology } from "@/lib/engine/meshValidation";
 import { projectedMeshContours } from "@/lib/engine/svgMeshProjection";
@@ -5413,6 +5414,7 @@ export function SketchForgeEditor({
   themePreference = "system",
   resolvedTheme = "light",
   onThemePreferenceChange,
+  autosaveNotice,
 }: {
   initialAssets?: ProjectAsset[];
   initialShapes?: WorkplaneShape[];
@@ -5462,6 +5464,7 @@ export function SketchForgeEditor({
   themePreference?: AppThemePreference;
   resolvedTheme?: ResolvedAppTheme;
   onThemePreferenceChange?: (preference: AppThemePreference) => void;
+  autosaveNotice?: AutosaveNotice | null;
 } = {}) {
   const t = useTranslations();
   const initialSceneRef = useRef<WorkplaneShape[] | null>(null);
@@ -10302,6 +10305,22 @@ export function SketchForgeEditor({
       <div className="editor-toast" role="status">
         {statusNotice ? statusNotice.text(t) : t("editor.notice.ready")}
       </div>
+      {autosaveNotice ? (
+        <div className="editor-autosave-alert" role="alert">
+          <span>
+            {autosaveNotice.state === "pending"
+              ? t("editor.autosave.pending", { projectName: autosaveNotice.projectName })
+              : t("editor.autosave.failed", { projectName: autosaveNotice.projectName })}
+          </span>
+          {autosaveNotice.state === "failed" && autosaveNotice.message ? <span>{autosaveNotice.message}</span> : null}
+          <button
+            type="button"
+            onClick={() => void exportSkfDesign(autosaveNotice.projectName, workspaceSettings.historyLimit)}
+          >
+            {t("editor.autosave.exportBackup")}
+          </button>
+        </div>
+      ) : null}
       <pre data-codex-state hidden>
         {debugState}
       </pre>

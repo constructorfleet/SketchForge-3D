@@ -237,6 +237,11 @@
     }
   },
   "editor": {
+    "autosave": {
+      "pending": "L’enregistrement de « {projectName} » prend plus de temps que prévu.",
+      "failed": "Impossible d’enregistrer « {projectName} ». Vos modifications récentes ne sont peut-être pas enregistrées.",
+      "exportBackup": "Exporter une sauvegarde .skf"
+    },
     "notice": {
       "ready": "Prêt",
       "selectShapeFirst": "Sélectionnez d’abord une forme",

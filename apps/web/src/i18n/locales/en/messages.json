@@ -246,6 +246,11 @@
     }
   },
   "editor": {
+    "autosave": {
+      "pending": "Saving “{projectName}” is taking longer than expected.",
+      "failed": "Could not save “{projectName}”. Your recent changes may not be saved.",
+      "exportBackup": "Export .skf backup"
+    },
     "notice": {
       "ready": "Ready",
       "selectShapeFirst": "Select a shape first",

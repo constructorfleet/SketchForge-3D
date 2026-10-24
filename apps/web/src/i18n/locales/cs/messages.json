@@ -237,6 +237,11 @@
     }
   },
   "editor": {
+    "autosave": {
+      "pending": "Ukládání projektu „{projectName}“ trvá déle, než se čekalo.",
+      "failed": "Projekt „{projectName}“ se nepodařilo uložit. Poslední změny možná nejsou uložené.",
+      "exportBackup": "Exportovat zálohu .skf"
+    },
     "notice": {
       "ready": "Připraveno",
       "selectShapeFirst": "Nejprve vyberte tvar",
