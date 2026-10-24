@@ -17,6 +17,7 @@
  */
 
 import type { OcctKernel, ShapeHandle, Vec3 } from "occt-wasm";
+import * as THREE from "three";
 import type { CadBrepFrame, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions } from "./sketchCadProfile.js";
 import { createLocalId } from "./localIds.js";
@@ -632,19 +633,30 @@ export function draftPrismProfileOffset(profile: Pick<SketchProfile, "points">) 
  * rebuilt on, and so the drafted result, which keeps it.
  *
  * The shape's position is moved by however far the rebuilt extrusion's frame
- * is from the source frame the draft first started from, in sketch
- * coordinates. A fresh draft, or a re-draft of an unchanged sketch, therefore
- * leaves the position where it is. The editor uses the same rule so that one
- * record means one placement whichever side wrote it (#384).
+ * is from the source frame the draft first started from. Frame offsets are in
+ * sketch coordinates, so rotate them by the shape's placement before adding
+ * them to its world position. The editor and REST use this same rule so one
+ * record means one placement whichever side wrote it (#384, #435).
  */
 export function retainedDraftSourcePlacement(
-  existing: Pick<WorkplaneShape, "x" | "z" | "elevation" | "faceDraftSourceFrame" | "draftPrismSourceFrame" | "cadBrepFrame">,
+  existing: Pick<WorkplaneShape, "x" | "z" | "elevation" | "rotation" | "rotationX" | "rotationZ" | "faceDraftSourceFrame" | "draftPrismSourceFrame" | "cadBrepFrame">,
   rebuiltFrame: Pick<CadBrepFrame, "x" | "z" | "elevation">,
+  sourceFrameOverride?: Pick<CadBrepFrame, "x" | "z" | "elevation">,
 ) {
-  const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
+  const sourceFrame = sourceFrameOverride ?? existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
+  const offset = new THREE.Vector3(
+    rebuiltFrame.x - (sourceFrame?.x ?? 0),
+    rebuiltFrame.elevation - (sourceFrame?.elevation ?? 0),
+    rebuiltFrame.z - (sourceFrame?.z ?? 0),
+  ).applyEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(existing.rotationX ?? 0),
+    THREE.MathUtils.degToRad(existing.rotation ?? 0),
+    THREE.MathUtils.degToRad(existing.rotationZ ?? 0),
+    "XYZ",
+  ));
   return {
-    x: existing.x - (sourceFrame?.x ?? 0) + rebuiltFrame.x,
-    z: existing.z - (sourceFrame?.z ?? 0) + rebuiltFrame.z,
-    elevation: (existing.elevation ?? 0) - (sourceFrame?.elevation ?? 0) + rebuiltFrame.elevation,
+    x: existing.x + offset.x,
+    z: existing.z + offset.z,
+    elevation: (existing.elevation ?? 0) + offset.y,
   };
 }
