@@ -7,6 +7,7 @@ import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTran
 import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/engine/exactBooleanSolids";
 import { buildDraftPrism } from "@/lib/engine/draftPrism";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
+import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -384,15 +385,6 @@ function tessellationOptions(quality: CadModifierQuality, amount: number) {
   return { linearDeflection: Math.max(0.055, amount / 7), angularDeflection: 0.2 };
 }
 
-function copyCadMesh(mesh: { positions: Float32Array; normals: Float32Array; indices: Uint32Array; triangleCount: number }) {
-  return {
-    positions: new Float32Array(mesh.positions),
-    normals: new Float32Array(mesh.normals),
-    indices: new Uint32Array(mesh.indices),
-    triangleCount: mesh.triangleCount,
-  };
-}
-
 function isImportStlWasmFault(message: string) {
   return /importStl:.*WebAssembly\.Exception/i.test(message);
 }
@@ -523,11 +515,11 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       result = componentResults.length === 1 ? componentResults[0] : activeCad.makeCompound(componentResults);
       if (!cadShapeIsValid(activeCad, result)) throw new LocalizedError("errors.cadModifier.invalidResult");
       const options = tessellationOptions(request.quality, request.amount);
-      const mesh = copyCadMesh(activeCad.tessellate(result, options));
+      const mesh = meshShapeWithFaceGroups(activeCad, result, options);
       const displayEdges = collectEdges(activeCad, result, 0).displayEdges;
       const brep = activeCad.toBREP(result);
       const components: CadModifierComponentMesh[] = componentResults.map((component, owner) => {
-        const componentMesh = copyCadMesh(activeCad.tessellate(component, options));
+        const componentMesh = meshShapeWithFaceGroups(activeCad, component, options);
         return {
           owner,
           positions: componentMesh.positions,
@@ -536,10 +528,11 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
           triangleCount: componentMesh.triangleCount,
           brep: activeCad.toBREP(component),
           displayEdges: collectEdges(activeCad, component, 0).displayEdges,
+          faceGroups: componentMesh.faceGroups,
         };
       });
       post(
-        { type: "preview", requestId: request.requestId, positions: mesh.positions, normals: mesh.normals, indices: mesh.indices, triangleCount: mesh.triangleCount, brep, displayEdges, components },
+        { type: "preview", requestId: request.requestId, positions: mesh.positions, normals: mesh.normals, indices: mesh.indices, triangleCount: mesh.triangleCount, brep, displayEdges, components, faceGroups: mesh.faceGroups },
         [
           mesh.positions.buffer,
           mesh.normals.buffer,

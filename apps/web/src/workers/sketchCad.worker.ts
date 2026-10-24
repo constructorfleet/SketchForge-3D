@@ -4,6 +4,7 @@ import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import { cadSketchRegions, type OrderedCadSketchPath } from "@/lib/sketchCadProfile";
 import { buildCadSketchSweep } from "@/lib/sketchCadSweep";
+import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 
 let kernelPromise: Promise<OcctKernel> | null = null;
@@ -63,12 +64,9 @@ self.onmessage = async (event: MessageEvent<SketchCadWorkerRequest>) => {
     }
     const result = solids.length === 1 ? solids[0] : cad.makeCompound(solids);
     if (!cad.isValid(result)) throw new LocalizedError("errors.sketch.invalidTopology");
-    const mesh = cad.tessellate(result, { linearDeflection: 0.05, angularDeflection: 0.16 });
-    const positions = new Float32Array(mesh.positions);
-    const normals = new Float32Array(mesh.normals);
-    const indices = new Uint32Array(mesh.indices);
+    const { positions, normals, indices, triangleCount, faceGroups } = meshShapeWithFaceGroups(cad, result, { linearDeflection: 0.05, angularDeflection: 0.16 });
     const brep = cad.toBREP(result);
-    post({ type: "built", requestId: request.requestId, positions, normals, indices, triangleCount: mesh.triangleCount, brep }, [positions.buffer, normals.buffer, indices.buffer]);
+    post({ type: "built", requestId: request.requestId, positions, normals, indices, triangleCount, brep, faceGroups }, [positions.buffer, normals.buffer, indices.buffer]);
   } catch (error) {
     // Structured clone drops the LocalizedError class; the main thread rebuilds it with errorFromPayload.
     const payload = localizedErrorPayload(error ?? new LocalizedError("errors.sketch.buildFailed"));

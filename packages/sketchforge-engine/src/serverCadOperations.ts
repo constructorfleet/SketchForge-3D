@@ -30,6 +30,7 @@ import { createLocalId } from "./localIds.js";
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
+import { triangleFaceGroups } from "./cadFaceMesh.js";
 
 export type ServerCadEdge = {
   index: number;
@@ -829,11 +830,7 @@ export function meshedCadResult(
   }
   const faces = cad.getSubShapes(result, "face");
   const faceIndexByHash = new Map(faces.map((face, index) => [cad.hashCode(face, 2_147_483_647), index]));
-  const faceGroups: number[] = [];
-  for (let group = 0; group + 2 < (mesh.faceGroups?.length ?? 0); group += 3) {
-    const index = faceIndexByHash.get(mesh.faceGroups![group + 2]!);
-    if (index !== undefined) faceGroups.push(mesh.faceGroups![group]!, mesh.faceGroups![group + 1]!, index);
-  }
+  const faceGroups = triangleFaceGroups(mesh.faceGroups, faceIndexByHash);
   const faceIds = sourceShape
     ? lineage
       ? faceIdsFromEvolution(

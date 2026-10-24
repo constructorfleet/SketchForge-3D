@@ -60,6 +60,8 @@ export type CadModifierComponentMesh = {
   triangleCount: number;
   brep: string;
   displayEdges: CadModifierDisplayEdge[];
+  /** Triangle start, triangle count and B-rep face index triples, for face colours. */
+  faceGroups?: number[];
 };
 
 export type CadModifierWorkerRequest =
@@ -90,6 +92,8 @@ export type CadModifierWorkerResponse =
       brep: string;
       displayEdges: CadModifierDisplayEdge[];
       components?: CadModifierComponentMesh[];
+    /** Triangle start, triangle count and B-rep face index triples, for face colours. */
+      faceGroups?: number[];
     }
   | {
       type: "boolean";
@@ -110,6 +114,7 @@ export type CadModifierWorkerResponse =
       indices: Uint32Array;
       triangleCount: number;
       brep: string;
+      faceGroups?: number[];
     }
   | {
       type: "draft-face";
@@ -121,6 +126,7 @@ export type CadModifierWorkerResponse =
       faceCount: number;
       volume: number;
       brep: string;
+      faceGroups?: number[];
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);

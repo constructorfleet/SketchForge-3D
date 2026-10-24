@@ -1,5 +1,6 @@
 import { type OcctKernel } from "occt-wasm";
 import type { SketchProfile } from "@/types/sketchforge";
+import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 
 export type DraftPrismBuildRequest = {
   profile: SketchProfile;
@@ -13,6 +14,8 @@ export type DraftPrismBuildResult = {
   indices: Uint32Array;
   triangleCount: number;
   brep: string;
+  /** Triangle start, triangle count and B-rep face index triples, for face colours. */
+  faceGroups: number[];
 };
 
 /** Builds an exact drafted solid from the editor's supported straight sketch profile. */
@@ -44,12 +47,13 @@ export function buildDraftPrism(cad: OcctKernel, request: DraftPrismBuildRequest
   const face = cad.makeFace(cad.makeWire(edges));
   const solid = cad.draftPrism(face, 0, request.height, 0, request.angle);
   if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new Error("The draft did not produce a valid solid.");
-  const mesh = cad.tessellate(solid, { linearDeflection: 0.035, angularDeflection: 0.16 });
+  const mesh = meshShapeWithFaceGroups(cad, solid, { linearDeflection: 0.035, angularDeflection: 0.16 });
   return {
     positions: mesh.positions,
     normals: mesh.normals,
     indices: mesh.indices,
     triangleCount: mesh.triangleCount,
+    faceGroups: mesh.faceGroups,
     brep: cad.toBREP(solid),
   };
 }
