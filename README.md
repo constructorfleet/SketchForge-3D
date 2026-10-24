@@ -349,6 +349,8 @@ For an administrator-managed one-click installation, configure all of the follow
 
 Without an administrator-managed trigger, the confirmation opens these safe update instructions instead of granting the web container access to the Docker socket.
 
+A server run from a git clone (`npm run dev` or `npm start`) can update its own checkout from the dashboard when you open it at `localhost`. It requires `SKETCHFORGE_UPDATE_ADMIN_KEY`, which the dialog asks for. If the server listens only on loopback, you can set `SKETCHFORGE_LOCAL_UPDATE=1` instead. See [application updates](docs/guides/deployment.md#application-updates) for why both exist.
+
 ### Docker Troubleshooting
 
 - **`docker` is not recognized**: install Docker Desktop, open it, and try again.

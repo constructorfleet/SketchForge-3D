@@ -37,7 +37,7 @@ const markdown = [
   '',
   '## Update settings',
   '',
-  'The update status and server-triggered update settings are read by [`apps/web/src/app/api/app-update/route.ts`](../apps/web/src/app/api/app-update/route.ts). The version, manifest URL, and guide URL customize update information. Trigger URL, admin key, and trigger token enable the privileged update action; keep both credentials in deployment secrets and only configure a trigger endpoint you control.',
+  'The update status and update settings are read by [`apps/web/src/app/api/app-update/route.ts`](../apps/web/src/app/api/app-update/route.ts). The version, manifest URL, and guide URL customize update information. The privileged update action has two modes. Server mode posts to the trigger URL and needs both the trigger URL and the admin key; the trigger token authenticates SketchForge to that endpoint. Local mode applies when the server runs from a git checkout and the request is addressed to `localhost`: it runs `git fetch`, `git merge --ff-only`, and `npm install` in the checkout and restarts the dev server. Local mode needs `SKETCHFORGE_LOCAL_UPDATE=1` or the admin key, and refuses with 403 when neither is set. The route cannot see the caller\'s address, and the `localhost` test reads the client-controlled Host header, so set `SKETCHFORGE_LOCAL_UPDATE` only on a server that listens on loopback alone. Keep both credentials in deployment secrets and only configure a trigger endpoint you control. The packaged desktop app uses its own updater and none of these settings affect it.',
   '',
   '## Scope and limitations',
   '',
