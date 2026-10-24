@@ -237,6 +237,17 @@
       "subsystem": "Desktop application origin",
       "source": "../apps/desktop/main.cjs",
       "ownerPage": "OPERATOR_CONFIGURATION.md#desktop-settings"
+    },
+    {
+      "name": "SKETCHFORGE_LOCAL_DOWNLOAD_ROOT",
+      "default": "Unset; folder downloads are disabled.",
+      "required": false,
+      "validation": "Absolute or relative directory allowed as a destination for desktop folder downloads. The packaged desktop app sets this to the user's Downloads directory and binds its web server to 127.0.0.1. The route is disabled unless SKETCHFORGE_DESKTOP=1 and this root is set; requested folders must remain inside the root.",
+      "sensitive": false,
+      "subsystem": "Desktop folder downloads",
+      "source": "../apps/web/src/app/api/local-download/route.ts",
+      "additionalSources": ["../apps/desktop/main.cjs"],
+      "ownerPage": "OPERATOR_CONFIGURATION.md#desktop-settings"
     }
   ]
 }

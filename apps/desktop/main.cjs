@@ -84,6 +84,7 @@ async function startPackagedWebServer() {
       PORT: String(port),
       SKETCHFORGE_DESKTOP: "1",
       SKETCHFORGE_DESKTOP_VERSION: app.getVersion(),
+      SKETCHFORGE_LOCAL_DOWNLOAD_ROOT: app.getPath("downloads"),
       SKETCHFORGE_SHARED_PROJECTS_DIR: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },

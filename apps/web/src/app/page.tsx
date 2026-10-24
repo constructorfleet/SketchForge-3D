@@ -641,6 +641,7 @@ export default function Home() {
   const [themePreference, setThemePreference] = useState<AppThemePreference>("system");
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedAppTheme>("light");
   const [downloadMode, setDownloadMode] = useState<DownloadMode>("browser");
+  const [localDownloadEnabled, setLocalDownloadEnabled] = useState(false);
   const [downloadFolder, setDownloadFolder] = useState("");
   const [showProjectNameInToolbar, setShowProjectNameInToolbar] = useState(true);
   const [dashboardNotice, setDashboardNotice] = useState("");
@@ -725,6 +726,18 @@ export default function Home() {
     }
     setDownloadMode(!STATIC_EXPORT_BUILD && window.localStorage.getItem(DOWNLOAD_MODE_STORAGE_KEY) === "folder" ? "folder" : "browser");
     setDownloadFolder(window.localStorage.getItem(DOWNLOAD_FOLDER_STORAGE_KEY) ?? "");
+    if (!STATIC_EXPORT_BUILD) {
+      void fetch("/api/local-download", { cache: "no-store" })
+        .then((response) => response.json() as Promise<{ enabled?: boolean }>)
+        .then(({ enabled }) => {
+          setLocalDownloadEnabled(Boolean(enabled));
+          if (!enabled) setDownloadMode("browser");
+        })
+        .catch(() => {
+          setLocalDownloadEnabled(false);
+          setDownloadMode("browser");
+        });
+    }
     setShowProjectNameInToolbar(window.localStorage.getItem(PROJECT_NAME_TOOLBAR_STORAGE_KEY) !== "false");
 
     const params = new URLSearchParams(window.location.search);
@@ -1528,6 +1541,7 @@ export default function Home() {
           dashboardNotice={dashboardNotice}
           downloadFolder={downloadFolder}
           downloadMode={downloadMode}
+          localDownloadEnabled={localDownloadEnabled}
           projects={visibleProjects}
           projectStorageMode={projectStorageMode}
           query={query}
@@ -1695,6 +1709,7 @@ function Dashboard({
   dashboardNotice,
   downloadFolder,
   downloadMode,
+  localDownloadEnabled,
   projects,
   projectStorageMode,
   query,
@@ -1731,6 +1746,7 @@ function Dashboard({
   dashboardNotice: string;
   downloadFolder: string;
   downloadMode: DownloadMode;
+  localDownloadEnabled: boolean;
   projects: DashboardProject[];
   projectStorageMode: ProjectStorageMode;
   query: string;
@@ -2383,14 +2399,15 @@ function Dashboard({
               ))}
             </select>
           </label>
+          {localDownloadEnabled ? <>
           <label className="dashboard-setting-row">
             <span>{t("dashboard.settings.saveMethod")}</span>
             <select
               value={downloadMode}
-              onChange={(event) => onDownloadModeChange(!staticExportBuild && event.currentTarget.value === "folder" ? "folder" : "browser")}
+              onChange={(event) => onDownloadModeChange(!staticExportBuild && localDownloadEnabled && event.currentTarget.value === "folder" ? "folder" : "browser")}
             >
               <option value="browser">{t("dashboard.settings.browserDownloads")}</option>
-              {!staticExportBuild ? <option value="folder">{t("dashboard.settings.saveToFolder")}</option> : null}
+              <option value="folder">{t("dashboard.settings.saveToFolder")}</option>
             </select>
           </label>
           <label className="dashboard-setting-row">
@@ -2402,6 +2419,7 @@ function Dashboard({
               placeholder="C:\\Users\\username\\Downloads"
             />
           </label>
+          </> : null}
           <div className="dashboard-version-row">
             <span>{t("dashboard.settings.version")}</span>
             <strong>{desktopAppVersion ?? updateStatus?.currentVersion ?? SKF_CREATED_WITH_VERSION}</strong>

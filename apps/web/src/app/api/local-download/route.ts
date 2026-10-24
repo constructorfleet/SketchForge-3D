@@ -9,6 +9,40 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const MAX_TEXT_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_BINARY_DOWNLOAD_BYTES = 512 * 1024 * 1024;
 
+function configuredRoot() {
+  const configured = process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT?.trim();
+  return configured ? path.resolve(configured) : null;
+}
+
+function isEnabled() {
+  return process.env.SKETCHFORGE_DESKTOP === "1" && configuredRoot() !== null;
+}
+
+function isWithin(root: string, target: string) {
+  const relative = path.relative(root, target);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+async function existingParentWithin(root: string, target: string) {
+  let candidate = target;
+  while (isWithin(root, candidate)) {
+    try {
+      const canonicalCandidate = await fs.realpath(candidate);
+      return isWithin(root, canonicalCandidate);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const parent = path.dirname(candidate);
+      if (parent === candidate) return false;
+      candidate = parent;
+    }
+  }
+  return false;
+}
+
+export async function GET() {
+  return NextResponse.json({ enabled: isEnabled() }, { headers: { "Cache-Control": "no-store" } });
+}
+
 function safeFileName(filename: string) {
   const base = path.basename(filename).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim();
   return base || "download.txt";
@@ -38,6 +72,9 @@ function isLocalSameOriginRequest(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!isEnabled()) {
+      return errorResponse("errors.download.localOnly", 403);
+    }
     if (!isLocalSameOriginRequest(request)) {
       return errorResponse("errors.download.localOnly", 403);
     }
@@ -78,8 +115,21 @@ export async function POST(request: Request) {
       return errorResponse("errors.download.noFolder", 400);
     }
 
-    const targetDirectory = path.resolve(path.isAbsolute(trimmedFolder) ? trimmedFolder : path.join(process.cwd(), trimmedFolder));
+    const rootDirectory = configuredRoot()!;
+    const targetDirectory = path.resolve(path.isAbsolute(trimmedFolder) ? trimmedFolder : path.join(rootDirectory, trimmedFolder));
+    if (!isWithin(rootDirectory, targetDirectory)) {
+      return errorResponse("errors.download.invalidPath", 400);
+    }
+    const canonicalRoot = await fs.realpath(rootDirectory);
+    const canonicalTarget = path.resolve(canonicalRoot, path.relative(rootDirectory, targetDirectory));
+    if (!(await existingParentWithin(canonicalRoot, canonicalTarget))) {
+      return errorResponse("errors.download.invalidPath", 400);
+    }
     await fs.mkdir(targetDirectory, { recursive: true });
+    const canonicalTargetDirectory = await fs.realpath(targetDirectory);
+    if (!isWithin(canonicalRoot, canonicalTargetDirectory)) {
+      return errorResponse("errors.download.invalidPath", 400);
+    }
     const targetPath = path.resolve(targetDirectory, safeFileName(filename));
     const relativeTarget = path.relative(targetDirectory, targetPath);
     if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget)) {
