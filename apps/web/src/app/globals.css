@@ -10183,3 +10183,134 @@ html[data-theme="dark"] .scene-row-tag {
 html[data-theme="dark"] .scene-row.hidden-shape .scene-row-label {
   color: #6f8698;
 }
+
+/* Scene analysis (#380) ----------------------------------------------------
+   Interference and wall-thickness checks under the scene list's group
+   actions. Read-only results; a pair button only selects its two shapes. */
+.scene-analysis {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid #d8e0e7;
+  border-bottom: 1px solid #d8e0e7;
+}
+
+/* Two action labels share the rail's width; keep each on one line. */
+.scene-analysis .scene-inspector-actions button {
+  padding: 4px 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.scene-analysis-title {
+  margin: 0;
+  color: #243d56;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.scene-analysis-note,
+.scene-analysis-method,
+.scene-analysis-stale {
+  margin: 0;
+  color: #53687a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.scene-analysis-summary {
+  margin: 0;
+  color: #243d56;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scene-analysis-summary:empty {
+  display: none;
+}
+
+.scene-analysis-summary.refused,
+.scene-analysis-stale {
+  color: #9a3412;
+}
+
+.scene-analysis-pairs {
+  display: flex;
+  overflow-y: auto;
+  max-height: 168px;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+.scene-analysis-pairs button {
+  display: flex;
+  width: 100%;
+  padding: 5px 9px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  color: #243d56;
+  text-align: left;
+  background: #f4f8fb;
+  border: 1px solid #d3dfe8;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.scene-analysis-pairs button:hover {
+  border-color: #159fd0;
+}
+
+.scene-analysis-pairs button[aria-pressed="true"] {
+  background: rgba(21, 159, 208, 0.18);
+  border-color: #159fd0;
+}
+
+.scene-analysis-pair-names {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.scene-analysis-pair-detail {
+  color: #53687a;
+  font-size: 11px;
+}
+
+html[data-theme="dark"] .scene-analysis {
+  border-color: #334753;
+}
+
+html[data-theme="dark"] .scene-analysis-title,
+html[data-theme="dark"] .scene-analysis-summary,
+html[data-theme="dark"] .scene-analysis-pairs button {
+  color: #d3e1ea;
+}
+
+html[data-theme="dark"] .scene-analysis-note,
+html[data-theme="dark"] .scene-analysis-method,
+html[data-theme="dark"] .scene-analysis-pair-detail {
+  color: #8fa6b6;
+}
+
+html[data-theme="dark"] .scene-analysis-summary.refused,
+html[data-theme="dark"] .scene-analysis-stale {
+  color: #fdba74;
+}
+
+html[data-theme="dark"] .scene-analysis-pairs button {
+  background: rgba(14, 22, 29, 0.9);
+  border-color: #334753;
+}
+
+html[data-theme="dark"] .scene-analysis-pairs button[aria-pressed="true"] {
+  background: rgba(66, 199, 235, 0.22);
+  border-color: #42c7eb;
+}

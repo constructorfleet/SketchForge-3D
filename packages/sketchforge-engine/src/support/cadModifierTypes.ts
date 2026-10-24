@@ -2,6 +2,7 @@ import type { LocalizedErrorPayload } from "./i18n/LocalizedError.js";
 import type { WorkplaneShape } from "./../domain/sketchforge.js";
 import type { SketchProfile } from "./../domain/sketchforge.js";
 import type { ResolvedSketchFaceDraftSource, RetainedFaceDraftResolution } from "./../sketchFaceDraftKernel.js";
+import type { InterferenceOperand, InterferenceResult, WallThicknessResult } from "./../cadAnalysis.js";
 
 export type CadModifierKind = "chamfer" | "fillet";
 
@@ -77,6 +78,10 @@ export type CadModifierWorkerRequest =
       chamferAngle: number;
     }
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
+  /** Read-only analysis (#380): exact gaps and overlap volumes between the operands. */
+  | { type: "interference"; requestId: number; operands: Array<InterferenceOperand & { part: CadModifierMeshPart }>; clearance: number }
+  /** Read-only analysis (#380): the sampled thinnest wall of one solid. */
+  | { type: "wall-thickness"; requestId: number; part: CadModifierMeshPart }
   | { type: "draft-prism"; requestId: number; profile: SketchProfile; height: number; angle: number }
   | { type: "draft-face"; requestId: number; brep: string; faceIds: string[]; faceId: string; angle: number; pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z"; brepTransform?: number[] }
   /**
@@ -124,6 +129,8 @@ export type CadModifierWorkerResponse =
       fusedVolume: number;
       cutVolume: number;
     }
+  | { type: "interference"; requestId: number; result: InterferenceResult }
+  | { type: "wall-thickness"; requestId: number; result: WallThicknessOutcome }
   | {
       type: "draft-prism";
       requestId: number;
@@ -186,3 +193,8 @@ export type CadModifierWorkerResponse =
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);
+
+/** A sampled wall thickness, or why the solid could not be sampled at all. */
+export type WallThicknessOutcome =
+  | { ok: true; value: WallThicknessResult }
+  | { ok: false; refusal: { reason: "no_faces" | "too_many_faces"; limit?: number } };

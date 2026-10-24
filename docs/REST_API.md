@@ -543,6 +543,8 @@ The response lists closest pairs first:
 
 To keep a large scene from monopolizing the kernel, a request is refused as a whole above 128 selected shapes or 512 AABB candidate pairs. The `422 invalid_request` response names the limit; narrow `ids` or lower `clearance` and retry. `pairs` contains only pairs whose gap is at most the requested clearance. `precision` is `exact` for parametric and B-rep inputs; a pair involving an imported triangle mesh reports `tessellated`, because OCCT can solve the stored mesh precisely but cannot recover the unsampled source surface. This is shape-to-shape reporting; it does not identify faces. Sampled wall-thickness estimation remains separate and must state its sampling limits.
 
+The editor's **Analysis** section in the scene list runs this same check, and `GET /thickness`'s sampling, in the browser on the unsaved scene, with the same limits and the same `method`. See [Interference and wall thickness](/docs/guides/scene-analysis.md).
+
 ## Shape properties
 
 `GET /properties?projectId=&shapeId=` requires both query parameters and returns the measured properties for one stored shape. `volume` is in mm³, `area` is in mm², and `centerOfMass` and the axis-aligned `bbox` coordinates are project-space millimeters. `isValid` reports the CAD kernel validity result. `provenance.source` identifies the representation measured (`parametric`, `brep`, or `mesh`); `provenance.precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.

@@ -121,6 +121,7 @@ import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard 
 import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/engine/booleanPrimitives";
 import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/engine/cutterPadding";
 import { exactBooleanPlacement, exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/engine/exactBooleanParts";
+import { createSceneAnalysisRunner } from "@/lib/sceneAnalysis";
 import { faceEditingCanBeEnabled } from "@/lib/shapeFaces";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
 import { createLocalId } from "@/lib/engine/localIds";
@@ -7965,6 +7966,19 @@ export function SketchForgeEditor({
     };
   }, [postCadModifierRequestAsync]);
 
+  // Interference and wall thickness for the scene list (#380). Read-only: the
+  // runner only measures, and nothing it returns reaches commitShapes.
+  const sceneAnalysisRunner = useMemo(() => createSceneAnalysisRunner(
+    (request, transfer, timeoutMs) => postCadModifierRequestAsync(request, transfer, timeoutMs),
+    (shape) => {
+      try {
+        return meshDataToCadTransfer(meshForShape(shape));
+      } catch {
+        return null;
+      }
+    },
+  ), [postCadModifierRequestAsync]);
+
   const cancelEdgeModifier = useCallback(() => {
     invalidateCadModifierSession();
     setNotice(notice((t) => t("editor.edgeModifier.cancelled")));
@@ -10250,6 +10264,7 @@ export function SketchForgeEditor({
           onMirrorPreviewClear={clearMirrorPreview}
           onMirrorSelection={mirrorSelectionAcross}
           onSelectShape={selectShape}
+          sceneAnalysisRunner={sceneAnalysisRunner}
           onDeleteShapeById={deleteShapeById}
           onSetShapeHidden={setShapeHidden}
           onSetShapeLocked={setShapeLocked}

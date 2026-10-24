@@ -42,6 +42,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
 
 - [#378: Explode imported STEP assemblies from the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/378) — P2, implemented and in review.
+- [#380: Interference check and wall-thickness analysis in the editor](https://github.com/constructorfleet/SketchForge-3D/issues/380) — P2, implemented and in review.
 
 ## CAD geometry correctness
 
