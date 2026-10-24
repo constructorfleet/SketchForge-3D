@@ -247,79 +247,24 @@ export function canonicalizeShape(shape: WorkplaneShape): WorkplaneShape {
   return (Object.keys(next) as Array<keyof WorkplaneShape>).every((key) => next[key] === shape[key]) ? shape : next;
 }
 
+/**
+ * Whether two shapes are the same for the editor's purposes. Every field is
+ * compared by reference except `appearance`, which is compared by value. The
+ * comparison walks the keys of both shapes rather than a hand-kept list, so a
+ * field added to `WorkplaneShape` is never treated as "no change" by default.
+ */
 export function workplaneShapesEqual(a: WorkplaneShape, b: WorkplaneShape) {
-  return (
-    a.id === b.id &&
-    a.name === b.name &&
-    a.kind === b.kind &&
-    a.color === b.color &&
-    a.material === b.material &&
-    shapeAppearancesEqual(a.appearance, b.appearance) &&
-    a.hole === b.hole &&
-    a.x === b.x &&
-    a.z === b.z &&
-    a.elevation === b.elevation &&
-    a.size === b.size &&
-    a.width === b.width &&
-    a.depth === b.depth &&
-    a.height === b.height &&
-    a.rotation === b.rotation &&
-    a.rotationX === b.rotationX &&
-    a.rotationZ === b.rotationZ &&
-    a.mirrorX === b.mirrorX &&
-    a.mirrorY === b.mirrorY &&
-    a.mirrorZ === b.mirrorZ &&
-    a.radius === b.radius &&
-    a.steps === b.steps &&
-    a.sides === b.sides &&
-    a.bevel === b.bevel &&
-    a.segments === b.segments &&
-    a.topRadius === b.topRadius &&
-    a.baseRadius === b.baseRadius &&
-    a.taperTopWidth === b.taperTopWidth &&
-    a.taperTopDepth === b.taperTopDepth &&
-    a.taperBottomWidth === b.taperBottomWidth &&
-    a.taperBottomDepth === b.taperBottomDepth &&
-    a.taperTopScale === b.taperTopScale &&
-    a.taperBottomScale === b.taperBottomScale &&
-    a.teeth === b.teeth &&
-    a.toothSize === b.toothSize &&
-    a.toothWidth === b.toothWidth &&
-    a.centerHoleSize === b.centerHoleSize &&
-    a.gearType === b.gearType &&
-    a.helixAngle === b.helixAngle &&
-    a.helixQuality === b.helixQuality &&
-    a.loftBottomShape === b.loftBottomShape &&
-    a.loftTopShape === b.loftTopShape &&
-    a.loftTopWidth === b.loftTopWidth &&
-    a.loftTopDepth === b.loftTopDepth &&
-    a.loftBottomRotation === b.loftBottomRotation &&
-    a.loftTopRotation === b.loftTopRotation &&
-    a.loftSegments === b.loftSegments &&
-    a.loftLayers === b.loftLayers &&
-    a.text === b.text &&
-    a.font === b.font &&
-    a.importedMesh === b.importedMesh &&
-    a.imagePlate === b.imagePlate &&
-    a.sketchProfile === b.sketchProfile &&
-    a.sketchOperation === b.sketchOperation &&
-    a.sketchRevolve === b.sketchRevolve &&
-    a.edgeTreatments === b.edgeTreatments &&
-    a.edgeTreatmentHistory === b.edgeTreatmentHistory &&
-    a.cadDisplayEdges === b.cadDisplayEdges &&
-    a.cadDisplayEdgesVersion === b.cadDisplayEdgesVersion &&
-    a.edgeResizeMode === b.edgeResizeMode &&
-    a.cadBrep === b.cadBrep &&
-    a.cadBrepFrame === b.cadBrepFrame &&
-    a.cadPrimitiveFrame === b.cadPrimitiveFrame &&
-    a.groupedShapes === b.groupedShapes &&
-    a.groupedBaseWidth === b.groupedBaseWidth &&
-    a.groupedBaseDepth === b.groupedBaseDepth &&
-    a.groupedBaseHeight === b.groupedBaseHeight &&
-    a.groupOperation === b.groupOperation &&
-    a.locked === b.locked &&
-    a.hidden === b.hidden
-  );
+  if (a === b) return true;
+  const left = a as unknown as Record<string, unknown>;
+  const right = b as unknown as Record<string, unknown>;
+  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+    if (key === "appearance") {
+      if (!shapeAppearancesEqual(a.appearance, b.appearance)) return false;
+    } else if (left[key] !== right[key]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function shapeAppearancesEqual(a?: ShapeAppearance, b?: ShapeAppearance) {
