@@ -8,6 +8,7 @@ import {
 } from "./serverCadOperations.js";
 import { shapeFaces } from "./serverCadShell.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
+import { draftFaceForSketchSegment, legacyDraftSegmentForShape } from "./faceDraftSegmentLineage.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -104,19 +105,45 @@ export async function replaySingleAllEdgeTreatment(
     };
   }
   if (original.faceDraft !== undefined && treatmentSource.faceDraft === undefined) {
-    const sourceNormal = original.faceDraft.sourceFaceNormal;
+    const profileChanged = JSON.stringify(original.sketchProfile) !== JSON.stringify(rebuilt.sketchProfile);
+    const legacySegmentMatch = profileChanged && !original.faceDraftSourceSegmentId
+      ? await legacyDraftSegmentForShape(original)
+      : undefined;
+    if (legacySegmentMatch?.status === "ambiguous") {
+      throw new Error("The saved face draft does not identify one source sketch segment.");
+    }
+    const sourceSegmentId = original.faceDraftSourceSegmentId
+      ?? (legacySegmentMatch?.status === "matched" ? legacySegmentMatch.segmentId : undefined);
+    const segmentMatch = sourceSegmentId
+      ? await draftFaceForSketchSegment(treatmentSource, sourceSegmentId)
+      : undefined;
+    if (segmentMatch && segmentMatch.status !== "matched"
+      && (segmentMatch.status !== "unsupported" || original.faceDraftSourceSegmentId !== undefined)) {
+      throw new Error("The selected sketch segment no longer maps to exactly one extrusion side face.");
+    }
+    const useSegmentLineage = segmentMatch?.status === "matched";
+    const sourceNormal = useSegmentLineage ? segmentMatch.normal : original.faceDraft.sourceFaceNormal;
     if (!sourceNormal) throw new Error("The selected source face has no stable planar reference.");
-    const matchingFaces = (await shapeFaces(treatmentSource)).filter((face) => face.surfaceType === "plane"
-      && face.normal
-      && Math.hypot(face.normal.x - sourceNormal.x, face.normal.y - sourceNormal.y, face.normal.z - sourceNormal.z) <= 1e-5);
+    const matchingFaces = useSegmentLineage
+      ? [{ id: segmentMatch.faceId }]
+      : (await shapeFaces(treatmentSource)).filter((face) => face.surfaceType === "plane" && face.normal
+        && Math.hypot(face.normal.x - sourceNormal.x, face.normal.y - sourceNormal.y, face.normal.z - sourceNormal.z) <= 1e-5);
     if (matchingFaces.length !== 1) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+    const matchedFace = matchingFaces[0]!;
+    const faceSegmentMatch = useSegmentLineage
+      ? segmentMatch
+      : undefined;
     const faceDraft = original.faceDraft;
     treatmentSource = {
       ...shapeWithCadResult(treatmentSource, await applySketchFaceDraft(treatmentSource, {
         ...faceDraft,
-        sourceFaceId: matchingFaces[0]!.id,
+        sourceFaceId: matchedFace.id,
       })),
-      faceDraft,
+      faceDraft: useSegmentLineage
+        ? { ...faceDraft, sourceFaceId: matchedFace.id, sourceFaceNormal: sourceNormal }
+        : faceDraft,
+      ...(useSegmentLineage ? { faceDraftSourceFaceIds: treatmentSource.faceIds } : {}),
+      ...(faceSegmentMatch ? { faceDraftSourceSegmentId: faceSegmentMatch.segmentId } : {}),
       faceDraftSourceFrame: original.faceDraftSourceFrame ?? treatmentSource.cadBrepFrame,
     };
   }

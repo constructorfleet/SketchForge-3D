@@ -76,10 +76,14 @@ These are implemented and should not be filed as missing features:
   sketch sweep, or plain single-region full-turn sketch revolve. Revolves use
   `GET /faces?topology=exact` so analytic face selection does not change the
   default tessellated listing or its compatibility indexes. It stores the
-  selected source face ID, signed pull axis, angle, unique planar-normal
-  matching evidence, original source frame, and resized revolve scale. Source edits replay that draft
-  only when exactly one planar face matches; missing or ambiguous matches and
-  failed dependent booleans roll back atomically. Partial-turn, helical, and
+  selected source face ID, signed pull axis, angle, and matching evidence. For
+  a straight-line, single-region, no-hole extrusion side face, `.skf` also
+  persists its exact sketch segment ID and profile edits replay against that
+  segment even when its normal changes. Missing, removed, or ambiguous segment
+  matches fail atomically. Caps and other extrusion profiles, sweeps, and
+  revolves continue to use a unique saved planar-normal match; missing or
+  ambiguous matches and failed dependent booleans roll back atomically.
+  Original source frames and resized revolve scales are retained. Partial-turn, helical, and
   multi-region revolve drafts are refused. A draft on an extrusion nested in
   a retained boolean group survives `.skf` round trip and replays after a
   source-profile edit while preserving the group ID and committing one atomic
@@ -190,10 +194,14 @@ Invalid profiles or failed dependent booleans leave the project unchanged.
 Draft prism angles on sketch extrusions now participate in this bounded path:
 their persisted source angle, source height, and source frame are reapplied
 when the source profile changes, and the angle itself can be changed by source
-ID. A single retained face draft on a sketch extrusion, single-solid sketch
-sweep, or plain single-region full-turn sketch revolve now recomputes when its
-selected planar face has exactly one normal match; missing or ambiguous matches
-fail atomically. `GET /faces?topology=exact` lists analytic B-rep revolve faces;
+ID. A single retained face draft on a straight-line, single-region, no-hole
+sketch extrusion side face now follows its sketch segment across profile edits,
+including edits that change the face normal. Missing or ambiguous segment
+matches fail atomically. If a tracked extrusion profile becomes unsupported,
+replay fails closed; metadata-free legacy drafts can still use unique-normal
+matching. Extrusion cap faces and other unsupported extrusion profiles,
+single-solid sketch sweeps, and plain single-region full-turn sketch revolves
+still replay only when exactly one planar face matches the saved normal. `GET /faces?topology=exact` lists analytic B-rep revolve faces;
 the default face listing remains mesh-based. Other downstream feature nodes and
 multi-step sequences beyond these bounded replays do not yet participate in a
 general dependency graph. A dependency-ordered graph with consistent failure
@@ -207,9 +215,11 @@ only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
 kernel. The editor's general face-draft results remain baked. The engine/API
 retains one editable face draft on a sketch extrusion, single-solid sketch
-sweep, or plain single-region full-turn sketch revolve, replaying it after a
-source edit only when exactly one planar face matches the stored local normal;
-it refuses missing or ambiguous matches. One symmetric 45° all-edge chamfer
+sweep, or plain single-region full-turn sketch revolve. Eligible straight-line,
+single-region, no-hole sketch extrusion side faces replay by exact source
+segment identity, including when the normal changes; other supported faces
+still replay only when exactly one planar face matches the stored local normal.
+Missing or ambiguous matches fail atomically. One symmetric 45° all-edge chamfer
 or one all-edge fillet may follow a face draft only on a plain single-region
 full-turn sketch revolve; profile or setting edits replay the revolve, face
 draft, then treatment atomically and refresh treatment history and eligible-edge
@@ -309,6 +319,7 @@ placement remain open.
 ## Verification baseline
 
 Focused coverage includes retained face-draft creation, `.skf` round trip,
+segment-lineage replay and rollback (`tests/unit/faceDraftSegmentLineage.test.ts`),
 source-profile replay, missing-match rollback, and dependent-boolean rollback
 (`tests/unit/engineParametricRecompute.test.ts`,
 `tests/unit/faceDraftFilletGroupRecompute.test.ts`,

@@ -103,16 +103,18 @@ describe("fillet after a retained face draft on a sketch extrusion", () => {
     expect(replayed.sketchSourceId).toBe(sourceId);
     expect(replayed.sketchProfile).toEqual(editedProfile);
     expect(replayed.cadBrep).not.toBe(treated.cadBrep);
-    expect(replayed.faceDraft).toMatchObject(draft);
+    expect(replayed.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: draft.pullDirection });
+    expect(replayed.faceDraft?.sourceFaceId).not.toBe(draft.sourceFaceId);
+    expect(replayed.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
     expect(replayed.edgeTreatments).toHaveLength(1);
     expect(replayed.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.1, allEdges: true });
     expect(replayed.edgeTreatmentHistory).toHaveLength(1);
-    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject(draft);
+    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: draft.pullDirection });
+    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft?.sourceFaceId).toBe(replayed.faceDraft?.sourceFaceId);
     expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
     expect(replayed.edgeTreatmentHistory?.[0]?.before.cadBrep).not.toBe(replayed.cadBrep);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
 
-    const beforeFailedReplay = value(await engine.project("recompute"));
     const writesBeforeFailedReplay = writeCount();
     const rotatedProfile = {
       ...editedProfile,
@@ -124,10 +126,12 @@ describe("fillet after a retained face draft on a sketch extrusion", () => {
     };
     const failedReplay = await engine.changeShape("recompute", sourceId, { sketchProfile: rotatedProfile });
 
-    expect(failedReplay.ok).toBe(false);
-    expect(failedReplay.ok ? undefined : failedReplay.failure.reason).toBe("sweep_failed");
-    expect(writeCount()).toBe(writesBeforeFailedReplay);
-    expect(value(await engine.project("recompute"))).toEqual(beforeFailedReplay);
+    expect(failedReplay.ok, JSON.stringify(failedReplay)).toBe(true);
+    const replayedAfterRotation = value(failedReplay).shape;
+    expect(replayedAfterRotation.sketchProfile).toEqual(rotatedProfile);
+    expect(replayedAfterRotation.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
+    expect(replayedAfterRotation.faceDraft?.sourceFaceId).not.toBe(replayed.faceDraft?.sourceFaceId);
+    expect(writeCount()).toBe(writesBeforeFailedReplay + 1);
   }, CAD_TEST_TIMEOUT_MS);
 });
 
@@ -199,17 +203,19 @@ describe("chamfer after a retained face draft on a sketch extrusion", () => {
     expect(changed.ok, JSON.stringify(changed)).toBe(true);
     const replayed = value(changed).shape;
     expect(replayed.sketchProfile).toEqual(editedProfile);
-    expect(replayed.faceDraft).toMatchObject(draft);
+    expect(replayed.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: draft.pullDirection });
+    expect(replayed.faceDraft?.sourceFaceId).not.toBe(draft.sourceFaceId);
+    expect(replayed.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
     expect(replayed.edgeTreatments).toHaveLength(1);
     expect(replayed.edgeTreatments?.[0]).toMatchObject({
       kind: "chamfer", amount: 0.1, chamferAngle: 45, allEdges: true,
     });
     expect(replayed.edgeTreatmentHistory).toHaveLength(1);
-    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject(draft);
+    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: draft.pullDirection });
+    expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft?.sourceFaceId).toBe(replayed.faceDraft?.sourceFaceId);
     expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
 
-    const beforeFailedReplay = value(await engine.project("recompute"));
     const writesBeforeFailedReplay = writeCount();
     const rotatedProfile = {
       ...editedProfile,
@@ -220,10 +226,12 @@ describe("chamfer after a retained face draft on a sketch extrusion", () => {
       })),
     };
     const failedReplay = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: rotatedProfile });
-    expect(failedReplay.ok).toBe(false);
-    expect(failedReplay.ok ? undefined : failedReplay.failure.reason).toBe("sweep_failed");
-    expect(writeCount()).toBe(writesBeforeFailedReplay);
-    expect(value(await engine.project("recompute"))).toEqual(beforeFailedReplay);
+    expect(failedReplay.ok, JSON.stringify(failedReplay)).toBe(true);
+    const replayedAfterRotation = value(failedReplay).shape;
+    expect(replayedAfterRotation.sketchProfile).toEqual(rotatedProfile);
+    expect(replayedAfterRotation.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
+    expect(replayedAfterRotation.faceDraft?.sourceFaceId).not.toBe(replayed.faceDraft?.sourceFaceId);
+    expect(writeCount()).toBe(writesBeforeFailedReplay + 1);
   }, CAD_TEST_TIMEOUT_MS);
 });
 
@@ -326,18 +334,20 @@ describe("editing angle and pull axis of a retained face draft on a sketch extru
       expect(replayed.id).toBe(original.id);
       expect(replayed.sketchSourceId).toBe(original.sketchSourceId);
       expect(replayed.sketchProfile).toEqual(editedProfile);
-      expect(replayed.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-y" });
+      expect(replayed.faceDraft).toMatchObject({ angle: 8, pullDirection: "-y" });
+      expect(replayed.faceDraft?.sourceFaceId).not.toBe(draft.sourceFaceId);
+      expect(replayed.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
       expect(replayed.edgeTreatments).toHaveLength(1);
       expect(replayed.edgeTreatments?.[0]).toMatchObject({
         kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
       });
       expect(replayed.edgeTreatmentHistory).toHaveLength(1);
-      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, angle: 8, pullDirection: "-y" });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ angle: 8, pullDirection: "-y" });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft?.sourceFaceId).toBe(replayed.faceDraft?.sourceFaceId);
       expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
       expect(replayed.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(replayed.edgeTreatments?.[0]?.edgeCount);
       expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
 
-      const beforeFailedReplay = value(await engine.project("recompute"));
       const writesBeforeFailedReplay = writeCount();
       const rotatedProfile = {
         ...editedProfile,
@@ -348,10 +358,12 @@ describe("editing angle and pull axis of a retained face draft on a sketch extru
         })),
       };
       const failedReplay = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: rotatedProfile });
-      expect(failedReplay.ok).toBe(false);
-      expect(failedReplay.ok ? undefined : failedReplay.failure.reason).toBe("sweep_failed");
-      expect(writeCount()).toBe(writesBeforeFailedReplay);
-      expect(value(await engine.project("recompute"))).toEqual(beforeFailedReplay);
+      expect(failedReplay.ok, JSON.stringify(failedReplay)).toBe(true);
+      const replayedAfterRotation = value(failedReplay).shape;
+      expect(replayedAfterRotation.sketchProfile).toEqual(rotatedProfile);
+      expect(replayedAfterRotation.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
+      expect(replayedAfterRotation.faceDraft?.sourceFaceId).not.toBe(replayed.faceDraft?.sourceFaceId);
+      expect(writeCount()).toBe(writesBeforeFailedReplay + 1);
     },
     CAD_TEST_TIMEOUT_MS,
   );
@@ -645,18 +657,20 @@ describe("editing the pull axis of a retained face draft on a sketch extrusion",
       expect(replayed.id).toBe(original.id);
       expect(replayed.sketchSourceId).toBe(original.sketchSourceId);
       expect(replayed.sketchProfile).toEqual(editedProfile);
-      expect(replayed.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(replayed.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: "-y" });
+      expect(replayed.faceDraft?.sourceFaceId).not.toBe(draft.sourceFaceId);
+      expect(replayed.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
       expect(replayed.edgeTreatments).toHaveLength(1);
       expect(replayed.edgeTreatments?.[0]).toMatchObject({
         kind, amount: 0.1, allEdges: true, ...(kind === "chamfer" ? { chamferAngle: 45 } : {}),
       });
       expect(replayed.edgeTreatmentHistory).toHaveLength(1);
-      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ ...draft, pullDirection: "-y" });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft).toMatchObject({ angle: draft.angle, pullDirection: "-y" });
+      expect(replayed.edgeTreatmentHistory?.[0]?.before.faceDraft?.sourceFaceId).toBe(replayed.faceDraft?.sourceFaceId);
       expect(replayed.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(editedProfile);
       expect(replayed.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(replayed.edgeTreatments?.[0]?.edgeCount);
       expect(writeCount()).toBe(writesBeforeProfileEdit + 1);
 
-      const beforeFailedReplay = value(await engine.project("recompute"));
       const writesBeforeFailedReplay = writeCount();
       const rotatedProfile = {
         ...editedProfile,
@@ -667,10 +681,12 @@ describe("editing the pull axis of a retained face draft on a sketch extrusion",
         })),
       };
       const failedReplay = await engine.changeShape("recompute", original.sketchSourceId!, { sketchProfile: rotatedProfile });
-      expect(failedReplay.ok).toBe(false);
-      expect(failedReplay.ok ? undefined : failedReplay.failure.reason).toBe("sweep_failed");
-      expect(writeCount()).toBe(writesBeforeFailedReplay);
-      expect(value(await engine.project("recompute"))).toEqual(beforeFailedReplay);
+      expect(failedReplay.ok, JSON.stringify(failedReplay)).toBe(true);
+      const replayedAfterRotation = value(failedReplay).shape;
+      expect(replayedAfterRotation.sketchProfile).toEqual(rotatedProfile);
+      expect(replayedAfterRotation.faceDraftSourceSegmentId).toBe(treated.faceDraftSourceSegmentId);
+      expect(replayedAfterRotation.faceDraft?.sourceFaceId).not.toBe(replayed.faceDraft?.sourceFaceId);
+      expect(writeCount()).toBe(writesBeforeFailedReplay + 1);
     },
     CAD_TEST_TIMEOUT_MS,
   );
