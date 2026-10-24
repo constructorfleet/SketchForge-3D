@@ -21,10 +21,12 @@ import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettings
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/engine/cadBakeMetadata";
+import { FACE_HIGHLIGHT_COLOR } from "@/lib/shapeFaces";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
-import { createFaceColorPreviewGeometry, createFaceHighlightGeometry } from "@/lib/faceColorPreview";
+import { createFaceColorPreviewGeometry, createFaceHighlightGeometry, faceAtTriangle } from "@/lib/faceColorPreview";
+import { FACE_PICK_CLICK_TOLERANCE_PX, isFacePickClick } from "@/lib/facePicking";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { resolveShapeAppearance } from "@/lib/shapeAppearance";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
@@ -302,9 +304,22 @@ type ShapeRenderRecord = {
   selected: boolean;
 };
 
+type FaceHighlight = { shapeId: string; faceIndex: number };
+
+/** A face of the picking shape under the pointer, and the mesh it was hit on. */
+type FaceHit = FaceHighlight & { surface: THREE.Mesh };
+
+/**
+ * The face under the pointer, outlined as a 3px line over the shape's surface.
+ * It is a child of that surface, so it moves with it, and the shape's own
+ * geometry and colours are never touched: hovering rebuilds nothing.
+ */
+type FaceHover = FaceHit & { overlay: LineSegments2; cameraMatrix: THREE.Matrix4; cameraProjection: THREE.Matrix4 };
+
 type ThreeState = {
-  /** The face the inspector's face tools are pointing at; outlined in the viewport only. */
-  faceHighlight?: { shapeId: string; faceIndex: number } | null;
+  /** Face being edited stays outlined; faceHover is the transient viewport pointer cue. */
+  faceHighlight?: FaceHighlight | null;
+  faceHover?: FaceHover | null;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -2559,6 +2574,14 @@ export function WorkplaneViewport({
     [],
   );
 
+  // The shape whose faces can be picked in the view: set while its Faces panel is open.
+  const facePickingRef = useRef<string | null>(null);
+  const facePickRef = useRef<{ pointerId: number; clientX: number; clientY: number; face: FaceHighlight } | null>(null);
+  const faceHoverPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const faceHoverFrameRef = useRef<number | null>(null);
+  const [pickedFace, setPickedFace] = useState<(FaceHighlight & { serial: number }) | null>(null);
+
+  // The Faces panel's persistent edit outline; viewport hover remains transient.
   const highlightFace = useCallback((faceIndex: number | null) => {
     const shapeId = selectedIdsRef.current.length === 1 ? selectedIdsRef.current[0] : undefined;
     const next = shapeId && faceIndex !== null ? { shapeId, faceIndex } : null;
@@ -2578,6 +2601,82 @@ export function WorkplaneViewport({
     );
     state.needsRender = true;
   }, [renderSelectionIds]);
+
+  const stopFaceHover = useCallback(() => {
+    if (faceHoverFrameRef.current !== null) window.cancelAnimationFrame(faceHoverFrameRef.current);
+    faceHoverFrameRef.current = null;
+    faceHoverPointRef.current = null;
+    clearFaceHover(threeRef.current);
+  }, []);
+
+  // The panel names its own shape: it mounts before this component's selection
+  // effect updates selectedIdsRef, so that ref can still hold the old selection.
+  const setFacePicking = useCallback((shapeId: string | null) => {
+    facePickingRef.current = shapeId;
+    if (!shapeId) facePickRef.current = null;
+    if (threeRef.current?.faceHover?.shapeId !== shapeId) stopFaceHover();
+  }, [stopFaceHover]);
+
+  /**
+   * The exact face of the picking shape under the pointer. Only that shape is
+   * raycast; null while a mode that owns the pointer (workplane, ruler, edge
+   * modifier, align) is on.
+   */
+  const pickFace = useCallback((clientX: number, clientY: number): FaceHit | null => {
+    const state = threeRef.current;
+    const shapeId = facePickingRef.current;
+    if (!state || !shapeId || selectedIdsRef.current.length !== 1 || selectedIdsRef.current[0] !== shapeId) return null;
+    if (workplaneModeRef.current || modifierActiveRef.current || rulerModeRef.current || rulerDeleteModeRef.current || rulerMoveModeRef.current || alignModeRef.current) return null;
+    const shape = shapesRef.current.find((entry) => entry.id === shapeId);
+    const mesh = shape?.importedMesh;
+    const object = findShapeObject(state, shapeId);
+    if (!shape || shape.hidden || !mesh?.faceGroups?.length || !object) return null;
+    const rect = state.renderer.domElement.getBoundingClientRect();
+    state.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    state.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    state.raycaster.setFromCamera(state.pointer, state.camera);
+    state.raycaster.layers.set(RENDER_LAYER_SHAPES);
+    const hit = state.raycaster
+      .intersectObject(object, true)
+      .find((entry) => entry.object instanceof THREE.Mesh && entry.object.userData.shapeSurface && entry.face);
+    if (!hit?.face) return null;
+    // An exact shape's mesh is unindexed, so vertex 3n starts triangle n. The
+    // picking BVH may add a reordered index, which makes hit.faceIndex unreliable
+    // but leaves the vertex indices alone.
+    const faceIndex = faceAtTriangle(mesh.faceGroups, Math.floor(mesh.positions.length / 9), Math.floor(hit.face.a / 3));
+    return faceIndex === null ? null : { shapeId, faceIndex, surface: hit.object as THREE.Mesh };
+  }, []);
+
+  const updateFaceHover = useCallback((clientX: number, clientY: number) => {
+    const state = threeRef.current;
+    if (!state) return;
+    if (dragRef.current || marqueeRef.current || transformRef.current) {
+      clearFaceHover(state);
+      return;
+    }
+    const hit = pickFace(clientX, clientY);
+    const groups = hit ? shapesRef.current.find((entry) => entry.id === hit.shapeId)?.importedMesh?.faceGroups : undefined;
+    if (!hit || !groups) clearFaceHover(state);
+    else showFaceHover(state, hit, groups);
+  }, [pickFace]);
+
+  // At most one hover pick per frame, however fast pointer events arrive.
+  const scheduleFaceHover = useCallback((clientX: number, clientY: number) => {
+    if (!facePickingRef.current && !threeRef.current?.faceHover) return;
+    faceHoverPointRef.current = { clientX, clientY };
+    if (faceHoverFrameRef.current !== null) return;
+    faceHoverFrameRef.current = window.requestAnimationFrame(() => {
+      faceHoverFrameRef.current = null;
+      const point = faceHoverPointRef.current;
+      if (point) updateFaceHover(point.clientX, point.clientY);
+    });
+  }, [updateFaceHover]);
+
+  // A mode that owns the pointer takes the hover highlight away with it.
+  useEffect(() => {
+    if (workplaneMode || modifierActive || rulerMode || rulerDeleteMode || rulerMoveMode || alignMode) stopFaceHover();
+  }, [alignMode, modifierActive, rulerDeleteMode, rulerMode, rulerMoveMode, stopFaceHover, workplaneMode]);
+  useEffect(() => stopFaceHover, [stopFaceHover]);
 
   useEffect(() => {
     modifierEdgesRef.current = modifierEdges;
@@ -3124,6 +3223,11 @@ export function WorkplaneViewport({
       // can read the previous matrix unless we force the matrix world current here.
       // Removing this brings back the one-frame-late handle/line lag during camera motion.
       state.camera.updateMatrixWorld();
+      // The face under a still pointer changes when the camera moves.
+      const hover = state.faceHover;
+      if (hover && (!hover.cameraMatrix.equals(state.camera.matrixWorld) || !hover.cameraProjection.equals(state.camera.projectionMatrix))) {
+        clearFaceHover(state);
+      }
       const currentCameraView = captureCameraView(state.camera, state.controls.target);
       if (JSON.stringify(currentCameraView) !== JSON.stringify(lastPersistedCameraViewRef.current)) {
         latestCameraViewRef.current = currentCameraView;
@@ -4593,6 +4697,13 @@ export function WorkplaneViewport({
 
       const id = pickShape(event.clientX, event.clientY);
       const additive = event.shiftKey;
+      // A click (not a drag) on a face of the shape whose Faces panel is open
+      // chooses that face; the drag below still starts as usual. The shape the
+      // click selects must be that shape, so a shape in front of it wins.
+      const face = !additive && id && id === facePickingRef.current ? pickFace(event.clientX, event.clientY) : null;
+      facePickRef.current = face
+        ? { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, face: { shapeId: face.shapeId, faceIndex: face.faceIndex } }
+        : null;
       if (!id) {
         const startX = event.clientX - rect.left;
         const startY = event.clientY - rect.top;
@@ -4716,6 +4827,7 @@ export function WorkplaneViewport({
       onWorkplaneModeChange,
       pickPlacementSurface,
       pickModifierEdge,
+      pickFace,
       pickShape,
       pickTransformHandle,
       resolveRulerCandidate,
@@ -4796,6 +4908,12 @@ export function WorkplaneViewport({
         }
       }
 
+      const pendingPick = facePickRef.current;
+      if (pendingPick && Math.hypot(event.clientX - pendingPick.clientX, event.clientY - pendingPick.clientY) > FACE_PICK_CLICK_TOLERANCE_PX) {
+        facePickRef.current = null;
+      }
+      scheduleFaceHover(event.clientX, event.clientY);
+
       const marquee = marqueeRef.current;
       if (marquee) {
         const state = threeRef.current;
@@ -4864,10 +4982,11 @@ export function WorkplaneViewport({
         threeRef.current.needsRender = true;
       }
     },
-    [pickPlacementSurface, pickTransformHandle, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, updateModifierEdgeHover, updateRulerHover, updateTransform],
+    [pickPlacementSurface, pickTransformHandle, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, scheduleFaceHover, updateModifierEdgeHover, updateRulerHover, updateTransform],
   );
 
   const handlePointerLeave = useCallback(() => {
+    stopFaceHover();
     if (workplaneModeRef.current) {
       syncWorkplaneHoverPreview(threeRef.current, null, workspaceRef.current, resolvedThemeRef.current);
     }
@@ -4878,10 +4997,20 @@ export function WorkplaneViewport({
         threeRef.current.needsRender = true;
       }
     }
-  }, [clearModifierEdgeHover]);
+  }, [clearModifierEdgeHover, stopFaceHover]);
 
   const finishDrag = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      const pick = facePickRef.current;
+      facePickRef.current = null;
+      const pressDrag = dragRef.current;
+      const pressMovedShapes = Boolean(pressDrag?.items.some((item) => {
+        const shape = shapesRef.current.find((entry) => entry.id === item.id);
+        return shape && (shape.x !== item.nextX || shape.z !== item.nextZ || (shape.elevation ?? 0) !== item.nextElevation);
+      }));
+      if (pick && isFacePickClick(pick, event, pressMovedShapes)) {
+        setPickedFace((previous) => ({ ...pick.face, serial: (previous?.serial ?? 0) + 1 }));
+      }
       const state = threeRef.current;
       const transform = transformRef.current;
       if (transform) {
@@ -5676,6 +5805,8 @@ export function WorkplaneViewport({
             onApplyDraftFace={onApplyDraftFace}
             onEnableFaceEditing={onEnableFaceEditing}
             onHighlightFace={highlightFace}
+            onFacePickingChange={setFacePicking}
+            pickedFace={pickedFace}
             canSeparateParts={canSeparateParts}
             onSeparateParts={onSeparateParts}
             volumeMm3={selectedShapeVolumeMm3}
@@ -6722,6 +6853,69 @@ function syncShapeObjectAppearance(object: THREE.Group, shape: WorkplaneShape, s
   });
   setObjectRenderLayer(object, RENDER_LAYER_SHAPES);
   freezeStaticObjectMatrices(object);
+}
+
+/** Take the hover highlight off the view; true when there was one. */
+function clearFaceHover(state: ThreeState | null) {
+  const hover = state?.faceHover;
+  if (!state || !hover) return false;
+  hover.overlay.removeFromParent();
+  hover.overlay.geometry.dispose();
+  (hover.overlay.material as THREE.Material).dispose();
+  state.faceHover = null;
+  state.needsRender = true;
+  return true;
+}
+
+/** Draw only the hovered face's 3px boundary, unless that face is already outlined there. */
+function showFaceHover(state: ThreeState, hit: FaceHit, faceGroups: readonly number[]) {
+  const current = state.faceHover;
+  if (current && current.surface === hit.surface && current.faceIndex === hit.faceIndex && current.overlay.parent === hit.surface) return;
+  clearFaceHover(state);
+  const position = hit.surface.geometry.getAttribute("position");
+  const normal = hit.surface.geometry.getAttribute("normal");
+  const boundary = createFaceHighlightGeometry({
+    positions: position.array,
+    normals: normal?.array,
+    faceGroups,
+  }, hit.faceIndex);
+  const boundaryPositions = boundary.getAttribute("position");
+  if (!boundaryPositions?.count) {
+    boundary.dispose();
+    return;
+  }
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions(Array.from(boundaryPositions.array));
+  boundary.dispose();
+  const viewport = state.renderer.domElement.getBoundingClientRect();
+  const material = new LineMaterial({
+    color: FACE_HIGHLIGHT_COLOR,
+    linewidth: 3,
+    worldUnits: false,
+    depthTest: true,
+    depthWrite: false,
+    alphaToCoverage: false,
+  });
+  material.toneMapped = false;
+  material.resolution.set(Math.max(1, viewport.width), Math.max(1, viewport.height));
+  const overlay = new LineSegments2(geometry, material);
+  overlay.name = "face-hover-highlight";
+  overlay.userData.shapeId = hit.shapeId;
+  overlay.userData.faceHoverHighlight = true;
+  overlay.raycast = () => undefined;
+  overlay.layers.mask = hit.surface.layers.mask;
+  overlay.matrixAutoUpdate = false;
+  overlay.renderOrder = 1004;
+  overlay.frustumCulled = false;
+  hit.surface.add(overlay);
+  overlay.updateMatrixWorld(true);
+  state.faceHover = {
+    ...hit,
+    overlay,
+    cameraMatrix: state.camera.matrixWorld.clone(),
+    cameraProjection: state.camera.projectionMatrix.clone(),
+  };
+  state.needsRender = true;
 }
 
 function rebuildShapes(

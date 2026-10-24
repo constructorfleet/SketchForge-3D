@@ -5938,6 +5938,14 @@ button {
   line-height: 1.45;
 }
 
+.face-id {
+  margin: -8px 0 0;
+  color: #586a7d;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+
 .face-picker {
   display: grid;
   grid-template-columns: 92px auto minmax(0, 1fr);
@@ -8465,6 +8473,7 @@ html[data-theme="dark"] .color-value {
 }
 
 html[data-theme="dark"] .face-tools-note,
+html[data-theme="dark"] .face-id,
 html[data-theme="dark"] .face-picker,
 html[data-theme="dark"] .face-count {
   color: #afc3d0;

@@ -112,6 +112,8 @@ export function ShapeInspector({
   onApplyDraftFace,
   onEnableFaceEditing,
   onHighlightFace,
+  onFacePickingChange,
+  pickedFace,
   canSeparateParts = false,
   onSeparateParts,
   onInteractionActiveChange,
@@ -132,6 +134,8 @@ export function ShapeInspector({
   onEnableFaceEditing?: () => Promise<void> | void;
   /** The face the face tools point at, or null; the viewport highlights it. */
   onHighlightFace?: (faceIndex: number | null) => void;
+  onFacePickingChange?: (shapeId: string | null) => void;
+  pickedFace?: { shapeId: string; faceIndex: number; serial: number } | null;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   onInteractionActiveChange?: (active: boolean) => void;
@@ -348,6 +352,8 @@ export function ShapeInspector({
           onEnableFaceEditing={onEnableFaceEditing}
           onApplyDraftFace={onApplyDraftFace}
           onHighlightFace={onHighlightFace}
+          onFacePickingChange={onFacePickingChange}
+          pickedFace={pickedFace}
         />
       ) : null}
 

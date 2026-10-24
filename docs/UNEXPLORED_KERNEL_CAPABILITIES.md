@@ -59,7 +59,10 @@ These are implemented and should not be filed as missing features:
   by `sketchSourceId`; source profile edits reapply the draft and recompute
   retained boolean ancestors atomically.
 - Face-based drafting is available in the shape inspector for exact B-rep
-  solids, with a selector for all six signed local CAD pull axes. The engine
+  solids, with a selector for all six signed local CAD pull axes. In the
+  editor the face for a draft or colour is picked by hovering and clicking it
+  in the viewport, which maps the hit triangle through the mesh's B-rep face
+  groups; the Faces panel's numbered stepper remains the keyboard fallback. The engine
   canonicalizes the selected direction before invoking the kernel and maps the
   result back to the original orientation. Measured support is geometry-
   specific: on the unrotated editor-plane extrusion, faces 0, 2, 4, and 5 are
