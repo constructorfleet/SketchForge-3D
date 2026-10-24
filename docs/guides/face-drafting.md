@@ -70,9 +70,48 @@ Face drafting tapers the chosen face, as if the part were pulled out of a mold
 in the chosen **Direction**. Choose the direction and a non-zero **Draft angle**
 strictly between -45° and 45°, then **Apply draft**. Combinations that would
 not give a valid solid are refused with a message, and the shape is left as it
-was. A successful result is baked geometry: it replaces the source shape,
-receives new face IDs, and does not keep face colours or edge-treatment
-metadata.
+was.
+
+### Drafts kept with the sketch
+
+On a sketch extrusion the draft is kept with the sketch, and the status says
+so. A **Face draft** card appears under the **Faces** panel, naming the face it
+acts on and showing its **Direction** and **Draft angle**. Change either and
+choose **Update draft** to redraft it. Reopening the sketch with **Edit sketch**
+and changing the profile replays the draft on the new outline, finding the face
+again by the side of the profile it was extruded from. If the draft cannot be
+rebuilt on the new profile, or the shape has been mirrored, resized, filleted
+or chamfered since it was drafted, the sketch is not updated and stays open, so
+the change can be undone or the edit cancelled. Undo steps back through each
+change and then removes the draft. A shape keeps one draft: a second face
+draft, or a prism draft on a face-drafted shape, is refused rather than baked
+over the first. The draft is saved in `.skf` projects and is
+the same feature the REST API's `PATCH /shapes` `faceDraft` writes, so a script
+can change it too.
+
+The **Draft prism** card works the same way. Once applied, it shows the angle
+the shape keeps and offers **Update draft**, and editing the sketch replays it.
+
+A draft is kept only on a single-loop sketch extrusion that is exact, has no
+fillet, chamfer or shell, is not mirrored and has not been resized, and only on
+a flat face that maps to one side of the profile or to its top or bottom.
+
+The part is placed as the REST API places it. A new draft, or a change of
+angle or direction, keeps the shape's position: the centre of the drafted
+part's bounds sits where the undrafted part's centre was, so a draft that
+grows the bounds on one side moves the unchanged faces by half that growth. A
+sketch edit moves the shape by however far the centre of the sketch's bounds
+moved. This differs from a plain sketch extrusion, whose sketch edits keep its
+centre where it was.
+
+![A face draft kept with its sketch extrusion, with its direction and angle editable in the Face draft card.](../screenshots/face-draft-retained.png)
+
+### Baked drafts
+
+On any other shape, such as a box made exact with **Enable face editing**, a
+sweep, a revolve or a filleted part, the result is baked geometry. It replaces
+the source shape, receives new face IDs, and does not keep face colours or
+edge-treatment metadata. Nothing replays it when the shape changes.
 
 The pull direction is ±X, ±Y (up and down), or ±Z in the solid's own frame.
 Choosing the opposite direction can expose draft cases on the other side of a
@@ -97,20 +136,29 @@ faces 1, 3, 4, and 5 at ±5° along +Z. These are narrow acceptance samples, not
 faces, dimensions, solids, axes, or angles. For example, face 1 at -5° is
 rejected along +X and +Y on the unrotated extrusion fixture.
 
-Automated kernel coverage lives in `tests/e2e/draftFaceEditor.e2e.ts`. Two
-browser acceptance flows cover the editor. `tests/browser/face-drafting.test.mjs`
-creates the default rectangular sketch extrusion, chooses face 2, the +Z pull
-direction and a -5° angle, and applies the draft from the **Faces** panel.
+Automated kernel coverage lives in `tests/e2e/draftFaceEditor.e2e.ts`, and
+`tests/unit/editorRetainedDrafts.test.ts` checks that the editor's kept draft,
+its angle edit and its replay through a profile edit each have the REST record
+and are the same solid as the REST result, by volume and by centre of mass in
+the world, at an outward angle where the bounds change. Browser acceptance flows cover the editor.
+`tests/browser/face-drafting.test.mjs` drafts face 2 of a box made exact and
+checks the result is baked. It then creates the default rectangular sketch
+extrusion, drafts face 2 along +Z at -5°, checks a second draft is refused,
+changes the kept draft in the **Face draft** card, undoes and redoes it, saves
+the project as `.skf`, opens it again, drags a corner of the sketch and checks
+the draft is replayed. A third flow applies, keeps and replays a prism draft on
+an edited profile. Each step checks the inspector's size and position readouts,
+not only the card's fields.
 `tests/browser/face-tools.test.mjs` adds a plain box, enables face editing,
 checks the chosen face is highlighted, picks it again by hovering and clicking
 it in the view, colours it, and drafts it. It then picks a drafted face, checks
 the shown face ID against `GET /faces` for the project the editor saved on the
 server, checks a camera move clears the hover highlight, and picks again after
-the shape is deselected and reselected. Both wait for
+the shape is deselected and reselected. Each waits for
 the editor's success status before capturing the result.
 
 ![A supported face draft applied from the editor inspector.](../screenshots/face-draft-browser.png)
 
+![The kept face draft after the sketch was saved, reopened and edited.](../screenshots/face-draft-retained-replayed.png)
+
 Run the acceptance flow after building the app with `npm run test:browser`.
-The inspector operation is local to the editor; it does not create a
-rebuildable feature-history node or a REST/client operation.

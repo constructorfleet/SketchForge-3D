@@ -64,6 +64,12 @@ test("face drafting guide links a supported editor workflow to browser acceptanc
   assert.match(browserTestText, /Apply draft/);
   assert.match(browserTestText, /Face drafted\./);
   assert.match(browserTestText, /face-draft-browser\.png/);
+  // The kept draft (#384) is documented with the browser flow that proves it.
+  assert.match(guideText, /Face draft/);
+  assert.match(guideText, /face-draft-retained\.png/);
+  assert.match(browserTestText, /region", \{ name: "Face draft" \}/);
+  assert.match(browserTestText, /Save SketchForge Project/);
+  assert.match(browserTestText, /face-draft-retained\.png/);
 });
 
 test("the perpendicular constraint workflow has browser acceptance and screenshot evidence", async () => {

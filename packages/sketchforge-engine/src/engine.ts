@@ -23,13 +23,15 @@ import {
   applySketchFaceDraft,
   exactPlainSketchRevolveResult,
   isPlainFullTurnSketchRevolve,
+  orientedSolidForShape,
   shapeEdges,
   shapeWithCadResult,
   ServerCadError,
   type ServerCadEdge,
   type ServerCadTreatment,
 } from "./serverCadOperations.js";
-import { draftFaceForSketchSegment, legacyDraftSegmentForShape, sketchSegmentForDraftFace } from "./faceDraftSegmentLineage.js";
+import { resolveRetainedFaceDraft, retainedFaceDraftFields, retainedPrismDraftFields } from "./sketchFaceDraftKernel.js";
+import { withCadKernel } from "./serverCadKernel.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import {
   applyShell,
@@ -1028,66 +1030,26 @@ export function createEngine(store: ProjectStore): Engine {
           if (requestedFaceDraft && replayedSource.faceDraft) {
             swept = replayedSource;
           } else if (requestedFaceDraft) {
-            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
-              ? existing.faceDraft.sourceFaceNormal
-              : undefined;
-            const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(existing, isExactSketchRevolve ? { topology: "exact" } : undefined))
-                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
-            const isReselection = existing.faceDraft !== undefined
-              && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId;
-            const exactReselectedSourceFace = isReselection
-              ? (await shapeFaces(replayedSource)).find((face) => face.id === requestedFaceDraft.sourceFaceId)
-              : undefined;
-            const exactSelectedSourceFace = !replacingSketchProfile && !existing.faceDraft
-              ? (await shapeFaces(replayedSource)).find((face) => face.id === requestedFaceDraft.sourceFaceId)
-              : undefined;
-            const legacySegmentMatch = replacingSketchProfile && existing.faceDraft && !existing.faceDraftSourceSegmentId
-              ? await legacyDraftSegmentForShape(existing)
-              : undefined;
-            if (legacySegmentMatch?.status === "ambiguous") {
-              throw new Error("The saved face draft does not identify one source sketch segment.");
-            }
-            const retainedSourceSegmentId = existing.faceDraftSourceSegmentId
-              ?? (legacySegmentMatch?.status === "matched" ? legacySegmentMatch.segmentId : undefined);
-            const retainedSegmentFace = replacingSketchProfile && retainedSourceSegmentId
-              ? await draftFaceForSketchSegment(replayedSource, retainedSourceSegmentId)
-              : undefined;
-            if (retainedSegmentFace && retainedSegmentFace.status !== "matched") {
-              throw new Error("The selected sketch segment no longer maps to exactly one extrusion side face.");
-            }
-            let currentFaceId = retainedSegmentFace?.status === "matched"
-              ? retainedSegmentFace.faceId
-              : exactReselectedSourceFace?.surfaceType === "plane" ? exactReselectedSourceFace.id
-                : exactSelectedSourceFace?.surfaceType === "plane" ? exactSelectedSourceFace.id : undefined;
-            const sourceFaceNormal = retainedSegmentFace?.status === "matched"
-              ? retainedSegmentFace.normal
-              : exactReselectedSourceFace?.normal ?? exactSelectedSourceFace?.normal ?? priorReference ?? selectedOnPrior?.normal;
-            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
-              throw new Error("The selected source face has no stable planar reference.");
-            }
-            if (!currentFaceId) currentFaceId = (await findUniqueDraftFace(replayedSource, sourceFaceNormal))?.id;
-            if (!currentFaceId) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
-            const segmentMatch = retainedSegmentFace?.status === "matched"
-              ? retainedSegmentFace
-              : await sketchSegmentForDraftFace(replayedSource, currentFaceId);
-            if (segmentMatch.status === "ambiguous") {
-              throw new Error("The selected lateral face matches multiple sketch segments.");
-            }
-            if (segmentMatch.status === "missing") {
-              throw new Error("The selected extrusion side face has no exact sketch-segment boundary match.");
-            }
-            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+            // The resolver the editor's draft, edit and replay call too (#384).
+            const { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch } = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
+              existing,
+              source: replayedSource,
+              request: requestedFaceDraft,
+              profileChanged: replacingSketchProfile,
+            }, (kernel, shape) => orientedSolidForShape(kernel, shape as WorkplaneShape)));
             const result = await applySketchFaceDraft(replayedSource, {
               ...requestedFaceDraft,
               sourceFaceId: currentFaceId,
             });
+            // The same record the editor writes for a draft it makes (#384).
             swept = {
               ...shapeWithCadResult(replayedSource, result),
-              faceDraft: { ...faceDraft, sourceFaceId: currentFaceId },
-              faceDraftSourceFaceIds: replayedSource.faceIds,
-              faceDraftSourceSegmentId: segmentMatch.status === "matched" ? segmentMatch.segmentId : undefined,
-              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
+              ...retainedFaceDraftFields(
+                replayedSource.faceIds,
+                existing,
+                { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch },
+                requestedFaceDraft,
+              ),
             };
           } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
             swept = {
@@ -1674,15 +1636,10 @@ export function createEngine(store: ProjectStore): Engine {
       },
     ),
 
-    draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, "prism-draft", async (shape) => {
-      const sourceFrame = shape.draftPrismSourceFrame ?? shape.cadBrepFrame;
-      return {
-        ...shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })),
-        draftPrismAngle: angle,
-        draftPrismSourceHeight: shape.draftPrismSourceHeight ?? shape.height,
-        ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
-      };
-    }),
+    draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, "prism-draft", async (shape) => ({
+      ...shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })),
+      ...retainedPrismDraftFields(shape, angle),
+    })),
 
     mirrorBaked: (projectId, ids, axis) => mutating(projectId, async (document) => {
       if (ids.length < 1) return failed({ reason: "selection_too_small", needed: 1, given: 0 });

@@ -1,6 +1,7 @@
 import type { LocalizedErrorPayload } from "./i18n/LocalizedError.js";
 import type { WorkplaneShape } from "./../domain/sketchforge.js";
 import type { SketchProfile } from "./../domain/sketchforge.js";
+import type { ResolvedSketchFaceDraftSource, RetainedFaceDraftResolution } from "./../sketchFaceDraftKernel.js";
 
 export type CadModifierKind = "chamfer" | "fillet";
 
@@ -78,6 +79,16 @@ export type CadModifierWorkerRequest =
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "draft-prism"; requestId: number; profile: SketchProfile; height: number; angle: number }
   | { type: "draft-face"; requestId: number; brep: string; faceIds: string[]; faceId: string; angle: number; pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z"; brepTransform?: number[] }
+  /**
+   * Draft one face of an undrafted sketch extrusion and keep it as a feature:
+   * the draft is made in the source's own B-rep frame, and the answer carries
+   * what the retained record needs (#384).
+   */
+  | {
+      type: "retained-face-draft";
+      requestId: number;
+      resolution: RetainedFaceDraftResolution;
+    }
   /** Build the parts as one exact solid, so a primitive gains B-rep faces to colour and draft. */
   | { type: "exact"; requestId: number; parts: CadModifierMeshPart[] }
   | { type: "dispose"; requestId: number };
@@ -129,6 +140,19 @@ export type CadModifierWorkerResponse =
       volume: number;
       brep: string;
       faceGroups?: number[];
+    }
+  | {
+      type: "retained-face-draft";
+      requestId: number;
+      positions: Float32Array;
+      normals: Float32Array;
+      indices: Uint32Array;
+      triangleCount: number;
+      brep: string;
+      faceGroups: number[];
+      sourceFaceIds: string[];
+      resultFaceIds: string[];
+      resolved: Pick<ResolvedSketchFaceDraftSource, "faceId" | "normal" | "segmentMatch">;
     }
   | {
       type: "exact";

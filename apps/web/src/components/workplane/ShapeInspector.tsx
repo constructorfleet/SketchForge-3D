@@ -21,6 +21,8 @@ import { draftPrismControlForShape, draftPrismRequestForShape, isDraftPrismAngle
 import type { DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import { shapeHasExactFaces } from "@/lib/shapeFaces";
 import { ShapeFaceTools } from "@/components/workplane/ShapeFaceTools";
+import { RetainedFaceDraftCard } from "@/components/workplane/RetainedFaceDraftCard";
+import { retainedFaceDraftEditable, retainedPrismDraftAvailable } from "@/lib/retainedDrafts";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
@@ -110,6 +112,7 @@ export function ShapeInspector({
   onEditSketch,
   onApplyDraftPrism,
   onApplyDraftFace,
+  onUpdateRetainedFaceDraft,
   onEnableFaceEditing,
   onHighlightFace,
   onFacePickingChange,
@@ -130,6 +133,8 @@ export function ShapeInspector({
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
+  /** Change the direction or angle of the face draft the shape keeps with its sketch. */
+  onUpdateRetainedFaceDraft?: (angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
   /** Present when the shape can be rebuilt as exact geometry to gain editable faces. */
   onEnableFaceEditing?: () => Promise<void> | void;
   /** The face the face tools point at, or null; the viewport highlights it. */
@@ -175,7 +180,13 @@ export function ShapeInspector({
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(false);
-  const [draftAngle, setDraftAngle] = useState("5");
+  const [draftAngle, setDraftAngle] = useState(String(shape.draftPrismAngle ?? 5));
+  const prismRetained = retainedPrismDraftAvailable(shape);
+  const prismDrafted = prismRetained && shape.draftPrismAngle !== undefined;
+  // An undo, or a change made elsewhere, replaces the angle the shape keeps.
+  useEffect(() => {
+    if (shape.draftPrismAngle !== undefined) setDraftAngle(String(shape.draftPrismAngle));
+  }, [shape.draftPrismAngle]);
   const [drafting, setDrafting] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -357,6 +368,16 @@ export function ShapeInspector({
         />
       ) : null}
 
+      {shape.faceDraft && onUpdateRetainedFaceDraft && retainedFaceDraftEditable(shape) ? (
+        <RetainedFaceDraftCard
+          key={`${shape.id}-face-draft`}
+          shape={shape as WorkplaneShape & { faceDraft: NonNullable<WorkplaneShape["faceDraft"]> }}
+          locked={locked}
+          onUpdate={onUpdateRetainedFaceDraft}
+          onInteractionActiveChange={onInteractionActiveChange}
+        />
+      ) : null}
+
       {shape.sketchProfile && onEditSketch ? (
         <button className="edit-sketch-button" type="button" disabled={locked} onClick={onEditSketch}>
           {t("panels.inspector.editSketch")}
@@ -367,7 +388,8 @@ export function ShapeInspector({
         <section className="property-card draft-prism-card" aria-label={t("panels.inspector.draftPrism.title")}>
           <div className="property-card-header"><span>{t("panels.inspector.draftPrism.title")}</span></div>
           <div className="property-list">
-            <p>{t("panels.inspector.draftPrism.hint")}</p>
+            <p>{t(shape.faceDraft ? "panels.inspector.draftPrism.faceDraftRetained"
+              : prismRetained ? "panels.inspector.draftPrism.hintRetained" : "panels.inspector.draftPrism.hint")}</p>
             <label>
               <span>{t("panels.inspector.draftPrism.angle")}</span>
               <input
@@ -385,7 +407,9 @@ export function ShapeInspector({
             <button
               className="inspector-action-button"
               type="button"
-              disabled={locked || drafting || !draftPrismRequestForShape(shape, Number(draftAngle))}
+              disabled={locked || drafting || !draftPrismRequestForShape(shape, Number(draftAngle))
+                || prismDrafted && Number(draftAngle) === shape.draftPrismAngle
+                || Boolean(shape.faceDraft)}
               onClick={async () => {
                 const angle = Number(draftAngle);
                 if (!isDraftPrismAngle(angle)) return;
@@ -397,7 +421,7 @@ export function ShapeInspector({
                 }
               }}
             >
-              <span>{t(drafting ? "panels.inspector.draftPrism.applying" : "panels.inspector.draftPrism.apply")}</span>
+              <span>{t(drafting ? "panels.inspector.draftPrism.applying" : prismDrafted ? "panels.inspector.draftPrism.update" : "panels.inspector.draftPrism.apply")}</span>
             </button>
           </div>
         </section>
