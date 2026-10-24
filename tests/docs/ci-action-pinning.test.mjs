@@ -19,7 +19,17 @@ test("CI grants read-only contents access and cancels superseded PR runs", () =>
 });
 
 test("CI actions are pinned to full SHAs with version comments", () => {
-  for (const name of ["ci.yml", "perf.yml"]) {
+  for (const name of [
+    "ci.yml",
+    "classify-changes.yml",
+    "docker.yml",
+    "docs.yml",
+    "docs-generated-commit.yml",
+    "docs-external-links.yml",
+    "pr-title.yml",
+    "trusted-pr-checks.yml",
+    "perf.yml",
+  ]) {
     const source = readFileSync(workflowPath(name), "utf8");
     const workflow = load(name);
     const uses = Object.values(workflow.jobs)

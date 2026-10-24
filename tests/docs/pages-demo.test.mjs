@@ -17,7 +17,8 @@ test("Pages workflow builds and stages the editor at the Demo subpath", () => {
   assert.match(workflow, /apps\/web\/.next-export\/\.\s+docs-site-dist\/Demo\//);
   assert.match(workflow, /scripts\/verify-pages-demo-artifact\.mjs/);
   assert.match(workflow, /tests\/browser\/github-pages-demo\.test\.mjs/);
-  assert.ok(workflow.indexOf("docs-site-dist/Demo") < workflow.indexOf("uses: actions/upload-pages-artifact@v3"));
+  const pagesArtifactUpload = workflow.match(/uses: actions\/upload-pages-artifact@[a-f0-9]{40}/)?.index ?? -1;
+  assert.ok(workflow.indexOf("docs-site-dist/Demo") < pagesArtifactUpload);
 });
 
 test("static export config and worker verifier honor the configured subpath", () => {
