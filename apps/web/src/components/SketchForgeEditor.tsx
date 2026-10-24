@@ -154,6 +154,7 @@ import {
 } from "@/lib/engine/patternShapes";
 import { threadSizesInSeries } from "@/lib/engine/threadCatalog";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
+import { canExplodeStepAssembly, explodeAssemblyInScene } from "@/lib/assemblyExplode";
 import { DEFAULT_TEXT_FONT, textFont } from "@/lib/textFonts";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { importedShapeFromStl } from "@/lib/engine/stlImport";
@@ -187,6 +188,7 @@ import {
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
+import { shellRequestForShape, shellUnavailable, shelledShapeFields, type ShellOpenFace } from "@/lib/shellEditor";
 import {
   CLEARED_RETAINED_DRAFT_FIELDS,
   hasRetainedDraft,
@@ -5921,6 +5923,10 @@ export function SketchForgeEditor({
     () => selectedShapes.length === 1 && Boolean(selectedShape && separablePartCount(selectedShape) > 1),
     [selectedShape, selectedShapes.length],
   );
+  const canExplodeSelectedAssembly = useMemo(
+    () => selectedShapes.length === 1 && Boolean(selectedShape && canExplodeStepAssembly(selectedShape)),
+    [selectedShape, selectedShapes.length],
+  );
   // The inspector's material readout needs a volume, and the export mesh is
   // the only place a volume exists for every shape kind. Tessellating is not
   // free, so it is done for the one selected shape and only while a material
@@ -7012,6 +7018,13 @@ export function SketchForgeEditor({
   const finishSketch = useCallback(async () => {
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
+    // Nothing can replay a shell on a rebuilt solid, so, as on the REST path,
+    // the edit is refused rather than returning the solid body without its
+    // cavity. The sketch stays open to cancel.
+    if (existing?.shell) {
+      setNotice(notice((t) => t("editor.sketch.shellNotReplayable")));
+      return;
+    }
     let resolved: WorkplaneShape | null;
     try {
       if (sketchOperation === "revolve") {
@@ -7803,6 +7816,51 @@ export function SketchForgeEditor({
     }
   }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, runRetainedFaceDraft, selectedShape, selectedShapes.length, t]);
 
+  // Hollow the selected shape to a wall, leaving the chosen faces open (#379).
+  // The CAD worker runs the REST endpoint's shell code; the result is an exact
+  // mesh shape like a fillet's, recorded with its shell, and undoable like any
+  // other edit.
+  const applyShellToSelection = useCallback(async (thickness: number, openFaces: ShellOpenFace[]) => {
+    const source = selectedShape;
+    if (!source || source.locked || selectedShapes.length !== 1) return;
+    const unavailable = shellUnavailable(source);
+    if (unavailable) {
+      setNotice(notice((translate) => translate(unavailable)));
+      return;
+    }
+    const request = shellRequestForShape(source, thickness, openFaces);
+    if (!request) {
+      setNotice(notice((translate) => translate("errors.cadModifier.shell.thicknessInvalid")));
+      return;
+    }
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.shell.applying")));
+    try {
+      const response = await postCadModifierRequestAsync({ type: "shell", ...request }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      if (response.type === "error") {
+        setNotice(notice((translate) => errorText(translate, errorFromPayload(response), "errors.cadModifier.invalidResult")));
+        return;
+      }
+      if (response.type !== "shell") throw new Error("The CAD worker did not return a hollowed solid");
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
+      const hollowed = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
+      if (!hollowed) throw new Error("The shell did not produce a usable solid");
+      const fields = shelledShapeFields(source.id, response.faceCount, request);
+      commitShapes(
+        shapesRef.current.map((shape) => shape.id === source.id ? { ...hollowed, ...fields } : shape),
+        [source.id],
+        notice((translate) => translate("panels.inspector.shell.applied", {
+          percent: Math.round((1 - response.volume / Math.max(Number.EPSILON, response.sourceVolume)) * 100),
+        })),
+      );
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
+
   // Change the direction or angle of a retained face draft: the undrafted
   // extrusion is rebuilt from its sketch and drafted again, finding the face
   // as the REST API's angle edit does. Undoable like any other edit.
@@ -8584,6 +8642,35 @@ export function SketchForgeEditor({
       notice((t) => t("editor.separate.separated", { count: parts.length })),
     );
   }, [commitShapes, selectedShape, selectedShapes.length, shapes, t]);
+
+  // One commit, so the explosion is one undo step back to the imported assembly.
+  const explodeSelectedAssembly = useCallback(async () => {
+    if (selectedShapes.length !== 1 || !selectedShape) {
+      setNotice(notice((t) => t("editor.explode.selectOne")));
+      return;
+    }
+    const target = shapesRef.current.find((shape) => shape.id === selectedShape.id);
+    if (!target) return;
+    const name = target.name;
+    const sourceProjectId = projectInfoRef.current.projectId;
+    setNotice(notice((t) => t("editor.explode.exploding", { name: shapeDisplayName(t, name) })));
+    const result = await explodeAssemblyInScene(shapesRef.current, target.id, projectAssetsRef.current);
+    if (!result.ok) {
+      setNotice(notice((t) => t(result.messageKey, result.params)));
+      return;
+    }
+    // The kernel is slow enough for the scene to move on underneath it.
+    if (projectInfoRef.current.projectId !== sourceProjectId || !shapesRef.current.includes(target)) {
+      setNotice(notice((t) => t("editor.explode.cancelled")));
+      return;
+    }
+    // Splice into the scene as it is now, keeping edits to other shapes made meanwhile.
+    commitShapes(
+      shapesRef.current.flatMap((shape) => (shape === target ? result.parts : [shape])),
+      result.parts.map((shape) => shape.id),
+      notice((t) => t(result.hierarchy === "nested" ? "editor.explode.exploded" : "editor.explode.flatFallback", { name: shapeDisplayName(t, name) })),
+    );
+  }, [commitShapes, selectedShape, selectedShapes.length]);
 
   const mcpSceneSnapshot = useCallback((params: Record<string, unknown> = {}): SketchForgeMcpSceneSummary & { rawShapes?: WorkplaneShape[] } => {
     const projectInfo = projectInfoRef.current;
@@ -10193,9 +10280,11 @@ export function SketchForgeEditor({
           onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
           onUpdateRetainedFaceDraft={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? updateRetainedFaceDraftOnSelection : undefined}
           onEnableFaceEditing={selectedShapes.length === 1 && selectedShape && faceEditingCanBeEnabled(selectedShape) ? enableFaceEditingOnSelection : undefined}
+          onApplyShell={selectedShapes.length === 1 && selectedShape && !selectedShape.hole ? applyShellToSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}
+          onExplodeAssembly={canExplodeSelectedAssembly ? explodeSelectedAssembly : undefined}
           onUpdateShape={updateShape}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
           onWorkplaneModeChange={closeViewportWorkplaneMode}

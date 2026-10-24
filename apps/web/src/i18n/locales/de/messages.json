@@ -345,6 +345,20 @@
       "singlePart": "Das ausgewählte Objekt besteht nur aus einem zusammenhängenden Teil",
       "separated": "{count, plural, one {In {count} Teil zerlegt} other {In {count} Teile zerlegt}}"
     },
+    "explode": {
+      "exploding": "{name} wird aufgelöst…",
+      "exploded": "{name} in verschachtelte Gruppen aufgelöst",
+      "flatFallback": "Die Baugruppenstruktur von {name} ließ sich den Körpern nicht zuordnen, daher wurde sie in einzelne Körper aufgeteilt",
+      "selectOne": "Wählen Sie eine importierte STEP-Baugruppe zum Auflösen aus",
+      "unlock": "Entsperren Sie die Baugruppe, bevor Sie sie auflösen",
+      "sourceMissing": "Die ursprüngliche STEP-Datei dieses Objekts ist nicht mehr im Projekt, daher kann es nicht aufgelöst werden",
+      "notStep": "Nur ein STEP-Import mit seiner ursprünglichen Datei kann aufgelöst werden",
+      "sourceTooLarge": "Das Auflösen von Baugruppen unterstützt STEP-Dateien bis 8 MiB",
+      "singleSolid": "Diese STEP-Datei enthält nur einen Körper; es gibt nichts aufzulösen",
+      "tooManySolids": "Das Auflösen von Baugruppen unterstützt höchstens {max} Körper; diese Datei enthält {count}",
+      "failed": "Die STEP-Baugruppe konnte nicht aufgelöst werden",
+      "cancelled": "Auflösen abgebrochen, weil sich das Objekt geändert hat"
+    },
     "edgeModifier": {
       "cancelled": "Kantenbearbeitung abgebrochen",
       "cancelledObjectChanged": "Kantenbearbeitung abgebrochen, weil sich das Objekt geändert hat",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Skizze bearbeiten",
       "separateParts": "In Teile zerlegen",
+      "explodeAssembly": "Baugruppe auflösen",
+      "explodingAssembly": "Wird aufgelöst…",
       "section": {
         "properties": "Eigenschaften",
         "taper": "Verjüngung",

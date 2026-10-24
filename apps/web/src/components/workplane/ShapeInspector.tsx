@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from "lucide-react";
+import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Network, Split } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
 import { normalizeGearType } from "@/lib/gearGeometry";
@@ -22,6 +22,8 @@ import type { DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import { shapeHasExactFaces } from "@/lib/shapeFaces";
 import { ShapeFaceTools } from "@/components/workplane/ShapeFaceTools";
 import { RetainedFaceDraftCard } from "@/components/workplane/RetainedFaceDraftCard";
+import { ShapeShellCard } from "@/components/workplane/ShapeShellCard";
+import type { ShellOpenFace } from "@/lib/shellEditor";
 import { retainedFaceDraftEditable, retainedPrismDraftAvailable } from "@/lib/retainedDrafts";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
@@ -114,11 +116,13 @@ export function ShapeInspector({
   onApplyDraftFace,
   onUpdateRetainedFaceDraft,
   onEnableFaceEditing,
+  onApplyShell,
   onHighlightFace,
   onFacePickingChange,
   pickedFace,
   canSeparateParts = false,
   onSeparateParts,
+  onExplodeAssembly,
   onInteractionActiveChange,
   volumeMm3,
   onMaterialPriceChange,
@@ -137,12 +141,16 @@ export function ShapeInspector({
   onUpdateRetainedFaceDraft?: (angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
   /** Present when the shape can be rebuilt as exact geometry to gain editable faces. */
   onEnableFaceEditing?: () => Promise<void> | void;
+  /** Present when the shape may be hollowed; the editor refuses what it cannot shell with a notice. */
+  onApplyShell?: (thickness: number, openFaces: ShellOpenFace[]) => Promise<void> | void;
   /** The face the face tools point at, or null; the viewport highlights it. */
   onHighlightFace?: (faceIndex: number | null) => void;
   onFacePickingChange?: (shapeId: string | null) => void;
   pickedFace?: { shapeId: string; faceIndex: number; serial: number } | null;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
+  /** Present when the shape is an imported STEP assembly that can be exploded into groups. */
+  onExplodeAssembly?: () => Promise<void> | void;
   onInteractionActiveChange?: (active: boolean) => void;
   /** Solid volume of this shape in mm3; absent when nothing has been measured. */
   volumeMm3?: number;
@@ -188,6 +196,7 @@ export function ShapeInspector({
     if (shape.draftPrismAngle !== undefined) setDraftAngle(String(shape.draftPrismAngle));
   }, [shape.draftPrismAngle]);
   const [drafting, setDrafting] = useState(false);
+  const [exploding, setExploding] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
@@ -427,10 +436,42 @@ export function ShapeInspector({
         </section>
       ) : null}
 
+      {onApplyShell && !shape.hole && !shape.imagePlate ? (
+        <ShapeShellCard
+          key={`${shape.id}-shell`}
+          shape={shape}
+          locked={locked}
+          workspace={workspace}
+          pickedFace={pickedFace}
+          onApply={onApplyShell}
+          onInteractionActiveChange={onInteractionActiveChange}
+        />
+      ) : null}
+
       {canSeparateParts && onSeparateParts ? (
         <button className="inspector-action-button" type="button" disabled={locked} onClick={onSeparateParts}>
           <Split size={17} strokeWidth={2.5} />
           <span>{t("panels.inspector.separateParts")}</span>
+        </button>
+      ) : null}
+
+      {onExplodeAssembly ? (
+        <button
+          className="inspector-action-button"
+          type="button"
+          disabled={locked || exploding}
+          aria-busy={exploding}
+          onClick={async () => {
+            setExploding(true);
+            try {
+              await onExplodeAssembly();
+            } finally {
+              setExploding(false);
+            }
+          }}
+        >
+          <Network size={17} strokeWidth={2.5} />
+          <span>{t(exploding ? "panels.inspector.explodingAssembly" : "panels.inspector.explodeAssembly")}</span>
         </button>
       ) : null}
 

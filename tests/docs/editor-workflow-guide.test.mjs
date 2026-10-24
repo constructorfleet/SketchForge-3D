@@ -100,3 +100,17 @@ test("STEP assembly guide links the editor-to-local-MCP workflow to browser acce
   assert.match(browserTestText, /sketchforge_explode_step_assembly/);
   assert.match(browserTestText, /step-assembly-editor-import\.png/);
 });
+
+test("STEP assembly guide documents exploding from the shape inspector with browser evidence", async () => {
+  const [guideText, browserTestText] = await Promise.all([
+    readFile(stepAssemblyGuide, "utf8"),
+    readFile(browserTest, "utf8"),
+  ]);
+
+  assert.match(guideText, /\*\*Explode Assembly\*\*/);
+  assert.match(guideText, /one undo step/i);
+  assert.match(guideText, /flat[\s\S]{0,80}solids[\s\S]{0,200}notice/i);
+  assert.match(guideText, /step-assembly-editor-exploded\.png/);
+  assert.match(browserTestText, /explodes into nested groups from the shape inspector/);
+  assert.match(browserTestText, /step-assembly-editor-exploded\.png/);
+});

@@ -345,6 +345,20 @@
       "singlePart": "O objeto selecionado tem apenas uma parte conectada",
       "separated": "{count, plural, one {Objeto separado em {count} parte} many {Objeto separado em {count} de partes} other {Objeto separado em {count} partes}}"
     },
+    "explode": {
+      "exploding": "Explodindo {name}…",
+      "exploded": "{name} explodido em grupos aninhados",
+      "flatFallback": "Não foi possível associar a estrutura da montagem {name} aos seus sólidos, então ela foi dividida em sólidos separados",
+      "selectOne": "Selecione uma montagem STEP importada para explodir",
+      "unlock": "Desbloqueie a montagem antes de explodi-la",
+      "sourceMissing": "O arquivo STEP original deste objeto não está mais no projeto, então ele não pode ser explodido",
+      "notStep": "Só é possível explodir uma importação STEP com o arquivo original",
+      "sourceTooLarge": "A explosão de montagens aceita arquivos STEP de até 8 MiB",
+      "singleSolid": "Este arquivo STEP contém apenas um sólido; não há nada para explodir",
+      "tooManySolids": "A explosão de montagens aceita no máximo {max} sólidos; este arquivo contém {count}",
+      "failed": "Não foi possível explodir a montagem STEP",
+      "cancelled": "Explosão cancelada porque o objeto mudou"
+    },
     "edgeModifier": {
       "cancelled": "Acabamento de arestas cancelado",
       "cancelledObjectChanged": "Acabamento de arestas cancelado porque o objeto mudou",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Editar esboço",
       "separateParts": "Separar partes",
+      "explodeAssembly": "Explodir montagem",
+      "explodingAssembly": "Explodindo…",
       "section": {
         "properties": "Propriedades",
         "taper": "Afunilamento",

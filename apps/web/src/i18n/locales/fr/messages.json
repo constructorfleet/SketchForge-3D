@@ -345,6 +345,20 @@
       "singlePart": "L’objet sélectionné n’a qu’une seule partie",
       "separated": "{count, plural, one {Objet séparé en {count} partie} many {Objet séparé en {count} de parties} other {Objet séparé en {count} parties}}"
     },
+    "explode": {
+      "exploding": "Éclatement de {name}…",
+      "exploded": "{name} éclaté en groupes imbriqués",
+      "flatFallback": "La structure de l’assemblage {name} n’a pas pu être associée à ses solides ; il a donc été séparé en solides distincts",
+      "selectOne": "Sélectionnez un seul assemblage STEP importé à éclater",
+      "unlock": "Déverrouillez l’assemblage avant de l’éclater",
+      "sourceMissing": "Le fichier STEP d’origine de cet objet ne fait plus partie du projet ; il ne peut donc pas être éclaté",
+      "notStep": "Seule une importation STEP avec son fichier d’origine peut être éclatée",
+      "sourceTooLarge": "L’éclatement d’assemblage prend en charge les fichiers STEP jusqu’à 8 Mio",
+      "singleSolid": "Ce fichier STEP ne contient qu’un seul solide ; il n’y a rien à éclater",
+      "tooManySolids": "L’éclatement d’assemblage prend en charge au plus {max} solides ; ce fichier en contient {count}",
+      "failed": "L’assemblage STEP n’a pas pu être éclaté",
+      "cancelled": "Éclatement annulé car l’objet a changé"
+    },
     "edgeModifier": {
       "cancelled": "Arrondi ou chanfrein annulé",
       "cancelledObjectChanged": "Arrondi ou chanfrein annulé : l’objet a changé",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Modifier l’esquisse",
       "separateParts": "Séparer en parties",
+      "explodeAssembly": "Éclater l’assemblage",
+      "explodingAssembly": "Éclatement…",
       "section": {
         "properties": "Propriétés",
         "taper": "Rétrécissement",

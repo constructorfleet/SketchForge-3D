@@ -9,6 +9,7 @@ import { buildDraftPrism } from "@/lib/engine/draftPrism";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
 import { retainedSketchFaceDraft, SketchFaceDraftError } from "@/lib/engine/sketchFaceDraftKernel";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
+import { buildEditorShell } from "@/lib/engine/editorShell";
 import { interferenceBetweenSolids, sampledWallThickness, WallThicknessRefusal } from "@/lib/engine/cadAnalysis";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
@@ -494,6 +495,21 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       try {
         const result = buildFaceDraft(activeCad, request);
         post({ type: "draft-face", requestId: request.requestId, ...result }, [
+          result.positions.buffer, result.normals.buffer, result.indices.buffer,
+        ]);
+        return;
+      } finally {
+        releaseSession(activeCad);
+      }
+    }
+    if (request.type === "shell") {
+      releaseSession(activeCad);
+      try {
+        // One part, rebuilt as it stands and not fused or unified, so its
+        // faces keep the B-rep order the Faces card numbers them in.
+        const solid = reconstructSolid(activeCad, request.part);
+        const result = buildEditorShell(activeCad, solid, request);
+        post({ type: "shell", requestId: request.requestId, ...result }, [
           result.positions.buffer, result.normals.buffer, result.indices.buffer,
         ]);
         return;

@@ -345,6 +345,20 @@
       "singlePart": "Vybraný objekt má jen jednu souvislou část",
       "separated": "{count, plural, one {Objekt rozdělen na {count} část} few {Objekt rozdělen na {count} části} many {Objekt rozdělen na {count} části} other {Objekt rozdělen na {count} částí}}"
     },
+    "explode": {
+      "exploding": "Rozkládání {name}…",
+      "exploded": "{name} rozložen do vnořených skupin",
+      "flatFallback": "Strukturu sestavy {name} nebylo možné přiřadit k jejím tělesům, proto byla rozdělena na samostatná tělesa",
+      "selectOne": "Vyberte jednu importovanou sestavu STEP, kterou chcete rozložit",
+      "unlock": "Před rozložením sestavu odemkněte",
+      "sourceMissing": "Původní soubor STEP tohoto objektu už v projektu není, proto jej nelze rozložit",
+      "notStep": "Rozložit lze jen import STEP s původním souborem",
+      "sourceTooLarge": "Rozložení sestavy podporuje soubory STEP do 8 MiB",
+      "singleSolid": "Tento soubor STEP obsahuje jen jedno těleso; není co rozložit",
+      "tooManySolids": "Rozložení sestavy podporuje nejvýše {max} těles; tento soubor jich obsahuje {count}",
+      "failed": "Sestavu STEP se nepodařilo rozložit",
+      "cancelled": "Rozložení zrušeno, protože se objekt změnil"
+    },
     "edgeModifier": {
       "cancelled": "Úprava hran zrušena",
       "cancelledObjectChanged": "Úprava hran zrušena, protože se objekt změnil",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Upravit náčrt",
       "separateParts": "Rozdělit na části",
+      "explodeAssembly": "Rozložit sestavu",
+      "explodingAssembly": "Rozkládání…",
       "section": {
         "properties": "Vlastnosti",
         "taper": "Zúžení",

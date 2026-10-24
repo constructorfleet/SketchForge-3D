@@ -292,3 +292,65 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
     }
   }
 });
+
+test("an imported STEP assembly explodes into nested groups from the shape inspector, as one undo step", { timeout: 300_000 }, async () => {
+  const port = await unusedPort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
+    cwd: process.cwd(),
+    detached: process.platform !== "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const fixturePath = path.join(process.cwd(), "tests/fixtures/step/nested-assembly.step");
+  let logs = "";
+  const keepLogs = (chunk) => { logs = `${logs}${chunk}`.slice(-8_000); };
+  server.stdout.on("data", keepLogs);
+  server.stderr.on("data", keepLogs);
+  let browser;
+
+  try {
+    await waitForServer(baseURL, server, () => logs);
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(baseURL);
+    await page.getByRole("button", { name: "Open SKF or import geometry" }).click();
+    await page.locator('input[type="file"][accept*=".step"]').setInputFiles(fixturePath);
+    await page.getByRole("textbox", { name: "Project name" }).waitFor({ state: "visible", timeout: 120_000 });
+
+    const scene = page.getByRole("complementary", { name: "Scene" });
+    const sceneLabels = () => scene.locator(".scene-row-label").allInnerTexts();
+    await scene.getByRole("button", { name: "nested-assembly", exact: true }).click();
+    const explode = page.getByRole("button", { name: "Explode Assembly", exact: true });
+    await explode.waitFor({ state: "visible" });
+    await explode.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "docs/screenshots/step-assembly-editor-explode-action.png" });
+    await explode.click();
+    await page.getByRole("status").getByText("Exploded nested-assembly into nested groups", { exact: true }).waitFor({ state: "visible", timeout: 120_000 });
+
+    // The imported mesh is replaced by one root group; its members are rows
+    // the scene inspector shows as each group is expanded.
+    assert.deepEqual(await sceneLabels(), ["MainAssembly"]);
+    // The selected group's settings fill the column; minimize them to give
+    // the scene list room for the expanded tree.
+    await page.getByRole("button", { name: "Minimize shape settings", exact: true }).click();
+    await scene.getByRole("button", { name: "Show what MainAssembly groups", exact: true }).click();
+    assert.deepEqual(await sceneLabels(), ["MainAssembly", "Frame", "Sensors"]);
+    await scene.getByRole("button", { name: "Show what Sensors groups", exact: true }).click();
+    assert.deepEqual(await sceneLabels(), ["MainAssembly", "Frame", "Sensors", "SensorLeft", "SensorRight"]);
+    await page.getByRole("button", { name: "Center view on selection" }).click();
+    await page.screenshot({ path: "docs/screenshots/step-assembly-editor-exploded.png" });
+
+    // One undo returns the imported assembly; one redo brings the groups back.
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await scene.getByRole("button", { name: "nested-assembly", exact: true }).waitFor({ state: "visible" });
+    assert.deepEqual(await sceneLabels(), ["nested-assembly"]);
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await scene.locator(".scene-row-label", { hasText: "MainAssembly" }).waitFor({ state: "visible" });
+    const redone = await sceneLabels();
+    assert.equal(redone[0], "MainAssembly");
+    assert.ok(!redone.includes("nested-assembly"), `redo should replace the imported assembly: ${redone.join(", ")}`);
+  } finally {
+    if (browser) await browser.close();
+    if (server.pid) await stopNextServer(server);
+  }
+});
