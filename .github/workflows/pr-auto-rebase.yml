@@ -1,0 +1,105 @@
+name: Rebase conflicting pull requests
+
+# Every merge to main can leave open pull requests conflicting with it, almost
+# always in docs/CHANGELOG.md, where every PR adds its entry at the same spot.
+# GitHub's conflict check ignores the union merge rule in .gitattributes, so
+# this rebases each conflicting same-repository PR with plain git, which honours
+# it, and pushes the result. A PR that also conflicts somewhere else gets one
+# comment naming the files and is left for a person.
+#
+# Only conflicting PRs are rebased. main does not require branches to be up to
+# date, so a PR that is merely behind still merges; rebasing it would only
+# restart its CI on every merge.
+#
+# The push uses the release GitHub App, not GITHUB_TOKEN: GitHub starts no
+# workflow run for a push its own token made, so a rebased PR would have no CI.
+# The app also needs the "workflows" permission to rebase a PR that edits
+# .github/workflows; without it that push is refused and logged as a warning.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-auto-rebase-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint a token for the release app
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_KEY }}
+
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Rebase each conflicting pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          # Each rebase checks out the PR branch, which may predate this script.
+          cp scripts/rebase-pr.mjs "$RUNNER_TEMP/rebase-pr.mjs"
+          app_user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${app_user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+          failed=0
+          prs=$(gh pr list --base "$BASE" --state open --limit 100 \
+            --json number,headRefName,headRefOid,isCrossRepository)
+          while read -r row; do
+            number=$(jq -r .number <<< "$row")
+            branch=$(jq -r .headRefName <<< "$row")
+            head=$(jq -r .headRefOid <<< "$row")
+            # Fork branches cannot be pushed to; the release PR is rewritten by release-please.
+            if [[ "$(jq -r .isCrossRepository <<< "$row")" == true || "$branch" == release-please--* ]]; then
+              continue
+            fi
+
+            # GitHub computes mergeability lazily after main moves.
+            mergeable=UNKNOWN
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              mergeable=$(gh pr view "$number" --json mergeable --jq .mergeable)
+              [[ "$mergeable" != UNKNOWN ]] && break
+              sleep 6
+            done
+            if [[ "$mergeable" != CONFLICTING ]]; then
+              echo "#$number ($branch): $mergeable, nothing to do."
+              continue
+            fi
+
+            set +e
+            output=$(node "$RUNNER_TEMP/rebase-pr.mjs" --branch "$branch" --base "$BASE" --push --expect-head "$head" 2>&1)
+            status=$?
+            set -e
+            echo "#$number: $output"
+            if [[ $status -eq 0 ]]; then
+              echo "- #$number rebased onto $BASE." >> "$GITHUB_STEP_SUMMARY"
+            elif [[ $status -eq 2 ]]; then
+              echo "- #$number needs a manual rebase." >> "$GITHUB_STEP_SUMMARY"
+              marker="<!-- pr-auto-rebase:$head -->"
+              if ! gh api "repos/$GH_REPO/issues/$number/comments" --paginate --jq '.[].body' | grep -qF "$marker"; then
+                gh pr comment "$number" --body "$(printf '%s\nThis PR conflicts with `%s` outside the changelog, so it could not be rebased automatically.\n\n```\n%s\n```\n\nRebase it onto `%s` by hand. `docs/CHANGELOG.md` merges itself there too, through the union rule in `.gitattributes`.' "$marker" "$BASE" "$output" "$BASE")"
+              fi
+            else
+              echo "::warning::#$number could not be rebased: $output"
+              failed=1
+            fi
+            git checkout --quiet "$BASE"
+          done < <(jq -c '.[]' <<< "$prs")
+          exit $failed
