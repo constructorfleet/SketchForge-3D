@@ -9,6 +9,7 @@ import { buildDraftPrism } from "@/lib/engine/draftPrism";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
 import { retainedSketchFaceDraft, SketchFaceDraftError } from "@/lib/engine/sketchFaceDraftKernel";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
+import { interferenceBetweenSolids, sampledWallThickness, WallThicknessRefusal } from "@/lib/engine/cadAnalysis";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -428,6 +429,30 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
           },
           [meshed.positions.buffer, meshed.normals.buffer],
         );
+      } finally {
+        if (!sessionOpen) releaseSession(activeCad);
+      }
+      return;
+    }
+    if (request.type === "interference" || request.type === "wall-thickness") {
+      // Read-only analysis (#380): solids are built, measured and released,
+      // and nothing is sent back that could replace a shape. Like an exact cut
+      // it leaves an open edge-modifier session's handles alone.
+      const sessionOpen = baseShape !== null;
+      try {
+        if (request.type === "interference") {
+          const result = interferenceBetweenSolids(activeCad, request.operands, (operand) => reconstructSolid(activeCad, operand.part), request.clearance);
+          post({ type: "interference", requestId: request.requestId, result });
+          return;
+        }
+        try {
+          const value = sampledWallThickness(activeCad, reconstructSolid(activeCad, request.part));
+          post({ type: "wall-thickness", requestId: request.requestId, result: { ok: true, value } });
+        } catch (error) {
+          if (!(error instanceof WallThicknessRefusal)) throw error;
+          const refusal = error.limit === undefined ? { reason: error.reason } : { reason: error.reason, limit: error.limit };
+          post({ type: "wall-thickness", requestId: request.requestId, result: { ok: false, refusal } });
+        }
       } finally {
         if (!sessionOpen) releaseSession(activeCad);
       }
