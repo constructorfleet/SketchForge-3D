@@ -32,7 +32,7 @@ permissions:
 
 ## Create a release
 
-Push a tag such as `v1.0.6`, or run `Desktop Release` with `workflow_dispatch` and enter `1.0.6`.
+Merging the Release Please pull request publishes a release and dispatches `Desktop Release` for it. To rebuild the installers for an existing version, run `Desktop Release` with `workflow_dispatch` and enter the version, such as `1.0.6`. The workflow has no tag trigger, so pushing a tag does not start it. See [the release process](../docs/RELEASE_PROCESS.md#desktop-installers) for how a failed platform is reported and recovered.
 
 The workflow builds these packages:
 
