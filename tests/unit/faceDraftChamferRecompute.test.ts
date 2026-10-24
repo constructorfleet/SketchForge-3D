@@ -57,15 +57,18 @@ describe("face draft and chamfer replay", () => {
     const draft = { sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z" as const };
     const drafted = value(await engine.changeShape("recompute", created.id, { faceDraft: draft })).shape;
     // Clone the drafted result into a control feature with identical source data
-    // and displayed dimensions. Removing draft metadata makes its treatment path
-    // rebuild from the undrafted profile, while the tested feature must chamfer
-    // its retained drafted BREP.
+    // and displayed dimensions. Removing draft metadata and the drafted BREP
+    // makes its treatment path rebuild from the undrafted profile, while the
+    // tested feature must chamfer its retained drafted BREP. (A revolve that
+    // still carries a BREP is treated from that BREP, not rebuilt.)
     const control = structuredClone(drafted);
     control.id = `${drafted.id}-undrafted-control`;
     control.sketchSourceId = `${drafted.sketchSourceId}-undrafted-control`;
     delete control.faceDraft;
     delete control.faceDraftSourceFrame;
     delete control.faceDraftSourceScale;
+    delete control.cadBrep;
+    delete control.cadBrepFrame;
     document.shapes.push(control);
     const capArea = async (shape: WorkplaneShape) => {
       const cap = (await shapeFaces(shape, { topology: "exact" }))

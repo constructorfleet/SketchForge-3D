@@ -29,7 +29,7 @@ import { canonicalizeShape } from "./workplaneShapes.js";
 import { createLocalId } from "./localIds.js";
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
-import { sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
+import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 
 export type ServerCadEdge = {
   index: number;
@@ -277,8 +277,9 @@ export function shapeEdges(shape: WorkplaneShape): Promise<ServerCadEdge[]> {
   return withCadKernel((cad) => {
     // Oriented, not local: the edge a caller names by index has to be the edge
     // the treatment then rounds, and a turned shape's edge midpoints are only
-    // where the caller sees them once the rotation is applied.
-    const solid = orientedSolidForShape(cad, shape);
+    // where the caller sees them once the rotation is applied. `edgeSolidForShape`
+    // is what the treatment builds too, so the two cannot number differently.
+    const solid = edgeSolidForShape(cad, shape);
     return cad.getSubShapes(solid, "edge").map((handle, index) => edgeSummary(cad, solid, handle, index));
   });
 }
@@ -391,7 +392,7 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
   }
 
   return withCadKernel((cad) => {
-    const solid = edgeTreatmentSolid(cad, shape, treatment);
+    const solid = edgeSolidForShape(cad, shape);
     const allEdges = cad.getSubShapes(solid, "edge");
     const requested = treatment.edges;
     if (requested?.some((index) => !Number.isInteger(index) || index < 0 || index >= allEdges.length)) {
@@ -444,24 +445,116 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
     const treatedSolids = cad.getSubShapes(treated, "solid");
     const result = treatedSolids.length === 1 ? treatedSolids[0] : treated;
 
-    return meshedCadResult(cad, result, shape, evolution ? { sourceFaceHashes, evolution } : undefined);
+    return meshedCadResult(cad, result, shape, evolution ? { sourceFaceHashes, evolution } : undefined, solid);
   });
 }
 
 /** Count currently chamferable/filletable edges without preserving topology indexes. */
-export function allEdgeTreatmentEdgeCount(shape: WorkplaneShape, kind: ServerCadTreatment["kind"]): Promise<number> {
+export function allEdgeTreatmentEdgeCount(shape: WorkplaneShape, _kind: ServerCadTreatment["kind"]): Promise<number> {
   return withCadKernel((cad) => {
-    const solid = edgeTreatmentSolid(cad, shape, { kind, amount: 1 });
+    const solid = edgeSolidForShape(cad, shape);
     return cad.getSubShapes(solid, "edge").filter((edge) => adjacentFaceCount(cad, solid, edge) >= 2).length;
   });
 }
 
-function edgeTreatmentSolid(cad: OcctKernel, shape: WorkplaneShape, treatment: ServerCadTreatment) {
-  if (treatment.kind === "chamfer" && !treatment.edges?.length
-    && shape.sketchOperation === "revolve" && shape.sketchProfile && !shape.faceDraft) {
-    return exactPlainSketchRevolveSolid(cad, shape.sketchProfile, shape.sketchRevolve, shape);
+/**
+ * A retained sketch revolve whose geometry is still exactly its sketch.
+ *
+ * A revolve is stored as a manifold mesh with its profile and settings beside
+ * it, and nothing else: no `cadBrep` until something treats, shells or drafts
+ * it. Its edges are therefore the facets of that mesh unless they are rebuilt
+ * from the profile, which is what makes these shapes different from every
+ * other mesh the server can be handed.
+ */
+function isUntreatedSketchRevolve(shape: WorkplaneShape) {
+  return shape.sketchOperation === "revolve" && Boolean(shape.sketchProfile)
+    && !shape.cadBrep && !shape.faceDraft;
+}
+
+/**
+ * Why an untreated revolve has no exact solid to list or treat edges on, or
+ * null when it has one.
+ *
+ * Only a plain full turn of one closed region is rebuilt exactly. Anything else
+ * would fall back to the sewn tessellation, where a fillet "succeeds" by
+ * rounding hundreds of facet edges and an edge index names a facet, so it is
+ * refused instead.
+ */
+function revolveWithoutExactEdges(shape: WorkplaneShape): string | null {
+  if (!isUntreatedSketchRevolve(shape)) return null;
+  const settings = normalizeSketchRevolveSettings(shape.sketchRevolve);
+  const limitation = "Fillets, chamfers and edge listings on a revolve use its exact solid, which is built only for a plain full turn of one closed profile region";
+  if (settings.pitch !== 0) {
+    return `${limitation}. This is a helical revolve (a thread or spring), whose only geometry is a tessellated sweep, so its edges are facets. Treat the profile before revolving it instead.`;
   }
-  return orientedSolidForShape(cad, shape);
+  if (settings.coreRadius > 0) {
+    return `${limitation}. This revolve is fused to a core, which has no exact solid here, so its edges are facets.`;
+  }
+  if (Math.abs(Math.abs(settings.sweepAngle) - 360) > 1e-6) {
+    return `${limitation}. This revolve turns ${Math.abs(settings.sweepAngle)} degrees rather than a full turn, so its edges are facets.`;
+  }
+  const { radialX, radialZ } = revolveResizeFactors(shape);
+  if (Math.abs(radialX - radialZ) > 1e-6 * Math.max(radialX, radialZ)) {
+    return `${limitation}. This revolve has been resized unevenly across its axis, so it is no longer round and no revolve describes it exactly. Resize its width and depth together.`;
+  }
+  return null;
+}
+
+/**
+ * How far a revolve has been resized since it was swept, per axis.
+ *
+ * The ratio of its drawn size to its mesh's natural size, which is what the
+ * viewport stretches the mesh by.
+ */
+function revolveResizeFactors(shape: WorkplaneShape) {
+  const mesh = shape.importedMesh;
+  const ratio = (drawn: number, base: number | undefined) => (base && base > 0 && drawn > 0 ? drawn / base : 1);
+  return {
+    radialX: ratio(shape.width, mesh?.baseWidth),
+    radialZ: ratio(shape.depth, mesh?.baseDepth),
+    axial: ratio(shape.height, mesh?.baseHeight),
+  };
+}
+
+/**
+ * The exact solid of an untreated plain full-turn revolve, at its drawn size,
+ * or null for any other shape.
+ *
+ * A resize is applied to the profile before it is turned, not to the solid
+ * afterwards: the section is scaled radially by the width ratio and axially by
+ * the height ratio, so a resized revolve is still a revolve and its faces stay
+ * analytic. Scaling the solid instead goes wrong both ways the kernel offers --
+ * `transform` turns an uneven scale into a uniform one, and `generalTransform`
+ * approximates every face as a B-spline that is about 1% off in volume and
+ * cannot be written back out as BREP.
+ *
+ * The ratios are to the mesh's natural size rather than its bounds, which for
+ * a facet count that is not a multiple of four are narrower than the circle.
+ */
+function exactRevolveSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
+  if (!isUntreatedSketchRevolve(shape) || revolveWithoutExactEdges(shape)) return null;
+  const { radialX, axial } = revolveResizeFactors(shape);
+  return exactPlainSketchRevolveSolid(
+    cad,
+    shape.sketchProfile!,
+    normalizeSketchRevolveSettings(shape.sketchRevolve),
+    undefined,
+    { radial: radialX, axial },
+  );
+}
+
+/**
+ * The solid `GET /edges` numbers and a fillet or chamfer rounds.
+ *
+ * One builder for both, so an index from the listing names the same edge in
+ * the treatment. For an untreated revolve that is the exact solid rebuilt from
+ * its profile (#347); a revolve with no exact solid is refused rather than
+ * listed or treated by its facets. Everything else is the oriented solid.
+ */
+export function edgeSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
+  const refusal = revolveWithoutExactEdges(shape);
+  if (refusal) throw new ServerCadError(refusal);
+  return exactRevolveSolidForShape(cad, shape) ?? orientedSolidForShape(cad, shape);
 }
 
 /** Build the analytical full-turn BREP for chamfering a retained plain revolve. */
@@ -478,18 +571,19 @@ export function exactPlainSketchRevolveSolid(
   sketchProfile: SketchProfile,
   sketchRevolve: WorkplaneShape["sketchRevolve"],
   targetShape?: WorkplaneShape,
+  sectionScale: { radial: number; axial: number } = { radial: 1, axial: 1 },
 ) {
   if (!sketchRevolve || (sketchRevolve.pitch ?? 0) !== 0 || (sketchRevolve.coreRadius ?? 0) !== 0
     || Math.abs(Math.abs(sketchRevolve.sweepAngle) - 360) > 1e-6) {
-    throw new ServerCadError("Exact face drafting requires a plain full-turn sketch revolve.");
+    throw new ServerCadError("Exact revolve geometry requires a plain full-turn sketch revolve.");
   }
   const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
   if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region.");
   const profile: SketchProfile = {
     points: polygons.flatMap((polygon, polygonIndex) => polygon.map(([x, z], pointIndex) => ({
       id: `revolve-${polygonIndex}-point-${pointIndex}`,
-      x,
-      z,
+      x: x * sectionScale.radial,
+      z: z * sectionScale.axial,
     }))),
     segments: polygons.flatMap((polygon, polygonIndex) => polygon.map((_, pointIndex) => ({
       id: `revolve-${polygonIndex}-segment-${pointIndex}`,
@@ -503,7 +597,9 @@ export function exactPlainSketchRevolveSolid(
     { x: to.x, y: to.z, z: 0 },
   )));
   const regions = cadSketchRegions(profile);
-  if (regions.length !== 1) throw new ServerCadError("Exact face drafting requires one closed revolve profile region.");
+  if (regions.length !== 1) {
+    throw new ServerCadError("Exact revolve geometry requires one closed profile region, and this revolve's profile has several.");
+  }
   const solids = regions.map((region) => {
     let face = cad.makeFace(pathWire(region.outer));
     if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map(pathWire));
@@ -556,7 +652,12 @@ export function exactPlainSketchRevolveResult(shape: WorkplaneShape): Promise<Se
     return Promise.reject(new ServerCadError("Exact revolve geometry requires a plain full-turn retained sketch revolve."));
   }
   return withCadKernel((cad) => {
-    const solid = exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
+    // The same solid a treatment of this shape starts from, so the untreated
+    // exact result and a treated one are the same geometry before the blend.
+    // A revolve stretched unevenly across its axis has no such solid; it keeps
+    // the bounds-fitted rebuild this function has always returned.
+    const solid = exactRevolveSolidForShape(cad, { ...shape, cadBrep: undefined, faceDraft: undefined })
+      ?? exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
     return { ...meshedCadResult(cad, solid), faceIds: freshFaceIds(cad, solid, shape.id) };
   });
 }
@@ -714,6 +815,7 @@ export function meshedCadResult(
   result: ShapeHandle,
   sourceShape?: WorkplaneShape,
   lineage?: { sourceFaceHashes: number[]; evolution: EvolutionData },
+  sourceSolid?: ShapeHandle,
 ): ServerCadResult {
   const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
   // The editor stores a flat triangle list, not an indexed mesh, so the
@@ -741,7 +843,7 @@ export function meshedCadResult(
         faces.map((face) => cad.hashCode(face, FACE_HASH_UPPER_BOUND)),
         lineage.evolution,
       )
-      : faceIdsForResult(cad, sourceShape, faces)
+      : faceIdsForResult(cad, sourceShape, faces, sourceSolid)
     : undefined;
   return {
     brep: cad.toBREP(result),
@@ -758,8 +860,13 @@ export function meshedCadResult(
  * occurs on each side. OCCT face ordering and hash codes are kernel details,
  * so an unmatched or ambiguous face receives a new application ID.
  */
-function faceIdsForResult(cad: OcctKernel, source: WorkplaneShape, resultFaces: ShapeHandle[]): string[] {
-  const sourceFaces = cad.getSubShapes(orientedSolidForShape(cad, source), "face");
+function faceIdsForResult(
+  cad: OcctKernel,
+  source: WorkplaneShape,
+  resultFaces: ShapeHandle[],
+  sourceSolid = orientedSolidForShape(cad, source),
+): string[] {
+  const sourceFaces = cad.getSubShapes(sourceSolid, "face");
   const fingerprint = (face: ShapeHandle) => {
     const brep = cad.toBREP(face);
     try {

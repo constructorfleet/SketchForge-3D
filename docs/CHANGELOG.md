@@ -13,6 +13,22 @@ owner: "Contributors"
 
 - The TypeScript client can now cut, group, ungroup and separate shapes. `client.booleans.cut(projectId, { solidIds, holeIds })`, `client.groups.group(projectId, ids)`, `client.groups.ungroup(projectId, shapeId)` and `client.parts.separate(projectId, shapeId)` call `POST /booleans`, `POST /groups`, `DELETE /groups` and `POST /parts`. The project handle has the same four as `project.cut`, `group`, `ungroup` and `separate`, matching the Python client. Each is retried when the project lock is busy. A new example macro, `tap-drill-plate.macro.mjs`, drills a plate with `project.cut` and exports it as STL entirely through the API, and runs in the package integration suite. The README no longer claims the API has no grouping endpoint. Instead it records the real limit: a `thread` cutter is stored as a mesh, and the server's boolean cannot cut it yet.
 - The TypeScript client can now export a project to every format the API produces. `client.exports.export(projectId, { format, shapeIds?, name?, view?, section? })` and `project.export(...)` return the file as a `Uint8Array` for `stl`, `obj`, `3mf`, `step`, `skf`, `zip`, `svg` and `dxf`, with STEP's `exportedCount` and `skipped` shapes. A `view` on anything but SVG, or a `section` on anything but SVG or DXF, is refused before the request is sent. `project.estimateWallThickness(shapeId)`, which the package README already documented, now exists.
+- Fillets, selected-edge treatments, and `GET /edges` on a revolve now use its
+  exact solid instead of its tessellated mesh. A revolve carries no exact
+  B-rep of its own, so the server sewed its mesh into a solid: a 24-sided ring
+  listed 288 facet edges, all filletable, and a fillet "succeeded" by rounding
+  every facet (7568 triangles in 2.3 s). An untreated plain full-turn revolve
+  is now rebuilt exactly from its profile for the edge listing, edge
+  measurements, and every fillet or chamfer, so that ring lists its four
+  corner circles (and two non-filletable seams), a fillet blends them with
+  tori, and edge indexes passed back to `POST /treatments` name those circles.
+  A resized revolve is rebuilt at its drawn size. A source edit replays a
+  revolve fillet against the exact topology. Partial-turn, helical, cored,
+  multi-region, and unevenly stretched revolves have no exact solid, so their
+  treatments and edge listings are refused with `422` naming the limitation
+  instead of working on facets. A second treatment on an already treated
+  revolve now builds on its stored geometry; an all-edge chamfer used to
+  rebuild the revolve from its profile and discard the earlier treatment.
 - Fixed a sketch source edit inside a turned, mirrored or resized boolean
   group moving the group's part. Recompute added the rebuilt part's offset to
   the group's position as if the group were unturned, dropped the group's

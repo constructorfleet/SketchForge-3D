@@ -143,13 +143,15 @@ These are implemented and should not be filed as missing features:
   without carrying edge indices across the edit. One recorded symmetric 45°
   all-edge chamfer follows the same replay path on those source kinds, with
   treatment history and the current eligible-edge count rebuilt from new
-  topology. Plain full-turn revolve chamfers are rebuilt from the retained
-  profile as exact CAD geometry and currently require exactly one closed
-  profile region; partial-turn, helical, and multi-region revolve chamfers are
-  refused. A plain revolve's fillet is still cut from its faceted mesh, so its
-  replay succeeds only when the rebuilt facets accept the radius. Revolve
-  setting edits also attempt replay and roll back if the new topology cannot
-  accept the treatment. A source edit on a shape whose record holds a
+  topology. Plain full-turn revolve fillets and chamfers, all-edge or
+  selected-edge, are cut from exact CAD geometry rebuilt from the retained
+  profile, and the edge listing and edge measurements number that same exact
+  solid (#347); a resize is applied to the section before it is turned. They
+  currently require exactly one closed profile region; partial-turn, helical,
+  cored, multi-region, and unevenly stretched revolves have no exact solid, so
+  their treatments and edge listings are refused rather than run on facets.
+  Revolve setting edits also attempt replay and roll back if the new topology
+  cannot accept the treatment. A source edit on a shape whose record holds a
   selected-edge treatment, a non-45° chamfer, or multiple treatment steps, or
   on a shape that was shelled (the shell is recorded too), is refused without
   a project write rather than rebuilt without them. Draft/treatment

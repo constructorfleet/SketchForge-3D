@@ -16,9 +16,10 @@
  * further back.
  *
  * The listing numbers entities as `GET /edges` and `GET /faces` number them, and
- * for the same reason: all three build the shape with `orientedSolidForShape`,
- * so an index means one thing across the listing, the measurement and the
- * fillet that follows. A *distance* is the one measurement that also depends on
+ * for the same reason: edges come from `edgeSolidForShape`, which the edge
+ * listing and a fillet also use, and faces from `orientedSolidForShape`, which
+ * the face listing uses, so an index means one thing across the listing, the
+ * measurement and the fillet that follows. A *distance* is the one measurement that also depends on
  * where the shape sits, and `measureBetween` says below what it does instead.
  *
  * A measurement that is not meaningful for the entity selected is reported as
@@ -36,7 +37,7 @@ import {
   type RadiusUnavailableCode,
 } from "./cadMeasurements.js";
 import { withCadKernel } from "./serverCadKernel.js";
-import { orientedSolidForShape, ServerCadError } from "./serverCadOperations.js";
+import { edgeSolidForShape, orientedSolidForShape, ServerCadError } from "./serverCadOperations.js";
 import { faceOutwardNormal } from "./serverCadShell.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
@@ -128,10 +129,21 @@ function faceMeasurement(cad: OcctKernel, handle: ShapeHandle, index: number): S
 /** Every edge and face of a shape, measured. */
 export function shapeMeasurements(shape: WorkplaneShape): Promise<ServerCadMeasurement[]> {
   return withCadKernel((cad) => {
-    const solid = orientedSolidForShape(cad, shape);
+    // Edges from the solid `GET /edges` numbers, faces from the one `GET /faces`
+    // numbers. They differ only for an untreated revolve, whose edges are its
+    // exact circles while its default face listing is still its mesh's. A
+    // revolve the edge listing refuses (a partial turn, a thread) is still
+    // measured, from its mesh, as it was before the listing refused it.
+    const faceSolid = orientedSolidForShape(cad, shape);
+    let edgeSolid = faceSolid;
+    try {
+      edgeSolid = edgeSolidForShape(cad, shape);
+    } catch (error) {
+      if (!(error instanceof ServerCadError)) throw error;
+    }
     return [
-      ...cad.getSubShapes(solid, "edge").map((handle, index) => edgeMeasurement(cad, handle, index)),
-      ...cad.getSubShapes(solid, "face").map((handle, index) => faceMeasurement(cad, handle, index)),
+      ...cad.getSubShapes(edgeSolid, "edge").map((handle, index) => edgeMeasurement(cad, handle, index)),
+      ...cad.getSubShapes(faceSolid, "face").map((handle, index) => faceMeasurement(cad, handle, index)),
     ];
   });
 }
