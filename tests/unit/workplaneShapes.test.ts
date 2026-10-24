@@ -203,6 +203,25 @@ describe("workplane shape helpers", () => {
     expect(workplaneShapesEqual(first, sameValues)).toBe(false);
   });
 
+  it("treats a change to any shape field as a change, including face metadata", () => {
+    const base = shape({ faceIds: ["face-a", "face-b"] });
+    const patches: Array<Partial<WorkplaneShape>> = [
+      { faceColors: { "face-a": "#ff0000" } },
+      { faceIds: ["face-a", "face-c"] },
+      { faceDraft: { sourceFaceId: "face-a", angle: 5, pullDirection: "z", sourceFaceNormal: { x: 0, y: 0, z: 1 } } },
+      { faceDraftSourceFaceIds: ["face-a"] },
+      { draftPrismAngle: 3 },
+      { shell: { thickness: 1 } },
+      { sketchSourceId: "sketch-1" },
+    ];
+    for (const patch of patches) {
+      expect(workplaneShapesEqual(base, { ...base, ...patch }), JSON.stringify(Object.keys(patch))).toBe(false);
+    }
+    // A field added to WorkplaneShape later must not need a matching edit here to count.
+    expect(workplaneShapesEqual(base, { ...base, futureField: 1 } as WorkplaneShape)).toBe(false);
+    expect(workplaneShapesEqual(base, { ...base, faceColors: undefined })).toBe(true);
+  });
+
   it("serializes canonical shapes for sync", () => {
     expect(JSON.parse(serializeShapesForSync([shape({ rotation: 359.9, mirrorX: false })]))).toEqual([
       expect.objectContaining({
