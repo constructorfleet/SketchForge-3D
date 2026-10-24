@@ -237,6 +237,11 @@
     }
   },
   "editor": {
+    "autosave": {
+      "pending": "Das Speichern von „{projectName}“ dauert länger als erwartet.",
+      "failed": "„{projectName}“ konnte nicht gespeichert werden. Die letzten Änderungen sind möglicherweise nicht gespeichert.",
+      "exportBackup": ".skf-Sicherung exportieren"
+    },
     "notice": {
       "ready": "Bereit",
       "selectShapeFirst": "Wählen Sie zuerst eine Form aus",

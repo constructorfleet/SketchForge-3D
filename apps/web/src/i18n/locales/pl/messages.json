@@ -237,6 +237,11 @@
     }
   },
   "editor": {
+    "autosave": {
+      "pending": "Zapisywanie „{projectName}” trwa dłużej niż oczekiwano.",
+      "failed": "Nie udało się zapisać „{projectName}”. Ostatnie zmiany mogą nie być zapisane.",
+      "exportBackup": "Eksportuj kopię zapasową .skf"
+    },
     "notice": {
       "ready": "Gotowe",
       "selectShapeFirst": "Najpierw zaznacz kształt",
