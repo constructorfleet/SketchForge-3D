@@ -57,10 +57,11 @@ describe("shape faces", () => {
     // An imported picture is a box carrying the image; rebuilding it would drop the picture.
     expect(faceEditingCanBeEnabled(shape({ imagePlate: { dataUrl: "data:image/png;base64,", mimeType: "image/png" } } as Partial<WorkplaneShape>))).toBe(false);
     expect(faceEditingCanBeEnabled(shape({ mirrorX: true }))).toBe(false);
-    // Turning about the vertical axis is fine; a tilt would move the rebuilt solid (#420).
+    // Any rotation: the exact solid turns about the shape's centre, as the
+    // viewport does, so a tilted shape is rebuilt where it stands (#420).
     expect(faceEditingCanBeEnabled(shape({ rotation: 30 }))).toBe(true);
-    expect(faceEditingCanBeEnabled(shape({ rotationX: 20 }))).toBe(false);
-    expect(faceEditingCanBeEnabled(shape({ rotationZ: 15 }))).toBe(false);
+    expect(faceEditingCanBeEnabled(shape({ rotationX: 20 }))).toBe(true);
+    expect(faceEditingCanBeEnabled(shape({ rotationZ: 15 }))).toBe(true);
   });
 
   it("sets and clears a face colour under its stable ID, replacing one stored by face number", () => {

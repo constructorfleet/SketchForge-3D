@@ -5,9 +5,11 @@
  * solid sat anywhere else, or turned the wrong way, the shape would jump when
  * face editing was enabled. Each case compares the exact solid's bounds with
  * the shape's own bounding box placed by `transformMesh`, the transform the
- * viewport and exports apply. That box is exact for a box turned about the
- * vertical axis and for any shape that is not turned. Tilted shapes are not
- * offered face editing yet (#420), and the last case pins why.
+ * viewport and exports apply. That box is exact for a box turned any way and
+ * for any shape that is not turned. A tilted box is where the exact solid used
+ * to turn about its base rather than its centre and land off where it was drawn
+ * (#420), so tilted boxes are among the cases; `exactSolidRotation.e2e.ts`
+ * checks the centre of mass of tilted asymmetric shapes.
  */
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "../unit/support/cadTestTimeout";
@@ -29,6 +31,9 @@ const CASES: WorkplaneShape[] = [
   placed({ kind: "wedge", x: -15, z: 4, elevation: 1, width: 20, depth: 12, height: 9, size: 20, rotation: 0 }),
   placed({ kind: "cone", x: 5, z: 5, elevation: 2, width: 16, depth: 16, height: 18, size: 16, rotation: 0 }),
   placed({ kind: "roof", x: 0, z: -20, elevation: 0, width: 24, depth: 14, height: 8, size: 24, rotation: 0 }),
+  placed({ kind: "box", x: 12, z: -7, elevation: 3, width: 30, depth: 10, height: 6, size: 30, rotation: 0, rotationX: 20 }),
+  placed({ kind: "box", x: -4, z: 9, elevation: 5, width: 18, depth: 12, height: 14, size: 18, rotation: 30, rotationZ: -25 }),
+  placed({ kind: "box", x: 6, z: 2, elevation: 0, width: 22, depth: 8, height: 10, size: 22, rotation: 15, rotationX: 40, rotationZ: 35 }),
 ];
 
 /** The shape's local bounding box, centred in X and Z and standing on Y = 0, placed in the world. */
@@ -40,10 +45,9 @@ function placedBoundingBox(shape: WorkplaneShape) {
 }
 
 describe("exact rebuild for face editing", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
-  it.each(CASES.map((shape) => [`${shape.kind} at (${shape.x}, ${shape.elevation}, ${shape.z}) turned ${shape.rotation}°/${shape.rotationX ?? 0}°`, shape] as const))(
+  it.each(CASES.map((shape) => [`${shape.kind} at (${shape.x}, ${shape.elevation}, ${shape.z}) turned ${shape.rotation}°/${shape.rotationX ?? 0}°/${shape.rotationZ ?? 0}°`, shape] as const))(
     "puts the %s where the viewport draws it",
     async (_, shape) => {
-      expect(faceEditingCanBeEnabled(shape)).toBe(true);
       const mesh = placedBoundingBox(shape);
       const drawn = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
       for (const vertex of mesh.vertices) {
@@ -55,7 +59,7 @@ describe("exact rebuild for face editing", { timeout: CAD_TEST_TIMEOUT_MS }, () 
       const exact = await withCadKernel((cad) => {
         try {
           const solid = exactPartSolid(cad, { shape, transform: exactBooleanPlacement(shape) });
-          return cad.getBoundingBox(solid, true);
+          return { ...cad.getBoundingBox(solid, true), volume: cad.getVolume(solid), centre: cad.getCenterOfMass(solid) };
         } finally {
           cad.releaseAll();
         }
@@ -67,22 +71,18 @@ describe("exact rebuild for face editing", { timeout: CAD_TEST_TIMEOUT_MS }, () 
       expect(Math.abs(exact.ymax - drawn.max[1]!)).toBeLessThan(tolerance);
       expect(Math.abs(exact.zmin - drawn.min[2]!)).toBeLessThan(tolerance);
       expect(Math.abs(exact.zmax - drawn.max[2]!)).toBeLessThan(tolerance);
+      if (shape.kind === "box") {
+        // A box's centre of mass is its middle, which the viewport turns it
+        // about and so never moves, whatever the rotation. Checked alongside
+        // the bounds because bounds are a proxy; this is the quantity itself.
+        expect(exact.volume).toBeCloseTo(shapeWidth(shape) * shapeDepth(shape) * shape.height, 4);
+        expect(exact.centre.x).toBeCloseTo(shape.x, 4);
+        expect(exact.centre.y).toBeCloseTo((shape.elevation ?? 0) + shape.height / 2, 4);
+        expect(exact.centre.z).toBeCloseTo(shape.z, 4);
+      }
+      // Last, so a shape that would move fails on where it lands rather than
+      // on being refused.
+      expect(faceEditingCanBeEnabled(shape)).toBe(true);
     },
   );
-
-  it("still moves a tilted shape, which is why face editing is not offered for one (#420)", async () => {
-    const tilted = placed({ kind: "box", x: 12, z: -7, elevation: 3, width: 30, depth: 10, height: 6, size: 30, rotation: 0, rotationX: 20 });
-    expect(faceEditingCanBeEnabled(tilted)).toBe(false);
-    const drawn = placedBoundingBox(tilted).vertices;
-    const drawnMinZ = Math.min(...drawn.map((vertex) => vertex[2]!));
-    const exactMinZ = await withCadKernel((cad) => {
-      try {
-        return cad.getBoundingBox(exactPartSolid(cad, { shape: tilted, transform: exactBooleanPlacement(tilted) }), true).zmin;
-      } finally {
-        cad.releaseAll();
-      }
-    });
-    // Turned about its base rather than its centre: 3 mm up the box, sin 20° of it.
-    expect(exactMinZ - drawnMinZ).toBeCloseTo(3 * Math.sin(20 * Math.PI / 180), 3);
-  });
 });
