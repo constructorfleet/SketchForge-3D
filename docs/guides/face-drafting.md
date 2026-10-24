@@ -96,6 +96,15 @@ A draft is kept only on a single-loop sketch extrusion that is exact, has no
 fillet, chamfer or shell, is not mirrored and has not been resized, and only on
 a flat face that maps to one side of the profile or to its top or bottom.
 
+The REST API can also keep a face or prism draft on a sketch extrusion that
+already has mirror flags. It drafts the retained source geometry and leaves
+those flags on the shape, so the drawn result stays mirrored and a later profile
+edit can replay the same mirror. The face-draft record's source normal describes
+the unmirrored geometry used by the draft. The editor still uses a baked draft
+for mirrored shapes. Projects saved after the earlier REST mirror-loss bug may
+already have cleared the mirror flags; that lost placement is not recoverable
+from the saved draft alone.
+
 The part is placed as the REST API places it. A new draft, or a change of
 angle or direction, keeps the shape's position: the centre of the drafted
 part's bounds sits where the undrafted part's centre was, so a draft that

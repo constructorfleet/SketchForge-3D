@@ -168,6 +168,14 @@ async function findUniqueDraftFace(shape: WorkplaneShape, normal: SketchFaceDraf
   return matches.length === 1 ? matches[0] : null;
 }
 
+function unmirroredDraftSource(shape: WorkplaneShape): WorkplaneShape {
+  return { ...shape, mirrorX: undefined, mirrorY: undefined, mirrorZ: undefined };
+}
+
+function retainDraftSourceMirrors(result: WorkplaneShape, source: WorkplaneShape): WorkplaneShape {
+  return { ...result, mirrorX: source.mirrorX, mirrorY: source.mirrorY, mirrorZ: source.mirrorZ };
+}
+
 /**
  * Carry face metadata across a parameter edit only when a face has a unique
  * counterpart. Curved faces may change their sampled normal as their defining
@@ -1002,6 +1010,9 @@ export function createEngine(store: ProjectStore): Engine {
           const rebuiltSource = {
             ...sourceMetadata,
             ...rebuilt,
+            mirrorX: existing.mirrorX,
+            mirrorY: existing.mirrorY,
+            mirrorZ: existing.mirrorZ,
             ...(existing.faceDraft || faceDraftChanged ? { faceDraftSourceScale } : {}),
             width: rebuilt.width * rebuildScale.width,
             depth: rebuilt.depth * rebuildScale.depth,
@@ -1053,14 +1064,14 @@ export function createEngine(store: ProjectStore): Engine {
               source: replayedSource,
               request: requestedFaceDraft,
               profileChanged: replacingSketchProfile,
-            }, (kernel, shape) => orientedSolidForShape(kernel, shape as WorkplaneShape)));
+            }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
             const result = await applySketchFaceDraft(replayedSource, {
               ...requestedFaceDraft,
               sourceFaceId: currentFaceId,
             });
             // The same record the editor writes for a draft it makes (#384).
             swept = {
-              ...shapeWithCadResult(replayedSource, result),
+              ...retainDraftSourceMirrors(shapeWithCadResult(replayedSource, result), replayedSource),
               ...retainedFaceDraftFields(
                 replayedSource.faceIds,
                 existing,
@@ -1071,7 +1082,10 @@ export function createEngine(store: ProjectStore): Engine {
             };
           } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
             swept = {
-              ...shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
+              ...retainDraftSourceMirrors(
+                shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
+                replayedSource,
+              ),
               draftPrismAngle,
             };
           } else {
@@ -1128,6 +1142,9 @@ export function createEngine(store: ProjectStore): Engine {
           const rebuiltSweep = {
             ...sourceMetadata,
             ...resized,
+            mirrorX: existing.mirrorX,
+            mirrorY: existing.mirrorY,
+            mirrorZ: existing.mirrorZ,
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceIds: refreshedFaceIds,
@@ -1155,13 +1172,13 @@ export function createEngine(store: ProjectStore): Engine {
               ? existing.faceDraft.sourceFaceNormal
               : undefined;
             const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(existing, isExactSketchRevolve ? { topology: "exact" } : undefined))
+              : (await shapeFaces(unmirroredDraftSource(existing), isExactSketchRevolve ? { topology: "exact" } : undefined))
                 .find((face) => face.id === requestedFaceDraft.sourceFaceId);
             const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
             }
-            const currentFace = await findUniqueDraftFace(replayedSource, sourceFaceNormal);
+            const currentFace = await findUniqueDraftFace(unmirroredDraftSource(replayedSource), sourceFaceNormal);
             if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
             const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
             const result = await applySketchFaceDraft(replayedSource, {
@@ -1169,7 +1186,7 @@ export function createEngine(store: ProjectStore): Engine {
               sourceFaceId: currentFace.id,
             });
             swept = {
-              ...shapeWithCadResult(replayedSource, result),
+              ...retainDraftSourceMirrors(shapeWithCadResult(replayedSource, result), replayedSource),
               faceDraft,
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
             };
@@ -1204,20 +1221,20 @@ export function createEngine(store: ProjectStore): Engine {
           const rebuilt = resizeRebuiltRevolve(rebuiltAtNaturalScale, sourceScale);
           if (requestedFaceDraft) {
             const exactBase = {
-              ...shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt)),
+              ...retainDraftSourceMirrors(shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt)), rebuilt),
               faceDraftSourceScale: sourceScale,
             };
             const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
               ? existing.faceDraft.sourceFaceNormal
               : undefined;
             const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(existing, { topology: "exact" }))
+              : (await shapeFaces(unmirroredDraftSource(existing), { topology: "exact" }))
                 .find((face) => face.id === requestedFaceDraft.sourceFaceId);
             const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
             if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
               throw new Error("The selected source face has no stable planar reference.");
             }
-            const currentFace = await findUniqueDraftFace(exactBase, sourceFaceNormal);
+            const currentFace = await findUniqueDraftFace(unmirroredDraftSource(exactBase), sourceFaceNormal);
             if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
             const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
             const result = await applySketchFaceDraft(exactBase, {
@@ -1225,7 +1242,7 @@ export function createEngine(store: ProjectStore): Engine {
               sourceFaceId: currentFace.id,
             });
             swept = {
-              ...shapeWithCadResult(exactBase, result),
+              ...retainDraftSourceMirrors(shapeWithCadResult(exactBase, result), exactBase),
               faceDraft,
               faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame ?? exactBase.cadBrepFrame,
               faceDraftSourceScale: sourceScale,
@@ -1658,7 +1675,7 @@ export function createEngine(store: ProjectStore): Engine {
     ),
 
     draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, "prism-draft", async (shape) => ({
-      ...shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })),
+      ...retainDraftSourceMirrors(shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })), shape),
       ...retainedPrismDraftFields(shape, angle),
     })),
 
