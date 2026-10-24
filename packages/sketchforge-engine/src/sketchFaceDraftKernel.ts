@@ -639,15 +639,15 @@ export function draftPrismProfileOffset(profile: Pick<SketchProfile, "points">) 
  * record means one placement whichever side wrote it (#384, #435).
  */
 export function retainedDraftSourcePlacement(
-  existing: Pick<WorkplaneShape, "x" | "z" | "elevation" | "rotation" | "rotationX" | "rotationZ" | "faceDraftSourceFrame" | "draftPrismSourceFrame" | "cadBrepFrame">,
+  existing: Pick<WorkplaneShape, "x" | "z" | "elevation" | "rotation" | "rotationX" | "rotationZ" | "mirrorX" | "mirrorY" | "mirrorZ" | "faceDraftSourceFrame" | "draftPrismSourceFrame" | "cadBrepFrame">,
   rebuiltFrame: Pick<CadBrepFrame, "x" | "z" | "elevation">,
   sourceFrameOverride?: Pick<CadBrepFrame, "x" | "z" | "elevation">,
 ) {
   const sourceFrame = sourceFrameOverride ?? existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
   const offset = new THREE.Vector3(
-    rebuiltFrame.x - (sourceFrame?.x ?? 0),
-    rebuiltFrame.elevation - (sourceFrame?.elevation ?? 0),
-    rebuiltFrame.z - (sourceFrame?.z ?? 0),
+    (rebuiltFrame.x - (sourceFrame?.x ?? 0)) * (existing.mirrorX ? -1 : 1),
+    (rebuiltFrame.elevation - (sourceFrame?.elevation ?? 0)) * (existing.mirrorY ? -1 : 1),
+    (rebuiltFrame.z - (sourceFrame?.z ?? 0)) * (existing.mirrorZ ? -1 : 1),
   ).applyEuler(new THREE.Euler(
     THREE.MathUtils.degToRad(existing.rotationX ?? 0),
     THREE.MathUtils.degToRad(existing.rotation ?? 0),

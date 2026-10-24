@@ -1083,11 +1083,13 @@ export function createEngine(store: ProjectStore): Engine {
             const drafted = shapeWithCadResult(replayedSource, result);
             swept = {
               ...retainDraftSourceMirrors(drafted, replayedSource),
-              ...retainedDraftSourcePlacement({
-                ...replayedSource,
-                faceDraftSourceFrame: undefined,
-                draftPrismSourceFrame: undefined,
-              }, drafted.cadBrepFrame!),
+              ...(!replayedSource.mirrorX && !replayedSource.mirrorY && !replayedSource.mirrorZ
+                ? retainedDraftSourcePlacement({
+                    ...replayedSource,
+                    faceDraftSourceFrame: undefined,
+                    draftPrismSourceFrame: undefined,
+                  }, drafted.cadBrepFrame!)
+                : {}),
               ...retainedFaceDraftFields(
                 replayedSource.faceIds,
                 existing,
