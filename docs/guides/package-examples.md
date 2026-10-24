@@ -43,6 +43,15 @@ Source: `packages/sketchforge-client/examples/filleted-box.macro.mjs`.
 !!!include(../../packages/sketchforge-client/examples/filleted-box.macro.mjs)!!!
 ```
 
+## TypeScript: tap-drill plate
+
+Source: `packages/sketchforge-client/examples/tap-drill-plate.macro.mjs`. Cuts a tap-drill hole through a plate with `project.cut` and exports the part as STL with `project.export`, entirely through the API. The integration test checks the removed volume, the centre of mass, and that the written STL encloses the same solid.
+
+<!-- runnable-source: packages/sketchforge-client/examples/tap-drill-plate.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->
+```js
+!!!include(../../packages/sketchforge-client/examples/tap-drill-plate.macro.mjs)!!!
+```
+
 ## Python: bolt plate
 
 Source: `packages/sketchforge-py/examples/bolt_plate.py`.

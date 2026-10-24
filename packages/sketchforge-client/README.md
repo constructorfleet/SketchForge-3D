@@ -99,6 +99,11 @@ client.thickness.estimate(projectId, shapeId): Promise<WallThicknessEstimate>
 client.drawings.dxf(projectId, { plane, offset, shapeIds?, name? }): Promise<SectionDxfArtifact>
 client.exports.export(projectId, { format, shapeIds?, name?, view?, section? }): Promise<ProjectExportArtifact>
 
+client.booleans.cut(projectId, { solidIds, holeIds }): Promise<BooleanCutResult>
+client.groups.group(projectId, ids): Promise<GroupResult>
+client.groups.ungroup(projectId, shapeId): Promise<ShapeWriteResult>
+client.parts.separate(projectId, shapeId): Promise<ShapeWriteResult>
+
 client.shell.apply(projectId, shapeId, { thickness, openFaces? }): Promise<ShellResult>
 client.shell.hollow(projectId, shapeId, thickness): Promise<ShellResult>
 client.shell.tray(projectId, shapeId, thickness, openFaces?): Promise<ShellResult>
@@ -138,6 +143,7 @@ project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to)
 project.sectionDrawing({ plane: "xy", offset: 3, shapeIds? })
 project.sectionDxf({ plane: "xy", offset: 3, shapeIds? }) | estimateWallThickness(id) | explodeStepAssembly(id)
 project.export({ format, shapeIds?, name?, view?, section? })
+project.cut({ solidIds, holeIds }) | group(ids) | ungroup(id) | separate(id)
 project.mirrorBaked(ids, axis)
 project.shell(id, { thickness, openFaces? }) | hollow(id, thickness) | tray(id, thickness, openFaces?)
 project.draftPrism(id, angle)
@@ -241,15 +247,16 @@ A module that exports a bare function instead of a definition runs in a `fresh` 
 
 ## Examples
 
-`examples/` holds the three worked macros, which double as the integration tests:
+`examples/` holds the four worked macros, which double as the integration tests:
 
 | Macro | Builds |
 | --- | --- |
 | `bolt-plate.macro.mjs` | A plate sized around a computed row of tapped holes |
 | `bolt-circle.macro.mjs` | A flange with N tapped holes on a ring of radius R |
 | `filleted-box.macro.mjs` | A box from three numbers, with every roundable edge filleted on the server |
+| `tap-drill-plate.macro.mjs` | A plate drilled for a tap through `project.cut`, exported as STL |
 
-Tapped holes are `kind: "thread"` with `hole: true`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor taps the plate. The API has no grouping endpoint yet, so the macros stop at marked holes.
+Tapped holes are `kind: "thread"` with `hole: true`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor taps the plate. The API does group and cut (`project.group`, `project.cut`), but a thread is stored as a mesh, and the server's exact boolean cannot cut that mesh yet, so the bolt macros stop at marked holes. `tap-drill-plate.macro.mjs` runs the whole cut-and-export workflow through the API, with a cylinder at the tap-drill diameter instead of the thread form.
 
 ## Development
 

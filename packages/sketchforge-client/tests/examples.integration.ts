@@ -8,6 +8,9 @@
  * `npm run test:integration`.
  */
 
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { clientFromEnvironment } from "../src/environment.js";
 import { macroFromModule, runMacro } from "../src/macro.js";
@@ -16,6 +19,7 @@ import type { SketchForgeClient } from "../src/client.js";
 import boltPlate from "../examples/bolt-plate.macro.mjs";
 import boltCircle from "../examples/bolt-circle.macro.mjs";
 import filletedBox from "../examples/filleted-box.macro.mjs";
+import tapDrillPlate from "../examples/tap-drill-plate.macro.mjs";
 
 let client: SketchForgeClient;
 const createdProjects: string[] = [];
@@ -96,6 +100,66 @@ describe("bolt circle", () => {
     const second = await run(boltCircle, { holes: "4" });
     expect(second.projectId).not.toBe(first.projectId);
     expect(second.projectCreated).toBe(true);
+  });
+});
+
+/** Enclosed volume and centroid of a binary STL, by signed tetrahedra from the origin. */
+function stlSolid(bytes: Uint8Array) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const triangles = view.getUint32(80, true);
+  let volume = 0;
+  const moment = [0, 0, 0];
+  for (let index = 0; index < triangles; index += 1) {
+    const at = 84 + index * 50 + 12;
+    const vertex = (n: number) => [0, 1, 2].map((axis) => view.getFloat32(at + n * 12 + axis * 4, true));
+    const [a, b, c] = [vertex(0), vertex(1), vertex(2)] as [number[], number[], number[]];
+    const signed = (a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) - a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) + a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!)) / 6;
+    volume += signed;
+    for (let axis = 0; axis < 3; axis += 1) moment[axis]! += (signed * (a[axis]! + b[axis]! + c[axis]!)) / 4;
+  }
+  return { triangles, volume, centroid: moment.map((value) => value / volume) };
+}
+
+describe("tap-drill plate", () => {
+  it("drills the plate on the server and exports the part as a closed STL", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "sketchforge-tap-drill-plate-"));
+    const out = path.join(directory, "tap-drill-plate.stl");
+    try {
+      const report = await run(tapDrillPlate, { drill: "6.8", width: "60", depth: "40", thickness: "8", offset: "10", out });
+      const result = report.result as { plateId: string; triangles: number; stl: { filename: string; bytes: number; shapeCount: number } };
+
+      // The cut replaced both operands with one shape.
+      const shapes = await client.shapes.list(report.projectId);
+      expect(shapes.map((shape) => shape.id)).toEqual([result.plateId]);
+      expect(result.triangles).toBeGreaterThan(0);
+
+      // A 6.8 mm cylinder through the 8 mm plate was removed, and nothing
+      // else. The result's properties are measured on its tessellated mesh,
+      // whose bore is inscribed in the true one, so a little less than the
+      // exact cylinder is missing -- never more.
+      const plateVolume = 60 * 40 * 8;
+      const { volume, centerOfMass } = await client.properties.get(report.projectId, result.plateId);
+      const removed = plateVolume - volume;
+      const drilled = Math.PI * 3.4 ** 2 * 8;
+      expect(removed).toBeGreaterThan(drilled * 0.98);
+      expect(removed).toBeLessThanOrEqual(drilled * 1.0001);
+      // And from where the hole is: taking it out at x = +10 moves the centre
+      // of mass of the plate, centred on the origin, toward -x by exactly this.
+      expect(centerOfMass.x).toBeCloseTo((-removed * 10) / volume, 1);
+      expect(centerOfMass.x).toBeLessThan(0);
+
+      // The file on disk is that same solid, closed: its triangles enclose the
+      // server's volume about the same centre. STL is Z-up, so X is unchanged.
+      expect(result.stl).toMatchObject({ filename: "tap-drill-plate.stl", shapeCount: 1 });
+      const bytes = new Uint8Array(await readFile(out));
+      expect(bytes.byteLength).toBe(result.stl.bytes);
+      const stl = stlSolid(bytes);
+      expect(bytes.byteLength).toBe(84 + stl.triangles * 50);
+      expect(stl.volume).toBeCloseTo(volume, 0);
+      expect(stl.centroid[0]).toBeCloseTo(centerOfMass.x, 1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 

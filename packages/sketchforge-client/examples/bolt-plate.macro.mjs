@@ -7,7 +7,8 @@
  *
  * The holes are `kind: "thread"` with `hole: true`, which cuts the thread form
  * wider by a clearance and marks the shape as a hole -- so grouping them with
- * the plate in the editor taps the plate. The API has no grouping endpoint yet,
+ * the plate in the editor taps the plate. A thread is stored as a mesh, which
+ * the server's exact boolean (`project.cut`, `project.group`) cannot cut yet,
  * so the macro leaves them as marked holes for the editor's boolean.
  *
  * @type {import("@constructorfleet/sketchforge3d").MacroDefinition<{

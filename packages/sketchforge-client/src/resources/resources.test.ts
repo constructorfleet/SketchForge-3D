@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
-import { fakeServer, type FakeServer } from "../testing.js";
+import { fakeServer, type FakeServer, type StubResponse } from "../testing.js";
 import {
   EXPORT_VIEWS,
   MAX_SHAPES_PER_REQUEST,
@@ -507,6 +507,85 @@ describe("exports", () => {
     await expect(client(server).project("p9").export({ format: "3mf" })).resolves.toMatchObject({ format: "3mf", data: artifactBytes });
     expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/exports?projectId=p9");
     expect(server.calls[0]?.body).toEqual({ format: "3mf" });
+  });
+});
+
+describe("booleans, groups and parts", () => {
+  it("names the solids and the cutters in the body, with only the project in the query", async () => {
+    const server = fakeServer({ status: 201, body: { shape: shapeSummary("cut"), triangles: 412, revision: 7 } });
+
+    const result = await client(server).booleans.cut("p1", { solidIds: ["plate"], holeIds: ["h1", "h2"] });
+
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/booleans?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ solidIds: ["plate"], holeIds: ["h1", "h2"] });
+    expect(result).toEqual({ shape: shapeSummary("cut"), triangles: 412, revision: 7 });
+  });
+
+  it("groups by ids in the body", async () => {
+    const server = fakeServer({ status: 201, body: { shape: shapeSummary("g"), revision: 3 } });
+
+    const result = await client(server).groups.group("p1", ["a", "b"]);
+
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/groups?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ ids: ["a", "b"] });
+    expect(result).toEqual({ shape: shapeSummary("g"), revision: 3 });
+  });
+
+  it("ungroups by DELETE with the group in the query and no body", async () => {
+    const server = fakeServer({ body: { shapes: [shapeSummary("a"), shapeSummary("b")], revision: 4 } });
+
+    const result = await client(server).groups.ungroup("p1", "g");
+
+    expect(server.calls[0]?.method).toBe("DELETE");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/groups?projectId=p1&shapeId=g");
+    expect(server.calls[0]?.body).toBeUndefined();
+    expect(result).toEqual({ shapes: [shapeSummary("a"), shapeSummary("b")], revision: 4 });
+  });
+
+  it("separates by POST with the shape in the query and no body", async () => {
+    const server = fakeServer({ body: { shapes: [shapeSummary("left"), shapeSummary("right")], revision: 5 } });
+
+    const result = await client(server).parts.separate("p1", "bar");
+
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/parts?projectId=p1&shapeId=bar");
+    expect(server.calls[0]?.body).toBeUndefined();
+    expect(result).toEqual({ shapes: [shapeSummary("left"), shapeSummary("right")], revision: 5 });
+  });
+
+  it("retries each of the four when the project lock is busy, because each one writes", async () => {
+    const busy = { status: 409, body: { error: "Project is busy.", code: "project_busy" } };
+    const calls: Array<[string, (c: SketchForgeClient) => Promise<unknown>, StubResponse]> = [
+      ["cut", (c) => c.booleans.cut("p1", { solidIds: ["a"], holeIds: ["b"] }), { status: 201, body: { shape: shapeSummary("a"), triangles: 1, revision: 2 } }],
+      ["group", (c) => c.groups.group("p1", ["a", "b"]), { status: 201, body: { shape: shapeSummary("g"), revision: 2 } }],
+      ["ungroup", (c) => c.groups.ungroup("p1", "g"), { body: { shapes: [], revision: 2 } }],
+      ["separate", (c) => c.parts.separate("p1", "a"), { body: { shapes: [], revision: 2 } }],
+    ];
+    for (const [name, call, ok] of calls) {
+      const server = fakeServer(busy, ok);
+      await expect(call(client(server)), name).resolves.toBeDefined();
+      expect(server.calls, name).toHaveLength(2);
+    }
+  });
+
+  it("binds the project id through a handle, the way the Python handle does", async () => {
+    const server = fakeServer({ status: 201, body: { shape: shapeSummary("x"), triangles: 1, revision: 1 } });
+    const project = client(server).project("p9");
+
+    await project.cut({ solidIds: ["plate"], holeIds: ["h"] });
+    await project.group(["a", "b"]);
+    await project.ungroup("g");
+    await project.separate("s");
+
+    expect(server.calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      "POST http://localhost:3100/api/v1/booleans?projectId=p9",
+      "POST http://localhost:3100/api/v1/groups?projectId=p9",
+      "DELETE http://localhost:3100/api/v1/groups?projectId=p9&shapeId=g",
+      "POST http://localhost:3100/api/v1/parts?projectId=p9&shapeId=s",
+    ]);
+    expect(server.calls.map((call) => call.body)).toEqual([{ solidIds: ["plate"], holeIds: ["h"] }, { ids: ["a", "b"] }, undefined, undefined]);
   });
 });
 

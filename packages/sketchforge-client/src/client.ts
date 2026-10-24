@@ -9,16 +9,19 @@
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Align, Distribute, Patterns } from "./resources/arrange.js";
+import { Booleans } from "./resources/booleans.js";
 import { Drawings } from "./resources/drawings.js";
 import { DraftPrism } from "./resources/draft-prism.js";
 import { Edges } from "./resources/edges.js";
 import { Explosions } from "./resources/explosions.js";
 import { Exports } from "./resources/exports.js";
 import { Faces } from "./resources/faces.js";
+import { Groups } from "./resources/groups.js";
 import { Imports } from "./resources/imports.js";
 import { Interference } from "./resources/interference.js";
 import { Measurements } from "./resources/measurements.js";
 import { Mirrors } from "./resources/mirrors.js";
+import { Parts } from "./resources/parts.js";
 import { Projects } from "./resources/projects.js";
 import { Properties } from "./resources/properties.js";
 import { Shapes } from "./resources/shapes.js";
@@ -28,6 +31,9 @@ import { Thickness } from "./resources/thickness.js";
 import type {
   AlignRequest,
   BakedMirrorResult,
+  BooleanCutRequest,
+  BooleanCutResult,
+  GroupResult,
   MirrorAxis,
   AlignResult,
   DistributeRequest,
@@ -82,6 +88,9 @@ export class SketchForgeClient {
   readonly interference: Interference;
   readonly thickness: Thickness;
   readonly exports: Exports;
+  readonly booleans: Booleans;
+  readonly groups: Groups;
+  readonly parts: Parts;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -105,6 +114,9 @@ export class SketchForgeClient {
     this.interference = new Interference(this.transport);
     this.thickness = new Thickness(this.transport);
     this.exports = new Exports(this.transport);
+    this.booleans = new Booleans(this.transport);
+    this.groups = new Groups(this.transport);
+    this.parts = new Parts(this.transport);
   }
 
   get apiRoot() {
@@ -230,6 +242,26 @@ export class ProjectHandle {
   /** Exports the project, or the named shapes, as one file in any of `PROJECT_EXPORT_FORMATS`. */
   export(request: ProjectExportRequest): Promise<ProjectExportArtifact> {
     return this.client.exports.export(this.id, request);
+  }
+
+  /** Subtracts the named holes from the named solids, leaving one exact shape. */
+  cut(request: BooleanCutRequest): Promise<BooleanCutResult> {
+    return this.client.booleans.cut(this.id, request);
+  }
+
+  /** Groups shapes; members marked `hole: true` are subtracted. */
+  group(ids: readonly string[]): Promise<GroupResult> {
+    return this.client.groups.group(this.id, ids);
+  }
+
+  /** Restores a group's members as separate project shapes. */
+  ungroup(shapeId: string): Promise<ShapeWriteResult> {
+    return this.client.groups.ungroup(this.id, shapeId);
+  }
+
+  /** Splits a shape into its disconnected bodies. */
+  separate(shapeId: string): Promise<ShapeWriteResult> {
+    return this.client.parts.separate(this.id, shapeId);
   }
 
   /** A sampled estimate of the shape's thinnest wall; not a certified minimum. */
