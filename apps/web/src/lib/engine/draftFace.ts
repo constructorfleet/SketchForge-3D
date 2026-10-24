@@ -1,5 +1,6 @@
 import type { OcctKernel, ShapeHandle, Vec3 } from "occt-wasm";
 import { LocalizedError } from "@/i18n/LocalizedError";
+import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 
 export type DraftFaceRequest = {
   brep: string;
@@ -18,6 +19,8 @@ export type DraftFaceResult = {
   faceCount: number;
   volume: number;
   brep: string;
+  /** Triangle start, triangle count and B-rep face index triples, for face colours. */
+  faceGroups: number[];
 };
 
 const AXIS: Record<DraftFaceRequest["pullDirection"], Vec3> = {
@@ -106,12 +109,13 @@ export function buildFaceDraft(cad: OcctKernel, request: DraftFaceRequest): Draf
   }
   if (request.brepTransform?.length === 12) drafted = cad.generalTransform(drafted, request.brepTransform);
   if (!cad.isValid(drafted) || !cad.isSolid(drafted)) throw new LocalizedError("errors.cadModifier.draftFaceInvalid");
-  const mesh = cad.tessellate(drafted, { linearDeflection: 0.035, angularDeflection: 0.16 });
+  const mesh = meshShapeWithFaceGroups(cad, drafted, { linearDeflection: 0.035, angularDeflection: 0.16 });
   return {
     positions: mesh.positions,
     normals: mesh.normals,
     indices: mesh.indices,
     triangleCount: mesh.triangleCount,
+    faceGroups: mesh.faceGroups,
     faceCount: cad.getSubShapes(drafted, "face").length,
     volume: cad.getVolume(drafted),
     brep: cad.toBREP(drafted),

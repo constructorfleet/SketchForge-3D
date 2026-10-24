@@ -28,9 +28,10 @@ export function createFaceColorPreviewGeometry(mesh: FaceGroupedMesh, faceColors
     colors[index + 2] = base.b;
   }
 
+  const unit = faceGroupUnit(mesh.faceGroups, triangleCount);
   for (let group = 0; group + 2 < mesh.faceGroups.length; group += 3) {
-    const start = mesh.faceGroups[group]!;
-    const count = mesh.faceGroups[group + 1]!;
+    const start = mesh.faceGroups[group]! / unit;
+    const count = mesh.faceGroups[group + 1]! / unit;
     const faceIndex = mesh.faceGroups[group + 2]!;
     const faceId = mesh.faceIds?.[faceIndex];
     const color = (faceId ? faceColors[faceId] : undefined) ?? faceColors[faceIndex];
@@ -49,4 +50,21 @@ export function createFaceColorPreviewGeometry(mesh: FaceGroupedMesh, faceColors
 
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   return geometry;
+}
+
+/**
+ * Server CAD results stored by earlier versions kept the kernel's ranges as-is, in
+ * index-buffer entries (three per triangle), so their groups cover three times
+ * the triangles the mesh has. Ranges in triangles never can, which tells the
+ * two apart without a format flag.
+ */
+function faceGroupUnit(faceGroups: readonly number[], triangleCount: number) {
+  let total = 0;
+  for (let group = 0; group + 2 < faceGroups.length; group += 3) {
+    const start = faceGroups[group]!;
+    const count = faceGroups[group + 1]!;
+    if (start % 3 !== 0 || count % 3 !== 0) return 1;
+    total += count;
+  }
+  return triangleCount > 0 && total === triangleCount * 3 ? 3 : 1;
 }

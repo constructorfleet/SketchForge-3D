@@ -44,4 +44,19 @@ describe("face color viewport preview", () => {
     expect([colors.getX(3), colors.getY(3), colors.getZ(3)]).toEqual([1, 0, 0]);
     expect(geometry.getIndex()).toBeNull();
   });
+
+  it("reads face groups that an older server stored in index-buffer units", () => {
+    // Two triangles, one per face, stored as [start, count] in index entries (3 per triangle).
+    const geometry = createFaceColorPreviewGeometry({
+      positions: new Float32Array([
+        0, 0, 0, 1, 0, 0, 0, 1, 0,
+        1, 0, 0, 1, 1, 0, 0, 1, 0,
+      ]),
+      faceGroups: [0, 3, 0, 3, 3, 1],
+    }, { 1: "#ff0000" }, "#0098c7");
+
+    const colors = geometry.getAttribute("color") as THREE.BufferAttribute;
+    expect([colors.getX(0), colors.getY(0), colors.getZ(0)]).not.toEqual([1, 0, 0]);
+    expect([colors.getX(3), colors.getY(3), colors.getZ(3)]).toEqual([1, 0, 0]);
+  });
 });

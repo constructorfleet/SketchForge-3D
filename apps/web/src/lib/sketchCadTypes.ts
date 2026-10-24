@@ -25,5 +25,7 @@ export type SketchCadBuildResponse =
       indices: Uint32Array;
       triangleCount: number;
       brep: string;
+      /** Triangle start, triangle count and B-rep face index triples, for face colours. */
+      faceGroups?: number[];
     }
   | ({ type: "error"; requestId: number } & LocalizedErrorPayload);
