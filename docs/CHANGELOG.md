@@ -11,6 +11,8 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Repeated face drafts now refuse kernel results whose volume or bounds grow far beyond the input solid, preventing a bad draft from stretching a face across the workspace. The Faces panel also explains that drafting can change face numbers and points to the current Face ID.
+
 - Faces can now be picked in the viewport. While the selected shape's **Faces** panel is open, the face under the pointer is highlighted, and clicking it chooses it for colouring or drafting, so the face stepper no longer has to be walked to find one. Dragging the shape, Shift-click, the transform handles and the workplane, ruler, edge-modifier and align modes are unchanged; those modes and camera moves clear the hover highlight, and a press that moves the shape does not also change the chosen face. The stepper stays as the keyboard way to choose a face. A shape whose faces have stable IDs now shows the chosen face's ID in the panel, the same ID `GET /faces` lists for it. The hover highlight is drawn as a separate overlay, so moving across faces does not rebuild the shape. Picking only changes the highlight and the panel's chosen face: nothing is stored and no undo step is recorded.
 - Fixed rolled round cylinders and cones taking a different yaw in mesh booleans and exports than they show in the viewport. Tilted round meshes now keep the full yaw; untilted meshes retain their facet-aligned yaw snapping.
 

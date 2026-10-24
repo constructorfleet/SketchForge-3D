@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { discardCadKernel, withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { exactSolidForShape } from "@constructorfleet/sketchforge-engine/cadSolids";
+import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { CAD_TEST_TIMEOUT_MS } from "../unit/support/cadTestTimeout";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
 import editorExtrusion from "../fixtures/face-draft-editor-extrusion.json";
@@ -167,5 +169,66 @@ describe("face draft kernel operation", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     expect(supported).toContain("0/-x/5");
     expect(supported).toContain("0/z/5");
     expect(supported).toContain("2/x/5");
+  });
+
+  it("refuses the repeated cube drafts that would stretch the selected face", async () => {
+    // The earlier support-matrix test deliberately probes failing kernel calls;
+    // start this reproduction with a fresh kernel just as the editor worker does.
+    discardCadKernel();
+    const initial = await withCadKernel((cad) => {
+      const shape = sceneShape({ name: "Cube", color: "#d41721", kind: "box", width: 20, depth: 20, height: 20, size: 20 });
+      const solid = exactSolidForShape(cad, shape);
+      const faces = cad.getSubShapes(solid, "face");
+      return {
+        brep: cad.toBREP(solid),
+        faceIds: faces.map((_, index) => `cube-face-${index}`),
+        volume: cad.getVolume(solid),
+        centre: (() => { const centre = cad.getCenterOfMass(solid); return { x: centre.x, y: centre.y, z: centre.z }; })(),
+        diagonal: Math.hypot(20, 20, 20),
+      };
+    });
+    let current = initial;
+    for (const [step, pullDirection] of ["y", "-z", "-x"].entries()) {
+      const faceIndex = 0;
+      let result: typeof current | null = null;
+      try {
+        result = await withCadKernel((cad) => {
+          const drafted = buildFaceDraft(cad, {
+            brep: current.brep,
+            faceIds: current.faceIds,
+            faceId: current.faceIds[faceIndex]!,
+            angle: 5,
+            pullDirection: pullDirection as "y" | "-z" | "-x",
+          });
+          const solid = cad.fromBREP(drafted.brep);
+          const bounds = cad.getBoundingBox(solid, true);
+          const centre = cad.getCenterOfMass(solid);
+          return {
+            brep: drafted.brep,
+            faceIds: Array.from({ length: drafted.faceCount }, (_, index) => `draft-${step}-face-${index}`),
+            volume: cad.getVolume(solid),
+            centre: { x: centre.x, y: centre.y, z: centre.z },
+            diagonal: Math.hypot(bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin, bounds.zmax - bounds.zmin),
+          };
+        });
+      } catch (error) {
+        expect(step, "the first bad draft must be refused").toBe(2);
+        expect(error).toMatchObject({ key: "errors.cadModifier.draftFaceInvalid" });
+        expect(current.volume).toBeLessThan(initial.volume * 1.5);
+        break;
+      }
+      expect(result).not.toBeNull();
+      const accepted = result!;
+      expect(accepted.volume, `draft ${step + 1} volume`).toBeGreaterThan(initial.volume * 0.5);
+      expect(accepted.volume, `draft ${step + 1} volume`).toBeLessThan(initial.volume * 1.5);
+      expect(accepted.diagonal, `draft ${step + 1} bounding diagonal`).toBeLessThan(initial.diagonal * 1.5);
+      expect(Math.hypot(
+        accepted.centre.x - initial.centre.x,
+        accepted.centre.y - initial.centre.y,
+        accepted.centre.z - initial.centre.z,
+      ), `draft ${step + 1} centre shift`).toBeLessThan(5);
+      current = accepted;
+    }
+    expect(current.volume).toBeLessThan(initial.volume * 1.5);
   });
 });

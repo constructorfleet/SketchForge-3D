@@ -1033,7 +1033,7 @@
         "remove": "Remove color from face {face}",
         "noColors": "No faces colored yet.",
         "draftTitle": "Draft",
-        "draftHint": "Tilts the chosen face by the angle, as if the part were pulled out of a mold in the chosen direction. Not every face can be drafted in every direction. Drafting rebuilds the faces, so it clears their colors.",
+        "draftHint": "Tilts the chosen face by the angle, as if the part were pulled out of a mold in the chosen direction. Not every face can be drafted in every direction. Drafting rebuilds the face list, clears its colors, and can change face numbers; check the Face ID before drafting again.",
         "direction": {
           "label": "Direction",
           "x": "+X",

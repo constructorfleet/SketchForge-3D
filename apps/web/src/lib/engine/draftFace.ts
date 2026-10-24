@@ -23,6 +23,13 @@ export type DraftFaceResult = {
   faceGroups: number[];
 };
 
+// Face drafting should adjust a local face, not produce a dramatically larger
+// solid when the pull axis is near-parallel to it. These limits leave headroom
+// for high-angle drafts while rejecting runaway kernel results like #428.
+const MAX_DRAFT_BOUNDING_SCALE = 8;
+const MIN_DRAFT_VOLUME_SCALE = 1 / 8;
+const MAX_DRAFT_VOLUME_SCALE = 8;
+
 const AXIS: Record<DraftFaceRequest["pullDirection"], Vec3> = {
   x: { x: 1, y: 0, z: 0 },
   y: { x: 0, y: 1, z: 0 },
@@ -96,6 +103,13 @@ export function buildFaceDraft(cad: OcctKernel, request: DraftFaceRequest): Draf
   const solid = cad.fromBREP(request.brep);
   const face = cad.getSubShapes(solid, "face")[indices[0]!];
   if (!face) throw new LocalizedError("errors.cadModifier.draftFaceNotFound");
+  const sourceVolume = Math.abs(cad.getVolume(solid));
+  const sourceBounds = cad.getBoundingBox(solid, true);
+  const sourceDiagonal = Math.hypot(
+    sourceBounds.xmax - sourceBounds.xmin,
+    sourceBounds.ymax - sourceBounds.ymin,
+    sourceBounds.zmax - sourceBounds.zmin,
+  );
 
   let drafted: ShapeHandle;
   try {
@@ -109,6 +123,20 @@ export function buildFaceDraft(cad: OcctKernel, request: DraftFaceRequest): Draf
   }
   if (request.brepTransform?.length === 12) drafted = cad.generalTransform(drafted, request.brepTransform);
   if (!cad.isValid(drafted) || !cad.isSolid(drafted)) throw new LocalizedError("errors.cadModifier.draftFaceInvalid");
+  const draftedVolume = Math.abs(cad.getVolume(drafted));
+  const draftedBounds = cad.getBoundingBox(drafted, true);
+  const draftedDiagonal = Math.hypot(
+    draftedBounds.xmax - draftedBounds.xmin,
+    draftedBounds.ymax - draftedBounds.ymin,
+    draftedBounds.zmax - draftedBounds.zmin,
+  );
+  const volumeScale = draftedVolume / Math.max(Number.EPSILON, sourceVolume);
+  const boundingScale = draftedDiagonal / Math.max(Number.EPSILON, sourceDiagonal);
+  if (!Number.isFinite(volumeScale) || !Number.isFinite(boundingScale)
+    || volumeScale < MIN_DRAFT_VOLUME_SCALE || volumeScale > MAX_DRAFT_VOLUME_SCALE
+    || boundingScale > MAX_DRAFT_BOUNDING_SCALE) {
+    throw new LocalizedError("errors.cadModifier.draftFaceInvalid");
+  }
   const mesh = meshShapeWithFaceGroups(cad, drafted, { linearDeflection: 0.035, angularDeflection: 0.16 });
   return {
     positions: mesh.positions,
