@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push to a pull request supersedes the run for the older one, so that
+# run is cancelled. Runs on main are not: each is the record for its commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   package-reference:
     name: Package reference generation

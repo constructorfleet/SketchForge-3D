@@ -4,6 +4,12 @@ on:
   repository_dispatch:
     types: [generated_docs_pr_checks]
 
+# A later dispatch for the same pull request checks a newer head SHA, so the
+# older run's results would be recorded against a commit nobody will merge.
+concurrency:
+  group: trusted-pr-checks-${{ github.event.client_payload.pr_number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -1,0 +1,53 @@
+name: Cancel closed pull request runs
+
+# Concurrency groups cancel a pull request's run when a newer push supersedes
+# it, but nothing supersedes the last push of a pull request that is merged or
+# closed, so its runs went on holding runners for a result nobody reads. This
+# cancels them.
+#
+# pull_request_target rather than pull_request: only it gets a token that can
+# cancel runs for a fork's pull request. It checks out nothing and runs none of
+# the pull request's code, and event fields reach the script through env.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cancel:
+    name: Cancel unfinished runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel unfinished pull_request runs for the closed branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          CLOSED_AT: ${{ github.event.pull_request.closed_at }}
+        run: |
+          set -euo pipefail
+          # Branch names are not unique across forks, so the head repository
+          # must match too. A run created after the close belongs to a new pull
+          # request opened from the same branch and is left alone.
+          ids=$(gh api --paginate -X GET "repos/$REPOSITORY/actions/runs" \
+            -f event=pull_request -f branch="$HEAD_BRANCH" -f per_page=100 \
+            --jq '.workflow_runs[]
+              | select(.status != "completed")
+              | select(.head_repository.full_name == env.HEAD_REPOSITORY)
+              | select(.created_at <= env.CLOSED_AT)
+              | .id')
+          if [[ -z "$ids" ]]; then
+            echo "No unfinished runs for $HEAD_REPOSITORY:$HEAD_BRANCH." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for id in $ids; do
+            # A run can finish between the listing and the cancel.
+            if gh run cancel "$id" --repo "$REPOSITORY"; then
+              echo "Cancelled run $id." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::Could not cancel run $id; it may have finished already."
+            fi
+          done
