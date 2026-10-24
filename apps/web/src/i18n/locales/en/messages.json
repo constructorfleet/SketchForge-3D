@@ -910,6 +910,37 @@
     }
   },
   "panels": {
+    "analysis": {
+      "title": "Analysis",
+      "readOnly": "Analysis reads the scene and never changes it.",
+      "checkInterference": "Check interference",
+      "wallThickness": "Wall thickness",
+      "scopeSelection": "{count, plural, one {Checks the # selected shape.} other {Checks the # selected shapes.}}",
+      "scopeScene": "{count, plural, =0 {Add two shapes to check them for collisions.} one {Add another shape to check for collisions.} other {Checks all # visible shapes. Select two or more to narrow it.}}",
+      "thicknessHint": "Select one solid to sample its walls.",
+      "running": "Analyzing…",
+      "noCollisions": "{count, plural, one {No collisions among # shape.} other {No collisions among # shapes.}}",
+      "collisions": "{pairs, plural, one {# colliding pair} other {# colliding pairs}} among {count, plural, one {# shape} other {# shapes}}.",
+      "pairsLabel": "Colliding pairs",
+      "pair": "{a} and {b}",
+      "overlap": "overlap {volume} mm³",
+      "touching": "touching",
+      "tessellated": "from triangles",
+      "interferenceMethod": "Exact OCCT surface distance and common volume for every pair whose bounding boxes meet.",
+      "thicknessResult": "Thinnest wall of {name}: {value} mm",
+      "thicknessNone": "No opposing walls of {name} were found to measure.",
+      "thicknessMethod": "Sampled estimate: {samples} points per face across {faces} faces, measured to the opposing surface. A wall thinner between sample points can be missed.",
+      "stale": "The scene has changed since this result. Run it again.",
+      "failed": "The CAD kernel could not analyze the scene.",
+      "refusal": {
+        "tooManyShapes": "Interference checks at most {limit} shapes at a time, and {given} were given. Select fewer shapes and check again.",
+        "tooManyCandidates": "Too many shapes sit close together: {given} pairs would need an exact check, and the limit is {limit}. Select fewer shapes and check again.",
+        "invalidClearance": "The clearance must be zero or more millimeters.",
+        "tooManyFaces": "Wall thickness samples solids of at most {limit} faces.",
+        "noFaces": "That shape has no faces to sample.",
+        "noGeometry": "{name} has no geometry to analyze."
+      }
+    },
     "unit": {
       "deg": "deg",
       "degrees": "{value} deg",

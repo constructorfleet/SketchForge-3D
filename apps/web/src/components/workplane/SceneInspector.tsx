@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, Layers, LockKeyhole, LockKeyholeOpen, Pencil, Search, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "@/i18n";
 import { sceneRows, sceneSummary } from "@/lib/sceneTree";
 import { normalizeRenamedShapeName } from "@/lib/shapeName";
@@ -22,6 +22,8 @@ export type SceneInspectorProps = {
   canUngroup: boolean;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  /** Scene-wide checks shown under the group actions (#380). */
+  analysis?: ReactNode;
 };
 
 export function SceneInspector({
@@ -38,6 +40,7 @@ export function SceneInspector({
   canUngroup,
   collapsed,
   onCollapsedChange,
+  analysis,
 }: SceneInspectorProps) {
   const t = useTranslations();
   const [filter, setFilter] = useState("");
@@ -98,6 +101,8 @@ export function SceneInspector({
         <button type="button" disabled={!canGroup} onClick={onGroup}>{t("editor.toolbar.group")}</button>
         <button type="button" disabled={!canUngroup} onClick={onUngroup}>{t("editor.toolbar.ungroup")}</button>
       </div>
+
+      {analysis}
 
       <label className="scene-inspector-search">
         <Search size={15} strokeWidth={2.2} aria-hidden="true" />

@@ -27,6 +27,7 @@ hero:
 - **Call the REST API:** start with [API setup, operations, and errors](/docs/REST_API.md), then inspect the [OpenAPI contract](/openapi-v1.json) or use the [TypeScript client reference](/docs/reference/typescript-client.md) and [Python client reference](/docs/reference/python-client.md).
 - **Deploy or configure SketchForge:** start with the [deployment guide](/docs/guides/deployment.md), then use the [operator configuration reference](/docs/OPERATOR_CONFIGURATION.md) for supported values, owners, and implementation readers.
 - **Taper a CAD face:** follow the [face-drafting guide](/docs/guides/face-drafting.md) for selectable pull axes and measured kernel support.
+- **Check parts for collisions or thin walls:** use the editor's [interference and wall-thickness checks](/docs/guides/scene-analysis.md).
 - **Automate a design:** follow the [command-line reference](/docs/CLI_REFERENCE.md) and run the [client package examples](/docs/guides/package-examples.md).
 - **Use MCP tools:** run the [local MCP project example](/docs/mcp/EXAMPLES.md) and browse the [MCP tool reference](/docs/mcp/TOOLS_REFERENCE.md).
 - **Inspect or exchange a project:** read the [editable `.skf` project guide](/docs/SKF_PROJECT_FORMAT.md) and its [generated format reference](/docs/SKF_FORMAT_REFERENCE.md).
