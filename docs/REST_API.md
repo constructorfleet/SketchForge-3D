@@ -324,7 +324,7 @@ Each shape is rebuilt as true geometry from what the project stores, rather than
 | `wedge` | The same, with the ridge over one side so one face is vertical. |
 | `roundRoof` | Half an ellipse, extruded. |
 | `pyramid` | A base and one triangle per side; four sides unless the shape says otherwise. |
-| `torus` | A ring sized the way the editor sizes one, and centred on the workplane rather than sitting on it. |
+| `torus` | A ring sized the way the editor sizes one, resting on the workplane. |
 
 It also works from **exact geometry a shape already carries** -- anything previously treated, or a STEP import -- and from **an imported model's triangles**, sewn back into a solid.
 

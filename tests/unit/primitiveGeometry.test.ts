@@ -228,8 +228,8 @@ describe("tessellated curves", () => {
     measured.centroid.forEach((value, axis) => {
       expect(value, `torus centroid on ${"xyz"[axis]}`).toBeCloseTo(0, 6);
     });
-    // The one kind that is not sitting on y = 0 -- which the exact builder in
-    // `cadSolids.ts` matches, and which `putGeometryOnBase` then fixes.
+    // The one kind that is not sitting on y = 0 -- `putGeometryOnBase` lifts
+    // it for the viewport, and the exact builder in `cadSolids.ts` matches that.
     expectExtents(createTorusGeometry(W, H, D), -H / 2, "torus");
   });
 });

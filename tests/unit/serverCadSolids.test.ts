@@ -224,15 +224,15 @@ describe("exact solids for stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(measured.volume).toBeGreaterThan(0);
   });
 
-  it("builds a torus the size the editor draws, centred on the workplane", async () => {
+  it("builds a torus the size the editor draws, sitting on the workplane", async () => {
     const measured = await measure(shape("torus", { height: 10 }));
 
     // Tube radius from the height, major radius from the smaller footprint,
-    // and centred rather than sitting on the plane -- the one kind that is.
+    // and resting on the plane the way the viewport draws it.
     expect(measured.width).toBeCloseTo(40, 1);
     expect(measured.depth).toBeCloseTo(40, 1);
     expect(measured.height).toBeCloseTo(10, 3);
-    expect(measured.bottom).toBeCloseTo(-5, 3);
+    expect(measured.bottom).toBeCloseTo(0, 3);
     expect(measured.volume / (2 * Math.PI ** 2 * 15 * 25)).toBeCloseTo(1, 2);
   });
 

@@ -12,15 +12,18 @@
  * checks the centre of mass of tilted asymmetric shapes.
  */
 import { describe, expect, it } from "vitest";
+import * as THREE from "three";
 import { CAD_TEST_TIMEOUT_MS } from "../unit/support/cadTestTimeout";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { exactPartSolid } from "@constructorfleet/sketchforge-engine/exactBooleanSolids";
 import { exactBooleanPlacement } from "@constructorfleet/sketchforge-engine/exactBooleanParts";
 import { transformMesh, type Vec3 } from "@constructorfleet/sketchforge-engine/meshTransform";
+import { createTorusGeometry, putGeometryOnBase } from "@constructorfleet/sketchforge-engine/primitiveGeometry";
 import { shapeDepth, shapeWidth } from "@constructorfleet/sketchforge-engine/workplaneShapes";
 import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { faceEditingCanBeEnabled } from "@/lib/shapeFaces";
 import type { WorkplaneShape } from "@/types/sketchforge";
+import { measureMesh } from "../unit/support/meshMeasure";
 
 function placed(overrides: Partial<WorkplaneShape> & Pick<WorkplaneShape, "kind">): WorkplaneShape {
   return { ...sceneShape({ name: overrides.kind, color: "#d41721", ...overrides }), ...overrides };
@@ -83,6 +86,48 @@ describe("exact rebuild for face editing", { timeout: CAD_TEST_TIMEOUT_MS }, () 
       // Last, so a shape that would move fails on where it lands rather than
       // on being refused.
       expect(faceEditingCanBeEnabled(shape)).toBe(true);
+    },
+  );
+});
+
+
+const TORUS_CASES = [
+  placed({ kind: "torus", x: 4, z: -3, elevation: 2, width: 40, depth: 40, height: 10, size: 40 }),
+  placed({ kind: "torus", x: 4, z: -3, elevation: 2, width: 40, depth: 40, height: 10, size: 40, rotationX: 30 }),
+] as const;
+
+function viewportTorusCentre(shape: WorkplaneShape) {
+  const mesh = putGeometryOnBase(createTorusGeometry(shapeWidth(shape), shape.height, shapeDepth(shape)));
+  const localCentre = new THREE.Vector3(...measureMesh(mesh).centroid);
+  const pivot = new THREE.Vector3(0, shape.height / 2, 0);
+  return localCentre
+    .sub(pivot)
+    .applyEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(shape.rotationX ?? 0),
+      THREE.MathUtils.degToRad(shape.rotation ?? 0),
+      THREE.MathUtils.degToRad(shape.rotationZ ?? 0),
+      "XYZ",
+    ))
+    .add(pivot)
+    .add(new THREE.Vector3(shape.x, shape.elevation ?? 0, shape.z));
+}
+
+describe("exact torus face editing placement", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it.each(TORUS_CASES.map((shape) => [`rotationX=${shape.rotationX ?? 0}`, shape] as const))(
+    "keeps an untilted or tilted torus at the viewport mesh centre (%s)",
+    async (_, shape) => {
+      const drawn = viewportTorusCentre(shape);
+      const exact = await withCadKernel((cad) => {
+        try {
+          const solid = exactPartSolid(cad, { shape, transform: exactBooleanPlacement(shape) });
+          return cad.getCenterOfMass(solid);
+        } finally {
+          cad.releaseAll();
+        }
+      });
+      expect(exact.x).toBeCloseTo(drawn.x, 3);
+      expect(exact.y).toBeCloseTo(drawn.y, 3);
+      expect(exact.z).toBeCloseTo(drawn.z, 3);
     },
   );
 });
