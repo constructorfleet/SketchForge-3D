@@ -639,6 +639,10 @@
         "skf": {
           "description": "Projeto editável",
           "note": "Preserva o projeto editável, o histórico de desfazer e refazer, esboços, grupos, dados CAD e os arquivos importados originais."
+        },
+        "dxf": {
+          "description": "Section drawing",
+          "note": "Requires a section plane. Geometry is drawn from the CAD kernel."
         }
       },
       "historyTitle": "Histórico de ações salvo",

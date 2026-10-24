@@ -68,6 +68,13 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 - [#380: Interference check and wall-thickness analysis in the editor](https://github.com/constructorfleet/SketchForge-3D/issues/380) — P2, implemented and in review.
 - [#386: Cover the core editor workflows in browser tests](https://github.com/constructorfleet/SketchForge-3D/issues/386) — browser regressions now cover file import/export, boolean hole grouping, edge treatments, pattern, mirror, align, distribution, prism draft and touch; implementation is ready for review.
 
+## Editor CAD tools
+
+Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
+
+- [#381: 3D measurements and exact B-rep inspector properties](https://github.com/constructorfleet/SketchForge-3D/issues/381) — implementation and browser coverage complete; awaiting review.
+- [#382: Section view and kernel hidden-line SVG/DXF export](https://github.com/constructorfleet/SketchForge-3D/issues/382) — implementation and browser coverage complete; awaiting review.
+
 ## CAD geometry correctness
 
 - [#435: Keep retained drafts in place across draft growth and rotated sketch edits](https://github.com/constructorfleet/SketchForge-3D/issues/435) — implementation and regression coverage in progress.

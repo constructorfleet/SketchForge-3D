@@ -639,6 +639,10 @@
         "skf": {
           "description": "Редактируемый проект",
           "note": "Сохраняет редактируемый проект, историю изменений, эскизы, группы, данные CAD и исходные импортированные файлы."
+        },
+        "dxf": {
+          "description": "Section drawing",
+          "note": "Requires a section plane. Geometry is drawn from the CAD kernel."
         }
       },
       "historyTitle": "Сохраняемая история изменений",
