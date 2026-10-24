@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
 import { fakeServer, type FakeServer } from "../testing.js";
 import {
+  EXPORT_VIEWS,
   MAX_SHAPES_PER_REQUEST,
+  PROJECT_EXPORT_FORMATS,
   MEASUREMENT_ANGLE_UNAVAILABLE_CODES,
   MEASUREMENT_RADIUS_UNAVAILABLE_CODES,
   type MeasurementAngleUnavailableCode,
@@ -14,6 +17,7 @@ import {
   type SketchFaceDraft,
   type SketchSweepProfile,
 } from "../types.js";
+import { base64ToBytes } from "./exports.js";
 import { meshBytesToBase64 } from "./imports.js";
 import { chunk, shapePatchFromSummary } from "./shapes.js";
 
@@ -400,6 +404,119 @@ describe("section drawings", () => {
     const server = fakeServer({ body: { filename: "Plate.dxf", mimeType: "application/dxf", bytes: dxf.length, shapeCount: 1, base64: btoa(dxf) } });
     await expect(client(server).project("p1").sectionDxf({ plane: "xy", offset: 2 })).resolves.toMatchObject({ filename: "Plate.dxf", dxf });
     expect(server.calls[0]?.body).toMatchObject({ format: "dxf", section: { plane: "xy", offset: 2 } });
+  });
+});
+
+describe("exports", () => {
+  // Not valid UTF-8, so a decode that went through text would change them.
+  const artifactBytes = Uint8Array.from([0, 255, 128, 10, 13, 0x89, 0x50]);
+  const artifactBase64 = Buffer.from(artifactBytes).toString("base64");
+  const exported = (format: string) => ({
+    format, filename: `Plate.${format}`, mimeType: "application/octet-stream", bytes: artifactBytes.length, shapeCount: 2, base64: artifactBase64,
+  });
+
+  it("names the same formats and views the API contract does", () => {
+    const contract = JSON.parse(readFileSync(new URL("../../../../docs/openapi-v1.json", import.meta.url), "utf8"));
+    const body = contract.paths["/api/v1/exports"].post.requestBody.content["application/json"].schema.properties;
+    expect([...PROJECT_EXPORT_FORMATS]).toEqual(body.format.enum);
+    expect([...EXPORT_VIEWS]).toEqual(body.view.enum);
+  });
+
+  it.each(PROJECT_EXPORT_FORMATS)("sends a %s export to the project and returns its exact bytes", async (format) => {
+    const server = fakeServer({ body: exported(format) });
+
+    const artifact = await client(server).exports.export("p1", { format, shapeIds: ["a", "b"], name: "Plate" });
+
+    expect(server.calls).toHaveLength(1);
+    expect(server.calls[0]?.method).toBe("POST");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/exports?projectId=p1");
+    expect(server.calls[0]?.body).toEqual({ format, shapeIds: ["a", "b"], name: "Plate" });
+    expect(artifact).toEqual({
+      format, filename: `Plate.${format}`, mimeType: "application/octet-stream", bytes: artifactBytes.length, shapeCount: 2, data: artifactBytes,
+    });
+    expect(artifact.data).toBeInstanceOf(Uint8Array);
+  });
+
+  it("sends only the format when nothing else is named", async () => {
+    const server = fakeServer({ body: exported("stl") });
+    await client(server).exports.export("p1", { format: "stl" });
+    expect(server.calls[0]?.body).toEqual({ format: "stl" });
+  });
+
+  it("sends a projected view with an SVG", async () => {
+    const server = fakeServer({ body: exported("svg") });
+    await client(server).exports.export("p1", { format: "svg", view: "top" });
+    expect(server.calls[0]?.body).toEqual({ format: "svg", view: "top" });
+  });
+
+  it.each(["svg", "dxf"] as const)("sends a section plane with %s", async (format) => {
+    const server = fakeServer({ body: exported(format) });
+    await client(server).exports.export("p1", { format, section: { plane: "xz", offset: -4 } });
+    expect(server.calls[0]?.body).toEqual({ format, section: { plane: "xz", offset: -4 } });
+  });
+
+  it("keeps STEP's exported count and skipped shapes, and leaves them off when absent", async () => {
+    const skipped = [{ name: "Mesh", kind: "mesh", reason: "No exact solid." }];
+    const server = fakeServer({ body: { ...exported("step"), exportedCount: 1, skipped } }, { body: exported("step") });
+
+    await expect(client(server).exports.export("p1", { format: "step" })).resolves.toMatchObject({ exportedCount: 1, skipped });
+    const plain = await client(server).exports.export("p1", { format: "step" });
+    expect(plain).not.toHaveProperty("exportedCount");
+    expect(plain).not.toHaveProperty("skipped");
+  });
+
+  it.each(PROJECT_EXPORT_FORMATS.filter((format) => format !== "svg"))("refuses a view on %s before sending anything", async (format) => {
+    const server = fakeServer({ body: exported(format) });
+    await expect(client(server).exports.export("p1", { format, view: "top" })).rejects.toThrow(/view only applies to the svg format/);
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it.each(PROJECT_EXPORT_FORMATS.filter((format) => format !== "svg" && format !== "dxf"))("refuses a section on %s before sending anything", async (format) => {
+    const server = fakeServer({ body: exported(format) });
+    await expect(client(server).exports.export("p1", { format, section: { plane: "xy", offset: 0 } })).rejects.toThrow(/section only applies to svg and dxf/);
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it("refuses a view and a section together, and a format the server does not produce", async () => {
+    const server = fakeServer({ body: exported("svg") });
+    await expect(client(server).exports.export("p1", { format: "svg", view: "top", section: { plane: "xy", offset: 0 } }))
+      .rejects.toThrow(/section and view cannot be used together/);
+    await expect(client(server).exports.export("p1", { format: "gltf" as never })).rejects.toThrow(/format must be one of: stl, obj, 3mf, step, skf, zip, svg, dxf/);
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it("decodes an artifact the same way with or without node's Buffer", () => {
+    // Every byte value, so a decode that went through text or dropped the
+    // high bit cannot match.
+    const bytes = new Uint8Array(1024).map((_, index) => index % 256);
+    const encoded = Buffer.from(bytes).toString("base64");
+    expect(base64ToBytes(encoded)).toEqual(bytes);
+
+    const global = globalThis as { Buffer?: unknown };
+    const saved = global.Buffer;
+    delete global.Buffer;
+    try {
+      expect(base64ToBytes(encoded)).toEqual(bytes);
+    } finally {
+      global.Buffer = saved;
+    }
+  });
+
+  it("binds the project id through a handle", async () => {
+    const server = fakeServer({ body: exported("3mf") });
+    await expect(client(server).project("p9").export({ format: "3mf" })).resolves.toMatchObject({ format: "3mf", data: artifactBytes });
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/exports?projectId=p9");
+    expect(server.calls[0]?.body).toEqual({ format: "3mf" });
+  });
+});
+
+describe("wall thickness", () => {
+  it("estimates through a handle, as the README documents", async () => {
+    const thickness = { minimum: 2, unit: "mm", method: "sampled-opposing-surface-distance", samplesPerFace: 4, facesChecked: 6 };
+    const server = fakeServer({ body: { thickness } });
+    await expect(client(server).project("p9").estimateWallThickness("s1")).resolves.toEqual(thickness);
+    expect(server.calls[0]?.method).toBe("GET");
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/thickness?projectId=p9&shapeId=s1");
   });
 });
 

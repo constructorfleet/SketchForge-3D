@@ -705,6 +705,48 @@ export type SectionDrawingArtifact = {
 
 export type SectionDxfArtifact = { filename: string; mimeType: "application/dxf"; bytes: number; shapeCount: number; dxf: string };
 
+/** Every format `POST /exports` produces, in the server's order. */
+export const PROJECT_EXPORT_FORMATS = ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] as const;
+export type ProjectExportFormat = (typeof PROJECT_EXPORT_FORMATS)[number];
+
+/** What an SVG export shows: the four-view grid, or one named view. */
+export const EXPORT_VIEWS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"] as const;
+export type ExportView = (typeof EXPORT_VIEWS)[number];
+
+/** Section contours cut by one axis plane, at `offset` millimetres along its omitted axis. */
+export type ExportSection = { plane: SectionPlane; offset: number };
+
+export type ProjectExportRequest = {
+  format: ProjectExportFormat;
+  /** Omit to export every shape in the project. */
+  shapeIds?: readonly string[];
+  /** Output basename; the project name when omitted. At most 120 characters. */
+  name?: string;
+  /** SVG only. Cannot be combined with `section`. */
+  view?: ExportView;
+  /** SVG or DXF only. Cannot be combined with `view`. */
+  section?: ExportSection;
+};
+
+/** A shape a STEP export left out, and why. */
+export type ExportSkippedShape = { name: string; kind: string; reason: string };
+
+export type ProjectExportArtifact = {
+  format: ProjectExportFormat;
+  filename: string;
+  mimeType: string;
+  /** The artifact's length in bytes, as the server counted it. */
+  bytes: number;
+  /** How many shapes the export covered. */
+  shapeCount: number;
+  /** STEP only: how many of those shapes became exact solids. */
+  exportedCount?: number;
+  /** STEP only: the shapes left out, which a mesh-only shape always is. */
+  skipped?: ExportSkippedShape[];
+  /** The file itself, byte for byte. */
+  data: Uint8Array;
+};
+
 /**
  * A model file to import.
  *
