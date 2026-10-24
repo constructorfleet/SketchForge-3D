@@ -185,6 +185,10 @@ test("a face draft on a sketch extrusion is kept, edited, undone, saved as .skf 
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
     const page = await context.newPage();
+    // This workflow covers draft persistence, not release discovery. A newer
+    // upstream release can otherwise open a blocking modal on the second visit
+    // to the dashboard and intercept the project import click.
+    await page.route("**/api/app-update**", (route) => route.abort());
     await page.goto(baseURL);
     await page.getByRole("button", { name: "Create new 3D design" }).click();
 
