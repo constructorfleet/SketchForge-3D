@@ -115,7 +115,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(changelog, /adding a prism draft after a treatment[\s\S]*?draft\/treatment combinations outside the retained prism-draft-first single-treatment path remain unsupported/i);
   assert.match(changelog, /retained face draft on a single-section, hole-free sketch sweep can now[\s\S]*?change its angle[\s\S]*?treatment atomically/i);
   assert.match(spec, /does not establish general topology lineage/i);
-  assert.match(spec, /editor's arbitrary-shape face-draft workflow remains baked/i);
+  assert.match(spec, /The editor writes the same retained face and prism drafts on an eligible sketch extrusion, and its arbitrary-shape face-draft workflow remains baked/i);
+  assert.doesNotMatch(spec, /The editor's arbitrary-shape face-draft workflow remains baked/i);
   assert.match(spec, /OpenAPI baseline (?:is|remains) 28 of 32 operations; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
