@@ -31,15 +31,28 @@ const config = defineConfig({
   themeConfig: {
     nav: [
       { text: "Learn", link: "/" },
-      { text: "Quick start", link: "/docs/guides/editor-quickstart" },
-      { text: "Edit a model", link: "/docs/guides/edit-and-export-model" },
-      { text: "Sketch constraints", link: "/docs/guides/sketch-constraints" },
-      { text: "REST API", link: "/docs/REST_API" },
-      { text: "REST API operations", link: "/docs/rest-api/" },
-      { text: "Project format", link: "/docs/SKF_PROJECT_FORMAT" },
-      { text: "Clients", link: "/docs/PUBLISHING_CLIENTS" },
-      { text: "References", link: "/docs/reference/typescript-client" },
-      { text: "Migration map", link: "/docs/site-migration" },
+      { text: "Install", link: "/#installation" },
+      {
+        text: "Guides",
+        items: [
+          { text: "Editor quick start", link: "/docs/guides/editor-quickstart" },
+          { text: "Create, edit, save, export", link: "/docs/guides/edit-and-export-model" },
+          { text: "Sketch constraints", link: "/docs/guides/sketch-constraints" },
+          { text: "Face drafting", link: "/docs/guides/face-drafting" },
+          { text: "Deployment", link: "/docs/guides/deployment" },
+        ],
+      },
+      {
+        text: "API & reference",
+        items: [
+          { text: "REST API", link: "/docs/REST_API" },
+          { text: "REST API operations", link: "/docs/rest-api/" },
+          { text: ".skf project format", link: "/docs/SKF_PROJECT_FORMAT" },
+          { text: "Publishing clients", link: "/docs/PUBLISHING_CLIENTS" },
+          { text: "Generated references", link: "/docs/reference/typescript-client" },
+        ],
+      },
+      { text: "GitHub", link: "https://github.com/constructorfleet/SketchForge-3D" },
     ],
     sidebar: [
       {
