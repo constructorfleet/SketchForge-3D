@@ -8,9 +8,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request supersedes the run for the older one, so that
+# run is cancelled; the generated-docs commit skips a cancelled run. Runs on
+# main are not: each one deploys Pages and feeds the generated-docs repair.
 concurrency:
   group: docs-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
