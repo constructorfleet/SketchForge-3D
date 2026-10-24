@@ -46,6 +46,35 @@ So the version number lives in the tree, committed by the release pull request, 
 
 The clients carry the app's version rather than their own, so a user can tell which client matches which server without a compatibility table.
 
+### Merging the release pull request on a schedule
+
+Nobody has to remember to merge the release pull request. `.github/workflows/release-auto-merge.yml` runs every four hours (at 17 minutes past) and merges it when it is safe to, using the release app's token. A merge made with `GITHUB_TOKEN` would start no workflow run, so `release-please.yml` would never run on the merge commit and nothing would be tagged or published. The merge is a squash merge pinned to the head commit that was checked, and it goes through the `main` ruleset like any other merge; it never uses `--admin`.
+
+`scripts/release/auto-merge-release-pr.mjs` makes the decision. It merges only when all of these hold, and otherwise writes the reason to the run summary and stops without failing:
+
+- there is exactly one open, non-draft pull request labelled `autorelease: pending`, opened by the release app from a `release-please--` branch into `main`;
+- the release is not on hold (see below);
+- the pull request is not behind `main`, so release-please has refreshed it since the latest merge;
+- every check run and commit status on its head commit has finished as success, skipped or neutral, and every check the `main` ruleset requires is among them (the list is read from the ruleset, or from a built-in copy if the ruleset cannot be read);
+- nothing has merged to `main` in the last 30 minutes, so a burst of merges goes out as one release;
+- no `release-please.yml`, `release.yml` or `desktop-release.yml` run is queued or in progress.
+
+To hold releases:
+
+- for one release, add the `release: hold` label to the release pull request, and remove it to let the next run merge;
+- for all releases, set the repository variable `RELEASE_AUTO_MERGE` to `false` (**Settings -> Secrets and variables -> Actions -> Variables**). Delete the variable, or set it to anything else, to resume.
+
+Merging the release pull request by hand still works and is still the release.
+
+To run the check now rather than wait, start the workflow from the Actions tab, or:
+
+<!-- runnable-exempt: Dispatching this can merge the release pull request, which publishes a release; it is a maintainer command, not a repository example. -->
+```sh
+gh workflow run release-auto-merge.yml --repo constructorfleet/SketchForge-3D -f dry_run=true
+```
+
+With `dry_run=true` it reports what it would do and merges nothing; leave it out to merge. Locally, `node scripts/release/auto-merge-release-pr.mjs --dry-run` makes the same decision with your own `gh` login. It only reads, and never merges.
+
 ### Why this way round
 
 Before this, a `v*.*.*` tag built only the desktop installers, and the draft release was created by the *desktop* workflow -- so the release existed as a side effect of packaging an Electron app, and a code-signing failure on one platform meant no release at all. The Docker image was published from `main` with no version tag, and the clients had their own separate tags.
