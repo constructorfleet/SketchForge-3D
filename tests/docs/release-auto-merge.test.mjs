@@ -22,7 +22,6 @@ const REQUIRED = [
   "Check and build docs",
   "REST API end to end",
   "Package examples against local API",
-  "Package reference generation",
 ];
 
 function releasePull(overrides = {}) {
