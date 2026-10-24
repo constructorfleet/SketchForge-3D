@@ -19,9 +19,9 @@ All three are published by `.github/workflows/release.yml`, from the same `v<ver
 | Package | Registry | Version |
 | --- | --- | --- |
 <!-- publishing-version-table:start -->
-| `@constructorfleet/sketchforge3d` | npm | `1.23.0` | <!-- x-release-please-version -->
-| `@constructorfleet/sketchforge-engine` | npm | `1.23.0` | <!-- x-release-please-version -->
-| `sketchforge3d` | PyPI | `1.23.0` | <!-- x-release-please-version -->
+| `@constructorfleet/sketchforge3d` | npm | `1.24.0` | <!-- x-release-please-version -->
+| `@constructorfleet/sketchforge-engine` | npm | `1.24.0` | <!-- x-release-please-version -->
+| `sketchforge3d` | PyPI | `1.24.0` | <!-- x-release-please-version -->
 <!-- publishing-version-table:end -->
 
 The table is generated from `.release-please-manifest.json`, the release-please source of truth, after verifying that the app, engine, TypeScript client, and Python package manifests all match it. Release Please updates its marked version rows in each release pull request; regenerate locally with `node scripts/docs/generate-publishing-clients.mjs`. `npm run docs:check` detects stale versions.
