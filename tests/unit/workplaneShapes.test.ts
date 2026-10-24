@@ -74,6 +74,8 @@ describe("workplane shape helpers", () => {
     expect(meshYawDegrees({ ...triangularPrism, width: 12, rotation: 150 })).toBe(150);
     expect(meshYawDegrees({ ...triangularPrism, kind: "box", rotation: 30 })).toBe(30);
     expect(meshYawDegrees({ ...triangularPrism, sides: 96, rotation: 90 })).toBe(0);
+    expect(meshYawDegrees({ ...triangularPrism, rotation: 150, rotationX: 20 })).toBe(150);
+    expect(meshYawDegrees({ ...triangularPrism, rotation: 150, rotationZ: 20 })).toBe(150);
   });
 
   it("cleans near-zero values and derives dimensions", () => {

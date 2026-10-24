@@ -95,6 +95,11 @@ export function shapeTaperScaleAt(shape: WorkplaneShape, normalizedHeight: numbe
 }
 
 export function meshYawDegrees(shape: WorkplaneShape) {
+  // Once a round primitive is tilted, yaw also sets the axis the tilt turns
+  // around. Keep the full viewport yaw in that case; only an untilted round
+  // mesh is invariant under snapping to a whole facet step.
+  if (shape.rotationX || shape.rotationZ) return shape.rotation;
+
   const isRoundPrimitive = !shape.importedMesh && (shape.kind === "cylinder" || shape.kind === "cone");
   const isCircular = Math.abs(shapeWidth(shape) - shapeDepth(shape)) < 0.0005;
   if (!isRoundPrimitive || !isCircular) {
