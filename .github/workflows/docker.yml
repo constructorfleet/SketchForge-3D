@@ -16,6 +16,9 @@ concurrency:
 # commit" for Docker and "newest release" everywhere else. release.yml owns
 # `latest` now; main is available as the `main` tag and by short SHA.
 jobs:
+  changes:
+    uses: ./.github/workflows/classify-changes.yml
+
   build:
     # Pull requests get the smoke job below instead: a native single-arch build
     # that is run, not pushed.
@@ -66,8 +69,13 @@ jobs:
   # SKETCHFORGE_PROJECTS_DIR name before dropping to node; this job runs the
   # built image against fresh volumes, at a path the image never heard of, and
   # under --user, so a regression cannot ship.
+  #
+  # A documentation-only pull request skips it: see the changes job and
+  # scripts/ci/classify-changes.mjs.
   smoke:
     name: Smoke-test the image
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     timeout-minutes: 30
     permissions:
       contents: read

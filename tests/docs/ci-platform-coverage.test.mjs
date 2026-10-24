@@ -28,3 +28,12 @@ test("pull requests trigger the workflow that holds the Windows job", () => {
   assert.match(trigger, /pull_request:/, "ci.yml must run on pull_request for its Windows job to gate anything");
   assert.doesNotMatch(trigger, /pull_request:\s*\n\s+paths:/, "a path-filtered pull_request trigger would skip code-only changes");
 });
+
+test("the Windows job is skipped only for documentation-only pull requests", () => {
+  // It needs the changes job and skips when that reports no code changed
+  // (see tests/docs/ci-docs-only-skip.test.mjs). Any other condition could
+  // stop it running on a code change without anything noticing.
+  const windowsJob = ci.split(/\n(?=  \w[\w-]*:\n)/).find((job) => /runs-on:\s*windows-/.test(job));
+  const conditions = [...windowsJob.matchAll(/^ {4}if:\s*(.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(conditions, ["${{ !cancelled() && needs.changes.outputs.code != 'false' }}"]);
+});
