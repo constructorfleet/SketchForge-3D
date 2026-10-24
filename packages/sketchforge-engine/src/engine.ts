@@ -961,6 +961,18 @@ export function createEngine(store: ProjectStore): Engine {
         || (faceDraftChanged && isSketchExtrusion)) {
         const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
         const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height ?? existing.height;
+        const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
+        const faceDraftSourceScale = existing.faceDraftSourceScale ?? (existing.faceDraft ? {
+          // Editor-written drafts predate this field. Their output bounds
+          // include the taper, so they cannot be used to infer the source
+          // resize ratio; these shapes were only retained before resize support.
+          width: 1, depth: 1, height: 1,
+        } : {
+          width: ratio(existing.width, sourceFrame?.width ?? existing.importedMesh?.baseWidth),
+          depth: ratio(existing.depth, sourceFrame?.depth ?? existing.importedMesh?.baseDepth),
+          height: ratio(existing.height, sourceFrame?.height ?? existing.importedMesh?.baseHeight),
+        });
+        const rebuildScale = existing.faceDraft || faceDraftChanged ? faceDraftSourceScale : { width: 1, depth: 1, height: 1 };
         try {
           const rebuilt = await sketchExtrusionShapeFromRequest({
             id: existing.id,
@@ -990,6 +1002,11 @@ export function createEngine(store: ProjectStore): Engine {
           const rebuiltSource = {
             ...sourceMetadata,
             ...rebuilt,
+            ...(existing.faceDraft || faceDraftChanged ? { faceDraftSourceScale } : {}),
+            width: rebuilt.width * rebuildScale.width,
+            depth: rebuilt.depth * rebuildScale.depth,
+            height: rebuilt.height * rebuildScale.height,
+            size: Math.max(rebuilt.width * rebuildScale.width, rebuilt.depth * rebuildScale.depth),
             id: existing.id,
             sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
             faceDraft: undefined,
@@ -1050,6 +1067,7 @@ export function createEngine(store: ProjectStore): Engine {
                 { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch },
                 requestedFaceDraft,
               ),
+              faceDraftSourceScale,
             };
           } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
             swept = {
@@ -1185,7 +1203,10 @@ export function createEngine(store: ProjectStore): Engine {
           const sourceScale = existing.faceDraftSourceScale ?? revolveSourceScale(existing);
           const rebuilt = resizeRebuiltRevolve(rebuiltAtNaturalScale, sourceScale);
           if (requestedFaceDraft) {
-            const exactBase = shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt));
+            const exactBase = {
+              ...shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt)),
+              faceDraftSourceScale: sourceScale,
+            };
             const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
               ? existing.faceDraft.sourceFaceNormal
               : undefined;

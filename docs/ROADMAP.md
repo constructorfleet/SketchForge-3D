@@ -30,3 +30,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 ## Geometry placement
 
 - [#424: Keep server treatments in place on tilted shapes](https://github.com/constructorfleet/SketchForge-3D/issues/424) — P2, open.
+
+## CAD geometry correctness
+
+- [#412: Preserve non-uniform resize in face-draft paths](https://github.com/constructorfleet/SketchForge-3D/issues/412) — P2, implementation and regression coverage in progress.

@@ -11,6 +11,7 @@ owner: "Contributors"
 
 - Server fillets, chamfers and shells on tilted shapes now keep the treated mesh aligned with the source shape. Re-centering the result on its bounds also adjusts the shape origin, preserving its project-space volume and centre of mass.
 - Moved `@vitest/mocker` to development dependencies so production installs no longer include Vitest's Vite dependency tree.
+- Server-side prism and face drafts on sketch extrusions now apply the shape's non-uniform resize to the sketch before drafting. Retained face drafts keep that resize when a profile edit replays the feature, and plain revolve face drafts scale their profile before revolving instead of transforming the finished solid.
 - Fixed `POST /measurements` resolving edge indexes on a mesh-backed revolve. It now uses the exact edge ordering returned by `GET /edges`, matching `GET /measurements` and edge treatments.
 - Server booleans and grouping now subtract helical thread meshes, so a thread cutter can make a tapped hole in a plate when its length matches the plate thickness. The TypeScript tap-drill example now uses an M8 cutter. Kernel failures in these geometry operations return `422 geometry_failed` instead of an internal server error.
 
