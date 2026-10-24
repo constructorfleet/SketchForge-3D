@@ -302,8 +302,8 @@ function pyramidSolid(cad: OcctKernel, shape: WorkplaneShape) {
  *
  * Its tube radius comes from the height and its major radius from the smaller
  * of width and depth, and it is then stretched so the outer diameter matches
- * width and depth separately. Unlike every other kind here it is centred on
- * the workplane rather than sitting on it, which is what the editor draws.
+ * width and depth separately. The kernel's torus is centred on its axis, so it
+ * is raised by half its height to sit on the workplane like the viewport mesh.
  */
 function torusSolid(cad: OcctKernel, shape: WorkplaneShape) {
   const width = shapeWidth(shape);
@@ -314,8 +314,10 @@ function torusSolid(cad: OcctKernel, shape: WorkplaneShape) {
   const outerDiameter = (majorRadius + tubeRadius) * 2;
   const scaleX = width / Math.max(0.001, outerDiameter);
   const scaleZ = depth / Math.max(0.001, outerDiameter);
-  if (Math.abs(scaleX - 1) < 1e-9 && Math.abs(scaleZ - 1) < 1e-9) return ring;
-  return cad.generalTransform(ring, [scaleX, 0, 0, 0, 0, 1, 0, 0, 0, 0, scaleZ, 0]);
+  const sized = Math.abs(scaleX - 1) < 1e-9 && Math.abs(scaleZ - 1) < 1e-9
+    ? ring
+    : cad.generalTransform(ring, [scaleX, 0, 0, 0, 0, 1, 0, 0, 0, 0, scaleZ, 0]);
+  return cad.translate(sized, 0, shape.height / 2, 0);
 }
 
 /**

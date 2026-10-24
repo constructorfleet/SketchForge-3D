@@ -38,6 +38,7 @@ import {
   createRoundRoofGeometry,
   createTorusGeometry,
   createWedgeGeometry,
+  putGeometryOnBase,
 } from "@constructorfleet/sketchforge-engine/primitiveGeometry";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { exactSolidForShape } from "@constructorfleet/sketchforge-engine/cadSolids";
@@ -130,7 +131,7 @@ const CANDIDATES: Candidate[] = [
   {
     label: "torus",
     shape: shapeOf({ kind: "torus" }),
-    mesh: (shape) => createTorusGeometry(width(shape), shape.height, depth(shape)),
+    mesh: (shape) => putGeometryOnBase(createTorusGeometry(width(shape), shape.height, depth(shape))),
     volumeTolerance: 0.01,
     centroidTolerance: 0.05,
   },
