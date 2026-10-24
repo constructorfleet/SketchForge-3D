@@ -522,7 +522,8 @@
       "cannotSweep": "Could not create the planar sweep",
       "sweepCreated": "Planar sweep created",
       "sweepUpdated": "Planar sweep updated",
-      "draftReplayFailed": "The sketch was not updated: its draft cannot be rebuilt on this profile. Change the profile back, or cancel the sketch edit."
+      "draftReplayFailed": "The sketch was not updated: its draft cannot be rebuilt on this profile. Change the profile back, or cancel the sketch edit.",
+      "shellNotReplayable": "The sketch was not updated: this shape was hollowed, and rebuilding it from its sketch cannot replay the shell. Undo the shell first, or cancel the sketch edit."
     },
     "export": {
       "needSolidSelected": "Select at least one solid shape before exporting",
@@ -1076,6 +1077,29 @@
         "update": "Update draft",
         "updating": "Updating draft…",
         "updated": "Face draft updated."
+      },
+      "shell": {
+        "title": "Shell",
+        "hint": "Hollow the shape to a wall of this thickness, measured inwards, so the outside keeps its size. Leave faces open to make a tray or a sleeve.",
+        "thickness": "Wall thickness",
+        "openFaces": "Leave open",
+        "directionsHint": "Sides are the workplane's: top faces up. A side only opens a flat face.",
+        "direction": {
+          "top": "Top",
+          "bottom": "Bottom",
+          "left": "Left",
+          "right": "Right",
+          "front": "Front",
+          "back": "Back"
+        },
+        "faceNumbers": "Faces by number",
+        "faceNumbersHint": "Numbers from the Faces card, separated by commas.",
+        "faceNumbersInvalid": "Enter face numbers from 1 to {count}.",
+        "addPicked": "Add picked face {face}",
+        "apply": "Hollow shape",
+        "applying": "Hollowing…",
+        "applied": "Shape hollowed: {percent}% less material.",
+        "hollowed": "Hollowed to a {thickness} {unit} wall."
       }
     },
     "appearance": {
@@ -1418,7 +1442,19 @@
       "validatorReset": "The CAD kernel exposed an incomplete validation function and reset. Start the edge tool again; no page refresh is needed.",
       "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed.",
       "draftNotRetained": "The face draft cannot be kept with the sketch: the drafted face is not flat, or no longer matches one side of the profile. Undo the change, or draft another face.",
-      "draftNotReplayable": "The draft this shape keeps cannot be rebuilt, because the shape has been mirrored, resized, filleted or chamfered since it was drafted. Undo that change first; the shape and its sketch are left as they were."
+      "draftNotReplayable": "The draft this shape keeps cannot be rebuilt, because the shape has been mirrored, resized, filleted or chamfered since it was drafted. Undo that change first; the shape and its sketch are left as they were.",
+      "shell": {
+        "thicknessInvalid": "Enter a wall thickness greater than zero.",
+        "noVolume": "This shape has no volume to hollow out.",
+        "faceIndexInvalid": "One of the faces to leave open is not on this shape. Choose faces from the Faces card's numbers.",
+        "noFlatFace": "This shape has no flat face on that side to leave open. Hollow it sealed, or choose its faces by number.",
+        "everyFaceOpen": "Leaving every face open would remove the shape rather than hollow it. Leave at least one face closed.",
+        "tooThick": "That wall is too thick for this shape: hollowing it leaves no cavity. Try a thinner wall.",
+        "cannotOffset": "This shape's surfaces cannot be offset inwards into a sound wall. A ball with unequal radii, a pointed cone, a tube, ring, round roof or loft fails this way at any thickness; cut a cavity with a hole shape instead.",
+        "unreadable": "The hollowed solid could not be stored. Try a different wall thickness.",
+        "unsupported": "This shape cannot be hollowed exactly. Hollow a box, cylinder, polygon, pyramid, roof, wedge, sphere, torus or cone with a flat top, or a shape that already has exact faces.",
+        "treated": "A shape with a fillet, chamfer or draft cannot be hollowed, because nothing could rebuild the treatment on the wall. Undo the treatment, hollow the shape, then treat it again."
+      }
     },
     "mesh": {
       "incompleteTriangles": "Mesh does not contain complete triangles",

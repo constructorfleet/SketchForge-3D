@@ -91,6 +91,11 @@ export type CadModifierWorkerRequest =
     }
   /** Build the parts as one exact solid, so a primitive gains B-rep faces to colour and draft. */
   | { type: "exact"; requestId: number; parts: CadModifierMeshPart[] }
+  /**
+   * Hollow one shape to a wall of `thickness` mm, leaving `openFaces` off --
+   * direction names or indexes of the part's B-rep faces (#379).
+   */
+  | { type: "shell"; requestId: number; part: CadModifierMeshPart; thickness: number; openFaces: Array<number | string> }
   | { type: "dispose"; requestId: number };
 
 export type CadModifierWorkerResponse =
@@ -164,6 +169,20 @@ export type CadModifierWorkerResponse =
       brep: string;
       faceCount: number;
       faceGroups: number[];
+    }
+  | {
+      type: "shell";
+      requestId: number;
+      positions: Float32Array;
+      normals: Float32Array;
+      indices: Uint32Array;
+      triangleCount: number;
+      brep: string;
+      faceGroups: number[];
+      faceCount: number;
+      /** The exact solid's volume after and before, so the caller can say what went. */
+      volume: number;
+      sourceVolume: number;
     }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);

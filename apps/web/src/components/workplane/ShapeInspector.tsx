@@ -22,6 +22,8 @@ import type { DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import { shapeHasExactFaces } from "@/lib/shapeFaces";
 import { ShapeFaceTools } from "@/components/workplane/ShapeFaceTools";
 import { RetainedFaceDraftCard } from "@/components/workplane/RetainedFaceDraftCard";
+import { ShapeShellCard } from "@/components/workplane/ShapeShellCard";
+import type { ShellOpenFace } from "@/lib/shellEditor";
 import { retainedFaceDraftEditable, retainedPrismDraftAvailable } from "@/lib/retainedDrafts";
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
@@ -114,6 +116,7 @@ export function ShapeInspector({
   onApplyDraftFace,
   onUpdateRetainedFaceDraft,
   onEnableFaceEditing,
+  onApplyShell,
   onHighlightFace,
   onFacePickingChange,
   pickedFace,
@@ -137,6 +140,8 @@ export function ShapeInspector({
   onUpdateRetainedFaceDraft?: (angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
   /** Present when the shape can be rebuilt as exact geometry to gain editable faces. */
   onEnableFaceEditing?: () => Promise<void> | void;
+  /** Present when the shape may be hollowed; the editor refuses what it cannot shell with a notice. */
+  onApplyShell?: (thickness: number, openFaces: ShellOpenFace[]) => Promise<void> | void;
   /** The face the face tools point at, or null; the viewport highlights it. */
   onHighlightFace?: (faceIndex: number | null) => void;
   onFacePickingChange?: (shapeId: string | null) => void;
@@ -425,6 +430,18 @@ export function ShapeInspector({
             </button>
           </div>
         </section>
+      ) : null}
+
+      {onApplyShell && !shape.hole && !shape.imagePlate ? (
+        <ShapeShellCard
+          key={`${shape.id}-shell`}
+          shape={shape}
+          locked={locked}
+          workspace={workspace}
+          pickedFace={pickedFace}
+          onApply={onApplyShell}
+          onInteractionActiveChange={onInteractionActiveChange}
+        />
       ) : null}
 
       {canSeparateParts && onSeparateParts ? (

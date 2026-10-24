@@ -22,6 +22,7 @@ import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/engine/cadBakeMetadata";
 import { FACE_HIGHLIGHT_COLOR } from "@/lib/shapeFaces";
+import type { ShellOpenFace } from "@/lib/shellEditor";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
@@ -237,6 +238,8 @@ type WorkplaneViewportProps = {
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
   onUpdateRetainedFaceDraft?: (angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
   onEnableFaceEditing?: () => Promise<void> | void;
+  /** Hollow the selected shape to a wall of `thickness` mm, leaving `openFaces` off. */
+  onApplyShell?: (thickness: number, openFaces: ShellOpenFace[]) => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   /** Solid volume of the selected shape, for the inspector's material readout. */
@@ -2440,6 +2443,7 @@ export function WorkplaneViewport({
   onApplyDraftFace,
   onUpdateRetainedFaceDraft,
   onEnableFaceEditing,
+  onApplyShell,
   canSeparateParts = false,
   onSeparateParts,
   selectedShapeVolumeMm3,
@@ -5807,6 +5811,7 @@ export function WorkplaneViewport({
             onApplyDraftFace={onApplyDraftFace}
             onUpdateRetainedFaceDraft={onUpdateRetainedFaceDraft}
             onEnableFaceEditing={onEnableFaceEditing}
+            onApplyShell={onApplyShell}
             onHighlightFace={highlightFace}
             onFacePickingChange={setFacePicking}
             pickedFace={pickedFace}
