@@ -345,6 +345,20 @@
       "singlePart": "Zaznaczony obiekt składa się tylko z jednej spójnej części",
       "separated": "{count, plural, one {Rozdzielono obiekt na {count} część} few {Rozdzielono obiekt na {count} części} many {Rozdzielono obiekt na {count} części} other {Rozdzielono obiekt na {count} części}}"
     },
+    "explode": {
+      "exploding": "Rozbijanie {name}…",
+      "exploded": "Rozbito {name} na zagnieżdżone grupy",
+      "flatFallback": "Nie udało się dopasować struktury złożenia {name} do jego brył, więc rozdzielono je na osobne bryły",
+      "selectOne": "Zaznacz jedno zaimportowane złożenie STEP do rozbicia",
+      "unlock": "Przed rozbiciem odblokuj złożenie",
+      "sourceMissing": "Oryginalnego pliku STEP tego obiektu nie ma już w projekcie, więc nie można go rozbić",
+      "notStep": "Rozbić można tylko import STEP z jego oryginalnym plikiem",
+      "sourceTooLarge": "Rozbijanie złożeń obsługuje pliki STEP do 8 MiB",
+      "singleSolid": "Ten plik STEP zawiera tylko jedną bryłę; nie ma czego rozbijać",
+      "tooManySolids": "Rozbijanie złożeń obsługuje najwyżej {max} brył; ten plik zawiera {count}",
+      "failed": "Nie udało się rozbić złożenia STEP",
+      "cancelled": "Rozbijanie anulowano, ponieważ obiekt się zmienił"
+    },
     "edgeModifier": {
       "cancelled": "Anulowano obróbkę krawędzi",
       "cancelledObjectChanged": "Anulowano obróbkę krawędzi, ponieważ obiekt się zmienił",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Edytuj szkic",
       "separateParts": "Rozdziel na części",
+      "explodeAssembly": "Rozbij złożenie",
+      "explodingAssembly": "Rozbijanie…",
       "section": {
         "properties": "Właściwości",
         "taper": "Zwężenie",
