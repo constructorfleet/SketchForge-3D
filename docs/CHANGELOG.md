@@ -11,6 +11,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- The local MCP now exposes `sketchforge_import_stl`, which imports an STL file from the MCP host filesystem into a chosen local project.
 - Retained face drafts on straight-line, single-region, no-hole sketch extrusion
   side faces now follow the same sketch segment through source-profile edits,
   even when the face normal changes. The segment identity survives `.skf`

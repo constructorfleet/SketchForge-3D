@@ -67,6 +67,7 @@ function compactMutationValue(value) {
 const MUTATION_TOOLS = new Set([
   "sketchforge_create_shape",
   "sketchforge_import_mesh",
+  "sketchforge_import_stl",
   "sketchforge_update_object",
   "sketchforge_delete_objects",
   "sketchforge_align_objects",
@@ -365,6 +366,18 @@ async function callLocalEngineToolRaw(name, args = {}) {
       const imported = await unwrap(await engine.importMesh(id, {
         fileName: `${args.name || "Imported mesh"}.stl`,
         bytes: stlBytesFromPositions(args.positions),
+        mediaType: "model/stl",
+      }));
+      const changes = Object.fromEntries(["name", "color", "x", "z", "elevation"].filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
+      return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;
+    }
+    case "sketchforge_import_stl": {
+      const sourcePath = path.resolve(String(args.filePath ?? ""));
+      if (path.extname(sourcePath).toLowerCase() !== ".stl") throw new Error("filePath must point to an .stl file.");
+      const bytes = await readFile(sourcePath);
+      const imported = await unwrap(await engine.importMesh(id, {
+        fileName: path.basename(sourcePath),
+        bytes,
         mediaType: "model/stl",
       }));
       const changes = Object.fromEntries(["name", "color", "x", "z", "elevation"].filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
