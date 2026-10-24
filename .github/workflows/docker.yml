@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +17,9 @@ concurrency:
 # `latest` now; main is available as the `main` tag and by short SHA.
 jobs:
   build:
+    # Pull requests get the smoke job below instead: a native single-arch build
+    # that is run, not pushed.
+    if: github.event_name != 'pull_request'
     timeout-minutes: 30
     permissions:
       packages: write
@@ -55,3 +59,126 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=sketchforge-docker
           cache-to: type=gha,mode=max,scope=sketchforge-docker
+
+  # The server runs as node (UID 1000), but Docker creates the mount point of a
+  # fresh volume owned by root wherever the image has no such path. The
+  # entrypoint creates and chowns whatever SKETCHFORGE_SHARED_PROJECTS_DIR and
+  # SKETCHFORGE_PROJECTS_DIR name before dropping to node; this job runs the
+  # built image against fresh volumes, at a path the image never heard of, and
+  # under --user, so a regression cannot ship.
+  smoke:
+    name: Smoke-test the image
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the image for the runner's architecture
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          push: false
+          load: true
+          tags: sketchforge:smoke
+          cache-from: type=gha,scope=sketchforge-docker
+
+      - name: Fresh volumes are prepared at start and the server runs as node
+        run: |
+          set -euo pipefail
+          probe() {
+            # $1: description, rest: docker run arguments. Prints the uid the command ran as.
+            desc="$1"; shift
+            uid="$(docker run --rm "$@" sketchforge:smoke \
+              sh -c 'for d in "$SKETCHFORGE_SHARED_PROJECTS_DIR" "$SKETCHFORGE_PROJECTS_DIR"; do [ -z "$d" ] || { touch "$d/.probe" && rm "$d/.probe"; } || exit 1; done; id -u')"
+            echo "$desc: wrote to both storage directories as uid $uid"
+            if [ "$uid" != "1000" ]; then
+              echo "::error::$desc: the server should run as node (1000), not uid $uid"
+              exit 1
+            fi
+          }
+          docker volume create smoke-my-projects
+          docker volume create smoke-shared-projects
+          docker volume create smoke-custom-projects
+          docker volume create smoke-custom-shared
+          docker volume create smoke-user-projects
+          probe "documented paths" \
+            -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
+            -v smoke-my-projects:/data/my-projects \
+            -v smoke-shared-projects:/data/projects
+          probe "custom paths the image does not contain" \
+            -e SKETCHFORGE_SHARED_PROJECTS_DIR=/srv/custom-shared/library \
+            -e SKETCHFORGE_PROJECTS_DIR=/srv/custom-projects \
+            -v smoke-custom-shared:/srv/custom-shared \
+            -v smoke-custom-projects:/srv/custom-projects
+          # A volume seeded root-owned by an image up to 1.23.0 is repaired on start.
+          docker run --rm --user root -v smoke-user-projects:/data/my-projects alpine:3 \
+            sh -c 'chown root:root /data/my-projects && ls -ld /data/my-projects'
+          probe "volume left root-owned by an older image" \
+            -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
+            -v smoke-user-projects:/data/my-projects
+          # Without root the entrypoint cannot chown, but the image's own directory still works.
+          probe "started with --user 1000:1000" --user 1000:1000 \
+            -e SKETCHFORGE_PROJECTS_DIR=/data/projects/mine
+
+      - name: The server saves a project to a fresh volume and reports healthy
+        run: |
+          set -euo pipefail
+          wait_healthy() {
+            for _ in $(seq 1 60); do
+              status="$(docker inspect -f '{{.State.Health.Status}}' "$1")"
+              if [ "$status" = "healthy" ]; then echo "$1 is healthy"; return 0; fi
+              if [ "$status" = "unhealthy" ]; then break; fi
+              sleep 2
+            done
+            echo "::error::$1 did not become healthy (last status: $status)"
+            docker inspect -f '{{json .State.Health}}' "$1"
+            docker logs "$1"
+            return 1
+          }
+
+          docker volume create smoke-server-projects
+          docker run -d --name smoke-server --health-interval=2s \
+            -p 3000:3000 \
+            -e SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
+            -e SKETCHFORGE_API_TOKEN=smoke-token \
+            -v smoke-server-projects:/data/my-projects \
+            sketchforge:smoke
+          wait_healthy smoke-server
+
+          curl -fsS http://127.0.0.1:3000/api/projects | tee projects.json
+          echo
+          grep -q '"enabled":true' projects.json
+
+          status="$(curl -sS -o created.json -w '%{http_code}' -X POST \
+            -H 'Authorization: Bearer smoke-token' \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"Smoke"}' \
+            http://127.0.0.1:3000/api/v1/projects)"
+          cat created.json
+          echo
+          if [ "$status" != "201" ]; then
+            echo "::error::creating a project on a fresh volume answered $status"
+            exit 1
+          fi
+          docker exec smoke-server ls -ln /data/my-projects
+          docker exec smoke-server sh -c 'ls /data/my-projects/*.json'
+
+          # Shared projects turned off is a configuration, not a fault.
+          docker run -d --name smoke-unshared --health-interval=2s \
+            -e SKETCHFORGE_SHARED_PROJECTS_DIR= \
+            sketchforge:smoke
+          wait_healthy smoke-unshared
+
+      - name: Container logs
+        if: always()
+        run: |
+          for name in smoke-server smoke-unshared; do
+            docker logs "$name" 2>&1 | tail -n 50 || true
+          done
