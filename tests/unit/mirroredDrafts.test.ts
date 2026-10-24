@@ -72,6 +72,20 @@ async function expectSameMassProperties(actual: WorkplaneShape, expected: Workpl
   expect(actualProperties.centerOfMass.z).toBeCloseTo(expectedProperties.centerOfMass.z, 3);
 }
 
+function profileBoundsCenter(source: typeof profile) {
+  const xs = source.points.map((point) => point.x);
+  const zs = source.points.map((point) => point.z);
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
+}
+
+function expectedMirroredFramePlacement(source: WorkplaneShape, from: NonNullable<WorkplaneShape["cadBrepFrame"]>, to: NonNullable<WorkplaneShape["cadBrepFrame"]>) {
+  return {
+    x: source.x + (to.x - from.x) * (source.mirrorX ? -1 : 1),
+    z: source.z + (to.z - from.z) * (source.mirrorZ ? -1 : 1),
+    elevation: (source.elevation ?? 0) + (to.elevation - from.elevation) * (source.mirrorY ? -1 : 1),
+  };
+}
+
 describe("drafts on mirrored retained sketch extrusions", () => {
   it.each(["x", "y", "z"] as const)("drafts a prism and retains a mirror in %s", async (axis) => {
     const plain = await extrusion();
@@ -124,7 +138,12 @@ describe("drafts on mirrored retained sketch extrusions", () => {
     expect(replayed.mirrorX).toBe(true);
     expect(replayed.faceDraft?.sourceFaceNormal).not.toEqual(plainDraft.faceDraft?.sourceFaceNormal);
     const expectedMesh = await mirrorResult(replayed, { brep: plainReplayed.cadBrep! }, "x");
-    const expected = shapeWithCadResult(replayed, expectedMesh);
+    const editedSource = await sketchExtrusionShapeFromRequest({ id: mirrored.id, sketchSourceId: mirrored.sketchSourceId!, name: mirrored.name, profile: editedProfile, height: mirrored.height });
+    const expectedPlacement = expectedMirroredFramePlacement(mirroredDraft, mirroredDraft.cadBrepFrame!, editedSource.cadBrepFrame!);
+    const expected = {
+      ...shapeWithCadResult(replayed, expectedMesh),
+      ...expectedPlacement,
+    };
     await expectSameMassProperties(replayed, expected);
   }, CAD_TEST_TIMEOUT_MS);
 
@@ -139,7 +158,11 @@ describe("drafts on mirrored retained sketch extrusions", () => {
     expect(replayed.draftPrismAngle).toBe(-7);
     const base = await sketchExtrusionShapeFromRequest({ id: source.id, sketchSourceId: source.sketchSourceId!, name: source.name, profile: editedProfile, height: source.height });
     const plainDraft = await applyDraftPrism(base, { angle: -7 });
-    const expected = shapeWithCadResult(replayed, await mirrorResult(replayed, plainDraft, "z"));
+    const expectedPlacement = expectedMirroredFramePlacement(drafted, drafted.draftPrismSourceFrame!, base.cadBrepFrame!);
+    const expected = {
+      ...shapeWithCadResult(replayed, await mirrorResult(replayed, plainDraft, "z")),
+      ...expectedPlacement,
+    };
     await expectSameMassProperties(replayed, expected);
   }, CAD_TEST_TIMEOUT_MS);
 });
