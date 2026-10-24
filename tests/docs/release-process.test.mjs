@@ -71,3 +71,11 @@ test("a release runs once: the app-pushed tag does not duplicate the dispatched 
     assert.match(triggers[1], /workflow_dispatch:/, `${file} must stay dispatchable`);
   }
 });
+
+test("every changelog entry sits under a section heading", async () => {
+  const changelog = await read("docs/CHANGELOG.md");
+  const body = changelog.replace(/^---\n[\s\S]*?\n---\n/, "");
+  const beforeFirstSection = body.slice(0, body.search(/^## /m));
+  assert.doesNotMatch(beforeFirstSection, /^\s*[-*] /m,
+    "entries above the first ## heading belong under ## Unreleased");
+});
