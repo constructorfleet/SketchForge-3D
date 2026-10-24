@@ -368,6 +368,20 @@
       "singlePart": "The selected object has only one connected part",
       "separated": "{count, plural, one {Separated {count} part} other {Separated {count} parts}}"
     },
+    "explode": {
+      "exploding": "Exploding {name}…",
+      "exploded": "Exploded {name} into nested groups",
+      "flatFallback": "The assembly structure of {name} could not be matched to its solids, so it was split into separate solids",
+      "selectOne": "Select one imported STEP assembly to explode",
+      "unlock": "Unlock the assembly before exploding it",
+      "sourceMissing": "The original STEP file for this object is no longer in the project, so it cannot be exploded",
+      "notStep": "Only a STEP import with its original file can be exploded",
+      "sourceTooLarge": "Assembly explosion supports STEP files up to 8 MiB",
+      "singleSolid": "This STEP file contains only one solid; there is nothing to explode",
+      "tooManySolids": "Assembly explosion supports at most {max} solids; this file contains {count}",
+      "failed": "The STEP assembly could not be exploded",
+      "cancelled": "Explode cancelled because the object changed"
+    },
     "edgeModifier": {
       "cancelled": "Edge modifier cancelled",
       "cancelledObjectChanged": "Edge modifier cancelled because the object changed",
@@ -1010,6 +1024,8 @@
       },
       "editSketch": "Edit sketch",
       "separateParts": "Separate Parts",
+      "explodeAssembly": "Explode Assembly",
+      "explodingAssembly": "Exploding…",
       "section": {
         "properties": "Properties",
         "taper": "Taper",

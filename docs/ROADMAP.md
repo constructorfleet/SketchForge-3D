@@ -31,6 +31,12 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#424: Keep server treatments in place on tilted shapes](https://github.com/constructorfleet/SketchForge-3D/issues/424) — P2, open.
 
+## Editor parity
+
+Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
+
+- [#378: Explode imported STEP assemblies from the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/378) — P2, implemented and in review.
+
 ## CAD geometry correctness
 
 - [#435: Keep retained drafts in place across draft growth and rotated sketch edits](https://github.com/constructorfleet/SketchForge-3D/issues/435) — implementation and regression coverage in progress.

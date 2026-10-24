@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Split } from "lucide-react";
+import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Network, Split } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
 import { normalizeGearType } from "@/lib/gearGeometry";
@@ -119,6 +119,7 @@ export function ShapeInspector({
   pickedFace,
   canSeparateParts = false,
   onSeparateParts,
+  onExplodeAssembly,
   onInteractionActiveChange,
   volumeMm3,
   onMaterialPriceChange,
@@ -143,6 +144,8 @@ export function ShapeInspector({
   pickedFace?: { shapeId: string; faceIndex: number; serial: number } | null;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
+  /** Present when the shape is an imported STEP assembly that can be exploded into groups. */
+  onExplodeAssembly?: () => Promise<void> | void;
   onInteractionActiveChange?: (active: boolean) => void;
   /** Solid volume of this shape in mm3; absent when nothing has been measured. */
   volumeMm3?: number;
@@ -188,6 +191,7 @@ export function ShapeInspector({
     if (shape.draftPrismAngle !== undefined) setDraftAngle(String(shape.draftPrismAngle));
   }, [shape.draftPrismAngle]);
   const [drafting, setDrafting] = useState(false);
+  const [exploding, setExploding] = useState(false);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const customColorInputRef = useRef<HTMLInputElement>(null);
@@ -431,6 +435,26 @@ export function ShapeInspector({
         <button className="inspector-action-button" type="button" disabled={locked} onClick={onSeparateParts}>
           <Split size={17} strokeWidth={2.5} />
           <span>{t("panels.inspector.separateParts")}</span>
+        </button>
+      ) : null}
+
+      {onExplodeAssembly ? (
+        <button
+          className="inspector-action-button"
+          type="button"
+          disabled={locked || exploding}
+          aria-busy={exploding}
+          onClick={async () => {
+            setExploding(true);
+            try {
+              await onExplodeAssembly();
+            } finally {
+              setExploding(false);
+            }
+          }}
+        >
+          <Network size={17} strokeWidth={2.5} />
+          <span>{t(exploding ? "panels.inspector.explodingAssembly" : "panels.inspector.explodeAssembly")}</span>
         </button>
       ) : null}
 

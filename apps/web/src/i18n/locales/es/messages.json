@@ -345,6 +345,20 @@
       "singlePart": "El objeto seleccionado tiene una sola parte",
       "separated": "{count, plural, one {El objeto se separó en {count} parte} many {El objeto se separó en {count} de partes} other {El objeto se separó en {count} partes}}"
     },
+    "explode": {
+      "exploding": "Descomponiendo {name}…",
+      "exploded": "{name} se descompuso en grupos anidados",
+      "flatFallback": "No se pudo asociar la estructura del ensamblaje {name} con sus sólidos, así que se dividió en sólidos separados",
+      "selectOne": "Selecciona un ensamblaje STEP importado para descomponerlo",
+      "unlock": "Desbloquea el ensamblaje antes de descomponerlo",
+      "sourceMissing": "El archivo STEP original de este objeto ya no está en el proyecto, así que no se puede descomponer",
+      "notStep": "Solo se puede descomponer una importación STEP con su archivo original",
+      "sourceTooLarge": "La descomposición de ensamblajes admite archivos STEP de hasta 8 MiB",
+      "singleSolid": "Este archivo STEP contiene un solo sólido; no hay nada que descomponer",
+      "tooManySolids": "La descomposición de ensamblajes admite como máximo {max} sólidos; este archivo contiene {count}",
+      "failed": "No se pudo descomponer el ensamblaje STEP",
+      "cancelled": "Descomposición cancelada porque el objeto cambió"
+    },
     "edgeModifier": {
       "cancelled": "Se canceló el redondeo o chaflán",
       "cancelledObjectChanged": "Se canceló el redondeo o chaflán porque el objeto cambió",
@@ -888,6 +902,8 @@
       },
       "editSketch": "Editar boceto",
       "separateParts": "Separar en partes",
+      "explodeAssembly": "Descomponer ensamblaje",
+      "explodingAssembly": "Descomponiendo…",
       "section": {
         "properties": "Propiedades",
         "taper": "Estrechamiento",
