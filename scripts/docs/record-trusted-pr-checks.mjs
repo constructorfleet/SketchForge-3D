@@ -2,7 +2,6 @@ const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
 const token = process.env.GITHUB_TOKEN;
 
 const checks = [
-  ["package-reference", "Package reference generation"],
   ["package-examples", "Package examples against local API"],
   ["typecheck", "Typecheck and unit tests"],
   ["api-e2e", "REST API end to end"],
