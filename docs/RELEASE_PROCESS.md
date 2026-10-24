@@ -43,6 +43,20 @@ would publish every release twice.
 notes. Add user-visible changes there as part of their feature or fix pull
 request.
 
+## Pull request and performance checks
+
+`ci.yml` runs typechecks and unit tests on code changes, including the Python
+client unit suite, on both Linux and Windows. `trusted-pr-checks.yml` repeats
+those checks for generated documentation pull requests and also runs browser,
+API, integration, and documentation checks. `docs.yml` runs documentation
+checks on every pull request. `ci.yml` skips code jobs only for pull requests
+classified as documentation-only; pushes to `main` run them all.
+
+The `Performance` workflow runs the performance suite on pushes to `main` and
+weekly on Mondays. It uploads the complete test output as a 30-day artifact,
+including when the suite fails, so regressions can be inspected alongside the
+run.
+
 ## Publishing
 
 After Release Please creates the tag and GitHub release, the release workflow

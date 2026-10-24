@@ -101,6 +101,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install dependencies
         run: npm ci
 
@@ -112,6 +117,12 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      - name: Python client unit tests
+        run: npm run client:test:py
+
+      - name: Python client unit tests
+        run: npm run client:test:py
 
   windows-unit:
     # Release 1.20.0 shipped with no desktop installers: the desktop release
