@@ -125,3 +125,45 @@ function faceGroupUnit(faceGroups: readonly number[], triangleCount: number) {
   }
   return triangleCount > 0 && total === triangleCount * 3 ? 3 : 1;
 }
+
+/**
+ * The exact face a mesh triangle belongs to, read from the mesh's face groups
+ * (start, count, face index), or null when no group covers it. Used to turn a
+ * viewport hit into the face the inspector's face tools act on.
+ */
+export function faceAtTriangle(faceGroups: readonly number[], triangleCount: number, triangle: number): number | null {
+  if (!Number.isInteger(triangle) || triangle < 0 || triangle >= triangleCount) return null;
+  const unit = faceGroupUnit(faceGroups, triangleCount);
+  for (let group = 0; group + 2 < faceGroups.length; group += 3) {
+    const start = faceGroups[group]! / unit;
+    const count = faceGroups[group + 1]! / unit;
+    if (triangle >= start && triangle < start + count) return faceGroups[group + 2]!;
+  }
+  return null;
+}
+
+/**
+ * The positions of one face's triangles, copied from an unindexed mesh in its
+ * face groups' order, for drawing that face on its own (the viewport's hover
+ * highlight). Empty when no group names the face.
+ */
+export function faceTrianglePositions(positions: ArrayLike<number>, faceGroups: readonly number[], faceIndex: number): Float32Array {
+  const triangleCount = Math.floor(positions.length / 9);
+  const unit = faceGroupUnit(faceGroups, triangleCount);
+  const ranges: Array<[number, number]> = [];
+  let total = 0;
+  for (let group = 0; group + 2 < faceGroups.length; group += 3) {
+    if (faceGroups[group + 2] !== faceIndex) continue;
+    const start = faceGroups[group]! / unit;
+    const end = Math.min(triangleCount, start + faceGroups[group + 1]! / unit);
+    if (!Number.isInteger(start) || start < 0 || end <= start) continue;
+    ranges.push([start, end]);
+    total += end - start;
+  }
+  const out = new Float32Array(total * 9);
+  let offset = 0;
+  for (const [start, end] of ranges) {
+    for (let index = start * 9; index < end * 9; index += 1) out[offset++] = positions[index]!;
+  }
+  return out;
+}

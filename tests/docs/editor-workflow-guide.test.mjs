@@ -55,6 +55,11 @@ test("face drafting guide links a supported editor workflow to browser acceptanc
   assert.match(guideText, /face-drafting\.test\.mjs/);
   assert.match(guideText, /face-tools\.test\.mjs/);
   assert.doesNotMatch(guideText, /CAD face index/);
+  // Faces are picked in the view; the stepper is the keyboard fallback.
+  assert.match(guideText, /click(?:ing)? (?:a|the|that) face in the view/i);
+  assert.match(guideText, /keyboard/i);
+  assert.match(guideText, /Face ID/);
+  assert.match(guideText, /face-picking\.png/);
   assert.match(browserTestText, /getByRole\("region", \{ name: "Faces" \}\)/);
   assert.match(browserTestText, /Apply draft/);
   assert.match(browserTestText, /Face drafted\./);

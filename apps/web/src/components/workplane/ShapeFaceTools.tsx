@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, ChevronUp, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations, type MessageKey } from "@/i18n";
 import { updateFaceColor } from "@/lib/faceColorEditor";
 import { DRAFT_FACE_PULL_AXES, applyDraftFaceSelection, draftFaceRequestForShape, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
@@ -20,8 +20,10 @@ const PULL_AXIS_LABELS: Record<DraftFacePullAxis, MessageKey> = {
 /**
  * The inspector's face colour and face draft tools.
  *
- * Both act on one face, chosen once here and outlined in the viewport while
- * this card is open. A shape without exact faces gets an
+ * Both act on one face, chosen once here and highlighted in the viewport while
+ * the pointer or focus is in the card. While the card is open the face can also
+ * be picked in the viewport, which hands it back through `pickedFace`; the
+ * stepper stays as the keyboard way to choose one. A shape without exact faces gets an
  * explicit "Enable face editing" action instead of the tools simply not being
  * there.
  */
@@ -33,6 +35,8 @@ export function ShapeFaceTools({
   onEnableFaceEditing,
   onApplyDraftFace,
   onHighlightFace,
+  onFacePickingChange,
+  pickedFace,
 }: {
   shape: WorkplaneShape;
   locked: boolean;
@@ -41,12 +45,17 @@ export function ShapeFaceTools({
   onEnableFaceEditing?: () => Promise<void> | void;
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => Promise<void> | void;
   onHighlightFace?: (faceIndex: number | null) => void;
+  /** Told which shape's faces can be picked in the viewport right now, or null for none. */
+  onFacePickingChange?: (shapeId: string | null) => void;
+  /** The face last picked in the viewport; a new `serial` chooses it again. */
+  pickedFace?: { shapeId: string; faceIndex: number; serial: number } | null;
 }) {
   const t = useTranslations();
   const exact = shapeHasExactFaces(shape);
   const [open, setOpen] = useState(true);
   const [faceIndex, setFaceIndex] = useState(0);
   const [faceInput, setFaceInput] = useState("1");
+  const [active, setActive] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [pullAxis, setPullAxis] = useState<DraftFacePullAxis>("y");
   const [angle, setAngle] = useState("5");
@@ -73,9 +82,28 @@ export function ShapeFaceTools({
     }
   }, [faceCount, faceIndex]);
   useEffect(() => {
-    onHighlightFace?.(exact && open ? faceIndex : null);
-  }, [exact, faceIndex, onHighlightFace, open, shape.id]);
+    onHighlightFace?.(exact && open && active ? faceIndex : null);
+  }, [active, exact, faceIndex, onHighlightFace, open]);
   useEffect(() => () => onHighlightFace?.(null), [onHighlightFace]);
+  const pickable = exact && open && !locked;
+  useEffect(() => {
+    onFacePickingChange?.(pickable ? shape.id : null);
+  }, [onFacePickingChange, pickable, shape.id]);
+  useEffect(() => () => onFacePickingChange?.(null), [onFacePickingChange]);
+  // Only a new pick moves the stepper, so stepping away from a picked face
+  // sticks, and a pick made before this panel opened is not replayed.
+  const pickSerial = pickedFace?.shapeId === shape.id ? pickedFace.serial : null;
+  const pickedIndex = pickedFace?.faceIndex ?? 0;
+  const seenPick = useRef(pickSerial);
+  useEffect(() => {
+    if (pickSerial === seenPick.current) return;
+    seenPick.current = pickSerial;
+    if (pickSerial === null) return;
+    const next = Math.max(0, Math.min(lastFace, pickedIndex));
+    setFaceIndex(next);
+    setFaceInput(String(next + 1));
+  }, [lastFace, pickSerial, pickedIndex]);
+  const faceId = shape.faceIds?.[faceIndex];
 
   const coloredFaces = Object.entries(shape.faceColors ?? {})
     .map(([key, color]) => {
@@ -89,6 +117,12 @@ export function ShapeFaceTools({
     <section
       className={`property-card face-tools-card ${open ? "" : "collapsed"}`}
       aria-label={t("panels.inspector.faces.title")}
+      onPointerEnter={() => setActive(true)}
+      onPointerLeave={() => setActive(false)}
+      onFocus={() => setActive(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActive(false);
+      }}
     >
       <button
         className="property-card-header"
@@ -148,6 +182,7 @@ export function ShapeFaceTools({
                 </div>
                 {faceCount ? <span className="face-count">{t("panels.inspector.faces.of", { count: faceCount })}</span> : null}
               </div>
+              {faceId ? <p className="face-id">{t("panels.inspector.faces.faceId", { id: faceId })}</p> : null}
               <p className="face-tools-note">{t("panels.inspector.faces.highlightHint")}</p>
 
               <div className="face-color-control">
