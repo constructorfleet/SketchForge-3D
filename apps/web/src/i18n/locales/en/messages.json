@@ -1024,7 +1024,7 @@
         "previous": "Previous face",
         "next": "Next face",
         "faceId": "Face ID: {id}",
-        "highlightHint": "Point at a face of this shape in the view to highlight it, and click to choose it. While the pointer is over this panel, the chosen face is highlighted, or shown in its color if it has one.",
+        "highlightHint": "Point at a face in the view to highlight it, then click to choose it. The chosen face stays outlined while this panel is open, including when it has a color.",
         "colorFor": "Color for face {face}",
         "chooseColor": "Choose a color",
         "clearColor": "Clear",

@@ -20,10 +20,10 @@ const PULL_AXIS_LABELS: Record<DraftFacePullAxis, MessageKey> = {
 /**
  * The inspector's face colour and face draft tools.
  *
- * Both act on one face, chosen once here and highlighted in the viewport while
- * the pointer or focus is in the card. While the card is open the face can also
- * be picked in the viewport, which hands it back through `pickedFace`; the
- * stepper stays as the keyboard way to choose one. A shape without exact faces gets an
+ * Both act on one face, chosen once here and outlined in the viewport while
+ * this card is open. While the card is open the face can also be picked in the
+ * viewport, which hands it back through `pickedFace`; the stepper stays as the
+ * keyboard way to choose one. A shape without exact faces gets an
  * explicit "Enable face editing" action instead of the tools simply not being
  * there.
  */
@@ -55,7 +55,6 @@ export function ShapeFaceTools({
   const [open, setOpen] = useState(true);
   const [faceIndex, setFaceIndex] = useState(0);
   const [faceInput, setFaceInput] = useState("1");
-  const [active, setActive] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [pullAxis, setPullAxis] = useState<DraftFacePullAxis>("y");
   const [angle, setAngle] = useState("5");
@@ -82,8 +81,8 @@ export function ShapeFaceTools({
     }
   }, [faceCount, faceIndex]);
   useEffect(() => {
-    onHighlightFace?.(exact && open && active ? faceIndex : null);
-  }, [active, exact, faceIndex, onHighlightFace, open]);
+    onHighlightFace?.(exact && open ? faceIndex : null);
+  }, [exact, faceIndex, onHighlightFace, open, shape.id]);
   useEffect(() => () => onHighlightFace?.(null), [onHighlightFace]);
   const pickable = exact && open && !locked;
   useEffect(() => {
@@ -117,12 +116,6 @@ export function ShapeFaceTools({
     <section
       className={`property-card face-tools-card ${open ? "" : "collapsed"}`}
       aria-label={t("panels.inspector.faces.title")}
-      onPointerEnter={() => setActive(true)}
-      onPointerLeave={() => setActive(false)}
-      onFocus={() => setActive(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActive(false);
-      }}
     >
       <button
         className="property-card-header"

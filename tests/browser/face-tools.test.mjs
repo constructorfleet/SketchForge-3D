@@ -100,6 +100,7 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await waitForServer(baseURL, server, () => logs);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/projects", async (route) => { if (route.request().method() === "GET") await new Promise((r) => setTimeout(r, Number(process.env.PROBE_DELAY))); await route.continue(); });
     await page.goto(baseURL);
     await page.getByRole("button", { name: "Create new 3D design" }).click();
     await page.getByRole("button", { name: "Add shape" }).click();
@@ -120,40 +121,43 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
       assert.equal(inspectorText.includes(jargon), false, `the face tools must not show "${jargon}"`);
     }
 
-    // While the pointer is over the card, the chosen face is highlighted in the view.
+    // The chosen face stays outlined while the panel is open, and viewport hover
+    // adds a transient face highlight that can be clicked to change the choice.
     const canvasBox = await page.locator("canvas").first().boundingBox();
     const cardBox = await faces.boundingBox();
     assert.ok(canvasBox && cardBox);
     const modelView = () => page.screenshot({
       clip: { x: canvasBox.x, y: canvasBox.y, width: cardBox.x - 20 - canvasBox.x, height: canvasBox.height },
     });
-    await page.mouse.move(canvasBox.x + 40, canvasBox.y + canvasBox.height - 40);
+    await header.click();
     await page.waitForTimeout(300);
     const unhighlighted = await highlightPixels(await modelView());
+    await header.click();
+    await page.waitForTimeout(300);
     const faceField = faces.getByRole("spinbutton", { name: "Face" });
     let shown = 0;
     let region = { count: 0, x: 0, y: 0 };
     // Step until a face that looks at the default camera is selected.
-    for (let face = 1; face <= 6 && shown <= unhighlighted + 1_000; face += 1) {
+    for (let face = 1; face <= 6 && shown <= unhighlighted + 40; face += 1) {
       await faceField.fill(String(face));
       await faces.hover();
       await page.waitForTimeout(300);
       region = await highlightRegion(await modelView());
       shown = region.count;
     }
-    assert.ok(shown > unhighlighted + 1_000, `the selected face must be highlighted (${unhighlighted} before, ${shown} after)`);
+    assert.ok(shown > unhighlighted + 40, `the selected face must be outlined (${unhighlighted} before, ${shown} after)`);
     const selectedFace = await faceField.inputValue();
 
-    // Leaving the panel takes the highlight away again.
+    // The outline remains when the pointer leaves the panel and moves to the model.
     await page.mouse.move(canvasBox.x + 40, canvasBox.y + canvasBox.height - 40);
     await faceField.blur();
     await page.waitForTimeout(300);
-    const cleared = await highlightPixels(await modelView());
-    assert.ok(cleared < unhighlighted + 200, `the highlight must clear when the pointer leaves the panel (${cleared} left, ${unhighlighted} before)`);
+    const persistent = await highlightPixels(await modelView());
+    assert.ok(persistent > unhighlighted + 40, `the selected face stays outlined after leaving the panel (${persistent} pixels)`);
 
     // Hovering that face in the view highlights it, and clicking it chooses it,
     // even after the panel was stepped to a different face.
-    const facePoint = { x: canvasBox.x + region.x, y: canvasBox.y + region.y };
+    let facePoint = { x: canvasBox.x + region.x, y: canvasBox.y + region.y };
     const otherFace = String((Number(selectedFace) % 6) + 1);
     await faceField.fill(otherFace);
     await faceField.blur();
@@ -172,12 +176,14 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await page.mouse.move(canvasBox.x + 40, canvasBox.y + canvasBox.height - 40, { steps: 4 });
     await page.waitForTimeout(300);
     const unhovered = await highlightPixels(await modelView());
-    assert.ok(unhovered < unhighlighted + 200, `the hover highlight must clear when the pointer leaves the face (${unhovered} left, ${unhighlighted} before)`);
+    assert.ok(unhovered > unhighlighted + 40, `the selected face outline remains after the hover cue clears (${unhovered} pixels)`);
 
     await faces.getByLabel(`Color for face ${selectedFace}`).fill("#3366ff");
     await faces.getByRole("list", { name: "Colored faces" }).getByText(`Face ${selectedFace}`, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
     await faces.hover();
     await page.waitForTimeout(300);
+    const coloredFaceHighlight = await highlightPixels(await modelView());
+    assert.ok(coloredFaceHighlight > unhighlighted + 40, `a colored face keeps the yellow edit outline (${coloredFaceHighlight} pixels)`);
     await page.screenshot({ path: "docs/screenshots/face-tools.png" });
 
     const draft = faces.getByRole("group", { name: "Draft" });
@@ -193,18 +199,25 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
       await faceField.fill(String(face));
       await faces.hover();
       await page.waitForTimeout(300);
-      if (await highlightAt(await modelView(), region.x, region.y)) draftedFace = String(face);
+      const outline = await highlightRegion(await modelView());
+      const candidate = { x: canvasBox.x + outline.x, y: canvasBox.y + outline.y };
+      const differentFace = face === 1 ? "2" : "1";
+      await faceField.fill(differentFace);
+      await faceField.blur();
+      await page.mouse.move(candidate.x, candidate.y, { steps: 3 });
+      await page.waitForTimeout(300);
+      await page.mouse.click(candidate.x, candidate.y);
+      await waitForValue(faceField, String(face));
+      if (await faceField.inputValue() === String(face)) {
+        draftedFace = String(face);
+        facePoint = candidate;
+      }
     }
-    assert.ok(draftedFace, "one drafted face must lie under the picked point");
+    assert.ok(draftedFace, "clicking an outlined drafted face must choose it in the viewport");
 
-    // Clicking it chooses exactly that face and shows its stable ID.
+    // The picked face's stable ID is shown in the inspector.
+    assert.equal(await faceField.inputValue(), draftedFace);
     const elsewhere = draftedFace === "1" ? "2" : "1";
-    await faceField.fill(elsewhere);
-    await faceField.blur();
-    await page.mouse.move(facePoint.x, facePoint.y, { steps: 4 });
-    await page.mouse.click(facePoint.x, facePoint.y);
-    await waitForValue(faceField, draftedFace);
-    assert.equal(await faceField.inputValue(), draftedFace, "clicking a drafted face must choose exactly that face");
     const shownId = (await faces.getByText(/^Face ID: \S+$/).innerText()).replace(/^Face ID: /, "");
 
     // That is the ID GET /faces returns for the face, once the editor has saved the project.
@@ -232,9 +245,12 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await page.mouse.move(facePoint.x + 1, facePoint.y + 1);
     await page.waitForTimeout(300);
     assert.ok(await highlightAt(await modelView(), region.x, region.y), "the hovered face must be highlighted");
+    const highlightedBeforeCameraMove = await highlightPixels(await modelView());
     await page.mouse.wheel(0, 240);
     await page.waitForTimeout(600);
-    assert.equal(await highlightPixels(await modelView()) < unhighlighted + 200, true, "the hover highlight must clear when the camera moves");
+    const afterCameraMove = await highlightPixels(await modelView());
+    assert.ok(afterCameraMove < highlightedBeforeCameraMove, "the hover cue must clear when the camera moves");
+    assert.ok(afterCameraMove > unhighlighted + 40, "the selected face outline must remain after the hover cue clears");
     await page.mouse.wheel(0, -240);
     await page.waitForTimeout(600);
 
