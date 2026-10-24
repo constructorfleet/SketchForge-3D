@@ -253,6 +253,54 @@ describe("exact editor booleans", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     });
   });
 
+  describe("a tilted cylinder cutter (#420)", () => {
+    // A bore slanting through the plate. The viewport turns a shape about its
+    // centre, `elevation + height / 2`, so a cutter whose centre sits at the
+    // plate's mid-height bores through with its axis crossing that mid-height
+    // at the cutter's own x and z -- whichever way it is tilted.
+    //
+    // A tilted bore through a slab removes the slab thickness times the bore's
+    // horizontal section, an ellipse of area pi r^2 / cos(tilt). And because
+    // the axis crosses mid-height at (x, z), the material removed is centred
+    // there too. A cutter turned about its base instead keeps the same volume
+    // -- the bore still runs right through -- but crosses mid-height
+    // `(height / 2) tan(tilt)` away, 8.66 mm here, which only the centre of
+    // mass can see.
+    const BORE_RADIUS = 3;
+    const BORE_LENGTH = 30;
+    const BORE_TILT = 30;
+    const BORE_X = 8;
+    const BORE_Z = -5;
+    const tiltedBore = (tilt: Partial<WorkplaneShape>) => shape({
+      kind: "cylinder",
+      hole: true,
+      width: BORE_RADIUS * 2,
+      depth: BORE_RADIUS * 2,
+      size: BORE_RADIUS * 2,
+      height: BORE_LENGTH,
+      x: BORE_X,
+      z: BORE_Z,
+      elevation: PLATE_HEIGHT / 2 - BORE_LENGTH / 2,
+      ...tilt,
+    });
+
+    it.each([
+      ["pitched", { rotationX: BORE_TILT }],
+      ["rolled", { rotationZ: BORE_TILT }],
+      ["pitched the other way and yawed", { rotationX: -BORE_TILT, rotation: 40 }],
+    ] as const)("removes the slanted bore from where the viewport draws it, %s", async (_, tilt) => {
+      const { cad, cut } = await cutExactly([plate(), tiltedBore(tilt)]);
+      const measured = measure(cad, cut);
+
+      const removed = (Math.PI * BORE_RADIUS ** 2 * PLATE_HEIGHT) / Math.cos((BORE_TILT * Math.PI) / 180);
+      const remaining = PLATE_VOLUME - removed;
+      expect(measured.volume).toBeCloseTo(remaining, 3);
+      expect(measured.centerX).toBeCloseTo((-BORE_X * removed) / remaining, 5);
+      expect(measured.centerY).toBeCloseTo(PLATE_HEIGHT / 2, 5);
+      expect(measured.centerZ).toBeCloseTo((-BORE_Z * removed) / remaining, 5);
+    });
+  });
+
   describe("the mesh path's cutter (the before numbers)", () => {
     it("removes too much, too deep, for a round pocket", async () => {
       const cad = await serverCadKernel();

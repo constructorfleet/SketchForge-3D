@@ -25,9 +25,8 @@ but settings that belong to the shape type, such as the number of sides, become
 fixed. The step is undoable. Sketch extrusions, sweeps, filleted or chamfered
 shapes and STEP imports already have exact faces, so the panel opens on the
 face tools directly. Holes, text, groups, imported pictures and plain meshes
-do not offer it. Nor, for now, does a shape tilted about a horizontal axis,
-because its rebuilt solid would shift slightly; turning about the vertical axis
-is fine.
+do not offer it. A shape turned any way, including one tilted about a
+horizontal axis, is rebuilt exactly where it stands.
 
 ![The Faces panel after enabling face editing on a box, with one face coloured.](../screenshots/face-tools.png)
 

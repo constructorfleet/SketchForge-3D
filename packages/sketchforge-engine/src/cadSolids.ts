@@ -415,18 +415,26 @@ export const EXACT_SOLID_KINDS = [
  * Rotation has to be baked in: the treated result is stored as a mesh with no
  * rotation of its own, so a shape filleted while turned would otherwise come
  * back straightened.
+ *
+ * Turned about the shape's centre, `height / 2` above its base, which is where
+ * the viewport and `transformMesh` turn it. It used to turn about the base
+ * (the origin), which yaw cannot tell apart -- the vertical axis passes through
+ * both -- but a pitch or roll can: a 30 x 10 x 6 box pitched 20 degrees landed
+ * 0.18 mm low and 1.03 mm forward of where it was drawn, and an exact cut with
+ * a tilted cutter was off by that much (#420).
  */
-const Z_AXIS = { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } } as const;
-
 export function exactSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   let solid = unrotatedSolidForShape(cad, shape);
   const yaw = shape.rotation ?? 0;
   const pitch = shape.rotationX ?? 0;
   const roll = shape.rotationZ ?? 0;
+  const pivot = { x: 0, y: shape.height / 2, z: 0 };
   // The editor orients a shape with THREE.Euler(rotationX, rotation, rotationZ)
   // in its default "XYZ" order, which is the matrix Rx * Ry * Rz -- so a point
   // is turned by roll first, then yaw, then pitch. Each `rotate` here
   // left-multiplies, so the calls run in that same order: roll, yaw, pitch.
+  // All three axes pass through the same pivot, so the composition is the one
+  // rotation `transformMesh` applies about that point.
   //
   // This used to negate the yaw and apply the three in the opposite order, and
   // nothing noticed, because the shapes anyone had filleted while turned were
@@ -435,9 +443,9 @@ export function exactSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   // asymmetric shape -- a wedge, a roof, a cone with a top radius -- the result
   // came back mirrored about the yaw, and any two non-zero rotations came back
   // in the wrong order.
-  if (roll) solid = cad.rotate(solid, Z_AXIS, degreesToRadians(roll));
-  if (yaw) solid = cad.rotate(solid, Y_AXIS, degreesToRadians(yaw));
-  if (pitch) solid = cad.rotate(solid, X_AXIS, degreesToRadians(pitch));
+  if (roll) solid = cad.rotate(solid, { point: pivot, direction: { x: 0, y: 0, z: 1 } }, degreesToRadians(roll));
+  if (yaw) solid = cad.rotate(solid, { point: pivot, direction: Y_AXIS.direction }, degreesToRadians(yaw));
+  if (pitch) solid = cad.rotate(solid, { point: pivot, direction: X_AXIS.direction }, degreesToRadians(pitch));
   return solid;
 }
 

@@ -15,9 +15,7 @@ export function shapeHasExactFaces(shape: WorkplaneShape) {
  */
 export function faceEditingCanBeEnabled(shape: WorkplaneShape) {
   // An imported picture is a box carrying the image, which the rebuild would drop.
-  // A tilted shape's exact solid is turned about its base, not its centre, so
-  // the rebuilt shape would move (#420).
-  return !shape.hole && !shape.imagePlate && !shape.rotationX && !shape.rotationZ
+  return !shape.hole && !shape.imagePlate
     && !shapeHasExactFaces(shape) && !shape.importedMesh && shapeHasExactBooleanSolid(shape);
 }
 
