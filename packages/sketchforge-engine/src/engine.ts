@@ -1021,7 +1021,7 @@ export function createEngine(store: ProjectStore): Engine {
             ...retainedDraftSourcePlacement(
               existing,
               rebuilt.cadBrepFrame!,
-              existing.faceDraft ? existing.cadBrepFrame : undefined,
+              existing.faceDraft && !hasExistingTreatment ? existing.cadBrepFrame : undefined,
             ),
             ...(existing.faceDraft || faceDraftChanged ? { faceDraftSourceScale } : {}),
             width: rebuilt.width * rebuildScale.width,
