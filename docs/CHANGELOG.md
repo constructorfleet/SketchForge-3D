@@ -31,6 +31,7 @@ owner: "Contributors"
   shell is refused with `422` and writes nothing, where it used to return the
   bare solid. Because API treatments are now recorded, the existing refusals
   for shelling or adding a prism draft after a treatment apply to them too.
+- The Docker container now prepares its storage directories when it starts: an entrypoint creates whatever `SKETCHFORGE_SHARED_PROJECTS_DIR` and `SKETCHFORGE_PROJECTS_DIR` name, hands each directory to the `node` user, and then drops privileges before the server runs. Saving to a fresh volume at `/data/my-projects`, at a path of your own, or to a volume left root-owned by an earlier image no longer fails. Started without root, the container logs which configured directory it cannot write instead of failing on the first save. The container health check no longer reports unhealthy when shared projects are turned off. See [volume ownership](guides/deployment.md#volume-ownership).
 - The GitHub Pages documentation workflow now publishes a browser-only SketchForge editor demo at `/SketchForge-3D/Demo/`, with subpath-aware static assets and a direct navigation link.
 - README now has a dedicated installation overview for the browser app, desktop releases, Docker, source checkouts, and static exports. The documentation site's top bar groups guides and references into dropdowns and links directly to installation.
 - The local MCP now exposes `sketchforge_import_stl`, which imports an STL file from the MCP host filesystem into a chosen local project.

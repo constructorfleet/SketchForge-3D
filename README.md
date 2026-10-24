@@ -227,6 +227,8 @@ docker run -d --name sketchforge --restart unless-stopped \
   ghcr.io/constructorfleet/sketchforge-3d:latest
 ```
 
+The server runs as UID `1000`. At start the container creates the configured storage directories and hands them to that user, on a named volume or a bind mount alike; see [volume ownership](docs/guides/deployment.md#volume-ownership) for running without root.
+
 The directory *replaces* browser storage rather than mirroring it: the dashboard reads its list from the server, autosave writes there, and deleting a project deletes it there. Each project is two files — `<project id>.json` for the dashboard's own record of it and `<project id>.skf` for the geometry — written through a temporary file so an interrupted save cannot leave half a project behind.
 
 Projects already held in a browser are moved up the first time it reaches a server with the directory set, and the dashboard says how many it moved. If any of them cannot be moved, that browser keeps its own storage and says so, rather than carrying on with half a list on the server.

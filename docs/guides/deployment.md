@@ -29,6 +29,25 @@ Set `SKETCHFORGE_API_TOKEN` together with `SKETCHFORGE_PROJECTS_DIR` to enable a
 
 The Docker image stores shared projects at `/data/projects` by default. Set `SKETCHFORGE_SHARED_PROJECTS_DIR` to change the path, and mount persistent storage there. The default compose volume is `sketchforge-shared-projects`; set `SKETCHFORGE_SHARED_PROJECTS_VOLUME` to choose another named volume or bind-mount source. See [shared Docker projects](https://github.com/constructorfleet/SketchForge-3D#shared-docker-projects).
 
+## Volume ownership
+
+The server runs as the `node` user, UID `1000`, so every directory it saves into must be writable by that user. Docker creates the mount point of a fresh named or anonymous volume owned by `root` whenever the path does not already exist in the image, and the storage directories are whatever `SKETCHFORGE_SHARED_PROJECTS_DIR` and `SKETCHFORGE_PROJECTS_DIR` name, so the image cannot prepare them ahead of time. Instead the container starts as `root` in a small entrypoint that creates both configured directories, hands each one to `node`, and then drops privileges before the server starts. Named volumes at the documented paths, at paths of your own, and volumes left `root`-owned by images up to 1.23.0 all work without setup.
+
+The entrypoint changes the owner of the directory itself, not of the files below it. The server wrote those files as `node`, so they already belong to it.
+
+**Bind mounts.** A bind-mounted host directory is handed to UID `1000` the same way, which changes that directory's owner on the host. Create it first if you want to choose where it lives:
+
+<!-- runnable-exempt: This host-side setup uses an operator-chosen bind-mount path on the Docker host. -->
+```bash
+mkdir -p /srv/sketchforge/my-projects
+SKETCHFORGE_PROJECTS_DIR=/data/my-projects \
+SKETCHFORGE_PROJECTS_VOLUME=/srv/sketchforge/my-projects \
+  docker compose -f deploy/docker/compose-ghcr.yaml up -d
+```
+
+**Running without root.** With `docker run --user 1000:1000`, rootless Docker, or a platform that refuses root containers, the entrypoint cannot change ownership. It still creates what it can, starts the server as that user, and logs a line naming any configured directory that user cannot write, so a misconfigured mount shows up in `docker logs` rather than on the first save. Make the mounted directory writable by that UID yourself in this mode.
+
+The container health check asks `/api/shared-projects` for its status. Turning shared projects off with an empty `SKETCHFORGE_SHARED_PROJECTS_DIR` leaves the container healthy; an unreadable shared library reports it unhealthy.
 
 ## Application updates
 
