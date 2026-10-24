@@ -37,9 +37,10 @@ import {
   type RadiusUnavailableCode,
 } from "./cadMeasurements.js";
 import { withCadKernel } from "./serverCadKernel.js";
-import { edgeSolidForShape, orientedSolidForShape, ServerCadError } from "./serverCadOperations.js";
+import { edgeSolidForShape, orientedSolidForShape, ServerCadError, treatmentBakesRotation } from "./serverCadOperations.js";
 import { faceOutwardNormal } from "./serverCadShell.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
+import { shapePlacementMatrix } from "./serverShapeGroups.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type MeasurementEntityKind = "edge" | "face";
@@ -188,7 +189,36 @@ function resolveTarget(cad: OcctKernel, target: MeasurementTarget, label: string
   // listings use, and which is right for them -- hands back the solid in its own
   // frame with the rotation applied and the translation not. Two parts 60mm
   // apart both measured from the origin through that, so this read zero.
-  const solid = placedSolidForShape(cad, target.shape);
+  // Edges have their own canonical solid: for an untreated plain revolve it
+  // is rebuilt from the retained profile, exactly like GET /edges and edge
+  // treatments. The stored mesh has many more edges and cannot resolve those
+  // listed indexes. Faces continue to use their existing placed solid.
+  let solid: ShapeHandle;
+  if (target.entity === "edge") {
+    solid = edgeSolidForShape(cad, target.shape);
+    // The edge listing and treatment solid is in the shape frame: its mirror
+    // is already applied, while a treatment may bake a parametric shape's
+    // rotation into the geometry. Put that same solid where it sits without
+    // applying either transform twice. Untreated revolves are the exception:
+    // their exact edge solid is rebuilt from the profile before rotation.
+    const rotationAlreadyApplied = treatmentBakesRotation(target.shape)
+      && target.shape.sketchOperation !== "revolve";
+    const placementShape = {
+      ...target.shape,
+      mirrorX: undefined,
+      mirrorY: undefined,
+      mirrorZ: undefined,
+      ...(rotationAlreadyApplied ? { rotation: 0, rotationX: 0, rotationZ: 0 } : {}),
+    };
+    const elements = shapePlacementMatrix(placementShape).elements;
+    solid = cad.transform(solid, [
+      elements[0], elements[4], elements[8], elements[12],
+      elements[1], elements[5], elements[9], elements[13],
+      elements[2], elements[6], elements[10], elements[14],
+    ]);
+  } else {
+    solid = placedSolidForShape(cad, target.shape);
+  }
   if (target.entity === "shape") {
     return { handle: solid, face: null };
   }
