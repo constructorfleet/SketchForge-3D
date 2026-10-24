@@ -188,6 +188,7 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await page.screenshot({ path: "docs/screenshots/face-tools.png" });
 
     const draft = faces.getByRole("group", { name: "Draft" });
+    assert.match(await draft.innerText(), /face numbers; check the Face ID before drafting again/i);
     await draft.getByLabel("Direction").selectOption("y");
     await draft.getByLabel("Draft angle").fill("5");
     await draft.getByRole("button", { name: "Apply draft" }).click();
