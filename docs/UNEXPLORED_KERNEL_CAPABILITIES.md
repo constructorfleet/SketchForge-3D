@@ -136,19 +136,25 @@ These are implemented and should not be filed as missing features:
   placement and writing the new source and dependent geometry atomically. A
   source-driven revolve profile or operation-setting edit (for example, its
   side count) follows the same bottom-up rebuild and atomic-write path.
-  A sketch extrusion, sweep, or revolve with one persisted all-edge fillet
+  Every edge treatment is recorded on the shape, whether the editor or the
+  engine's `treat` operation (REST `POST /treatments`, MCP) applied it. A
+  sketch extrusion, sweep, or revolve whose record is one all-edge fillet
   replays that fillet after a source-profile edit against rebuilt topology,
-  without carrying edge indices across the edit. One persisted symmetric 45°
-  all-edge chamfer now follows the same replay path on those source kinds, with
+  without carrying edge indices across the edit. One recorded symmetric 45°
+  all-edge chamfer follows the same replay path on those source kinds, with
   treatment history and the current eligible-edge count rebuilt from new
   topology. Plain full-turn revolve chamfers are rebuilt from the retained
   profile as exact CAD geometry and currently require exactly one closed
   profile region; partial-turn, helical, and multi-region revolve chamfers are
-  refused. Revolve setting edits also attempt replay and roll back if the new
-  topology cannot accept the treatment. Selected-edge treatments, non-45°
-  chamfers, multiple treatment steps, draft/treatment combinations outside
-  the supported order below, and treatments on other source operation types
-  remain unsupported. One retained
+  refused. A plain revolve's fillet is still cut from its faceted mesh, so its
+  replay succeeds only when the rebuilt facets accept the radius. Revolve
+  setting edits also attempt replay and roll back if the new topology cannot
+  accept the treatment. A source edit on a shape whose record holds a
+  selected-edge treatment, a non-45° chamfer, or multiple treatment steps, or
+  on a shape that was shelled (the shell is recorded too), is refused without
+  a project write rather than rebuilt without them. Draft/treatment
+  combinations outside the supported order below and treatments on other
+  source operation types remain unsupported. One retained
   prism draft followed by one all-edge fillet or symmetric 45° chamfer is now
   supported on a sketch extrusion; source-profile and draft-angle edits replay
   the draft first and treatment second, refreshing history and eligible-edge
