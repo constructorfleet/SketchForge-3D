@@ -926,13 +926,13 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
   ...featureOperations.slice(1, 2),
 ] as const satisfies readonly ApiV1Operation[];
 
-export const API_V1_OPERATIONS: readonly ApiV1Operation[] = API_V1_OPERATIONS_BASE.map((item): ApiV1Operation => item.method === "POST" || item.method === "PATCH"
-  ? ({
+export const API_V1_OPERATIONS: readonly ApiV1Operation[] = API_V1_OPERATIONS_BASE.map((item): ApiV1Operation => item.requestBody
+  ? {
     ...item,
     maxRequestBytes: item.operationId === "importGeometry" ? 64 * 1024 * 1024 : DEFAULT_JSON_BODY_LIMIT_BYTES,
     responses: [...new Set([...(item.responses ?? []), 413])].sort((a, b) => a - b),
     responseSchemas: { ...item.responseSchemas, 413: errorSchema },
-  } as ApiV1Operation)
+  }
   : item);
 
 export type CreateProjectRequest = { name: string };

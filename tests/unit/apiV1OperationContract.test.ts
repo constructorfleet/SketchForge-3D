@@ -67,7 +67,7 @@ describe("REST API v1 operation contract", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
     expect(operation).toMatchObject({
       operationId: "explodeAssembly",
-      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 422, 500, 503],
       query: { required: ["projectId", "shapeId"] },
     });
     expect(contract.parseApiV1Query(key, new Request("https://example.test/api/v1/explode?projectId=%20project-1%20&shapeId=%20assembly%20")))
