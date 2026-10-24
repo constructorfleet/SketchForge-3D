@@ -24,6 +24,7 @@ The app runs at `http://127.0.0.1:3000/` by default.
 - If a Markdown file declares `verified_delivery: contract` in its frontmatter, `npm run docs:verify` lints it as an acceptance contract. Structural problems fail the check; vague wording is reported as a warning without failing it. Unmarked documents are untouched.
 - Commit each coherent unit of work atomically, including its tests and documentation. Open separate PRs for independent, reviewable chunks.
 - Monitor each PR for merge conflicts, review feedback, and failing or pending checks through merge or explicit handoff. Resolve conflicts and failures, push fixes, and recheck the PR; report unresolved blockers and pending checks accurately.
+- You do not need to rebase a PR just because `main` moved. After every merge, `.github/workflows/pr-auto-rebase.yml` rebases each same-repository PR that now conflicts and force-pushes it with a lease; fetch before pushing to that branch again. `docs/CHANGELOG.md` merges with git's union driver (`.gitattributes`), so two PRs adding entries under `## Unreleased` keep both instead of conflicting. A PR that also conflicts elsewhere gets a comment naming the files. To rebase locally the same way, run `node scripts/rebase-pr.mjs --branch <branch> [--push]`.
 
 ## Areas That Need Care
 

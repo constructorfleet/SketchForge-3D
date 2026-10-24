@@ -1,5 +1,11 @@
 * text=auto eol=lf
 
+# Every PR adds its entry at the top of "## Unreleased", so two open PRs always
+# collide there. The union driver keeps both sides' lines instead of
+# conflicting. Plain git honours it on rebase and merge; GitHub's own conflict
+# check does not, which is what .github/workflows/pr-auto-rebase.yml is for.
+docs/CHANGELOG.md merge=union
+
 *.png binary
 *.wasm binary
 *.ico binary
