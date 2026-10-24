@@ -17,6 +17,7 @@ async function postMirrors(request: Request) {
   const { projectId } = query.values;
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiError("Expected a JSON object body.", 400, "invalid_body");
   const ids = apiShapeIds(body.ids);
   if (!ids?.length) return apiError("Send ids: a list of distinct shape ids to mirror.", 400, "invalid_request");

@@ -117,14 +117,52 @@ export function apiTarget(request: Request) {
   };
 }
 
-export async function apiJsonBody(request: Request) {
+type ApiBodyLimit = { maxBytes: number };
+
+export async function apiJsonBody(request: Request, options: ApiBodyLimit = { maxBytes: 16 * 1024 * 1024 }) {
+  return apiJsonBodyWithLimit(request, options);
+}
+
+async function apiJsonBodyWithLimit(request: Request, { maxBytes }: ApiBodyLimit): Promise<Record<string, unknown> | null | Response> {
+  const bytes = await apiRequestBodyBytes(request, { maxBytes });
+  if (bytes instanceof Response) return bytes;
   try {
-    const parsed = (await request.json()) as unknown;
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     return parsed as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+/** Read a request body without allowing its stream to exceed the configured size. */
+export async function apiRequestBodyBytes(request: Request, { maxBytes }: ApiBodyLimit): Promise<Uint8Array | Response> {
+  const declaredBytes = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredBytes) && declaredBytes > maxBytes) {
+    return apiError(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, 413, "invalid_request");
+  }
+  if (!request.body) return new Uint8Array();
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return apiError(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, 413, "invalid_request");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 /**

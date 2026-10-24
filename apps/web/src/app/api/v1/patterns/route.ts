@@ -39,6 +39,7 @@ async function postPatterns(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const ids = apiShapeIds(body.ids);
   if (!ids?.length) return apiError("Send ids: a list of distinct shape ids to repeat.", 400, "invalid_request");

@@ -39,6 +39,8 @@ export type ApiV1Operation = {
   path: `/api/v1/${string}`;
   auth: "bearer" | "none";
   description?: string;
+  /** Maximum raw bytes accepted for the request body. */
+  maxRequestBytes?: number;
   /** Populated only for routes whose response set has been verified. */
   responses?: readonly number[];
   responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
@@ -90,6 +92,7 @@ export type ApiV1MeasureBetweenRequestBody = {
   schema: ApiV1FieldSchema;
 };
 
+const DEFAULT_JSON_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
 const operation = (
   method: ApiV1Method,
   route: `/api/v1/${string}`,
@@ -97,7 +100,7 @@ const operation = (
   responses?: readonly number[],
   requestBody?: ApiV1Operation["requestBody"],
   auth: ApiV1Operation["auth"] = "bearer",
-): ApiV1Operation => ({ operationId, method, path: route, auth, ...(responses ? { responses } : {}), ...(requestBody ? { requestBody } : {}) });
+): ApiV1Operation => ({ operationId, method, path: route, auth, ...(responses ? { responses } : {}), ...(requestBody ? { requestBody, maxRequestBytes: DEFAULT_JSON_BODY_LIMIT_BYTES } : {}) });
 
 const createProjectRequestBody = {
   contentType: "application/json",
@@ -409,7 +412,9 @@ export function parseApiV1Query(key: string, request: Request): { ok: true; valu
 export function validateApiV1Response(key: string, status: number, body: unknown): boolean {
   const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
   const schema = (operation?.responseSchemas as Readonly<Record<number, ApiV1FieldSchema>> | undefined)?.[status];
-  return Boolean(schema && validateApiV1Schema(body, schema));
+  if (schema) return validateApiV1Schema(body, schema);
+  if (status === 413 && body && typeof body === "object") return (body as Record<string, unknown>).code === "invalid_request" && typeof (body as Record<string, unknown>).error === "string";
+  return false;
 }
 
 function isValidBinaryApiV1Response(key: string, request: Request, response: Response): boolean {
@@ -566,7 +571,7 @@ const arrangementOperations = [
   },
 ] as const satisfies readonly ApiV1Operation[];
 
-export const API_V1_OPERATIONS = [
+const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
   ...featureOperations.slice(0, 1),
   ...arrangementOperations.slice(0, 1),
   ...arrangementOperations.slice(1),
@@ -920,6 +925,15 @@ export const API_V1_OPERATIONS = [
   operation("OPTIONS", "/api/v1/thickness", "thicknessRouteOptions", [204], undefined, "none"),
   ...featureOperations.slice(1, 2),
 ] as const satisfies readonly ApiV1Operation[];
+
+export const API_V1_OPERATIONS: readonly ApiV1Operation[] = API_V1_OPERATIONS_BASE.map((item): ApiV1Operation => item.method === "POST" || item.method === "PATCH"
+  ? ({
+    ...item,
+    maxRequestBytes: item.operationId === "importGeometry" ? 64 * 1024 * 1024 : DEFAULT_JSON_BODY_LIMIT_BYTES,
+    responses: [...new Set([...(item.responses ?? []), 413])].sort((a, b) => a - b),
+    responseSchemas: { ...item.responseSchemas, 413: errorSchema },
+  } as ApiV1Operation)
+  : item);
 
 export type CreateProjectRequest = { name: string };
 

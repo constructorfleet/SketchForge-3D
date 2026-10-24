@@ -16,6 +16,7 @@ async function postExport(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   if (typeof body.format !== "string" || !PROJECT_EXPORT_FORMATS.includes(body.format as ProjectExportFormat)) {
     return apiError(`format must be one of: ${PROJECT_EXPORT_FORMATS.join(", ")}.`, 400, "unsupported_format");

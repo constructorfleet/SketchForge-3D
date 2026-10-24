@@ -59,6 +59,7 @@ async function postHandler(request: Request) {
   if (context.error) return context.error;
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const parsed = parseCreateProjectRequest(body);
   if (!parsed) return apiError("A project name is required.", 400, "invalid_request");
