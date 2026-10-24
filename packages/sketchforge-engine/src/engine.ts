@@ -30,7 +30,12 @@ import {
   type ServerCadEdge,
   type ServerCadTreatment,
 } from "./serverCadOperations.js";
-import { resolveRetainedFaceDraft, retainedFaceDraftFields, retainedPrismDraftFields } from "./sketchFaceDraftKernel.js";
+import {
+  resolveRetainedFaceDraft,
+  retainedDraftSourcePlacement,
+  retainedFaceDraftFields,
+  retainedPrismDraftFields,
+} from "./sketchFaceDraftKernel.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import {
@@ -990,9 +995,9 @@ export function createEngine(store: ProjectStore): Engine {
             hole: existing.hole,
             profile: replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile,
             height: sourceHeight,
-            x: existing.x - (sourceFrame?.x ?? 0),
-            z: existing.z - (sourceFrame?.z ?? 0),
-            elevation: (existing.elevation ?? 0) - (sourceFrame?.elevation ?? 0),
+            x: 0,
+            z: 0,
+            elevation: 0,
             rotation: existing.rotation,
             rotationX: existing.rotationX,
             rotationZ: existing.rotationZ,
@@ -1013,6 +1018,11 @@ export function createEngine(store: ProjectStore): Engine {
             mirrorX: existing.mirrorX,
             mirrorY: existing.mirrorY,
             mirrorZ: existing.mirrorZ,
+            ...retainedDraftSourcePlacement(
+              existing,
+              rebuilt.cadBrepFrame!,
+              existing.faceDraft && !hasExistingTreatment ? existing.cadBrepFrame : undefined,
+            ),
             ...(existing.faceDraft || faceDraftChanged ? { faceDraftSourceScale } : {}),
             width: rebuilt.width * rebuildScale.width,
             depth: rebuilt.depth * rebuildScale.depth,
@@ -1070,8 +1080,16 @@ export function createEngine(store: ProjectStore): Engine {
               sourceFaceId: currentFaceId,
             });
             // The same record the editor writes for a draft it makes (#384).
+            const drafted = shapeWithCadResult(replayedSource, result);
             swept = {
-              ...retainDraftSourceMirrors(shapeWithCadResult(replayedSource, result), replayedSource),
+              ...retainDraftSourceMirrors(drafted, replayedSource),
+              ...(!replayedSource.mirrorX && !replayedSource.mirrorY && !replayedSource.mirrorZ
+                ? retainedDraftSourcePlacement({
+                    ...replayedSource,
+                    faceDraftSourceFrame: undefined,
+                    draftPrismSourceFrame: undefined,
+                  }, drafted.cadBrepFrame!)
+                : {}),
               ...retainedFaceDraftFields(
                 replayedSource.faceIds,
                 existing,

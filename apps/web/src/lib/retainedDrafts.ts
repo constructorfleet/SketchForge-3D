@@ -208,7 +208,7 @@ export function retainedFaceDraftRebuildBase(
     sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
     locked: existing.locked,
     hidden: existing.hidden,
-    ...retainedDraftSourcePlacement(existing, rebuilt.cadBrepFrame!),
+    ...retainedDraftSourcePlacement(existing, rebuilt.cadBrepFrame!, existing.cadBrepFrame),
     ...rotationOf(existing),
     faceIds: faceIds.length ? [...faceIds] : undefined,
     ...CLEARED_TREATMENT_FIELDS,
@@ -242,9 +242,7 @@ export function retainedFaceDraftShape(
 ): WorkplaneShape {
   return canonicalizeShape({
     ...drafted,
-    x: base.x,
-    z: base.z,
-    elevation: base.elevation ?? 0,
+    ...retainedDraftSourcePlacement(base, drafted.cadBrepFrame!),
     ...rotationOf(base),
     faceIds: [...outcome.resultFaceIds],
     ...CLEARED_TREATMENT_FIELDS,
