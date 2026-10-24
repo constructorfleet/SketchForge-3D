@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { API_V1_OPERATIONS, type ApiV1FieldSchema, type ApiV1Operation } from "@/lib/apiV1OperationContract";
+import { API_V1_OPERATIONS, validateApiV1Response, type ApiV1FieldSchema, type ApiV1Operation } from "@/lib/apiV1OperationContract";
 
 const routeRoot = path.resolve("apps/web/src/app/api/v1");
 
@@ -90,7 +90,7 @@ describe("REST API v1 operation contract", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
     expect(operation).toMatchObject({
       operationId: "exportProject",
-      responses: [200, 400, 401, 404, 422, 500, 503],
+      responses: [200, 400, 401, 404, 413, 422, 500, 503],
       query: { required: ["projectId"] },
       requestBody: { schema: { type: "object", required: ["format"] } },
       binaryResponse: { status: 200, metadataHeader: "X-SketchForge-Metadata" },
@@ -136,7 +136,7 @@ describe("REST API v1 operation contract", () => {
     expect(operation).toMatchObject({
       operationId: "analyzeInterference",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     expect(contract.validateApiV1RequestBody(key, { ids: ["post-a", "post-b"], clearance: 0.4 })).toBe(true);
@@ -172,7 +172,7 @@ describe("REST API v1 operation contract", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
     expect(operation).toMatchObject({
       operationId: "patternShapes",
-      responses: [201, 400, 401, 404, 409, 422, 500, 503],
+      responses: [201, 400, 401, 404, 409, 413, 422, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], kind: "linear", count: 4, stepX: 10 })).toBe(true);
@@ -248,7 +248,7 @@ describe("REST API v1 operation contract", () => {
       .toMatchObject({
         operationId: "createProject",
         auth: "bearer",
-        responses: [201, 400, 401, 404, 409, 500, 503],
+        responses: [201, 400, 401, 404, 409, 413, 500, 503],
         requestBody: {
           contentType: "application/json",
           required: true,
@@ -256,6 +256,14 @@ describe("REST API v1 operation contract", () => {
           schema: { type: "object", required: ["name"], properties: { name: { type: "string", minimumLength: 1, maximumLength: 80 } } },
         },
       });
+  });
+
+  it("declares bounded request sizes and the common oversized-body response", () => {
+    const createShapes = API_V1_OPERATIONS.find(({ method, path }) => method === "POST" && path === "/api/v1/shapes");
+    const imports = API_V1_OPERATIONS.find(({ method, path }) => method === "POST" && path === "/api/v1/imports");
+    expect(createShapes).toMatchObject({ maxRequestBytes: 16 * 1024 * 1024, responses: expect.arrayContaining([413]) });
+    expect(imports).toMatchObject({ maxRequestBytes: 64 * 1024 * 1024, responses: expect.arrayContaining([413]) });
+    expect(validateApiV1Response("POST /api/v1/shapes", 413, { error: "Body too large.", code: "invalid_request" })).toBe(true);
   });
 
   it("validates project creation with the contract's required name constraints", async () => {
@@ -305,13 +313,13 @@ describe("REST API v1 operation contract", () => {
     expect(align).toMatchObject({
       operationId: "alignShapes",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     expect(distribute).toMatchObject({
       operationId: "distributeShapes",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     const alignBody = { ids: ["left", "right"], axis: "y", target: "max", anchorId: "right" };
@@ -343,7 +351,7 @@ describe("REST API v1 operation contract", () => {
     expect(operation).toMatchObject({
       operationId: "mirrorShapes",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     expect(contract.validateApiV1RequestBody(key, { ids: [" left ", "right"], axis: "x" })).toBe(true);
@@ -636,7 +644,7 @@ describe("REST API v1 operation contract", () => {
     expect(operation).toMatchObject({
       operationId: "measureEntities",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       query: { required: ["projectId"] },
       requestBody: {
         contentType: "application/json",
@@ -673,7 +681,7 @@ describe("REST API v1 operation contract", () => {
     expect(operation).toMatchObject({
       operationId: "updateShape",
       auth: "bearer",
-      responses: [200, 400, 401, 404, 409, 422, 500, 503],
+      responses: [200, 400, 401, 404, 409, 413, 422, 500, 503],
       query: { required: ["projectId", "shapeId"] },
       requestBody: {
         contentType: "application/json",

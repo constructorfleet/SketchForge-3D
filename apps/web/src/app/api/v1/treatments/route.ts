@@ -28,6 +28,7 @@ const postTreatment = async (request: Request) => {
   if (!shapeId) return apiErrors.shapeIdRequired();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const kind = body.kind === "chamfer" ? "chamfer" : body.kind === "fillet" ? "fillet" : null;
   if (!kind) return apiError('Send kind: "fillet" or kind: "chamfer".', 400, "invalid_request");

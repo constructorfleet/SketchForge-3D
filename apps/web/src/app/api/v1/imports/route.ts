@@ -1,5 +1,5 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
-import { apiContext, apiError, apiErrors, apiJson, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiJson, apiRequestBodyBytes, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { IMPORTABLE_MESH_FORMATS } from "@/lib/engine/meshImport";
@@ -81,7 +81,12 @@ async function handlePost(request: Request) {
   const { projectId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
 
-  const upload = await uploadFrom(request);
+  const requestBytes = await apiRequestBodyBytes(request, { maxBytes: MAX_IMPORT_BYTES });
+  if (requestBytes instanceof Response) return requestBytes;
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  const boundedRequest = new Request(request.url, { method: request.method, headers, body: Buffer.from(requestBytes) });
+  const upload = await uploadFrom(boundedRequest);
   if (typeof upload === "string") return apiError(upload, 400, "invalid_body");
   if (upload.bytes.byteLength > MAX_IMPORT_BYTES) {
     return apiError(`A model can be at most ${MAX_IMPORT_BYTES / (1024 * 1024)}MB.`, 413, "invalid_request");

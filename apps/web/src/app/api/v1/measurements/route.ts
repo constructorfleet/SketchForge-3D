@@ -32,6 +32,7 @@ async function measureEntities(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
 
   const ends = parseMeasureBetweenRequest(body);

@@ -195,6 +195,24 @@ describe("POST /imports", () => {
     expect(payload.shape).toMatchObject({ width: 80, depth: 60, height: 20 });
   });
 
+  it("rejects a declared 70 MB import body before attempting to parse or import it", async () => {
+    const projectId = await makeProject();
+    const validImport = JSON.stringify({ fileName: "plate.stl", data: base64(plateStl(80, 60, 20)) });
+    const response = await importMesh(new Request(`http://localhost/api/v1/imports?projectId=${projectId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        "Content-Type": "application/json",
+        "Content-Length": String(70 * 1024 * 1024),
+      },
+      body: validImport,
+    }));
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({ code: "invalid_request" });
+    expect((await storedShapes(projectId)).shapes).toHaveLength(0);
+  });
+
   it("reads an OBJ, whose faces may have more than three corners", async () => {
     const projectId = await makeProject();
     const obj = [

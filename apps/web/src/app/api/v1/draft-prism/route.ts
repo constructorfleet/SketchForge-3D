@@ -15,6 +15,7 @@ const postDraftPrism = async (request: Request) => {
   if (!shapeId) return apiErrors.shapeIdRequired();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   if (typeof body.angle !== "number" || !Number.isFinite(body.angle)) {
     return apiError("Send angle as a number of degrees, between -45 and 45, excluding zero.", 400, "invalid_request");

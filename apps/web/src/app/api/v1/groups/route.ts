@@ -24,6 +24,7 @@ const postGroup = async (request: Request) => {
   if (!query.ok) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const ids = apiShapeIds(body.ids);
   if (!ids) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");

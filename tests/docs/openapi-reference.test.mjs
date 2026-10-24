@@ -76,7 +76,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   const patchShape = spec.paths["/api/v1/shapes"].patch;
   assert.equal(patchShape.operationId, "updateShape");
   assert.deepEqual(patchShape.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
-  assert.deepEqual(Object.keys(patchShape.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(patchShape.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const patchBody = patchShape.requestBody.content["application/json"].schema;
   assert.equal(patchBody.additionalProperties, true, "other engine-supported patch fields remain pass-through");
   const colors = patchBody.properties.faceColors;
@@ -96,7 +96,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(measurement.properties.radius.type, ["number", "null"]);
   const measureEntities = spec.paths["/api/v1/measurements"].post;
   assert.ok(measureEntities, "POST /measurements should describe both entity selectors and its conditional index requirement");
-  assert.deepEqual(Object.keys(measureEntities.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(measureEntities.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const body = measureEntities.requestBody.content["application/json"].schema;
   assert.deepEqual(body.required, ["from", "to"]);
   assert.ok(body.properties.from.oneOf.some((variant) => variant.required.includes("index")));
@@ -109,7 +109,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "measureEntities"), false);
   const group = spec.paths["/api/v1/groups"].post;
   assert.ok(group, "POST /groups should be included once its runtime contract is complete");
-  assert.deepEqual(Object.keys(group.responses).sort(), ["201", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(group.responses).sort(), ["201", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const groupBody = group.requestBody.content["application/json"].schema;
   assert.deepEqual(groupBody.required, ["ids"]);
   assert.equal(groupBody.additionalProperties, undefined, "the route tolerates extension fields");
@@ -134,18 +134,19 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(align, "POST /align should be present once its runtime contract is complete");
   assert.deepEqual(align.requestBody.content["application/json"].schema.required, ["ids", "axis", "target"]);
   assert.deepEqual(align.requestBody.content["application/json"].schema.properties.axis.enum, ["x", "y", "z"]);
-  assert.deepEqual(Object.keys(align.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(align.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   assert.deepEqual(align.responses["200"].content["application/json"].schema.required, ["moved", "axis", "target", "anchorId", "shapes", "revision"]);
   const distribute = spec.paths["/api/v1/distribute"].post;
   assert.ok(distribute, "POST /distribute should be present once its runtime contract is complete");
   assert.deepEqual(distribute.requestBody.content["application/json"].schema.required, ["ids"]);
   assert.deepEqual(distribute.requestBody.content["application/json"].schema.properties.axis.enum, ["x", "z"]);
   assert.deepEqual(distribute.requestBody.content["application/json"].schema.properties.spacing.enum, ["gaps", "centers"]);
+  assert.ok(distribute.responses["413"], "oversized JSON is rejected before body parsing");
   assert.deepEqual(distribute.responses["200"].content["application/json"].schema.required, ["moved", "axis", "spacing", "shapes", "revision"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "alignShapes" || operationId === "distributeShapes"), false);
   const interference = spec.paths["/api/v1/interference"].post;
   assert.ok(interference, "POST /interference is included once its bounded report contract is runtime-backed");
-  assert.deepEqual(Object.keys(interference.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(interference.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const interferenceBody = interference.requestBody.content["application/json"].schema;
   assert.equal(interferenceBody.properties.ids.oneOf.length, 2);
   assert.equal(interferenceBody.properties.clearance.minimum, 0);
@@ -155,7 +156,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "analyzeInterference"), false);
   const mirrors = spec.paths["/api/v1/mirrors"].post;
   assert.equal(mirrors.operationId, "mirrorShapes");
-  assert.deepEqual(Object.keys(mirrors.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(mirrors.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const mirrorBody = mirrors.requestBody.content["application/json"].schema;
   assert.deepEqual(mirrorBody.required, ["ids", "axis"]);
   assert.deepEqual(mirrorBody.properties.axis.enum, ["x", "y", "z"]);
@@ -164,7 +165,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "mirrorShapes"), false);
   const patterns = spec.paths["/api/v1/patterns"].post;
   assert.equal(patterns.operationId, "patternShapes");
-  assert.deepEqual(Object.keys(patterns.responses).sort(), ["201", "400", "401", "404", "409", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(patterns.responses).sort(), ["201", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const patternBody = patterns.requestBody.content["application/json"].schema;
   assert.deepEqual(patternBody.required, ["ids"]);
   assert.deepEqual(patternBody.properties.kind.enum, ["linear", "circular"]);
@@ -206,7 +207,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   const exports = spec.paths["/api/v1/exports"].post;
   assert.equal(exports.operationId, "exportProject");
   assert.deepEqual(exports.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["download", false]]);
-  assert.deepEqual(Object.keys(exports.responses).sort(), ["200", "400", "401", "404", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(exports.responses).sort(), ["200", "400", "401", "404", "413", "422", "500", "503"]);
   assert.deepEqual(exports.responses["400"].content["application/json"].schema.properties.code.enum, ["invalid_project_id", "invalid_body", "unsupported_format", "invalid_request"]);
   assert.deepEqual(exports.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
   assert.deepEqual(exports.responses["422"].content["application/json"].schema.properties.code.enum, ["geometry_failed"]);

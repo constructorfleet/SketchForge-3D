@@ -44,6 +44,7 @@ async function postHandler(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const requested = Array.isArray(body.shapes) ? body.shapes : [body];
   if (requested.length === 0) return apiError("No shapes were given.", 400, "invalid_request");
@@ -82,6 +83,7 @@ async function patchHandler(request: Request) {
   if (!shapeId) return apiErrors.shapeIdRequired();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const parsed = parseShapePatchRequest(body);
   if (!parsed.ok) {

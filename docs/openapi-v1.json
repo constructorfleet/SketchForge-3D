@@ -1110,6 +1110,50 @@
               }
             }
           },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request is valid JSON but cannot be applied.",
             "content": {
@@ -2405,6 +2449,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3770,6 +3858,50 @@
               }
             }
           },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request is valid JSON but cannot be applied.",
             "content": {
@@ -5026,6 +5158,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6899,6 +7075,50 @@
               }
             }
           },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request is valid JSON but cannot be applied.",
             "content": {
@@ -8478,6 +8698,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11028,11 +11292,29 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "invalid_request"
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
                       ]
                     }
                   },
-                  "additionalProperties": false
+                  "additionalProperties": true
                 }
               }
             }
@@ -11475,6 +11757,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12177,6 +12503,50 @@
                     }
                   },
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
                 }
               }
             }
@@ -13510,6 +13880,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15948,6 +16362,50 @@
               }
             }
           },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request is valid JSON but cannot be applied.",
             "content": {
@@ -17590,6 +18048,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22051,6 +22553,50 @@
               }
             }
           },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "422": {
             "description": "Request is valid JSON but cannot be applied.",
             "content": {
@@ -23580,6 +24126,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25174,6 +25764,50 @@
           },
           "409": {
             "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "shape_not_found",
+                        "shape_locked",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
             "content": {
               "application/json": {
                 "schema": {

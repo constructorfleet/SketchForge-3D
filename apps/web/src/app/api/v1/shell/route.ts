@@ -38,6 +38,7 @@ const postShell = async (request: Request) => {
   if (!shapeId) return apiErrors.shapeIdRequired();
 
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
   const thickness = body.thickness ?? body.wall;
   if (typeof thickness !== "number") {

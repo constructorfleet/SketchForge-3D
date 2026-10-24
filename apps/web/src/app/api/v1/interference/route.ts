@@ -12,6 +12,7 @@ async function postInterference(request: Request) {
   const { projectId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
   const body = await apiJsonBody(request);
+  if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
 
   let ids: string[] | undefined;
