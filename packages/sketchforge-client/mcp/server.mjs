@@ -183,6 +183,24 @@ const tools = [
     },
   },
   {
+    name: "sketchforge_import_stl",
+    description: "Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath.",
+    inputSchema: {
+      ...editorTargetSchema,
+      required: ["projectId", "filePath"],
+      properties: {
+        ...editorTargetSchema.properties,
+        projectId: { type: "string" },
+        filePath: { type: "string", description: "Path to an STL file readable by the MCP host." },
+        name: { type: "string" },
+        color: { type: "string" },
+        x: { type: "number" },
+        z: { type: "number" },
+        elevation: { type: "number" },
+      },
+    },
+  },
+  {
     name: "sketchforge_update_object",
     description: "Update one object's exact dimensions, position, color, name, hole state, or rotations.",
     inputSchema: {
@@ -766,6 +784,9 @@ function normalizedServerUrl(value) {
 
 async function callTool(name, args = {}) {
   const { url, ...toolArgs } = args || {};
+  if (name === "sketchforge_import_stl" && typeof url === "string" && url.trim()) {
+    throw new Error("sketchforge_import_stl is only available in local mode; omit url.");
+  }
   if (["sketchforge_list_projects", "sketchforge_create_project", "sketchforge_import_project"].includes(name) && typeof url === "string" && url.trim()) {
     throw new Error(`${name} is only available in local mode; omit url.`);
   }

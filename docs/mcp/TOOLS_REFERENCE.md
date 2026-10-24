@@ -12,7 +12,7 @@ sources:
 Generated from the running `tools/list` registry in `packages/sketchforge-client/mcp/server.mjs`.
 Regenerate with `node scripts/generate-mcp-reference.mjs`; `--check` verifies that this file matches the current public registry.
 
-The server currently exposes 38 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
+The server currently exposes 39 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
 
 ## sketchforge_list_projects
 
@@ -683,6 +683,63 @@ Import a triangle mesh into SketchForge from raw position and optional normal ar
   },
   "required": [
     "positions"
+  ]
+}
+```
+## sketchforge_import_stl
+
+### Description
+
+Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "editorNumber": {
+      "type": "number",
+      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
+    },
+    "editorId": {
+      "type": "string",
+      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
+    },
+    "timeoutMs": {
+      "type": "number",
+      "description": "Command timeout in milliseconds. Defaults to 15000."
+    },
+    "filePath": {
+      "type": "string",
+      "description": "Path to an STL file readable by the MCP host."
+    },
+    "name": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "x": {
+      "type": "number"
+    },
+    "z": {
+      "type": "number"
+    },
+    "elevation": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "projectId",
+    "filePath"
   ]
 }
 ```

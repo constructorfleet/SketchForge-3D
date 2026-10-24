@@ -119,6 +119,26 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(scene[1].result.content[0].text).objects).toEqual([expect.objectContaining({ id: shapeId, name: "Imported box" })]);
   });
 
+  it("imports an STL file into a local project", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-stl-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const stlPath = path.join(projectsDir, "tetrahedron.stl");
+    fs.writeFileSync(stlPath, [
+      "solid tetrahedron",
+      "facet normal 0 0 1", "outer loop", "vertex 0 0 0", "vertex 1 0 0", "vertex 0 1 0", "endloop", "endfacet",
+      "endsolid tetrahedron",
+    ].join("\n"));
+
+    const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_import_stl");
+    expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_stl", { projectId: "case", filePath: stlPath, name: "Triangle" });
+    expect(imported[1].result.isError).toBeUndefined();
+    expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
+      shape: expect.objectContaining({ name: "Triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
+    });
+  }, 60_000);
+
   it("imports a STEP-backed SKF project locally and explodes its nested assembly", async () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-step-mcp-"));
     temporaryDirectories.push(projectsDir);
