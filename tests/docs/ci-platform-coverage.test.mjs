@@ -6,7 +6,7 @@ import test from "node:test";
 const root = decodeURIComponent(new URL("../../", import.meta.url).pathname);
 const ci = readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
 
-// Release 1.20.0 shipped without a Windows installer: the desktop release runs
+// Release 1.20.0 shipped without a Windows installer: the desktop release ran
 // `npm test` on each platform, and a Windows-only failure in the unit suite
 // stopped the build. Every ci.yml job ran on ubuntu, so nothing could have
 // caught it before the release. The unit suite must run on Windows somewhere

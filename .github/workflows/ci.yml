@@ -123,8 +123,8 @@ jobs:
 
   windows-unit:
     # Release 1.20.0 shipped with no desktop installers: the desktop release
-    # runs `npm test` on each platform, one Windows-only unit failure stopped
-    # the Windows build, and the attach job needs all three. Every other job
+    # then ran `npm test` on each platform, one Windows-only unit failure stopped
+    # the Windows build, and the attach job needed every leg. Every other job
     # here runs on ubuntu, so nothing could catch that before the release.
     # Typecheck is not repeated -- it is platform independent.
     name: Unit tests on Windows

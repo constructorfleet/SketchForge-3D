@@ -49,6 +49,44 @@ notarization secrets described in [repository setup](../.github/SETUP.md).
 Check all three workflow runs and the release assets before announcing a
 release. A GitHub release can exist while an artifact workflow is still failing.
 
-The desktop workflow can also be run manually with a version, but this is for
-recovery or explicitly requested desktop rebuilds. Normal application releases
-start by merging the Release Please pull request.
+## Desktop installers
+
+`desktop-release.yml` builds the installers on four runners and attaches them
+to the release that Release Please already published. It does not re-run the
+unit suite: CI ran it on Linux and Windows before the commit reached `main`.
+Each build leg verifies its own packages before uploading them as an artifact.
+
+```mermaid
+flowchart LR
+  W[Windows leg] --> A
+  L[Linux leg] --> A
+  X[macOS Intel leg] --> A
+  M[macOS Apple silicon leg] --> A
+  A[Attach job] --> U[Upload every leg that built]
+  U --> C{All installers on the release?}
+  C -- yes --> D[Clear any incomplete notice]
+  C -- no --> N[Add incomplete notice to the release notes] --> F[Fail the run]
+```
+
+The attach job runs even when a leg fails. It attaches every leg that built,
+together with the `electron-updater` manifests: `latest.yml` for Windows,
+`latest-linux.yml` for Linux, and `latest-mac.yml`, merged from both macOS
+architectures, when macOS signing is configured. Unsigned macOS packages carry
+an `-unsigned` suffix and no update manifest. If any installer is missing, the
+job adds a warning naming the missing platforms to the top of the release notes
+and fails the run. The rest of the notes are left as generated.
+
+A failed leg is recovered by running the workflow again for the same version:
+
+<!-- runnable-exempt: Dispatching this publishes release assets for a reader-supplied version; it is a maintainer recovery command, not a repository example. -->
+```sh
+gh workflow run desktop-release.yml --repo constructorfleet/SketchForge-3D -f version=X.Y.Z
+```
+
+The rerun builds the released tag, replaces only the assets of the platforms it
+rebuilt, and keeps those of any platform that fails again. It removes the
+warning once every installer is attached. It never marks an already published
+release as latest. If the version has no release yet, the workflow creates a
+draft and publishes it only once every installer is attached. Run the workflow
+by hand only for recovery or an explicitly requested desktop rebuild. Normal
+application releases start by merging the Release Please pull request.
