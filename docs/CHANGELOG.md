@@ -7,8 +7,6 @@ owner: "Contributors"
 
 # Changelog
 
-- Sketch constraints now include a perpendicular relation between two selected segments. The solver projects both segments toward a right angle during point edits, and the constraint persists in `.skf` sketches and is represented in the TypeScript client profile type.
-
 ## Unreleased
 
 - Fixed `POST /measurements` resolving edge indexes on a mesh-backed revolve. It now uses the exact edge ordering returned by `GET /edges`, matching `GET /measurements` and edge treatments.
@@ -500,6 +498,7 @@ owner: "Contributors"
   Which size applies at which width lives in `lib/toolbarLayout.ts` rather than in a media query, and it is derived rather than chosen -- a section is as wide as its buttons or its minimum, the ribbon is its sections plus the rules between them, and the two widths that falls out of (1081px and 897px) are what the component switches on. A breakpoint written in CSS is a number no test can read; these are tested either side of the step, and so is the decision to keep spelling out "Import" and "Export" above 461px and show bare icons below it.
 
 - Toolbar menus -- the shapes palette and the sketch-to-3D menu -- are now positioned against the window rather than laid out inside their section, like the visibility and distribute menus already were. A menu inside a row that scrolls sideways is clipped by that row and slides out from under its own button, and all four now clamp themselves inside the window's edges through one tested function instead of three copies of the same arithmetic.
+- Sketch constraints now include a perpendicular relation between two selected segments. The solver projects both segments toward a right angle during point edits, and the constraint persists in `.skf` sketches and is represented in the TypeScript client profile type.
 
 ## 1.0.9
 
