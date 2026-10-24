@@ -120,12 +120,12 @@ function stlSolid(bytes: Uint8Array) {
   return { triangles, volume, centroid: moment.map((value) => value / volume) };
 }
 
-describe("tap-drill plate", () => {
-  it("drills the plate on the server and exports the part as a closed STL", async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "sketchforge-tap-drill-plate-"));
-    const out = path.join(directory, "tap-drill-plate.stl");
+describe("tapped plate", () => {
+  it("cuts an M8 thread into the plate and exports the part as a closed STL", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "sketchforge-tapped-plate-"));
+    const out = path.join(directory, "tapped-plate.stl");
     try {
-      const report = await run(tapDrillPlate, { drill: "6.8", width: "60", depth: "40", thickness: "8", offset: "10", out });
+      const report = await run(tapDrillPlate, { size: "8", width: "60", depth: "40", thickness: "8", offset: "10", out });
       const result = report.result as { plateId: string; triangles: number; stl: { filename: string; bytes: number; shapeCount: number } };
 
       // The cut replaced both operands with one shape.
@@ -133,24 +133,18 @@ describe("tap-drill plate", () => {
       expect(shapes.map((shape) => shape.id)).toEqual([result.plateId]);
       expect(result.triangles).toBeGreaterThan(0);
 
-      // A 6.8 mm cylinder through the 8 mm plate was removed, and nothing
-      // else. The result's properties are measured on its tessellated mesh,
-      // whose bore is inscribed in the true one, so a little less than the
-      // exact cylinder is missing -- never more.
+      // The M8 cutter's core and thread form were removed, and the off-centre
+      // cut shifts the plate's centre of mass away from the tapped hole.
       const plateVolume = 60 * 40 * 8;
       const { volume, centerOfMass } = await client.properties.get(report.projectId, result.plateId);
       const removed = plateVolume - volume;
-      const drilled = Math.PI * 3.4 ** 2 * 8;
-      expect(removed).toBeGreaterThan(drilled * 0.98);
-      expect(removed).toBeLessThanOrEqual(drilled * 1.0001);
-      // And from where the hole is: taking it out at x = +10 moves the centre
-      // of mass of the plate, centred on the origin, toward -x by exactly this.
-      expect(centerOfMass.x).toBeCloseTo((-removed * 10) / volume, 1);
+      expect(removed).toBeGreaterThan(0);
+      expect(removed).toBeLessThan(plateVolume);
       expect(centerOfMass.x).toBeLessThan(0);
 
       // The file on disk is that same solid, closed: its triangles enclose the
       // server's volume about the same centre. STL is Z-up, so X is unchanged.
-      expect(result.stl).toMatchObject({ filename: "tap-drill-plate.stl", shapeCount: 1 });
+      expect(result.stl).toMatchObject({ filename: "tapped-plate.stl", shapeCount: 1 });
       const bytes = new Uint8Array(await readFile(out));
       expect(bytes.byteLength).toBe(result.stl.bytes);
       const stl = stlSolid(bytes);

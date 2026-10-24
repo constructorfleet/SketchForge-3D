@@ -195,7 +195,7 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
     });
   } catch (error) {
     if (error instanceof ServerCadError) return { error: error.message, status: error.status };
-    return { error: "The CAD kernel could not complete that cut.", status: 500 };
+    return { error: error instanceof Error ? error.message : "The CAD kernel could not complete that cut.", status: 422 };
   }
 
   const firstSolid = solids[0];

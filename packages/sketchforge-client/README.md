@@ -254,9 +254,9 @@ A module that exports a bare function instead of a definition runs in a `fresh` 
 | `bolt-plate.macro.mjs` | A plate sized around a computed row of tapped holes |
 | `bolt-circle.macro.mjs` | A flange with N tapped holes on a ring of radius R |
 | `filleted-box.macro.mjs` | A box from three numbers, with every roundable edge filleted on the server |
-| `tap-drill-plate.macro.mjs` | A plate drilled for a tap through `project.cut`, exported as STL |
+| `tap-drill-plate.macro.mjs` | A plate cut with an M8 thread through `project.cut`, exported as STL |
 
-Tapped holes are `kind: "thread"` with `hole: true`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor taps the plate. The API does group and cut (`project.group`, `project.cut`), but a thread is stored as a mesh, and the server's exact boolean cannot cut that mesh yet, so the bolt macros stop at marked holes. `tap-drill-plate.macro.mjs` runs the whole cut-and-export workflow through the API, with a cylinder at the tap-drill diameter instead of the thread form.
+Tapped holes are `kind: "thread"` with `hole: true`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor or through `project.group` taps the plate. `project.cut` can also subtract a thread mesh directly. `tap-drill-plate.macro.mjs` runs the whole cut-and-export workflow through the API with an M8 thread cutter.
 
 ## Development
 

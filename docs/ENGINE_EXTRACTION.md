@@ -514,7 +514,7 @@ and `filleted-box.macro.mjs` additionally fillets. Both map directly:
 `Engine.treat` for the fillet, `ProjectStore.write` to persist. Note the existing
 macro's own comment — "The API has no grouping endpoint yet, so the macro leaves
 them as marked holes for the editor's boolean" — is already stale (`POST /groups`
-exists), and with `Engine.cut` the macro could tap the plate itself.
+exists), and with `Engine.cut` the macro can subtract a thread mesh to tap the plate.
 
 **Against the route handlers.** They are already thin: `v1/booleans/route.ts` is
 67 lines of which roughly 45 are validation and status-code selection, and the

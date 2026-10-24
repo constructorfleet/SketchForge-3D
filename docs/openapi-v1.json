@@ -1287,7 +1287,7 @@
             }
           }
         },
-        "description": "Subtract one or more cutter shapes from one or more solids and persist the resulting exact geometry.",
+        "description": "Subtract one or more cutter shapes, including helical thread meshes, from solids and persist exact geometry. Kernel geometry failures return 422 geometry_failed.",
         "security": [
           {
             "bearerAuth": []
@@ -8917,7 +8917,7 @@
             }
           }
         },
-        "description": "Groups at least two distinct shapes; members marked hole are subtracted using the same semantics as the editor.",
+        "description": "Groups at least two distinct shapes; members marked hole, including helical thread meshes, are subtracted using the same semantics as the editor. Kernel geometry failures return 422 geometry_failed.",
         "security": [
           {
             "bearerAuth": []
