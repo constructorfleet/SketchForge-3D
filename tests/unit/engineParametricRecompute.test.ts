@@ -373,7 +373,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(value(cleared).shape.faceDraft).toBeUndefined();
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("keeps a resized full-turn revolve's dimensions when adding a face draft", async () => {
+  it("keeps a resized full-turn revolve's dimensions when adding a face draft with equal radial scales", async () => {
     const { store } = projectStore();
     const engine = createEngine(store);
     const created = value(await engine.addShapes("recompute", [{
@@ -385,7 +385,7 @@ describe("dependency-ordered feature recomputation", () => {
     const resized = {
       ...created,
       width: created.width * 1.5,
-      depth: created.depth * 0.75,
+      depth: created.depth * 1.5,
       height: created.height * 2,
     };
     const document = await store.read("recompute");
@@ -406,7 +406,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(controlDraft.ok, JSON.stringify(controlDraft)).toBe(true);
     expect(value(drafted).shape.width).toBeGreaterThan(value(controlDraft).shape.width);
     expect(value(drafted).shape.height).toBeGreaterThan(value(controlDraft).shape.height);
-    expect(value(drafted).shape.faceDraftSourceScale).toMatchObject({ width: 1.5, depth: 0.75, height: 2 });
+    expect(value(drafted).shape.faceDraftSourceScale).toMatchObject({ width: 1.5, depth: 1.5, height: 2 });
 
     const changedProfile = {
       ...created.sketchProfile!,
@@ -414,7 +414,7 @@ describe("dependency-ordered feature recomputation", () => {
     };
     const replayed = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: changedProfile });
     expect(replayed.ok, JSON.stringify(replayed)).toBe(true);
-    expect(value(replayed).shape.faceDraftSourceScale).toEqual({ width: 1.5, depth: 0.75, height: 2 });
+    expect(value(replayed).shape.faceDraftSourceScale).toEqual({ width: 1.5, depth: 1.5, height: 2 });
   }, CAD_TEST_TIMEOUT_MS);
 
   it("persists a face draft on a retained sketch sweep", async () => {

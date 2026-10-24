@@ -137,3 +137,26 @@ describe("drafts on non-uniformly resized sketch extrusions", () => {
       .toBeCloseTo((await shapeProperties({ ...expected, importedMesh: undefined })).volume, 6);
   }, CAD_TEST_TIMEOUT_MS);
 });
+
+describe("face drafts on resized revolves", () => {
+  it("refuses unequal radial scales that cannot be represented by an analytic revolve", async () => {
+    const { store } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("resize", [{
+      kind: "revolve", name: "Elliptically resized revolve",
+      profile: [[1, -2], [3, -2], [3, 2], [1, 2]], sides: 48,
+    }])).shapes[0]!;
+    const resized = {
+      ...created,
+      width: created.width * 1.5,
+      depth: created.depth * 0.75,
+      height: created.height * 2,
+    };
+    const selectedFace = (await shapeFaces(resized, { topology: "exact" }))
+      .find((face) => face.surfaceType === "plane" && face.normal?.y! > 0.99)!;
+
+    await expect(applySketchFaceDraft(resized, {
+      sourceFaceId: selectedFace.id, angle: 5, pullDirection: "z",
+    })).rejects.toThrow(/equal resize across the revolve's radial axes/i);
+  }, CAD_TEST_TIMEOUT_MS);
+});

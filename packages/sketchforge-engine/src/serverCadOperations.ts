@@ -757,6 +757,15 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     return Promise.reject(new ServerCadError("The face draft angle must be non-zero and between -45 and 45 degrees.", 400));
   }
   const exactRevolve = isPlainFullTurnSketchRevolve(shape);
+  if (exactRevolve) {
+    const resize = revolveResizeFactors(shape);
+    if (Math.abs(resize.radialX - resize.radialZ) > 1e-6 * Math.max(resize.radialX, resize.radialZ)) {
+      return Promise.reject(new ServerCadError(
+        "Face drafting requires an equal resize across the revolve's radial axes; unequal radial resizing makes an elliptical shape that cannot be drafted exactly.",
+        400,
+      ));
+    }
+  }
   if ((!exactRevolve && shape.sketchOperation !== "extrude" && shape.sketchOperation !== "sweep")
     || !shape.sketchProfile || (!shape.cadBrep && !exactRevolve)) {
     return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion, sweep, or plain full-turn revolve.", 400));
