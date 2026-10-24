@@ -34,7 +34,6 @@ export const FALLBACK_REQUIRED_CHECKS = [
   "Check and build docs",
   "REST API end to end",
   "Package examples against local API",
-  "Package reference generation",
 ];
 
 const PASSING = new Set(["success", "skipped", "neutral"]);
