@@ -11,6 +11,7 @@ import {
 import { shapeFaces } from "./serverCadShell.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import { draftFaceForSketchSegment, legacyDraftSegmentForShape } from "./faceDraftSegmentLineage.js";
+import { retainedDraftSourcePlacement } from "./sketchFaceDraftKernel.js";
 import type { EdgeTreatmentHistoryEntry, WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
@@ -137,11 +138,13 @@ export async function replaySingleAllEdgeTreatment(
       ? segmentMatch
       : undefined;
     const faceDraft = original.faceDraft;
-    treatmentSource = {
-      ...shapeWithCadResult(treatmentSource, await applySketchFaceDraft(treatmentSource, {
+    const drafted = shapeWithCadResult(treatmentSource, await applySketchFaceDraft(treatmentSource, {
         ...faceDraft,
         sourceFaceId: matchedFace.id,
-      })),
+      }));
+    treatmentSource = {
+      ...drafted,
+      ...retainedDraftSourcePlacement(treatmentSource, drafted.cadBrepFrame!, treatmentSource.cadBrepFrame),
       faceDraft: useSegmentLineage
         ? { ...faceDraft, sourceFaceId: matchedFace.id, sourceFaceNormal: sourceNormal }
         : faceDraft,

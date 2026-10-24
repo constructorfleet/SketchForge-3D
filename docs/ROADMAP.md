@@ -33,5 +33,6 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 ## CAD geometry correctness
 
+- [#435: Keep retained drafts in place across draft growth and rotated sketch edits](https://github.com/constructorfleet/SketchForge-3D/issues/435) — implementation and regression coverage in progress.
 - [#412: Preserve non-uniform resize in face-draft paths](https://github.com/constructorfleet/SketchForge-3D/issues/412) — P2, implementation and regression coverage in progress.
 - [#436: Preserve mirrors in REST face and prism drafts](https://github.com/constructorfleet/SketchForge-3D/issues/436) — implementation and regression coverage complete; awaiting merge.

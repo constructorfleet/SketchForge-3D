@@ -105,13 +105,17 @@ for mirrored shapes. Projects saved after the earlier REST mirror-loss bug may
 already have cleared the mirror flags; that lost placement is not recoverable
 from the saved draft alone.
 
-The part is placed as the REST API places it. A new draft, or a change of
-angle or direction, keeps the shape's position: the centre of the drafted
-part's bounds sits where the undrafted part's centre was, so a draft that
-grows the bounds on one side moves the unchanged faces by half that growth. A
-sketch edit moves the shape by however far the centre of the sketch's bounds
-moved. This differs from a plain sketch extrusion, whose sketch edits keep its
-centre where it was.
+The drafted solid keeps the undrafted extrusion's placement. Draft growth does
+not recenter the unchanged faces: their world positions stay fixed. When a
+sketch edit moves the profile bounds, the placement follows that centre shift
+in the shape's rotated coordinate frame. A plain, undrafted sketch extrusion
+continues to keep its centre where it was during a sketch edit.
+
+This corrects the placement of new drafts and of drafts replayed after a sketch
+edit. Existing `.skf` files need no schema migration because no stored fields
+changed. Opening a file does not rewrite a draft's saved placement; an existing
+draft is repositioned under the corrected rule when it is replayed by a sketch
+edit.
 
 ![A face draft kept with its sketch extrusion, with its direction and angle editable in the Face draft card.](../screenshots/face-draft-retained.png)
 
