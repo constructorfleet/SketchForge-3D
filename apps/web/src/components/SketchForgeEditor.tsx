@@ -185,6 +185,22 @@ import {
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierKind, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
+import {
+  CLEARED_RETAINED_DRAFT_FIELDS,
+  hasRetainedDraft,
+  retainedDraftReplayBlocked,
+  retainedDraftSourceHeight,
+  retainedFaceDraftEditable,
+  retainedFaceDraftRebuildBase,
+  retainedFaceDraftResolution,
+  retainedFaceDraftShape,
+  retainedFaceDraftUnavailable,
+  retainedPrismDraftAvailable,
+  retainedPrismDraftShape,
+  withDraftFaceIds,
+  type RetainedFaceDraftOutcome,
+} from "@/lib/retainedDrafts";
+import type { RetainedFaceDraftResolution } from "@/lib/engine/sketchFaceDraftKernel";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
@@ -6985,6 +7001,10 @@ export function SketchForgeEditor({
     setSketchTool("select");
   }, [commitSketchProfile, sketchProfile, t]);
 
+  // The CAD worker helpers that replay a retained draft are declared further
+  // down, after the worker plumbing they need; finishing a sketch reaches them here.
+  const replayRetainedDraftRef = useRef<((existing: WorkplaneShape, profile: SketchProfile) => Promise<WorkplaneShape | null>) | null>(null);
+
   const finishSketch = useCallback(async () => {
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
@@ -6998,8 +7018,27 @@ export function SketchForgeEditor({
         resolved = placeSketchExtrusion(sweep, activeSketchWorkplane, existing);
       } else {
         setNotice(notice((t) => t("editor.sketch.building")));
-        const extrusion = await cadShapeFromSketchProfile(sketchProfile, height, existing);
-        resolved = placeSketchExtrusion(extrusion, activeSketchWorkplane, existing);
+        let replayed: WorkplaneShape | null = null;
+        if (existing && (existing.faceDraft || existing.draftPrismAngle !== undefined)) {
+          try {
+            replayed = await (replayRetainedDraftRef.current?.(existing, sketchProfile) ?? Promise.resolve(null));
+          } catch (error) {
+            // Like the REST path, a draft that cannot be rebuilt refuses the
+            // edit rather than dropping the draft; the sketch stays open.
+            setNotice(notice((t) => error instanceof LocalizedError && error.key === "errors.cadModifier.draftNotRetained"
+              ? t("editor.sketch.draftReplayFailed")
+              : errorText(t, error, "editor.sketch.draftReplayFailed")));
+            return;
+          }
+        }
+        if (replayed) {
+          resolved = replayed;
+        } else {
+          // No draft that can be replayed; any record left over describes
+          // geometry the rebuilt extrusion no longer has.
+          const extrusion = await cadShapeFromSketchProfile(sketchProfile, height, existing && { ...existing, ...CLEARED_RETAINED_DRAFT_FIELDS });
+          resolved = placeSketchExtrusion(extrusion, activeSketchWorkplane, existing);
+        }
       }
     } catch (error) {
       setNotice(notice((t) => errorText(t, error, sketchOperation === "revolve" ? "editor.sketch.cannotRevolve" : sketchOperation === "sweep" ? "editor.sketch.cannotSweep" : "editor.sketch.cannotExtrude")));
@@ -7619,6 +7658,15 @@ export function SketchForgeEditor({
     const source = selectedShape;
     const request = source && draftPrismRequestForShape(source, angle);
     if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    // A prism draft would replace the face draft this shape keeps; the REST
+    // API refuses the combination, and so does the editor.
+    if (source.faceDraft) {
+      setNotice(notice((translate) => translate("panels.inspector.draftPrism.faceDraftRetained")));
+      return;
+    }
+    // Kept as a feature where a sketch edit can replay it (#384); baked, as
+    // it always was, where it cannot.
+    const retained = retainedPrismDraftAvailable(source);
     const fingerprint = projectShapesFingerprint([source]);
     const sourceProjectId = projectInfoRef.current.projectId;
     invalidateCadModifierSession();
@@ -7636,33 +7684,97 @@ export function SketchForgeEditor({
       const drafted = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
       if (!drafted) throw new Error("The draft did not produce a usable solid");
       commitShapes(
-        shapesRef.current.map((shape) => shape.id === source.id ? {
-          ...drafted,
-          x: source.x,
-          z: source.z,
-          elevation: source.elevation ?? 0,
-          faceColors: undefined,
-          edgeTreatments: undefined,
-          edgeTreatmentHistory: undefined,
-          cadDisplayEdges: undefined,
-          cadDisplayEdgesVersion: undefined,
-        } : shape),
+        shapesRef.current.map((shape) => shape.id !== source.id ? shape : retained
+          ? retainedPrismDraftShape(source, drafted, angle)
+          : {
+            ...drafted,
+            x: source.x,
+            z: source.z,
+            elevation: source.elevation ?? 0,
+            faceColors: undefined,
+            edgeTreatments: undefined,
+            edgeTreatmentHistory: undefined,
+            cadDisplayEdges: undefined,
+            cadDisplayEdgesVersion: undefined,
+            ...CLEARED_RETAINED_DRAFT_FIELDS,
+          }),
         [source.id],
-        notice((translate) => translate("panels.inspector.draftPrism.applied")),
+        notice((translate) => translate(retained ? "panels.inspector.draftPrism.appliedRetained" : "panels.inspector.draftPrism.applied")),
       );
     } catch (error) {
       setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
     }
   }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
 
+  /**
+   * Resolve and draft a retained face draft in the CAD worker, with the
+   * engine's resolver and draft (#384). Resolves to the drafted shape and the
+   * evidence the record keeps, or rejects with the worker's error.
+   */
+  const runRetainedFaceDraft = useCallback(async (base: WorkplaneShape, resolution: RetainedFaceDraftResolution) => {
+    const response = await postCadModifierRequestAsync({ type: "retained-face-draft", resolution }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+    if (response.type === "error") throw errorFromPayload(response);
+    if (response.type !== "retained-face-draft") throw new Error("The CAD worker did not return a drafted face solid");
+    const drafted = shapeFromCadMesh(base, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
+    if (!drafted) throw new Error("The face draft did not produce a usable solid");
+    const outcome: RetainedFaceDraftOutcome = {
+      sourceFaceIds: response.sourceFaceIds,
+      resultFaceIds: response.resultFaceIds,
+      resolved: response.resolved,
+    };
+    return { drafted, outcome };
+  }, [postCadModifierRequestAsync]);
+
+  /** Rebuild the undrafted extrusion a retained draft is redrafted or replayed on, from `profile`. */
+  const rebuildRetainedDraftBase = useCallback(async (existing: WorkplaneShape, profile: SketchProfile, profileChanged: boolean) => {
+    const rebuilt = await cadShapeFromSketchProfile(profile, retainedDraftSourceHeight(existing), {
+      ...existing,
+      faceIds: undefined,
+      ...CLEARED_RETAINED_DRAFT_FIELDS,
+    });
+    return retainedFaceDraftRebuildBase(existing, rebuilt, profileChanged ? "profile-changed" : "unchanged");
+  }, []);
+
   const applyDraftFaceToSelection = useCallback(async (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => {
     const source = selectedShape;
     const request = source && draftFaceRequestForShape(source, faceIndex, angle, pullDirection);
     if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    const unavailable = retainedFaceDraftUnavailable(source);
+    // One kept draft per shape, as on the REST path: a second one would have
+    // to bake over the first and lose it.
+    if (unavailable === "draft-retained") {
+      setNotice(notice((translate) => translate(source.faceDraft ? "panels.inspector.faces.draftRetained" : "panels.inspector.faces.prismDraftRetained")));
+      return;
+    }
     const fingerprint = projectShapesFingerprint([source]);
     const sourceProjectId = projectInfoRef.current.projectId;
     invalidateCadModifierSession();
     setNotice(notice((translate) => translate("panels.inspector.faces.drafting")));
+    // A sketch extrusion the REST path could replay keeps the draft as a
+    // feature (#384). A face the record cannot name -- curved, or a side no
+    // single sketch segment bounds -- falls through to the baked draft.
+    if (unavailable === null) {
+      try {
+        const identified = withDraftFaceIds(source);
+        const faceId = identified.faceIds?.[faceIndex];
+        if (!faceId) throw new LocalizedError("errors.cadModifier.draftNotRetained");
+        const draft = { angle, pullDirection };
+        const { drafted, outcome } = await runRetainedFaceDraft(identified, retainedFaceDraftResolution(identified, identified, { ...draft, sourceFaceId: faceId }, false));
+        const current = shapesRef.current.find((shape) => shape.id === source.id);
+        if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
+        commitShapes(
+          shapesRef.current.map((shape) => shape.id === source.id ? retainedFaceDraftShape(identified, drafted, outcome, draft) : shape),
+          [source.id],
+          notice((translate) => translate("panels.inspector.faces.draftedRetained")),
+        );
+        return;
+      } catch (error) {
+        if (!(error instanceof LocalizedError && error.key === "errors.cadModifier.draftNotRetained")) {
+          setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+          return;
+        }
+      }
+    }
     try {
       const response = await postCadModifierRequestAsync({ type: "draft-face", ...request }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
       if (response.type === "error") {
@@ -7679,11 +7791,71 @@ export function SketchForgeEditor({
       commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? {
         ...drafted,
         ...faceMetadata,
+        // Baked: no record describes this geometry any more.
+        ...CLEARED_RETAINED_DRAFT_FIELDS,
       } : shape), [source.id], notice((translate) => translate("panels.inspector.faces.drafted")));
     } catch (error) {
       setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
     }
-  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, runRetainedFaceDraft, selectedShape, selectedShapes.length, t]);
+
+  // Change the direction or angle of a retained face draft: the undrafted
+  // extrusion is rebuilt from its sketch and drafted again, finding the face
+  // as the REST API's angle edit does. Undoable like any other edit.
+  const updateRetainedFaceDraftOnSelection = useCallback(async (angle: number, pullDirection: DraftFacePullAxis) => {
+    const source = selectedShape;
+    if (!source?.faceDraft || !source.sketchProfile || source.locked || source.hole || selectedShapes.length !== 1) return;
+    if (!retainedFaceDraftEditable(source)) {
+      setNotice(notice((translate) => translate("errors.cadModifier.draftNotReplayable")));
+      return;
+    }
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.faceDraft.updating")));
+    try {
+      const draft = { angle, pullDirection };
+      const base = await rebuildRetainedDraftBase(source, source.sketchProfile, false);
+      const { drafted, outcome } = await runRetainedFaceDraft(base, retainedFaceDraftResolution(source, base, draft, false));
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
+      commitShapes(
+        shapesRef.current.map((shape) => shape.id === source.id ? retainedFaceDraftShape(base, drafted, outcome, draft, source) : shape),
+        [source.id],
+        notice((translate) => translate("panels.inspector.faceDraft.updated")),
+      );
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, rebuildRetainedDraftBase, runRetainedFaceDraft, selectedShape, selectedShapes.length, t]);
+
+  /**
+   * Rebuild a sketch extrusion that keeps a draft from its edited profile and
+   * draft it again (#384), or null when it keeps none. Rejects when the draft
+   * cannot be rebuilt -- on the new profile, or at all, because the shape was
+   * mirrored, treated or resized since -- which leaves the sketch open.
+   */
+  const replayRetainedDraft = useCallback(async (existing: WorkplaneShape, profile: SketchProfile) => {
+    if (existing.sketchOperation !== "extrude" || !hasRetainedDraft(existing)) return null;
+    if (retainedDraftReplayBlocked(existing)) throw new LocalizedError("errors.cadModifier.draftNotReplayable");
+    const profileChanged = JSON.stringify(profile) !== JSON.stringify(existing.sketchProfile);
+    if (existing.faceDraft) {
+      const base = await rebuildRetainedDraftBase(existing, profile, profileChanged);
+      const draft = { angle: existing.faceDraft.angle, pullDirection: existing.faceDraft.pullDirection };
+      const { drafted, outcome } = await runRetainedFaceDraft(base, retainedFaceDraftResolution(existing, base, draft, profileChanged));
+      return retainedFaceDraftShape(base, drafted, outcome, draft, existing);
+    }
+    const angle = existing.draftPrismAngle!;
+    const request = draftPrismRequestForShape({ ...existing, sketchProfile: profile }, angle);
+    if (!request) throw new LocalizedError("errors.cadModifier.draftNotRetained");
+    const response = await postCadModifierRequestAsync({ type: "draft-prism", ...request }, [], CAD_BOOLEAN_REQUEST_TIMEOUT_MS);
+    if (response.type === "error") throw errorFromPayload(response);
+    if (response.type !== "draft-prism") throw new Error("The CAD worker did not return a drafted solid");
+    const drafted = shapeFromCadMesh(existing, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
+    if (!drafted) throw new Error("The draft did not produce a usable solid");
+    return retainedPrismDraftShape(existing, drafted, angle, profile);
+  }, [postCadModifierRequestAsync, rebuildRetainedDraftBase, runRetainedFaceDraft]);
+  replayRetainedDraftRef.current = replayRetainedDraft;
 
   // Rebuild a primitive as an exact solid in place, so it has B-rep faces to
   // colour and draft. Undoable like any other edit; the result is the same kind
@@ -10001,6 +10173,7 @@ export function SketchForgeEditor({
           onEditSketch={beginSketchEdit}
           onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
           onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
+          onUpdateRetainedFaceDraft={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? updateRetainedFaceDraftOnSelection : undefined}
           onEnableFaceEditing={selectedShapes.length === 1 && selectedShape && faceEditingCanBeEnabled(selectedShape) ? enableFaceEditingOnSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}

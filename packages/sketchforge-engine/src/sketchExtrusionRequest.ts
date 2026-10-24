@@ -1,24 +1,8 @@
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
-import type { OcctKernel } from "occt-wasm";
 import { createLocalId } from "./localIds.js";
 import { withCadKernel } from "./serverCadKernel.js";
-import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
+import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { canonicalizeShape, cleanNearZero } from "./workplaneShapes.js";
-
-function pathWire(cad: OcctKernel, path: OrderedCadSketchPath) {
-  return cad.makeWire(path.steps.map(({ segment, from, to }) => {
-    const forward = segment.startId === from.id;
-    const first = forward ? from.handleOut : from.handleIn;
-    const second = forward ? to.handleIn : to.handleOut;
-    if (segment.kind !== "line" && first && second) {
-      return cad.makeBezierEdge([
-        { x: from.x, y: 0, z: from.z }, { x: first.x, y: 0, z: first.z },
-        { x: second.x, y: 0, z: second.z }, { x: to.x, y: 0, z: to.z },
-      ]);
-    }
-    return cad.makeLineEdge({ x: from.x, y: 0, z: from.z }, { x: to.x, y: 0, z: to.z });
-  }));
-}
 
 /** Rebuild a retained sketch extrusion as exact OCCT geometry. */
 export async function sketchExtrusionShapeFromRequest(request: Record<string, unknown>): Promise<WorkplaneShape> {
@@ -28,14 +12,7 @@ export async function sketchExtrusionShapeFromRequest(request: Record<string, un
     throw new Error("A sketch extrusion height must be finite and greater than zero.");
   }
   return withCadKernel((cad) => {
-    const regions = cadSketchRegions(profile);
-    if (regions.length === 0) throw new Error("A sketch extrusion requires a closed profile.");
-    const solids = regions.map((region) => {
-      let face = cad.makeFace(pathWire(cad, region.outer));
-      if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map((hole) => pathWire(cad, hole)));
-      return cad.extrude(face, 0, height, 0);
-    });
-    const solid = solids.length === 1 ? solids[0]! : cad.makeCompound(solids);
+    const solid = sketchExtrusionSolid(cad, profile, height);
     if (!cad.isValid(solid)) throw new Error("The sketch extrusion produced invalid geometry.");
     const mesh = cad.tessellate(solid, { linearDeflection: 0.05, angularDeflection: 0.16 });
     if (mesh.positions.length < 9 || mesh.indices.length < 3) throw new Error("The sketch extrusion produced no solid geometry.");

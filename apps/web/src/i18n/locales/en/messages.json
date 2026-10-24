@@ -516,7 +516,8 @@
       "buildingSweep": "Building planar sweep",
       "cannotSweep": "Could not create the planar sweep",
       "sweepCreated": "Planar sweep created",
-      "sweepUpdated": "Planar sweep updated"
+      "sweepUpdated": "Planar sweep updated",
+      "draftReplayFailed": "The sketch was not updated: its draft cannot be rebuilt on this profile. Change the profile back, or cancel the sketch edit."
     },
     "export": {
       "needSolidSelected": "Select at least one solid shape before exporting",
@@ -1046,7 +1047,10 @@
         "angle": "Draft angle",
         "applyDraft": "Apply draft",
         "drafting": "Drafting face…",
-        "drafted": "Face drafted."
+        "drafted": "Face drafted.",
+        "draftedRetained": "Face drafted. The draft stays with the sketch, so editing the sketch keeps it.",
+        "draftRetained": "This shape already keeps a face draft. Change it in the Face draft card, or undo it before drafting another face.",
+        "prismDraftRetained": "This shape keeps a prism draft, and a face draft cannot be added to it. Undo the prism draft first."
       },
       "draftPrism": {
         "title": "Draft prism",
@@ -1054,7 +1058,19 @@
         "angle": "Draft angle",
         "apply": "Apply draft",
         "applying": "Applying draft…",
-        "applied": "Draft applied. The shape is now baked geometry."
+        "applied": "Draft applied. The shape is now baked geometry.",
+        "hintRetained": "Taper a straight sketch extrusion. The draft stays with the sketch, so editing the sketch keeps it.",
+        "appliedRetained": "Draft applied. It stays with the sketch, so editing the sketch keeps it.",
+        "update": "Update draft",
+        "faceDraftRetained": "This shape keeps a face draft, and a prism draft cannot be added to it. Undo the face draft first."
+      },
+      "faceDraft": {
+        "title": "Face draft",
+        "hint": "Kept with the sketch: editing the sketch draws the draft again. Change its direction or angle here.",
+        "face": "Face {face} of the sketch extrusion",
+        "update": "Update draft",
+        "updating": "Updating draft…",
+        "updated": "Face draft updated."
       }
     },
     "appearance": {
@@ -1395,7 +1411,9 @@
       "edgeTreatmentFailed": "The CAD kernel could not complete this edge treatment",
       "meshImportReset": "The selected mesh could not be converted into a closed CAD solid. The CAD kernel reset; try Separate Parts, ungrouping, or simplifying the object before adding edge features.",
       "validatorReset": "The CAD kernel exposed an incomplete validation function and reset. Start the edge tool again; no page refresh is needed.",
-      "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed."
+      "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed.",
+      "draftNotRetained": "The face draft cannot be kept with the sketch: the drafted face is not flat, or no longer matches one side of the profile. Undo the change, or draft another face.",
+      "draftNotReplayable": "The draft this shape keeps cannot be rebuilt, because the shape has been mirrored, resized, filleted or chamfered since it was drafted. Undo that change first; the shape and its sketch are left as they were."
     },
     "mesh": {
       "incompleteTriangles": "Mesh does not contain complete triangles",

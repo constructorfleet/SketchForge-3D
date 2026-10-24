@@ -235,6 +235,7 @@ type WorkplaneViewportProps = {
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
+  onUpdateRetainedFaceDraft?: (angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
   onEnableFaceEditing?: () => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
@@ -2437,6 +2438,7 @@ export function WorkplaneViewport({
   onEditSketch,
   onApplyDraftPrism,
   onApplyDraftFace,
+  onUpdateRetainedFaceDraft,
   onEnableFaceEditing,
   canSeparateParts = false,
   onSeparateParts,
@@ -5803,6 +5805,7 @@ export function WorkplaneViewport({
             onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
             onApplyDraftPrism={onApplyDraftPrism}
             onApplyDraftFace={onApplyDraftFace}
+            onUpdateRetainedFaceDraft={onUpdateRetainedFaceDraft}
             onEnableFaceEditing={onEnableFaceEditing}
             onHighlightFace={highlightFace}
             onFacePickingChange={setFacePicking}

@@ -7,6 +7,7 @@ import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTran
 import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/engine/exactBooleanSolids";
 import { buildDraftPrism } from "@/lib/engine/draftPrism";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
+import { retainedSketchFaceDraft, SketchFaceDraftError } from "@/lib/engine/sketchFaceDraftKernel";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
@@ -470,6 +471,42 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
         post({ type: "draft-face", requestId: request.requestId, ...result }, [
           result.positions.buffer, result.normals.buffer, result.indices.buffer,
         ]);
+        return;
+      } finally {
+        releaseSession(activeCad);
+      }
+    }
+    if (request.type === "retained-face-draft") {
+      releaseSession(activeCad);
+      try {
+        let drafted: ReturnType<typeof retainedSketchFaceDraft>;
+        try {
+          drafted = retainedSketchFaceDraft(activeCad, request.resolution);
+        } catch (error) {
+          // The engine's reason is the REST API's English message; the editor
+          // says it in the person's language instead. Only a face the record
+          // cannot name is "not retained"; the angle, the kernel refusing the
+          // face and axis, and an invalid result keep the messages a baked
+          // draft gives for the same faults.
+          const reason = error instanceof SketchFaceDraftError ? error.reason : "unresolved";
+          throw new LocalizedError(reason === "incompatible" ? "errors.cadModifier.draftFaceIncompatible"
+            : reason === "angle" || reason === "invalid-result" ? "errors.cadModifier.draftFaceInvalid"
+              : "errors.cadModifier.draftNotRetained");
+        }
+        const mesh = meshShapeWithFaceGroups(activeCad, drafted.solid, { linearDeflection: 0.035, angularDeflection: 0.16 });
+        post({
+          type: "retained-face-draft",
+          requestId: request.requestId,
+          positions: mesh.positions,
+          normals: mesh.normals,
+          indices: mesh.indices,
+          triangleCount: mesh.triangleCount,
+          faceGroups: mesh.faceGroups,
+          brep: activeCad.toBREP(drafted.solid),
+          sourceFaceIds: drafted.sourceFaceIds,
+          resultFaceIds: drafted.resultFaceIds,
+          resolved: { faceId: drafted.resolved.faceId, normal: drafted.resolved.normal, segmentMatch: drafted.resolved.segmentMatch },
+        }, [mesh.positions.buffer, mesh.normals.buffer, mesh.indices.buffer]);
         return;
       } finally {
         releaseSession(activeCad);

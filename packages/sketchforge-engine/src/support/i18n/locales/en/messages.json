@@ -1276,7 +1276,9 @@
       "edgeTreatmentFailed": "The CAD kernel could not complete this edge treatment",
       "meshImportReset": "The selected mesh could not be converted into a closed CAD solid. The CAD kernel reset; try Separate Parts, ungrouping, or simplifying the object before adding edge features.",
       "validatorReset": "The CAD kernel exposed an incomplete validation function and reset. Start the edge tool again; no page refresh is needed.",
-      "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed."
+      "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed.",
+      "draftNotRetained": "The face draft cannot be kept with the sketch: the drafted face is not flat, or no longer matches one side of the profile. Undo the change, or draft another face.",
+      "draftNotReplayable": "The draft this shape keeps cannot be rebuilt, because the shape has been mirrored, resized, filleted or chamfered since it was drafted. Undo that change first; the shape and its sketch are left as they were."
     },
     "mesh": {
       "incompleteTriangles": "Mesh does not contain complete triangles",

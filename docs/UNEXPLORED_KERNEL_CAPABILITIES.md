@@ -74,8 +74,10 @@ These are implemented and should not be filed as missing features:
   +30° along -Y. The box face 0/+5°/+X case is rejected because the pull axis
   is parallel to that face. These are measured cases, not broad support for
   other faces, solids, or angles. Other unsupported combinations return a
-  localized error. The editor's arbitrary-shape draft remains baked. The
-  engine/API can retain one face draft on a sketch extrusion, single-solid
+  localized error. The editor keeps a face or prism draft on an eligible
+  single-loop sketch extrusion as the same retained feature the REST API
+  writes, built by the engine's browser-safe `sketchFaceDraftKernel`; its
+  arbitrary-shape draft remains baked. The engine/API can retain one face draft on a sketch extrusion, single-solid
   sketch sweep, or plain single-region full-turn sketch revolve. Revolves use
   `GET /faces?topology=exact` so analytic face selection does not change the
   default tessellated listing or its compatibility indexes. It stores the
@@ -224,7 +226,9 @@ the highest-value foundation before expanding editable downstream operations.
 Face drafting is selectable along local X, Y, or Z, but verification covers
 only the fixture/face/angle combinations listed above. Other face orientations,
 solid classes, and angle ranges are unverified or may be rejected by the
-kernel. The editor's general face-draft results remain baked. The engine/API
+kernel. The editor's general face-draft results remain baked; on an eligible
+sketch extrusion it now creates and edits the retained face and prism drafts
+(#384). The engine/API
 retains one editable face draft on a sketch extrusion, single-solid sketch
 sweep, or plain single-region full-turn sketch revolve. Eligible straight-line,
 single-region, no-hole sketch extrusion side faces replay by exact source
@@ -270,8 +274,10 @@ topology rather than transferring IDs by CAD face index. Other source-face
 reselection remains unsupported; this bounded support does not define semantic
 lineage across arbitrary topology changes. Prism drafts are editable
 only as a retained angle on a straight, single-loop sketch extrusion. The
-editor does not yet create or edit the persisted face-draft feature; its
-arbitrary-shape results remain baked. Other draft operations and general
+editor creates and edits both retained features on an exact, untreated,
+unmirrored, unresized single-loop sketch extrusion, and replays them when the
+sketch is edited (#384); sweeps, revolves and every other shape keep the baked
+editor result. Other draft operations and general
 editable draft history remain unsupported. Broader fixture coverage should
 establish the supported geometric envelope.
 

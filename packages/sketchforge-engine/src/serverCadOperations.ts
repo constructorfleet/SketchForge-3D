@@ -32,6 +32,7 @@ import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
+import { draftSketchFace, draftPrismProfileOffset, faceIdsForCadResult, type SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
 export type ServerCadEdge = {
   index: number;
@@ -70,16 +71,7 @@ export class ServerCadError extends Error {
 const MESH_DEFLECTION = 0.1;
 const MIN_CAD_DIMENSION = 0.01;
 const FACE_HASH_UPPER_BOUND = 2_147_483_647;
-const DRAFT_PULL_AXES = {
-  x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 },
-  "-x": { x: -1, y: 0, z: 0 }, "-y": { x: 0, y: -1, z: 0 }, "-z": { x: 0, y: 0, z: -1 },
-} as const;
-
-export type SketchFaceDraftRequest = {
-  sourceFaceId: string;
-  angle: number;
-  pullDirection: keyof typeof DRAFT_PULL_AXES;
-};
+export type { SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
 function meshPositionsOf(shape: WorkplaneShape) {
   const positions = shape.importedMesh?.positions;
@@ -690,9 +682,11 @@ export function exactPlainSketchRevolveResult(shape: WorkplaneShape): Promise<Se
 /**
  * Apply a prism draft along the shape's vertical extrusion axis.
  *
- * This is intentionally a baked operation: the project does not yet retain
- * the source extrusion as a parametric feature. The exact BREP and viewport
- * mesh are persisted together, as with shell and edge treatments.
+ * The geometry only: the caller records the retained angle and source frame
+ * (`retainedPrismDraftFields`) that a sketch edit replays it from. The B-rep
+ * is built about the centre of the profile's bounds
+ * (`draftPrismProfileOffset`), and the exact BREP and viewport mesh are
+ * persisted together, as with shell and edge treatments.
  */
 export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number }): Promise<ServerCadResult> {
   if (!Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
@@ -711,12 +705,7 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
   }
 
   return withCadKernel((cad) => {
-    const minX = Math.min(...points.map(({ x }) => x));
-    const maxX = Math.max(...points.map(({ x }) => x));
-    const minZ = Math.min(...points.map(({ z }) => z));
-    const maxZ = Math.max(...points.map(({ z }) => z));
-    const centerX = (minX + maxX) / 2;
-    const centerZ = (minZ + maxZ) / 2;
+    const { x: centerX, z: centerZ } = draftPrismProfileOffset(shape.sketchProfile!);
     const edges = points.map((point, index) => {
       const next = points[(index + 1) % points.length];
       return cad.makeLineEdge(
@@ -767,71 +756,13 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     const face = faces[selected[0]!];
     if (!face) throw new ServerCadError("The selected source face is no longer available.");
 
-    const direction = DRAFT_PULL_AXES[request.pullDirection];
-    const angle = request.angle * Math.PI / 180;
-    let drafted: ShapeHandle;
-    try {
-      drafted = cad.draft(solid, face, angle, direction);
-    } catch {
-      const rotation = canonicalDraftRotation(request.pullDirection);
-      try {
-        if (!rotation) throw new Error("No canonical rotation for the selected pull axis.");
-        const rotatedSolid = cad.rotate(solid, rotation.axis, rotation.angle);
-        const oldNormal = faceNormal(cad, face);
-        if (!oldNormal) throw new Error("The selected face has no usable normal.");
-        const targetNormal = rotateVector(oldNormal, rotation.axis.direction, rotation.angle);
-        const targetCenter = rotateVector(cad.getSurfaceCenterOfMass(face), rotation.axis.direction, rotation.angle);
-        const bounds = cad.getBoundingBox(solid, false);
-        const scale = Math.max(1, Math.hypot(bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin, bounds.zmax - bounds.zmin));
-        const matches = cad.getSubShapes(rotatedSolid, "face").filter((candidate) => {
-          const normal = faceNormal(cad, candidate);
-          const center = cad.getSurfaceCenterOfMass(candidate);
-          return normal && Math.hypot(normal.x - targetNormal.x, normal.y - targetNormal.y, normal.z - targetNormal.z) <= 1e-7
-            && Math.hypot(center.x - targetCenter.x, center.y - targetCenter.y, center.z - targetCenter.z) <= scale * 1e-8;
-        });
-        if (matches.length !== 1) throw new Error("Could not uniquely identify the selected face after rotating the solid.");
-        const canonicalDraft = cad.draft(rotatedSolid, matches[0]!, angle, { x: 0, y: 0, z: 1 });
-        drafted = cad.rotate(canonicalDraft, rotation.axis, -rotation.angle);
-      } catch {
-        throw new ServerCadError("The selected source face cannot be drafted along that local pull axis and angle.");
-      }
-    }
+    const drafted = draftSketchFace(cad, solid, face, request);
+    if (!drafted) throw new ServerCadError("The selected source face cannot be drafted along that local pull axis and angle.");
     if (!cadResultIsValid(cad, drafted) || !cad.isSolid(drafted)) {
       throw new ServerCadError("The face draft did not produce a valid solid.");
     }
     return meshedCadResult(cad, exactRevolve ? scaleRevolveResult(cad, drafted, shape) : drafted, shape);
   });
-}
-
-function canonicalDraftRotation(direction: SketchFaceDraftRequest["pullDirection"]) {
-  switch (direction) {
-    case "x": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: -Math.PI / 2 };
-    case "-x": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: Math.PI / 2 };
-    case "y": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, angle: Math.PI / 2 };
-    case "-y": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, angle: -Math.PI / 2 };
-    case "z": return null;
-    case "-z": return { axis: { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } }, angle: Math.PI };
-  }
-}
-
-function rotateVector(vector: { x: number; y: number; z: number }, axis: { x: number; y: number; z: number }, angle: number) {
-  const cosine = Math.cos(angle), sine = Math.sin(angle);
-  const dot = axis.x * vector.x + axis.y * vector.y + axis.z * vector.z;
-  const cross = { x: axis.y * vector.z - axis.z * vector.y, y: axis.z * vector.x - axis.x * vector.z, z: axis.x * vector.y - axis.y * vector.x };
-  return {
-    x: vector.x * cosine + cross.x * sine + axis.x * dot * (1 - cosine),
-    y: vector.y * cosine + cross.y * sine + axis.y * dot * (1 - cosine),
-    z: vector.z * cosine + cross.z * sine + axis.z * dot * (1 - cosine),
-  };
-}
-
-function faceNormal(cad: OcctKernel, face: ShapeHandle) {
-  try {
-    const bounds = cad.uvBounds(face);
-    return cad.surfaceNormal(face, (bounds.uMin + bounds.uMax) / 2, (bounds.vMin + bounds.vMax) / 2);
-  } catch {
-    return null;
-  }
 }
 
 /** The exact geometry and a mesh of it, which is what a shape stores after any CAD operation. */
@@ -876,59 +807,13 @@ export function meshedCadResult(
   };
 }
 
-/**
- * Keep an ID only when an exact face BREP or a unique planar support surface
- * occurs on each side. OCCT face ordering and hash codes are kernel details,
- * so an unmatched or ambiguous face receives a new application ID.
- */
 function faceIdsForResult(
   cad: OcctKernel,
   source: WorkplaneShape,
   resultFaces: ShapeHandle[],
   sourceSolid = orientedSolidForShape(cad, source),
 ): string[] {
-  const sourceFaces = cad.getSubShapes(sourceSolid, "face");
-  const fingerprint = (face: ShapeHandle) => {
-    const brep = cad.toBREP(face);
-    try {
-      if (cad.surfaceType(face) !== "plane") return `brep:${brep}`;
-      const bounds = cad.uvBounds(face);
-      const normal = cad.surfaceNormal(face, (bounds.uMin + bounds.uMax) / 2, (bounds.vMin + bounds.vMax) / 2);
-      const center = cad.getSurfaceCenterOfMass(face);
-      const round = (value: number) => Math.round(value * 1e6) / 1e6;
-      const n = [round(normal.x), round(normal.y), round(normal.z)];
-      const offset = round(center.x * normal.x + center.y * normal.y + center.z * normal.z);
-      return `plane:${n.join(",")}:${offset}`;
-    } catch {
-      return `brep:${brep}`;
-    }
-  };
-  const sourceByBrep = new Map<string, number[]>();
-  sourceFaces.forEach((face, index) => {
-    const key = fingerprint(face);
-    sourceByBrep.set(key, [...(sourceByBrep.get(key) ?? []), index]);
-  });
-  const resultCounts = new Map<string, number>();
-  const resultBreps = resultFaces.map((face) => {
-    const key = fingerprint(face);
-    resultCounts.set(key, (resultCounts.get(key) ?? 0) + 1);
-    return key;
-  });
-  const used = new Set<string>();
-  return resultBreps.map((brep, index) => {
-    const matches = sourceByBrep.get(brep) ?? [];
-    const sourceIndex = matches.length === 1 && resultCounts.get(brep) === 1 ? matches[0] : undefined;
-    const inherited = sourceIndex === undefined
-      ? undefined
-      : source.faceIds?.[sourceIndex] ?? `face_${encodeURIComponent(source.id)}_${sourceIndex}`;
-    if (inherited && !used.has(inherited)) {
-      used.add(inherited);
-      return inherited;
-    }
-    const fresh = createLocalId(`${source.id}-face-${index}`);
-    used.add(fresh);
-    return fresh.startsWith("face_") ? fresh : `face_${fresh}`;
-  });
+  return faceIdsForCadResult(cad, source, resultFaces, sourceSolid);
 }
 
 function freshFaceIds(cad: OcctKernel, solid: ShapeHandle, shapeId: string): string[] {
