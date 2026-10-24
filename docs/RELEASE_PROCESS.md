@@ -21,7 +21,11 @@ version. Release Please reads `release-please-config.json` and opens or updates
 a release pull request on `main`. It updates the publishing-client version table
 in that pull request as part of its version bump. Review its version changes and
 generated release notes, then merge that release pull request to publish the
-release.
+release. If nobody does, `release-auto-merge.yml` merges it every four hours
+once its checks have passed and `main` has been quiet for 30 minutes; the
+`release: hold` label or the repository variable `RELEASE_AUTO_MERGE=false`
+holds it. See [publishing the client libraries](PUBLISHING_CLIENTS.md) for the
+full conditions.
 
 Release Please authenticates as the repository's release GitHub App, using the
 `APP_ID` and `APP_KEY` secrets, rather than with the default workflow token.

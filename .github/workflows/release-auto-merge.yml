@@ -1,0 +1,77 @@
+name: Release auto-merge
+
+# Merges the standing release-please pull request every four hours when it is
+# safe to. Merging it is the release: release-please tags the merge commit and
+# dispatches release.yml (Docker, npm, PyPI -- none of which can be withdrawn)
+# and desktop-release.yml.
+#
+# scripts/release/auto-merge-release-pr.mjs decides, reading with the default
+# token. It refuses unless there is exactly one release pull request from the
+# release app, it is not on hold (the `release: hold` label, or the repository
+# variable RELEASE_AUTO_MERGE set to `false`), it is not behind main, every
+# check on its head passed, main has been quiet for 30 minutes, and no release
+# workflow is running. A refusal is logged to the run summary and is not a
+# failure.
+#
+# The merge itself uses the release GitHub App's token. GitHub starts no
+# workflow run for a push its own token made, so a merge with GITHUB_TOKEN
+# would never start release-please.yml: nothing would be tagged or published.
+# It never uses --admin: the main ruleset applies to the app as to anyone.
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Decide and report, but do not merge
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: release-auto-merge-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Decide whether the release pull request is safe to merge
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_AUTO_MERGE: ${{ vars.RELEASE_AUTO_MERGE }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/release/auto-merge-release-pr.mjs
+
+      - name: Mint a token for the release app
+        id: app-token
+        if: steps.decide.outputs.merge == 'true' && inputs.dry_run != true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_KEY }}
+
+      - name: Merge the release pull request
+        if: steps.decide.outputs.merge == 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.decide.outputs.number }}
+          HEAD_SHA: ${{ steps.decide.outputs.sha }}
+        run: |
+          # --match-head-commit refuses the merge if release-please pushed again
+          # after the checks this run read.
+          gh pr merge "$PR_NUMBER" --squash --match-head-commit "$HEAD_SHA"
+          echo "Merged #$PR_NUMBER at $HEAD_SHA." >> "$GITHUB_STEP_SUMMARY"
