@@ -9,6 +9,8 @@ type FaceGroupedMesh = {
   faceIds?: readonly string[];
 };
 
+const FACE_HIGHLIGHT_OFFSET_MM = 0.1;
+
 /** Build a viewport mesh with persisted face colors applied to tessellated triangles. */
 export function createFaceColorPreviewGeometry(mesh: FaceGroupedMesh, faceColors: Record<string, string>, baseColor: string) {
   const geometry = new THREE.BufferGeometry();
