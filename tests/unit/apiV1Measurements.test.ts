@@ -350,6 +350,34 @@ describe("REST API v1 measurements", () => {
     expect(corner.payload.distance).toBeCloseTo(0, 6);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("measures revolve edges using the indexes returned by the exact edge listing", async () => {
+    const projectId = await project();
+    const shapeId = await addShape(projectId, {
+      kind: "revolve",
+      name: "Four point measurement probe",
+      profile: [[5, -4], [10, -4], [10, 4], [5, 4]],
+      sides: 24,
+    });
+    const listingResponse = await listEdges(projectId, shapeId);
+    const listing = (await listingResponse.json()) as {
+      edges?: Array<{ index: number; curveType: string; length: number }>;
+      error?: string;
+    };
+    expect(listingResponse.status, JSON.stringify(listing)).toBe(200);
+    const outerCircles = listing.edges!.filter((edge) =>
+      edge.curveType === "circle" && Math.abs(edge.length - 20 * Math.PI) < 1e-6,
+    );
+    expect(outerCircles).toHaveLength(2);
+
+    const { status, payload } = await between(projectId, {
+      from: { shapeId, entity: "edge", index: outerCircles[0].index },
+      to: { shapeId, entity: "edge", index: outerCircles[1].index },
+    });
+
+    expect(status, JSON.stringify(payload)).toBe(200);
+    expect(payload.distance).toBeCloseTo(8, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("measures an edge of one shape against a face of another", async () => {
     const projectId = await project();
     // A post whose base sits 12 mm above a plate whose top face is at y=16.
