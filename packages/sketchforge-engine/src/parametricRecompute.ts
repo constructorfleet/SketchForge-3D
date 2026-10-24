@@ -11,13 +11,14 @@ import {
 import { shapeFaces } from "./serverCadShell.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import { draftFaceForSketchSegment, legacyDraftSegmentForShape } from "./faceDraftSegmentLineage.js";
-import type { WorkplaneShape } from "./domain/sketchforge.js";
+import type { EdgeTreatmentHistoryEntry, WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
   | { ok: true; shapes: WorkplaneShape[]; updated: WorkplaneShape; matchCount: number }
   | { ok: false; reason: "recompute_failed" | "dependency_missing" | "dependency_ambiguous"; message?: string };
 
-function appliedFrame(shape: WorkplaneShape) {
+/** Where a treatment was applied, so reverting it later carries any move made since. */
+export function edgeTreatmentAppliedFrame(shape: WorkplaneShape): NonNullable<EdgeTreatmentHistoryEntry["appliedFrame"]> {
   return {
     x: shape.x,
     z: shape.z,
@@ -164,7 +165,7 @@ export async function replaySingleAllEdgeTreatment(
   return {
     ...treated,
     edgeTreatments: [replayedFeature],
-    edgeTreatmentHistory: [{ ...entry, feature: replayedFeature, before, appliedFrame: appliedFrame(treated) }],
+    edgeTreatmentHistory: [{ ...entry, feature: replayedFeature, before, appliedFrame: edgeTreatmentAppliedFrame(treated) }],
   };
 }
 

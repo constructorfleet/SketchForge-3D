@@ -90,50 +90,24 @@ function value<T>(result: EngineResult<T>): T {
   return result.value;
 }
 
+// `engine.treat` writes the replayable treatment record itself (#346), so these
+// go through it exactly as a REST or MCP caller would.
 async function persistAllEdgeFillet(
   engine: ReturnType<typeof createEngine>,
-  store: ProjectStore,
   projectId: string,
   shapeId: string,
   amount = 0.1,
 ) {
-  const before = await store.read(projectId);
-  const source = before!.shapes.find((shape) => shape.id === shapeId)!;
-  const treated = value(await engine.treat(projectId, shapeId, { kind: "fillet", amount })).shape;
-  if (source.draftPrismAngle !== undefined) return treated;
-  const feature = { kind: "fillet" as const, amount, edgeCount: 12, allEdges: true as const };
-  const persisted = {
-    ...treated,
-    edgeTreatments: [feature],
-    edgeTreatmentHistory: [{ id: `all-edge-fillet-${shapeId}`, createdAt: 1, feature, before: source }],
-  };
-  const after = await store.read(projectId);
-  const index = after!.shapes.findIndex((shape) => shape.id === shapeId);
-  after!.shapes[index] = persisted;
-  return persisted;
+  return value(await engine.treat(projectId, shapeId, { kind: "fillet", amount })).shape;
 }
 
 async function persistAllEdgeChamfer(
   engine: ReturnType<typeof createEngine>,
-  store: ProjectStore,
   projectId: string,
   shapeId: string,
   amount = 0.1,
 ) {
-  const before = await store.read(projectId);
-  const source = before!.shapes.find((shape) => shape.id === shapeId)!;
-  const treated = value(await engine.treat(projectId, shapeId, { kind: "chamfer", amount })).shape;
-  if (source.draftPrismAngle !== undefined) return treated;
-  const feature = { kind: "chamfer" as const, amount, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
-  const persisted = {
-    ...treated,
-    edgeTreatments: [feature],
-    edgeTreatmentHistory: [{ id: `all-edge-chamfer-${shapeId}`, createdAt: 1, feature, before: source }],
-  };
-  const after = await store.read(projectId);
-  const index = after!.shapes.findIndex((shape) => shape.id === shapeId);
-  after!.shapes[index] = persisted;
-  return persisted;
+  return value(await engine.treat(projectId, shapeId, { kind: "chamfer", amount })).shape;
 }
 
 describe("dependency-ordered feature recomputation", () => {
@@ -174,7 +148,7 @@ describe("dependency-ordered feature recomputation", () => {
     });
     document.shapes = [original];
     const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
-    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
+    const persisted = await persistAllEdgeFillet(engine, "recompute", drafted.id, 0.2);
     const writesBefore = writeCount();
 
     const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { draftPrismAngle: 8 });
@@ -198,7 +172,7 @@ describe("dependency-ordered feature recomputation", () => {
       profile: extrusionProfile(), height: 3,
     });
     document.shapes = [original];
-    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
+    const treated = await persistAllEdgeFillet(engine, "recompute", original.id, 0.2);
     const before = value(await engine.project("recompute"));
     const writesBefore = writeCount();
 
@@ -218,7 +192,7 @@ describe("dependency-ordered feature recomputation", () => {
       profile: extrusionProfile(), height: 3,
     });
     document.shapes = [original];
-    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
+    const treated = await persistAllEdgeFillet(engine, "recompute", original.id, 0.2);
     const before = value(await engine.project("recompute"));
     const writesBefore = writeCount();
 
@@ -319,7 +293,7 @@ describe("dependency-ordered feature recomputation", () => {
       faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
     })).shape;
     document.shapes = [original];
-    const treated = await persistAllEdgeFillet(engine, store, "recompute", original.id, 0.2);
+    const treated = await persistAllEdgeFillet(engine, "recompute", original.id, 0.2);
     document.shapes = [{
       ...treated,
       faceDraft: drafted.faceDraft,
@@ -819,7 +793,7 @@ describe("dependency-ordered feature recomputation", () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);
     const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Treated sweep", profile: profile() }]));
-    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id);
+    const source = await persistAllEdgeFillet(engine, "recompute", created.shapes[0]!.id);
     const writesBeforeEdit = writeCount();
     const changedProfile = profile(1.5);
 
@@ -851,7 +825,7 @@ describe("dependency-ordered feature recomputation", () => {
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);
     const created = value(await engine.addShapes("recompute", [{ kind: "sketchSweep", name: "Chamfered sweep", profile: profile() }]));
-    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id);
+    const source = await persistAllEdgeChamfer(engine, "recompute", created.shapes[0]!.id);
     const writesBeforeEdit = writeCount();
     const changedProfile = profile(1.5);
 
@@ -872,7 +846,7 @@ describe("dependency-ordered feature recomputation", () => {
     const created = value(await engine.addShapes("recompute", [{
       kind: "revolve", name: "Treated revolve", profile: [[1, -2], [2, -2], [2, 2], [1, 2]], sides: 8,
     }]));
-    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id, 0.01);
+    const source = await persistAllEdgeFillet(engine, "recompute", created.shapes[0]!.id, 0.01);
     const writesBeforeEdit = writeCount();
     const changedProfile = {
       ...source.sketchProfile!,
@@ -892,6 +866,9 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.elevation).toBeCloseTo(source.elevation ?? 0);
     expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.01, allEdges: true });
     expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
+    // The faceted revolve is all planes; blend faces mean the fillet was replayed.
+    const surfaces = new Set((await shapeFaces(updated)).map((face) => face.surfaceType));
+    expect([...surfaces].some((surface) => surface !== "plane")).toBe(true);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
   }, CAD_TEST_TIMEOUT_MS);
 
@@ -901,7 +878,7 @@ describe("dependency-ordered feature recomputation", () => {
     const created = value(await engine.addShapes("recompute", [{
       kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
     }]));
-    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const source = await persistAllEdgeChamfer(engine, "recompute", created.shapes[0]!.id, 0.1);
     const writesBeforeEdit = writeCount();
     const changedProfile = {
       ...source.sketchProfile!,
@@ -944,7 +921,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(source.sketchOperation).toBe("revolve");
     expect(source.sketchRevolve?.sweepAngle).toBe(360);
     expect(sketchProfileToRevolvePolygons(source.sketchProfile!, source.sketchRevolve)).toHaveLength(2);
-    const treated = await persistAllEdgeChamfer(engine, store, "recompute", source.id, 0.05);
+    const treated = await persistAllEdgeChamfer(engine, "recompute", source.id, 0.05);
     const writesBeforeEdit = writeCount();
     const changedProfile = {
       ...treated.sketchProfile!,
@@ -969,7 +946,7 @@ describe("dependency-ordered feature recomputation", () => {
     const created = value(await engine.addShapes("recompute", [{
       kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
     }]));
-    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const source = await persistAllEdgeChamfer(engine, "recompute", created.shapes[0]!.id, 0.1);
     const beforeEdit = value(await engine.project("recompute")).shapes;
     const writesBeforeEdit = writeCount();
 
@@ -992,7 +969,7 @@ describe("dependency-ordered feature recomputation", () => {
     const created = value(await engine.addShapes("recompute", [{
       kind: "revolve", name: "Chamfered revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
     }]));
-    const source = await persistAllEdgeChamfer(engine, store, "recompute", created.shapes[0]!.id, 0.1);
+    const source = await persistAllEdgeChamfer(engine, "recompute", created.shapes[0]!.id, 0.1);
     const beforeEdit = value(await engine.project("recompute")).shapes;
     const writesBeforeEdit = writeCount();
     const addedPoints = [
@@ -1025,7 +1002,7 @@ describe("dependency-ordered feature recomputation", () => {
     const created = value(await engine.addShapes("recompute", [{
       kind: "revolve", name: "Treated revolve", profile: [[1, -2], [2, -2], [2, 2], [1, 2]], sides: 8,
     }]));
-    const source = await persistAllEdgeFillet(engine, store, "recompute", created.shapes[0]!.id, 0.01);
+    const source = await persistAllEdgeFillet(engine, "recompute", created.shapes[0]!.id, 0.01);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 10 });
@@ -1217,11 +1194,7 @@ describe("dependency-ordered feature recomputation", () => {
     document!.shapes[0] = source;
     const treated = value(await engine.treat("recompute", created.id, { kind: "fillet", amount: 0.2 })).shape;
     const feature = { kind: "fillet" as const, amount: 0.2, edgeCount: 12, allEdges: true as const };
-    document!.shapes[0] = {
-      ...treated,
-      edgeTreatments: [feature],
-      edgeTreatmentHistory: [{ id: "all-edge-fillet", createdAt: 1, feature, before: source }],
-    };
+    expect(treated.edgeTreatments).toEqual([feature]);
     const writesBeforeEdit = writeCount();
     const changedProfile = extrusionProfile(2);
     const rawRebuild = await sketchExtrusionShapeFromRequest({
@@ -1264,11 +1237,7 @@ describe("dependency-ordered feature recomputation", () => {
     document!.shapes[0] = source;
     const treated = value(await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.2 })).shape;
     const feature = { kind: "chamfer" as const, amount: 0.2, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
-    document!.shapes[0] = {
-      ...treated,
-      edgeTreatments: [feature],
-      edgeTreatmentHistory: [{ id: "all-edge-chamfer", createdAt: 1, feature, before: source }],
-    };
+    expect(treated.edgeTreatments).toEqual([feature]);
     const writesBeforeEdit = writeCount();
     const changedProfile = extrusionProfile(2);
     const rawRebuild = await sketchExtrusionShapeFromRequest({
@@ -1308,14 +1277,7 @@ describe("dependency-ordered feature recomputation", () => {
       cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
     };
     document!.shapes[0] = source;
-    const treated = value(await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.2 })).shape;
-    const feature = { kind: "chamfer" as const, amount: 0.2, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
-    const persisted = {
-      ...treated,
-      edgeTreatments: [feature],
-      edgeTreatmentHistory: [{ id: "all-edge-chamfer", createdAt: 1, feature, before: source }],
-    };
-    document!.shapes[0] = persisted;
+    const persisted = value(await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.2 })).shape;
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: extrusionProfile(0.05) });
@@ -1373,7 +1335,7 @@ describe("dependency-ordered feature recomputation", () => {
     });
     document.shapes = [source];
     const drafted = value(await engine.draftPrism("recompute", source.id, 5)).shape;
-    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
+    const persisted = await persistAllEdgeFillet(engine, "recompute", drafted.id, 0.2);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sketchProfile: extrusionProfile(0.1) });
@@ -1392,7 +1354,7 @@ describe("dependency-ordered feature recomputation", () => {
     });
     document.shapes = [original];
     const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
-    const persisted = await persistAllEdgeFillet(engine, store, "recompute", drafted.id, 0.2);
+    const persisted = await persistAllEdgeFillet(engine, "recompute", drafted.id, 0.2);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { sketchProfile: extrusionProfile(2) });
@@ -1419,7 +1381,7 @@ describe("dependency-ordered feature recomputation", () => {
     });
     document.shapes = [original];
     const drafted = value(await engine.draftPrism("recompute", original.id, 5)).shape;
-    const persisted = await persistAllEdgeChamfer(engine, store, "recompute", drafted.id, 0.1);
+    const persisted = await persistAllEdgeChamfer(engine, "recompute", drafted.id, 0.1);
     const writesBefore = writeCount();
 
     const changed = await engine.changeShape("recompute", persisted.sketchSourceId!, { sketchProfile: extrusionProfile(2) });

@@ -391,6 +391,11 @@ export type WorkplaneShape = {
   faceDraftSourceScale?: { width: number; depth: number; height: number };
   edgeTreatments?: EdgeTreatmentFeature[];
   edgeTreatmentHistory?: EdgeTreatmentHistoryEntry[];
+  /**
+   * A shell baked into `cadBrep`. Nothing can replay it, so a rebuild from the
+   * source sketch is refused rather than returning the solid body.
+   */
+  shell?: { thickness: number; openFaces?: Array<number | string> };
   cadDisplayEdges?: CadDisplayEdge[];
   cadDisplayEdgesVersion?: 2;
   edgeResizeMode?: "scale" | "preserve";

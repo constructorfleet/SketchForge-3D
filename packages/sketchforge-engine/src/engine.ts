@@ -81,7 +81,12 @@ import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
 import { sketchExtrusionShapeFromRequest } from "./sketchExtrusionRequest.js";
-import { findSketchOutput, recomputeSketchOutput, replaySingleAllEdgeTreatment } from "./parametricRecompute.js";
+import {
+  edgeTreatmentAppliedFrame,
+  findSketchOutput,
+  recomputeSketchOutput,
+  replaySingleAllEdgeTreatment,
+} from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
 import {
   REQUESTABLE_SHAPE_KINDS,
@@ -98,7 +103,7 @@ import {
   withHoleMode,
 } from "./workplaneShapes.js";
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
-import type { ProjectAsset, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
+import type { EdgeTreatmentFeature, ProjectAsset, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
 
 const UNIQUE_CURVED_FACE_SURFACES = new Set(["cone", "sphere", "torus", "cylinder"]);
 const FACE_DRAFT_AXES = new Set(["x", "y", "z", "-x", "-y", "-z"]);
@@ -862,6 +867,14 @@ export function createEngine(store: ProjectStore): Engine {
       const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
       const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
       const isSketchRevolve = isRevolveShape(existing);
+      const rebuildsFromSource = replacingSketchProfile || faceDraftChanged || changes.draftPrismAngle !== undefined
+        || (isSketchRevolve && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined));
+      if (existing.shell && rebuildsFromSource) {
+        return failed({
+          reason: "sweep_failed",
+          message: "This shape was shelled, and a rebuild from its source cannot replay a shell, so the edit would lose it",
+        });
+      }
       if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
         return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
       }
@@ -1628,26 +1641,33 @@ export function createEngine(store: ProjectStore): Engine {
         : "edge-treatment",
       async (shape) => {
         const treated = shapeWithCadResult(shape, await applyEdgeTreatment(shape, treatment));
-        if (shape.draftPrismAngle === undefined && shape.faceDraft === undefined) return treated;
-
-        const feature = {
+        // Every treatment is recorded, as the editor records its own. A source
+        // edit rebuilds the solid from the sketch and replays this record; with
+        // no record it rebuilt a bare solid and silently dropped the treatment.
+        // A selected-edge or non-45-degree chamfer record cannot be replayed,
+        // so a later source edit is refused rather than lossy.
+        const allEdges = treatment.edges === undefined || treatment.edges.length === 0;
+        const feature: EdgeTreatmentFeature = {
           kind: treatment.kind,
           amount: treatment.amount,
-          edgeCount: await allEdgeTreatmentEdgeCount(shape, treatment.kind),
-          allEdges: true as const,
+          edgeCount: allEdges ? await allEdgeTreatmentEdgeCount(shape, treatment.kind) : treatment.edges!.length,
+          ...(allEdges ? { allEdges: true as const } : {}),
           ...(treatment.kind === "chamfer" ? { chamferAngle: treatment.angle ?? 45 } : {}),
         };
-        const history = shape.edgeTreatmentHistory ?? [];
+        // The snapshot drops its own history, as the editor's does, so each
+        // treatment does not nest a copy of every earlier one.
+        const { edgeTreatmentHistory: _ownHistory, ...before } = shape;
         return {
           ...treated,
           edgeTreatments: [...(shape.edgeTreatments ?? []), feature],
           edgeTreatmentHistory: [
-            ...history,
+            ...(shape.edgeTreatmentHistory ?? []),
             {
               id: createLocalId("edge-history"),
               createdAt: Date.now(),
               feature,
-              before: structuredClone(shape),
+              before: structuredClone(before),
+              appliedFrame: edgeTreatmentAppliedFrame(treated),
             },
           ],
         };
@@ -1690,8 +1710,14 @@ export function createEngine(store: ProjectStore): Engine {
       });
     }),
 
-    shell: (projectId, shapeId, request) => cadTreatment(projectId, shapeId, "shell", async (shape) => (
-      shapeWithCadResult(shape, await applyShell(shape, request))
-    )),
+    shell: (projectId, shapeId, request) => cadTreatment(projectId, shapeId, "shell", async (shape) => ({
+      ...shapeWithCadResult(shape, await applyShell(shape, request)),
+      // Recorded so a rebuild from the source sketch, which cannot replay a
+      // shell, is refused instead of returning a solid body.
+      shell: {
+        thickness: request.thickness,
+        ...(request.openFaces?.length ? { openFaces: [...request.openFaces] } : {}),
+      },
+    })),
   };
 }
