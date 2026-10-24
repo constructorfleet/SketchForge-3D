@@ -27,6 +27,12 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#338: Enforce request body size limits on REST routes](https://github.com/constructorfleet/SketchForge-3D/issues/338) — P2, open.
 
+## Editor parity with the engine and API
+
+Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
+
+- [#379: Shell and tray (hollow) operation in the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/379) — P2, implemented with browser coverage; in review.
+
 ## Geometry placement
 
 - [#424: Keep server treatments in place on tilted shapes](https://github.com/constructorfleet/SketchForge-3D/issues/424) — P2, open.

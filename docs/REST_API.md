@@ -350,6 +350,8 @@ Stacking treatments works, but OCCT will refuse a second one on edges immediatel
 
 A solid box printed at 20mm cube costs four times the filament of the same box with a 2mm wall, and the same box with its top face left open is a tray. This is the one operation a printed part wants most often, and `POST /shell` is it: OCCT offsets every face inwards by the thickness you give and takes the result away from the original, leaving a wall.
 
+The editor does the same from the **Shell** card in the shape inspector, with the same code and the same refusals; see the [shells and trays guide](guides/shells-and-trays.md).
+
 | Method | Path | Does |
 | --- | --- | --- |
 | `GET` | `/faces?projectId=&shapeId=` | The shape's faces: index, area, surface type, centroid, outward normal, direction. |
