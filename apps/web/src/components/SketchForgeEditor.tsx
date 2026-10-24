@@ -120,7 +120,8 @@ import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeome
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
 import { canUsePrimitiveSolid, isAxisAlignedBoxCutter } from "@/lib/engine/booleanPrimitives";
 import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/engine/cutterPadding";
-import { exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/engine/exactBooleanParts";
+import { exactBooleanPlacement, exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/engine/exactBooleanParts";
+import { faceEditingCanBeEnabled } from "@/lib/shapeFaces";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
 import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
@@ -7661,7 +7662,7 @@ export function SketchForgeEditor({
     const fingerprint = projectShapesFingerprint([source]);
     const sourceProjectId = projectInfoRef.current.projectId;
     invalidateCadModifierSession();
-    setNotice(notice((translate) => translate("panels.inspector.draftFace.applying")));
+    setNotice(notice((translate) => translate("panels.inspector.faces.drafting")));
     try {
       const response = await postCadModifierRequestAsync({ type: "draft-face", ...request }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
       if (response.type === "error") {
@@ -7678,7 +7679,42 @@ export function SketchForgeEditor({
       commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? {
         ...drafted,
         ...faceMetadata,
-      } : shape), [source.id], notice((translate) => translate("panels.inspector.draftFace.applied")));
+      } : shape), [source.id], notice((translate) => translate("panels.inspector.faces.drafted")));
+    } catch (error) {
+      setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
+    }
+  }, [commitShapes, invalidateCadModifierSession, postCadModifierRequestAsync, selectedShape, selectedShapes.length, t]);
+
+  // Rebuild a primitive as an exact solid in place, so it has B-rep faces to
+  // colour and draft. Undoable like any other edit; the result is the same kind
+  // of exact mesh shape a fillet leaves.
+  const enableFaceEditingOnSelection = useCallback(async () => {
+    const source = selectedShape;
+    if (!source || source.locked || selectedShapes.length !== 1 || !faceEditingCanBeEnabled(source)) return;
+    const fingerprint = projectShapesFingerprint([source]);
+    const sourceProjectId = projectInfoRef.current.projectId;
+    invalidateCadModifierSession();
+    setNotice(notice((translate) => translate("panels.inspector.faces.enabling")));
+    try {
+      const response = await postCadModifierRequestAsync({
+        type: "exact",
+        parts: [{ exact: { shape: source, transform: exactBooleanPlacement(source) }, hole: false }],
+      }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      if (response.type !== "exact") throw new Error("The CAD worker did not return an exact solid");
+      const current = shapesRef.current.find((shape) => shape.id === source.id);
+      if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) {
+        // The shape changed while the kernel worked; leave it, and say so rather than "Preparing faces…".
+        setNotice(notice((translate) => translate("panels.inspector.faces.enableSuperseded")));
+        return;
+      }
+      const exact = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
+      const faceMetadata = draftFaceResultMetadata(source.id, response.faceCount);
+      if (!exact || !faceMetadata) throw new Error("The CAD kernel returned an empty solid");
+      commitShapes(
+        shapesRef.current.map((shape) => shape.id === source.id ? { ...exact, ...faceMetadata } : shape),
+        selectedIdsRef.current,
+        notice((translate) => translate("panels.inspector.faces.enabled")),
+      );
     } catch (error) {
       setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
     }
@@ -9965,6 +10001,7 @@ export function SketchForgeEditor({
           onEditSketch={beginSketchEdit}
           onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
           onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
+          onEnableFaceEditing={selectedShapes.length === 1 && selectedShape && faceEditingCanBeEnabled(selectedShape) ? enableFaceEditingOnSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
           selectedShapeVolumeMm3={selectedShapeVolumeMm3}
           onSeparateParts={separateSelectedParts}

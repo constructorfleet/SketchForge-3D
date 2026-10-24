@@ -1012,13 +1012,40 @@
       },
       "gearType": "Gear Type",
       "placement": "Placement",
-      "faceColors": {
-        "title": "Face colors",
-        "hint": "Choose a CAD face index to assign a color. Colors are stored by stable face ID and preview on B-rep shapes and STEP imports, and are included in 3MF export. GET /faces returns stable IDs for API color updates.",
-        "index": "CAD face index",
-        "add": "Add face color",
-        "remove": "Remove color for face {index}",
-        "empty": "No face colors assigned."
+      "faces": {
+        "title": "Faces",
+        "enableHint": "Color individual faces, or tilt one with a draft. This first rebuilds the shape as exact solid geometry. Its size stays editable, but settings that belong to this shape type, such as the number of sides, become fixed.",
+        "enable": "Enable face editing",
+        "enabling": "Preparing faces…",
+        "enabled": "Face editing enabled. Choose a face to color or draft.",
+        "enableSuperseded": "The shape changed before its faces were ready. Enable face editing again.",
+        "face": "Face",
+        "of": "of {count}",
+        "previous": "Previous face",
+        "next": "Next face",
+        "highlightHint": "While the pointer is over this panel, the chosen face is highlighted in the view, or shown in its color if it has one.",
+        "colorFor": "Color for face {face}",
+        "chooseColor": "Choose a color",
+        "clearColor": "Clear",
+        "coloredFaces": "Colored faces",
+        "faceNumber": "Face {face}",
+        "remove": "Remove color from face {face}",
+        "noColors": "No faces colored yet.",
+        "draftTitle": "Draft",
+        "draftHint": "Tilts the chosen face by the angle, as if the part were pulled out of a mold in the chosen direction. Not every face can be drafted in every direction. Drafting rebuilds the faces, so it clears their colors.",
+        "direction": {
+          "label": "Direction",
+          "x": "+X",
+          "negX": "−X",
+          "y": "Up (+Y)",
+          "negY": "Down (−Y)",
+          "z": "+Z",
+          "negZ": "−Z"
+        },
+        "angle": "Draft angle",
+        "applyDraft": "Apply draft",
+        "drafting": "Drafting face…",
+        "drafted": "Face drafted."
       },
       "draftPrism": {
         "title": "Draft prism",
@@ -1027,16 +1054,6 @@
         "apply": "Apply draft",
         "applying": "Applying draft…",
         "applied": "Draft applied. The shape is now baked geometry."
-      },
-      "draftFace": {
-        "title": "Draft face",
-        "hint": "Taper one face of exact B-rep geometry. Choose a pull axis in the shape's local CAD coordinate frame. Incompatible face, axis, or angle combinations are rejected by the kernel.",
-        "index": "CAD face index",
-        "axis": "Local CAD pull axis",
-        "angle": "Draft angle",
-        "apply": "Apply face draft",
-        "applying": "Applying face draft…",
-        "applied": "Face draft applied. The result is baked geometry."
       }
     },
     "appearance": {
@@ -1369,9 +1386,9 @@
       "notPrepared": "Prepare an object before previewing the modifier",
       "noEdgesSelected": "Select at least one highlighted edge",
       "invalidResult": "The chosen size creates invalid or overlapping edge geometry",
-      "draftFaceInvalid": "The face draft could not produce a valid solid. Check the face index and draft angle.",
-      "draftFaceNotFound": "The selected face is no longer available on this solid. Choose another face index.",
-      "draftFaceIncompatible": "The selected face cannot be drafted along that local CAD axis at this angle. Try another axis, face, or angle.",
+      "draftFaceInvalid": "The draft could not produce a valid solid. Try a smaller angle or another face.",
+      "draftFaceNotFound": "That face no longer exists on this shape. Choose another face.",
+      "draftFaceIncompatible": "This face cannot be drafted in that direction. Try another direction, face, or angle.",
       "filletTooLarge": "The selected edges cannot be filleted together at this size. Reduce the size or select fewer connected edges.",
       "chamferTooLarge": "The selected edges cannot be chamfered together at this size. Reduce the size or select fewer connected edges.",
       "edgeTreatmentFailed": "The CAD kernel could not complete this edge treatment",

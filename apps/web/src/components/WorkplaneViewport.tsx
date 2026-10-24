@@ -21,6 +21,7 @@ import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettings
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/engine/cadBakeMetadata";
+import { withFaceHighlight } from "@/lib/shapeFaces";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
@@ -233,6 +234,7 @@ type WorkplaneViewportProps = {
   onEditSketch?: () => void;
   onApplyDraftPrism?: (angle: number) => Promise<void> | void;
   onApplyDraftFace?: (faceIndex: number, angle: number, pullDirection: "x" | "y" | "z" | "-x" | "-y" | "-z") => Promise<void> | void;
+  onEnableFaceEditing?: () => Promise<void> | void;
   canSeparateParts?: boolean;
   onSeparateParts?: () => void;
   /** Solid volume of the selected shape, for the inspector's material readout. */
@@ -302,6 +304,8 @@ type ShapeRenderRecord = {
 };
 
 type ThreeState = {
+  /** The face the inspector's face tools are pointing at; painted for display only. */
+  faceHighlight?: { shapeId: string; faceIndex: number } | null;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -2419,6 +2423,7 @@ export function WorkplaneViewport({
   onEditSketch,
   onApplyDraftPrism,
   onApplyDraftFace,
+  onEnableFaceEditing,
   canSeparateParts = false,
   onSeparateParts,
   selectedShapeVolumeMm3,
@@ -2553,6 +2558,25 @@ export function WorkplaneViewport({
     ),
     [],
   );
+
+  const highlightFace = useCallback((faceIndex: number | null) => {
+    const state = threeRef.current;
+    if (!state) return;
+    const shapeId = selectedIdsRef.current.length === 1 ? selectedIdsRef.current[0] : undefined;
+    const next = shapeId && faceIndex !== null ? { shapeId, faceIndex } : null;
+    const current = state.faceHighlight ?? null;
+    if (current?.shapeId === next?.shapeId && current?.faceIndex === next?.faceIndex) return;
+    state.faceHighlight = next;
+    rebuildShapes(
+      state,
+      shapesRef.current,
+      renderSelectionIds(),
+      shouldBuildCutPreviews(transformRef.current, dragRef.current),
+      modifierActiveRef.current,
+      placementWorkplaneRef.current,
+    );
+    state.needsRender = true;
+  }, [renderSelectionIds]);
 
   useEffect(() => {
     modifierEdgesRef.current = modifierEdges;
@@ -5648,6 +5672,8 @@ export function WorkplaneViewport({
             onEditSketch={selectedShape.sketchProfile ? onEditSketch : undefined}
             onApplyDraftPrism={onApplyDraftPrism}
             onApplyDraftFace={onApplyDraftFace}
+            onEnableFaceEditing={onEnableFaceEditing}
+            onHighlightFace={highlightFace}
             canSeparateParts={canSeparateParts}
             onSeparateParts={onSeparateParts}
             volumeMm3={selectedShapeVolumeMm3}
@@ -6698,7 +6724,7 @@ function syncShapeObjectAppearance(object: THREE.Group, shape: WorkplaneShape, s
 
 function rebuildShapes(
   state: ThreeState | null,
-  shapes: WorkplaneShape[],
+  projectShapes: WorkplaneShape[],
   selectedIds: string[],
   showCutPreviews = true,
   useOfficialModifierRendering = false,
@@ -6707,6 +6733,10 @@ function rebuildShapes(
   if (!state) {
     return;
   }
+  const highlight = state.faceHighlight;
+  const shapes = highlight
+    ? projectShapes.map((shape) => shape.id === highlight.shapeId ? withFaceHighlight(shape, highlight.faceIndex) : shape)
+    : projectShapes;
 
   clearCutPreviewOverlays(state);
   const selected = new Set(selectedIds);

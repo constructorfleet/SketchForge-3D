@@ -48,12 +48,16 @@ test("face drafting guide links a supported editor workflow to browser acceptanc
     readFile(faceDraftBrowserTest, "utf8"),
   ]);
 
-  assert.match(guideText, /Draft face/);
+  assert.match(guideText, /\*\*Faces\*\*/);
+  assert.match(guideText, /Enable face editing/);
   assert.match(guideText, /face-draft-browser\.png/);
+  assert.match(guideText, /face-tools\.png/);
   assert.match(guideText, /face-drafting\.test\.mjs/);
-  assert.match(browserTestText, /getByRole\("region", \{ name: "Draft face" \}\)/);
-  assert.match(browserTestText, /Apply face draft/);
-  assert.match(browserTestText, /Face draft applied/);
+  assert.match(guideText, /face-tools\.test\.mjs/);
+  assert.doesNotMatch(guideText, /CAD face index/);
+  assert.match(browserTestText, /getByRole\("region", \{ name: "Faces" \}\)/);
+  assert.match(browserTestText, /Apply draft/);
+  assert.match(browserTestText, /Face drafted\./);
   assert.match(browserTestText, /face-draft-browser\.png/);
 });
 

@@ -57,15 +57,16 @@ test("a user can draft a supported face from the shape inspector", { timeout: 12
     await page.getByRole("button", { name: "Finish sketch" }).click();
     await page.getByText("Sketch extrusion").first().waitFor({ state: "visible", timeout: 30_000 });
 
-    const draftPanel = page.getByRole("region", { name: "Draft face" });
-    await draftPanel.waitFor({ state: "visible", timeout: 30_000 });
-    await draftPanel.getByLabel("CAD face index").fill("1");
-    await draftPanel.getByLabel("Local CAD pull axis").selectOption("z");
+    const faces = page.getByRole("region", { name: "Faces" });
+    await faces.waitFor({ state: "visible", timeout: 30_000 });
+    await faces.getByRole("spinbutton", { name: "Face" }).fill("2");
+    const draftPanel = faces.getByRole("group", { name: "Draft" });
+    await draftPanel.getByLabel("Direction").selectOption("z");
     await draftPanel.getByLabel("Draft angle").fill("-5");
-    const apply = draftPanel.getByRole("button", { name: "Apply face draft" });
+    const apply = draftPanel.getByRole("button", { name: "Apply draft" });
     assert.equal(await apply.isDisabled(), false, "the measured face, axis, and angle should be available");
     await apply.click();
-    await page.getByRole("status").getByText("Face draft applied. The result is baked geometry.", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByRole("status").getByText("Face drafted.", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
     await page.screenshot({ path: "docs/screenshots/face-draft-browser.png" });
   } finally {
     await browser?.close();
