@@ -11,6 +11,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- README now has a dedicated installation overview for the browser app, desktop releases, Docker, source checkouts, and static exports. The documentation site's top bar groups guides and references into dropdowns and links directly to installation.
 - The local MCP now exposes `sketchforge_import_stl`, which imports an STL file from the MCP host filesystem into a chosen local project.
 - Retained face drafts on straight-line, single-region, no-hole sketch extrusion
   side faces now follow the same sketch segment through source-profile edits,

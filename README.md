@@ -19,7 +19,7 @@
     <a href="https://github.com/constructorfleet/SketchForge-3D/stargazers"><img alt="Star SketchForge on GitHub" src="https://img.shields.io/github/stars/constructorfleet/SketchForge-3D?style=flat&logo=github"></a>
     <a href="https://github.com/sponsors/Formsmith746"><img alt="Sponsor SketchForge on GitHub" src="https://img.shields.io/badge/GitHub-Sponsor-ea4aaa?logo=githubsponsors&logoColor=white"></a>
     <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20account-0ea5e9">
-    <img alt="Version v1.0.9" src="https://img.shields.io/badge/version-v1.0.9-2563eb">
+    <img alt="Latest release version" src="https://img.shields.io/github/v/release/constructorfleet/SketchForge-3D?label=version">
   </p>
 </div>
 
@@ -56,16 +56,21 @@ Press **O** in the editor to switch between perspective and orthographic project
 
 ![SketchForge projects dashboard](https://sketchforge3d.com/assets/landing/project-dashboard.png)
 
-## Getting Started
+## Installation
 
-There are two common ways to run SketchForge. If you are not sure which one to choose, use Docker.
+Choose an installation based on how you want to use SketchForge. The browser app and desktop releases are for designing; Docker is useful when you want to host the app for a classroom or local network. You do not need an account for any of these options.
 
 | Path | Best for | Difficulty |
 | --- | --- | --- |
-| Docker / FabLab server | Teachers, classrooms, shared computers, local network hosting | Recommended |
-| Local development | Developers who want to edit the code | Medium |
+| [Browser app](https://sketchforge3d.com/) | Trying SketchForge without installing anything | Easiest |
+| [Desktop releases](#linux-desktop-release) | Offline use on Linux or macOS | Easy |
+| [Docker](#docker--fablab-server-recommended) | Classrooms, shared computers, or local network hosting | Recommended for hosting |
+| [Run from source](#local-development) | Developers who want to change the code | Requires Node.js |
+| [Static export](#static-export) | Hosting the browser app on static web hosting | Advanced |
 
-SketchForge is local-first in both modes. The app files may be served from a computer or server, but projects stay in each user's browser storage. STL and OBJ exports download through the user's browser. SketchForge does not upload models to a SketchForge cloud service.
+SketchForge is local-first across these options. The app files may be served from a computer or server, but private projects stay in each user's browser storage unless an operator configures server-side project storage. STL and OBJ exports download through the user's browser. SketchForge does not upload models to a SketchForge cloud service.
+
+The browser app requires no installation. For desktop use, download the release for your operating system. For a self-hosted installation, Docker Compose builds SketchForge locally; the prebuilt GHCR image avoids the build step. Desktop and Docker setup details follow below.
 
 ## Linux Desktop Release
 
@@ -427,6 +432,10 @@ Build a static export:
 ```bash
 npm run export
 ```
+
+### Static Export
+
+`npm run export` creates a static build for a web server or static hosting provider. This option is intended for operators comfortable building and deploying the repository. Static exports do not support server-side project storage or the REST API; use Docker or another server deployment for those features. See the [deployment guide](docs/guides/deployment.md) for hosting details.
 
 ## Contributing
 
