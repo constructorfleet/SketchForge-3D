@@ -164,7 +164,8 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await page.mouse.move(facePoint.x, facePoint.y, { steps: 4 });
     await page.waitForTimeout(300);
     const hovered = await highlightPixels(await modelView());
-    assert.ok(hovered > unhighlighted + 1_000, `hovering a face of the selected shape must highlight it (${unhighlighted} before, ${hovered} hovering)`);
+    assert.ok(hovered > unhighlighted + 40, `hovering adds a 3px face outline (${unhighlighted} before, ${hovered} hovering)`);
+    assert.equal(await highlightAt(await modelView(), region.x, region.y), false, "hover must not fill the face interior");
     const placement = () => page.locator('[id^="placement-"] input').evaluateAll((inputs) => inputs.map((input) => input.value));
     const placementBefore = await placement();
     assert.ok(placementBefore.length > 0, "the placement fields must be readable");
@@ -244,7 +245,7 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     // The hover highlight goes when the camera moves under a still pointer.
     await page.mouse.move(facePoint.x + 1, facePoint.y + 1);
     await page.waitForTimeout(300);
-    assert.ok(await highlightAt(await modelView(), region.x, region.y), "the hovered face must be highlighted");
+    assert.equal(await highlightAt(await modelView(), region.x, region.y), false, "the face interior stays unfilled during hover");
     const highlightedBeforeCameraMove = await highlightPixels(await modelView());
     await page.mouse.wheel(0, 240);
     await page.waitForTimeout(600);

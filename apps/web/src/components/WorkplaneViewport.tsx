@@ -25,7 +25,7 @@ import { FACE_HIGHLIGHT_COLOR } from "@/lib/shapeFaces";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
-import { createFaceColorPreviewGeometry, createFaceHighlightGeometry, faceAtTriangle, faceTrianglePositions } from "@/lib/faceColorPreview";
+import { createFaceColorPreviewGeometry, createFaceHighlightGeometry, faceAtTriangle } from "@/lib/faceColorPreview";
 import { FACE_PICK_CLICK_TOLERANCE_PX, isFacePickClick } from "@/lib/facePicking";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { resolveShapeAppearance } from "@/lib/shapeAppearance";
@@ -310,11 +310,11 @@ type FaceHighlight = { shapeId: string; faceIndex: number };
 type FaceHit = FaceHighlight & { surface: THREE.Mesh };
 
 /**
- * The face under the pointer, drawn as its own mesh over the shape's surface.
+ * The face under the pointer, outlined as a 3px line over the shape's surface.
  * It is a child of that surface, so it moves with it, and the shape's own
  * geometry and colours are never touched: hovering rebuilds nothing.
  */
-type FaceHover = FaceHit & { overlay: THREE.Mesh; cameraMatrix: THREE.Matrix4; cameraProjection: THREE.Matrix4 };
+type FaceHover = FaceHit & { overlay: LineSegments2; cameraMatrix: THREE.Matrix4; cameraProjection: THREE.Matrix4 };
 
 type ThreeState = {
   /** Face being edited stays outlined; faceHover is the transient viewport pointer cue. */
@@ -6867,27 +6867,46 @@ function clearFaceHover(state: ThreeState | null) {
   return true;
 }
 
-/** Draw the hovered face over its surface, unless that exact face is already drawn there. */
+/** Draw only the hovered face's 3px boundary, unless that face is already outlined there. */
 function showFaceHover(state: ThreeState, hit: FaceHit, faceGroups: readonly number[]) {
   const current = state.faceHover;
   if (current && current.surface === hit.surface && current.faceIndex === hit.faceIndex && current.overlay.parent === hit.surface) return;
   clearFaceHover(state);
-  const positions = faceTrianglePositions(hit.surface.geometry.getAttribute("position").array, faceGroups, hit.faceIndex);
-  if (!positions.length) return;
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const overlay = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+  const position = hit.surface.geometry.getAttribute("position");
+  const normal = hit.surface.geometry.getAttribute("normal");
+  const boundary = createFaceHighlightGeometry({
+    positions: position.array,
+    normals: normal?.array,
+    faceGroups,
+  }, hit.faceIndex);
+  const boundaryPositions = boundary.getAttribute("position");
+  if (!boundaryPositions?.count) {
+    boundary.dispose();
+    return;
+  }
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions(Array.from(boundaryPositions.array));
+  boundary.dispose();
+  const viewport = state.renderer.domElement.getBoundingClientRect();
+  const material = new LineMaterial({
     color: FACE_HIGHLIGHT_COLOR,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  }));
+    linewidth: 3,
+    worldUnits: false,
+    depthTest: true,
+    depthWrite: false,
+    alphaToCoverage: false,
+  });
+  material.toneMapped = false;
+  material.resolution.set(Math.max(1, viewport.width), Math.max(1, viewport.height));
+  const overlay = new LineSegments2(geometry, material);
   overlay.name = "face-hover-highlight";
   overlay.userData.shapeId = hit.shapeId;
+  overlay.userData.faceHoverHighlight = true;
   overlay.raycast = () => undefined;
   overlay.layers.mask = hit.surface.layers.mask;
   overlay.matrixAutoUpdate = false;
+  overlay.renderOrder = 1004;
+  overlay.frustumCulled = false;
   hit.surface.add(overlay);
   overlay.updateMatrixWorld(true);
   state.faceHover = {
