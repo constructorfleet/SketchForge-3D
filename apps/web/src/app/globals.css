@@ -6178,6 +6178,42 @@ html[data-theme="dark"] .editor-autosave-alert {
   box-shadow: 0 0 0 3px rgba(0, 156, 222, 0.14);
 }
 
+.shell-open-faces {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.shell-open-faces legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: #586a7d;
+  font-size: 15px;
+}
+
+.shell-open-sides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.shell-open-sides label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #31465d;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.shell-current {
+  color: #31465d;
+  font-weight: 600;
+}
+
 .gear-type-property {
   display: grid;
   gap: 8px;
@@ -8547,6 +8583,15 @@ html[data-theme="dark"] .face-draft {
 }
 
 html[data-theme="dark"] .face-draft-title {
+  color: #d8e6ef;
+}
+
+html[data-theme="dark"] .shell-open-faces legend {
+  color: #afc3d0;
+}
+
+html[data-theme="dark"] .shell-open-sides label,
+html[data-theme="dark"] .shell-current {
   color: #d8e6ef;
 }
 
