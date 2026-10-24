@@ -20,6 +20,7 @@ import { faceIdsFromEvolution } from "./faceLineage.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import {
   exactSolidForShape,
+  mirroredInShapeFrame,
   shapeIsTurned,
   unrotatedSolidForShape,
   UnbuildableShapeError,
@@ -229,11 +230,15 @@ export function localSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
  * straightened. `treatmentBakesRotation` is the other half of that bargain and
  * reads the same predicate.
  *
- * For stored geometry this is the local solid unchanged: the rotation stays on
- * the shape, which is where it already was.
+ * For stored geometry this is the local solid with only its mirror applied:
+ * the rotation stays on the shape, which is where it already was.
+ *
+ * Mirrored either way, because the result is stored with the shape's mirror
+ * flags cleared. Building it unmirrored handed back the unmirrored shape and
+ * reported success (#413).
  */
 export function orientedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
-  if (!rotationIsRebuilt(shape)) return localSolidForShape(cad, shape);
+  if (!rotationIsRebuilt(shape)) return mirroredStoredSolid(cad, localSolidForShape(cad, shape), shape);
 
   try {
     return exactSolidForShape(cad, shape);
@@ -241,6 +246,25 @@ export function orientedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
     if (error instanceof UnbuildableShapeError) throw new ServerCadError(error.message);
     throw error;
   }
+}
+
+/**
+ * A solid stored on the shape -- its BREP, its mesh, or a revolve rebuilt from
+ * its profile -- with the shape's mirror flags applied about its own centre.
+ *
+ * The bounds centre rather than the origin, because stored geometry is not
+ * always in the builders' frame (an earlier treatment's BREP keeps whatever
+ * frame it was made in); the viewport mirrors the normalized mesh about its
+ * centre, and a plane through any other point would only move the result.
+ */
+function mirroredStoredSolid(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape) {
+  if (!shape.mirrorX && !shape.mirrorY && !shape.mirrorZ) return solid;
+  const bounds = cad.getBoundingBox(solid, false);
+  return mirroredInShapeFrame(cad, solid, shape, {
+    x: (bounds.xmin + bounds.xmax) / 2,
+    y: (bounds.ymin + bounds.ymax) / 2,
+    z: (bounds.zmin + bounds.zmax) / 2,
+  });
 }
 
 /** How many faces of the solid meet along this edge. A seam reports one. */
@@ -326,9 +350,7 @@ export function applyBakedMirror(shape: WorkplaneShape, axis: "x" | "y" | "z", p
     }
 
     const centerY = shape.height / 2;
-    if (shape.mirrorX) solid = cad.mirror(solid, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 });
-    if (shape.mirrorY) solid = cad.mirror(solid, { x: 0, y: centerY, z: 0 }, { x: 0, y: 1, z: 0 });
-    if (shape.mirrorZ) solid = cad.mirror(solid, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+    solid = mirroredInShapeFrame(cad, solid, shape, { x: 0, y: centerY, z: 0 });
 
     const center = { x: 0, y: centerY, z: 0 };
     const angle = (degrees: number) => degrees * Math.PI / 180;
@@ -551,11 +573,13 @@ function exactRevolveSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
  * the treatment. For an untreated revolve that is the exact solid rebuilt from
  * its profile (#347); a revolve with no exact solid is refused rather than
  * listed or treated by its facets. Everything else is the oriented solid.
+ * Both carry the shape's mirror, which the treated result no longer does.
  */
 export function edgeSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   const refusal = revolveWithoutExactEdges(shape);
   if (refusal) throw new ServerCadError(refusal);
-  return exactRevolveSolidForShape(cad, shape) ?? orientedSolidForShape(cad, shape);
+  const revolve = exactRevolveSolidForShape(cad, shape);
+  return revolve ? mirroredStoredSolid(cad, revolve, shape) : orientedSolidForShape(cad, shape);
 }
 
 /** Build the analytical full-turn BREP for chamfering a retained plain revolve. */
