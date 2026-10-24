@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { serverCadKernel, withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
-import { applyEdgeTreatment, applyBakedMirror, applyDraftPrism, cadResultIsValid, shapeEdges, shapeWithCadResult, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { applyEdgeTreatment, applyBakedMirror, applyDraftPrism, cadResultIsValid, shapeEdges, shapeWithCadResult, solidFromMeshPositions, ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
+import { worldMeshForShape } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 import { sceneShape } from "@constructorfleet/sketchforge-engine/shapeCatalog";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -121,6 +122,35 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(Math.min(...xs)).toBeCloseTo(-20, 1);
     expect(Math.max(...xs)).toBeCloseTo(20, 1);
     expect(Math.min(...ys)).toBeCloseTo(0, 5);
+  });
+
+  it.each([
+    ["pitch", { rotationX: 25 }],
+    ["roll", { rotationZ: -20 }],
+    ["pitch and yaw", { rotationX: 25, rotation: 35 }],
+  ])("keeps a %s treated shape at its original project-space center of mass", async (_label, rotation) => {
+    const source = shapeFromRequest({
+      kind: "wedge", width: 32, depth: 18, height: 26,
+      x: 15, z: -8, elevation: 4, ...rotation,
+    }) as WorkplaneShape;
+    const result = await applyEdgeTreatment(source, { kind: "fillet", amount: 0.6 });
+    const treated = shapeWithCadResult(source, result);
+    const renderedMesh = worldMeshForShape(treated)!;
+    const worldPositions = renderedMesh.faces.flatMap((face) => face.flatMap((vertexIndex) => renderedMesh.vertices[vertexIndex]!));
+    const measured = await withCadKernel((cad) => {
+      const solid = cad.fromBREP(result.brep);
+      const meshSolid = solidFromMeshPositions(cad, worldPositions);
+      return {
+        exact: { volume: cad.getVolume(solid), center: cad.getCenterOfMass(solid) },
+        rendered: { volume: cad.getVolume(meshSolid), center: cad.getCenterOfMass(meshSolid) },
+      };
+    });
+    // The editor worker receives the source mesh in project coordinates. This
+    // world-space mesh is the geometry the viewport draws after rebasing.
+    expect(Math.abs(measured.rendered.volume - measured.exact.volume)).toBeLessThan(1);
+    expect(measured.rendered.center.x).toBeCloseTo(source.x + measured.exact.center.x, 2);
+    expect(measured.rendered.center.y).toBeCloseTo((source.elevation ?? 0) + measured.exact.center.y, 2);
+    expect(measured.rendered.center.z).toBeCloseTo(source.z + measured.exact.center.z, 2);
   });
 
   it("keeps the color on an unchanged coplanar face through fillet topology changes", async () => {
