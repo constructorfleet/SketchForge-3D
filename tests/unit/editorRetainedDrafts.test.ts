@@ -118,6 +118,54 @@ async function expectSamePlacedSolid(actual: WorkplaneShape, expected: Workplane
   expect(drawn.centerOfMass.z).toBeCloseTo(reference.centerOfMass.z, 4);
 }
 
+/** Rotate a local placement offset with the viewport's XYZ Euler matrix. */
+function rotatePlacementOffset(shape: WorkplaneShape, offset: { x: number; y: number; z: number }) {
+  const radians = Math.PI / 180;
+  const rx = (shape.rotationX ?? 0) * radians;
+  const ry = (shape.rotation ?? 0) * radians;
+  const rz = (shape.rotationZ ?? 0) * radians;
+  const afterZ = {
+    x: offset.x * Math.cos(rz) - offset.y * Math.sin(rz),
+    y: offset.x * Math.sin(rz) + offset.y * Math.cos(rz),
+    z: offset.z,
+  };
+  const afterY = {
+    x: afterZ.x * Math.cos(ry) + afterZ.z * Math.sin(ry),
+    y: afterZ.y,
+    z: -afterZ.x * Math.sin(ry) + afterZ.z * Math.cos(ry),
+  };
+  const afterX = {
+    x: afterY.x,
+    y: afterY.y * Math.cos(rx) - afterY.z * Math.sin(rx),
+    z: afterY.y * Math.sin(rx) + afterY.z * Math.cos(rx),
+  };
+  return {
+    x: afterX.x,
+    y: afterX.y,
+    z: afterX.z,
+  };
+}
+
+/** Compare a placed draft with an independently rotated copy of its B-rep. */
+async function expectDraftAtFrameOffset(
+  actual: WorkplaneShape,
+  original: WorkplaneShape,
+  originalFrame: NonNullable<WorkplaneShape["cadBrepFrame"]>,
+) {
+  const resultFrame = actual.cadBrepFrame!;
+  const offset = rotatePlacementOffset(original, {
+    x: resultFrame.x - originalFrame.x,
+    y: resultFrame.elevation - originalFrame.elevation,
+    z: resultFrame.z - originalFrame.z,
+  });
+  await expectSamePlacedSolid(actual, {
+    ...actual,
+    x: original.x + offset.x,
+    z: original.z + offset.z,
+    elevation: (original.elevation ?? 0) + offset.y,
+  });
+}
+
 async function sideFace(source: WorkplaneShape) {
   return (await shapeFaces(source)).find((face) => face.surfaceType === "plane" && face.normal && Math.abs(face.normal.y) < 0.5)!;
 }
@@ -140,6 +188,7 @@ describe("retained drafts made in the editor", () => {
     expect({ x: editorShape.x, z: editorShape.z, elevation: editorShape.elevation }).toEqual(
       retainedDraftSourcePlacement(source, editorShape.cadBrepFrame!),
     );
+    await expectDraftAtFrameOffset(editorShape, source, source.cadBrepFrame!);
 
     const viaRest = value(await projectStore([source]).changeShape(PROJECT, source.id, {
       faceDraft: { sourceFaceId: side.id, ...OUTWARD },
@@ -200,6 +249,7 @@ describe("retained drafts made in the editor", () => {
       expect(viaEditor.faceDraftSourceFrame).toEqual(source.cadBrepFrame);
       expect(viaEditor.faceDraftSourceFaceIds).toContain(viaEditor.faceDraft!.sourceFaceId);
       await expectSamePlacedSolid(viaEditor, viaRest);
+      await expectDraftAtFrameOffset(viaEditor, drafted, drafted.cadBrepFrame!);
     }
   }, CAD_TEST_TIMEOUT_MS);
 
