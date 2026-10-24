@@ -12,7 +12,7 @@ The package registry survey below was run on 2026-10-24 with `npm view <package>
 | Package | Current range in the repository | Candidate | Spike | Required focus |
 | --- | --- | --- | --- | --- |
 | Next | `^15.5.28` | `16.4.3` | [#460](https://github.com/constructorfleet/SketchForge-3D/issues/460) | Typecheck, unit, build, browser tests, desktop build |
-| Electron | `^43.8.1` | `45.0.0` | [#461](https://github.com/constructorfleet/SketchForge-3D/issues/461) | Desktop packaging and release workflow compatibility |
+| Electron | `^43.8.1` | `45.0.0` | [#461](https://github.com/constructorfleet/SketchForge-3D/issues/461) | macOS arm64 directory package built; Electron framework in the artifact reports `45.0.0`. Cross-platform release packaging remains unverified. |
 | Vitest | `^4.1.12` | `5.0.5` | [#462](https://github.com/constructorfleet/SketchForge-3D/issues/462) | Unit, e2e, integration, browser, and performance suites |
 | TypeScript | `^5.8.3` (root and packages) | `7.0.2` | [#463](https://github.com/constructorfleet/SketchForge-3D/issues/463) | All package typechecks and builds |
 | occt-wasm | `^3.6.1` | `5.8.0` | [#464](https://github.com/constructorfleet/SketchForge-3D/issues/464) | Engine build, STEP round-trip e2e, engine performance |
@@ -27,4 +27,4 @@ Start Electron before the next desktop release, then evaluate Next and test tool
 
 ## Verification record
 
-At plan creation, all nine spikes are open and awaiting isolated build/test results. The registry survey is the only completed check. Do not report the package upgrades as tested or green until the linked spike records actual results.
+The Electron spike built the web bundle and a macOS arm64 directory package with Electron 45.0.0 on 2026-10-24; the two desktop release workflow test files passed (13 tests). The first packaging attempt ran out of disk space; after clearing this worktree's generated `dist` directory, packaging completed. macOS code signing was skipped because no valid Developer ID identity was available. Windows, Linux, macOS x64, signed installers, and installed-app update behavior remain unverified. The other eight spikes await build/test results. Do not report package upgrades as tested or green beyond the specific checks recorded here.
