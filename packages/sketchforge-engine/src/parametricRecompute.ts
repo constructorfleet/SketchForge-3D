@@ -1,4 +1,6 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
+import { groupChildFrame } from "./serverShapeGroups.js";
+import { resizedShapeSize, shapeDepth, shapeWidth } from "./workplaneShapes.js";
 import {
   allEdgeTreatmentEdgeCount,
   applyDraftPrism,
@@ -201,21 +203,36 @@ export async function recomputeSketchOutput(
     if ("error" in result || result.cutRemovedNothing) {
       throw new Error("The edited sketch made a dependent boolean invalid or ineffective.");
     }
+    // `children` are expressed in this group's child frame, so the rebuilt
+    // group comes back placed in that frame at its natural size. Put it through
+    // the retained group's frame -- resize, mirror, turn, then move -- the same
+    // way ungrouping puts each child, and keep the turn, mirror and resize on
+    // the rebuilt group so its geometry is drawn under them too.
+    const rebuilt = result.group;
+    const frame = groupChildFrame(shape);
+    const width = shapeWidth(rebuilt) * frame.scale.x;
+    const depth = shapeDepth(rebuilt) * frame.scale.z;
+    const height = rebuilt.height * frame.scale.y;
+    const center = frame.toParent(rebuilt.x, (rebuilt.elevation ?? 0) + rebuilt.height / 2, rebuilt.z);
     return {
-      ...result.group,
+      ...rebuilt,
       id: shape.id,
       name: shape.name,
       color: shape.color,
       locked: shape.locked,
-      // `children` are expressed in this group's local coordinate system.
-      // Rebuilding a new group from them produces a local origin; restore the
-      // retained group's world placement on the rebuilt ancestor.
-      x: result.group.x + shape.x,
-      z: result.group.z + shape.z,
-      elevation: (result.group.elevation ?? 0) + (shape.elevation ?? 0),
+      x: center.x,
+      z: center.z,
+      elevation: center.y - height / 2,
+      width,
+      depth,
+      height,
+      size: resizedShapeSize(width, depth),
       rotation: shape.rotation,
       rotationX: shape.rotationX,
       rotationZ: shape.rotationZ,
+      mirrorX: shape.mirrorX,
+      mirrorY: shape.mirrorY,
+      mirrorZ: shape.mirrorZ,
       // The group builder creates fresh child IDs because ordinary grouping
       // is a new operation. Recompute is different: each retained child is the
       // same feature with new geometry, so keep its existing feature identity.
