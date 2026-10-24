@@ -1023,7 +1023,7 @@
         "of": "of {count}",
         "previous": "Previous face",
         "next": "Next face",
-        "highlightHint": "While the pointer is over this panel, the chosen face is highlighted in the view, or shown in its color if it has one.",
+        "highlightHint": "The chosen face is outlined in the view while this panel is open, including when it already has a color.",
         "colorFor": "Color for face {face}",
         "chooseColor": "Choose a color",
         "clearColor": "Clear",

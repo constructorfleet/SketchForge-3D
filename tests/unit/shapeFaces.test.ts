@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorkplaneShape } from "@/types/sketchforge";
-import { FACE_HIGHLIGHT_COLOR, faceColorsWith, faceEditingCanBeEnabled, shapeFaceCount, shapeFaceKey, shapeHasExactFaces, withFaceHighlight } from "@/lib/shapeFaces";
+import { faceColorsWith, faceEditingCanBeEnabled, shapeFaceCount, shapeFaceKey, shapeHasExactFaces } from "@/lib/shapeFaces";
 
 function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return {
@@ -31,20 +31,6 @@ describe("shape faces", () => {
   it("keys a face colour by stable ID when the shape has one", () => {
     expect(shapeFaceKey(shape({ faceIds: ["a", "b"] }), 1)).toBe("b");
     expect(shapeFaceKey(shape(), 1)).toBe("1");
-  });
-
-  it("paints the highlighted face for display without touching the stored colours", () => {
-    const stored = { "1": "#00ff00" };
-    const source = shape({ kind: "mesh", cadBrep: "brep", importedMesh: mesh([0, 1, 0, 1, 1, 1]), faceColors: stored });
-    const shown = withFaceHighlight(source, 0);
-    expect(shown.faceColors).toEqual({ "0": FACE_HIGHLIGHT_COLOR, "1": "#00ff00" });
-    expect(source.faceColors).toBe(stored);
-    expect(withFaceHighlight(shape({ faceIds: ["a", "b"], kind: "mesh", importedMesh: mesh([0, 1, 0]) }), 1).faceColors).toEqual({ b: FACE_HIGHLIGHT_COLOR });
-    // A face that already has a colour shows that colour, not the highlight.
-    expect(withFaceHighlight(source, 1)).toBe(source);
-    // Without face groups there is nothing to paint, so the shape is returned as is.
-    const plain = shape();
-    expect(withFaceHighlight(plain, 0)).toBe(plain);
   });
 
   it("offers to enable face editing on solid primitives that do not have exact faces yet", () => {

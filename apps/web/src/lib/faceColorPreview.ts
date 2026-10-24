@@ -52,6 +52,42 @@ export function createFaceColorPreviewGeometry(mesh: FaceGroupedMesh, faceColors
   return geometry;
 }
 
+/** Build only the selected B-rep face's outer wire for a viewport edit cue. */
+export function createFaceHighlightGeometry(mesh: FaceGroupedMesh, selectedFaceIndex: number) {
+  const triangleCount = Math.floor(mesh.positions.length / 9);
+  const unit = faceGroupUnit(mesh.faceGroups, triangleCount);
+  const edges = new Map<string, { count: number; points: number[] }>();
+  for (let group = 0; group + 2 < mesh.faceGroups.length; group += 3) {
+    if (mesh.faceGroups[group + 2] !== selectedFaceIndex) continue;
+    const start = mesh.faceGroups[group]! / unit;
+    const count = mesh.faceGroups[group + 1]! / unit;
+    if (!Number.isInteger(start) || !Number.isInteger(count) || start < 0 || count < 0) continue;
+    const end = Math.min(triangleCount, start + count);
+    for (let triangle = start; triangle < end; triangle += 1) {
+      const vertices = Array.from({ length: 3 }, (_, vertex) => {
+        const offset = triangle * 9 + vertex * 3;
+        return [mesh.positions[offset]!, mesh.positions[offset + 1]!, mesh.positions[offset + 2]!];
+      });
+      for (let edge = 0; edge < 3; edge += 1) {
+        const a = vertices[edge]!;
+        const b = vertices[(edge + 1) % 3]!;
+        const keyFor = (point: number[]) => point.map((coordinate) => Math.round(coordinate * 1e5)).join(",");
+        const aKey = keyFor(a);
+        const bKey = keyFor(b);
+        const key = aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
+        const existing = edges.get(key);
+        if (existing) existing.count += 1;
+        else edges.set(key, { count: 1, points: [...a, ...b] });
+      }
+    }
+  }
+  const positions: number[] = [];
+  edges.forEach(({ count, points }) => { if (count === 1) positions.push(...points); });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  return geometry;
+}
+
 /**
  * Server CAD results stored by earlier versions kept the kernel's ranges as-is, in
  * index-buffer entries (three per triangle), so their groups cover three times

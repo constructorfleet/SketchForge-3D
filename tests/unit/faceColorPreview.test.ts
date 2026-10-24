@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { createFaceColorPreviewGeometry } from "@/lib/faceColorPreview";
+import { createFaceColorPreviewGeometry, createFaceHighlightGeometry } from "@/lib/faceColorPreview";
 
 describe("face color viewport preview", () => {
   it("uses persisted face IDs to color face groups while retaining numeric-key compatibility", () => {
@@ -58,5 +58,21 @@ describe("face color viewport preview", () => {
     const colors = geometry.getAttribute("color") as THREE.BufferAttribute;
     expect([colors.getX(0), colors.getY(0), colors.getZ(0)]).not.toEqual([1, 0, 0]);
     expect([colors.getX(3), colors.getY(3), colors.getZ(3)]).toEqual([1, 0, 0]);
+  });
+});
+
+describe("face highlight geometry", () => {
+  it("outlines only the outer boundary of the selected triangulated face", () => {
+    const mesh = {
+      positions: [
+        0, 0, 0, 1, 0, 0, 1, 1, 0,
+        0, 0, 0, 1, 1, 0, 0, 1, 0,
+      ],
+      faceGroups: [0, 2, 0],
+    };
+    const geometry = createFaceHighlightGeometry(mesh, 0);
+    expect(geometry.getAttribute("position").count).toBe(8);
+    expect(createFaceHighlightGeometry(mesh, 1).getAttribute("position").count).toBe(0);
+    geometry.dispose();
   });
 });

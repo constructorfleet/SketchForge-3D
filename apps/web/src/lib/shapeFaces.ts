@@ -47,17 +47,3 @@ export function faceColorsWith(shape: WorkplaneShape, faceIndex: number, color: 
   else next[key] = color;
   return next;
 }
-
-/**
- * A display-only copy of the shape with one uncoloured face painted in the
- * highlight colour. It is only ever handed to the viewport's renderer, never
- * stored.
- */
-export function withFaceHighlight(shape: WorkplaneShape, faceIndex: number): WorkplaneShape {
-  if (!shape.importedMesh?.faceGroups?.length) return shape;
-  const key = shapeFaceKey(shape, faceIndex);
-  // A coloured face is already marked by its colour, and the person choosing it
-  // wants to see that colour, not the highlight over it.
-  if (shape.faceColors?.[key] ?? shape.faceColors?.[String(faceIndex)]) return shape;
-  return { ...shape, faceColors: { ...(shape.faceColors ?? {}), [key]: FACE_HIGHLIGHT_COLOR } };
-}

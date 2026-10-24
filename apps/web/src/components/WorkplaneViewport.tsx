@@ -21,11 +21,10 @@ import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettings
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/engine/cadBakeMetadata";
-import { withFaceHighlight } from "@/lib/shapeFaces";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
 import { orthographicHalfHeightAtDistance, orthographicVisibleHalfHeight, perspectiveDistanceForHalfHeight, toggledCameraProjection, type CameraProjection } from "@/lib/cameraProjection";
 import { createGearGeometry } from "@/lib/gearGeometry";
-import { createFaceColorPreviewGeometry } from "@/lib/faceColorPreview";
+import { createFaceColorPreviewGeometry, createFaceHighlightGeometry } from "@/lib/faceColorPreview";
 import { createLoftGeometry } from "@/lib/loftGeometry";
 import { resolveShapeAppearance } from "@/lib/shapeAppearance";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
@@ -304,7 +303,7 @@ type ShapeRenderRecord = {
 };
 
 type ThreeState = {
-  /** The face the inspector's face tools are pointing at; painted for display only. */
+  /** The face the inspector's face tools are pointing at; outlined in the viewport only. */
   faceHighlight?: { shapeId: string; faceIndex: number } | null;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -2498,6 +2497,7 @@ export function WorkplaneViewport({
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const threeRef = useRef<ThreeState | null>(null);
+  const faceHighlightRef = useRef<{ shapeId: string; faceIndex: number } | null>(null);
   const shapesRef = useRef(shapes);
   const alignReferenceShapesRef = useRef(alignReferenceShapes);
   const mirrorReferenceShapesRef = useRef(mirrorReferenceShapes);
@@ -2560,10 +2560,11 @@ export function WorkplaneViewport({
   );
 
   const highlightFace = useCallback((faceIndex: number | null) => {
-    const state = threeRef.current;
-    if (!state) return;
     const shapeId = selectedIdsRef.current.length === 1 ? selectedIdsRef.current[0] : undefined;
     const next = shapeId && faceIndex !== null ? { shapeId, faceIndex } : null;
+    faceHighlightRef.current = next;
+    const state = threeRef.current;
+    if (!state) return;
     const current = state.faceHighlight ?? null;
     if (current?.shapeId === next?.shapeId && current?.faceIndex === next?.faceIndex) return;
     state.faceHighlight = next;
@@ -3067,6 +3068,7 @@ export function WorkplaneViewport({
 
     const state = createThreeScene(host);
     threeRef.current = state;
+    state.faceHighlight = faceHighlightRef.current;
     rebuildWorkplane(state, workspaceRef.current, resolvedThemeRef.current, placementWorkplaneRef.current);
     // The scene is built after the projection effect has already run for the first
     // time, so the stored preference is applied here on mount.
@@ -6734,13 +6736,9 @@ function rebuildShapes(
     return;
   }
   const highlight = state.faceHighlight;
-  const shapes = highlight
-    ? projectShapes.map((shape) => shape.id === highlight.shapeId ? withFaceHighlight(shape, highlight.faceIndex) : shape)
-    : projectShapes;
-
   clearCutPreviewOverlays(state);
   const selected = new Set(selectedIds);
-  const visibleShapes = shapes.filter((shape) => !shape.hidden);
+  const visibleShapes = projectShapes.filter((shape) => !shape.hidden);
 
   if (useOfficialModifierRendering) {
     disposeChildren(state.shapeLayer);
@@ -6749,13 +6747,13 @@ function rebuildShapes(
     visibleShapes.forEach((shape) => {
       const object = createShapeObject(shape, selected.has(shape.id), () => {
         state.needsRender = true;
-      }, false);
+      }, false, highlight?.shapeId === shape.id ? highlight.faceIndex : null);
       state.shapeLayer.add(object);
     });
     if (showCutPreviews) {
       syncCutPreviewOverlays(state, visibleShapes);
     }
-    rebuildSelectionHelpers(state, shapes, selectedIds, workplane);
+    rebuildSelectionHelpers(state, projectShapes, selectedIds, workplane);
     state.needsRender = true;
     return;
   }
@@ -6779,8 +6777,9 @@ function rebuildShapes(
     const transformSignature = shapeTransformSignature(shape);
     const materialSignature = shapeMaterialSignature(shape);
     const geometrySignature = shapeGeometrySignature(shape);
+    const faceHighlightIndex = highlight?.shapeId === shape.id ? highlight.faceIndex : null;
     let record = state.shapeRecords.get(shape.id);
-    if (record && record.geometrySignature !== geometrySignature) {
+    if (record && (record.geometrySignature !== geometrySignature || record.object.userData.faceHighlightIndex !== faceHighlightIndex)) {
       state.shapeLayer.remove(record.object);
       disposeObject(record.object);
       state.shapeRecords.delete(shape.id);
@@ -6790,7 +6789,7 @@ function rebuildShapes(
     if (!record) {
       const object = createShapeObject(shape, selectedShape, () => {
         state.needsRender = true;
-      });
+      }, true, faceHighlightIndex);
       state.shapeLayer.add(object);
       record = {
         object,
@@ -6826,7 +6825,7 @@ function rebuildShapes(
     syncCutPreviewOverlays(state, visibleShapes);
   }
 
-  rebuildSelectionHelpers(state, shapes, selectedIds, workplane);
+  rebuildSelectionHelpers(state, projectShapes, selectedIds, workplane);
   state.needsRender = true;
 }
 
@@ -8041,12 +8040,14 @@ function createShapeObject(
   showEdges = false,
   onTextureReady?: () => void,
   acceleratedPicking = true,
+  faceHighlightIndex: number | null = null,
 ) {
   const group = new THREE.Group();
   group.name = shape.name;
   group.userData.shapeId = shape.id;
   group.userData.showEdges = showEdges;
   group.userData.acceleratedPicking = acceleratedPicking;
+  group.userData.faceHighlightIndex = faceHighlightIndex;
   group.userData.rulerDimensions = [shapeWidth(shape), shape.height, shapeDepth(shape)] satisfies [number, number, number];
   group.userData.rulerTopologyKey = rulerShapeTopologyKey(shape);
   group.position.set(shape.x, (shape.elevation ?? 0) + shape.height / 2, shape.z);
@@ -8213,6 +8214,7 @@ function createShapeObject(
             height / Math.max(0.001, shape.importedMesh.baseHeight),
             depth / Math.max(0.001, shape.importedMesh.baseDepth),
           ),
+          faceHighlightIndex,
         );
       } else {
         addMesh(group, sharedShapeGeometry(geometryCacheKey, () => new THREE.BoxGeometry(size, Math.max(3, height * 0.35), size * 0.72)), material, shape);
@@ -8355,6 +8357,7 @@ function addMesh(
   position?: THREE.Vector3,
   rotation?: THREE.Euler,
   scale?: THREE.Vector3,
+  faceHighlightIndex: number | null = null,
 ) {
   const based = geometry.userData.cached ? geometry : putGeometryOnBase(geometry);
   const prepared = taperGeometryForShape(based, shape);
@@ -8379,6 +8382,23 @@ function addMesh(
   }
   group.add(mesh);
   addShapeEdgeDecorations(group, mesh, prepared, shape);
+  if (faceHighlightIndex !== null && shape.importedMesh?.faceGroups?.length) {
+    const outline = createFaceHighlightGeometry({
+      positions: shape.importedMesh.positions,
+      faceGroups: shape.importedMesh.faceGroups,
+    }, faceHighlightIndex);
+    if (outline.getAttribute("position").count) {
+      const lineMaterial = new THREE.LineBasicMaterial({ color: "#ffb400", depthTest: false, depthWrite: false });
+      const line = new THREE.LineSegments(outline, lineMaterial);
+      line.position.copy(mesh.position);
+      line.rotation.copy(mesh.rotation);
+      line.scale.copy(mesh.scale);
+      line.renderOrder = 1004;
+      line.userData.shapeDecoration = true;
+      line.userData.faceHighlight = true;
+      group.add(line);
+    } else outline.dispose();
+  }
 }
 
 function addShapeEdgeDecorations(group: THREE.Group, mesh: THREE.Mesh, prepared: THREE.BufferGeometry, shape: WorkplaneShape) {
