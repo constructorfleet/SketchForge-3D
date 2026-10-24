@@ -14,6 +14,8 @@ import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { AlignOverlay, MirrorOverlay, type AlignOverlayState, type MirrorOverlayState } from "@/components/workplane/ActionOverlays";
 import { MoveDimensionOverlay } from "@/components/workplane/MoveDimensionOverlay";
 import { SceneInspector } from "@/components/workplane/SceneInspector";
+import { SceneAnalysisPanel } from "@/components/workplane/SceneAnalysisPanel";
+import type { SceneAnalysisRunner } from "@/lib/sceneAnalysis";
 import { ShapeInspector, SnapGridControl, type ShapeInspectorUpdateOptions } from "@/components/workplane/ShapeInspector";
 import { KeyTagTutorialPanel } from "@/components/workplane/KeyTagTutorialPanel";
 import { NameplateTutorialPanel } from "@/components/workplane/NameplateTutorialPanel";
@@ -220,6 +222,8 @@ type WorkplaneViewportProps = {
   onMirrorPreviewClear: () => void;
   onMirrorSelection: (axis: AlignAxis) => void;
   onSelectShape: (id: string | string[] | null, mode?: "replace" | "toggle") => void;
+  /** Runs the scene list's read-only interference and wall-thickness checks (#380). */
+  sceneAnalysisRunner?: SceneAnalysisRunner;
   onDeleteShapeById: (id: string) => void;
   onSetShapeHidden: (id: string, hidden: boolean) => void;
   onSetShapeLocked: (id: string, locked: boolean) => void;
@@ -2425,6 +2429,7 @@ export function WorkplaneViewport({
   onMirrorPreviewClear,
   onMirrorSelection,
   onSelectShape,
+  sceneAnalysisRunner,
   onDeleteShapeById,
   onSetShapeHidden,
   onSetShapeLocked,
@@ -5835,6 +5840,9 @@ export function WorkplaneViewport({
           canUngroup={selectedIds.length > 0 && shapes.some((shape) => selectedIds.includes(shape.id) && (shape.groupedShapes?.length ?? 0) > 0)}
           collapsed={sceneListCollapsed}
           onCollapsedChange={setSceneListCollapsed}
+          analysis={sceneAnalysisRunner ? (
+            <SceneAnalysisPanel shapes={shapes} selectedIds={selectedIds} runner={sceneAnalysisRunner} onSelectShapes={(ids) => onSelectShape(ids)} />
+          ) : null}
         />
 
         <div className="inspector-rail-footer">

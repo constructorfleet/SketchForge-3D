@@ -22,9 +22,11 @@ These are implemented and should not be filed as missing features:
   between entities are exposed through `/measurements` and the TypeScript and
   Python clients. Mesh imports remain limited to their tessellated geometry,
   and unavailable measurements include a reason.
-- Interference checking is available through the engine and REST API, with an
-  AABB candidate prefilter and bounded pair count. Wall thickness is available
-  as a sampled estimate with its sampling method disclosed.
+- Interference checking is available through the engine, the REST API and the
+  editor's scene list, with an AABB candidate prefilter and bounded pair count.
+  Wall thickness is available as a sampled estimate with its sampling method
+  disclosed. The editor runs both in its CAD worker on the same engine code
+  (`cadAnalysis.ts`).
 - STEP imports can expose bounded product names and nested `stepAssembly`
   hierarchy metadata in shape summaries. Extraction is limited to inputs up to
   200 solids and 8 MiB, with at most 2,000 hierarchy nodes and depth 32.
@@ -189,7 +191,7 @@ These are implemented and should not be filed as missing features:
   server kernel, so STEP imports can reopen from server-backed storage.
 
 Relevant implementation seams include `serverCadProperties.ts`,
-`serverCadMeasure.ts`, `serverCadInterference.ts`, `serverCadThickness.ts`,
+`serverCadMeasure.ts`, `cadAnalysis.ts`, `serverCadInterference.ts`, `serverCadThickness.ts`,
 `serverStepExplode.ts`, `stepAssemblyHierarchy.ts`, `serverCadProjection.ts`,
 and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
