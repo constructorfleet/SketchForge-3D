@@ -6,6 +6,7 @@ import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforg
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { applyEdgeTreatment, applySketchFaceDraft, shapeWithCadResult } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
@@ -866,7 +867,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect(updated.elevation).toBeCloseTo(source.elevation ?? 0);
     expect(updated.edgeTreatments?.[0]).toMatchObject({ kind: "fillet", amount: 0.01, allEdges: true });
     expect(updated.edgeTreatmentHistory?.[0]?.before.sketchProfile).toEqual(changedProfile);
-    // The faceted revolve is all planes; blend faces mean the fillet was replayed.
+    // The fillet is cut from the exact solid, so it blends with tori.
     const surfaces = new Set((await shapeFaces(updated)).map((face) => face.surfaceType));
     expect([...surfaces].some((surface) => surface !== "plane")).toBe(true);
     expect(writeCount()).toBe(writesBeforeEdit + 1);
@@ -996,7 +997,10 @@ describe("dependency-ordered feature recomputation", () => {
     expect(value(await engine.project("recompute")).shapes).toEqual(beforeEdit);
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("rolls back a revolve setting edit when its all-edge fillet cannot be replayed", async () => {
+  it("replays an all-edge fillet unchanged when only a revolve's facet count changes", async () => {
+    // The fillet is cut from the exact solid (#347), which has no facets, so a
+    // new facet count rebuilds the same filleted geometry. When it was cut from
+    // the 8-sided mesh, the same edit could not be replayed and was refused.
     const { store, writeCount } = projectStore();
     const engine = createEngine(store);
     const created = value(await engine.addShapes("recompute", [{
@@ -1006,6 +1010,29 @@ describe("dependency-ordered feature recomputation", () => {
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 10 });
+
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+    const updated = value(changed).shape;
+    expect(updated.sketchRevolve?.sides).toBe(10);
+    expect(updated.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: 0.01, allEdges: true, edgeCount: 4 })]);
+    const [before, after] = await withCadKernel((cad) => [source, updated]
+      .map((shape) => cad.queryBatch([cad.fromBREP(shape.cadBrep!)])[0]!));
+    expect(after!.volume).toBeCloseTo(before!.volume, 6);
+    expect(after!.centerOfMass.y).toBeCloseTo(before!.centerOfMass.y, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("rolls back a revolve setting edit to a partial turn when its all-edge fillet cannot be replayed", async () => {
+    const { store, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Treated revolve", profile: [[1, -2], [2, -2], [2, 2], [1, 2]], sides: 8,
+    }]));
+    const source = await persistAllEdgeFillet(engine, "recompute", created.shapes[0]!.id, 0.01);
+    const writesBeforeEdit = writeCount();
+
+    // A partial turn has no exact solid to fillet, and its facets are refused.
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sweepAngle: 180 });
 
     expect(changed.ok).toBe(false);
     expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");

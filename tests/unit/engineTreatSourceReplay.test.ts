@@ -8,6 +8,7 @@ import {
   shapeWithCadResult,
 } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeProperties } from "@constructorfleet/sketchforge-engine/serverCadProperties";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
@@ -129,9 +130,7 @@ describe("engine.treat records a replayable treatment for source edits", () => {
     ["extrusion", { kind: "chamfer", amount: 0.2 }],
     ["sweep", { kind: "fillet", amount: 0.2 }],
     ["sweep", { kind: "chamfer", amount: 0.2, angle: 45 }],
-    // A revolve fillet is not here: a plain revolve has no exact BREP yet
-    // (#347), so its fillet runs on the faceted mesh and whether it replays
-    // depends on the facets. See the refusal test below.
+    ["revolve", { kind: "fillet", amount: 0.2 }],
     ["revolve", { kind: "chamfer", amount: 0.2 }],
   ];
 
@@ -168,8 +167,8 @@ describe("engine.treat records a replayable treatment for source edits", () => {
     // The ground truth: the same treatment applied directly to the rebuilt,
     // untreated source. The replayed solid must match it by volume and centre
     // of mass, and must be smaller than the untreated rebuild. A revolve's
-    // chamfer is cut from its exact solid rather than its faceted mesh, so
-    // that exact solid is the untreated reference.
+    // fillet and chamfer are cut from its exact solid rather than its faceted
+    // mesh (#347), so that exact solid is the untreated reference.
     const plain = await createSource(kind);
     const plainEdited = value(await plain.engine.changeShape("treat", plain.source.sketchSourceId!, {
       sketchProfile: editedProfile(kind, plain.source),
@@ -181,7 +180,9 @@ describe("engine.treat records a replayable treatment for source edits", () => {
     const [replayedProps, plainProps, expectedProps, treatedProps] = await Promise.all([
       shapeProperties(updated), shapeProperties(untreated), shapeProperties(expected), shapeProperties(treated),
     ]);
-    expect(plainProps.volume - replayedProps.volume).toBeGreaterThan(plainProps.volume * 1e-3);
+    // These volumes come from display meshes, so the margin is loose: a 0.2
+    // fillet on the large revolve takes off only about 0.06%.
+    expect(plainProps.volume - replayedProps.volume).toBeGreaterThan(plainProps.volume * 3e-4);
     expect(replayedProps.volume).toBeCloseTo(expectedProps.volume, 3);
     expect(Math.abs(replayedProps.volume - treatedProps.volume)).toBeGreaterThan(treatedProps.volume * 1e-2);
     expect(replayedProps.centerOfMass.x).toBeCloseTo(expectedProps.centerOfMass.x, 3);
@@ -242,21 +243,44 @@ describe("engine.treat records a replayable treatment for source edits", () => {
     expect(restoredHollow.shell).toEqual(hollow.shell);
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("refuses, rather than drops, a revolve fillet the kernel cannot replay on the edited facets", async () => {
-    // A plain revolve's fillet is cut from its faceted mesh until #347 gives
-    // it an exact BREP. This one fillets, but the same radius does not fit the
-    // rebuilt facets; the record makes the edit fail instead of succeeding bare.
-    const { engine, source, store, writeCount } = await createSource("revolve");
-    const treated = value(await engine.treat("treat", source.id, { kind: "fillet", amount: 0.2 })).shape;
-    expect(treated.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: 0.2, allEdges: true })]);
-    const before = (await store.read("treat"))!.shapes;
+  it("replays a revolve fillet against the exact topology of the edited profile", async () => {
+    // Before #347 this fillet was cut from the revolve's 24-sided mesh: 288
+    // facet edges, and the same radius did not fit the rebuilt facets, so the
+    // edit was refused. It is now cut from the exact solid both times.
+    const r = 0.2;
+    const { engine, source, writeCount } = await createSource("revolve");
+    const treated = value(await engine.treat("treat", source.id, { kind: "fillet", amount: r })).shape;
+    // Four circular edges, not the mesh's facets.
+    expect(treated.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: r, allEdges: true, edgeCount: 4 })]);
     const writesBeforeEdit = writeCount();
 
     const changed = await engine.changeShape("treat", source.sketchSourceId!, { sketchProfile: editedProfile("revolve", source) });
 
-    expect(changed.ok).toBe(false);
-    expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
-    expect(writeCount()).toBe(writesBeforeEdit);
-    expect((await store.read("treat"))!.shapes).toEqual(before);
+    expect(changed.ok, JSON.stringify(changed)).toBe(true);
+    expect(writeCount()).toBe(writesBeforeEdit + 1);
+    const updated = value(changed).shape;
+    expect(updated.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: r, allEdges: true, edgeCount: 4 })]);
+    expect(updated.edgeTreatmentHistory?.[0]?.feature.edgeCount).toBe(4);
+
+    // The edit scales the section's radii by 1.25: 6.25 to 12.5, still 10 tall.
+    // Closed form, by Pappus: each convex corner loses r^2 (1 - pi/4) swept
+    // around the axis at its centroid, which sits inside an outer corner's
+    // radius and outside an inner one's.
+    const inner = 6.25;
+    const outer = 12.5;
+    const height = 10;
+    const area = r * r * (1 - Math.PI / 4);
+    const offset = (r * (10 - 3 * Math.PI)) / (3 * (4 - Math.PI));
+    const removed = 2 * 2 * Math.PI * area * ((outer - offset) + (inner + offset));
+    const expectedVolume = Math.PI * (outer ** 2 - inner ** 2) * height - removed;
+    const exact = await withCadKernel((cad) => {
+      const solid = cad.fromBREP(updated.cadBrep!);
+      return cad.queryBatch([solid])[0]!;
+    });
+    expect(exact.volume).toBeCloseTo(expectedVolume, 3);
+    expect(exact.centerOfMass.x).toBeCloseTo(0, 6);
+    expect(exact.centerOfMass.z).toBeCloseTo(0, 6);
+    expect(exact.centerOfMass.y).toBeCloseTo(height / 2, 6);
+    expect(surfaceCounts(await shapeFaces(updated)).torus).toBe(4);
   }, CAD_TEST_TIMEOUT_MS);
 });
