@@ -65,13 +65,27 @@ test("package references can be checked for stale generated output in a temporar
   }
 });
 
-test("the CI reference job validates staged generated pages instead of git diffs", async () => {
-  const workflow = await readFile(path.join(root, ".github/workflows/ci.yml"), "utf8");
-  const job = workflow.split("  package-examples:")[0];
+test("the docs job validates staged generated pages instead of git diffs", async () => {
+  const yaml = await import("js-yaml");
+  const load = async (name) => yaml.load(await readFile(path.join(root, ".github/workflows", name), "utf8"));
+  const check = "node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference";
+  const runs = (job) => job.steps.map(({ run }) => run ?? "");
 
-  assert.match(job, /npm run docs:stage/);
-  assert.match(job, /--check --output-dir \.docs-site\/docs\/reference/);
-  assert.doesNotMatch(job, /git diff --exit-code -- docs\/reference/);
+  for (const [name, id] of [["docs.yml", "build"], ["trusted-pr-checks.yml", "docs"]]) {
+    const steps = runs((await load(name)).jobs[id]);
+    const generate = steps.findIndex((run) => run.includes("npm run docs:generate"));
+    const checked = steps.findIndex((run) => run.includes(check));
+    assert.ok(generate >= 0, `${name} ${id} must generate the staged docs tree`);
+    assert.ok(checked > generate, `${name} ${id} must check staged package references after docs:generate`);
+    assert.ok(steps.every((run) => !/git diff --exit-code -- docs\/reference/.test(run)));
+  }
+
+  // docs:generate already builds both packages and stages the references, so a
+  // separate job repeating that build to run the same check is duplicate work.
+  for (const name of ["ci.yml", "trusted-pr-checks.yml"]) {
+    assert.equal((await load(name)).jobs["package-reference"], undefined,
+      `${name} must not repeat the package reference build in its own job`);
+  }
 });
 
 test("docs build runs the artifact assertion after VitePress emits Pages output", async () => {

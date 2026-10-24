@@ -97,31 +97,6 @@ jobs:
       - run: npm ci
       - run: npm run export
 
-  package-reference:
-    name: Package reference generation
-    needs: validate-target
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ needs.validate-target.outputs.expected_sha }}
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: npm ci
-      - run: npm run engine:build && npm run client:build
-      - run: npm run docs:stage
-      - run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference
-
   package-examples:
     name: Package examples against local API
     needs: validate-target
@@ -210,6 +185,7 @@ jobs:
       - run: python -m pip install -r packages/sketchforge-py/requirements-dev.txt
       - run: npx playwright install --with-deps --only-shell chromium
       - run: npm run docs:generate
+      - run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference
       - run: npm run docs:verify
       - run: npm run docs:site-build
       - run: npm run test:browser
@@ -256,7 +232,7 @@ jobs:
   record-checks:
     name: Record trusted checks on PR SHA
     if: always() && needs.validate-target.result == 'success'
-    needs: [validate-target, typecheck, static-export, package-reference, package-examples, api-e2e, docs, title]
+    needs: [validate-target, typecheck, static-export, package-examples, api-e2e, docs, title]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -278,5 +254,5 @@ jobs:
           EXPECTED_HEAD_SHA: ${{ needs.validate-target.outputs.expected_sha }}
           EXPECTED_DEFAULT_BRANCH: ${{ needs.validate-target.outputs.default_branch }}
           EXPECTED_TITLE_B64: ${{ needs.validate-target.outputs.title_b64 }}
-          CHECK_RESULTS: '{"typecheck":"${{ needs.typecheck.result }}","static-export":"${{ needs.static-export.result }}","package-reference":"${{ needs.package-reference.result }}","package-examples":"${{ needs.package-examples.result }}","api-e2e":"${{ needs.api-e2e.result }}","docs":"${{ needs.docs.result }}","title":"${{ needs.title.result }}"}'
+          CHECK_RESULTS: '{"typecheck":"${{ needs.typecheck.result }}","static-export":"${{ needs.static-export.result }}","package-examples":"${{ needs.package-examples.result }}","api-e2e":"${{ needs.api-e2e.result }}","docs":"${{ needs.docs.result }}","title":"${{ needs.title.result }}"}'
         run: node scripts/docs/record-trusted-pr-checks.mjs

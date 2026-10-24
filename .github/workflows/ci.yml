@@ -12,37 +12,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  package-reference:
-    name: Package reference generation
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build public packages
-        run: npm run engine:build && npm run client:build
-
-      - name: Stage source and generated package documentation
-        run: npm run docs:stage
-
-      - name: Check staged package references
-        run: node scripts/docs/generate-package-references.mjs --check --output-dir .docs-site/docs/reference
-
   package-examples:
     name: Package examples against local API
     runs-on: ubuntu-latest

@@ -14,7 +14,6 @@ const recorderPath = path.join(root, "scripts/docs/record-trusted-pr-checks.mjs"
 const sha = "a".repeat(40);
 const repository = "constructorfleet/SketchForge-3D";
 const expectedChecks = [
-  "Package reference generation",
   "Package examples against local API",
   "Typecheck and unit tests",
   "REST API end to end",
@@ -35,7 +34,7 @@ test("trusted PR verifier is only dispatched from default-branch repository_disp
   assert.match(targetValidation, /\.merged/);
   assert.match(targetValidation, /\.head\.repo\.full_name/);
   assert.match(targetValidation, /\.head\.sha/);
-  for (const id of ["package-reference", "package-examples", "typecheck", "api-e2e", "static-export", "docs"]) {
+  for (const id of ["package-examples", "typecheck", "api-e2e", "static-export", "docs"]) {
     const job = workflow.jobs[id];
     assert.equal(job.permissions.contents, "read");
     const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
@@ -118,7 +117,6 @@ async function runRecorder({ apiUrl, expectedSha = sha, title = "docs: refresh r
 }
 
 const results = {
-  "package-reference": "success",
   "package-examples": "success",
   typecheck: "success",
   "api-e2e": "success",
