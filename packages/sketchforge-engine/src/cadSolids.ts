@@ -403,6 +403,31 @@ export function unrotatedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
   }
 }
 
+/**
+ * Apply a shape's `mirrorX/Y/Z` flags to a solid in the shape's own frame.
+ *
+ * The editor draws a shape as translate * rotate * mirror about the centre of
+ * its frame -- X and Z through its axis, Y through mid-height -- so the mirror
+ * comes first, before any rotation. Mirroring after a rotation reflects across
+ * the wrong plane: a wedge yawed 30 degrees lands its material 5mm away.
+ *
+ * `center` is that frame's centre in the solid's coordinates: (0, height/2, 0)
+ * for a solid a builder made, the solid's own bounds centre for one stored on
+ * the shape, whose rotation stays on the shape and is applied when drawn.
+ */
+export function mirroredInShapeFrame(
+  cad: OcctKernel,
+  solid: ShapeHandle,
+  shape: WorkplaneShape,
+  center: { x: number; y: number; z: number },
+) {
+  let mirrored = solid;
+  if (shape.mirrorX) mirrored = cad.mirror(mirrored, center, { x: 1, y: 0, z: 0 });
+  if (shape.mirrorY) mirrored = cad.mirror(mirrored, center, { x: 0, y: 1, z: 0 });
+  if (shape.mirrorZ) mirrored = cad.mirror(mirrored, center, { x: 0, y: 0, z: 1 });
+  return mirrored;
+}
+
 /** The kinds `exactSolidForShape` can build, for an error message to name. */
 export const EXACT_SOLID_KINDS = [
   "box", "cylinder", "cone", "sphere", "halfSphere", "loft",
@@ -410,11 +435,12 @@ export const EXACT_SOLID_KINDS = [
 ] as const;
 
 /**
- * The shape as an exact solid, turned the way it sits in the project.
+ * The shape as an exact solid, mirrored and turned the way it sits in the project.
  *
  * Rotation has to be baked in: the treated result is stored as a mesh with no
  * rotation of its own, so a shape filleted while turned would otherwise come
- * back straightened.
+ * back straightened. So does any mirror, applied first as the editor does,
+ * because the result clears the shape's mirror flags (#413).
  *
  * Turned about the shape's centre, `height / 2` above its base, which is where
  * the viewport and `transformMesh` turn it. It used to turn about the base
@@ -424,11 +450,11 @@ export const EXACT_SOLID_KINDS = [
  * a tilted cutter was off by that much (#420).
  */
 export function exactSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
-  let solid = unrotatedSolidForShape(cad, shape);
+  const pivot = { x: 0, y: shape.height / 2, z: 0 };
+  let solid = mirroredInShapeFrame(cad, unrotatedSolidForShape(cad, shape), shape, pivot);
   const yaw = shape.rotation ?? 0;
   const pitch = shape.rotationX ?? 0;
   const roll = shape.rotationZ ?? 0;
-  const pivot = { x: 0, y: shape.height / 2, z: 0 };
   // The editor orients a shape with THREE.Euler(rotationX, rotation, rotationZ)
   // in its default "XYZ" order, which is the matrix Rx * Ry * Rz -- so a point
   // is turned by roll first, then yaw, then pitch. Each `rotate` here
