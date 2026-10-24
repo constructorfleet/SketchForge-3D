@@ -38,4 +38,21 @@ describe("createAutosaveNoticeController", () => {
 
     expect(notices).toHaveLength(1);
   });
+
+  it("keeps project A's failure visible when project B later becomes pending", () => {
+    vi.useFakeTimers();
+    const notices: unknown[] = [];
+    const controller = createAutosaveNoticeController((notice) => notices.push(notice), 100);
+
+    controller.failed("project-a", "A", "quota exceeded");
+    controller.pending("project-b", "B");
+    vi.advanceTimersByTime(100);
+
+    expect(notices.at(-1)).toEqual({
+      projectId: "project-a",
+      projectName: "A",
+      state: "failed",
+      message: "quota exceeded",
+    });
+  });
 });
