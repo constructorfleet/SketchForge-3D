@@ -186,6 +186,7 @@ import { draftPrismRequestForShape } from "@/lib/draftPrismEditor";
 import { draftFaceRequestForShape, draftFaceResultMetadata, faceDraftSourceIsCurrent, type DraftFacePullAxis } from "@/lib/draftFaceEditor";
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
+import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
 import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -9590,15 +9591,8 @@ export function SketchForgeEditor({
   }, [commitShapes, hasSelection, placementWorkplane, selectedIds, selectedShapes, shapes, t]);
 
   useEffect(() => {
-    const isTypingTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) {
+      if (shouldIgnoreGlobalShortcut(event)) {
         keyboardMovement.finish();
         return;
       }

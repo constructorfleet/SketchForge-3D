@@ -83,6 +83,7 @@ import {
 } from "@/components/workplane/TransformOverlay";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, MeasurementAccuracy, ShapeAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 import type { CadModifierEdge } from "@/lib/cadModifierTypes";
+import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
 import {
   createRotationRingSet,
   ROTATION_RING_AXES,
@@ -5401,15 +5402,8 @@ export function WorkplaneViewport({
   }, [finishTransform, updateTransform]);
 
   useEffect(() => {
-    const isTypingTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) {
+      if (shouldIgnoreGlobalShortcut(event)) {
         return;
       }
 
