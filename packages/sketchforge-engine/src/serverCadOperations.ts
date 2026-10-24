@@ -30,6 +30,7 @@ import { canonicalizeShape } from "./workplaneShapes.js";
 import { createLocalId } from "./localIds.js";
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
+import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
 import { draftSketchFace, draftPrismProfileOffset, faceIdsForCadResult, type SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
@@ -72,6 +73,32 @@ const MESH_DEFLECTION = 0.1;
 const MIN_CAD_DIMENSION = 0.01;
 const FACE_HASH_UPPER_BOUND = 2_147_483_647;
 export type { SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
+
+function sketchResizeFactors(shape: WorkplaneShape) {
+  const mesh = shape.importedMesh;
+  if (shape.faceDraftSourceScale) return shape.faceDraftSourceScale;
+  const factor = (drawn: number, base: number | undefined) => base && base > 0 ? drawn / base : 1;
+  return {
+    width: factor(shape.width, mesh?.baseWidth),
+    depth: factor(shape.depth, mesh?.baseDepth),
+    height: factor(shape.height, mesh?.baseHeight),
+  };
+}
+
+function scaledSketchProfile(profile: SketchProfile, width: number, depth: number): SketchProfile {
+  const xs = profile.points.map((point) => point.x);
+  const zs = profile.points.map((point) => point.z);
+  const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const centerZ = (Math.min(...zs) + Math.max(...zs)) / 2;
+  const scalePoint = (point: SketchProfile["points"][number]) => ({
+    ...point,
+    x: centerX + (point.x - centerX) * width,
+    z: centerZ + (point.z - centerZ) * depth,
+    ...(point.handleIn ? { handleIn: { ...point.handleIn, x: centerX + (point.handleIn.x - centerX) * width, z: centerZ + (point.handleIn.z - centerZ) * depth } } : {}),
+    ...(point.handleOut ? { handleOut: { ...point.handleOut, x: centerX + (point.handleOut.x - centerX) * width, z: centerZ + (point.handleOut.z - centerZ) * depth } } : {}),
+  });
+  return { ...profile, points: profile.points.map(scalePoint) };
+}
 
 function meshPositionsOf(shape: WorkplaneShape) {
   const positions = shape.importedMesh?.positions;
@@ -522,6 +549,13 @@ function revolveWithoutExactEdges(shape: WorkplaneShape): string | null {
  * viewport stretches the mesh by.
  */
 function revolveResizeFactors(shape: WorkplaneShape) {
+  if (shape.faceDraftSourceScale) {
+    return {
+      radialX: shape.faceDraftSourceScale.width,
+      radialZ: shape.faceDraftSourceScale.depth,
+      axial: shape.faceDraftSourceScale.height,
+    };
+  }
   const mesh = shape.importedMesh;
   const ratio = (drawn: number, base: number | undefined) => (base && base > 0 && drawn > 0 ? drawn / base : 1);
   return {
@@ -630,6 +664,9 @@ export function exactPlainSketchRevolveSolid(
     }, (sketchRevolve.startAngle * Math.PI) / 180);
   });
   let solid = solids[0]!;
+  // Callers that cannot express a resized revolve analytically (for example,
+  // exact face listing of a radially elliptical legacy shape) use this bounds
+  // fit. Face drafting of a supported resize passes profile scales instead.
   if (targetShape?.importedMesh && targetShape.width > 0 && targetShape.depth > 0 && targetShape.height > 0) {
     const bounds = cad.getBoundingBox(solid, false);
     const sx = targetShape.width / Math.max(bounds.xmax - bounds.xmin, 1e-9);
@@ -643,24 +680,6 @@ export function exactPlainSketchRevolveSolid(
   }
   if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new ServerCadError("The retained sketch revolve could not be rebuilt as exact CAD geometry.");
   return solid;
-}
-
-function scaleRevolveResult(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShape) {
-  const mesh = shape.importedMesh;
-  if (!mesh) return solid;
-  const factors = [
-    shape.width / Math.max(mesh.baseWidth ?? shape.width, 1e-9),
-    shape.height / Math.max(mesh.baseHeight ?? shape.height, 1e-9),
-    shape.depth / Math.max(mesh.baseDepth ?? shape.depth, 1e-9),
-  ];
-  if (factors.every((factor) => Math.abs(factor - 1) < 1e-8)) return solid;
-  const bounds = cad.getBoundingBox(solid, false);
-  const [sx, sy, sz] = factors as [number, number, number];
-  return cad.transform(solid, [
-    sx, 0, 0, -(bounds.xmin + bounds.xmax) * sx / 2,
-    0, sy, 0, -bounds.ymin * sy,
-    0, 0, sz, -(bounds.zmin + bounds.zmax) * sz / 2,
-  ]);
 }
 
 /** Rebuild the exact CAD representation of an eligible retained revolve. */
@@ -695,7 +714,9 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
   if (shape.sketchOperation !== "extrude" || !shape.sketchProfile) {
     return Promise.reject(new ServerCadError("Draft prism requires a sketch extrusion with its source profile retained.", 400));
   }
-  const { points, segments } = shape.sketchProfile;
+  const scale = sketchResizeFactors(shape);
+  const profile = scaledSketchProfile(shape.sketchProfile, scale.width, scale.depth);
+  const { points, segments } = profile;
   if (points.length < 3 || segments.length !== points.length
     || segments.some((segment, index) => segment.kind && segment.kind !== "line"
       || segment.startId !== points[index].id
@@ -705,7 +726,7 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
   }
 
   return withCadKernel((cad) => {
-    const { x: centerX, z: centerZ } = draftPrismProfileOffset(shape.sketchProfile!);
+    const { x: centerX, z: centerZ } = draftPrismProfileOffset(profile);
     const edges = points.map((point, index) => {
       const next = points[(index + 1) % points.length];
       return cad.makeLineEdge(
@@ -736,14 +757,42 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     return Promise.reject(new ServerCadError("The face draft angle must be non-zero and between -45 and 45 degrees.", 400));
   }
   const exactRevolve = isPlainFullTurnSketchRevolve(shape);
+  if (exactRevolve) {
+    const resize = revolveResizeFactors(shape);
+    if (Math.abs(resize.radialX - resize.radialZ) > 1e-6 * Math.max(resize.radialX, resize.radialZ)) {
+      return Promise.reject(new ServerCadError(
+        "Face drafting requires an equal resize across the revolve's radial axes; unequal radial resizing makes an elliptical shape that cannot be drafted exactly.",
+        400,
+      ));
+    }
+  }
   if ((!exactRevolve && shape.sketchOperation !== "extrude" && shape.sketchOperation !== "sweep")
     || !shape.sketchProfile || (!shape.cadBrep && !exactRevolve)) {
     return Promise.reject(new ServerCadError("Face drafts require an exact retained sketch extrusion, sweep, or plain full-turn revolve.", 400));
   }
   return withCadKernel((cad) => {
-    const solid = exactRevolve
-      ? exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape)
-      : solidFromBrep(cad, shape.cadBrep!);
+    let solid: ShapeHandle;
+    if (exactRevolve) {
+      const resize = revolveResizeFactors(shape);
+      const hasResize = [resize.radialX, resize.radialZ, resize.axial]
+        .some((factor) => Math.abs(factor - 1) > 1e-8);
+      solid = hasResize
+        ? exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, undefined, {
+          radial: resize.radialX,
+          axial: resize.axial,
+        })
+        : exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
+    } else {
+      solid = solidFromBrep(cad, shape.cadBrep!);
+    }
+    const resize = sketchResizeFactors(shape);
+    if (!exactRevolve && shape.sketchOperation === "extrude"
+      && [resize.width, resize.depth, resize.height].some((factor) => Math.abs(factor - 1) > 1e-8)) {
+      solid = sketchExtrusionSolid(cad, scaledSketchProfile(shape.sketchProfile!, resize.width, resize.depth), shape.height);
+      if (!cadResultIsValid(cad, solid) || !cad.isSolid(solid)) {
+        throw new ServerCadError("The resized sketch extrusion could not be rebuilt as exact CAD geometry.");
+      }
+    }
     const faces = cad.getSubShapes(solid, "face");
     const ids = shape.faceIds?.length === faces.length ? shape.faceIds
       : exactRevolve && !shape.faceColors ? faces.map((_, index) => `face_${encodeURIComponent(shape.id)}_${index}`)
@@ -761,7 +810,7 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     if (!cadResultIsValid(cad, drafted) || !cad.isSolid(drafted)) {
       throw new ServerCadError("The face draft did not produce a valid solid.");
     }
-    return meshedCadResult(cad, exactRevolve ? scaleRevolveResult(cad, drafted, shape) : drafted, shape);
+    return meshedCadResult(cad, drafted, shape);
   });
 }
 
