@@ -19,7 +19,7 @@ test("README has a distinct installation section covering supported install path
 test("VitePress top navigation groups documentation instead of listing every category", () => {
   const nav = config.match(/nav:\s*\[([\s\S]*?)\n\s*\],\n\s*sidebar:/)?.[1] ?? "";
   const topLevelLinks = [...nav.matchAll(/^      \{\s*text:/gm)];
-  assert.ok(topLevelLinks.length <= 5, `Expected at most 5 top-level nav entries, found ${topLevelLinks.length}`);
+  assert.ok(topLevelLinks.length <= 6, `Expected at most 6 top-level nav entries, found ${topLevelLinks.length}`);
   assert.match(nav, /Install/i, "installation should be reachable from the top navigation");
   assert.match(nav, /items:/, "related documentation categories should be grouped in dropdowns");
 });

@@ -32,6 +32,7 @@ const config = defineConfig({
     nav: [
       { text: "Learn", link: "/" },
       { text: "Install", link: "/#installation" },
+      { text: "Demo", link: "/Demo/" },
       {
         text: "Guides",
         items: [

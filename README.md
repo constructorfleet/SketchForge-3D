@@ -54,6 +54,8 @@ Press **O** in the editor to switch between perspective and orthographic project
 
 ## Demo
 
+[Try the live browser demo](https://constructorfleet.github.io/SketchForge-3D/Demo/). The demo saves projects in your browser; server-side project storage and the REST API require a server deployment.
+
 ![SketchForge projects dashboard](https://sketchforge3d.com/assets/landing/project-dashboard.png)
 
 ## Installation

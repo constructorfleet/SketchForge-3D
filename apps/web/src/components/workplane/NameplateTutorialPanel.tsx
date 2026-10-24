@@ -4,6 +4,7 @@ import { ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLayoutEffect, useState } from "react";
 import { useTranslations, type MessageKey } from "@/i18n";
 import { snapGridLabel } from "@/lib/measurementUnits";
+import { publicAssetPath } from "@/lib/publicAssetPath";
 import type { GridSize } from "@/types/sketchforge";
 
 const NAMEPLATE_STEP_STORAGE_KEY = "sketchforge:nameplate-tutorial-step";
@@ -238,7 +239,7 @@ export function NameplateTutorialPanel({
         </div>
 
         <div className="key-tag-tutorial-image-box">
-          <img className="key-tag-tutorial-capture" src={step.image} alt={t(step.altKey)} draggable={false} />
+          <img className="key-tag-tutorial-capture" src={publicAssetPath(step.image)} alt={t(step.altKey)} draggable={false} />
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import type { CSSProperties, SVGProps } from "react";
+import { publicAssetPath } from "@/lib/publicAssetPath";
 
 type IconProps = SVGProps<SVGSVGElement>;
 type SpriteRect = {
@@ -8,8 +9,8 @@ type SpriteRect = {
   height: number;
 };
 
-const toolbarSprite = "assets/sketchforge/toolbar-sprite.svg?v=2";
-const vectorToolbarSprite = "assets/sketchforge/vector-toolbar-icons.svg?v=1";
+const toolbarSprite = `${publicAssetPath("/assets/sketchforge/toolbar-sprite.svg")}?v=2`;
+const vectorToolbarSprite = `${publicAssetPath("/assets/sketchforge/vector-toolbar-icons.svg")}?v=1`;
 
 function ToolbarSpriteIcon({ rect, className, style }: IconProps & { rect: SpriteRect }) {
   const size = 35;
@@ -63,7 +64,7 @@ type ToolbarCommandImageProps = { file: string; className?: string };
 
 function ToolbarCommandImage({ file, className }: ToolbarCommandImageProps) {
   const assetClassName = `toolbar-art-${file.replace(/\.png$/i, "")}`;
-  return <img aria-hidden="true" className={["toolbar-command-icon", assetClassName, className].filter(Boolean).join(" ")} src={"/assets/sketchforge/" + file} alt="" draggable={false} />;
+  return <img aria-hidden="true" className={["toolbar-command-icon", assetClassName, className].filter(Boolean).join(" ")} src={publicAssetPath(`/assets/sketchforge/${file}`)} alt="" draggable={false} />;
 }
 
 export function ToolbarHomeIcon() {

@@ -67,7 +67,7 @@ test("built pages identify their release and link to source at the represented r
   const home = readFileSync(path.join(output, "index.html"), "utf8");
   const packageGuide = readFileSync(path.join(output, "docs/packages/typescript-client.html"), "utf8");
   const builtPages = walk(output)
-    .filter((file) => file.endsWith(".html") && path.basename(file) !== "404.html")
+    .filter((file) => file.endsWith(".html") && path.basename(file) !== "404.html" && !file.includes(`${path.sep}Demo${path.sep}`))
     .map((file) => readFileSync(file, "utf8"));
 
   assert.ok(builtPages.length > 1, "the smoke test should cover the rendered site pages");

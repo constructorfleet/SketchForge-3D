@@ -1,5 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { resolveStaticExportBasePath } from "../../apps/web/next.config";
+import { publicAssetPath, withAppBasePath } from "@/lib/publicAssetPath";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 
@@ -43,5 +45,38 @@ describe("static export build", () => {
     // the variable unset, and the script builds a server bundle while claiming
     // to build the static export.
     expect(packageJson.scripts.export).not.toMatch(/(^|\s)set\s+\w+=/);
+  });
+});
+
+describe("static export base path", () => {
+  it("uses a validated path only for static exports", () => {
+    expect(resolveStaticExportBasePath({
+      STATIC_EXPORT: "true",
+      STATIC_EXPORT_BASE_PATH: "/SketchForge-3D/Demo",
+    })).toBe("/SketchForge-3D/Demo");
+    expect(resolveStaticExportBasePath({
+      STATIC_EXPORT: "false",
+      STATIC_EXPORT_BASE_PATH: "/SketchForge-3D/Demo",
+    })).toBeUndefined();
+    expect(resolveStaticExportBasePath({ STATIC_EXPORT: "true" })).toBeUndefined();
+  });
+
+  it("rejects malformed paths that would produce broken Pages asset URLs", () => {
+    for (const path of ["SketchForge-3D/Demo", "/SketchForge-3D/Demo/", "/SketchForge-3D//Demo", "/Demo?query"]) {
+      expect(() => resolveStaticExportBasePath({
+        STATIC_EXPORT: "true",
+        STATIC_EXPORT_BASE_PATH: path,
+      })).toThrow(/STATIC_EXPORT_BASE_PATH/);
+    }
+  });
+
+  it("prefixes public assets for a nested static export and leaves other URLs alone", () => {
+    expect(publicAssetPath("/assets/sketchforge/sketchforge-logo-white.png", "/SketchForge-3D/Demo"))
+      .toBe("/SketchForge-3D/Demo/assets/sketchforge/sketchforge-logo-white.png");
+    expect(publicAssetPath("https://example.com/logo.png", "/SketchForge-3D/Demo"))
+      .toBe("https://example.com/logo.png");
+    expect(publicAssetPath("/assets/logo.png")).toBe("/assets/logo.png");
+    expect(withAppBasePath("/?editor=1", "/SketchForge-3D/Demo"))
+      .toBe("/SketchForge-3D/Demo/?editor=1");
   });
 });
