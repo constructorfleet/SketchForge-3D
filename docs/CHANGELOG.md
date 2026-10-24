@@ -11,6 +11,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- The TypeScript client can now export a project to every format the API produces. `client.exports.export(projectId, { format, shapeIds?, name?, view?, section? })` and `project.export(...)` return the file as a `Uint8Array` for `stl`, `obj`, `3mf`, `step`, `skf`, `zip`, `svg` and `dxf`, with STEP's `exportedCount` and `skipped` shapes. A `view` on anything but SVG, or a `section` on anything but SVG or DXF, is refused before the request is sent. `project.estimateWallThickness(shapeId)`, which the package README already documented, now exists.
 - Fixed a sketch source edit inside a turned, mirrored or resized boolean
   group moving the group's part. Recompute added the rebuilt part's offset to
   the group's position as if the group were unturned, dropped the group's

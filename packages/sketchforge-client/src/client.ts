@@ -13,6 +13,7 @@ import { Drawings } from "./resources/drawings.js";
 import { DraftPrism } from "./resources/draft-prism.js";
 import { Edges } from "./resources/edges.js";
 import { Explosions } from "./resources/explosions.js";
+import { Exports } from "./resources/exports.js";
 import { Faces } from "./resources/faces.js";
 import { Imports } from "./resources/imports.js";
 import { Interference } from "./resources/interference.js";
@@ -40,6 +41,9 @@ import type {
   MeasurementSummary,
   ShapeProperties,
   MeshImportRequest,
+  ProjectExportArtifact,
+  ProjectExportRequest,
+  WallThicknessEstimate,
   MeshImportResult,
   PatternRequest,
   PatternResult,
@@ -77,6 +81,7 @@ export class SketchForgeClient {
   readonly imports: Imports;
   readonly interference: Interference;
   readonly thickness: Thickness;
+  readonly exports: Exports;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -99,6 +104,7 @@ export class SketchForgeClient {
     this.imports = new Imports(this.transport);
     this.interference = new Interference(this.transport);
     this.thickness = new Thickness(this.transport);
+    this.exports = new Exports(this.transport);
   }
 
   get apiRoot() {
@@ -219,6 +225,16 @@ export class ProjectHandle {
 
   sectionDxf(request: SectionDrawingRequest): Promise<SectionDxfArtifact> {
     return this.client.drawings.dxf(this.id, request);
+  }
+
+  /** Exports the project, or the named shapes, as one file in any of `PROJECT_EXPORT_FORMATS`. */
+  export(request: ProjectExportRequest): Promise<ProjectExportArtifact> {
+    return this.client.exports.export(this.id, request);
+  }
+
+  /** A sampled estimate of the shape's thinnest wall; not a certified minimum. */
+  estimateWallThickness(shapeId: string): Promise<WallThicknessEstimate> {
+    return this.client.thickness.estimate(this.id, shapeId);
   }
 
   measurementsWithRadius(shapeId: string): Promise<MeasurementSummary[]> {
