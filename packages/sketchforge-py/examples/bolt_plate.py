@@ -6,9 +6,9 @@ re-running with a different hole count should give one plate with the new holes
 rather than a second plate beside the first.
 
 The holes are ``kind="thread"`` with ``hole=True``, which cuts the thread form
-wider by a clearance and marks the shape as a hole -- so grouping them with the
-plate in the editor taps the plate. The API has no grouping endpoint yet, so the
-macro leaves them as marked holes for the editor's boolean.
+wider by a clearance and marks the shape as a hole. Grouping these thread meshes
+with the plate subtracts the bore and thread form to tap it. The REST API also
+supports this through ``POST /groups`` or ``POST /booleans``.
 """
 
 from typing import Any, Dict, List
@@ -39,12 +39,12 @@ def build(context: MacroContext) -> Dict[str, Any]:
                 "kind": "thread",
                 "name": f"{params['size']} hole {index}",
                 "size": params["size"],
-                # Through the plate, and started below it so the first turn is complete.
-                "length": thickness + 2,
+                # Match the plate thickness; longer helical meshes can fail OCCT STL import.
+                "length": thickness,
                 "hole": True,
                 "x": layout.mm(position.x),
                 "z": layout.mm(position.z),
-                "elevation": -1,
+                "elevation": 0,
             }
         )
 

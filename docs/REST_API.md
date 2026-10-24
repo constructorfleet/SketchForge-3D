@@ -793,6 +793,8 @@ A parameterised part is rarely one shape. A bracket is a plate with holes in it,
 
 Grouping is how this app subtracts. A group is one shape carrying its members; a member marked `hole: true` is subtracted from the rest when the group is made. So `POST /groups` and `POST /booleans` are one operation with two front doors: the first takes a flat list of ids and reads each shape's own `hole` flag, the second names the two roles explicitly and does not care how the shapes were stored.
 
+Thread shapes are tessellated meshes, and both endpoints can use one as a cutter to make a tapped hole. For a through cut, set the thread length to the plate thickness; the OCCT STL importer can fail on a longer thread mesh. If the CAD kernel cannot complete a boolean, the endpoint returns `422 geometry_failed` with the kernel message.
+
 <!-- runnable-exempt: These POST /booleans and POST /groups requests use placeholder ids and credentials; they document route alternatives, not a standalone script. -->
 ```bash
 # Cut: name the solid and the holes, whatever their stored hole flag says

@@ -109,7 +109,7 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
     case "shape_locked":
       return apiErrors.shapeLocked(wording.locked?.(failure.ids));
     case "geometry_failed":
-      return apiError(failure.message, failure.status, "geometry_failed");
+      return apiError(failure.message, 422, "geometry_failed");
     case "cad_refused":
       return apiError(failure.message, failure.status, "cad_failed");
     case "cad_failed":

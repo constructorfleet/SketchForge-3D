@@ -66,6 +66,20 @@ function meshVolume(positions: number[]) {
   return Math.abs(total);
 }
 
+function meshCenterY(positions: number[]) {
+  let signedVolume = 0;
+  let yMoment = 0;
+  for (let index = 0; index + 8 < positions.length; index += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(index, index + 9);
+    const tetraVolume = (
+      ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)
+    ) / 6;
+    signedVolume += tetraVolume;
+    yMoment += tetraVolume * (ay + by + cy) / 4;
+  }
+  return yMoment / signedVolume;
+}
+
 /**
  * That a cut removed the volume it was asked to remove.
  *
@@ -132,6 +146,41 @@ describe("REST API v1 grouping", () => {
     expect(payload.shape.x).toBeCloseTo(0, 3);
     expect(await storedShapes(projectId)).toHaveLength(1);
   });
+
+  it("subtracts a hole-marked thread shape when grouping", async () => {
+    const projectId = await makeProject("Tapped group");
+    const [plate, cutter] = await addShapes(projectId, [
+      { kind: "box", width: 40, depth: 40, height: 10, name: "Plate" },
+      { kind: "thread", size: "M8", length: 7, elevation: 0, hole: true, name: "Tap" },
+    ]);
+
+    const response = await group(authorized(`/api/v1/groups?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ ids: [plate, cutter] }),
+    }));
+    const [stored] = await storedShapes(projectId);
+
+    expect(response.status).toBe(201);
+    expect(stored?.importedMesh).toBeDefined();
+    expect(meshVolume(stored!.importedMesh!.positions)).toBeLessThan(40 * 40 * 10);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("returns 422 geometry_failed when grouping cannot import a long thread cutter", async () => {
+    const projectId = await makeProject("Long thread group");
+    const [plate, cutter] = await addShapes(projectId, [
+      { kind: "box", width: 60, depth: 40, height: 8, name: "Plate" },
+      { kind: "thread", size: "M8", length: 10, elevation: -1, x: 10, hole: true, name: "Tap" },
+    ]);
+
+    const response = await group(authorized(`/api/v1/groups?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ ids: [plate, cutter] }),
+    }));
+    const payload = await response.json() as { code: string; error: string };
+
+    expect(response.status).toBe(422);
+    expect(payload.code).toBe("geometry_failed");
+    expect(payload.error).toContain("importStl:");
+    expect(await storedShapes(projectId)).toHaveLength(2);
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("keeps a pure group as a record rather than baking it into a mesh", async () => {
     const { projectId, left, right } = await twoBoxes();
@@ -232,6 +281,22 @@ describe("REST API v1 boolean cut", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     expectVolume(meshVolume(stored.importedMesh!.positions), PLATE_VOLUME - Math.PI * 16 * 10);
   });
 
+  it("cuts an M8 thread shape from a plate and moves the centre of mass away from the cut", async () => {
+    const projectId = await makeProject("Tapped plate");
+    const [plate, cutter] = await addShapes(projectId, [
+      { kind: "box", width: 40, depth: 40, height: 10, name: "Plate" },
+      { kind: "thread", size: "M8", length: 7, elevation: 0, name: "Tap" },
+    ]);
+
+    const response = await cut(projectId, { solidIds: [plate], holeIds: [cutter] });
+    const [stored] = await storedShapes(projectId);
+
+    expect(response.status).toBe(201);
+    expect(stored?.importedMesh).toBeDefined();
+    expect(meshVolume(stored!.importedMesh!.positions)).toBeLessThan(PLATE_VOLUME);
+    expect(meshCenterY(stored!.importedMesh!.positions)).toBeGreaterThan(5);
+  });
+
   it("cuts the hole where the hole is, not where the plate is", async () => {
     const { projectId, plate, bore } = await platedProject({ x: 12, z: -8 });
 
@@ -289,6 +354,22 @@ describe("REST API v1 boolean cut", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
     expect(response.status).toBe(422);
     expect(await storedShapes(projectId)).toHaveLength(2);
   });
+
+  it("returns 422 geometry_failed with the kernel message when a thread mesh cannot be imported", async () => {
+    const projectId = await makeProject("Long thread cut");
+    const [plate, cutter] = await addShapes(projectId, [
+      { kind: "box", width: 60, depth: 40, height: 8, name: "Plate" },
+      { kind: "thread", size: "M8", length: 10, elevation: -1, x: 10, name: "Tap" },
+    ]);
+
+    const response = await cut(projectId, { solidIds: [plate], holeIds: [cutter] });
+    const payload = await response.json() as { code: string; error: string };
+
+    expect(response.status).toBe(422);
+    expect(payload.code).toBe("geometry_failed");
+    expect(payload.error).toContain("importStl:");
+    expect(await storedShapes(projectId)).toHaveLength(2);
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("refuses a request with no solid, no hole, a shape in both roles, or an unknown id", async () => {
     const { projectId, plate, bore } = await platedProject({});
