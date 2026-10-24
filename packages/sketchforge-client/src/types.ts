@@ -769,4 +769,16 @@ export type ShapePatchResult = { shape: ShapeSummary; revision: number };
 export type TreatmentResult = { shape: ShapeSummary; triangles: number; revision: number };
 /** The same three fields a treatment answers with; hollowing is one more of them. */
 export type ShellResult = TreatmentResult;
+
+/** Shapes to cut from, and shapes to cut away. No shape may be both. */
+export type BooleanCutRequest = { solidIds: readonly string[]; holeIds: readonly string[] };
+/**
+ * The one shape a cut leaves, replacing every operand.
+ *
+ * `triangles` counts the result's mesh. A cut that removed nothing is refused
+ * rather than answered with an unchanged shape.
+ */
+export type BooleanCutResult = TreatmentResult;
+/** The new group, which replaces its members; members marked `hole` are subtracted. */
+export type GroupResult = { shape: ShapeSummary; revision: number };
 export type DeleteResult = { deleted: true; id: string; revision?: number };

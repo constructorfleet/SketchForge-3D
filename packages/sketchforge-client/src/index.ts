@@ -4,6 +4,9 @@ export { Transport, normalizeBaseUrl, buildUrl, type FetchLike, type RequestSpec
 export { Projects } from "./resources/projects.js";
 export { Shapes, chunk, shapePatchFromSummary } from "./resources/shapes.js";
 export { Align, Distribute, Patterns } from "./resources/arrange.js";
+export { Booleans } from "./resources/booleans.js";
+export { Groups } from "./resources/groups.js";
+export { Parts } from "./resources/parts.js";
 export { Edges } from "./resources/edges.js";
 export { Explosions } from "./resources/explosions.js";
 export { Exports } from "./resources/exports.js";
