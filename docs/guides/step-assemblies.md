@@ -20,6 +20,12 @@ sources:
 
 A STEP assembly imported in the editor begins as one positioned mesh. The editor retains the source STEP file as a project asset, so it remains available when the project is saved or exported as `.skf`. When the source is within the bounded metadata extraction limits, the shape summary includes `stepAssembly`: a product tree with names, optional source occurrence IDs, and direct children. This tree describes the source assembly; it does not itself create selectable parts. See the [editor project export walkthrough](./editor-quickstart.md).
 
+## Export nested groups as STEP assemblies
+
+Exporting a grouped project writes an XCAF product and occurrence for each project group level. Other CAD readers can inspect the hierarchy through native `NEXT_ASSEMBLY_USAGE_OCCURRENCE` relationships; group paths are no longer packed into component names. Reimport reads those nested XCAF labels and retains the same group tree for explosion. Exact solid placements and colors remain attached to their leaf components.
+
+Imported STEP component placements are not directly editable as occurrence transforms. To reposition a subassembly in SketchForge, explode it into project groups and move the group; STEP export writes the resulting group hierarchy and placement.
+
 ## Explode an assembly in the editor
 
 Select an imported STEP assembly whose shape carries `stepAssembly` metadata, and the shape inspector offers **Explode Assembly**. The editor explodes it on the same browser CAD kernel that imported it, using the project's retained STEP source, so no server or API token is involved. The imported mesh is replaced, in its place in the scene, by nested groups matching the source product tree; expand a group in the scene inspector to see its members. The explosion is one undo step: **Undo** returns the single imported assembly, and **Redo** brings the groups back.
@@ -60,6 +66,6 @@ When every exact solid can be associated with a unique product occurrence, explo
 
 `id` identifies a solid within its source occurrence, `occurrenceId` identifies the product occurrence, and `path` records the root-to-component ancestry. These are descriptive source identifiers: changing the STEP file or its product structure can change them. The nested groups and leaf metadata persist through normal project save and `.skf` round-trip. Select a group to move its complete subassembly; ungroup one level at a time to work with its children or individual solids.
 
-Hierarchy-to-solid association is bounded and conservative. It compares world-space bounds from the XCAF GLB occurrence meshes with exact imported solid bounds, and uses a match only when both sides are unique. If any solid cannot be associated unambiguously, the operation falls back to the existing flat, top-level solids rather than creating a partial tree; those solids keep the name and color available from XCAF, and `stepComponent` may be absent. Nested groups retain the component positions in project space. They do not preserve the STEP file's original transform operations or guarantee hierarchy-preserving STEP export.
+Hierarchy-to-solid association is bounded and conservative. It compares world-space bounds from the XCAF GLB occurrence meshes with exact imported solid bounds, and uses a match only when both sides are unique. If any solid cannot be associated unambiguously, the operation falls back to the existing flat, top-level solids rather than creating a partial tree; those solids keep the name and color available from XCAF, and `stepComponent` may be absent. Nested groups retain the component positions in project space. They do not preserve the STEP file's original transform operations.
 
 Extraction remains limited to STEP sources up to 8 MiB and 200 solids; hierarchy metadata has a 2,000-node and 32-level bound. REST request and response details are in the [generated operation references](/docs/rest-api/).

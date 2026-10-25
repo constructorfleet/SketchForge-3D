@@ -32,8 +32,8 @@ let importedShapeFromStep: typeof import("@/lib/engine/stepImport").importedShap
 
 beforeAll(async () => {
   brep = await import("brepjs");
-  ({ exportShapesToStep } = await import("@/lib/engine/stepExport"));
-  ({ importedShapeFromStep } = await import("@/lib/engine/stepImport"));
+  ({ exportShapesToStep } = await import("../../packages/sketchforge-engine/src/stepExport"));
+  ({ importedShapeFromStep } = await import("../../packages/sketchforge-engine/src/stepImport"));
   // Warm the kernel via the mocked loader so brepjs has a registered kernel for
   // the re-import assertions below.
   const { loadBrepWithOcct } = await import("@/lib/brepKernel");
@@ -223,8 +223,9 @@ describe("STEP import → re-export round-trip (real OCCT kernel)", () => {
     expect(Object.values(imported.faceColors ?? {})).toContain("#1a33e5");
     const stepText = await blob.text();
     expect(stepText).toContain("COLOUR_RGB");
-    expect(stepText).toContain("MainAssembly / Sensors / SensorLeft");
-    expect(stepText).toContain("MainAssembly / Sensors / SensorRight");
+    expect(stepText).not.toContain("MainAssembly / Sensors / SensorLeft");
+    expect(stepText).not.toContain("MainAssembly / Sensors / SensorRight");
+    expect(stepText.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g)).toHaveLength(4);
     expect(near(await reimportVolume(blob), 10 * 8 * 6 + 2 * 4 * 4 * 4)).toBe(true);
     const xs = imported.importedMesh!.positions.filter((_, index) => index % 3 === 0);
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(40);

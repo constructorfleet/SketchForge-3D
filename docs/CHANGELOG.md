@@ -9,6 +9,8 @@ owner: "Contributors"
 
 ## Unreleased
 
+- STEP export now writes nested project groups as native assembly occurrences that CAD readers can inspect, and reimport preserves that group tree without relying on encoded group-path names.
+
 Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.
 
 - Editor dialogs now move keyboard focus into the opened panel, contain Tab navigation in modal dialogs, return focus to the opener, and close on Escape.
