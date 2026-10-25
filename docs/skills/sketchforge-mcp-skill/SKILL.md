@@ -72,7 +72,7 @@ Useful tools:
 
 - `sketchforge_select_objects`: select ids in the live editor.
 - `sketchforge_delete_objects`: delete ids in the live editor, or delete the current selection when ids are omitted.
-- `sketchforge_create_shape`: create `box`, `cube`, `cylinder`, or `sketch`.
+- `sketchforge_create_shape`: create a shape by `kind`. Local mode builds every parameterized kind (`box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`) plus `revolve` and `thread`. An open editor builds `box`, `cube`, `cylinder`, `text`, `loft`, `sketch`, `revolve`, and `thread`. `sketch` is editor-only, and local mode refuses it. On `tube` and `ring`, `bevel` is the wall thickness in mm (default 4).
 - `sketchforge_import_mesh`: import STL-style mesh data into the editor.
 - `sketchforge_update_object`: set exact dimensions, position, color, name, hole state, and `rotation`/`rotationX`/`rotationZ`.
 - `sketchforge_align_objects`: align two or more ids using the same logic as the editor Alignment button.

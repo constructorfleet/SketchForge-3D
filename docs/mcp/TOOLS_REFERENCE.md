@@ -387,7 +387,7 @@ Delete objects by id, or delete the current selection when ids are omitted.
 
 ### Description
 
-Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or standard screw thread in SketchForge.
+Create a parameterized shape, extruded sketch, revolve, or standard screw thread in SketchForge. Local mode (no url) builds box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, icosahedron, text, loft, gear, revolve, thread. An editor (url) builds box, cube, cylinder, text, loft, sketch, revolve, thread. sketch is editor-only. Each parameter's description names the kinds it applies to.
 
 ### Input schema
 
@@ -421,11 +421,26 @@ Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or standard 
         "box",
         "cube",
         "cylinder",
-        "sketch",
+        "cone",
+        "sphere",
+        "halfSphere",
+        "torus",
+        "tube",
+        "ring",
+        "polygon",
+        "pyramid",
+        "roof",
+        "roundRoof",
+        "wedge",
+        "icosahedron",
+        "text",
         "loft",
+        "gear",
         "revolve",
-        "thread"
-      ]
+        "thread",
+        "sketch"
+      ],
+      "description": "Local mode builds every kind except sketch. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only box, cube, cylinder, text, loft, sketch, revolve, thread."
     },
     "profile": {
       "type": "array",
@@ -514,7 +529,81 @@ Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or standard 
       "type": "number"
     },
     "sides": {
-      "type": "number"
+      "type": "number",
+      "description": "For cylinder, cone, pyramid and roundRoof: number of sides around the axis (at least 3, default 96)."
+    },
+    "steps": {
+      "type": "number",
+      "description": "For sphere and halfSphere: number of segments around and over the surface (at least 4, default 32)."
+    },
+    "bevel": {
+      "type": "number",
+      "description": "For tube and ring: wall thickness in mm, measured inward from the outer radius (minimum 0.1, default 4). A 20x20x10 tube with bevel 4 has a 6 mm inner radius. For text: edge rounding in mm (default 0)."
+    },
+    "segments": {
+      "type": "number",
+      "description": "For text: curve segments per glyph outline (at least 1, default 2)."
+    },
+    "topRadius": {
+      "type": "number",
+      "description": "For cone: radius of the top in mm (default 0, a point)."
+    },
+    "baseRadius": {
+      "type": "number",
+      "description": "For cone: radius of the base in mm (default half the width)."
+    },
+    "taperTopWidth": {
+      "type": "number",
+      "description": "Every kind but gear: footprint width at the top of the extrusion in mm (default width)."
+    },
+    "taperTopDepth": {
+      "type": "number",
+      "description": "Every kind but gear: footprint depth at the top of the extrusion in mm (default depth)."
+    },
+    "taperBottomWidth": {
+      "type": "number",
+      "description": "Every kind but gear: footprint width at the bottom of the extrusion in mm (default width)."
+    },
+    "taperBottomDepth": {
+      "type": "number",
+      "description": "Every kind but gear: footprint depth at the bottom of the extrusion in mm (default depth)."
+    },
+    "teeth": {
+      "type": "number",
+      "description": "For gear: tooth count (default 12)."
+    },
+    "toothSize": {
+      "type": "number",
+      "description": "For gear: radial tooth height in mm (default 2.5)."
+    },
+    "toothWidth": {
+      "type": "number",
+      "description": "For gear: tooth width in mm (default 0.54 of the tooth pitch, clamped between 0.12 and 0.82 of it)."
+    },
+    "centerHoleSize": {
+      "type": "number",
+      "description": "For gear: centre hole size in mm (default 6, clamped so it stays inside the tooth roots; 0 for none)."
+    },
+    "gearType": {
+      "type": "string",
+      "enum": [
+        "spur",
+        "helical",
+        "bevel"
+      ],
+      "description": "For gear: tooth form (default spur)."
+    },
+    "helixAngle": {
+      "type": "number",
+      "description": "For gear with gearType helical: helix angle in degrees (default 22.5)."
+    },
+    "text": {
+      "type": "string",
+      "description": "For text: the characters to extrude (default TEXT)."
+    },
+    "font": {
+      "type": "string",
+      "description": "For text: font name (default Multilanguage)."
     },
     "loftBottomShape": {
       "type": "string",
