@@ -16619,7 +16619,8 @@
                     {
                       "type": "object",
                       "required": [
-                        "projects"
+                        "projects",
+                        "nextCursor"
                       ],
                       "properties": {
                         "projects": {
@@ -16655,6 +16656,12 @@
                               }
                             }
                           }
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       }
                     },
@@ -17886,6 +17893,26 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,4}$",
+              "maxLength": 4
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "maxLength": 128
+            }
           }
         ]
       },
@@ -18914,7 +18941,8 @@
                 "schema": {
                   "type": "object",
                   "required": [
-                    "shapes"
+                    "shapes",
+                    "nextCursor"
                   ],
                   "properties": {
                     "shapes": {
@@ -19819,6 +19847,12 @@
                           }
                         }
                       }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   }
                 }
@@ -20107,6 +20141,26 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,4}$",
+              "maxLength": 4
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "maxLength": 128
             }
           }
         ]

@@ -2,6 +2,7 @@ import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
+import { paginateApiV1 } from "@/lib/apiV1Pagination";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -19,7 +20,9 @@ async function getHandler(request: Request) {
 
   const project = await apiEngine(context.root).project(projectId);
   if (!project.ok) return apiEngineError(project.failure);
-  return apiJson({ shapes: project.value.shapes.map(apiShapeSummary) });
+  const page = paginateApiV1(project.value.shapes, new URL(request.url).searchParams.get("limit") ?? undefined, new URL(request.url).searchParams.get("cursor") ?? undefined);
+  if (!page) return apiError("The limit or cursor is invalid.", 400, "invalid_request");
+  return apiJson({ shapes: page.items.map(apiShapeSummary), nextCursor: page.nextCursor });
 }
 
 /**

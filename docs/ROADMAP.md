@@ -30,6 +30,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 ## API contract accuracy
 
 - [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
+- [#373: Add limit and cursor paging to project and shape listings](https://github.com/constructorfleet/SketchForge-3D/issues/373) — implementation and route/client coverage complete; awaiting review.
 
 ## Client command line
 

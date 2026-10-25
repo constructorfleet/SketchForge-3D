@@ -66,12 +66,14 @@ client.check(): Promise<{ ok: true; projects: number } | { ok: false; reason: st
 client.project(projectId): ProjectHandle
 
 client.projects.list(): Promise<ProjectSummary[]>
+client.projects.listPage({ limit?, cursor? }): Promise<{ items: ProjectSummary[]; nextCursor: string | null }>
 client.projects.get(projectId): Promise<ProjectDetail>
 client.projects.create(name): Promise<ProjectSummary>
 client.projects.delete(projectId): Promise<DeleteResult>
 client.projects.findByName(name): Promise<ProjectSummary | null>
 
 client.shapes.list(projectId): Promise<ShapeSummary[]>
+client.shapes.listPage(projectId, { limit?, cursor? }): Promise<{ items: ShapeSummary[]; nextCursor: string | null }>
 client.shapes.create(projectId, shape): Promise<ShapeSummary>
 client.shapes.createMany(projectId, shapes): Promise<ShapeWriteResult>
 client.shapes.update(projectId, shapeId, changes): Promise<ShapePatchResult>

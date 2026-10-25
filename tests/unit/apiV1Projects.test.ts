@@ -107,6 +107,32 @@ describe("REST API v1", () => {
     expect(payload.projects[0]).toMatchObject({ id: projectId, name: "Bracket", shapes: 0 });
   });
 
+  it("paginates project and shape listings with a next cursor", async () => {
+    const firstProjectId = await makeProject("First");
+    await makeProject("Second");
+    await makeProject("Third");
+
+    const firstProjectsResponse = await getProjects(authorized("/api/v1/projects?limit=2"));
+    const firstProjects = await firstProjectsResponse.json() as { projects: Array<{ id: string }>; nextCursor: string | null };
+    expect(firstProjects.projects).toHaveLength(2);
+    expect(firstProjects.nextCursor).toEqual(expect.any(String));
+    const secondProjects = await (await getProjects(authorized(`/api/v1/projects?limit=2&cursor=${encodeURIComponent(firstProjects.nextCursor!)}`))).json() as { projects: Array<{ id: string }>; nextCursor: string | null };
+    expect(secondProjects.projects).toHaveLength(1);
+    expect(secondProjects.nextCursor).toBeNull();
+    expect([...firstProjects.projects, ...secondProjects.projects]).toHaveLength(3);
+
+    await addShape(firstProjectId, { kind: "cube", size: 10, name: "A" });
+    await addShape(firstProjectId, { kind: "cube", size: 10, x: 20, name: "B" });
+    await addShape(firstProjectId, { kind: "cube", size: 10, x: 40, name: "C" });
+    const firstShapes = await (await getShapes(authorized(`/api/v1/shapes?projectId=${firstProjectId}&limit=2`))).json() as { shapes: Array<{ name: string }>; nextCursor: string | null };
+    expect(firstShapes.shapes).toHaveLength(2);
+    expect(firstShapes.nextCursor).toEqual(expect.any(String));
+    const secondShapes = await (await getShapes(authorized(`/api/v1/shapes?projectId=${firstProjectId}&limit=2&cursor=${encodeURIComponent(firstShapes.nextCursor!)}`))).json() as { shapes: Array<{ name: string }>; nextCursor: string | null };
+    expect(secondShapes.shapes).toHaveLength(1);
+    expect(secondShapes.nextCursor).toBeNull();
+    expect([...firstShapes.shapes, ...secondShapes.shapes].map((shape) => shape.name)).toEqual(["A", "B", "C"]);
+  });
+
   it("requires a name to create a project", async () => {
     const response = await createProject(authorized("/api/v1/projects", { method: "POST", body: JSON.stringify({ name: "   " }) }));
     expect(response.status).toBe(400);

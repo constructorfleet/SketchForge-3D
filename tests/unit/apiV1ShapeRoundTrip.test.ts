@@ -333,7 +333,7 @@ describe("REST API shape round trip", () => {
 
     expect(drafted.status, JSON.stringify(drafted.payload)).toBe(200);
     expect(drafted.payload.shape?.faceDraft).toMatchObject(draft);
-    expect(validateApiV1Response("GET /api/v1/shapes", 200, { shapes: [drafted.payload.shape] })).toBe(true);
+    expect(validateApiV1Response("GET /api/v1/shapes", 200, { shapes: [drafted.payload.shape], nextCursor: null })).toBe(true);
     expect((await readShape(projectId, revolve.id)).faceDraft).toMatchObject(draft);
   }, 60_000);
 
