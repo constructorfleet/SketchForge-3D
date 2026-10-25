@@ -6,8 +6,7 @@
  */
 
 import { withCadKernel } from "./serverCadKernel.js";
-import { placedSolidForShape } from "./serverShapeBooleans.js";
-import { hasExactRevolveSolid } from "./serverCadOperations.js";
+import { placedSolid } from "./serverShapeBooleans.js";
 import { interferenceBetweenSolids, interferenceRequestRefusal, type InterferenceResult } from "./cadAnalysis.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
@@ -36,8 +35,15 @@ export async function checkInterference(shapes: readonly WorkplaneShape[], reque
 
   return withCadKernel((cad) => interferenceBetweenSolids(
     cad,
-    selected.map((shape) => ({ id: shape.id, name: shape.name, tessellated: (shape.importedMesh?.positions?.length ?? 0) >= 9 && !hasExactRevolveSolid(shape), shape })),
-    (operand) => placedSolidForShape(cad, operand.shape),
+    selected.map((shape) => {
+      // Built here rather than in `solidFor`, because which representation a
+      // solid came from is only known once it has been built: whether a
+      // boolean result's B-rep passed its check (#541), or a group record's
+      // members fell back to their triangles. The pair's precision says so.
+      const { solid, provenance } = placedSolid(cad, shape);
+      return { id: shape.id, name: shape.name, tessellated: provenance.precision === "tessellated", solid };
+    }),
+    (operand) => operand.solid,
     clearance,
   ));
 }

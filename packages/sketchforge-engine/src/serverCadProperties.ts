@@ -7,19 +7,15 @@
  * time, and could not improve on a result that is tessellated either way.
  */
 
+import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "./serverCadKernel.js";
-import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
+import { hasCurrentResultBrep, placedResultBrepSolid, placedSolid, type ShapeGeometryProvenance } from "./serverShapeBooleans.js";
 import { worldMeshForShape } from "./serverShapeGroups.js";
 import { meshMassProperties } from "./meshMassProperties.js";
 import { asServerCadError, hasExactRevolveSolid } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
-export type ShapeGeometryProvenance = {
-  /** Which stored representation supplied the geometry that was measured. */
-  source: "parametric" | "brep" | "mesh";
-  /** Imported triangle meshes remain tessellated even after sewing into a solid. */
-  precision: "exact" | "tessellated";
-};
+export type { ShapeGeometryProvenance };
 
 export type ServerCadShapeProperties = {
   /** Volume in mm^3. */
@@ -38,31 +34,32 @@ export type ServerCadShapeProperties = {
   provenance: ShapeGeometryProvenance;
 };
 
-function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
-  // A plain revolve is measured on the exact solid of its profile, not on the
-  // sweep's mesh it is stored as (#523).
-  if (hasExactRevolveSolid(shape)) return { source: "parametric", precision: "exact" };
-  // placedSolidForShape uses an imported mesh when one is present, including
-  // when it also carries source STEP text. Report the geometry actually used.
-  if (shape.importedMesh?.positions && shape.importedMesh.positions.length >= 9) {
-    return { source: "mesh", precision: "tessellated" };
-  }
-  // A group record is measured as its children fused, so it is only as exact
-  // as the least exact of them. A hidden member is left out of the fuse, so
-  // it is left out here too.
-  if (isGroupRecord(shape)) {
-    const children = (shape.groupedShapes ?? []).filter((child) => !child.hidden).map(geometryProvenance);
-    return children.find((child) => child.source === "mesh")
-      ?? children.find((child) => child.source === "brep")
-      ?? { source: "parametric", precision: "exact" };
-  }
-  return shape.cadBrep
-    ? { source: "brep", precision: "exact" }
-    : { source: "parametric", precision: "exact" };
+const MESH_PROVENANCE: ShapeGeometryProvenance = { source: "mesh", precision: "tessellated" };
+
+function measuredSolid(cad: OcctKernel, solid: ShapeHandle, provenance: ShapeGeometryProvenance): ServerCadShapeProperties {
+  const query = cad.queryBatch([solid])[0];
+  if (!query) throw new Error("The CAD kernel returned no shape properties.");
+  return {
+    volume: query.volume,
+    area: query.area,
+    centerOfMass: query.centerOfMass,
+    bbox: query.bbox,
+    isValid: query.isValid,
+    provenance,
+  };
 }
 
 /** Measure one shape using the same project-space solid the engine's CAD tools use. */
-export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
+export async function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
+  // A boolean result is measured on its exact B-rep while that still agrees
+  // with its mesh (#541), and falls through to the mesh when it does not.
+  if (hasCurrentResultBrep(shape)) {
+    const exact = await withCadKernel((cad) => {
+      const solid = placedResultBrepSolid(cad, shape);
+      return solid ? measuredSolid(cad, solid, { source: "brep", precision: "exact" }) : null;
+    });
+    if (exact) return exact;
+  }
   // The same placed triangles placedSolidForShape would sew, measured as they are.
   const mesh = hasExactRevolveSolid(shape) ? null : worldMeshForShape(shape);
   // A mesh that does not close at any weld tolerance has no volume to report:
@@ -73,20 +70,18 @@ export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapePr
   try {
     fromMesh = mesh ? meshMassProperties(mesh) : null;
   } catch (error) {
-    return Promise.reject(asServerCadError(error));
+    throw asServerCadError(error);
   }
-  if (fromMesh) return Promise.resolve({ ...fromMesh, isValid: true, provenance: geometryProvenance(shape) });
+  // Measured from the triangles, so tessellated, whatever else the shape
+  // carries: a result whose B-rep did not match its mesh lands here too.
+  if (fromMesh) return { ...fromMesh, isValid: true, provenance: MESH_PROVENANCE };
+  // The provenance comes from the build itself: a revolve is its profile, a
+  // mesh that did not close is sewn and still triangles, and a group record is
+  // only as exact as the members it actually fused -- a cut inside it that was
+  // resized with the group, or whose B-rep failed its check, is sewn from its
+  // mesh and makes the record tessellated.
   return withCadKernel((cad) => {
-    const solid = placedSolidForShape(cad, shape);
-    const query = cad.queryBatch([solid])[0];
-    if (!query) throw new Error("The CAD kernel returned no shape properties.");
-    return {
-      volume: query.volume,
-      area: query.area,
-      centerOfMass: query.centerOfMass,
-      bbox: query.bbox,
-      isValid: query.isValid,
-      provenance: geometryProvenance(shape),
-    };
+    const { solid, provenance } = placedSolid(cad, shape);
+    return measuredSolid(cad, solid, provenance);
   });
 }
