@@ -40,8 +40,12 @@ export const LOCAL_SOLID_KINDS = [
  */
 export const LOCAL_STORED_KINDS = ["icosahedron", "text", "gear"];
 
-/** Kinds whose STEP export is exact B-Rep; every other solid exports as STL only. */
-export const STEP_KINDS = ["box", "cube", "cylinder", "cone", "sphere"];
+/**
+ * Kinds whose STEP export is exact B-Rep; every other solid exports as STL only.
+ * A `revolve` is exported from the exact solid of its profile (#523); a
+ * `thread` is helical, has only its tessellated sweep, and is not.
+ */
+export const STEP_KINDS = ["box", "cube", "cylinder", "cone", "sphere", "revolve"];
 
 /**
  * Kinds a taper (`taperTopWidth` and the rest) builds on, in local mode only.

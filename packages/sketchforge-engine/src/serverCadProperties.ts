@@ -11,7 +11,7 @@ import { withCadKernel } from "./serverCadKernel.js";
 import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
 import { worldMeshForShape } from "./serverShapeGroups.js";
 import { meshMassProperties } from "./meshMassProperties.js";
-import { asServerCadError } from "./serverCadOperations.js";
+import { asServerCadError, hasExactRevolveSolid } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ShapeGeometryProvenance = {
@@ -39,6 +39,9 @@ export type ServerCadShapeProperties = {
 };
 
 function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
+  // A plain revolve is measured on the exact solid of its profile, not on the
+  // sweep's mesh it is stored as (#523).
+  if (hasExactRevolveSolid(shape)) return { source: "parametric", precision: "exact" };
   // placedSolidForShape uses an imported mesh when one is present, including
   // when it also carries source STEP text. Report the geometry actually used.
   if (shape.importedMesh?.positions && shape.importedMesh.positions.length >= 9) {
@@ -61,7 +64,7 @@ function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
 /** Measure one shape using the same project-space solid the engine's CAD tools use. */
 export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
   // The same placed triangles placedSolidForShape would sew, measured as they are.
-  const mesh = worldMeshForShape(shape);
+  const mesh = hasExactRevolveSolid(shape) ? null : worldMeshForShape(shape);
   // A mesh that does not close at any weld tolerance has no volume to report:
   // the kernel's sewing gets the last word, and refuses it as it always has.
   // Bodies overlapping without nesting are refused here, as the exact path

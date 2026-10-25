@@ -18,8 +18,8 @@
 import type { Matrix4 } from "three";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "./serverCadKernel.js";
-import { localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "./serverCadOperations.js";
-import { UnbuildableShapeError } from "./cadSolids.js";
+import { exactRevolveAngularDeflection, exactRevolveLocalSolid, hasExactRevolveSolid,localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "./serverCadOperations.js";
+import { mirroredInShapeFrame, UnbuildableShapeError } from "./cadSolids.js";
 import { createLocalId } from "./localIds.js";
 import type { MeshData } from "./meshTransform.js";
 import {
@@ -93,6 +93,16 @@ function meshTrianglePositions(mesh: MeshData) {
  * `generalTransform` because a reflection is not a rigid placement.
  */
 export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
+  // A plain revolve is stored as its sweep's mesh, but its profile describes
+  // it exactly (#523). It is built in the mesh's own frame and placed the way
+  // the mesh is, with the mirror applied exactly about the same centre rather
+  // than through `generalTransform`, so its faces stay analytic.
+  const revolve = exactRevolveLocalSolid(cad, shape);
+  if (revolve) {
+    const mirrored = mirroredInShapeFrame(cad, revolve, shape, { x: 0, y: shape.height / 2, z: 0 });
+    const rigid = { ...shape, mirrorX: false, mirrorY: false, mirrorZ: false };
+    return cad.transform(mirrored, rowMajorTransform(shapePlacementMatrix(rigid)));
+  }
   const mesh = worldMeshForShape(shape);
   if (mesh) return solidFromMeshPositions(cad, meshTrianglePositions(mesh));
   if (isGroupRecord(shape)) return groupRecordSolid(cad, shape);
@@ -110,6 +120,16 @@ export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): Sha
   return shape.mirrorX || shape.mirrorY || shape.mirrorZ
     ? cad.generalTransform(solid, matrix)
     : cad.transform(solid, matrix);
+}
+
+/**
+ * A plain revolve's exact solid where it stands, as BREP text, or null for any
+ * other shape: what the STEP exporter writes for a revolve instead of skipping
+ * it as a mesh with no B-rep source (#523).
+ */
+export function placedExactRevolveBrep(shape: WorkplaneShape): Promise<string | null> {
+  if (!hasExactRevolveSolid(shape)) return Promise.resolve(null);
+  return withCadKernel((cad) => cad.toBREP(placedSolidForShape(cad, shape)));
 }
 
 function singleSolid(cad: OcctKernel, shape: ShapeHandle) {
@@ -223,7 +243,9 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
       // Measured with the same threshold the editor uses, so the two agree
       // about what counts as a cut.
       const removedNothing = cutVolume >= fusedVolume - 1e-6;
-      const meshed = meshedCadResult(cad, cut);
+      // No coarser than the finest exact revolve that went in (#523).
+      const angularDeflection = exactRevolveAngularDeflection(operands);
+      const meshed = meshedCadResult(cad, cut, undefined, undefined, undefined, angularDeflection);
       const bounds = boundsForPositions(meshed.positions);
       if (!bounds) return { meshed, brep: null, removedNothing };
       // The exact geometry is stored in the result's own frame, the way a

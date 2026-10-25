@@ -1169,13 +1169,15 @@ describe("dependency-ordered feature recomputation", () => {
     const previousMesh = sourceChild.importedMesh?.positions;
     const previousWrites = writeCount();
 
-    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { sides: 64 });
+    // A setting the cut's exact revolve solid sees (#523): its start angle
+    // turns the solid's seam, where a facet count would leave it unchanged.
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, { startAngle: 10 });
 
     expect(changed.ok, JSON.stringify(changed)).toBe(true);
     const updated = value(changed).shape;
     expect(updated).toMatchObject({
       id: sourceChild.id, sketchSourceId: source.sketchSourceId, sketchOperation: "revolve",
-      sketchRevolve: { sides: 64 }, x: sourceChild.x, z: sourceChild.z,
+      sketchRevolve: { startAngle: 10 }, x: sourceChild.x, z: sourceChild.z,
       elevation: sourceChild.elevation, rotation: sourceChild.rotation,
       rotationX: sourceChild.rotationX, rotationZ: sourceChild.rotationZ,
     });
@@ -1184,7 +1186,7 @@ describe("dependency-ordered feature recomputation", () => {
     const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === group.id)!;
     expect(persisted.cadBrep).not.toBe(previousGroupBrep);
     expect(persisted.groupedShapes?.find((child) => child.id === sourceChild.id)).toMatchObject({
-      sketchSourceId: source.sketchSourceId, sketchRevolve: { sides: 64 },
+      sketchSourceId: source.sketchSourceId, sketchRevolve: { startAngle: 10 },
     });
     expect(persisted).toMatchObject({ x: group.x, z: group.z, elevation: group.elevation, rotation: group.rotation });
   });
