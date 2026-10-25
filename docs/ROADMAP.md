@@ -43,6 +43,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 - [#378: Explode imported STEP assemblies from the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/378) — P2, implemented and in review.
 - [#380: Interference check and wall-thickness analysis in the editor](https://github.com/constructorfleet/SketchForge-3D/issues/380) — P2, implemented and in review.
+- [#386: Cover the core editor workflows in browser tests](https://github.com/constructorfleet/SketchForge-3D/issues/386) — browser regressions now cover file import/export, boolean hole grouping, edge treatments, pattern, mirror, align, distribution, prism draft and touch; implementation is ready for review.
 
 ## CAD geometry correctness
 
