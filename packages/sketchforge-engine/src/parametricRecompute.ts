@@ -12,7 +12,8 @@ import { shapeFaces } from "./serverCadShell.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import { draftFaceForSketchSegment, legacyDraftSegmentForShape } from "./faceDraftSegmentLineage.js";
 import { retainedDraftSourcePlacement } from "./sketchFaceDraftKernel.js";
-import type { EdgeTreatmentHistoryEntry, WorkplaneShape } from "./domain/sketchforge.js";
+import { edgeIndexesForSketchSourceEdges } from "./sketchEdgeSegmentLineage.js";
+import type { EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, WorkplaneShape } from "./domain/sketchforge.js";
 
 export type RecomputeTreeResult =
   | { ok: true; shapes: WorkplaneShape[]; updated: WorkplaneShape; matchCount: number }
@@ -47,6 +48,9 @@ export async function replaySingleAllEdgeTreatment(
   if (features.length === 0 && history.length === 0) return rebuilt;
   const feature = features[0];
   const historyFeature = history[0]?.feature;
+  if (feature?.sourceEdges !== undefined || historyFeature?.sourceEdges !== undefined) {
+    return replaySelectedEdgeTreatment(original, rebuilt, draftPrismAngle);
+  }
   const revolveSettings = original.sketchRevolve;
   const supportedFaceDraftRevolve = original.sketchOperation === "revolve"
     && revolveSettings !== undefined
@@ -165,6 +169,62 @@ export async function replaySingleAllEdgeTreatment(
     ...treated,
     edgeTreatments: [replayedFeature],
     edgeTreatmentHistory: [{ ...entry, feature: replayedFeature, before, appliedFrame: edgeTreatmentAppliedFrame(treated) }],
+  };
+}
+
+function sameSelectedEdgeFeature(left: EdgeTreatmentFeature, right: EdgeTreatmentFeature) {
+  return left.kind === right.kind
+    && left.amount === right.amount
+    && left.allEdges === undefined && right.allEdges === undefined
+    && (left.kind !== "chamfer" || Math.abs((left.chamferAngle ?? 45) - (right.chamferAngle ?? 45)) < 0.001)
+    && JSON.stringify(left.sourceEdges) === JSON.stringify(right.sourceEdges);
+}
+
+/**
+ * Replay one selected-edge fillet or chamfer by its sketch lineage (#350).
+ *
+ * Each recorded (segment, cap) must name exactly one edge of the rebuilt bare
+ * extrusion; a segment the edit removed, or one that now names no edge or two,
+ * fails the whole edit before anything is written. The rebuilt indexes are
+ * used for this one treatment and not stored.
+ */
+async function replaySelectedEdgeTreatment(
+  original: WorkplaneShape,
+  rebuilt: WorkplaneShape,
+  draftPrismAngle: number | undefined,
+): Promise<WorkplaneShape> {
+  const features = original.edgeTreatments ?? [];
+  const history = original.edgeTreatmentHistory ?? [];
+  const feature = features[0];
+  const entry = history[0];
+  const distinct = new Set(feature?.sourceEdges?.map((edge) => `${edge.cap}:${edge.segmentId}`) ?? []);
+  if (features.length !== 1 || history.length !== 1 || !feature?.sourceEdges?.length || !entry
+    || distinct.size !== feature.sourceEdges.length
+    || !sameSelectedEdgeFeature(feature, entry.feature)
+    || original.sketchOperation !== "extrude" || original.faceDraft !== undefined
+    || original.draftPrismAngle !== undefined || draftPrismAngle !== undefined) {
+    throw new Error("Selected-edge lineage replays exactly one selected-edge fillet or chamfer on an undrafted sketch extrusion.");
+  }
+  const found = await edgeIndexesForSketchSourceEdges(rebuilt, feature.sourceEdges);
+  if (found.status === "unsupported") {
+    throw new Error(`The selected ${feature.kind} edges on sketch segment${feature.sourceEdges.length === 1 ? "" : "s"} ${[...new Set(feature.sourceEdges.map((edge) => edge.segmentId))].join(", ")} cannot be replayed: the edited sketch is outside selected-edge lineage, which needs one straight-line region without holes, unmirrored and undrafted.`);
+  }
+  if (found.status !== "matched") {
+    throw new Error(`The selected ${feature.kind} edge on sketch segment ${found.sourceEdge.segmentId} (${found.sourceEdge.cap} cap) is ${found.status} after the sketch edit.`);
+  }
+  const result = await applyEdgeTreatment(rebuilt, {
+    kind: feature.kind,
+    amount: feature.amount,
+    ...(feature.kind === "chamfer" ? { angle: feature.chamferAngle ?? 45 } : {}),
+    edges: found.edges,
+  });
+  const treated = shapeWithCadResult(rebuilt, result);
+  const replayedFeature: EdgeTreatmentFeature = { ...feature, edgeCount: found.edges.length };
+  const { edgeTreatmentHistory: _ownHistory, ...before } = rebuilt;
+  return {
+    ...treated,
+    edgeTreatments: [replayedFeature],
+    edgeTreatmentHistory: [{ ...entry, feature: replayedFeature, before: structuredClone(before), appliedFrame: edgeTreatmentAppliedFrame(treated) }],
   };
 }
 

@@ -1107,6 +1107,21 @@ function validateSketchProfile(value: unknown, label: string) {
   }
 }
 
+/** Whether a stored value is a well-formed selected-edge lineage list: non-empty, distinct `{ segmentId, cap }` entries. */
+function isEdgeTreatmentSourceEdges(value: unknown) {
+  if (!Array.isArray(value)) return false;
+  const distinct = new Set(value.map((entry) => entry && typeof entry === "object"
+    ? `${String((entry as Record<string, unknown>).cap)}:${String((entry as Record<string, unknown>).segmentId)}`
+    : ""));
+  return value.length > 0 && distinct.size === value.length && value.every((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const record = entry as Record<string, unknown>;
+    return typeof record.segmentId === "string" && record.segmentId.trim().length > 0
+      && (record.cap === "top" || record.cap === "bottom")
+      && Object.keys(record).every((key) => key === "segmentId" || key === "cap");
+  });
+}
+
 function validateShapeDefinition(
   definition: Record<string, unknown>,
   label: string,
@@ -1160,6 +1175,18 @@ function validateShapeDefinition(
     throw new LocalizedError("errors.skf.inlinePackageFields", { label });
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
+  // Selected-edge lineage (#350): the replay trusts these names, so a
+  // malformed one is refused here rather than at the next sketch edit.
+  const treatmentFeatures = [
+    ...(Array.isArray(definition.edgeTreatments) ? definition.edgeTreatments.map((feature, index) => [feature, `${label}.edgeTreatments[${index}]`] as const) : []),
+    ...(options.edgeTreatmentHistory ?? []).map((entry, index) => [entry?.feature, `${label}.edgeTreatmentHistory[${index}].feature`] as const),
+  ];
+  for (const [feature, featureLabel] of treatmentFeatures) {
+    const sourceEdges = feature && typeof feature === "object" ? (feature as Record<string, unknown>).sourceEdges : undefined;
+    if (sourceEdges !== undefined && !isEdgeTreatmentSourceEdges(sourceEdges)) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${featureLabel}.sourceEdges` });
+    }
+  }
   if (definition.sketchSourceId !== undefined) stringValue(definition.sketchSourceId, `${label}.sketchSourceId`);
   if (definition.sketchSourceNodeId !== undefined) stringValue(definition.sketchSourceNodeId, `${label}.sketchSourceNodeId`);
   if (definition.sketchSourceOfObjectId !== undefined) stringValue(definition.sketchSourceOfObjectId, `${label}.sketchSourceOfObjectId`);

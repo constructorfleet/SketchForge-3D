@@ -158,8 +158,15 @@ These are implemented and should not be filed as missing features:
   cored, multi-region, and unevenly stretched revolves have no exact solid, so
   their treatments and edge listings are refused rather than run on facets.
   Revolve setting edits also attempt replay and roll back if the new topology
-  cannot accept the treatment. A source edit on a shape whose record holds a
-  selected-edge treatment, a non-45° chamfer, or multiple treatment steps, or
+  cannot accept the treatment. A selected-edge fillet or chamfer on the cap
+  edges of a straight, single-region, hole-free sketch extrusion records each
+  edge by its sketch segment and cap (`sourceEdges`) and replays by that
+  identity after a source-profile edit; a removed, missing, or ambiguous match,
+  or an edit that leaves the boundary, fails without a write (#350). Side
+  (vertical) edges, drafted, mirrored or already-treated extrusions, and
+  sweeps and revolves have no selected-edge lineage yet. A source edit on a
+  shape whose record holds a selected-edge treatment without lineage, a non-45°
+  all-edge chamfer, or multiple treatment steps, or
   on a shape that was shelled (the shell is recorded too), is refused without
   a project write rather than rebuilt without them. Draft/treatment
   combinations outside the supported order below and treatments on other
@@ -317,6 +324,8 @@ placement remain open.
 
 Focused coverage includes retained face-draft creation, `.skf` round trip,
 segment-lineage replay and rollback (`tests/unit/faceDraftSegmentLineage.test.ts`),
+selected-edge segment-lineage replay and rollback
+(`tests/unit/selectedEdgeSegmentLineage.test.ts`),
 source-profile replay, missing-match rollback, and dependent-boolean rollback
 (`tests/unit/engineParametricRecompute.test.ts`,
 `tests/unit/faceDraftFilletGroupRecompute.test.ts`,

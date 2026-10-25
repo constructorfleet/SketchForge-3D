@@ -50,10 +50,16 @@ export type SketchFaceSegmentMatch =
 /** What a face-draft lookup needs of the undrafted source extrusion. */
 export type SketchFaceDraftSource = Pick<WorkplaneShape, "id" | "sketchOperation" | "sketchProfile" | "cadBrep" | "faceIds" | "cadBrepFrame" | "height">;
 
-type SegmentEndpoints = { id: string; start: { x: number; z: number }; end: { x: number; z: number } };
-type BoundaryEdge = { curveType: string; vertices: Vec3[] };
+export type SegmentEndpoints = { id: string; start: { x: number; z: number }; end: { x: number; z: number } };
+export type BoundaryEdge = { curveType: string; vertices: Vec3[] };
 
-function segmentEndpoints(profile: SketchProfile): SegmentEndpoints[] | null {
+/**
+ * The endpoints of every segment of a straight-line, single-region, hole-free
+ * profile, or null when the profile is outside that boundary (or its point and
+ * segment IDs are not unique). The one definition of "eligible for segment
+ * lineage" that face drafts and selected-edge treatments share.
+ */
+export function segmentEndpoints(profile: SketchProfile): SegmentEndpoints[] | null {
   let regions;
   try {
     regions = cadSketchRegions(profile);
@@ -88,7 +94,7 @@ function close(left: number, right: number) {
   return Math.abs(left - right) <= MATCH_TOLERANCE;
 }
 
-function edgeMatchesSegmentAtY(vertices: Vec3[], y: number, segment: SegmentEndpoints) {
+export function edgeMatchesSegmentAtY(vertices: Vec3[], y: number, segment: SegmentEndpoints) {
   if (vertices.length !== 2) return false;
   const [first, second] = vertices;
   if (!first || !second || !close(first.y, y) || !close(second.y, y)) return false;
