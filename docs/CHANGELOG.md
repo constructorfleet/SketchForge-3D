@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- REST reference now documents the engine's exported size and count limits, including revolve profiles and turn counts, section drawing bounds, and the associated error behavior.
 - STEP export now writes nested project groups as native assembly occurrences that CAD readers can inspect, and reimport preserves that group tree without relying on encoded group-path names.
 
 Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.

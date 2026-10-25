@@ -205,7 +205,7 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | --- | --- |
 | `profile` | The closed outline to revolve, as `[x, z]` pairs. `x` is the distance from the axis, `z` runs along it. A triangle makes a thread, a rectangle a tube or a coil of square wire, a many-sided polygon a round spring. Distances may be written positive. |
 | `pitch` | Axial rise per full turn, in mm. `0` is a plain revolve. **Negative is a left-hand thread.** |
-| `turns` | How many full turns to sweep (0.1–20). |
+| `turns` | How many full turns to sweep (0.1–20; `MAX_REVOLVE_TURNS` is 20). Values are clamped to this range. |
 | `startAngle` | Rotation the sweep starts at. |
 | `sweepAngle` | How far round to revolve when there is no pitch (±360). |
 | `size` | `thread` only: a catalog designation that carries its own pitch. Includes ISO metric coarse sizes, selected ISO metric fine sizes (such as `M8x1`, `M10x1.25`), Unified UNC sizes, and selected UNF sizes (such as `1/4-28 UNF`). Coarse defaults are unchanged; default `M8`. An unknown size is refused with the list of known ones. |
@@ -220,6 +220,46 @@ A thread comes with its core: a bolt is the thread standing on its shank, and a 
 Catalog pitches and nominal diameters reference ISO 261 / ISO 262 for metric threads and ASME B1.1 for Unified threads. UNF pitches in millimetres are calculated from the standard threads-per-inch values using 25.4 mm per inch. The generated geometry is a simplified nominal 60-degree model; it does not encode thread classes, tolerance limits, or gaging dimensions and is not a manufacturing acceptance model. See [ISO 261](https://www.iso.org/standard/4165.html), [ISO 262:2023](https://www.iso.org/standard/85105.html), [ASME B1.1](https://www.asme.org/codes-standards/find-codes-standards/b1-1-unified-inch-screw-threads-un-unr-thread-form), and the [NIST federal screw-thread standards handbook](https://nvlpubs.nist.gov/nistpubs/Legacy/hb/nbshandbook28supp1963.pdf).
 
 A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable afterwards** -- in the editor's inspector, and over this API: a thread reads back with its sweep under `revolve`, and a `PATCH` changing the pitch sweeps it again.
+
+`POST /shapes` accepts at most `MAX_PROFILE_POINTS` (2,000) outline points for
+a revolve. More points return `400 invalid_request`. Helical tessellation uses
+at most `MAX_REVOLVE_RINGS` (2,400) rings to bound generated geometry.
+
+## Engine limit index
+
+These names are the engine's exported limits. Limits that normalize a request
+are clamped and do not produce an error response; limits that refuse a request
+are identified by their status in the route description above or below.
+
+| Limit | Maximum | Applies to |
+| --- | ---: | --- |
+| `MAX_INTERFERENCE_SHAPES` | 128 | `POST /interference`; over-limit scenes return `413 limit_exceeded`. |
+| `MAX_INTERFERENCE_CANDIDATES` | 512 | `POST /interference`; over-limit candidate pairs return `413 limit_exceeded`. |
+| `MAX_EDITOR_HISTORY_ENTRIES` | 5,000 | Client-side editor undo history; no REST response. |
+| `MAX_GEAR_TEETH` | 64 | Gear shape normalization in `POST /shapes`. |
+| `MAX_GEAR_HELIX_ANGLE` | 45° | Gear shape normalization in `POST /shapes`. |
+| `MAX_GEAR_HELIX_QUALITY` | 32 | Gear shape normalization in `POST /shapes`. |
+| `MAX_LOFT_SEGMENTS` | 128 | Loft shape normalization in `POST /shapes`. |
+| `MAX_LOFT_LAYERS` | 80 | Loft shape normalization in `POST /shapes`. |
+| `MAX_PATTERN_COUNT` | 200 | `POST /patterns`; the requested count is normalized to the supported range. |
+| `MAX_PROFILE_POINTS` | 2,000 | Revolve outlines in `POST /shapes`; excess returns `400 invalid_request`. |
+| `MAX_REQUESTED_DIMENSION` | 10,000 mm | Parameterized shape dimensions in `POST /shapes`; values are clamped. |
+| `MAX_REVOLVE_TURNS` | 20 | Helical revolve settings; values are clamped. |
+| `MAX_REVOLVE_PITCH` | 200 mm | Helical revolve settings; values are clamped. |
+| `MAX_REVOLVE_RINGS` | 2,400 | Upper bound on generated helical revolve rings. |
+| `MAX_EXPLODE_SOLIDS` | 200 | STEP import/explosion exact metadata and `POST /explode`. |
+| `MAX_EXPLODE_SOURCE_BYTES` | 8 MiB | STEP import/explosion exact metadata and `POST /explode`; over-limit source returns `413`. |
+| `MAX_MATERIAL_PRICE_PER_KG` | 100,000 | Material preset normalization; no REST response. |
+| `MAX_SVG_BYTES` | 2 MiB | SVG parser input; an importer refusal returns `422 geometry_failed`. |
+| `MAX_SVG_XML_ELEMENTS` | 10,000 | SVG parser input; an importer refusal returns `422 geometry_failed`. |
+| `MAX_SVG_GEOMETRY_ELEMENTS` | 2,000 | SVG parser input; an importer refusal returns `422 geometry_failed`. |
+| `MAX_SVG_PATH_COMMANDS` | 50,000 | SVG parser input; an importer refusal returns `422 geometry_failed`. |
+| `MAX_SVG_TRIANGLES` | 200,000 | Mesh produced from SVG; an importer refusal returns `422 geometry_failed`. |
+| `MAX_CUSTOM_SHAPE_DIMENSION` | 2,000 mm | Client-side custom shape settings; no REST response. |
+| `MAX_HIGH_RESOLUTION_SIDES` | 512 | Revolve tessellation and client-side custom shape settings. |
+| `MAX_SECTION_FACE_SPAN` | 10,000 mm | `POST /exports` SVG/DXF section face span; excess returns `413 limit_exceeded`. |
+| `MAX_CONTOURS` | 10,000 | `POST /exports` SVG/DXF section contours; excess returns `413 limit_exceeded`. |
+| `MAX_SAMPLED_POINTS` | 100,000 | `POST /exports` SVG/DXF section points; excess returns `413 limit_exceeded`. |
 
 ## Sketch sweeps
 
@@ -743,7 +783,10 @@ For a cut through the model, pass `section` instead of `view`. Plane names use
 the drawing's Z-up frame: `xy` omits Z, `xz` omits Y and `yz` omits X; `offset`
 is the coordinate of that omitted axis in millimetres. The plane must intersect
 the selected scene. The server limits a section to 100 shapes, 50,000 imported
-mesh triangles, and an 8,000 mm maximum span.
+mesh triangles, and an 8,000 mm maximum span. Each section face is also limited
+to `MAX_SECTION_FACE_SPAN` (10,000 mm) per side; more than `MAX_CONTOURS`
+(10,000) contours or `MAX_SAMPLED_POINTS` (100,000) sampled points returns
+`413 limit_exceeded`.
 
 ```json
 // POST /exports?projectId=...
