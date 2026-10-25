@@ -26,6 +26,7 @@ import {
   orientedSolidForShape,
   shapeEdges,
   shapeWithCadResult,
+  sketchResizeFactors,
   ServerCadError,
   type ServerCadEdge,
   type ServerCadTreatment,
@@ -973,10 +974,32 @@ export function createEngine(store: ProjectStore): Engine {
       let swept = existing;
       if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)
         || (faceDraftChanged && isSketchExtrusion)) {
+        // A treatment is built from the extrusion at the size it was shown
+        // (#539), and its record keeps that shape as `before`. Replaying it on
+        // a new profile rebuilds at that same resize, or the edit would hand
+        // back the treatment at the size the sketch was first drawn.
+        const treatmentSource = existing.edgeTreatmentHistory?.[0]?.before;
+        const recordedTreatmentScale = hasExistingTreatment && !existing.faceDraft && existing.draftPrismAngle === undefined
+          && treatmentSource?.sketchOperation === "extrude" && treatmentSource.cadBrep
+          ? sketchResizeFactors(treatmentSource)
+          : undefined;
+        // A treatment recorded before #539 kept the resize in `before` but was
+        // built, and stored, at the drawn size. Its shape is nearer that drawn
+        // size than the resized one on every resized axis, and its edit keeps
+        // the old behaviour: rebuilt at the profile's own size.
+        const nearerResized = (current: number, resized: number, factor: number) =>
+          Math.abs(factor - 1) < 1e-8 || Math.abs(current - resized) < Math.abs(current - resized / factor);
+        const treatmentSourceScale = recordedTreatmentScale && treatmentSource
+          && nearerResized(existing.width, treatmentSource.width, recordedTreatmentScale.width)
+          && nearerResized(existing.depth, treatmentSource.depth, recordedTreatmentScale.depth)
+          && nearerResized(existing.height, treatmentSource.height, recordedTreatmentScale.height)
+          ? recordedTreatmentScale
+          : undefined;
         const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
-        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height ?? existing.height;
+        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height
+          ?? (treatmentSourceScale ? treatmentSource!.height / treatmentSourceScale.height : existing.height);
         const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
-        const faceDraftSourceScale = existing.faceDraftSourceScale ?? (existing.faceDraft ? {
+        const faceDraftSourceScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
           // Editor-written drafts predate this field. Their output bounds
           // include the taper, so they cannot be used to infer the source
           // resize ratio; these shapes were only retained before resize support.
@@ -986,7 +1009,9 @@ export function createEngine(store: ProjectStore): Engine {
           depth: ratio(existing.depth, sourceFrame?.depth ?? existing.importedMesh?.baseDepth),
           height: ratio(existing.height, sourceFrame?.height ?? existing.importedMesh?.baseHeight),
         });
-        const rebuildScale = existing.faceDraft || faceDraftChanged ? faceDraftSourceScale : { width: 1, depth: 1, height: 1 };
+        const rebuildScale = existing.faceDraft || faceDraftChanged
+          ? faceDraftSourceScale
+          : treatmentSourceScale ?? { width: 1, depth: 1, height: 1 };
         try {
           const rebuilt = await sketchExtrusionShapeFromRequest({
             id: existing.id,
@@ -1024,7 +1049,9 @@ export function createEngine(store: ProjectStore): Engine {
               rebuilt.cadBrepFrame!,
               existing.faceDraft && !hasExistingTreatment ? existing.cadBrepFrame : undefined,
             ),
-            ...(existing.faceDraft || faceDraftChanged ? { faceDraftSourceScale } : {}),
+            // A cleared draft's resize is not kept: the bounds carry it from here.
+            faceDraftSourceScale: clearingFaceDraft ? undefined
+              : existing.faceDraft || faceDraftChanged ? faceDraftSourceScale : existing.faceDraftSourceScale,
             width: rebuilt.width * rebuildScale.width,
             depth: rebuilt.depth * rebuildScale.depth,
             height: rebuilt.height * rebuildScale.height,

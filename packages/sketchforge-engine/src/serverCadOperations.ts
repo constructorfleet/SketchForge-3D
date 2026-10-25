@@ -79,9 +79,16 @@ const MIN_CAD_DIMENSION = 0.01;
 const FACE_HASH_UPPER_BOUND = 2_147_483_647;
 export type { SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
-function sketchResizeFactors(shape: WorkplaneShape) {
+/**
+ * How far a retained sketch output has been resized since it was swept: its
+ * drawn dimensions over the ones its source geometry was built at.
+ */
+export function sketchResizeFactors(shape: WorkplaneShape) {
   const mesh = shape.importedMesh;
-  if (shape.faceDraftSourceScale) return shape.faceDraftSourceScale;
+  // A face-drafted output's bounds include its taper, so the resize recorded
+  // with the draft is the one to use. Once the draft is gone the bounds are
+  // the extrusion's again, and a recorded scale would hide any resize since.
+  if (shape.faceDraft && shape.faceDraftSourceScale) return shape.faceDraftSourceScale;
   const factor = (drawn: number, base: number | undefined) => base && base > 0 ? drawn / base : 1;
   return {
     width: factor(shape.width, mesh?.baseWidth),
@@ -103,6 +110,39 @@ function scaledSketchProfile(profile: SketchProfile, width: number, depth: numbe
     ...(point.handleOut ? { handleOut: { ...point.handleOut, x: centerX + (point.handleOut.x - centerX) * width, z: centerZ + (point.handleOut.z - centerZ) * depth } } : {}),
   });
   return { ...profile, points: profile.points.map(scalePoint) };
+}
+
+const isResized = (factors: { width: number; depth: number; height: number }) =>
+  [factors.width, factors.depth, factors.height].some((factor) => Math.abs(factor - 1) > 1e-8);
+
+/**
+ * A sketch extrusion whose exact solid is still its bare sweep -- no draft,
+ * treatment or shell -- has its B-rep stored at the size it was drawn. A resize
+ * since then lives only in its dimensions, so its exact solid at the size it is
+ * shown is its profile scaled by that resize and extruded to its height, the
+ * rebuild a face draft already makes (#452). Null when there is no resize to
+ * apply, or the solid is something else.
+ *
+ * Without this, a fillet, chamfer or shell of a resized extrusion was built
+ * from the B-rep as drawn and stored back at the original size (#539).
+ */
+export function resizedSketchExtrusionProfile(shape: WorkplaneShape): SketchProfile | null {
+  if (shape.sketchOperation !== "extrude" || !shape.sketchProfile || !shape.cadBrep) return null;
+  if (shape.faceDraft !== undefined || shape.draftPrismAngle !== undefined || shape.shell
+    || (shape.edgeTreatments?.length ?? 0) > 0 || (shape.edgeTreatmentHistory?.length ?? 0) > 0) return null;
+  const resize = sketchResizeFactors(shape);
+  return isResized(resize) ? scaledSketchProfile(shape.sketchProfile, resize.width, resize.depth) : null;
+}
+
+/** The bare extrusion's exact solid at its drawn size, or its stored solid when it has not been resized. */
+function storedOrResizedSolid(cad: OcctKernel, shape: WorkplaneShape) {
+  const resizedProfile = resizedSketchExtrusionProfile(shape);
+  if (!resizedProfile) return localSolidForShape(cad, shape);
+  const solid = sketchExtrusionSolid(cad, resizedProfile, shape.height);
+  if (!cadResultIsValid(cad, solid)) {
+    throw new ServerCadError("The resized sketch extrusion could not be rebuilt as exact CAD geometry.");
+  }
+  return solid;
 }
 
 function meshPositionsOf(shape: WorkplaneShape) {
@@ -289,14 +329,16 @@ export function localSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
  * reads the same predicate.
  *
  * For stored geometry this is the local solid with only its mirror applied:
- * the rotation stays on the shape, which is where it already was.
+ * the rotation stays on the shape, which is where it already was. A resized
+ * bare sketch extrusion is the exception: it is rebuilt at its drawn size
+ * (`resizedSketchExtrusionProfile`), since its stored B-rep is not.
  *
  * Mirrored either way, because the result is stored with the shape's mirror
  * flags cleared. Building it unmirrored handed back the unmirrored shape and
  * reported success (#413).
  */
 export function orientedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
-  if (!rotationIsRebuilt(shape)) return mirroredStoredSolid(cad, localSolidForShape(cad, shape), shape);
+  if (!rotationIsRebuilt(shape)) return mirroredStoredSolid(cad, storedOrResizedSolid(cad, shape), shape);
 
   try {
     return exactSolidForShape(cad, shape);
@@ -981,8 +1023,7 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
       solid = solidFromBrep(cad, shape.cadBrep!);
     }
     const resize = sketchResizeFactors(shape);
-    if (!exactRevolve && shape.sketchOperation === "extrude"
-      && [resize.width, resize.depth, resize.height].some((factor) => Math.abs(factor - 1) > 1e-8)) {
+    if (!exactRevolve && shape.sketchOperation === "extrude" && isResized(resize)) {
       solid = sketchExtrusionSolid(cad, scaledSketchProfile(shape.sketchProfile!, resize.width, resize.depth), shape.height);
       if (!cadResultIsValid(cad, solid) || !cad.isSolid(solid)) {
         throw new ServerCadError("The resized sketch extrusion could not be rebuilt as exact CAD geometry.");
