@@ -9,10 +9,27 @@ owner: Contributors
 
 This page summarizes active tracked work. Issue status remains authoritative.
 
+## Open epics
+
+| Epic | Status |
+| --- | --- |
+| [#324: Project storage durability](https://github.com/constructorfleet/SketchForge-3D/issues/324) | Open; autosave, server volume, and project provenance work is tracked below the epic. |
+| [#325: Server route and local MCP safety](https://github.com/constructorfleet/SketchForge-3D/issues/325) | Open; route hardening and caller isolation work is tracked below the epic. |
+| [#326: Desktop release installers](https://github.com/constructorfleet/SketchForge-3D/issues/326) | Open; cross-platform installer and release work is in progress. |
+| [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Open; bounded recompute support is in progress. |
+| [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Open; REST, TypeScript, Python, MCP, and CLI parity work is tracked below the epic. |
+| [#329: Editor parity with engine and API](https://github.com/constructorfleet/SketchForge-3D/issues/329) | Open; editor parity work is tracked below the epic. |
+| [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
+| [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
+
+## Documentation suite open work
+
+- The [documentation suite specification](DOCUMENTATION_SUITE_SPEC.md) tracks partial source ownership diagnostics and broader task-workflow coverage as open work.
+- The [site migration status](site-migration.md) records unmapped editor/UI sources, examples, and content sources as open ownership work.
+
 ## Dependency maintenance
 
 - [#397: Keep Vitest's mocker out of production installs](https://github.com/constructorfleet/SketchForge-3D/issues/397) — security dependency fix.
-- [#398: Plan major dependency upgrades](https://github.com/constructorfleet/SketchForge-3D/issues/398) — nine package-major spikes are tracked separately; see [the upgrade spike plan](DEPENDENCY_UPGRADES.md). Keep the CAD kernel pair gated on STEP round-trip e2e and engine performance checks.
 
 ## Project storage durability
 

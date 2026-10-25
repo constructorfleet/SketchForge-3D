@@ -213,7 +213,8 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(capabilities, /`sketchProfile`[\s\S]*?`PATCH \/api\/v1\/shapes`[\s\S]*?retaining shape and source IDs/i);
   assert.match(capabilities, /rebuilds nested editable project groups when every exact\s+solid maps unambiguously to a source occurrence/i);
   assert.match(capabilities, /editing a\s+sketch-backed extrusion or sweep[\s\S]*?boolean ancestors bottom-up/i);
-  assert.match(capabilities, /Other downstream feature nodes and\s+multi-step sequences beyond these bounded replays do not yet participate in a\s+general dependency graph/i);
+  assert.match(capabilities, /tracked by \[epic #327: Parametric recompute correctness and editable feature history\]/i);
+  assert.doesNotMatch(capabilities, /Other downstream feature nodes and\s+multi-step sequences beyond these bounded replays do not yet participate in a\s+general dependency graph/i);
   assert.match(capabilities, /uniquely\s+occurring cones, spheres, tori, and cylinders[\s\S]*?sampled normal changes/i);
   assert.match(capabilities, /coincident, horizontal, vertical, perpendicular, parallel, fixed-distance,\s+and\s+fixed-point sketch constraints/i);
   assert.match(capabilities, /bounded deterministic\s+least-squares solve/i);
