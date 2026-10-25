@@ -199,29 +199,7 @@ and `serverCadSection.ts` in `packages/sketchforge-engine/src/`.
 
 ### 1. Dependency-ordered parametric recomputation
 
-Sketch extrusion, revolve, and sweep persist source sketches and operation
-parameters; `.skf` also records dependency links for sketch outputs and boolean
-groups. Runtime recomputation remains narrow: editing a sketch-backed extrusion
-or sweep rebuilds it inside retained boolean groups, bottom-up, and writes the
-updated result atomically; source-ID edits to revolve profiles and operation
-settings such as side count follow the same path.
-Invalid profiles or failed dependent booleans leave the project unchanged.
-Draft prism angles on sketch extrusions now participate in this bounded path:
-their persisted source angle, source height, and source frame are reapplied
-when the source profile changes, and the angle itself can be changed by source
-ID. A single retained face draft on a straight-line, single-region, no-hole
-sketch extrusion side face now follows its sketch segment across profile edits,
-including edits that change the face normal. Missing or ambiguous segment
-matches fail atomically. If a tracked extrusion profile becomes unsupported,
-replay fails closed; metadata-free legacy drafts can still use unique-normal
-matching. Extrusion cap faces and other unsupported extrusion profiles,
-single-solid sketch sweeps, and plain single-region full-turn sketch revolves
-still replay only when exactly one planar face matches the saved normal. `GET /faces?topology=exact` lists analytic B-rep revolve faces;
-the default face listing remains mesh-based. Other downstream feature nodes and
-multi-step sequences beyond these bounded replays do not yet participate in a
-general dependency graph. A dependency-ordered graph with consistent failure
-propagation remains
-the highest-value foundation before expanding editable downstream operations.
+This work is tracked by [epic #327: Parametric recompute correctness and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327). See that issue for current scope, supported recompute paths, and remaining implementation gaps.
 
 ### 2. Broader and editable drafting
 

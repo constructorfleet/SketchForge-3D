@@ -8,6 +8,23 @@ import test from "node:test";
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("contributor guidance points to the roadmap and kernel gaps defer to the engine epic", async () => {
+  const [agents, contributing, kernelGaps, roadmap] = await Promise.all([
+    readFile(path.join(repository, "AGENTS.md"), "utf8"),
+    readFile(path.join(repository, ".github/CONTRIBUTING.md"), "utf8"),
+    readFile(path.join(repository, "docs/UNEXPLORED_KERNEL_CAPABILITIES.md"), "utf8"),
+    readFile(path.join(repository, "docs/ROADMAP.md"), "utf8"),
+  ]);
+
+  assert.match(agents, /\[project roadmap\]\(docs\/ROADMAP\.md\)/i);
+  assert.match(contributing, /\[project roadmap\]\(\.\.\/docs\/ROADMAP\.md\)/i);
+  assert.match(roadmap, /slug: \/docs\/ROADMAP/);
+  const remainingGaps = kernelGaps.split("## Remaining gaps, ranked")[1];
+  assert.ok(remainingGaps, "kernel capability page has a remaining gaps section");
+  assert.match(remainingGaps, /\[epic #327: Parametric recompute correctness and editable feature history\]/);
+  assert.doesNotMatch(remainingGaps, /Sketch extrusion, revolve, and sweep persist source sketches/);
+});
+
 test("documentation suite status records REST and runnable-fence coverage accurately", async () => {
   const spec = await readFile(path.join(repository, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
   const changelog = await readFile(path.join(repository, "docs/CHANGELOG.md"), "utf8");

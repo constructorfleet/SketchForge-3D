@@ -21,6 +21,7 @@ The app runs at `http://127.0.0.1:3000/` by default.
 - Include screenshots or short recordings for UI changes when possible.
 - Call out changes to storage, import, export, grouping, or undo/redo behavior.
 - Update the relevant roadmap and documentation for every feature or behavior change. Add user-visible changes to `docs/CHANGELOG.md` using its existing format.
+- Track active work and current issue status in the [project roadmap](../docs/ROADMAP.md).
 - If a Markdown file declares `verified_delivery: contract` in its frontmatter, `npm run docs:verify` lints it as an acceptance contract. Structural problems fail the check; vague wording is reported as a warning without failing it. Unmarked documents are untouched.
 - Commit each coherent unit of work atomically, including its tests and documentation. Open separate PRs for independent, reviewable chunks.
 - Monitor each PR for merge conflicts, review feedback, and failing or pending checks through merge or explicit handoff. Resolve conflicts and failures, push fixes, and recheck the PR; report unresolved blockers and pending checks accurately.
