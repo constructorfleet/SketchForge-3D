@@ -387,7 +387,7 @@ Delete objects by id, or delete the current selection when ids are omitted.
 
 ### Description
 
-Create a parameterized shape, extruded sketch, revolve, or standard screw thread in SketchForge. Local mode (no url) builds box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, icosahedron, text, loft, gear, revolve, thread. An editor (url) builds box, cube, cylinder, text, loft, sketch, revolve, thread. sketch is editor-only. Each parameter's description names the kinds it applies to.
+Create a parameterized shape, extruded sketch, revolve, or standard screw thread in SketchForge. Local mode (no url) accepts box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, icosahedron, text, loft, gear, revolve, thread; the kind description says which of those it can measure and export. An editor (url) builds box, cube, cylinder, text, loft, sketch, revolve, thread. sketch is editor-only. Each parameter's description names the kinds it applies to.
 
 ### Input schema
 
@@ -440,7 +440,7 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
         "thread",
         "sketch"
       ],
-      "description": "Local mode builds every kind except sketch. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only box, cube, cylinder, text, loft, sketch, revolve, thread."
+      "description": "Local mode builds box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, loft, revolve, thread as solids that measure and export as STL. A roundRoof's height may be at most half its width; a taller one fails to build. icosahedron, text, gear are stored only: local mode records the parameters but cannot measure or export them; open the project in an editor for those. STEP export holds only box, cube, cylinder, cone, sphere; export the other solids as STL. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only box, cube, cylinder, text, loft, sketch, revolve, thread."
     },
     "profile": {
       "type": "array",
@@ -530,7 +530,7 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "sides": {
       "type": "number",
-      "description": "For cylinder, cone, pyramid and roundRoof: number of sides around the axis (at least 3, default 96). For kind revolve/thread: facets per full turn of the sweep, 3-512 (default 64). On a 150 mm ring 64 facets are about 7.4 mm wide and 256 about 1.8 mm; the triangle count grows with it."
+      "description": "Number of flat sides around the axis, at least 3. For cylinder: default 96, which builds a true round cylinder; fewer builds a prism. For pyramid: default 4, a rectangular base; any other count is a regular polygon base. A cone and roundRoof are always round, whatever sides says. For kind revolve/thread: facets per full turn of the sweep, 3-512 (default 64). On a 150 mm ring 64 facets are about 7.4 mm wide and 256 about 1.8 mm; the triangle count grows with it."
     },
     "quality": {
       "type": "number",
@@ -538,11 +538,11 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "steps": {
       "type": "number",
-      "description": "For sphere and halfSphere: number of segments around and over the surface (at least 4, default 32)."
+      "description": "For sphere and halfSphere: display mesh segments around and over the surface (at least 4, default 32). The measured and exported solid is a true curved surface whatever steps says."
     },
     "bevel": {
       "type": "number",
-      "description": "For tube and ring: wall thickness in mm, measured inward from the outer radius (minimum 0.1, default 4). A 20x20x10 tube with bevel 4 has a 6 mm inner radius. For text: edge rounding in mm (default 0)."
+      "description": "For tube and ring: wall thickness in mm, measured inward from the outer radius (default 4). It is clamped to at least 0.1 and at most the smaller outer radius less 0.1, so the bore never closes: on a 20 mm wide tube, any bevel above 9.9 builds a 9.9 mm wall. A 20x20x10 tube with bevel 4 has a 6 mm inner radius. For text: edge rounding in mm (default 0)."
     },
     "segments": {
       "type": "number",
@@ -554,23 +554,23 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "baseRadius": {
       "type": "number",
-      "description": "For cone: radius of the base in mm (default half the width)."
+      "description": "For cone: recorded base radius in mm (default half the width). It does not change the solid: a cone stands on half its width, so set width and depth to size the base."
     },
     "taperTopWidth": {
       "type": "number",
-      "description": "Every kind but gear: footprint width at the top of the extrusion in mm (default width)."
+      "description": "For box, cube, cylinder in local mode: footprint width at the top of the extrusion in mm (default width). Other kinds store it, but measuring or exporting a tapered one is refused. An editor ignores it."
     },
     "taperTopDepth": {
       "type": "number",
-      "description": "Every kind but gear: footprint depth at the top of the extrusion in mm (default depth)."
+      "description": "For box, cube, cylinder in local mode: footprint depth at the top of the extrusion in mm (default depth). Other kinds store it, but measuring or exporting a tapered one is refused. An editor ignores it."
     },
     "taperBottomWidth": {
       "type": "number",
-      "description": "Every kind but gear: footprint width at the bottom of the extrusion in mm (default width)."
+      "description": "For box, cube, cylinder in local mode: footprint width at the bottom of the extrusion in mm (default width). Other kinds store it, but measuring or exporting a tapered one is refused. An editor ignores it."
     },
     "taperBottomDepth": {
       "type": "number",
-      "description": "Every kind but gear: footprint depth at the bottom of the extrusion in mm (default depth)."
+      "description": "For box, cube, cylinder in local mode: footprint depth at the bottom of the extrusion in mm (default depth). Other kinds store it, but measuring or exporting a tapered one is refused. An editor ignores it."
     },
     "teeth": {
       "type": "number",

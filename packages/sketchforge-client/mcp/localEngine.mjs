@@ -366,7 +366,7 @@ async function callLocalEngineToolRaw(name, args = {}) {
       if (args.kind === "sketch") {
         // The engine has no outline-to-extrusion request: a sketch is drawn in an
         // editor, so say where it can be made rather than listing kinds.
-        throw new Error("kind sketch is editor-only: pass url to create it in an open SketchForge editor. Local mode builds every other advertised kind; a revolve takes the same [x, z] profile.");
+        throw new Error("kind sketch is editor-only: pass url to create it in an open SketchForge editor. Local mode takes every other advertised kind, and a revolve takes the same [x, z] profile.");
       }
       return unwrap(await engine.addShapes(id, [args]));
     case "sketchforge_select_objects": {
