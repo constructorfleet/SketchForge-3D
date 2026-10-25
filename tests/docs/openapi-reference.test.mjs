@@ -178,7 +178,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "mirrorShapes"), false);
   const patterns = spec.paths["/api/v1/patterns"].post;
   assert.equal(patterns.operationId, "patternShapes");
-  assert.deepEqual(Object.keys(patterns.responses).sort(), ["201", "400", "401", "404", "409", "413", "422", "500", "503"]);
+  assert.deepEqual(Object.keys(patterns.responses).sort(), ["201", "400", "401", "404", "409", "413", "500", "503"]);
   const patternBody = patterns.requestBody.content["application/json"].schema;
   assert.deepEqual(patternBody.required, ["ids"]);
   assert.deepEqual(patternBody.properties.kind.enum, ["linear", "circular"]);
@@ -194,7 +194,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.deepEqual(patterns.responses["201"].content["application/json"].schema.required, ["created", "kind", "shapes", "revision"]);
   assert.deepEqual(patterns.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
   assert.deepEqual(patterns.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy"]);
-  assert.deepEqual(patterns.responses["422"].content["application/json"].schema.properties.code.enum, ["invalid_request"]);
+  assert.deepEqual(patterns.responses["413"].content["application/json"].schema.properties.code.enum, ["limit_exceeded"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "patternShapes"), false);
   const explode = spec.paths["/api/v1/explode"].post;
   assert.equal(explode.operationId, "explodeAssembly");

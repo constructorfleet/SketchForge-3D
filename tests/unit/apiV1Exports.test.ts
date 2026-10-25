@@ -280,4 +280,19 @@ describe("REST API v1 project exports", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "unsupported_format" });
   });
+
+  it("uses the limit error code when a section includes more than 100 shapes", async () => {
+    const projectId = await makeProject();
+    const added = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: Array.from({ length: 100 }, (_, index) => ({ kind: "box", width: 1, depth: 1, height: 1, x: index * 2 })) }),
+    }));
+    expect(added.status).toBe(201);
+    const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ format: "svg", section: { plane: "xy", offset: 0 } }),
+    }));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "limit_exceeded" });
+  });
 });

@@ -7,8 +7,9 @@
  * shape of this one transport, and the editor would want a translated
  * `LocalizedError` for the very same refusal.
  *
- * The wordings here are the ones the handlers used before they were thinned, so
- * a client matching on `code` -- or, against advice, on prose -- sees no change.
+ * Route handlers share the same status and error-code rules here. In particular,
+ * request-size and operation-count caps use `413 limit_exceeded`; malformed values
+ * stay `400`, while geometry refusals stay `422`.
  */
 
 import { apiError, apiErrors, type ApiErrorCode } from "@/lib/apiV1";
@@ -117,8 +118,8 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
     case "interference_refused": {
       const refusal = failure.refusal;
       if (refusal.reason === "invalid_clearance") return apiError("clearance must be a finite, non-negative number of millimetres.", 400, "invalid_request");
-      if (refusal.reason === "too_many_shapes") return apiError(`Interference check refused: ${refusal.given} shapes exceed the limit of ${refusal.limit}. Narrow the ids list.`, 422, "invalid_request", { limit: refusal.limit, given: refusal.given });
-      return apiError(`Interference check refused: more than ${refusal.limit} candidate pairs; narrow the ids list or reduce clearance.`, 422, "invalid_request", { limit: refusal.limit, atLeast: refusal.given });
+      if (refusal.reason === "too_many_shapes") return apiErrors.limitExceeded(`Interference check refused: ${refusal.given} shapes exceed the limit of ${refusal.limit}. Narrow the ids list.`, refusal.limit, refusal.given);
+      return apiErrors.limitExceeded(`Interference check refused: more than ${refusal.limit} candidate pairs; narrow the ids list or reduce clearance.`, refusal.limit, refusal.given);
     }
     case "unsupported_kind":
       return apiError(
@@ -150,7 +151,7 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
         failure.kind === "linear"
           ? "A row needs a stepX or a stepZ, or every copy lands on top of the original."
           : "A ring needs a sweepAngle other than zero, or every copy lands on top of the original.",
-        422,
+        400,
         "invalid_request",
       );
     case "import_unsupported":

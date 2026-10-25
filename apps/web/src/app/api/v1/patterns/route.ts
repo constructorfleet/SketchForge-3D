@@ -51,7 +51,10 @@ async function postPatterns(request: Request) {
   if (typeof count !== "number" || !Number.isFinite(count) || !Number.isInteger(count)) {
     return apiError("count must be a number: the total copies including the original.", 400, "invalid_request");
   }
-  if (count < MIN_PATTERN_COUNT || count > MAX_PATTERN_COUNT) {
+  if (count > MAX_PATTERN_COUNT) {
+    return apiErrors.limitExceeded(`count must not exceed ${MAX_PATTERN_COUNT}.`, MAX_PATTERN_COUNT, count);
+  }
+  if (count < MIN_PATTERN_COUNT) {
     return apiError(`count must be between ${MIN_PATTERN_COUNT} and ${MAX_PATTERN_COUNT}.`, 400, "invalid_request");
   }
 

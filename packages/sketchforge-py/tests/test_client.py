@@ -9,6 +9,7 @@ import unittest
 import urllib.error
 
 from sketchforge3d import (
+    API_ERROR_CODES,
     BooleanCutResult,
     ExportResult,
     Imports,
@@ -914,6 +915,15 @@ class ShapeSummaryTests(unittest.TestCase):
 
 
 class ErrorCodeTests(unittest.TestCase):
+    def test_recognizes_new_and_legacy_limit_codes(self) -> None:
+        self.assertIn("limit_exceeded", API_ERROR_CODES)
+        self.assertIn("too_many_shapes", API_ERROR_CODES)
+        for code in ("limit_exceeded", "too_many_shapes"):
+            opener = FakeOpener((413, {"error": "limit reached", "code": code}))
+            with self.assertRaises(SketchForgeApiError) as caught:
+                client(opener).projects.list()
+            self.assertTrue(caught.exception.is_limit_exceeded)
+
     def test_tells_a_busy_project_from_a_locked_shape_by_code(self) -> None:
         opener = FakeOpener((409, {"error": "Hold on.", "code": "shape_locked"}))
         with self.assertRaises(SketchForgeApiError) as caught:

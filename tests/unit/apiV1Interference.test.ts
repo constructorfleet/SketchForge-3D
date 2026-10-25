@@ -87,4 +87,17 @@ describe("REST API v1 interference", () => {
     expect((await interference(authorized("/api/v1/interference?projectId=p", { method: "POST", body: JSON.stringify({ clearance: -1 }) }))).status).toBe(400);
     expect((await interference(authorized("/api/v1/interference", { method: "POST", body: JSON.stringify({}) }))).status).toBe(400);
   });
+
+  it("returns a limit error when more than 128 shapes are selected", async () => {
+    const created = await createProject(authorized("/api/v1/projects", { method: "POST", body: JSON.stringify({ name: "Large scene" }) }));
+    const projectId = ((await created.json()) as { project: { id: string } }).project.id;
+    const added = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: Array.from({ length: 129 }, (_, index) => ({ kind: "box", width: 1, depth: 1, height: 1, x: index * 2 })) }),
+    }));
+    const ids = ((await added.json()) as { shapes: Array<{ id: string }> }).shapes.map((shape) => shape.id);
+    const response = await interference(authorized(`/api/v1/interference?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ ids }) }));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "limit_exceeded", limit: 128, given: 129 });
+  });
 });

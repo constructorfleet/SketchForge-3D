@@ -192,7 +192,7 @@ const top = await project.export({ format: "svg", view: "top" });
 
 `ShapePatch` also accepts `faceDraft` to retain one face draft on a sketch extrusion. The source face is named by its stable ID from `GET /faces`; the draft stores the signed local pull axis and angle. Profile edits replay it only when one planar face matches its original normal. Send `faceDraft: null` to clear the operation. `.skf` preserves the operation and source frame; prism drafts and edge treatments cannot be combined with it yet.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`) or `SketchForgeTransportError`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`, and `isLimitExceeded`) or `SketchForgeTransportError`. `isLimitExceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 ## Macros
 

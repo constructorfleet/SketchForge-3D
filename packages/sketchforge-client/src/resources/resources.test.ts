@@ -55,6 +55,13 @@ describe("retained face draft patches", () => {
 });
 
 describe("projects", () => {
+  it("recognizes the new and legacy limit error codes", async () => {
+    const current = fakeServer({ status: 413, body: { error: "limit reached", code: "limit_exceeded" } });
+    await expect(client(current).projects.list()).rejects.toMatchObject({ isLimitExceeded: true });
+    const legacy = fakeServer({ status: 413, body: { error: "too many shapes", code: "too_many_shapes" } });
+    await expect(client(legacy).projects.list()).rejects.toMatchObject({ isLimitExceeded: true });
+  });
+
   it("unwraps the list", async () => {
     const server = fakeServer({ body: { projects: [{ id: "p1", name: "Plate", shapes: 2, revision: 1, updatedAt: 0, packageBytes: 0 }] } });
     await expect(client(server).projects.list()).resolves.toHaveLength(1);

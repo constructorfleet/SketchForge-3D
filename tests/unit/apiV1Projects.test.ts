@@ -176,6 +176,16 @@ describe("REST API v1", () => {
     expect(listing.shapes.map((shape) => shape.name)).toEqual(["A", "B", "C"]);
   });
 
+  it("returns a limit error when a shape batch exceeds 200 entries", async () => {
+    const projectId = await makeProject();
+    const response = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ shapes: Array.from({ length: 201 }, () => ({ kind: "box", width: 1, depth: 1, height: 1 })) }),
+    }));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "limit_exceeded", limit: 200, given: 201 });
+  });
+
   it("creates a thread from a diameter and a pitch", async () => {
     const projectId = await makeProject();
 

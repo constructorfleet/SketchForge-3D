@@ -40,6 +40,7 @@ export const API_ERROR_CODES = [
   "unsupported_format",
   "unapplicable_fields",
   "too_many_shapes",
+  "limit_exceeded",
   "geometry_failed",
   "cad_failed",
   "internal_error",
@@ -66,6 +67,10 @@ export const apiErrors = {
   shapeNotFound: () => apiError("That shape is not in the project.", 404, "shape_not_found"),
   shapesNotFound: (ids: readonly string[]) => apiError(`Not in the project: ${ids.join(", ")}.`, 404, "shape_not_found"),
   shapeLocked: (message = "That shape is locked.") => apiError(message, 409, "shape_locked"),
+  limitExceeded: (message: string, limit?: number, given?: number) => apiError(message, 413, "limit_exceeded", {
+    ...(limit === undefined ? {} : { limit }),
+    ...(given === undefined ? {} : { given }),
+  }),
 };
 
 export function apiJson(body: unknown, status = 200) {
@@ -139,7 +144,7 @@ async function apiJsonBodyWithLimit(request: Request, { maxBytes }: ApiBodyLimit
 export async function apiRequestBodyBytes(request: Request, { maxBytes }: ApiBodyLimit): Promise<Uint8Array | Response> {
   const declaredBytes = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredBytes) && declaredBytes > maxBytes) {
-    return apiError(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, 413, "invalid_request");
+    return apiErrors.limitExceeded(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, maxBytes, declaredBytes);
   }
   if (!request.body) return new Uint8Array();
 
@@ -152,7 +157,7 @@ export async function apiRequestBodyBytes(request: Request, { maxBytes }: ApiBod
     size += value.byteLength;
     if (size > maxBytes) {
       await reader.cancel();
-      return apiError(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, 413, "invalid_request");
+      return apiErrors.limitExceeded(`The request body can be at most ${Math.floor(maxBytes / (1024 * 1024))}MB.`, maxBytes, size);
     }
     chunks.push(value);
   }
