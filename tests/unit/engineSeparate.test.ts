@@ -1,3 +1,6 @@
+import * as THREE from "three";
+import { worldMeshForShape } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+import { measureMesh } from "./support/meshMeasure";
 import { describe, expect, it } from "vitest";
 import { createEngine, type EngineResult } from "@constructorfleet/sketchforge-engine";
 import { importedShapeFromTriangleSoup } from "@constructorfleet/sketchforge-engine/stlImport";
@@ -56,6 +59,26 @@ describe("engine separation of transformed imported meshes", { timeout: CAD_TEST
     const parts = value(await engine.separate("separate", shape.id)).shapes;
 
     expect(parts).toHaveLength(2);
+    // Measure the actual closed meshes, including winding, independently of
+    // their stored dimensions. The unequal bodies also expose a lost mirror.
+    const measured = parts.map((part) => {
+      const mesh = worldMeshForShape(part)!;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(
+        mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]!)), 3,
+      ));
+      try { return measureMesh(geometry); } finally { geometry.dispose(); }
+    }).sort((a, b) => b.volume - a.volume);
+    for (const [index, expected] of [
+      { volume: 8, centroid: [10, 4, 3.25] },
+      { volume: 1, centroid: [10, 4, 9.25] },
+    ].entries()) {
+      expect(measured[index]!.volume).toBeCloseTo(expected.volume, 4);
+      expected.centroid.forEach((coordinate, axis) => {
+        expect(measured[index]!.centroid[axis]).toBeCloseTo(coordinate, 4);
+      });
+    }
+
     const larger = parts.find((part) => part.width > 1.5)!;
     const smaller = parts.find((part) => part.width < 1.5)!;
     expect([larger.width, larger.depth, larger.height]).toEqual([2, 2, 2]);

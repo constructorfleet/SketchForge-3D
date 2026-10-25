@@ -11,7 +11,7 @@ function box(id: string, x: number, extras: Partial<WorkplaneShape> = {}) {
 }
 
 function wedge(id: string, x: number, extras: Partial<WorkplaneShape> = {}) {
-  return sceneShape({ id, name: id, kind: "wedge", color: "#123456", width: 4, depth: 1, height: 2, x, ...extras });
+  return { ...sceneShape({ id, name: id, kind: "wedge", color: "#123456", width: 4, depth: 1, height: 2, x }), ...extras };
 }
 
 function engineWithShapes(shapes: WorkplaneShape[]) {
@@ -35,16 +35,19 @@ function value<T>(result: EngineResult<T>): T {
 }
 
 describe("engine exact interference", () => {
-  it("measures rotated and mirrored solids by their actual overlap volume", async () => {
-    const partner = box("offset", 1, { width: 3, depth: 1.5, height: 2, z: 0.5 });
-    const mirrored = value(await engineWithShapes([
-      wedge("turned", 0, { rotation: 45, mirrorX: true }),
-      partner,
+  it.each([
+    [false, 1],
+    [true, 3],
+  ] as const)("measures the rotated wedge half with mirrorX=%s", async (mirrorX, expectedVolume) => {
+    // The 4 x 2 x 1 wedge has volume 4. A quarter turn puts its thin
+    // half at positive Z; mirroring exchanges the 1 and 3 mm³ halves.
+    const report = value(await engineWithShapes([
+      wedge("turned", 0, { rotation: 90, mirrorX }),
+      box("positive-z", 0, { width: 1, depth: 2, height: 2, z: 1 }),
     ]).interference("interference"));
 
-    expect(mirrored.pairs).toHaveLength(1);
-    expect(mirrored.pairs[0]?.overlapVolume).toBeGreaterThan(0);
-    expect(mirrored.pairs[0]?.overlapVolume).toBeLessThan(12);
+    expect(report.pairs).toHaveLength(1);
+    expect(report.pairs[0]?.overlapVolume).toBeCloseTo(expectedVolume, 6);
   });
 
   it("reports exact gaps, touching and penetration, excluding distant pairs", async () => {
