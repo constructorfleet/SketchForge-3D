@@ -100,6 +100,8 @@ import {
   shapeFromRequest,
   shapeWithRequestedChanges,
   SHAPE_PARAMETERS,
+  withResultAttributes,
+  type ResultAttributes,
   type ShapeRequest,
 } from "./shapeRequests.js";
 import {
@@ -330,7 +332,7 @@ export type ShapesWritten = { shapes: WorkplaneShape[]; revision: number };
 /** One shape removed, with the revision the write landed on. */
 export type ShapeRemoved = { id: string; revision: number };
 
-export type CutRequest = { solidIds: string[]; holeIds: string[] };
+export type CutRequest = { solidIds: string[]; holeIds: string[] } & ResultAttributes;
 
 /**
  * A project, as much of it as a caller reading the scene needs.
@@ -438,7 +440,7 @@ export type Engine = {
   /** Subtract `holeIds` from `solidIds`, leaving one group where the operands were. */
   cut(projectId: string, request: CutRequest): Promise<EngineResult<ShapeWritten>>;
   /** Bundle shapes into one group; a selection holding a hole comes back cut. */
-  group(projectId: string, ids: string[]): Promise<EngineResult<ShapeWritten>>;
+  group(projectId: string, ids: string[], result?: ResultAttributes): Promise<EngineResult<ShapeWritten>>;
   /** Take a group apart, leaving its children where they appeared. */
   ungroup(projectId: string, shapeId: string): Promise<EngineResult<ShapesWritten>>;
   /** Split a shape into the separate bodies it is made of. */
@@ -680,6 +682,7 @@ export function createEngine(store: ProjectStore): Engine {
     projectId: string,
     ids: string[],
     holes: Set<string> | undefined,
+    attributes: ResultAttributes = {},
   ): Promise<EngineResult<ShapeWritten>> {
     return mutating(projectId, async (document) => {
       const resolved = shapesByIds(document, ids);
@@ -700,9 +703,10 @@ export function createEngine(store: ProjectStore): Engine {
       // from success. The editor treats the same case as a failed cut.
       if (outcome.cutRemovedNothing) return failed({ reason: "cut_removed_nothing" });
 
+      const group = withResultAttributes(outcome.group, attributes);
       const consumed = new Set(ids);
-      const shapes = [...document.shapes.filter((shape) => !consumed.has(shape.id)), outcome.group];
-      return ok({ shape: outcome.group, revision: await writeShapes(projectId, document, shapes) });
+      const shapes = [...document.shapes.filter((shape) => !consumed.has(shape.id)), group];
+      return ok({ shape: group, revision: await writeShapes(projectId, document, shapes) });
     });
   }
 
@@ -1524,9 +1528,10 @@ export function createEngine(store: ProjectStore): Engine {
       projectId,
       [...request.solidIds, ...request.holeIds],
       new Set(request.holeIds),
+      request,
     ),
 
-    group: (projectId, ids) => combine(projectId, ids, undefined),
+    group: (projectId, ids, result) => combine(projectId, ids, undefined, result),
 
     ungroup: (projectId, shapeId) => mutating(projectId, async (document) => {
       const found = oneShape(document, shapeId);

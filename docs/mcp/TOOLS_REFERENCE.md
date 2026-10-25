@@ -472,7 +472,7 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "hole": {
       "type": "boolean",
-      "description": "For kind thread: cut the form wider by a clearance so a bolt of that size fits, and mark the shape as a hole so grouping it with a solid taps that solid."
+      "description": "Any kind: create the shape as a hole (a cutter), so grouping it with a solid cuts it out of that solid without a separate update_object call. For kind thread it also cuts the form wider by a clearance so a bolt of that size fits, which taps the solid."
     },
     "clearance": {
       "type": "number",
@@ -1094,7 +1094,7 @@ Align two or more SketchForge objects using the same alignment logic as the edit
 
 ### Description
 
-Group objects by id using SketchForge's normal grouping/boolean pipeline.
+Group objects by id using SketchForge's normal grouping/boolean pipeline. A selection holding a hole comes back cut. Optional name and color are set on the result.
 
 ### Input schema
 
@@ -1127,6 +1127,14 @@ Group objects by id using SketchForge's normal grouping/boolean pipeline.
       "items": {
         "type": "string"
       }
+    },
+    "name": {
+      "type": "string",
+      "description": "Name for the result (default \"Group\")."
+    },
+    "color": {
+      "type": "string",
+      "description": "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)."
     }
   },
   "required": [
@@ -1182,7 +1190,7 @@ Ungroup one or more grouped objects by id and preserve their edited geometry.
 
 ### Description
 
-Cut solids with hole objects. Provide solidIds and holeIds; the result replaces the operands.
+Cut solids with hole objects. Provide solidIds and holeIds; the result replaces the operands. Optional name and color are set on the result.
 
 ### Input schema
 
@@ -1221,6 +1229,14 @@ Cut solids with hole objects. Provide solidIds and holeIds; the result replaces 
       "items": {
         "type": "string"
       }
+    },
+    "name": {
+      "type": "string",
+      "description": "Name for the result (default \"Group\")."
+    },
+    "color": {
+      "type": "string",
+      "description": "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)."
     }
   },
   "required": [
