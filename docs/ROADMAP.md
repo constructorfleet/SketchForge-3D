@@ -71,6 +71,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
 
+- [#385: Manage keyboard focus in editor dialogs](https://github.com/constructorfleet/SketchForge-3D/issues/385) — initial focus, modal Tab handling, Escape, and focus return are implemented with browser and axe coverage; in review.
 - [#379: Shell and tray (hollow) operation in the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/379) — P2, implemented with browser coverage; in review.
 
 ## Geometry placement

@@ -11,6 +11,7 @@ owner: "Contributors"
 
 Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.
 
+- Editor dialogs now move keyboard focus into the opened panel, contain Tab navigation in modal dialogs, return focus to the opener, and close on Escape.
 - `sketchforge-macro` now has direct `projects list|create|delete`, `export --format <fmt> --out <file>`, and `import <file>` commands alongside the macro runner. Import creates a project from the filename unless `--project` or `SKETCHFORGE_PROJECT_ID` selects an existing one; export requires a selected project.
 - `GET /api/v1/projects` and `GET /api/v1/shapes` now accept optional `limit` and `cursor` query parameters and return a `nextCursor` for the next page. The TypeScript and Python clients expose `projects.listPage` / `projects.list_page` and `shapes.listPage` / `shapes.list_page` page methods; existing list methods and requests without pagination options continue to return the full listing.
 - Size and count caps across project shapes, imports, interference checks, patterns, section exports, and wall-thickness checks now return `413 limit_exceeded`. Malformed values return `400`, geometry failures return `422`, and the clients expose `isLimitExceeded` / `is_limit_exceeded` while retaining support for the legacy `too_many_shapes` code.

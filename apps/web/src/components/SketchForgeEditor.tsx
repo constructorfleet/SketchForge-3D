@@ -23,6 +23,7 @@ import {
   type Translator,
 } from "@/i18n";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { manifoldModuleSource } from "@/generated/manifoldModuleSource";
 import { manifoldWasmBase64 } from "@/generated/manifoldWasmBase64";
@@ -5488,6 +5489,7 @@ export function SketchForgeEditor({
   const [projectAssets, setProjectAssets] = useState<ProjectAsset[]>(() => dedupeProjectAssets(initialAssets));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [measureDialogOpen, setMeasureDialogOpen] = useState(false);
+  const measureDialogRef = useDialogFocus<HTMLElement>({ active: measureDialogOpen, onEscape: () => setMeasureDialogOpen(false) });
   const [measureFromEntity, setMeasureFromEntity] = useState<"shape" | "edge" | "face">("shape");
   const [measureToEntity, setMeasureToEntity] = useState<"shape" | "edge" | "face">("shape");
   const [measureFromIndex, setMeasureFromIndex] = useState("0");
@@ -10148,13 +10150,13 @@ export function SketchForgeEditor({
     <div className="sketchforge-editor">
       {measureDialogOpen ? (
         <div className="measure-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setMeasureDialogOpen(false); }}>
-          <section className="top-action-panel" role="dialog" aria-modal="true" aria-label="Measure 3D entities">
+          <section ref={measureDialogRef} className="top-action-panel" role="dialog" aria-modal="true" aria-label="Measure 3D entities" tabIndex={-1}>
             <header><strong>Measure 3D entities</strong><button type="button" aria-label="Close measurement" onClick={() => setMeasureDialogOpen(false)}>×</button></header>
             <div className="export-dialog-body">
               {[{ label: "First entity", entity: measureFromEntity, setEntity: setMeasureFromEntity, index: measureFromIndex, setIndex: setMeasureFromIndex }, { label: "Second entity", entity: measureToEntity, setEntity: setMeasureToEntity, index: measureToIndex, setIndex: setMeasureToIndex }].map((end) => (
                 <section key={end.label} className="export-setting-section">
                   <strong>{end.label}</strong>
-                  <label><span>Type</span><select aria-label={`${end.label} type`} value={end.entity} onChange={(event) => end.setEntity(event.target.value as "shape" | "edge" | "face")}><option value="shape">Shape</option><option value="face">Face</option><option value="edge">Edge</option></select></label>
+                  <label><span>Type</span><select data-dialog-initial-focus={end.label === "First entity" ? true : undefined} aria-label={`${end.label} type`} value={end.entity} onChange={(event) => end.setEntity(event.target.value as "shape" | "edge" | "face")}><option value="shape">Shape</option><option value="face">Face</option><option value="edge">Edge</option></select></label>
                   {end.entity !== "shape" ? <label><span>Index (zero-based)</span><input aria-label={`${end.label} index`} type="number" min="0" step="1" value={end.index} onChange={(event) => end.setIndex(event.target.value)} /></label> : null}
                 </section>
               ))}
@@ -10685,6 +10687,9 @@ function SecondaryToolbar({
   const [visibilityMenuPosition, setVisibilityMenuPosition] = useState({ top: 0, left: 0 });
   const [distributeOpen, setDistributeOpen] = useState(false);
   const [patternOpen, setPatternOpen] = useState(false);
+  const visibilityDialogRef = useDialogFocus<HTMLDivElement>({ active: visibilityOpen, trapFocus: false, onEscape: () => setVisibilityOpen(false) });
+  const distributeDialogRef = useDialogFocus<HTMLDivElement>({ active: distributeOpen, trapFocus: false, onEscape: () => setDistributeOpen(false) });
+  const patternDialogRef = useDialogFocus<HTMLDivElement>({ active: patternOpen, trapFocus: false, onEscape: () => setPatternOpen(false) });
   const [patternPosition, setPatternPosition] = useState({ top: 0, left: 0 });
   const [patternKind, setPatternKind] = useState<"linear" | "circular">("linear");
   const [patternCount, setPatternCount] = useState(4);
@@ -11237,9 +11242,11 @@ function SecondaryToolbar({
           </div>
           {visibilityOpen ? (
             <div
+              ref={visibilityDialogRef}
               className="visibility-dropdown"
               role="menu"
               aria-label={t("editor.toolbar.visibilityOptions")}
+              tabIndex={-1}
               style={visibilityMenuPosition}
             >
               <button
@@ -11300,9 +11307,10 @@ function SecondaryToolbar({
                 <ToolbarPatternIcon />
               </button>
               {patternOpen ? (
-                <div className="pattern-panel" role="dialog" aria-label={t("editor.toolbar.pattern")} style={patternPosition}>
+                <div ref={patternDialogRef} className="pattern-panel" role="dialog" aria-label={t("editor.toolbar.pattern")} tabIndex={-1} style={patternPosition}>
                   <div className="pattern-panel-modes" role="group">
                     <button
+                      data-dialog-initial-focus
                       className={patternKind === "linear" ? "active" : ""}
                       type="button"
                       aria-pressed={patternKind === "linear"}
@@ -11399,7 +11407,7 @@ function SecondaryToolbar({
                 <ToolbarDistributeIcon />
               </button>
               {distributeOpen ? (
-                <div className="distribute-dropdown" role="menu" aria-label={t("editor.toolbar.distribute")} style={distributeMenuPosition}>
+                <div ref={distributeDialogRef} className="distribute-dropdown" role="menu" aria-label={t("editor.toolbar.distribute")} tabIndex={-1} style={distributeMenuPosition}>
                   <button
                     className="distribute-dropdown-action"
                     type="button"
@@ -11735,6 +11743,7 @@ function TopActionPanel({
   onNotice: (message: Notice) => void;
 }) {
   const t = useTranslations();
+  const dialogRef = useDialogFocus<HTMLDivElement>({ onEscape: onClose });
   const [exportFormat, setExportFormat] = useState<ExportFormat>("stl");
   const [exportName, setExportName] = useState(projectName);
   const [sectionPlane, setSectionPlane] = useState<EditorSection["plane"]>("xy");
@@ -11771,9 +11780,12 @@ function TopActionPanel({
 
   return (
     <div
+      ref={dialogRef}
       className={`top-action-panel ${panel === "export" ? "export-action-panel" : panel === "import" ? "import-action-panel" : ""}`}
       role="dialog"
+      aria-modal="true"
       aria-label={title}
+      tabIndex={-1}
     >
       <header>
         <div className="top-action-heading">
@@ -11785,7 +11797,7 @@ function TopActionPanel({
       </header>
       {panel === "import" ? (
         <div className="top-action-body">
-          <button className="open-skf-project-button" type="button" onClick={onPickProjectFile}>
+          <button data-dialog-initial-focus className="open-skf-project-button" type="button" onClick={onPickProjectFile}>
             <span className="open-skf-project-icon"><FolderOpen size={18} /></span>
             <span>
               <strong>{t("editor.panel.openProject")}</strong>
@@ -11819,6 +11831,7 @@ function TopActionPanel({
             <label htmlFor="export-file-name">{t("editor.panel.fileName")}</label>
             <div className="export-file-input-wrap">
               <input
+                data-dialog-initial-focus
                 id="export-file-name"
                 className="export-file-input"
                 value={exportName}
