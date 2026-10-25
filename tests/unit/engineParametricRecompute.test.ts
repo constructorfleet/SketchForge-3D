@@ -6,7 +6,7 @@ import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforg
 import { exportSkfProject, importSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { applyEdgeTreatment, applySketchFaceDraft, shapeWithCadResult } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
-import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
+import { serverCadKernel, withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-engine/sketchRevolve";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
@@ -112,6 +112,27 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("classifies an injected WebAssembly runtime fault as a kernel failure and logs its raw message", async () => {
+    const { store } = projectStore();
+    const engine = createEngine(store);
+    const shape = value(await engine.addShapes("recompute", [{ kind: "box", name: "WASM fault", width: 2, depth: 2, height: 2 }])).shapes[0]!;
+    const kernel = await serverCadKernel();
+    const fault = new WebAssembly.RuntimeError("injected memory access out of bounds");
+    const chamfer = vi.spyOn(kernel, "chamferWithHistory").mockImplementation(() => { throw fault; });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await engine.treat("recompute", shape.id, { kind: "chamfer", amount: 0.1 });
+
+      expect(result.ok).toBe(false);
+      expect(result.ok ? undefined : result.failure.reason).toBe("cad_failed");
+      expect(errorLog).toHaveBeenCalledWith("Unexpected CAD kernel failure", fault);
+    } finally {
+      chamfer.mockRestore();
+      errorLog.mockRestore();
+    }
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("returns a structured failure without writing when face reselection cannot read the stored BREP", async () => {
     const { store, document, writeCount } = projectStore();
     const engine = createEngine(store);
