@@ -28,6 +28,21 @@ const MCP_ROUTE = "/api/sketchforge-mcp";
 const PROJECTION_LAYOUTS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"];
 const SECTION_PLANES = ["xy", "xz", "yz"];
 
+/**
+ * The kinds `sketchforge_create_shape` advertises. Local mode builds them through
+ * the engine's `addShapes`, which takes its parameter table
+ * (`REQUESTABLE_SHAPE_KINDS`) plus `revolve` and `thread`; `sketch` extrudes a
+ * drawn outline with the editor's CAD kernel and is editor-only. Kept in step
+ * with the engine by `mcpCreateShapeKinds.test.ts`.
+ */
+const LOCAL_SHAPE_KINDS = [
+  "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus",
+  "tube", "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge",
+  "icosahedron", "text", "loft", "gear", "revolve", "thread",
+];
+const EDITOR_SHAPE_KINDS = ["box", "cube", "cylinder", "text", "loft", "sketch", "revolve", "thread"];
+const CREATE_SHAPE_KINDS = [...LOCAL_SHAPE_KINDS, "sketch"];
+
 const editorTargetSchema = {
   type: "object",
   properties: {
@@ -116,13 +131,17 @@ const tools = [
   },
   {
     name: "sketchforge_create_shape",
-    description: "Create a box/cube, cylinder, loft, simple extruded sketch, revolve, or standard screw thread in SketchForge.",
+    description: `Create a parameterized shape, extruded sketch, revolve, or standard screw thread in SketchForge. Local mode (no url) builds ${LOCAL_SHAPE_KINDS.join(", ")}. An editor (url) builds ${EDITOR_SHAPE_KINDS.join(", ")}. sketch is editor-only. Each parameter's description names the kinds it applies to.`,
     inputSchema: {
       ...editorTargetSchema,
       required: ["kind"],
       properties: {
         ...editorTargetSchema.properties,
-        kind: { type: "string", enum: ["box", "cube", "cylinder", "sketch", "loft", "revolve", "thread"] },
+        kind: {
+          type: "string",
+          enum: CREATE_SHAPE_KINDS,
+          description: `Local mode builds every kind except sketch. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only ${EDITOR_SHAPE_KINDS.join(", ")}.`,
+        },
         profile: {
           type: "array",
           description: "For kind sketch: a closed 2D outline to extrude, as [x, z] pairs. For kind revolve: the closed outline to revolve, where x is distance from axis and z runs along it.",
@@ -151,7 +170,27 @@ const tools = [
         rotation: { type: "number" },
         rotationX: { type: "number" },
         rotationZ: { type: "number" },
-        sides: { type: "number" },
+        sides: { type: "number", description: "For cylinder, cone, pyramid and roundRoof: number of sides around the axis (at least 3, default 96)." },
+        steps: { type: "number", description: "For sphere and halfSphere: number of segments around and over the surface (at least 4, default 32)." },
+        bevel: {
+          type: "number",
+          description: "For tube and ring: wall thickness in mm, measured inward from the outer radius (minimum 0.1, default 4). A 20x20x10 tube with bevel 4 has a 6 mm inner radius. For text: edge rounding in mm (default 0).",
+        },
+        segments: { type: "number", description: "For text: curve segments per glyph outline (at least 1, default 2)." },
+        topRadius: { type: "number", description: "For cone: radius of the top in mm (default 0, a point)." },
+        baseRadius: { type: "number", description: "For cone: radius of the base in mm (default half the width)." },
+        taperTopWidth: { type: "number", description: "Every kind but gear: footprint width at the top of the extrusion in mm (default width)." },
+        taperTopDepth: { type: "number", description: "Every kind but gear: footprint depth at the top of the extrusion in mm (default depth)." },
+        taperBottomWidth: { type: "number", description: "Every kind but gear: footprint width at the bottom of the extrusion in mm (default width)." },
+        taperBottomDepth: { type: "number", description: "Every kind but gear: footprint depth at the bottom of the extrusion in mm (default depth)." },
+        teeth: { type: "number", description: "For gear: tooth count (default 12)." },
+        toothSize: { type: "number", description: "For gear: radial tooth height in mm (default 2.5)." },
+        toothWidth: { type: "number", description: "For gear: tooth width in mm (default 0.54 of the tooth pitch, clamped between 0.12 and 0.82 of it)." },
+        centerHoleSize: { type: "number", description: "For gear: centre hole size in mm (default 6, clamped so it stays inside the tooth roots; 0 for none)." },
+        gearType: { type: "string", enum: ["spur", "helical", "bevel"], description: "For gear: tooth form (default spur)." },
+        helixAngle: { type: "number", description: "For gear with gearType helical: helix angle in degrees (default 22.5)." },
+        text: { type: "string", description: "For text: the characters to extrude (default TEXT)." },
+        font: { type: "string", description: "For text: font name (default Multilanguage)." },
         loftBottomShape: { type: "string", enum: ["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"], description: "loft only. Defaults to Rectangle." },
         loftTopShape: { type: "string", enum: ["Oval", "Rectangle", "Triangle", "Pentagon", "Hexagon"], description: "loft only. Defaults to Oval." },
         loftTopWidth: { type: "number", description: "loft only. Independent of the bottom's width, like a cone's top radius. Defaults to matching width." },

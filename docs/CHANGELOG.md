@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- `sketchforge_create_shape` now advertises every kind the local engine builds, including `cone`, `sphere`, `torus`, `tube`, `wedge`, and `gear`. Its schema documents each kind's parameters, for example `bevel` as the wall thickness of a `tube` or `ring`, and it says which kinds an editor builds. `sketch` is marked editor-only, and local mode now refuses it with that explanation instead of an `unsupported_kind` list.
 - The Python package's `sketchforge3d.__version__` now matches its published distribution version and is updated by release-please on each release.
 - Exact cuts now release their temporary CAD kernel handles even while an edge-modifier session is open, including after failed cuts, while preserving the session’s retained geometry.
 - Python clients now expose STEP assembly explosion and typed wall-thickness estimates, and accept DXF section exports. Python and TypeScript face listings can request exact analytic topology through resources and project handles.

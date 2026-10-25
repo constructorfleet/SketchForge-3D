@@ -72,6 +72,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#369: Document local STL import and executable MCP workflows](https://github.com/constructorfleet/SketchForge-3D/issues/369) — the README and agent skill describe local project tools and path rules; the guides include an executable STL import, measure, and export workflow.
 - [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.
+- [#502: Match the create_shape kind schema to each mode](https://github.com/constructorfleet/SketchForge-3D/issues/502) — implemented on `fix/502-create-shape-kind-schema`; awaiting review. Not yet done: local `sketch` extrusion from an `[x, z]` profile, which needs an engine request kind, and editor-bridge support for the remaining parameterized kinds.
 
 ## MCP host filesystem safety
 
