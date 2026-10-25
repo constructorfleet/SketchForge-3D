@@ -128,7 +128,7 @@ Everything above can be read as well as set, which is what makes **read a shape,
 
 `sketchOperation` names the operation the geometry came out of, for the shapes that have one -- `revolve` for these.
 
-A revolve also reports `revolve` (the sweep: its pitch, turns, sweep angle, start angle, facets per turn, sampling quality, the radius of the core it is fused to, and `axis`, the workplane `{ x, z }` its axis of revolution stands at) and `profile` (the outline it ran round, as `[x, z]` pairs with distances written positive, the way a request writes them). `profile` is omitted when the outline was drawn in the editor rather than described: a drawn profile can be several paths with curve handles, which no flat list of pairs describes, and guessing one would be worse than saying nothing.
+A revolve also reports `revolve` (the sweep: its pitch, turns, sweep angle, start angle, facets per turn, sampling quality, the radius of the core it is fused to, and `axis`, the workplane `{ x, z }` its axis of revolution stands at, left out while the shape is tilted by `rotationX` or `rotationZ` because a tilted axis stands at no single point) and `profile` (the outline it ran round, as `[x, z]` pairs with distances written positive, the way a request writes them). `profile` is omitted when the outline was drawn in the editor rather than described: a drawn profile can be several paths with curve handles, which no flat list of pairs describes, and guessing one would be worse than saying nothing.
 
 ## Changing a shape
 

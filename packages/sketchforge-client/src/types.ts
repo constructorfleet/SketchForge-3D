@@ -293,7 +293,9 @@ export type RevolveSummary = {
    * Where the axis of revolution is on the workplane. A shape's `x`/`z` is the
    * centre of its box, which for a partial sweep is off to one side of the
    * axis. Absent for a revolve saved before the axis was recorded, until it is
-   * next rebuilt. Read-only: a change sent back with it ignores it.
+   * next rebuilt, and while the shape is tilted by `rotationX` or `rotationZ`,
+   * since a tilted axis crosses the workplane at no single point. Read-only:
+   * a change sent back with it ignores it.
    */
   axis?: { x: number; z: number };
 };
