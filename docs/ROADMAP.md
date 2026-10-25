@@ -31,6 +31,10 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
 
+## MCP bridge
+
+- [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.
+
 ## Editor parity with the engine and API
 
 Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).

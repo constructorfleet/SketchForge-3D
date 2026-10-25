@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Local MCP tools now omit editor targeting and timeout arguments from their schemas, and local `sketchforge_update_object` ignores those remote-only fields if they are supplied.
 - The GitHub Pages Demo now applies its configured subpath to the sketch CAD worker's OCCT JavaScript and WebAssembly URLs, so sketch extrusions can load the kernel when the Demo is hosted below the repository path.
 - REST face and prism drafts on mirrored retained sketch extrusions now keep the existing mirror flags with their drafted BREP and mesh, and replay that mirror after profile edits. Face-draft records use the normal of the unmirrored source geometry the kernel drafts. This uses existing `.skf` fields and needs no format migration; a project already saved after the old bug cleared its mirror flags cannot recover that lost mirror automatically.
 - Retained face drafts now keep their undrafted faces fixed in world space as the draft grows the bounds. Profile-centre shifts during a sketch edit are rotated with the part, so REST and the editor place replayed drafts the same way. Existing `.skf` files need no schema migration; saved placements are recalculated when the draft is replayed by editing its sketch.

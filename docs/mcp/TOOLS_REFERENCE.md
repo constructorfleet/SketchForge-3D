@@ -25,12 +25,7 @@ List projects stored in SKETCHFORGE_PROJECTS_DIR for offline MCP use.
 ```json
 {
   "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
-    }
-  }
+  "properties": {}
 }
 ```
 ## sketchforge_create_project
@@ -45,26 +40,6 @@ Create an empty project in the local SKETCHFORGE_PROJECTS_DIR.
 {
   "type": "object",
   "properties": {
-    "url": {
-      "type": "string",
-      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
-    },
-    "projectId": {
-      "type": "string",
-      "description": "Project id in SKETCHFORGE_PROJECTS_DIR when running the MCP in local mode."
-    },
-    "editorNumber": {
-      "type": "number",
-      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
-    },
-    "editorId": {
-      "type": "string",
-      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
-    },
-    "timeoutMs": {
-      "type": "number",
-      "description": "Command timeout in milliseconds. Defaults to 15000."
-    },
     "name": {
       "type": "string"
     }
@@ -86,26 +61,6 @@ Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.
 {
   "type": "object",
   "properties": {
-    "url": {
-      "type": "string",
-      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
-    },
-    "projectId": {
-      "type": "string",
-      "description": "Project id in SKETCHFORGE_PROJECTS_DIR when running the MCP in local mode."
-    },
-    "editorNumber": {
-      "type": "number",
-      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
-    },
-    "editorId": {
-      "type": "string",
-      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
-    },
-    "timeoutMs": {
-      "type": "number",
-      "description": "Command timeout in milliseconds. Defaults to 15000."
-    },
     "filePath": {
       "type": "string"
     },
@@ -698,24 +653,8 @@ Import an STL file from the MCP host filesystem into a local project. Available 
 {
   "type": "object",
   "properties": {
-    "url": {
-      "type": "string",
-      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
-    },
     "projectId": {
       "type": "string"
-    },
-    "editorNumber": {
-      "type": "number",
-      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
-    },
-    "editorId": {
-      "type": "string",
-      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
-    },
-    "timeoutMs": {
-      "type": "number",
-      "description": "Command timeout in milliseconds. Defaults to 15000."
     },
     "filePath": {
       "type": "string",

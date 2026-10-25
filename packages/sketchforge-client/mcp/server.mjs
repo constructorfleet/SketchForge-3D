@@ -37,22 +37,23 @@ const editorTargetSchema = {
     timeoutMs: { type: "number", description: "Command timeout in milliseconds. Defaults to 15000." },
   },
 };
+const localProjectSchema = { type: "object", properties: {} };
 
 const tools = [
   {
     name: "sketchforge_list_projects",
     description: "List projects stored in SKETCHFORGE_PROJECTS_DIR for offline MCP use.",
-    inputSchema: { ...editorTargetSchema, properties: { url: editorTargetSchema.properties.url } },
+    inputSchema: localProjectSchema,
   },
   {
     name: "sketchforge_create_project",
     description: "Create an empty project in the local SKETCHFORGE_PROJECTS_DIR.",
-    inputSchema: { ...editorTargetSchema, required: ["name"], properties: { ...editorTargetSchema.properties, name: { type: "string" } } },
+    inputSchema: { ...localProjectSchema, required: ["name"], properties: { name: { type: "string" } } },
   },
   {
     name: "sketchforge_import_project",
     description: "Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.",
-    inputSchema: { ...editorTargetSchema, required: ["filePath"], properties: { ...editorTargetSchema.properties, filePath: { type: "string" }, name: { type: "string" } } },
+    inputSchema: { ...localProjectSchema, required: ["filePath"], properties: { filePath: { type: "string" }, name: { type: "string" } } },
   },
   {
     name: "sketchforge_list_editors",
@@ -186,10 +187,9 @@ const tools = [
     name: "sketchforge_import_stl",
     description: "Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath.",
     inputSchema: {
-      ...editorTargetSchema,
+      ...localProjectSchema,
       required: ["projectId", "filePath"],
       properties: {
-        ...editorTargetSchema.properties,
         projectId: { type: "string" },
         filePath: { type: "string", description: "Path to an STL file readable by the MCP host." },
         name: { type: "string" },
