@@ -302,7 +302,29 @@ export function aabbsOverlap(a: Aabb, b: Aabb): boolean {
   );
 }
 
-export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<StepExportResult> {
+export type StepExportOptions = {
+  /**
+   * The exact solid of a shape this exporter cannot build itself, as BREP text
+   * already placed in the editor's Y-up world frame, or null to fall through
+   * to the usual rules.
+   *
+   * The server passes its plain-revolve builder here (#523): a revolve is
+   * stored as its sweep's mesh, and only the server's kernel rebuilds the
+   * exact solid from its profile. The editor passes nothing, and a revolve is
+   * skipped there as before.
+   */
+  exactBrepFor?: (shape: WorkplaneShape) => Promise<string | null>;
+};
+
+// A world-space BREP from `exactBrepFor`, loaded as it stands.
+async function buildProvidedBody(brep: Brep, shape: WorkplaneShape, options: StepExportOptions): Promise<BuildOutcome | null> {
+  const text = await options.exactBrepFor?.(shape);
+  if (!text) return null;
+  const loaded = brep.fromBREP(text);
+  return loaded.ok ? { solid: loaded.value as unknown as BrepSolid } : { skip: "exact solid failed to load" };
+}
+
+export async function exportShapesToStep(shapes: WorkplaneShape[], options: StepExportOptions = {}): Promise<StepExportResult> {
   const brep = await loadBrepWithOcct();
 
   type ExportEntry = { shape: WorkplaneShape; productPath: string[]; productKeys: string[] };
@@ -321,6 +343,11 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   const skipped: SkippedShape[] = [];
   const holes: { box: Aabb; solid: BrepSolid }[] = [];
   for (const { shape } of entries.filter(({ shape }) => shape.hole)) {
+    const provided = await buildProvidedBody(brep, shape, options);
+    if (provided && "solid" in provided) {
+      holes.push({ box: worldAabb(shape), solid: provided.solid });
+      continue;
+    }
     if (!EXACT_KINDS.has(shape.kind)) {
       skipped.push(describe(shape, `hole ${unsupportedReason()}; cut omitted`));
       continue;
@@ -339,7 +366,10 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   const parts: { shape: BrepSolid; productPath: string[]; productKeys: string[]; color: string }[] = [];
   for (const { shape, productPath, productKeys } of entries.filter(({ shape }) => !shape.hole)) {
     let built: BuildOutcome;
-    if (isImportedBody(shape)) {
+    const provided = await buildProvidedBody(brep, shape, options);
+    if (provided) {
+      built = provided;
+    } else if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
     } else if (hasStoredCadBrep(shape)) {
       built = buildCadBrepBody(brep, shape);

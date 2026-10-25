@@ -227,7 +227,7 @@ describe("a group of solids evaluates as their union (#500)", () => {
     expect(JSON.stringify(!result.ok && result.failure)).toContain("hidden");
   }, CAD_TIMEOUT_MS);
 
-  it("fuses a meshed revolve with the cylinder that fills its bore, and says it is tessellated", async () => {
+  it("fuses a revolve with the cylinder that fills its bore, exactly", async () => {
     const { engine } = projectWith([]);
     const added = value(await engine.addShapes("union", [
       { kind: "revolve", name: "Ring", profile: [[5, -4], [10, -4], [10, 4], [5, 4]], sides: 96 },
@@ -239,16 +239,39 @@ describe("a group of solids evaluates as their union (#500)", () => {
     const group = value(await engine.group("union", [ring.id, core.id])).shape;
 
     const properties = value(await engine.properties("union", group.id));
-    // The core fills the ring's bore, so together they are one solid disc.
-    expect(properties.volume).toBeCloseTo(ringAlone.volume + Math.PI * 25 * 8, -1);
-    expect(properties.volume).toBeGreaterThan(Math.PI * 100 * 8 * 0.99);
-    expect(properties.centerOfMass.x).toBeCloseTo(core.x, 3);
-    expect(properties.centerOfMass.z).toBeCloseTo(core.z, 3);
-    expect(properties.centerOfMass.y).toBeCloseTo((core.elevation ?? 0) + 4, 3);
+    // The core fills the ring's bore, so together they are one solid disc --
+    // the analytic one, because the revolve is built from its profile (#523).
+    expect(ringAlone.volume).toBeCloseTo(Math.PI * 75 * 8, 6);
+    expect(properties.volume).toBeCloseTo(Math.PI * 100 * 8, 6);
+    expect(properties.centerOfMass.x).toBeCloseTo(core.x, 6);
+    expect(properties.centerOfMass.z).toBeCloseTo(core.z, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo((core.elevation ?? 0) + 4, 6);
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
+  }, CAD_TIMEOUT_MS);
+
+  it("fuses a helical revolve's mesh with a core it overlaps, and says it is tessellated", async () => {
+    const { engine } = projectWith([]);
+    const added = value(await engine.addShapes("union", [
+      { kind: "revolve", name: "Spring", profile: [[5, 0], [10, 0], [10, 2], [5, 2]], sides: 96, pitch: 4, turns: 2 },
+      { kind: "cylinder", name: "Core", width: 12, depth: 12, height: 14, elevation: -2 },
+    ]));
+    const [spring, core] = added.shapes;
+    expect(spring.importedMesh).toBeDefined();
+    const springAlone = value(await engine.properties("union", spring.id));
+    expect(springAlone.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+    const group = value(await engine.group("union", [spring.id, core.id])).shape;
+
+    const properties = value(await engine.properties("union", group.id));
+    // The core, radius 6, swallows the spring's section from radius 5 to 6:
+    // by Pappus that is (6^2 - 5^2) / (10^2 - 5^2) = 11/75 of the spring.
+    const coreVolume = Math.PI * 36 * 14;
+    const expected = springAlone.volume + coreVolume - springAlone.volume * (11 / 75);
+    expect(properties.volume / expected).toBeCloseTo(1, 3);
+    expect(properties.volume).toBeLessThan(springAlone.volume + coreVolume - 1);
     expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
   }, CAD_TIMEOUT_MS);
 
-  it("fuses two meshed revolves without counting their overlap twice", async () => {
+  it("fuses two revolves exactly without counting their overlap twice", async () => {
     const { engine } = projectWith([]);
     const added = value(await engine.addShapes("union", [
       { kind: "revolve", name: "Outer", profile: [[5, -4], [10, -4], [10, 4], [5, 4]], sides: 96 },
@@ -263,17 +286,18 @@ describe("a group of solids evaluates as their union (#500)", () => {
     const group = value(await engine.group("union", [outer.id, inner.id])).shape;
 
     const properties = value(await engine.properties("union", group.id));
-    // Both are faceted alike, so the overlap -- radii 5..7, 4mm tall -- carries
-    // the same faceting factor as the outer ring's 600*pi.
-    const overlap = outerAlone.volume * (96 / 600);
+    // Both are exact, so the overlap -- radii 5..7, 4mm tall -- is too.
+    expect(outerAlone.volume).toBeCloseTo(Math.PI * 75 * 8, 6);
+    expect(innerAlone.volume).toBeCloseTo(Math.PI * 40 * 8, 6);
+    const overlap = Math.PI * 24 * 4;
     const volume = outerAlone.volume + innerAlone.volume - overlap;
-    expect(properties.volume / volume).toBeCloseTo(1, 3);
+    expect(properties.volume / volume).toBeCloseTo(1, 6);
     const outerY = outerAlone.centerOfMass.y;
     expect(properties.centerOfMass.y).toBeCloseTo(
       (outerAlone.volume * outerY + innerAlone.volume * (outerY + 4) - overlap * (outerY + 2)) / volume,
-      2,
+      6,
     );
-    expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
   }, CAD_TIMEOUT_MS);
 
   it("exports the group as one closed solid with the union's volume", async () => {

@@ -145,6 +145,7 @@ const tools = [
             "A roundRoof's height may be at most half its width; a taller one fails to build.",
             `${LOCAL_STORED_KINDS.join(", ")} are stored only: local mode records the parameters but cannot measure or export them; open the project in an editor for those.`,
             `STEP export holds only ${STEP_KINDS.join(", ")}; export the other solids as STL.`,
+            "revolve there means a plain revolve: no pitch, no coreRadius, one closed profile region with straight edges, and not resized unevenly across its axis; any other revolve, like a thread, exports as STL only. A plain revolve is in STEP only when exported by the server or local mode, from its exact solid; an open editor's own STEP export skips it.",
             "sketch is editor-only: it needs an open editor (url), and local mode refuses it.",
             `An editor builds only ${EDITOR_SHAPE_KINDS.join(", ")}.`,
           ].join(" "),

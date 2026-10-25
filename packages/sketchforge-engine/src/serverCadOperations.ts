@@ -28,7 +28,7 @@ import {
   UnbuildableShapeError,
   EXACT_SOLID_KINDS,
 } from "./cadSolids.js";
-import { canonicalizeShape } from "./workplaneShapes.js";
+import { canonicalizeShape, shapeHasTaper } from "./workplaneShapes.js";
 import { createLocalId } from "./localIds.js";
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import { cadSketchRegions, draftPrismLoop, type OrderedCadSketchPath } from "./sketchCadProfile.js";
@@ -636,6 +636,137 @@ function exactRevolveSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
 }
 
 /**
+ * Where a stored revolve's axis sits in its mesh's natural frame, or null when
+ * that cannot be known without sweeping it again.
+ *
+ * The mesh is centred on its own box, so the axis is `-revolveAxisOffset`
+ * there (#503). A full turn saved before that offset was recorded is still
+ * symmetric about its axis under every one of its facet rotations, so the
+ * axis is the centroid of its triangles in X and Z -- which is not the box
+ * centre when the facet count is not a multiple of four. A partial sweep with
+ * no recorded axis has neither, and stays tessellated.
+ */
+function storedRevolveAxis(shape: WorkplaneShape, fullTurn: boolean): { x: number; z: number } | null {
+  if (shape.revolveAxisOffset) return { x: -shape.revolveAxisOffset.x, z: -shape.revolveAxisOffset.z };
+  if (!fullTurn) return null;
+  const positions = shape.importedMesh?.positions ?? [];
+  let volume = 0;
+  let x = 0;
+  let z = 0;
+  for (let index = 0; index + 8 < positions.length; index += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(index, index + 9);
+    const tetra = (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    volume += tetra;
+    x += tetra * (ax + bx + cx) / 4;
+    z += tetra * (az + bz + cz) / 4;
+  }
+  return Math.abs(volume) > 1e-12 ? { x: x / volume, z: z / volume } : null;
+}
+
+/**
+ * Whether any profile segment is drawn as a curve.
+ *
+ * The rule `sketchProfileToRevolvePolygons` samples by: a segment that is not
+ * a line and has both its handles (the start point's outgoing one and the end
+ * point's incoming one) is a cubic, sampled into straight pieces; anything
+ * else is drawn straight. A revolve of the samples would be exact about the
+ * axis but still an approximation of the drawn curve, so it is not reported
+ * as exact.
+ */
+function profileHasCurvedSegment(profile: SketchProfile) {
+  const points = new Map(profile.points.map((point) => [point.id, point]));
+  return profile.segments.some((segment) => segment.kind !== "line"
+    && Boolean(points.get(segment.startId)?.handleOut) && Boolean(points.get(segment.endId)?.handleIn));
+}
+
+/**
+ * Why a revolve stored as a mesh is not measured, cut or exported as its exact
+ * solid, or null when it is.
+ *
+ * Wider than the edge listing's rule (`revolveWithoutExactEdges`): a partial
+ * sweep is exact here too, because nothing numbers its edges.
+ */
+function revolveWithoutExactSolid(shape: WorkplaneShape): string | null {
+  if (!isUntreatedSketchRevolve(shape)) return "not an untreated sketch revolve";
+  if ((shape.importedMesh?.positions.length ?? 0) < 9) return "no stored sweep to place the solid by";
+  const settings = normalizeSketchRevolveSettings(shape.sketchRevolve);
+  if (settings.pitch !== 0) return "a helical revolve has only its tessellated sweep";
+  if (settings.coreRadius > 0) return "a revolve fused to a core has no exact solid";
+  const { radialX, radialZ } = revolveResizeFactors(shape);
+  if (Math.abs(radialX - radialZ) > 1e-6 * Math.max(radialX, radialZ)) return "resized unevenly across its axis, so no revolve describes it";
+  if (shapeHasTaper(shape)) return "a taper is applied to the mesh, not to a revolve";
+  const fullTurn = Math.abs(Math.abs(settings.sweepAngle) - 360) <= 1e-6;
+  if (!storedRevolveAxis(shape, fullTurn)) return "a partial sweep saved without its axis";
+  if (profileHasCurvedSegment(shape.sketchProfile!)) return "a curved profile edge is sampled into straight segments, so no exact solid describes it";
+  try {
+    if (cadSketchRegions(revolveSectionProfile(shape.sketchProfile!, settings, { radial: 1, axial: 1 })).length !== 1) {
+      return "the profile has several closed regions";
+    }
+  } catch {
+    return "the profile has no closed region";
+  }
+  return null;
+}
+
+/**
+ * Whether `placedSolidForShape` builds this shape as the exact solid of its
+ * revolve rather than sewing its stored mesh, which is what measuring it
+ * reports as its precision.
+ */
+export function hasExactRevolveSolid(shape: WorkplaneShape) {
+  return revolveWithoutExactSolid(shape) === null;
+}
+
+/**
+ * The angle a mesh of a result built from these shapes may turn through
+ * between facets, so that it is no coarser than the finest exact revolve
+ * among them, or undefined when none is one.
+ *
+ * Before a revolve was exact, a cut through it was made from its faceted
+ * sweep, so the stored result was exactly as fine as its `sides` asked. The
+ * exact result is meshed at a fixed chord height instead, which on a small
+ * ring is coarser than the sweep it replaced and ignores `sides` altogether.
+ * A group record is searched through, since it is cut as its members.
+ *
+ * Twice the sweep's facet angle, because OCCT's angular deflection bounds the
+ * turn between a facet's normal and the surface's, half a facet each way: at
+ * this value a full circle gets `sides` facets, the sweep's own count, and a
+ * 64-sided ring cut in half meshes to the 260 triangles its sweep gave.
+ */
+export function exactRevolveAngularDeflection(shapes: readonly WorkplaneShape[]): number | undefined {
+  let finest = 0;
+  const visit = (shape: WorkplaneShape) => {
+    if (hasExactRevolveSolid(shape)) {
+      finest = Math.max(finest, normalizeSketchRevolveSettings(shape.sketchRevolve).sides);
+    } else if (!shape.importedMesh && !shape.cadBrep) {
+      shape.groupedShapes?.forEach(visit);
+    }
+  };
+  shapes.forEach(visit);
+  return finest > 0 ? (4 * Math.PI) / finest : undefined;
+}
+
+/**
+ * The exact solid of a plain revolve, full turn or partial sweep, in the frame
+ * its stored mesh is drawn in -- centred on the mesh's box in X and Z, base at
+ * Y=0, at its drawn size -- or null when it has none (#523).
+ *
+ * That frame is what lets the caller place it exactly as the mesh is placed.
+ * The axis comes from the stored record rather than from the solid's own box,
+ * because a faceted partial sweep's box is not the exact sweep's box, and
+ * centring on the wrong one moves the solid off its axis.
+ */
+export function exactRevolveLocalSolid(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle | null {
+  if (!hasExactRevolveSolid(shape)) return null;
+  const settings = normalizeSketchRevolveSettings(shape.sketchRevolve);
+  const axis = storedRevolveAxis(shape, Math.abs(Math.abs(settings.sweepAngle) - 360) <= 1e-6)!;
+  const { radialX, radialZ, axial } = revolveResizeFactors(shape);
+  const solid = revolvedSectionSolid(cad, shape.sketchProfile!, settings, { radial: radialX, axial });
+  if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new ServerCadError("The retained sketch revolve could not be rebuilt as exact CAD geometry.");
+  return cad.translate(solid, axis.x * radialX, 0, axis.z * radialZ);
+}
+
+/**
  * The solid `GET /edges` numbers and a fillet or chamfer rounds.
  *
  * One builder for both, so an index from the listing names the same edge in
@@ -659,21 +790,19 @@ export function isPlainFullTurnSketchRevolve(shape: WorkplaneShape) {
     && Math.abs(Math.abs(settings!.sweepAngle) - 360) <= 1e-6;
 }
 
-/** Build the analytical BREP for a plain, single-region full-turn revolve. */
-export function exactPlainSketchRevolveSolid(
-  cad: OcctKernel,
+/**
+ * A revolve's section as a sketch profile in the OCCT build frame, at the given
+ * section scale: x is the distance from the axis and z runs up it from the
+ * revolve's base, the same polygons the mesh sweep turns.
+ */
+function revolveSectionProfile(
   sketchProfile: SketchProfile,
   sketchRevolve: WorkplaneShape["sketchRevolve"],
-  targetShape?: WorkplaneShape,
-  sectionScale: { radial: number; axial: number } = { radial: 1, axial: 1 },
-) {
-  if (!sketchRevolve || (sketchRevolve.pitch ?? 0) !== 0 || (sketchRevolve.coreRadius ?? 0) !== 0
-    || Math.abs(Math.abs(sketchRevolve.sweepAngle) - 360) > 1e-6) {
-    throw new ServerCadError("Exact revolve geometry requires a plain full-turn sketch revolve.");
-  }
+  sectionScale: { radial: number; axial: number },
+): SketchProfile {
   const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
   if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region.");
-  const profile: SketchProfile = {
+  return {
     points: polygons.flatMap((polygon, polygonIndex) => polygon.map(([x, z], pointIndex) => ({
       id: `revolve-${polygonIndex}-point-${pointIndex}`,
       x: x * sectionScale.radial,
@@ -686,6 +815,24 @@ export function exactPlainSketchRevolveSolid(
       kind: "line" as const,
     }))),
   };
+}
+
+/**
+ * The exact solid of a plain revolve's one section region, turned through its
+ * sweep about the Y axis, in the frame the mesh sweep builds before centring.
+ *
+ * Manifold sweeps from +X towards the editor's -Z and then turns the result by
+ * the start angle (or, for a negative sweep, by where the sweep ends), which
+ * is what a positive OCCT rotation about +Y does too, so the two agree for a
+ * partial sweep as well as for a full turn.
+ */
+function revolvedSectionSolid(
+  cad: OcctKernel,
+  sketchProfile: SketchProfile,
+  sketchRevolve: NonNullable<WorkplaneShape["sketchRevolve"]>,
+  sectionScale: { radial: number; axial: number },
+) {
+  const profile = revolveSectionProfile(sketchProfile, sketchRevolve, sectionScale);
   const pathWire = (path: OrderedCadSketchPath) => cad.makeWire(path.steps.map(({ from, to }) => cad.makeLineEdge(
     { x: from.x, y: from.z, z: 0 },
     { x: to.x, y: to.z, z: 0 },
@@ -694,19 +841,30 @@ export function exactPlainSketchRevolveSolid(
   if (regions.length !== 1) {
     throw new ServerCadError("Exact revolve geometry requires one closed profile region, and this revolve's profile has several.");
   }
-  const solids = regions.map((region) => {
-    let face = cad.makeFace(pathWire(region.outer));
-    if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map(pathWire));
-    const solid = cad.revolve(face, {
-      point: { x: 0, y: 0, z: 0 },
-      direction: { x: 0, y: 1, z: 0 },
-    }, Math.PI * 2);
-    return Math.abs(sketchRevolve.startAngle) < 1e-8 ? solid : cad.rotate(solid, {
-      point: { x: 0, y: 0, z: 0 },
-      direction: { x: 0, y: 1, z: 0 },
-    }, (sketchRevolve.startAngle * Math.PI) / 180);
-  });
-  let solid = solids[0]!;
+  const axis = { point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 1, z: 0 } };
+  const region = regions[0]!;
+  let face = cad.makeFace(pathWire(region.outer));
+  if (region.holes.length) face = cad.addHolesInFace(face, region.holes.map(pathWire));
+  const sweep = Math.abs(sketchRevolve.sweepAngle);
+  const solid = cad.revolve(face, axis, Math.abs(sweep - 360) <= 1e-6 ? Math.PI * 2 : (sweep * Math.PI) / 180);
+  const rotation = sketchRevolve.sweepAngle < 0 ? sketchRevolve.startAngle + sketchRevolve.sweepAngle : sketchRevolve.startAngle;
+  return Math.abs(rotation) < 1e-8 ? solid : cad.rotate(solid, axis, (rotation * Math.PI) / 180);
+}
+
+/** Build the analytical BREP for a plain, single-region full-turn revolve. */
+export function exactPlainSketchRevolveSolid(
+  cad: OcctKernel,
+  sketchProfile: SketchProfile,
+  sketchRevolve: WorkplaneShape["sketchRevolve"],
+  targetShape?: WorkplaneShape,
+  sectionScale: { radial: number; axial: number } = { radial: 1, axial: 1 },
+) {
+  if (!sketchRevolve || (sketchRevolve.pitch ?? 0) !== 0 || (sketchRevolve.coreRadius ?? 0) !== 0
+    || Math.abs(Math.abs(sketchRevolve.sweepAngle) - 360) > 1e-6) {
+    throw new ServerCadError("Exact revolve geometry requires a plain full-turn sketch revolve.");
+  }
+  // A full turn starts where its start angle says, whichever way it is swept.
+  let solid = revolvedSectionSolid(cad, sketchProfile, { ...sketchRevolve, sweepAngle: 360 }, sectionScale);
   // Callers that cannot express a resized revolve analytically (for example,
   // exact face listing of a radially elliptical legacy shape) use this bounds
   // fit. Face drafting of a supported resize passes profile scales instead.
@@ -858,8 +1016,11 @@ export function meshedCadResult(
   sourceShape?: WorkplaneShape,
   lineage?: { sourceFaceHashes: number[]; evolution: EvolutionData },
   sourceSolid?: ShapeHandle,
+  angularDeflection?: number,
 ): ServerCadResult {
-  const mesh = cad.meshShape(result, { linearDeflection: MESH_DEFLECTION });
+  const mesh = cad.meshShape(result, angularDeflection
+    ? { linearDeflection: MESH_DEFLECTION, angularDeflection }
+    : { linearDeflection: MESH_DEFLECTION });
   // The editor stores a flat triangle list, not an indexed mesh, so the
   // indices are expanded here rather than carried.
   const positions: number[] = [];

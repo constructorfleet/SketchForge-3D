@@ -7,6 +7,7 @@
 
 import { withCadKernel } from "./serverCadKernel.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
+import { hasExactRevolveSolid } from "./serverCadOperations.js";
 import { interferenceBetweenSolids, interferenceRequestRefusal, type InterferenceResult } from "./cadAnalysis.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
@@ -35,7 +36,7 @@ export async function checkInterference(shapes: readonly WorkplaneShape[], reque
 
   return withCadKernel((cad) => interferenceBetweenSolids(
     cad,
-    selected.map((shape) => ({ id: shape.id, name: shape.name, tessellated: (shape.importedMesh?.positions?.length ?? 0) >= 9, shape })),
+    selected.map((shape) => ({ id: shape.id, name: shape.name, tessellated: (shape.importedMesh?.positions?.length ?? 0) >= 9 && !hasExactRevolveSolid(shape), shape })),
     (operand) => placedSolidForShape(cad, operand.shape),
     clearance,
   ));

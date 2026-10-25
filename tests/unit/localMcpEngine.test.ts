@@ -181,16 +181,30 @@ describe("local MCP engine mode", () => {
     const shape = JSON.parse(created[1].result.content[0].text).shapes[0];
     expect(shape.sketchRevolve).toMatchObject({ sides: 256, quality: 8 });
 
-    // The volume and centre-of-mass checks below guard the engine path, which
-    // already read `sides` and `quality` from a flat request before #504; what
-    // #504 changed is the schema above and the typed request.
-    const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId: shape.id });
-    const properties = JSON.parse(read[1].result.content[0].text);
-    // A 256-gon annulus, 50..75 mm, 10 mm tall: within 0.01% of the true ring,
-    // where the default 64 facets fall 0.16% short of it.
+    // `sides` reaches the stored sweep: an STL export writes that mesh, a
+    // 256-gon annulus of 8 triangles per facet, holding the 256-gon's volume
+    // rather than the default 64-gon's, which is 0.16% short of the circle.
+    const stlPath = path.join(projectsDir, "ring.stl");
+    const stl = callMcp(projectsDir, 3, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: stlPath, overwrite: true });
+    expect(stl[1].result.isError, stl[1].result.content[0].text).toBeUndefined();
+    const bytes = fs.readFileSync(stlPath);
+    const triangleCount = bytes.readUInt32LE(80);
+    expect(triangleCount).toBe(256 * 8);
+    let stlVolume = 0;
+    for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+      const at = (vertex: number, axis: number) => bytes.readFloatLE(84 + triangle * 50 + 12 + vertex * 12 + axis * 4);
+      const [ax, ay, az, bx, by, bz, cx, cy, cz] = [0, 1, 2].flatMap((vertex) => [0, 1, 2].map((axis) => at(vertex, axis)));
+      stlVolume += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    }
     const facetedRing = (sides: number) => (sides / 2) * Math.sin((2 * Math.PI) / sides) * (75 ** 2 - 50 ** 2) * 10;
-    expect(properties.volume).toBeCloseTo(facetedRing(256), 0);
-    expect(properties.volume).toBeGreaterThan(facetedRing(64) + 100);
+    expect(Math.abs(stlVolume) / facetedRing(256)).toBeCloseTo(1, 4);
+
+    // Measuring is not the mesh: a plain revolve is measured on its exact
+    // solid (#523), so the annulus, 50..75 mm and 10 mm tall, is the true ring.
+    const read = callMcp(projectsDir, 4, "sketchforge_shape_properties", { projectId: "case", shapeId: shape.id });
+    const properties = JSON.parse(read[1].result.content[0].text);
+    expect(properties.volume).toBeCloseTo(Math.PI * (75 ** 2 - 50 ** 2) * 10, 3);
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
     expect(properties.centerOfMass.x).toBeCloseTo(0, 3);
     expect(properties.centerOfMass.y).toBeCloseTo(5, 3);
     expect(properties.centerOfMass.z).toBeCloseTo(0, 3);

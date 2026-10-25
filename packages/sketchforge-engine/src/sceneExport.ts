@@ -1,6 +1,7 @@
 import { zipSync, strToU8 } from "fflate";
 import { meshProjectShapes } from "./projectMeshes.js";
 import { exportShapesToStep } from "./stepExport.js";
+import { placedExactRevolveBrep } from "./serverShapeBooleans.js";
 import { exportSkfProject } from "./skfProject.js";
 import { projectShapesToSvg } from "./serverCadProjection.js";
 import { sectionShapesToDxf, sectionShapesToSvg, type SectionOptions } from "./serverCadSection.js";
@@ -140,7 +141,7 @@ export async function exportProjectScene(
     return { format, filename: `${baseName}.skf`, mimeType: "application/vnd.sketchforge.project+zip", data, shapeCount: shapes.length };
   }
   if (format === "step") {
-    const result = await exportShapesToStep(shapes.filter((shape) => shape.hidden !== true));
+    const result = await exportShapesToStep(shapes.filter((shape) => shape.hidden !== true), { exactBrepFor: placedExactRevolveBrep });
     const data = new Uint8Array(await result.blob.arrayBuffer());
     return { format, filename: `${baseName}.step`, mimeType: "model/step", data, shapeCount: shapes.length, exportedCount: result.exportedCount, skipped: result.skipped };
   }
