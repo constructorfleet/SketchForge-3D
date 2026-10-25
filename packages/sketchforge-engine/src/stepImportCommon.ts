@@ -34,7 +34,7 @@ function meshBounds(positions: number[]) {
   return { minX, minY, minZ, maxX, maxZ };
 }
 
-function componentColorsByFace(cad: OcctKernel, metadataBySolid: Map<string, { color?: string }[]>, solids: ShapeHandle[], faces: ShapeHandle[]) {
+export function componentColorsByFace(cad: OcctKernel, metadataBySolid: Map<string, { color?: string }[]>, solids: ShapeHandle[], faces: ShapeHandle[]) {
   const colorsBySolid = new Map<string, string>();
   for (const [key, candidates] of metadataBySolid) {
     const colors = [...new Set(candidates.map(({ color }) => color).filter((color): color is string => Boolean(color)))];
