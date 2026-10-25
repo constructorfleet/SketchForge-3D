@@ -34,6 +34,7 @@ export const API_ERROR_CODES = [
   "project_not_found",
   "project_exists",
   "project_busy",
+  "revision_mismatch",
   "shape_not_found",
   "shape_locked",
   "unsupported_kind",
@@ -64,6 +65,7 @@ export const apiErrors = {
   jsonBodyRequired: () => apiError("Expected a JSON object body.", 400, "invalid_body"),
   projectNotFound: () => apiError("That project is not on the server.", 404, "project_not_found"),
   projectBusy: () => apiError("That project is being changed; try again.", 409, "project_busy"),
+  revisionMismatch: (revision: number) => apiError("The project changed since the supplied revision.", 409, "revision_mismatch", { revision }),
   shapeNotFound: () => apiError("That shape is not in the project.", 404, "shape_not_found"),
   shapesNotFound: (ids: readonly string[]) => apiError(`Not in the project: ${ids.join(", ")}.`, 404, "shape_not_found"),
   shapeLocked: (message = "That shape is locked.") => apiError(message, 409, "shape_locked"),
@@ -75,6 +77,13 @@ export const apiErrors = {
 
 export function apiJson(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+/** The revision value inside the ETag produced by this API, when supplied. */
+export function apiExpectedRevision(request: Request): string | undefined {
+  const ifMatch = request.headers.get("if-match");
+  if (ifMatch === null) return undefined;
+  return ifMatch.trim() === "*" ? "*" : ifMatch.trim().replace(/^"|"$/g, "");
 }
 
 /**

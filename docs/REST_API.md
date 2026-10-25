@@ -10,6 +10,8 @@ sources:
 
 # REST API
 
+Kernel workload regression ceilings and measurement details are documented in [Performance budgets](PERFORMANCE.md).
+
 A scripting surface for SketchForge projects (upstream issue [#55](https://github.com/Formsmith746/SketchForge-3D/issues/55)). Shapes are described as data, so an LLM or a build script can generate a parameterised design -- a plate with a computed row of holes, a family of brackets at four sizes -- without driving the editor.
 
 It is **headless**: it reads and writes the projects that server-side storage holds, with no browser open anywhere. A dashboard that has the project open picks the change up on its next load, because every write advances the project's revision.
@@ -51,6 +53,8 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 All paths are under `/api/v1`. Request bodies are JSON except for multipart file imports; most responses are JSON, while export downloads can return binary bytes. Errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
 JSON request bodies are limited to 16 MiB; `POST /imports` accepts a raw request body up to 64 MiB for either JSON/base64 or multipart uploads. The server checks a declared `Content-Length` before parsing and also caps streamed bodies when the header is absent or understated. Oversized bodies return `413 limit_exceeded` without reaching an engine operation. For JSON imports, the base64 encoding is included in the 64 MiB request limit, so the usable file size is lower than the 64 MiB decoded-file ceiling; multipart imports can use nearly the full decoded-file limit.
+
+Project write routes accept an optional `If-Match: "<revision>"` header. The server checks it while holding the project write lock; a stale revision returns `409 revision_mismatch` with the current `revision`, and leaves the project unchanged. Successful writes return the new revision in both the JSON body and `ETag: "<revision>"`. Omitting `If-Match` preserves unconditional write behavior.
 
 For the current method and path inventory, accepted parameters and bodies, response schemas, authentication, and handler source, use the [generated REST operation references](/docs/rest-api/). Those 28 pages are generated from the same OpenAPI 3.1 contract as the [OpenAPI document](./openapi-v1.json), available as a [downloadable OpenAPI JSON](/openapi-v1.json); the four preflight-only OPTIONS handlers are omitted. Export references distinguish JSON/base64 responses from `download=1` binary responses and document the metadata header. For accepted per-kind shape fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`. This guide retains deployment, client, error-handling, and workflow walkthroughs; the generated pages are the source for the endpoint listing.
 
@@ -150,7 +154,7 @@ A locked shape answers `409` with `code: "shape_locked"`; send `locked: false` t
 
 ## Errors
 
-Every error carries a `code` beside its sentence, because the status alone is ambiguous in both directions a client cares about. `404` is a missing project, a missing shape, *or* an API with no token set; `409` is both a project someone else is writing -- retry -- and a locked shape -- do not. Decide on the code; the sentence is for a human reading a log.
+Every error carries a `code` beside its sentence, because the status alone is ambiguous in both directions a client cares about. `404` is a missing project, a missing shape, *or* an API with no token set; `409` is a busy project, a locked shape, or a stale revision. Decide on the code; the sentence is for a human reading a log.
 
 | Code | Status | Means |
 | --- | --- | --- |
@@ -163,6 +167,7 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `project_not_found` / `shape_not_found` | 404 | No such project, or no such shape in it. |
 | `project_exists` | 409 | A project with that id is already there. |
 | `project_busy` | 409 | Another write holds the project's lock. **Retry.** |
+| `revision_mismatch` | 409 | The project no longer has the revision in `If-Match`; the response includes the current `revision`. Reload before writing again. |
 | `shape_locked` | 409 | The shape is locked. Unlock it; retrying will not help. |
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
 | `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |

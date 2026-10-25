@@ -915,6 +915,7 @@ class SketchForgeClient:
         retry_on_busy: int = DEFAULT_RETRY_ON_BUSY,
         headers: Optional[Mapping[str, str]] = None,
         opener: Optional[Any] = None,
+        expected_revision: Optional[Union[int, str]] = None,
     ) -> None:
         self._transport = Transport(
             base_url=base_url,
@@ -923,6 +924,7 @@ class SketchForgeClient:
             retry_on_busy=retry_on_busy,
             headers=headers,
             opener=opener,
+            expected_revision=expected_revision,
         )
         self.projects = Projects(self._transport)
         self.shapes = Shapes(self._transport)

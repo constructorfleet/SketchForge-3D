@@ -1,4 +1,4 @@
-import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
+import { apiContext, apiError, apiErrors, apiExpectedRevision, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { createLocalId } from "@/lib/engine/localIds";
 import { horizontalPlacementWorkplane } from "@/lib/engine/placementWorkplane";
@@ -104,8 +104,15 @@ async function deleteHandler(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
 
   const locked = await withProjectLock(context.root, projectId, async () => {
+    const metadata = await readProjectMetadata(context.root, projectId);
+    if (!metadata) return apiErrors.projectNotFound();
+    const expectedRevision = apiExpectedRevision(request);
+    const currentRevision = typeof metadata?.revision === "number" ? metadata.revision : 0;
+    if (expectedRevision !== undefined && expectedRevision !== "*" && expectedRevision !== String(currentRevision)) {
+      return apiErrors.revisionMismatch(currentRevision);
+    }
     const existed = await deleteProjectFiles(context.root, projectId);
-    return existed ? apiJson({ deleted: true, id: projectId }) : apiErrors.projectNotFound();
+    return existed ? apiJson({ deleted: true, id: projectId, revision: currentRevision }) : apiErrors.projectNotFound();
   });
   return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

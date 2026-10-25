@@ -92,7 +92,7 @@ async function handlePost(request: Request) {
     return apiErrors.limitExceeded(`A model can be at most ${MAX_IMPORT_BYTES / (1024 * 1024)}MB.`, MAX_IMPORT_BYTES, upload.bytes.byteLength);
   }
 
-  const imported = await apiEngine(context.root).importMesh(projectId, upload);
+  const imported = await apiEngine(context.root, request).importMesh(projectId, upload);
   if (!imported.ok) return apiEngineError(imported.failure);
   return apiJson({
     shape: apiShapeSummary(imported.value.shape),

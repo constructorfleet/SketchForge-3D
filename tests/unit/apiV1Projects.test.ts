@@ -107,6 +107,41 @@ describe("REST API v1", () => {
     expect(payload.projects[0]).toMatchObject({ id: projectId, name: "Bracket", shapes: 0 });
   });
 
+  it("honours If-Match for shape writes and returns the resulting ETag", async () => {
+    const projectId = await makeProject("Conditional writes");
+    const created = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "cube", size: 10, name: "A" }),
+    }));
+    const createdPayload = await created.json() as { shapes: Array<{ id: string }>; revision: number };
+    expect(created.headers.get("etag")).toBe(`"${createdPayload.revision}"`);
+
+    const mismatch = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      headers: { "If-Match": '"0"' },
+      body: JSON.stringify({ name: "Must not apply" }),
+    }));
+    expect(mismatch.status).toBe(409);
+    expect(await mismatch.json()).toMatchObject({ code: "revision_mismatch", revision: createdPayload.revision });
+    const afterMismatch = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: Array<{ id: string; name: string }> };
+    expect(afterMismatch.shapes.find(({ id }) => id === createdPayload.shapes[0]!.id)?.name).toBe("A");
+
+    const absent = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: "No precondition" }),
+    }));
+    expect(absent.status).toBe(200);
+    const absentPayload = await absent.json() as { revision: number };
+
+    const matched = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      headers: { "If-Match": `"${absentPayload.revision}"` },
+      body: JSON.stringify({ name: "Matched" }),
+    }));
+    expect(matched.status).toBe(200);
+    expect(matched.headers.get("etag")).toMatch(/^"\d+"$/);
+  });
+
   it("paginates project and shape listings with a next cursor", async () => {
     const firstProjectId = await makeProject("First");
     await makeProject("Second");
@@ -449,10 +484,13 @@ describe("REST API v1", () => {
   it("deletes a project and everything it held", async () => {
     const projectId = await makeProject();
     await addShape(projectId, { kind: "cube", size: 10 });
+    const current = await readProjectDocument(projectsRoot, projectId);
 
     const response = await deleteProject(authorized(`/api/v1/projects?projectId=${projectId}`, { method: "DELETE" }));
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("etag")).toBe(`"${current?.metadata.revision}"`);
+    expect(await response.json()).toMatchObject({ deleted: true, id: projectId, revision: current?.metadata.revision });
     expect(await fs.readdir(projectsRoot)).toEqual([]);
   });
 });

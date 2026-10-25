@@ -36,7 +36,7 @@ const postBoolean = async (request: Request) => {
   if (both.length > 0) return apiError(`A shape cannot be both a solid and a hole: ${both.join(", ")}.`, 400, "invalid_request");
   if (!validateApiV1RequestBody("POST /api/v1/booleans", { solidIds, holeIds })) return apiError("The boolean request does not match its contract.", 400, "invalid_request");
 
-  const cut = await apiEngine(context.root).cut(projectId, { solidIds, holeIds });
+  const cut = await apiEngine(context.root, request).cut(projectId, { solidIds, holeIds });
   if (!cut.ok) {
     return apiEngineError(cut.failure, {
       locked: (ids) => `Unlock every operand first; these are locked: ${ids.join(", ")}.`,

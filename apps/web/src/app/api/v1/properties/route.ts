@@ -14,7 +14,7 @@ const getProperties = async (request: Request) => {
   if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
   const { projectId, shapeId } = query.values;
 
-  const properties = await apiEngine(context.root).properties(projectId, shapeId);
+  const properties = await apiEngine(context.root, request).properties(projectId, shapeId);
   if (!properties.ok) {
     return apiEngineError(properties.failure, { oneShape: true, cadFailed: "The CAD kernel could not read that shape's properties." });
   }

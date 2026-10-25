@@ -42,7 +42,7 @@ const postDistribute = async (request: Request) => {
     return apiError("The distribution request does not match its contract.", 400, "invalid_request");
   }
 
-  const distributed = await apiEngine(context.root).distribute(projectId, {
+  const distributed = await apiEngine(context.root, request).distribute(projectId, {
     ids,
     axis: body.axis as "x" | "z" | undefined,
     spacing: body.spacing as (typeof SPACINGS)[number] | undefined,

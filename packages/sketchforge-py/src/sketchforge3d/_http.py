@@ -15,13 +15,20 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Union
 
 from .errors import SketchForgeApiError, SketchForgeTransportError
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_RETRY_ON_BUSY = 4
 _BUSY_RETRY_BASE_SECONDS = 0.06
+
+
+def _if_match_value(revision: Union[int, str]) -> str:
+    value = str(revision)
+    if value == "*" or (value.startswith('"') and value.endswith('"')):
+        return value
+    return f'"{value}"'
 
 
 def normalize_base_url(base_url: str) -> str:
@@ -49,12 +56,14 @@ class Transport:
         retry_on_busy: int = DEFAULT_RETRY_ON_BUSY,
         headers: Optional[Mapping[str, str]] = None,
         opener: Optional[Any] = None,
+        expected_revision: Optional[Union[int, str]] = None,
     ) -> None:
         self.api_root = normalize_base_url(base_url)
         self._token = token
         self._timeout = timeout
         self._retry_on_busy = retry_on_busy
         self._headers = dict(headers or {})
+        self._expected_revision = expected_revision
         #: Injectable so tests need no socket; anything with ``open(request, timeout=)``.
         self._opener = opener or urllib.request.build_opener()
 
@@ -84,6 +93,8 @@ class Transport:
         headers: Dict[str, str] = dict(self._headers)
         headers["Authorization"] = "Bearer " + self._token
         headers["Accept"] = "application/json"
+        if method.upper() != "GET" and self._expected_revision is not None:
+            headers["If-Match"] = _if_match_value(self._expected_revision)
         payload = None
         if body is not None:
             payload = json.dumps(body).encode("utf-8")
@@ -132,6 +143,8 @@ class Transport:
         headers["Authorization"] = "Bearer " + self._token
         headers["Accept"] = "application/json"
         headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+        if method.upper() != "GET" and self._expected_revision is not None:
+            headers["If-Match"] = _if_match_value(self._expected_revision)
         request = urllib.request.Request(url, data=b"".join(chunks), headers=headers, method=method)
         attempts = self._retry_on_busy + 1 if retryable else 1
         for attempt in range(1, attempts + 1):

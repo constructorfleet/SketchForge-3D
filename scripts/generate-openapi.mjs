@@ -28,6 +28,9 @@ for (const operation of API_V1_OPERATIONS) {
     {
       description: responseDescription(Number(status)),
       content: { "application/json": { schema: toJsonSchema(schema) } },
+      ...(operation.ifMatch && Number(status) >= 200 && Number(status) < 300
+        ? { headers: { ETag: { description: "The project revision after this write.", schema: { type: "string", pattern: '^\\"[0-9]+\\"$' } } } }
+        : {}),
     },
   ]));
   if (operation.binaryResponse) {
@@ -56,6 +59,15 @@ for (const operation of API_V1_OPERATIONS) {
         ...(rule.maxLength !== undefined ? { maxLength: rule.maxLength } : {}),
       },
     }));
+  }
+  if (operation.ifMatch) {
+    generated.parameters = [...(generated.parameters ?? []), {
+      name: "If-Match",
+      in: "header",
+      required: false,
+      description: "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+      schema: { type: "string", pattern: '^\\"[0-9]+\\"$' },
+    }];
   }
   if (operation.requestBody) {
     const requestContent = operation.requestBody.content ?? (operation.requestBody.contentType && operation.requestBody.schema
