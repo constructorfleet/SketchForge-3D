@@ -62,7 +62,8 @@ Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR. File read
   "type": "object",
   "properties": {
     "filePath": {
-      "type": "string"
+      "type": "string",
+      "description": "Path to a .skf under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set."
     },
     "name": {
       "type": "string"
