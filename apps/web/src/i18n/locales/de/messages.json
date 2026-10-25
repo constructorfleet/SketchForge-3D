@@ -484,7 +484,13 @@
       "buildingSweep": "Planarer Sweep wird erstellt",
       "cannotSweep": "Planarer Sweep konnte nicht erstellt werden",
       "sweepCreated": "Planarer Sweep erstellt",
-      "sweepUpdated": "Planarer Sweep aktualisiert"
+      "sweepUpdated": "Planarer Sweep aktualisiert",
+      "constraints": {
+        "addTangent": "Tangential",
+        "kinds": {
+          "tangent": "Tangential"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Wählen Sie vor dem Export mindestens einen Volumenkörper aus",

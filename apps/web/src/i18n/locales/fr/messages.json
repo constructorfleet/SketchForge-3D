@@ -484,7 +484,13 @@
       "buildingSweep": "Création du balayage plan",
       "cannotSweep": "Impossible de créer le balayage plan",
       "sweepCreated": "Balayage plan créé",
-      "sweepUpdated": "Balayage plan mis à jour"
+      "sweepUpdated": "Balayage plan mis à jour",
+      "constraints": {
+        "addTangent": "Tangente",
+        "kinds": {
+          "tangent": "Tangente"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Sélectionnez au moins une forme solide avant d’exporter",

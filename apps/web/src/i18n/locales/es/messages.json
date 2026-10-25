@@ -484,7 +484,13 @@
       "buildingSweep": "Creando barrido plano",
       "cannotSweep": "No se pudo crear el barrido plano",
       "sweepCreated": "Barrido plano creado",
-      "sweepUpdated": "Barrido plano actualizado"
+      "sweepUpdated": "Barrido plano actualizado",
+      "constraints": {
+        "addTangent": "Tangente",
+        "kinds": {
+          "tangent": "Tangente"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Selecciona al menos una forma sólida antes de exportar",

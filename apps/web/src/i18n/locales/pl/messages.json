@@ -484,7 +484,13 @@
       "buildingSweep": "Tworzenie płaskiego wyciągnięcia",
       "cannotSweep": "Nie udało się utworzyć płaskiego wyciągnięcia",
       "sweepCreated": "Utworzono płaskie wyciągnięcie",
-      "sweepUpdated": "Zaktualizowano płaskie wyciągnięcie"
+      "sweepUpdated": "Zaktualizowano płaskie wyciągnięcie",
+      "constraints": {
+        "addTangent": "Styczność",
+        "kinds": {
+          "tangent": "Styczność"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Przed eksportem zaznacz co najmniej jedną bryłę",

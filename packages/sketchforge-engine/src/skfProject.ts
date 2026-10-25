@@ -1007,11 +1007,13 @@ function validateSketchProfile(value: unknown, label: string) {
   const profile = objectRecord(value, label);
   if (!Array.isArray(profile.points) || !Array.isArray(profile.segments)) throw new LocalizedError("errors.skf.sketchMissingPointsOrSegments", { label });
   const pointIds = new Set<string>();
+  const pointById = new Map<string, Record<string, unknown>>();
   profile.points.forEach((rawPoint, index) => {
     const point = objectRecord(rawPoint, `${label}.points[${index}]`);
     const id = stringValue(point.id, `${label}.points[${index}].id`);
     if (pointIds.has(id)) throw new LocalizedError("errors.skf.sketchDuplicatePointId", { label, id });
     pointIds.add(id);
+    pointById.set(id, point);
     finiteNumber(point.x, `${label}.points[${index}].x`);
     finiteNumber(point.z, `${label}.points[${index}].z`);
     if (point.sweepDepth !== undefined) {
@@ -1043,11 +1045,13 @@ function validateSketchProfile(value: unknown, label: string) {
     }
   }
   const segmentIds = new Set<string>();
+  const segmentById = new Map<string, Record<string, unknown>>();
   profile.segments.forEach((rawSegment, index) => {
     const segment = objectRecord(rawSegment, `${label}.segments[${index}]`);
     const id = stringValue(segment.id, `${label}.segments[${index}].id`);
     if (segmentIds.has(id)) throw new LocalizedError("errors.skf.sketchDuplicateSegmentId", { label, id });
     segmentIds.add(id);
+    segmentById.set(id, segment);
     const startId = stringValue(segment.startId, `${label}.segments[${index}].startId`);
     const endId = stringValue(segment.endId, `${label}.segments[${index}].endId`);
     if (!pointIds.has(startId) || !pointIds.has(endId)) throw new LocalizedError("errors.skf.sketchMissingPointReference", { label });
@@ -1071,9 +1075,23 @@ function validateSketchProfile(value: unknown, label: string) {
         if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }
-      } else if (kind === "perpendicular" || kind === "parallel") {
+      } else if (kind === "perpendicular" || kind === "parallel" || kind === "tangent") {
         if (!Array.isArray(constraint.segmentIds) || constraint.segmentIds.length !== 2 || constraint.segmentIds[0] === constraint.segmentIds[1] || !constraint.segmentIds.every((segmentId) => typeof segmentId === "string" && segmentIds.has(segmentId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+        }
+        if (kind === "tangent") {
+          const [first, second] = constraint.segmentIds.map((segmentId) => segmentById.get(String(segmentId))!);
+          const shared = [first.startId, first.endId].filter((id) => id === second.startId || id === second.endId);
+          const isLine = (segment: typeof first) => !segment.kind || segment.kind === "line";
+          const isBezier = (segment: typeof first) => segment.kind === "bezier" || segment.kind === "smooth";
+          if (shared.length !== 1 || !((isLine(first) && isBezier(second)) || (isLine(second) && isBezier(first)))) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+          }
+          const sharedPoint = pointById.get(String(shared[0]));
+          const curve = isBezier(first) ? first : second;
+          if (!sharedPoint || (curve.startId === shared[0] ? !sharedPoint.handleOut : !sharedPoint.handleIn)) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+          }
         }
       } else if (kind === "coincident" || kind === "distance") {
         if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {

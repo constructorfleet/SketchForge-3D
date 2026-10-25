@@ -53,6 +53,32 @@ function segmentPair(segmentIds: [string, string], profile: SketchProfile) {
   return first && second ? [first, second] as const : null;
 }
 
+function tangentInfo(segmentIds: [string, string], profile: SketchProfile, points: Map<string, SketchPoint>) {
+  const pair = segmentPair(segmentIds, profile);
+  if (!pair) return null;
+  const isLine = (segment: typeof pair[0]) => !segment.kind || segment.kind === "line";
+  const isBezier = (segment: typeof pair[0]) => segment.kind === "bezier" || segment.kind === "smooth";
+  const line = isLine(pair[0]) && isBezier(pair[1]) ? pair[0] : isLine(pair[1]) && isBezier(pair[0]) ? pair[1] : null;
+  const curve = line === pair[0] ? pair[1] : line === pair[1] ? pair[0] : null;
+  if (!line || !curve) return null;
+  const sharedIds = [line.startId, line.endId].filter((id) => id === curve.startId || id === curve.endId);
+  if (sharedIds.length !== 1) return null;
+  const sharedId = sharedIds[0]!;
+  const shared = points.get(sharedId);
+  const lineStart = points.get(line.startId);
+  const lineEnd = points.get(line.endId);
+  if (!shared || !lineStart || !lineEnd) return null;
+  const handle = curve.startId === sharedId ? shared.handleOut : shared.handleIn;
+  if (!handle) return null;
+  const curveX = curve.startId === sharedId ? handle.x - shared.x : shared.x - handle.x;
+  const curveZ = curve.startId === sharedId ? handle.z - shared.z : shared.z - handle.z;
+  return { line, lineStart, lineEnd, curveX, curveZ };
+}
+
+export function isSketchTangentPair(segmentIds: [string, string], profile: SketchProfile) {
+  return Boolean(tangentInfo(segmentIds, profile, new Map(profile.points.map((point) => [point.id, point]))));
+}
+
 function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, string] }>, points: Map<string, SketchPoint>) {
   const first = points.get(constraint.pointIds[0]);
   const second = points.get(constraint.pointIds[1]);
@@ -83,6 +109,17 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
     const vx = secondEnd.x - second.x, vz = secondEnd.z - second.z;
     const lengths = Math.hypot(ux, uz) * Math.hypot(vx, vz);
     return lengths <= CONSTRAINT_TOLERANCE_MM ** 2 ? Number.POSITIVE_INFINITY : Math.abs((ux * vz - uz * vx) / lengths);
+  }
+  if (constraint.kind === "tangent") {
+    const info = tangentInfo(constraint.segmentIds, profile, points);
+    if (!info) return Number.POSITIVE_INFINITY;
+    const lineX = info.lineEnd.x - info.lineStart.x;
+    const lineZ = info.lineEnd.z - info.lineStart.z;
+    const lineLength = Math.hypot(lineX, lineZ);
+    const curveLength = Math.hypot(info.curveX, info.curveZ);
+    return lineLength <= CONSTRAINT_TOLERANCE_MM || curveLength <= CONSTRAINT_TOLERANCE_MM
+      ? Number.POSITIVE_INFINITY
+      : Math.abs((lineX * info.curveZ - lineZ * info.curveX) / (lineLength * curveLength));
   }
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
@@ -159,6 +196,27 @@ function equationRows(
         { pointId: firstEnd.id, coordinate: 0, coefficient: gux }, { pointId: firstEnd.id, coordinate: 1, coefficient: guz },
         { pointId: second.id, coordinate: 0, coefficient: -gvx }, { pointId: second.id, coordinate: 1, coefficient: -gvz },
         { pointId: secondEnd.id, coordinate: 0, coefficient: gvx }, { pointId: secondEnd.id, coordinate: 1, coefficient: gvz },
+      ]);
+      continue;
+    }
+    if (constraint.kind === "tangent") {
+      const info = tangentInfo(constraint.segmentIds, profile, points);
+      if (!info) continue;
+      const ux = info.lineEnd.x - info.lineStart.x;
+      const uz = info.lineEnd.z - info.lineStart.z;
+      const vx = info.curveX;
+      const vz = info.curveZ;
+      const lineLength = Math.hypot(ux, uz);
+      const curveLength = Math.hypot(vx, vz);
+      if (lineLength <= CONSTRAINT_TOLERANCE_MM || curveLength <= CONSTRAINT_TOLERANCE_MM) continue;
+      const sine = (ux * vz - uz * vx) / (lineLength * curveLength);
+      const gux = vz / (lineLength * curveLength) - sine * ux / (lineLength * lineLength);
+      const guz = -vx / (lineLength * curveLength) - sine * uz / (lineLength * lineLength);
+      add(sine, [
+        { pointId: info.lineStart.id, coordinate: 0, coefficient: -gux },
+        { pointId: info.lineStart.id, coordinate: 1, coefficient: -guz },
+        { pointId: info.lineEnd.id, coordinate: 0, coefficient: gux },
+        { pointId: info.lineEnd.id, coordinate: 1, coefficient: guz },
       ]);
       continue;
     }
@@ -293,6 +351,9 @@ function breakCollinearDistanceDegeneracy(
         connect(pair[0].startId, pair[0].endId);
         connect(pair[1].startId, pair[1].endId);
       }
+    } else if (constraint.kind === "tangent") {
+      const info = tangentInfo(constraint.segmentIds, profile, points);
+      if (info) connect(info.line.startId, info.line.endId);
     } else if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (segment) connect(segment.startId, segment.endId);
@@ -356,6 +417,10 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
       const segment = profile.segments.find(({ id: candidate }) => candidate === id);
       return segment ? [segment.startId, segment.endId] : [];
     });
+    if (constraint.kind === "tangent") {
+      const info = tangentInfo(constraint.segmentIds, profile, new Map(profile.points.map((point) => [point.id, point])));
+      return info ? [info.line.startId, info.line.endId] : [];
+    }
     if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       return segment ? [segment.startId, segment.endId] : [];
@@ -467,6 +532,7 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
     : constraint.kind === "horizontal" || constraint.kind === "vertical"
     ? segmentIds.has(constraint.segmentId)
     : constraint.kind === "perpendicular" || constraint.kind === "parallel" ? constraint.segmentIds.every((id) => segmentIds.has(id))
+    : constraint.kind === "tangent" ? isSketchTangentPair(constraint.segmentIds, profile)
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
 }
 
@@ -516,6 +582,28 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
         row[base] = (row[base] ?? 0) + coefficients[index * 2]!;
         row[base + 1] = (row[base + 1] ?? 0) + coefficients[index * 2 + 1]!;
       });
+      rows.push(row);
+      continue;
+    }
+    if (constraint.kind === "tangent") {
+      const info = tangentInfo(constraint.segmentIds, profile, new Map(profile.points.map((point) => [point.id, point])));
+      if (!info) return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-segment" };
+      const ux = info.lineEnd.x - info.lineStart.x;
+      const uz = info.lineEnd.z - info.lineStart.z;
+      const vx = info.curveX;
+      const vz = info.curveZ;
+      const lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
+      if (lu <= CONSTRAINT_TOLERANCE_MM || lv <= CONSTRAINT_TOLERANCE_MM) return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-segment" };
+      const sine = (ux * vz - uz * vx) / (lu * lv);
+      const gux = vz / (lu * lv) - sine * ux / (lu * lu);
+      const guz = -vx / (lu * lv) - sine * uz / (lu * lu);
+      const row = Array(parameterCount).fill(0) as number[];
+      const start = pointIndex.get(info.line.startId)!;
+      const end = pointIndex.get(info.line.endId)!;
+      row[start] = (row[start] ?? 0) - gux;
+      row[start + 1] = (row[start + 1] ?? 0) - guz;
+      row[end] = (row[end] ?? 0) + gux;
+      row[end + 1] = (row[end + 1] ?? 0) + guz;
       rows.push(row);
       continue;
     }

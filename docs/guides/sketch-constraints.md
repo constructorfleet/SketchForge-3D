@@ -12,7 +12,7 @@ sources:
 # Constrain sketch geometry
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
-shows browser-verified **Parallel** and **Perpendicular** constraints.
+shows **Parallel**, **Perpendicular**, and **Tangent** constraints.
 
 ## Make two segments parallel
 
@@ -41,6 +41,18 @@ The browser acceptance flow checks the initial angle, applies the relation, and
 measures the resulting angle before capturing the editor state.
 
 ![Two adjoining sketch segments selected with the Perpendicular constraint applied.](../screenshots/sketch-perpendicular-constraint.png)
+
+## Make a line tangent to a Bezier
+
+1. Draw a line and a Bezier segment that meet at one endpoint. Give the Bezier
+   endpoint a control handle.
+2. Select the line and Bezier segment together.
+3. Choose **Tangent** in the sketch constraint toolbar.
+
+The solver keeps the line direction aligned with the Bezier's endpoint handle
+while the shared point moves. The relation removes one estimated degree of
+freedom. The segments must share exactly one endpoint; tangent constraints
+between unsupported segment types are refused when a `.skf` project is read.
 
 Run the browser acceptance flow with:
 

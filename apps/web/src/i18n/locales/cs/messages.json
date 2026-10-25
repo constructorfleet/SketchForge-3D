@@ -484,7 +484,13 @@
       "buildingSweep": "Vytváření rovinného tažení",
       "cannotSweep": "Rovinné tažení se nepodařilo vytvořit",
       "sweepCreated": "Rovinné tažení vytvořeno",
-      "sweepUpdated": "Rovinné tažení aktualizováno"
+      "sweepUpdated": "Rovinné tažení aktualizováno",
+      "constraints": {
+        "addTangent": "Tečna",
+        "kinds": {
+          "tangent": "Tečna"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Před exportem vyberte alespoň jedno těleso",
