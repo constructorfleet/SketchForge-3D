@@ -5416,6 +5416,7 @@ export function SketchForgeEditor({
   resolvedTheme = "light",
   onThemePreferenceChange,
   autosaveNotice,
+  hostNotice,
 }: {
   initialAssets?: ProjectAsset[];
   initialShapes?: WorkplaneShape[];
@@ -5468,6 +5469,8 @@ export function SketchForgeEditor({
   resolvedTheme?: ResolvedAppTheme;
   onThemePreferenceChange?: (preference: AppThemePreference) => void;
   autosaveNotice?: AutosaveNotice | null;
+  /** Shown in the status line whenever a new object is passed. */
+  hostNotice?: { id: number; notice: Notice } | null;
 } = {}) {
   const t = useTranslations();
   const initialSceneRef = useRef<WorkplaneShape[] | null>(null);
@@ -5517,6 +5520,11 @@ export function SketchForgeEditor({
   const [activeMode, setActiveMode] = useState("3D Design");
   // null: nothing has happened yet; shown as the translated "Ready".
   const [statusNotice, setNotice] = useState<Notice | null>(null);
+  // A message from the page around the editor, such as the progress of a
+  // project the desktop shell opened. Each new id replaces the status line once.
+  useEffect(() => {
+    if (hostNotice) setNotice(hostNotice.notice);
+  }, [hostNotice]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
   const sketchImageInputRef = useRef<HTMLInputElement | null>(null);

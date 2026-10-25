@@ -22,6 +22,7 @@ import {
   useTranslations,
   type ErrorResponseFields,
   type Locale,
+  type Notice,
   type Translator,
 } from "@/i18n";
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
@@ -51,6 +52,7 @@ import {
 } from "@/lib/serverProjectStore";
 import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
+import { openDesktopProjectFile } from "@/lib/desktopProjectFile";
 import { downloadBlob } from "@/lib/downloadFile";
 import { PROJECTS_BACKUP_MEDIA_TYPE, newerBackupSource, projectsBackupFileName, storedBackupRevision, writeProjectsBackup, type ProjectBackupEntry } from "@/lib/projectBackup";
 import { browserStorageManager, readStorageStatus, requestPersistentStorageOnce, storageNearQuota, storageUsageFraction, type StorageStatus } from "@/lib/storageHealth";
@@ -667,6 +669,7 @@ export default function Home() {
   // Whether the server-storage probe has answered. A static build has no
   // server to ask, so it starts settled in browser mode.
   const [storageProbeSettled, setStorageProbeSettled] = useState(STATIC_EXPORT_BUILD);
+  const [editorHostNotice, setEditorHostNotice] = useState<{ id: number; notice: Notice } | null>(null);
   const [exportingAllProjects, setExportingAllProjects] = useState(false);
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
@@ -1105,6 +1108,9 @@ export default function Home() {
     }
     setActiveChallengeTutorial(nextChallengeTutorial);
     setActiveProjectId(projectId);
+    // A desktop-opened file's earlier message must not replay in another
+    // project. Its own result is shown after this call, so it still appears.
+    setEditorHostNotice(null);
     setEditorStarted(true);
     setView("editor");
     if (typeof window !== "undefined") {
@@ -1314,6 +1320,34 @@ export default function Home() {
       return { ok: false, message: notice((t) => errorText(t, error, "dashboard.open.failed")) };
     }
   }, [projects.length, t]);
+
+  // The desktop shell hands over `.skf` files the OS opened with SketchForge
+  // (double-click, Open With, a path on the command line). They take the same
+  // path as a file chosen in the dashboard, and report progress and errors in
+  // the dashboard and in the editor's status line, as the editor's own import
+  // does. Subscribing releases any file that arrived while the app was
+  // starting, so it waits until the storage probe has settled: in server mode
+  // the probe's listing replaces the whole project list, and would drop a
+  // project opened before it answered.
+  const openSkfProjectFromFileRef = useRef(openSkfProjectFromFile);
+  useEffect(() => {
+    openSkfProjectFromFileRef.current = openSkfProjectFromFile;
+  }, [openSkfProjectFromFile]);
+  useEffect(() => {
+    if (!storageProbeSettled) return;
+    const subscribe = window.sketchforgeDesktop?.onOpenProjectFile;
+    if (!subscribe) return;
+    let opening = Promise.resolve();
+    let noticeId = 0;
+    const show = (value: Notice) => {
+      setDashboardNotice(value.text(currentTranslator()));
+      noticeId += 1;
+      setEditorHostNotice({ id: noticeId, notice: value });
+    };
+    return subscribe((payload) => {
+      opening = opening.then(() => openDesktopProjectFile(payload, { open: (file) => openSkfProjectFromFileRef.current(file), show }));
+    });
+  }, [storageProbeSettled]);
 
   const openSharedProject = useCallback(async (sharedProject: SharedProject) => {
     setDashboardNotice(t("dashboard.shared.opening", { name: sharedProject.name }));
@@ -1575,6 +1609,7 @@ export default function Home() {
     setDashboardSection("home");
     setActiveChallengeTutorial(null);
     setEditorLoading(false);
+    setEditorHostNotice(null);
     setView("dashboard");
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", "/");
@@ -1727,6 +1762,7 @@ export default function Home() {
             projectId={activeProjectId}
             projectName={activeProject?.name}
             autosaveNotice={autosaveNotice?.projectId === activeProjectId ? autosaveNotice : null}
+            hostNotice={editorHostNotice}
             showProjectNameInToolbar={showProjectNameInToolbar}
             onShowProjectNameInToolbarChange={setShowProjectNameInToolbar}
             projectCreatedAt={activeProject?.createdAt}

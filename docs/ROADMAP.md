@@ -22,6 +22,10 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
 
+## Desktop release installers
+
+- [#342: Register the `.skf` file association and open files passed by the OS](https://github.com/constructorfleet/SketchForge-3D/issues/342) — implementation complete; awaiting review. The macOS app and Windows installer register `.skf` with the engine's media type; the Linux AppImage declares it in its desktop entry and documents the user-level MIME setup double-click needs. First-launch argv, `second-instance` argv and macOS `open-file` open the project through the dashboard's `.skf` import. Verified manually on macOS in dev mode; Windows and Linux are not yet verified by hand.
+
 ## CAD worker reliability
 
 - [#361: Release exact-cut intermediate handles during an open edge-modifier session](https://github.com/constructorfleet/SketchForge-3D/issues/361) — implementation and real-kernel handle-baseline regression coverage complete; awaiting review. Cuts use an arena checkpoint and release their allocations on success or failure, preserving retained session geometry.
