@@ -160,12 +160,23 @@ describe("local MCP engine mode", () => {
 
     const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_import_stl");
     expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
-    const imported = callMcp(projectsDir, 2, "sketchforge_import_stl", { projectId: "case", filePath: stlPath, name: "Triangle" });
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_stl", { projectId: "case", filePath: stlPath });
     expect(imported[1].result.isError).toBeUndefined();
     expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
-      shape: expect.objectContaining({ name: "Triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
+      shape: expect.objectContaining({ name: "tetrahedron", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
     });
   }, 60_000);
+
+  it("advertises only file targeting fields for both local and remote file imports", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-import-schema-"));
+    temporaryDirectories.push(projectsDir);
+    const tools = listMcpTools(projectsDir);
+    for (const name of ["sketchforge_import_file", "sketchforge_import_stl"]) {
+      const tool = tools.find((candidate: { name: string }) => candidate.name === name);
+      expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
+      expect(Object.keys(tool.inputSchema.properties)).not.toEqual(expect.arrayContaining(["name", "color", "x", "z", "elevation"]));
+    }
+  });
 
   it("imports an OBJ fixture through the file import tool", async () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-obj-"));
@@ -178,10 +189,10 @@ describe("local MCP engine mode", () => {
     fs.copyFileSync(path.join(root, "tests/fixtures/obj/triangle.obj"), fixturePath);
     const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_import_file");
     expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
-    const imported = callMcp(projectsDir, 2, "sketchforge_import_file", { projectId: "case", filePath: fixturePath, name: "OBJ triangle" }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_file", { projectId: "case", filePath: fixturePath }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
     expect(imported[1].result.isError).toBeUndefined();
     expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
-      shape: expect.objectContaining({ name: "OBJ triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "obj", triangleCount: 1 }) }),
+      shape: expect.objectContaining({ name: "triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "obj", triangleCount: 1 }) }),
     });
     const outsidePath = path.join(projectsDir, "outside.obj");
     fs.copyFileSync(fixturePath, outsidePath);

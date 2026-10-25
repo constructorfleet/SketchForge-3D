@@ -186,24 +186,19 @@ const tools = [
   },
   {
     name: "sketchforge_import_file",
-    description: "Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
+    description: "Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. The source filename supplies the shape name; color and placement use importer defaults. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
     inputSchema: {
       ...localProjectSchema,
       required: ["projectId", "filePath"],
       properties: {
         projectId: { type: "string" },
         filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
-        name: { type: "string" },
-        color: { type: "string" },
-        x: { type: "number" },
-        z: { type: "number" },
-        elevation: { type: "number" },
       },
     },
   },
   {
     name: "sketchforge_import_stl",
-    description: "Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes.",
+    description: "Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes. The source filename supplies the shape name; color and placement use importer defaults.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["projectId", "filePath"],
@@ -211,11 +206,6 @@ const tools = [
         ...editorTargetSchema.properties,
         projectId: { type: "string" },
         filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
-        name: { type: "string" },
-        color: { type: "string" },
-        x: { type: "number" },
-        z: { type: "number" },
-        elevation: { type: "number" },
       },
     },
   },
