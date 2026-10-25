@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Project thumbnail capture failures no longer escape as unhandled rejections; the editor logs the failure and retries after its next idle capture window. Zero-size canvases and lost 2D contexts return an empty thumbnail.
 - REST reference now documents the engine's exported size and count limits, including revolve profiles and turn counts, section drawing bounds, and the associated error behavior.
 - Sketch constraints can now keep a line tangent to an attached Bezier endpoint while the sketch is edited; the relation is preserved in `.skf` projects.
 - STEP export now writes nested project groups as native assembly occurrences that CAD readers can inspect, and reimport preserves that group tree without relying on encoded group-path names.

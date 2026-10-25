@@ -53,7 +53,7 @@ import { cutPreviewCutterScale, cutterShapeForBoolean } from "@/lib/engine/cutte
 import { createHalfSphereGeometry, createHollowCylinderGeometry, createPyramidGeometry, createRoofGeometry, createRoundRoofGeometry, createTorusGeometry, createWedgeGeometry, putGeometryOnBase } from "@/lib/engine/primitiveGeometry";
 import type { CameraOrientation } from "@/lib/screenAlignedNudge";
 import type { CameraView } from "@/types/sketchforge";
-import { projectThumbnailDimensions } from "@/lib/projectThumbnail";
+import { projectThumbnailPngDataUrl } from "@/lib/projectThumbnail";
 import { canBeginShapeDrag, DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, shapeDimensionLimit, snapGridStep as snapStep, workplaneSettingsFingerprint, workspaceHydrationSyncDecision } from "@/lib/engine/workplaneSettings";
 import { interiorWorkplaneGridCoordinates, workplaneGridPalette, workplaneLabelLayout, workplaneThemePalette, WORKPLANE_LABEL_ASPECT, WORKPLANE_LINE_ELEVATION, WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { cleanNearZero, cleanRotationDegrees, mirroredAxisCount, mirrorSign, preservesEdgeTreatmentSize, proportionalResizeScale, resizedImportedCoordinates, resizedImportedMeshPositions, resizedShapeSize, shapeDepth, shapeHasTaper, shapeOverallFootprintDimensions, shapeTaperDimensions, shapeTaperScaleAt, shapeWidth } from "@/lib/engine/workplaneShapes";
@@ -686,32 +686,6 @@ function rotationPatchFromQuaternion(quaternion: THREE.Quaternion): Partial<Work
     rotation: cleanRotationDegrees(THREE.MathUtils.radToDeg(euler.y)),
     rotationZ: cleanRotationDegrees(THREE.MathUtils.radToDeg(euler.z)),
   };
-}
-
-function canvasPngDataUrl(canvas: HTMLCanvasElement) {
-  return new Promise<string>((resolve) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        resolve("");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(blob);
-    }, "image/png");
-  });
-}
-
-function thumbnailPngDataUrl(source: HTMLCanvasElement) {
-  const dimensions = projectThumbnailDimensions(source.width, source.height);
-  const thumbnail = document.createElement("canvas");
-  thumbnail.width = dimensions.width;
-  thumbnail.height = dimensions.height;
-  const context = thumbnail.getContext("2d", { alpha: false });
-  if (!context) return Promise.resolve("");
-  context.drawImage(source, 0, 0, dimensions.width, dimensions.height);
-  return canvasPngDataUrl(thumbnail);
 }
 
 function rotationScreenSign(axisVector: THREE.Vector3, camera: THREE.Camera) {
@@ -3194,7 +3168,7 @@ export function WorkplaneViewport({
     window.sketchforgeCaptureCanvasAsync = () => {
       state.camera.updateMatrixWorld();
       state.renderer.render(state.scene, state.camera);
-      return thumbnailPngDataUrl(state.renderer.domElement);
+      return projectThumbnailPngDataUrl(state.renderer.domElement);
     };
     window.sketchforgeCaptureView = (face = "current") => {
       if (face === "home") {

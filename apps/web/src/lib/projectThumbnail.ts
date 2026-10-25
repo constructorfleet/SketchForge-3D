@@ -2,6 +2,49 @@ export const PROJECT_THUMBNAIL_IDLE_MS = 2_500;
 export const PROJECT_THUMBNAIL_MAX_WIDTH = 512;
 export const PROJECT_THUMBNAIL_MAX_HEIGHT = 320;
 
+export async function captureProjectThumbnail(
+  capture: () => Promise<string>,
+  onError: (error: unknown) => void,
+): Promise<string> {
+  try {
+    return await capture();
+  } catch (error) {
+    try {
+      onError(error);
+    } catch {
+      // Error reporting must not turn a failed thumbnail into an unhandled rejection.
+    }
+    return "";
+  }
+}
+
+export function projectThumbnailPngDataUrl(source: HTMLCanvasElement, documentRef: Document = document) {
+  if (source.width <= 0 || source.height <= 0) return Promise.resolve("");
+  const dimensions = projectThumbnailDimensions(source.width, source.height);
+  try {
+    const thumbnail = documentRef.createElement("canvas");
+    thumbnail.width = dimensions.width;
+    thumbnail.height = dimensions.height;
+    const context = thumbnail.getContext("2d", { alpha: false });
+    if (!context) return Promise.resolve("");
+    context.drawImage(source, 0, 0, dimensions.width, dimensions.height);
+    return new Promise<string>((resolve) => {
+      thumbnail.toBlob((blob) => {
+        if (!blob) {
+          resolve("");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(blob);
+      }, "image/png");
+    }).catch(() => "");
+  } catch {
+    return Promise.resolve("");
+  }
+}
+
 export type ProjectThumbnailSceneKey = {
   projectId: string;
   fingerprint: string;

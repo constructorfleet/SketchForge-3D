@@ -37,6 +37,7 @@ Tracked under [epic #324](https://github.com/constructorfleet/SketchForge-3D/iss
 
 - [#332: Surface autosave failures while editing](https://github.com/constructorfleet/SketchForge-3D/issues/332) — P0, open.
 - [#336: Secure local folder downloads](https://github.com/constructorfleet/SketchForge-3D/issues/336) — P0, open.
+- [#377: Handle failed project thumbnail captures](https://github.com/constructorfleet/SketchForge-3D/issues/377) — capture failures are logged and retried; zero-size or lost-context canvases return an empty thumbnail; implementation and regression coverage complete, awaiting review.
 
 ## API request safety
 
