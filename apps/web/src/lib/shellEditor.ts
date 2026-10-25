@@ -1,5 +1,5 @@
 import type { WorkplaneShape } from "@/types/sketchforge";
-import type { ErrorKey } from "@/i18n/LocalizedError";
+import { LocalizedError, type ErrorKey } from "@/i18n/LocalizedError";
 import type { CadModifierMeshPart } from "@/lib/cadModifierTypes";
 import { cadBrepTransformForShape } from "@/lib/engine/cadBakeMetadata";
 import { exactBooleanPlacement, shapeHasExactBooleanSolid } from "@/lib/engine/exactBooleanParts";
@@ -90,7 +90,7 @@ export function parseShellFaceNumbers(text: string, faceCount: number): number[]
  */
 export function shelledShapeFields(shapeId: string, faceCount: number, request: Pick<ShellRequest, "thickness" | "openFaces">) {
   const faces = draftFaceResultMetadata(shapeId, faceCount);
-  if (!faces) throw new Error("The hollowed solid did not report a valid face count");
+  if (!faces) throw new LocalizedError("errors.cadModifier.result.shellFaceCount");
   return {
     ...faces,
     ...CLEARED_RETAINED_DRAFT_FIELDS,

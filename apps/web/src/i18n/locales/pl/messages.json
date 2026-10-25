@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "Nie udało się utworzyć zaokrąglenia lub fazki",
       "meshImportReset": "Nie udało się zamienić zaznaczonego modelu w zamkniętą bryłę. Moduł zaokrągleń i fazek został uruchomiony ponownie. Zanim dodasz zaokrąglenia lub fazki, użyj polecenia „Rozdziel na części”, rozgrupuj lub uprość obiekt.",
       "validatorReset": "Moduł zaokrągleń i fazek uległ awarii podczas sprawdzania i został uruchomiony ponownie. Otwórz narzędzie jeszcze raz – nie trzeba odświeżać strony.",
-      "memoryFaultReset": "W module zaokrągleń i fazek wystąpił błąd pamięci i moduł został uruchomiony ponownie. Otwórz narzędzie jeszcze raz – nie trzeba odświeżać strony."
+      "memoryFaultReset": "W module zaokrągleń i fazek wystąpił błąd pamięci i moduł został uruchomiony ponownie. Otwórz narzędzie jeszcze raz – nie trzeba odświeżać strony.",
+      "result": {
+        "draftPrismMissing": "Moduł CAD nie zwrócił bryły z pochyleniem",
+        "draftPrismUnusable": "Pochylenie nie dało użytecznej bryły",
+        "faceDraftMissing": "Moduł CAD nie zwrócił bryły z pochyloną ścianą",
+        "faceDraftUnusable": "Pochylenie ściany nie dało użytecznej bryły",
+        "faceDraftFaceCount": "Pochylenie ściany nie zwróciło prawidłowej liczby ścian",
+        "shellMissing": "Moduł CAD nie zwrócił wydrążonej bryły",
+        "shellUnusable": "Skorupa nie dała użytecznej bryły",
+        "shellFaceCount": "Wydrążona bryła nie podała prawidłowej liczby ścian",
+        "exactMissing": "Moduł CAD nie zwrócił dokładnej bryły",
+        "exactEmpty": "Jądro CAD zwróciło pustą bryłę",
+        "draftPrismInvalid": "Pochylenie nie dało prawidłowej bryły.",
+        "interferenceMissing": "Moduł CAD nie zwrócił raportu kolizji",
+        "wallThicknessMissing": "Moduł CAD nie zwrócił grubości ścianki"
+      },
+      "worker": {
+        "couldNotStart": "Nie udało się uruchomić modułu CAD",
+        "closed": "Moduł CAD został zamknięty",
+        "notReady": "Moduł CAD nie jest gotowy",
+        "timedOut": "Przekroczono czas oczekiwania na moduł CAD; moduł został uruchomiony ponownie",
+        "rejected": "Moduł CAD odrzucił żądanie"
+      },
+      "draftPrismRange": "Pochylenie graniastosłupa wymaga dodatniej wysokości i kąta od -45 do 45 stopni, z wyjątkiem zera.",
+      "draftNoFace": "Pochylenie ściany zachowane ze szkicem potrzebuje ściany, na którą działa."
     },
     "mesh": {
       "incompleteTriangles": "Siatka trójkątów zawiera niepełne trójkąty",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "Tworzenie bryły ze szkicu trwało zbyt długo. Spróbuj uprościć szkic",
       "sketchWorkerFailed": "Nie udało się uruchomić modułu tworzenia brył ze szkiców",
       "svgNoArea": "Widok z góry kształtu „{name}” ma zerowe pole – nie ma czego eksportować",
-      "svgOutline": "Nie udało się utworzyć zamkniętego konturu SVG dla kształtu „{name}”"
+      "svgOutline": "Nie udało się utworzyć zamkniętego konturu SVG dla kształtu „{name}”",
+      "exportFailedStatus": "Eksport nie powiódł się (HTTP {status})."
     },
     "download": {
       "localOnly": "Zapisywanie w folderze działa tylko w SketchForge uruchomionym na tym komputerze",

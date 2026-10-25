@@ -13,11 +13,14 @@ import {
   LocalizedError,
   englishNotice,
   errorFromPayload,
+  errorFromResponse,
   errorText,
   notice,
   translatorFor,
   unitLabel,
   useTranslations,
+  type ErrorKey,
+  type ErrorResponseFields,
   type MessageKey,
   type Notice,
   type Translator,
@@ -2613,9 +2616,9 @@ async function downloadTextFile(filename: string, content: string, type: string)
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content, filename, folder }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string; path?: string } | null;
+    const payload = (await response.json().catch(() => null)) as (Partial<ErrorResponseFields> & { path?: string }) | null;
     if (!response.ok || !payload?.path) {
-      throw payload?.error ? new Error(payload.error) : new LocalizedError("errors.editor.saveExport");
+      throw errorFromResponse(payload) ?? new LocalizedError("errors.editor.saveExport");
     }
     return { mode: "folder", path: payload.path };
   }
@@ -5627,10 +5630,10 @@ export function SketchForgeEditor({
 
   useEffect(() => {
     let disposed = false;
-    const rejectPendingRequests = (message: string) => {
+    const rejectPendingRequests = (key: ErrorKey) => {
       cadModifierPendingRef.current.forEach((pending) => {
         window.clearTimeout(pending.timer);
-        pending.reject(new Error(message));
+        pending.reject(new LocalizedError(key));
       });
       cadModifierPendingRef.current.clear();
     };
@@ -5639,7 +5642,7 @@ export function SketchForgeEditor({
       clearCadModifierWatchdog();
       worker?.terminate();
       cadModifierWorkerRef.current = null;
-      rejectPendingRequests("The CAD worker could not start");
+      rejectPendingRequests("errors.cadModifier.worker.couldNotStart");
       const requestId = cadModifierRequestRef.current + 1;
       cadModifierRequestRef.current = requestId;
       cadModifierPrepareRef.current = requestId;
@@ -5745,7 +5748,7 @@ export function SketchForgeEditor({
       disposed = true;
       clearCadModifierWatchdog();
       cadModifierWorkerRestartRef.current = () => null;
-      rejectPendingRequests("The CAD worker was closed");
+      rejectPendingRequests("errors.cadModifier.worker.closed");
       cadModifierWorkerRef.current?.terminate();
       cadModifierWorkerRef.current = null;
     };
@@ -7656,7 +7659,7 @@ export function SketchForgeEditor({
   const postCadModifierRequestAsync = useCallback((request: CadModifierWorkerPayload, transfer: Transferable[] = [], timeoutMs = 20000) => {
     const worker = cadModifierWorkerRef.current ?? cadModifierWorkerRestartRef.current();
     if (!worker) {
-      return Promise.reject(new Error("The CAD worker is not ready"));
+      return Promise.reject(new LocalizedError("errors.cadModifier.worker.notReady"));
     }
     const requestId = cadModifierRequestRef.current + 1;
     cadModifierRequestRef.current = requestId;
@@ -7677,7 +7680,7 @@ export function SketchForgeEditor({
         cadModifierSourcePartsRef.current = [];
         setEdgeModifier(null);
         cadModifierWorkerRestartRef.current();
-        pendingRequests.forEach((pending) => pending.reject(new Error("Timed out waiting for the CAD worker; the worker was restarted")));
+        pendingRequests.forEach((pending) => pending.reject(new LocalizedError("errors.cadModifier.worker.timedOut")));
       }, timeoutMs);
       cadModifierPendingRef.current.set(requestId, { resolve, reject, timer });
       try {
@@ -7685,7 +7688,7 @@ export function SketchForgeEditor({
       } catch (error) {
         window.clearTimeout(timer);
         cadModifierPendingRef.current.delete(requestId);
-        reject(error instanceof Error ? error : new Error("The CAD worker rejected the request"));
+        reject(error instanceof Error ? error : new LocalizedError("errors.cadModifier.worker.rejected"));
       }
     });
   }, []);
@@ -7714,11 +7717,11 @@ export function SketchForgeEditor({
         setNotice(notice((translate) => errorText(translate, error, "errors.cadModifier.invalidResult")));
         return;
       }
-      if (response.type !== "draft-prism") throw new Error("The CAD worker did not return a drafted solid");
+      if (response.type !== "draft-prism") throw new LocalizedError("errors.cadModifier.result.draftPrismMissing");
       const current = shapesRef.current.find((shape) => shape.id === source.id);
       if (projectInfoRef.current.projectId !== sourceProjectId || !current || projectShapesFingerprint([current]) !== fingerprint) return;
       const drafted = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
-      if (!drafted) throw new Error("The draft did not produce a usable solid");
+      if (!drafted) throw new LocalizedError("errors.cadModifier.result.draftPrismUnusable");
       commitShapes(
         shapesRef.current.map((shape) => shape.id !== source.id ? shape : retained
           ? retainedPrismDraftShape(source, drafted, angle)
@@ -7750,9 +7753,9 @@ export function SketchForgeEditor({
   const runRetainedFaceDraft = useCallback(async (base: WorkplaneShape, resolution: RetainedFaceDraftResolution) => {
     const response = await postCadModifierRequestAsync({ type: "retained-face-draft", resolution }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
     if (response.type === "error") throw errorFromPayload(response);
-    if (response.type !== "retained-face-draft") throw new Error("The CAD worker did not return a drafted face solid");
+    if (response.type !== "retained-face-draft") throw new LocalizedError("errors.cadModifier.result.faceDraftMissing");
     const drafted = shapeFromCadMesh(base, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
-    if (!drafted) throw new Error("The face draft did not produce a usable solid");
+    if (!drafted) throw new LocalizedError("errors.cadModifier.result.faceDraftUnusable");
     const outcome: RetainedFaceDraftOutcome = {
       sourceFaceIds: response.sourceFaceIds,
       resultFaceIds: response.resultFaceIds,
@@ -7817,13 +7820,13 @@ export function SketchForgeEditor({
         setNotice(notice((translate) => errorText(translate, errorFromPayload(response), "errors.cadModifier.invalidResult")));
         return;
       }
-      if (response.type !== "draft-face") throw new Error("The CAD worker did not return a drafted face solid");
+      if (response.type !== "draft-face") throw new LocalizedError("errors.cadModifier.result.faceDraftMissing");
       const current = shapesRef.current.find((shape) => shape.id === source.id);
       if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
       const drafted = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
-      if (!drafted) throw new Error("The face draft did not produce a usable solid");
+      if (!drafted) throw new LocalizedError("errors.cadModifier.result.faceDraftUnusable");
       const faceMetadata = draftFaceResultMetadata(source.id, response.faceCount);
-      if (!faceMetadata) throw new Error("The face draft did not return a valid face count");
+      if (!faceMetadata) throw new LocalizedError("errors.cadModifier.result.faceDraftFaceCount");
       commitShapes(shapesRef.current.map((shape) => shape.id === source.id ? {
         ...drafted,
         ...faceMetadata,
@@ -7862,11 +7865,11 @@ export function SketchForgeEditor({
         setNotice(notice((translate) => errorText(translate, errorFromPayload(response), "errors.cadModifier.invalidResult")));
         return;
       }
-      if (response.type !== "shell") throw new Error("The CAD worker did not return a hollowed solid");
+      if (response.type !== "shell") throw new LocalizedError("errors.cadModifier.result.shellMissing");
       const current = shapesRef.current.find((shape) => shape.id === source.id);
       if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) return;
       const hollowed = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
-      if (!hollowed) throw new Error("The shell did not produce a usable solid");
+      if (!hollowed) throw new LocalizedError("errors.cadModifier.result.shellUnusable");
       const fields = shelledShapeFields(source.id, response.faceCount, request);
       commitShapes(
         shapesRef.current.map((shape) => shape.id === source.id ? { ...hollowed, ...fields } : shape),
@@ -7931,9 +7934,9 @@ export function SketchForgeEditor({
     if (!request) throw new LocalizedError("errors.cadModifier.draftNotRetained");
     const response = await postCadModifierRequestAsync({ type: "draft-prism", ...request }, [], CAD_BOOLEAN_REQUEST_TIMEOUT_MS);
     if (response.type === "error") throw errorFromPayload(response);
-    if (response.type !== "draft-prism") throw new Error("The CAD worker did not return a drafted solid");
+    if (response.type !== "draft-prism") throw new LocalizedError("errors.cadModifier.result.draftPrismMissing");
     const drafted = shapeFromCadMesh(existing, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
-    if (!drafted) throw new Error("The draft did not produce a usable solid");
+    if (!drafted) throw new LocalizedError("errors.cadModifier.result.draftPrismUnusable");
     return retainedPrismDraftShape(existing, drafted, angle, profile);
   }, [postCadModifierRequestAsync, rebuildRetainedDraftBase, runRetainedFaceDraft]);
   replayRetainedDraftRef.current = replayRetainedDraft;
@@ -7953,7 +7956,7 @@ export function SketchForgeEditor({
         type: "exact",
         parts: [{ exact: { shape: source, transform: exactBooleanPlacement(source) }, hole: false }],
       }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
-      if (response.type !== "exact") throw new Error("The CAD worker did not return an exact solid");
+      if (response.type !== "exact") throw new LocalizedError("errors.cadModifier.result.exactMissing");
       const current = shapesRef.current.find((shape) => shape.id === source.id);
       if (!faceDraftSourceIsCurrent(source, current, sourceProjectId, projectInfoRef.current.projectId, fingerprint)) {
         // The shape changed while the kernel worked; leave it, and say so rather than "Preparing faces…".
@@ -7962,7 +7965,7 @@ export function SketchForgeEditor({
       }
       const exact = shapeFromCadMesh(source, response.positions, response.normals, response.indices, response.brep, response.faceGroups);
       const faceMetadata = draftFaceResultMetadata(source.id, response.faceCount);
-      if (!exact || !faceMetadata) throw new Error("The CAD kernel returned an empty solid");
+      if (!exact || !faceMetadata) throw new LocalizedError("errors.cadModifier.result.exactEmpty");
       commitShapes(
         shapesRef.current.map((shape) => shape.id === source.id ? { ...exact, ...faceMetadata } : shape),
         selectedIdsRef.current,
@@ -9614,8 +9617,8 @@ export function SketchForgeEditor({
       void fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) })
         .then(async (response) => {
           if (!response.ok) {
-            const body = await response.json().catch(() => null) as { error?: string } | null;
-            throw new Error(body?.error || `Export failed (${response.status}).`);
+            const body = await response.json().catch(() => null) as Partial<ErrorResponseFields> | null;
+            throw errorFromResponse(body) ?? new LocalizedError("errors.editor.exportFailedStatus", { status: response.status });
           }
           return response.blob();
         })

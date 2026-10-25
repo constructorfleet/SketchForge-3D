@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "Die Abrundung oder Fase konnte nicht erstellt werden",
       "meshImportReset": "Das ausgewählte Modell konnte nicht in einen geschlossenen Volumenkörper umgewandelt werden. Das Modul für Abrundungen und Fasen wurde neu gestartet. Versuchen Sie „In Teile zerlegen“, heben Sie die Gruppierung auf oder vereinfachen Sie das Objekt, bevor Sie Abrundungen oder Fasen hinzufügen.",
       "validatorReset": "Im Modul für Abrundungen und Fasen ist bei der Prüfung ein Fehler aufgetreten. Das Modul wurde neu gestartet. Öffnen Sie das Werkzeug erneut, die Seite muss nicht neu geladen werden.",
-      "memoryFaultReset": "Im Modul für Abrundungen und Fasen ist ein Speicherfehler aufgetreten. Das Modul wurde neu gestartet. Öffnen Sie das Werkzeug erneut, die Seite muss nicht neu geladen werden."
+      "memoryFaultReset": "Im Modul für Abrundungen und Fasen ist ein Speicherfehler aufgetreten. Das Modul wurde neu gestartet. Öffnen Sie das Werkzeug erneut, die Seite muss nicht neu geladen werden.",
+      "result": {
+        "draftPrismMissing": "Das CAD-Modul hat keinen Volumenkörper mit Formschräge zurückgegeben",
+        "draftPrismUnusable": "Die Formschräge hat keinen brauchbaren Volumenkörper ergeben",
+        "faceDraftMissing": "Das CAD-Modul hat keinen Volumenkörper mit geneigter Fläche zurückgegeben",
+        "faceDraftUnusable": "Die Flächenschräge hat keinen brauchbaren Volumenkörper ergeben",
+        "faceDraftFaceCount": "Die Flächenschräge hat keine gültige Flächenanzahl geliefert",
+        "shellMissing": "Das CAD-Modul hat keinen ausgehöhlten Volumenkörper zurückgegeben",
+        "shellUnusable": "Das Aushöhlen hat keinen brauchbaren Volumenkörper ergeben",
+        "shellFaceCount": "Der ausgehöhlte Volumenkörper hat keine gültige Flächenanzahl gemeldet",
+        "exactMissing": "Das CAD-Modul hat keinen exakten Volumenkörper zurückgegeben",
+        "exactEmpty": "Der CAD-Kern hat einen leeren Volumenkörper geliefert",
+        "draftPrismInvalid": "Die Formschräge hat keinen gültigen Volumenkörper ergeben.",
+        "interferenceMissing": "Das CAD-Modul hat keinen Kollisionsbericht zurückgegeben",
+        "wallThicknessMissing": "Das CAD-Modul hat keine Wandstärke zurückgegeben"
+      },
+      "worker": {
+        "couldNotStart": "Das CAD-Modul konnte nicht starten",
+        "closed": "Das CAD-Modul wurde beendet",
+        "notReady": "Das CAD-Modul ist nicht bereit",
+        "timedOut": "Zeitüberschreitung beim Warten auf das CAD-Modul; es wurde neu gestartet",
+        "rejected": "Das CAD-Modul hat die Anfrage abgelehnt"
+      },
+      "draftPrismRange": "Eine Prismen-Formschräge braucht eine positive Höhe und einen Winkel zwischen -45 und 45 Grad, außer null.",
+      "draftNoFace": "Eine mit der Skizze gespeicherte Flächenschräge braucht eine Fläche, auf die sie wirkt."
     },
     "mesh": {
       "incompleteTriangles": "Das Polygonnetz enthält unvollständige Dreiecke",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "Das Erstellen der Form aus der Skizze hat zu lange gedauert. Vereinfachen Sie die Skizze",
       "sketchWorkerFailed": "Die Erstellung von Formen aus Skizzen konnte nicht gestartet werden",
       "svgNoArea": "„{name}“ hat in der Ansicht von oben keine Fläche zum Exportieren",
-      "svgOutline": "„{name}“ konnte nicht in einen geschlossenen SVG-Umriss umgewandelt werden"
+      "svgOutline": "„{name}“ konnte nicht in einen geschlossenen SVG-Umriss umgewandelt werden",
+      "exportFailedStatus": "Der Export ist fehlgeschlagen (HTTP {status})."
     },
     "download": {
       "localOnly": "In einem Ordner speichern ist nur in SketchForge auf diesem Computer möglich",

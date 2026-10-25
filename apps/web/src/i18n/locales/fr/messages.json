@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "Impossible de créer cet arrondi ou ce chanfrein",
       "meshImportReset": "Impossible de convertir le modèle sélectionné en solide fermé. Le module des arrondis et chanfreins a redémarré. Avant d’ajouter des arrondis ou des chanfreins, essayez « Séparer en parties », dissociez le groupe ou simplifiez l’objet.",
       "validatorReset": "Le module des arrondis et chanfreins a rencontré une erreur de vérification et a redémarré. Relancez l’outil ; inutile de recharger la page.",
-      "memoryFaultReset": "Le module des arrondis et chanfreins a rencontré une erreur de mémoire et a redémarré. Relancez l’outil ; inutile de recharger la page."
+      "memoryFaultReset": "Le module des arrondis et chanfreins a rencontré une erreur de mémoire et a redémarré. Relancez l’outil ; inutile de recharger la page.",
+      "result": {
+        "draftPrismMissing": "Le module CAO n’a pas renvoyé de solide en dépouille",
+        "draftPrismUnusable": "La dépouille n’a pas produit de solide exploitable",
+        "faceDraftMissing": "Le module CAO n’a pas renvoyé de solide avec la face en dépouille",
+        "faceDraftUnusable": "La dépouille de la face n’a pas produit de solide exploitable",
+        "faceDraftFaceCount": "La dépouille de la face n’a pas renvoyé de nombre de faces valide",
+        "shellMissing": "Le module CAO n’a pas renvoyé de solide évidé",
+        "shellUnusable": "La coque n’a pas produit de solide exploitable",
+        "shellFaceCount": "Le solide évidé n’a pas indiqué de nombre de faces valide",
+        "exactMissing": "Le module CAO n’a pas renvoyé de solide exact",
+        "exactEmpty": "Le noyau CAO a renvoyé un solide vide",
+        "draftPrismInvalid": "La dépouille n’a pas produit de solide valide.",
+        "interferenceMissing": "Le module CAO n’a pas renvoyé de rapport d’interférences",
+        "wallThicknessMissing": "Le module CAO n’a pas renvoyé d’épaisseur de paroi"
+      },
+      "worker": {
+        "couldNotStart": "Impossible de démarrer le module CAO",
+        "closed": "Le module CAO a été fermé",
+        "notReady": "Le module CAO n’est pas prêt",
+        "timedOut": "Le module CAO n’a pas répondu à temps ; il a été redémarré",
+        "rejected": "Le module CAO a refusé la requête"
+      },
+      "draftPrismRange": "La dépouille du prisme exige une hauteur positive et un angle entre -45 et 45 degrés, zéro exclu.",
+      "draftNoFace": "Une dépouille de face conservée avec l’esquisse a besoin d’une face sur laquelle agir."
     },
     "mesh": {
       "incompleteTriangles": "Le maillage contient des triangles incomplets",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "La construction de la forme à partir de l’esquisse a pris trop de temps. Essayez de simplifier l’esquisse",
       "sketchWorkerFailed": "Impossible de démarrer la construction des esquisses",
       "svgNoArea": "La vue de dessus de « {name} » n’a pas d’aire à exporter",
-      "svgOutline": "Impossible de convertir « {name} » en tracé SVG fermé"
+      "svgOutline": "Impossible de convertir « {name} » en tracé SVG fermé",
+      "exportFailedStatus": "L’exportation a échoué (HTTP {status})."
     },
     "download": {
       "localOnly": "L’enregistrement dans un dossier n’est possible que dans SketchForge ouvert sur cet ordinateur",
