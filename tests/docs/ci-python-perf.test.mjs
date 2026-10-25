@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const root = decodeURIComponent(new URL("../../", import.meta.url).pathname);
 const workflowPath = (name) => path.join(root, ".github/workflows", name);
