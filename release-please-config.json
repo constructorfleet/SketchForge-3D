@@ -33,6 +33,14 @@
         {
           "type": "generic",
           "path": "docs/PUBLISHING_CLIENTS.md"
+        },
+        {
+          "type": "generic",
+          "path": "packages/sketchforge-engine/src/skfProject.ts"
+        },
+        {
+          "type": "generic",
+          "path": "docs/SKF_FORMAT_REFERENCE.md"
         }
       ],
       "include-component-in-tag": false
