@@ -10,6 +10,8 @@ owner: "Contributors"
 ## Unreleased
 
 - The Python package's `sketchforge3d.__version__` now matches its published distribution version and is updated by release-please on each release.
+- Exact cuts now release their temporary CAD kernel handles even while an edge-modifier session is open, including after failed cuts, while preserving the session’s retained geometry.
+
 - Project thumbnail capture failures no longer escape as unhandled rejections; the editor logs the failure and retries after its next idle capture window. Zero-size canvases and lost 2D contexts return an empty thumbnail.
 - Editor selection shortcuts avoid browser and macOS reserved keys: Shift+L locks or unlocks, Shift+H hides or shows, and Alt+Shift+H reveals hidden shapes. Press ? in the editor for an accessible shortcut list.
 - REST reference now documents the engine's exported size and count limits, including revolve profiles and turn counts, section drawing bounds, and the associated error behavior.
