@@ -32,6 +32,10 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 - [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
 - [#373: Add limit and cursor paging to project and shape listings](https://github.com/constructorfleet/SketchForge-3D/issues/373) — implementation and route/client coverage complete; awaiting review.
 
+## Documentation accuracy
+
+- [#371: Repair stale API-coverage statements in the changelog and client READMEs](https://github.com/constructorfleet/SketchForge-3D/issues/371) — changelog coverage is checked against generated OpenAPI; the current README method and grouping statements match the shipped client and API.
+
 ## Client command line
 
 - [#374: Add direct project, import, and export commands to the macro CLI](https://github.com/constructorfleet/SketchForge-3D/issues/374) — implementation, generated reference, and mocked-server coverage complete; awaiting review.

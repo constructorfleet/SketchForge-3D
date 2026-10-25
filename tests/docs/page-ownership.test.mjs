@@ -10,8 +10,20 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 test("documentation suite status records REST and runnable-fence coverage accurately", async () => {
   const spec = await readFile(path.join(repository, "docs/DOCUMENTATION_SUITE_SPEC.md"), "utf8");
+  const changelog = await readFile(path.join(repository, "docs/CHANGELOG.md"), "utf8");
+  const openapi = JSON.parse(await readFile(path.join(repository, "docs/openapi-v1.json"), "utf8"));
+  const omitted = openapi["x-sketchforge-omitted-operations"];
+  const documented = Object.values(openapi.paths).reduce((count, pathItem) => count + Object.keys(pathItem).filter((method) => method !== "parameters").length, 0);
+  const total = documented + omitted.length;
+  const currentCoverage = changelog.match(/^Current OpenAPI coverage is (\d+) of (\d+) registered operations; the four omitted handlers are `OPTIONS` preflights\.$/m);
 
   assert.match(spec, /Current status is 28 of 32; the four omitted operations are `OPTIONS` preflights/i);
+  assert.ok(currentCoverage, "changelog has one explicit current OpenAPI coverage claim");
+  assert.equal(Number(currentCoverage[1]), documented);
+  assert.equal(Number(currentCoverage[2]), total);
+  assert.equal(omitted.length, 4);
+  assert.ok(omitted.every(({ method }) => method === "OPTIONS"));
+  assert.ok(changelog.indexOf("## Unreleased") < changelog.indexOf("Current OpenAPI coverage"));
   assert.match(spec, /25 supported-language runnable fences.*exact tracked source with linked test and CI command, or carry a concrete reasoned exemption/i);
   assert.match(spec, /other fence languages[\s\S]*?ownership coverage for other content sources remain open/i);
   assert.match(spec, /6\. \*\*Partial:\*\*.*25 supported-language runnable fences/i);
