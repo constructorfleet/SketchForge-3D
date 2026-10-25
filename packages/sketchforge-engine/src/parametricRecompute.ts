@@ -78,19 +78,15 @@ export async function replaySingleAllEdgeTreatment(
     && historyFeature?.kind === feature?.kind
     && feature?.allEdges === true
     && historyFeature.allEdges === true
-    && supportedFaceDraftTreatmentKind
-    && (feature.kind !== "chamfer" || Math.abs((feature.chamferAngle ?? 45) - 45) < 0.001)
-    && (historyFeature.kind !== "chamfer" || Math.abs((historyFeature.chamferAngle ?? 45) - 45) < 0.001);
+    && supportedFaceDraftTreatmentKind;
   if (original.faceDraft !== undefined && !supportedFaceDraftTreatment) {
-    throw new Error("A face draft can replay one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-loop sketch extrusion, one symmetric 45-degree all-edge chamfer or all-edge fillet on a single-section sketch sweep, or one symmetric all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
+    throw new Error("A face draft can replay one all-edge chamfer or all-edge fillet on a single-loop sketch extrusion, one all-edge chamfer or all-edge fillet on a single-section sketch sweep, or one all-edge chamfer or all-edge fillet on a plain full-turn revolve.");
   }
   if (features.length !== 1 || history.length !== 1
     || !feature || !historyFeature
     || feature.allEdges !== true || historyFeature.allEdges !== true
     || historyFeature.kind !== feature.kind
     || historyFeature.amount !== feature.amount
-    || (feature.kind === "chamfer" && feature.chamferAngle !== undefined && Math.abs(feature.chamferAngle - 45) >= 0.001)
-    || (historyFeature.kind === "chamfer" && historyFeature.chamferAngle !== undefined && Math.abs(historyFeature.chamferAngle - 45) >= 0.001)
     || (feature.kind === "chamfer" && historyFeature.chamferAngle !== undefined && feature.chamferAngle !== undefined
       && Math.abs(historyFeature.chamferAngle - feature.chamferAngle) >= 0.001)) {
     throw new Error("This source edit cannot safely replay its selected-edge treatments.");

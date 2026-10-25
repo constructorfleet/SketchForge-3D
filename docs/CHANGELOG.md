@@ -18,6 +18,9 @@ Current OpenAPI coverage is 28 of 32 registered operations; the four omitted han
 - Local MCP tools now omit editor targeting and timeout arguments from their schemas, and local `sketchforge_update_object` ignores those remote-only fields if they are supplied.
 - Local and remote MCP file imports and exports now stay under `SKETCHFORGE_MCP_FILES_DIR`, falling back to `SKETCHFORGE_PROJECTS_DIR`; symlinks are resolved before checking the boundary. Exporting to an existing file now requires `overwrite: true`. When neither root is set, paths remain unrestricted for compatibility.
 - The MCP bridge now imports `.stl`, `.obj`, and `.svg` files through `sketchforge_import_file` in local or remote mode. Remote imports send base64 file contents to `POST /api/v1/imports` with the configured API token. The local-only `sketchforge_import_stl` compatibility alias retains custom name, color, and placement options; canonical imports use the source filename and importer defaults.
+- Non-45° all-edge chamfers now keep surviving face IDs and colours and replay when the source sketch changes. Existing `.skf` projects need no migration; the chamfer angle remains part of the persisted feature.
+- Exact face listings and face drafts now work on plain full-turn revolves with legacy mesh-index face colours. Colours are kept only when a result face maps to the same exact face ID.
+- Edge treatment errors now distinguish unexpected WebAssembly faults from sizing refusals in server logs. Geometry refusals include the requested amount and eligible-edge count, and failures during face reselection return a structured error without writing the project.
 
 ## Unreleased
 

@@ -95,6 +95,10 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 ## CAD geometry correctness
 
+- [#354: Preserve face lineage and replay non-45° chamfers](https://github.com/constructorfleet/SketchForge-3D/issues/354) — implementation and regression coverage complete; awaiting review.
+- [#355: Report kernel failures and guard face reselection](https://github.com/constructorfleet/SketchForge-3D/issues/355) — implementation and regression coverage complete; awaiting review.
+- [#356: Draft colored plain revolves](https://github.com/constructorfleet/SketchForge-3D/issues/356) — implementation and regression coverage complete; awaiting review.
+- [#357: Remove duplicated sketch-sweep builder branch](https://github.com/constructorfleet/SketchForge-3D/issues/357) — implementation complete; awaiting review.
 - [#435: Keep retained drafts in place across draft growth and rotated sketch edits](https://github.com/constructorfleet/SketchForge-3D/issues/435) — implementation and regression coverage in progress.
 - [#412: Preserve non-uniform resize in face-draft paths](https://github.com/constructorfleet/SketchForge-3D/issues/412) — P2, implementation and regression coverage in progress.
 - [#436: Preserve mirrors in REST face and prism drafts](https://github.com/constructorfleet/SketchForge-3D/issues/436) — implementation and regression coverage complete; awaiting merge.

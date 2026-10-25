@@ -42,6 +42,11 @@ async function coplanarBox() {
 
 // See the note in serverCadSolids.test.ts: the kernel, not the test, needs the time.
 describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("reports the requested amount and eligible-edge count for geometry sizing failures", async () => {
+    await expect(applyEdgeTreatment(box(), { kind: "chamfer", amount: 1000 }))
+      .rejects.toThrow(/1000.*12 eligible edges/);
+  });
+
   it("drafts an exact solid along its extrusion axis and returns persistable geometry", async () => {
     const result = await applyDraftPrism(sketchExtrusion(), { angle: 5 });
 
@@ -231,10 +236,10 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(result.triangleCount).toBeGreaterThan(0);
   });
 
-  it("reports a radius too large for the shape instead of grinding on it", async () => {
+  it("reports the requested amount and eligible edges when a radius does not fit", async () => {
     // The case that hangs the editor: a radius that cannot fit a thin plate.
     await expect(applyEdgeTreatment(box({ height: 1 }), { kind: "fillet", amount: 5 }))
-      .rejects.toThrow(/too large/);
+      .rejects.toThrow(/amount 5.*12 eligible edges/);
   });
 
   it("refuses a radius of zero or less", async () => {
