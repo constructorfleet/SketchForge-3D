@@ -38,7 +38,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 ## MCP host filesystem safety
 
 - [#339: Confine MCP host file access and refuse silent overwrites](https://github.com/constructorfleet/SketchForge-3D/issues/339) — implemented on `security/339-mcp-filesystem-root`; awaiting review.
-- [#365: Import STL, OBJ, and SVG files through the MCP bridge](https://github.com/constructorfleet/SketchForge-3D/issues/365) — implemented on `feat/365-mcp-import-obj-svg`; awaiting review.
+- [#365: Import STL, OBJ, and SVG files through the MCP bridge](https://github.com/constructorfleet/SketchForge-3D/issues/365) — implemented on `feat/365-mcp-import-obj-svg-stack`; awaiting review.
 
 ## Editor parity with the engine and API
 
