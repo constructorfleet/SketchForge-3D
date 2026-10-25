@@ -29,6 +29,8 @@ export type TransportOptions = {
   retryOnBusy?: number;
   /** Extra headers, for a reverse proxy that wants its own. */
   headers?: Record<string, string>;
+  /** Send this project revision as If-Match on every write request. */
+  expectedRevision?: number | string;
 };
 
 export type RequestSpec = {
@@ -43,6 +45,12 @@ export type RequestSpec = {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRY_ON_BUSY = 4;
 const BUSY_RETRY_BASE_MS = 60;
+
+function formatIfMatch(revision: number | string) {
+  const value = String(revision);
+  if (value === "*" || (value.startsWith('"') && value.endsWith('"'))) return value;
+  return `"${value}"`;
+}
 
 /** `http://host:3000`, `http://host:3000/`, and `http://host:3000/api/v1` all mean the same server. */
 export function normalizeBaseUrl(baseUrl: string) {
@@ -70,6 +78,7 @@ export class Transport {
   private readonly timeoutMs: number;
   private readonly retryOnBusy: number;
   private readonly extraHeaders: Record<string, string>;
+  private readonly expectedRevision: number | string | undefined;
 
   constructor(options: TransportOptions) {
     this.root = normalizeBaseUrl(options.baseUrl);
@@ -80,6 +89,7 @@ export class Transport {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.retryOnBusy = options.retryOnBusy ?? DEFAULT_RETRY_ON_BUSY;
     this.extraHeaders = options.headers ?? {};
+    this.expectedRevision = options.expectedRevision;
   }
 
   get apiRoot() {
@@ -108,6 +118,9 @@ export class Transport {
       Accept: "application/json",
     };
     if (spec.body !== undefined) headers["Content-Type"] = "application/json";
+    if (spec.method !== "GET" && this.expectedRevision !== undefined) {
+      headers["If-Match"] = formatIfMatch(this.expectedRevision);
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

@@ -79,7 +79,7 @@ async function postPatterns(request: Request) {
     return apiError("The pattern request does not match its contract.", 400, "invalid_request");
   }
 
-  const patterned = await apiEngine(context.root).pattern(projectId, {
+  const patterned = await apiEngine(context.root, request).pattern(projectId, {
     ids,
     kind: kind as PatternKind,
     count,

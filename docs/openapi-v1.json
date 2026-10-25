@@ -932,6 +932,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -961,6 +970,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -972,6 +982,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1006,6 +1019,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1017,6 +1031,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1051,6 +1068,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1062,6 +1080,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1096,6 +1117,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1107,6 +1129,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1141,6 +1166,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1152,6 +1178,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1186,6 +1215,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1197,6 +1227,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1231,6 +1264,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1242,6 +1276,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1276,6 +1313,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -1287,6 +1325,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -1313,6 +1354,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -2321,6 +2372,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -2350,6 +2410,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2361,6 +2422,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2395,6 +2459,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2406,6 +2471,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2440,6 +2508,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2451,6 +2520,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2485,6 +2557,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2496,6 +2569,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2530,6 +2606,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2541,6 +2618,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2575,6 +2655,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2586,6 +2667,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2620,6 +2704,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2631,6 +2716,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2665,6 +2753,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -2676,6 +2765,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -2702,6 +2794,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -3708,6 +3810,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -3737,6 +3848,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3748,6 +3860,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -3782,6 +3897,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3793,6 +3909,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -3827,6 +3946,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3838,6 +3958,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -3872,6 +3995,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3883,6 +4007,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -3917,6 +4044,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3928,6 +4056,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -3962,6 +4093,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -3973,6 +4105,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -4007,6 +4142,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -4018,6 +4154,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -4052,6 +4191,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -4063,6 +4203,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -4089,6 +4232,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -5070,6 +5223,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -5099,6 +5261,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5110,6 +5273,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5144,6 +5310,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5155,6 +5322,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5189,6 +5359,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5200,6 +5371,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5234,6 +5408,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5245,6 +5420,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5279,6 +5457,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5290,6 +5469,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5324,6 +5506,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5335,6 +5518,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5369,6 +5555,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5380,6 +5567,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5414,6 +5604,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -5425,6 +5616,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -5460,6 +5654,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -6688,6 +6892,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -6789,8 +7002,12 @@
                       "type": "string",
                       "enum": [
                         "project_busy",
-                        "shape_locked"
+                        "shape_locked",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -6905,6 +7122,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ]
@@ -8606,6 +8833,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -8635,6 +8871,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8646,6 +8883,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8680,6 +8920,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8691,6 +8932,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8725,6 +8969,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8736,6 +8981,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8770,6 +9018,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8781,6 +9030,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8815,6 +9067,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8826,6 +9079,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8860,6 +9116,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8871,6 +9128,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8905,6 +9165,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8916,6 +9177,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8950,6 +9214,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -8961,6 +9226,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -8987,6 +9255,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -9949,6 +10227,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -9978,6 +10265,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -9989,6 +10277,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10023,6 +10314,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10034,6 +10326,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10068,6 +10363,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10079,6 +10375,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10113,6 +10412,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10124,6 +10424,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10158,6 +10461,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10169,6 +10473,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10203,6 +10510,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10214,6 +10522,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10248,6 +10559,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -10259,6 +10571,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -10294,6 +10609,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ]
@@ -11225,6 +11550,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -11325,8 +11659,12 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "project_busy"
+                        "project_busy",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -11489,6 +11827,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -11697,6 +12045,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11708,6 +12057,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11742,6 +12094,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11753,6 +12106,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11787,6 +12143,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11798,6 +12155,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11832,6 +12192,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11843,6 +12204,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11909,6 +12273,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11920,6 +12285,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11954,6 +12322,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -11965,6 +12334,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -11999,6 +12371,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -12010,6 +12383,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -12273,8 +12649,12 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "project_busy"
+                        "project_busy",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -12540,8 +12920,12 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "project_busy"
+                        "project_busy",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -12576,6 +12960,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -12587,6 +12972,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -13787,6 +14175,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -13816,6 +14213,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -13827,6 +14225,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -13861,6 +14262,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -13872,6 +14274,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -13906,6 +14311,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -13917,6 +14323,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -13951,6 +14360,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -13962,6 +14372,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -13996,6 +14409,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -14007,6 +14421,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -14041,6 +14458,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -14052,6 +14470,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -14086,6 +14507,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -14097,6 +14519,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -14131,6 +14556,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -14142,6 +14568,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -14168,6 +14597,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -15143,6 +15582,15 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -15244,8 +15692,12 @@
                       "type": "string",
                       "enum": [
                         "project_busy",
-                        "shape_locked"
+                        "shape_locked",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -15361,6 +15813,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ]
@@ -16303,6 +16765,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -16404,8 +16875,12 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "project_busy"
+                        "project_busy",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -16516,6 +16991,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -17626,6 +18111,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17637,6 +18123,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17671,6 +18160,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17682,6 +18172,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17716,6 +18209,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17727,6 +18221,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17761,6 +18258,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17772,6 +18270,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17806,6 +18307,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17817,6 +18319,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17851,6 +18356,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17862,6 +18368,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -17958,6 +18467,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -17987,6 +18505,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -17998,6 +18517,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18032,6 +18554,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18043,6 +18566,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18077,6 +18603,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18088,6 +18615,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18122,6 +18652,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18133,6 +18664,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18167,6 +18701,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18178,6 +18713,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18212,6 +18750,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18223,6 +18762,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18257,6 +18799,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18268,6 +18811,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18282,6 +18828,18 @@
           },
           {
             "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
+            }
           }
         ],
         "requestBody": {
@@ -18328,6 +18886,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -18357,6 +18924,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18368,6 +18936,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18402,6 +18973,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18413,6 +18985,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18447,6 +19022,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18458,6 +19034,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18492,6 +19071,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18503,6 +19083,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18537,6 +19120,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18548,6 +19132,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18582,6 +19169,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -18593,6 +19181,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -18618,6 +19209,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ]
@@ -19894,6 +20495,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -19905,6 +20507,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -19939,6 +20544,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -19950,6 +20556,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -19984,6 +20593,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -19995,6 +20605,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -20029,6 +20642,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -20040,6 +20654,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -20074,6 +20691,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -20085,6 +20703,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -20119,6 +20740,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -20130,6 +20752,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21102,6 +21727,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -21131,6 +21765,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21142,6 +21777,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21176,6 +21814,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21187,6 +21826,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21221,6 +21863,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21232,6 +21875,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21266,6 +21912,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21277,6 +21924,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21311,6 +21961,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21322,6 +21973,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21356,6 +22010,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21367,6 +22022,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21401,6 +22059,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21412,6 +22071,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21446,6 +22108,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -21457,6 +22120,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -21482,6 +22148,16 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
               "maxLength": 120
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -22541,6 +23217,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -22644,8 +23329,12 @@
                       "type": "string",
                       "enum": [
                         "project_busy",
-                        "shape_locked"
+                        "shape_locked",
+                        "revision_mismatch"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": false
@@ -22680,6 +23369,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -22691,6 +23381,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -22814,6 +23507,16 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
+            }
           }
         ],
         "requestBody": {
@@ -22867,6 +23570,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -22896,6 +23608,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -22907,6 +23620,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -22941,6 +23657,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -22952,6 +23669,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -22986,6 +23706,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -22997,6 +23718,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -23031,6 +23755,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -23042,6 +23767,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -23076,6 +23804,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -23087,6 +23816,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -23121,6 +23853,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -23132,6 +23865,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -23166,6 +23902,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ]
@@ -24097,6 +24843,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -24126,6 +24881,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24137,6 +24893,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24171,6 +24930,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24182,6 +24942,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24216,6 +24979,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24227,6 +24991,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24261,6 +25028,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24272,6 +25040,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24306,6 +25077,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24317,6 +25089,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24351,6 +25126,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24362,6 +25138,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24396,6 +25175,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24407,6 +25187,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24441,6 +25224,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -24452,6 +25236,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -24487,6 +25274,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],
@@ -25749,6 +26546,15 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
             }
           },
           "400": {
@@ -25778,6 +26584,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -25789,6 +26596,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -25823,6 +26633,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -25834,6 +26645,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -25868,6 +26682,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -25879,6 +26694,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -25913,6 +26731,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -25924,6 +26743,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -25958,6 +26780,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -25969,6 +26792,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -26003,6 +26829,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -26014,6 +26841,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -26048,6 +26878,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -26059,6 +26890,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -26093,6 +26927,7 @@
                         "project_not_found",
                         "project_exists",
                         "project_busy",
+                        "revision_mismatch",
                         "shape_not_found",
                         "shape_locked",
                         "unsupported_kind",
@@ -26104,6 +26939,9 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   },
                   "additionalProperties": true
@@ -26139,6 +26977,16 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
             }
           }
         ],

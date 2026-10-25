@@ -59,7 +59,7 @@ The server needs both `SKETCHFORGE_API_TOKEN` and `SKETCHFORGE_PROJECTS_DIR` set
 ## The client
 
 ```ts
-new SketchForgeClient({ baseUrl, token, fetch?, timeoutMs?, retryOnBusy?, headers? })
+new SketchForgeClient({ baseUrl, token, fetch?, timeoutMs?, retryOnBusy?, headers?, expectedRevision? })
 
 client.apiRoot: string
 client.check(): Promise<{ ok: true; projects: number } | { ok: false; reason: string }>
@@ -124,6 +124,8 @@ client.patterns.ring(projectId, ids, count, { x, z }, { sweepAngle?, rotateCopie
 client.imports.apply(projectId, { fileName, bytes, mediaType? }): Promise<MeshImportResult>
 client.imports.readable(fileName): boolean
 ```
+
+Set `expectedRevision` to the revision from a project's previous response to send `If-Match: "<revision>"` with each write request. A stale value raises `SketchForgeApiError` with status `409` and code `revision_mismatch`; the error's `revision` is the current project revision. Use a client configured for one conditional write at a time, then create a new one with the returned revision for the next write.
 
 `shapes.create` accepts `SketchSweepShapeRequest` for server-built sketch
 sweeps. Its `profile` contains the closed section path(s), one open spine, and

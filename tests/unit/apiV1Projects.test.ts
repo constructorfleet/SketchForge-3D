@@ -107,6 +107,39 @@ describe("REST API v1", () => {
     expect(payload.projects[0]).toMatchObject({ id: projectId, name: "Bracket", shapes: 0 });
   });
 
+  it("honours If-Match for shape writes and returns the resulting ETag", async () => {
+    const projectId = await makeProject("Conditional writes");
+    const created = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "cube", size: 10, name: "A" }),
+    }));
+    const createdPayload = await created.json() as { shapes: Array<{ id: string }>; revision: number };
+    expect(created.headers.get("etag")).toBe(`"${createdPayload.revision}"`);
+
+    const mismatch = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      headers: { "If-Match": '"0"' },
+      body: JSON.stringify({ name: "Must not apply" }),
+    }));
+    expect(mismatch.status).toBe(409);
+    expect(await mismatch.json()).toMatchObject({ code: "revision_mismatch", revision: createdPayload.revision });
+
+    const absent = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: "No precondition" }),
+    }));
+    expect(absent.status).toBe(200);
+    const absentPayload = await absent.json() as { revision: number };
+
+    const matched = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
+      method: "PATCH",
+      headers: { "If-Match": `"${absentPayload.revision}"` },
+      body: JSON.stringify({ name: "Matched" }),
+    }));
+    expect(matched.status).toBe(200);
+    expect(matched.headers.get("etag")).toMatch(/^"\d+"$/);
+  });
+
   it("paginates project and shape listings with a next cursor", async () => {
     const firstProjectId = await makeProject("First");
     await makeProject("Second");

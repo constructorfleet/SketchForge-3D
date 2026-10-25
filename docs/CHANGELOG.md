@@ -17,6 +17,7 @@ owner: "Contributors"
 
 Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.
 
+- v1 project writes now accept `If-Match: "<revision>"` and return `409 revision_mismatch` with the current revision when the project has changed. Successful writes return the new revision as an ETag. The TypeScript and Python clients can send an expected revision on write requests.
 - Editor dialogs now move keyboard focus into the opened panel, contain Tab navigation in modal dialogs, return focus to the opener, and close on Escape.
 - `sketchforge-macro` now has direct `projects list|create|delete`, `export --format <fmt> --out <file>`, and `import <file>` commands alongside the macro runner. Import creates a project from the filename unless `--project` or `SKETCHFORGE_PROJECT_ID` selects an existing one; export requires a selected project.
 - `GET /api/v1/projects` and `GET /api/v1/shapes` now accept optional `limit` and `cursor` query parameters and return a `nextCursor` for the next page. The TypeScript and Python clients expose `projects.listPage` / `projects.list_page` and `shapes.listPage` / `shapes.list_page` page methods; existing list methods and requests without pagination options continue to return the full listing.

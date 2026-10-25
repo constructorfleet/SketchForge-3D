@@ -93,6 +93,8 @@ client.exports.export(project_id, format, shape_ids=None, name=None, view=None, 
 client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None, section=None) -> ExportResult
 ```
 
+Set `expected_revision` to a project's revision to send `If-Match: "<revision>"` with each write request. A stale value raises `SketchForgeApiError` with status `409`, code `revision_mismatch`, and the current revision. Use a client configured for one conditional write at a time, then create a new client with the returned revision for the next write.
+
 For an SVG section drawing, set `section={"plane": "xy", "offset": 3}` instead
 of `view`. The supported planes are `xy`, `xz`, and `yz` in drawing coordinates;
 the plane must intersect the selected shapes.

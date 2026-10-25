@@ -47,6 +47,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 ## API contract accuracy
 
+- [#367: Honour If-Match on v1 write routes](https://github.com/constructorfleet/SketchForge-3D/issues/367) — P2, implementation and route/client coverage complete; awaiting review.
 - [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
 - [#373: Add limit and cursor paging to project and shape listings](https://github.com/constructorfleet/SketchForge-3D/issues/373) — implementation and route/client coverage complete; awaiting review.
 - [#372: Normalize status and error codes for limit violations across v1 routes](https://github.com/constructorfleet/SketchForge-3D/issues/372) — implementation and contract tests complete; awaiting review.

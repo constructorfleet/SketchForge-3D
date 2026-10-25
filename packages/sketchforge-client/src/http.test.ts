@@ -57,6 +57,15 @@ describe("Transport", () => {
     expect(server.calls[1]?.body).toEqual({ name: "Plate" });
   });
 
+  it("sends the configured expected revision only on writes", async () => {
+    const server = fakeServer({ body: {} }, { body: {} });
+    const sender = transport(server, { expectedRevision: 42 });
+    await sender.send({ method: "GET", path: "/projects" });
+    await sender.send({ method: "PATCH", path: "/shapes", body: { name: "Panel" } });
+    expect(server.calls[0]?.headers["if-match"]).toBeUndefined();
+    expect(server.calls[1]?.headers["if-match"]).toBe('"42"');
+  });
+
   it("raises the server's error message with its status", async () => {
     const server = fakeServer({ status: 422, body: { error: "too large for this shape's edges" } });
     await expect(transport(server).send({ method: "POST", path: "/treatments" })).rejects.toMatchObject({
@@ -146,6 +155,13 @@ describe("error codes", () => {
     expect(error.isShapeMissing).toBe(true);
     expect(error.isProjectMissing).toBe(false);
     expect(error.looksDisabled).toBe(false);
+  });
+
+  it("exposes the current revision when a conditional write is stale", async () => {
+    const server = fakeServer({ status: 409, body: { error: "The project changed since the supplied revision.", code: "revision_mismatch", revision: 17 } });
+    const error = await refusal(transport(server).send({ method: "PATCH", path: "/shapes" }));
+    expect(error.isRevisionMismatch).toBe(true);
+    expect(error.currentRevision).toBe(17);
   });
 
   it("names the fields a change could not be applied to", async () => {

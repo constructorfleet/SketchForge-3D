@@ -20,7 +20,7 @@ async function postParts(request: Request) {
   if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
   const { projectId, shapeId } = query.values;
 
-  const separated = await apiEngine(context.root).separate(projectId, shapeId);
+  const separated = await apiEngine(context.root, request).separate(projectId, shapeId);
   if (!separated.ok) return apiEngineError(separated.failure, { oneShape: true });
   return apiJson({ shapes: separated.value.shapes.map(apiShapeSummary), revision: separated.value.revision });
 }

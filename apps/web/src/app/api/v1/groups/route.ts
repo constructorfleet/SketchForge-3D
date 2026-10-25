@@ -30,7 +30,7 @@ const postGroup = async (request: Request) => {
   if (!ids) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
   if (!validateApiV1RequestBody("POST /api/v1/groups", body)) return apiError("Send ids: a list of distinct shape ids to group.", 400, "invalid_request");
 
-  const grouped = await apiEngine(context.root).group(projectId, ids);
+  const grouped = await apiEngine(context.root, request).group(projectId, ids);
   if (!grouped.ok) {
     return apiEngineError(grouped.failure, {
       locked: (locked) => `Unlock every shape first; these are locked: ${locked.join(", ")}.`,
@@ -55,7 +55,7 @@ const deleteGroup = async (request: Request) => {
   const query = parseApiV1Query("DELETE /api/v1/groups", request);
   if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
 
-  const ungrouped = await apiEngine(context.root).ungroup(projectId, shapeId);
+  const ungrouped = await apiEngine(context.root, request).ungroup(projectId, shapeId);
   if (!ungrouped.ok) {
     return apiEngineError(ungrouped.failure, { oneShape: true, locked: () => "That group is locked." });
   }

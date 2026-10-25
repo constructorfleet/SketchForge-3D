@@ -88,7 +88,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "listFaces"), false);
   const patchShape = spec.paths["/api/v1/shapes"].patch;
   assert.equal(patchShape.operationId, "updateShape");
-  assert.deepEqual(patchShape.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(patchShape.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true], ["If-Match", false]]);
   assert.deepEqual(Object.keys(patchShape.responses).sort(), ["200", "400", "401", "404", "409", "413", "422", "500", "503"]);
   const patchBody = patchShape.requestBody.content["application/json"].schema;
   assert.equal(patchBody.additionalProperties, true, "other engine-supported patch fields remain pass-through");
@@ -97,6 +97,9 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(colors.patternProperties["^(?:[0-9]+|face_[^\\s]+)$"].pattern, "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$");
   assert.equal(colors.additionalProperties, false);
   assert.deepEqual(patchShape.responses["200"].content["application/json"].schema.required, ["shape", "revision"]);
+  assert.equal(patchShape.responses["200"].headers.ETag.schema.type, "string");
+  assert.ok(patchShape.responses["409"].content["application/json"].schema.properties.code.enum.includes("revision_mismatch"));
+  assert.equal(patchShape.responses["409"].content["application/json"].schema.properties.revision.type, "number");
   assert.deepEqual(patchShape.responses["400"].content["application/json"].schema.properties.code.enum, ["invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"]);
   assert.deepEqual(patchShape.responses["422"].content["application/json"].schema.properties.code.enum, ["unapplicable_fields", "geometry_failed", "cad_failed"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "updateShape"), false);
@@ -136,7 +139,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => ["groupShapes", "ungroupShape"].includes(operationId)), false);
   const parts = spec.paths["/api/v1/parts"].post;
   assert.equal(parts.operationId, "splitParts");
-  assert.deepEqual(parts.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(parts.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true], ["If-Match", false]]);
   assert.deepEqual(Object.keys(parts.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
   assert.deepEqual(parts.responses["422"].content["application/json"].schema.properties.code.enum, ["invalid_request", "geometry_failed"]);
   const splitResponse = parts.responses["200"].content["application/json"].schema;
@@ -193,16 +196,17 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(patternBody.properties.rotateCopies.default, true);
   assert.deepEqual(patterns.responses["201"].content["application/json"].schema.required, ["created", "kind", "shapes", "revision"]);
   assert.deepEqual(patterns.responses["404"].content["application/json"].schema.properties.code.enum, ["api_disabled", "project_not_found", "shape_not_found"]);
-  assert.deepEqual(patterns.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy"]);
+  assert.deepEqual(patterns.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy", "revision_mismatch"]);
+  assert.equal(patterns.responses["409"].content["application/json"].schema.properties.revision.type, "number");
   assert.deepEqual(patterns.responses["413"].content["application/json"].schema.properties.code.enum, ["limit_exceeded"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "patternShapes"), false);
   const explode = spec.paths["/api/v1/explode"].post;
   assert.equal(explode.operationId, "explodeAssembly");
-  assert.deepEqual(explode.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true]]);
+  assert.deepEqual(explode.parameters.map(({ name, required }) => [name, required]), [["projectId", true], ["shapeId", true], ["If-Match", false]]);
   assert.deepEqual(Object.keys(explode.responses).sort(), ["200", "400", "401", "404", "409", "422", "500", "503"]);
   assert.deepEqual(explode.responses["200"].content["application/json"].schema.required, ["shapes", "revision"]);
   assert.deepEqual(explode.responses["200"].content["application/json"].schema.properties.shapes.items.required, ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"]);
-  assert.deepEqual(explode.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy", "shape_locked"]);
+  assert.deepEqual(explode.responses["409"].content["application/json"].schema.properties.code.enum, ["project_busy", "shape_locked", "revision_mismatch"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "explodeAssembly"), false);
   const imports = spec.paths["/api/v1/imports"].post;
   assert.equal(imports.operationId, "importGeometry");

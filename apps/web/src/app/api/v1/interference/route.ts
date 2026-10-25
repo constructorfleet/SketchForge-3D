@@ -32,7 +32,7 @@ async function postInterference(request: Request) {
     return apiError("The interference request does not match its contract.", 400, "invalid_request");
   }
 
-  const result = await apiEngine(context.root).interference(projectId, {
+  const result = await apiEngine(context.root, request).interference(projectId, {
     ...(ids === undefined ? {} : { ids }),
     ...(body.clearance === undefined ? {} : { clearance: body.clearance as number }),
   });

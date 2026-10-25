@@ -4,6 +4,7 @@
  * migrate, and the parity test prevents public handlers from being omitted.
  */
 
+
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
 export type ApiV1FieldSchema = {
@@ -41,6 +42,8 @@ export type ApiV1Operation = {
   description?: string;
   /** Maximum raw bytes accepted for the request body. */
   maxRequestBytes?: number;
+  /** Write routes accept a project revision precondition. */
+  ifMatch?: true;
   /** Populated only for routes whose response set has been verified. */
   responses?: readonly number[];
   responseSchemas?: Readonly<Record<number, ApiV1FieldSchema>>;
@@ -100,7 +103,11 @@ const operation = (
   responses?: readonly number[],
   requestBody?: ApiV1Operation["requestBody"],
   auth: ApiV1Operation["auth"] = "bearer",
-): ApiV1Operation => ({ operationId, method, path: route, auth, ...(responses ? { responses } : {}), ...(requestBody ? { requestBody, maxRequestBytes: DEFAULT_JSON_BODY_LIMIT_BYTES } : {}) });
+): ApiV1Operation => ({
+  operationId, method, path: route, auth,
+  ...((method === "PATCH" || method === "DELETE" || (method === "POST" && !["/api/v1/measurements", "/api/v1/measure-between", "/api/v1/interference", "/api/v1/exports", "/api/v1/drawings", "/api/v1/thickness"].includes(route))) ? { ifMatch: true as const } : {}),
+  ...(responses ? { responses } : {}), ...(requestBody ? { requestBody, maxRequestBytes: DEFAULT_JSON_BODY_LIMIT_BYTES } : {}),
+});
 
 const createProjectRequestBody = {
   contentType: "application/json",
@@ -208,9 +215,21 @@ const shapeSummary = {
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
 } as const;
-const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
 const limitErrorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["limit_exceeded"] }, limit: int, given: int }, additionalProperties: false } as const;
-const faceError = (...codes: string[]): ApiV1FieldSchema => ({ type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: codes } }, additionalProperties: false });
+const faceError = (...codes: string[]): ApiV1FieldSchema => {
+  const conditionalWriteError = codes.includes("project_busy") || codes.includes("shape_locked");
+  return {
+    type: "object",
+    required: ["error", "code"],
+    properties: {
+      error: str,
+      code: { type: "string", enum: conditionalWriteError ? [...new Set([...codes, "revision_mismatch"])] : codes },
+      ...(conditionalWriteError ? { revision: num } : {}),
+    },
+    additionalProperties: false,
+  };
+};
 const vector3Schema = { type: "object", required: ["x", "y", "z"], properties: { x: num, y: num, z: num }, additionalProperties: false } as const;
 const faceItemSchema = {
   type: "object",
@@ -451,8 +470,24 @@ export function withApiV1Contract(key: string, handler: (request: Request) => Pr
       }
       const body = await response.clone().json().catch(() => null);
       if (!validateApiV1Response(key, response.status, body)) return Response.json({ error: "The API handler returned a response outside its contract.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+      const revision = body && typeof body === "object"
+        ? (typeof (body as { revision?: unknown }).revision === "number"
+          ? (body as { revision: number }).revision
+          : typeof (body as { project?: { revision?: unknown } }).project?.revision === "number"
+            ? (body as { project: { revision: number } }).project.revision
+            : undefined)
+        : undefined;
+      if (operation?.ifMatch && response.status >= 200 && response.status < 300 && revision !== undefined) {
+        response.headers.set("ETag", `"${revision}"`);
+      }
       return response;
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProjectRevisionMismatchError" && "currentRevision" in error && typeof error.currentRevision === "number") {
+        return Response.json(
+          { error: "The project changed since the supplied revision.", code: "revision_mismatch", revision: error.currentRevision },
+          { status: 409, headers: { "Cache-Control": "no-store" } },
+        );
+      }
       return Response.json({ error: "The request could not be completed.", code: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
     }
   };
