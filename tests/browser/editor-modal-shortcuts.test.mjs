@@ -3,12 +3,16 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
 import { createServer } from "node:net";
+import { createRequire } from "node:module";
 import { test } from "node:test";
 import { chromium } from "playwright";
 
 // The screenshot is evidence for review, not documentation, so it goes to the
 // automation output rather than docs/screenshots.
 const SCREENSHOT_DIR = "output/playwright";
+const require = createRequire(import.meta.url);
+
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 async function unusedPort() {
   const listener = createServer();
@@ -74,8 +78,33 @@ test("editor shortcuts stay inert while the Workspace Settings modal is open", {
     await page.getByRole("button", { name: "Workspace settings" }).click();
     const settings = page.getByRole("dialog", { name: "Workspace settings" });
     await settings.waitFor({ state: "visible" });
-    // Focus a non-input control inside the modal, as a keyboard user would.
-    await settings.getByRole("button", { name: "Appearance" }).focus();
+    assert.equal(await settings.getAttribute("aria-modal"), "true");
+    assert.equal(await settings.evaluate((dialog) => dialog.contains(document.activeElement)), true, "opening Settings should move focus into the dialog");
+    assert.equal(await settings.getByRole("button", { name: "Appearance" }).evaluate((element) => element === document.activeElement), true, "Settings should initially focus its first section control");
+    await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
+    const settingsAxe = await page.evaluate(async () => window.axe.run(document.querySelector('[role="dialog"][aria-label="Workspace settings"]'), {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+    }));
+    assert.deepEqual(settingsAxe.violations, [], `Settings dialog axe violations: ${JSON.stringify(settingsAxe.violations)}`);
+    fs.mkdirSync("docs/screenshots", { recursive: true });
+    await page.screenshot({ path: "docs/screenshots/editor-dialog-settings-focus.png", fullPage: true });
+    const settingsFocusables = settings.locator(FOCUSABLE).filter({ visible: true });
+    const settingsFirst = settingsFocusables.first();
+    const settingsLast = settingsFocusables.last();
+    await settingsLast.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await settingsFirst.evaluate((element) => element === document.activeElement), true, "Tab from the last Settings control should wrap to the first");
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await settingsLast.evaluate((element) => element === document.activeElement), true, "Shift+Tab from the first Settings control should wrap to the last");
+    await settings.getByRole("button", { name: "Workplane" }).click();
+    const gridColorTrigger = settings.getByRole("button", { name: /Grid color/ });
+    await gridColorTrigger.click();
+    const colorPicker = page.getByRole("group", { name: "Grid color picker" });
+    await colorPicker.waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await colorPicker.waitFor({ state: "hidden" });
+    assert.equal(await settings.isVisible(), true, "Escape inside the color picker should not close Settings");
+    assert.equal(await gridColorTrigger.evaluate((element) => element === document.activeElement), true, "closing the color picker should return focus to its trigger");
 
     await page.keyboard.press("Backspace");
     await page.keyboard.press("Delete");
@@ -90,7 +119,33 @@ test("editor shortcuts stay inert while the Workspace Settings modal is open", {
 
     await page.keyboard.press("Escape");
     await settings.waitFor({ state: "hidden", timeout: 5_000 });
+    assert.equal(await page.getByRole("button", { name: "Workspace settings" }).evaluate((element) => element === document.activeElement), true, "closing Settings should return focus to its trigger");
     assert.equal(await selectedRows.count(), 1, "Escape closes the modal without also clearing the selection");
+
+    const exportTrigger = page.getByRole("button", { name: "Export", exact: true });
+    await exportTrigger.click();
+    const exportDialog = page.getByRole("dialog", { name: "Export" });
+    await exportDialog.waitFor({ state: "visible" });
+    assert.equal(await exportDialog.getAttribute("aria-modal"), "true");
+    assert.equal(await exportDialog.evaluate((dialog) => dialog.contains(document.activeElement)), true, "opening Export should move focus into the dialog");
+    assert.equal(await exportDialog.getByLabel("File name").evaluate((element) => element === document.activeElement), true, "Export should initially focus the file name field");
+    const exportAxe = await page.evaluate(async () => window.axe.run(document.querySelector('[role="dialog"][aria-label="Export"]'), {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+    }));
+    assert.deepEqual(exportAxe.violations, [], `Export dialog axe violations: ${JSON.stringify(exportAxe.violations)}`);
+    await page.screenshot({ path: "docs/screenshots/editor-dialog-export-focus.png", fullPage: true });
+    const exportFocusables = exportDialog.locator(FOCUSABLE).filter({ visible: true });
+    const exportFirst = exportFocusables.first();
+    const exportLast = exportFocusables.last();
+    await exportLast.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await exportFirst.evaluate((element) => element === document.activeElement), true, "Tab from the last Export control should wrap to the first");
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await exportLast.evaluate((element) => element === document.activeElement), true, "Shift+Tab from the first Export control should wrap to the last");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Escape");
+    await exportDialog.waitFor({ state: "hidden", timeout: 5_000 });
+    assert.equal(await exportTrigger.evaluate((element) => element === document.activeElement), true, "closing Export should return focus to its trigger");
 
     // With the modal closed the same key reaches the editor, which proves the
     // keypresses above were delivered and suppressed rather than lost.

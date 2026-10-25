@@ -15,6 +15,7 @@ import {
   type Translator,
 } from "@/i18n";
 import { textFontLabel } from "@/components/workplane/ShapeInspector";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { gearCenterHoleLimits, gearToothPitch } from "@/lib/gearGeometry";
 import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, snapGridLabel, WORKSPACE_UNIT_OPTIONS, workspaceScaleLabel, workspaceUnitsLabel } from "@/lib/measurementUnits";
 import { shapeAssetDefaultDimensions, shapeAssetSpecialDefaults, toolbarShapeAssets } from "@/lib/engine/shapeCatalog";
@@ -174,6 +175,7 @@ export function WorkspaceSettingsModal({
   const t = useTranslations();
   const [languagePreference, setLanguagePreference] = useLanguagePreference();
   const [defaultSaved, setDefaultSaved] = useState(false);
+  const dialogRef = useDialogFocus<HTMLDivElement>({ onEscape: onClose });
   const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>("appearance");
   const [selectedShapeKind, setSelectedShapeKind] = useState<ShapeKind>(toolbarShapeAssets[0].kind);
   const [dimensionDrafts, setDimensionDrafts] = useState(() => ({
@@ -219,23 +221,6 @@ export function WorkspaceSettingsModal({
       setCustomHistoryDraft(String(workspace.historyLimit));
     }
   }, [workspace.historyLimit]);
-  // The editor's global shortcuts stand aside while this modal is open (see
-  // shouldIgnoreGlobalShortcut), so Escape has to close it from here. A nested
-  // control that handles Escape itself, such as the grid colour picker, calls
-  // preventDefault so that only the control closes.
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      event.preventDefault();
-      onCloseRef.current();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, []);
   const patchWorkspace = (patch: Partial<WorkspaceSettings>) => {
     setDefaultSaved(false);
     const next = { ...workspace, ...patch };
@@ -330,7 +315,7 @@ export function WorkspaceSettingsModal({
   };
 
   return (
-    <div className="workspace-modal" role="dialog" aria-modal="true" aria-label={t("panels.settings.title")}>
+    <div ref={dialogRef} className="workspace-modal" role="dialog" aria-modal="true" aria-label={t("panels.settings.title")} tabIndex={-1}>
       <div className="workspace-modal-card" onPointerDown={(event) => event.stopPropagation()}>
         <header className="workspace-modal-header">
           <strong>{t("panels.settings.title")}</strong>
@@ -341,7 +326,7 @@ export function WorkspaceSettingsModal({
 
         <div className="workspace-modal-layout">
           <nav className="workspace-settings-nav" aria-label={t("panels.settings.sections")}>
-            <button className={activeSection === "appearance" ? "active" : ""} aria-current={activeSection === "appearance" ? "page" : undefined} onClick={() => setActiveSection("appearance")}>
+            <button data-dialog-initial-focus className={activeSection === "appearance" ? "active" : ""} aria-current={activeSection === "appearance" ? "page" : undefined} onClick={() => setActiveSection("appearance")}>
               <Palette size={18} />
               <span>{t("panels.settings.appearance.title")}</span>
             </button>
@@ -880,6 +865,7 @@ function GridColorControl({ color, onChange }: { color: string; onChange: (color
     ? createPortal(
       <div
         ref={popoverRef}
+        data-dialog-focus-portal
         className="workspace-color-popover"
         role="group"
         aria-label={t("panels.settings.gridColor.picker")}
