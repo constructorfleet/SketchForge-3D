@@ -3,6 +3,7 @@ import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { parseProjectionLayout, PROJECTION_LAYOUTS } from "@constructorfleet/sketchforge-engine/cadProjection";
 import { SECTION_PLANES, type SectionPlane } from "@constructorfleet/sketchforge-engine/cadSection";
 import { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "@constructorfleet/sketchforge-engine/sceneExport";
+import { ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { withApiV1Contract } from "@/lib/apiV1OperationContract";
 
 export const runtime = "nodejs";
@@ -50,6 +51,9 @@ async function postExport(request: Request) {
     }
     if (body.view !== undefined) return apiError("section and view cannot be used together.", 400, "invalid_request");
     section = { plane: request.plane as SectionPlane, offset: request.offset };
+  }
+  if (body.format === "dxf" && !section) {
+    return apiError("A section plane is required for DXF export.", 400, "invalid_request");
   }
   const view = parseProjectionLayout(body.view);
   if (view === null) {
@@ -103,6 +107,10 @@ async function postExport(request: Request) {
       base64: Buffer.from(artifact.data).toString("base64"),
     });
   } catch (error) {
+    if (error instanceof ServerCadError) {
+      if (error.status === 413) return apiErrors.limitExceeded(error.message);
+      if (error.status === 400) return apiError(error.message, 400, "invalid_request");
+    }
     return apiError(error instanceof Error ? error.message : "The project could not be exported.", 422, "geometry_failed");
   }
 }

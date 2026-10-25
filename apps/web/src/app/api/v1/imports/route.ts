@@ -89,7 +89,7 @@ async function handlePost(request: Request) {
   const upload = await uploadFrom(boundedRequest);
   if (typeof upload === "string") return apiError(upload, 400, "invalid_body");
   if (upload.bytes.byteLength > MAX_IMPORT_BYTES) {
-    return apiError(`A model can be at most ${MAX_IMPORT_BYTES / (1024 * 1024)}MB.`, 413, "invalid_request");
+    return apiErrors.limitExceeded(`A model can be at most ${MAX_IMPORT_BYTES / (1024 * 1024)}MB.`, MAX_IMPORT_BYTES, upload.bytes.byteLength);
   }
 
   const imported = await apiEngine(context.root).importMesh(projectId, upload);

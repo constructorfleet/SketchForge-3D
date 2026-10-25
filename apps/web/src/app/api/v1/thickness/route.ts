@@ -24,6 +24,7 @@ const getThickness = async (request: Request) => {
     if (!response) return apiError("The CAD kernel returned an invalid wall-thickness estimate.", 500, "cad_failed");
     return apiJson(response);
   } catch (error) {
+    if (error instanceof ServerCadError && error.status === 413) return apiErrors.limitExceeded(error.message);
     return apiError(error instanceof Error ? error.message : "Wall thickness could not be estimated.", error instanceof ServerCadError ? error.status : 422, "geometry_failed");
   }
 };

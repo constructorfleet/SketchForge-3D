@@ -50,7 +50,7 @@ Send the token as a bearer header (`Authorization: Bearer <token>`) or as `X-Ske
 
 All paths are under `/api/v1`. Request bodies are JSON except for multipart file imports; most responses are JSON, while export downloads can return binary bytes. Errors are `{ "error": "...", "code": "..." }` with a meaningful status. The sentence is for whoever is reading; the code is for whatever is deciding what to do next (see **Errors**, below).
 
-JSON request bodies are limited to 16 MiB; `POST /imports` accepts a raw request body up to 64 MiB for either JSON/base64 or multipart uploads. The server checks a declared `Content-Length` before parsing and also caps streamed bodies when the header is absent or understated. Oversized bodies return `413 invalid_request` without reaching an engine operation. For JSON imports, the base64 encoding is included in the 64 MiB request limit, so the usable file size is lower than the 64 MiB decoded-file ceiling; multipart imports can use nearly the full decoded-file limit.
+JSON request bodies are limited to 16 MiB; `POST /imports` accepts a raw request body up to 64 MiB for either JSON/base64 or multipart uploads. The server checks a declared `Content-Length` before parsing and also caps streamed bodies when the header is absent or understated. Oversized bodies return `413 limit_exceeded` without reaching an engine operation. For JSON imports, the base64 encoding is included in the 64 MiB request limit, so the usable file size is lower than the 64 MiB decoded-file ceiling; multipart imports can use nearly the full decoded-file limit.
 
 For the current method and path inventory, accepted parameters and bodies, response schemas, authentication, and handler source, use the [generated REST operation references](/docs/rest-api/). Those 28 pages are generated from the same OpenAPI 3.1 contract as the [OpenAPI document](./openapi-v1.json), available as a [downloadable OpenAPI JSON](/openapi-v1.json); the four preflight-only OPTIONS handlers are omitted. Export references distinguish JSON/base64 responses from `download=1` binary responses and document the metadata header. For accepted per-kind shape fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`. This guide retains deployment, client, error-handling, and workflow walkthroughs; the generated pages are the source for the endpoint listing.
 
@@ -83,7 +83,7 @@ Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height
 
 `format: "dxf"` requires `section: { "plane": "xy", "offset": 4 }` (also `xz` or `yz`). It exports sampled section polylines. SVG section export uses the same contours.
 
-`GET /thickness?projectId=&shapeId=` returns `{ "thickness": { "minimum": 8, "unit": "mm", "method": "sampled-opposing-surface-distance", "samplesPerFace": 25, "facesChecked": 6 } }`. It samples a 5 × 5 UV grid on each face. `minimum` is `null` if no opposing pair is found. It can miss thin regions between samples and is not a certified minimum-thickness result. Both query values are trimmed before validation. A shape with more than 256 faces returns `413 geometry_failed`.
+`GET /thickness?projectId=&shapeId=` returns `{ "thickness": { "minimum": 8, "unit": "mm", "method": "sampled-opposing-surface-distance", "samplesPerFace": 25, "facesChecked": 6 } }`. It samples a 5 × 5 UV grid on each face. `minimum` is `null` if no opposing pair is found. It can miss thin regions between samples and is not a certified minimum-thickness result. Both query values are trimmed before validation. A shape with more than 256 faces returns `413 limit_exceeded`.
 
 Per kind:
 
@@ -159,7 +159,7 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `storage_unconfigured` | 503 | A token but no `SKETCHFORGE_PROJECTS_DIR`: nowhere to store a project. |
 | `invalid_project_id` / `invalid_shape_id` | 400 | The id is missing or not a safe id. |
 | `invalid_body` | 400 | The body was not a JSON object. |
-| `invalid_request` | 400 / 422 | A field is missing, malformed, or asks for something this shape has nothing to do. |
+| `invalid_request` | 400 / 422 | A required value is missing, malformed, or outside its allowed range (400); a valid selection may be inapplicable to the requested operation (422). |
 | `project_not_found` / `shape_not_found` | 404 | No such project, or no such shape in it. |
 | `project_exists` | 409 | A project with that id is already there. |
 | `project_busy` | 409 | Another write holds the project's lock. **Retry.** |
@@ -167,7 +167,8 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
 | `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |
 | `unapplicable_fields` | 422 | A change named fields the shape cannot take. `fields` lists them. |
-| `too_many_shapes` | 413 | More than 200 shapes in one `POST`. |
+| `limit_exceeded` | 413 | A request or operation exceeded a size or count cap. The response includes `limit` and `given` when those values are available. |
+| `too_many_shapes` | 413 (legacy) | Compatibility code used by older servers for more than 200 shapes in one `POST`; current servers return `limit_exceeded`. |
 | `geometry_failed` | 422 | The sweep, the boolean, or an imported model could not be built. |
 | `cad_failed` | 4xx / 500 | OCCT refused, or fell over. |
 
@@ -543,7 +544,7 @@ The response lists closest pairs first:
 }
 ```
 
-To keep a large scene from monopolizing the kernel, a request is refused as a whole above 128 selected shapes or 512 AABB candidate pairs. The `422 invalid_request` response names the limit; narrow `ids` or lower `clearance` and retry. `pairs` contains only pairs whose gap is at most the requested clearance. `precision` is `exact` for parametric and B-rep inputs; a pair involving an imported triangle mesh reports `tessellated`, because OCCT can solve the stored mesh precisely but cannot recover the unsampled source surface. This is shape-to-shape reporting; it does not identify faces. Sampled wall-thickness estimation remains separate and must state its sampling limits.
+To keep a large scene from monopolizing the kernel, a request is refused as a whole above 128 selected shapes or 512 AABB candidate pairs. The `413 limit_exceeded` response names the limit; narrow `ids` or lower `clearance` and retry. `pairs` contains only pairs whose gap is at most the requested clearance. `precision` is `exact` for parametric and B-rep inputs; a pair involving an imported triangle mesh reports `tessellated`, because OCCT can solve the stored mesh precisely but cannot recover the unsampled source surface. This is shape-to-shape reporting; it does not identify faces. Sampled wall-thickness estimation remains separate and must state its sampling limits.
 
 The editor's **Analysis** section in the scene list runs this same check, and `GET /thickness`'s sampling, in the browser on the unsaved scene, with the same limits and the same `method`. See [Interference and wall thickness](/docs/guides/scene-analysis.md).
 
@@ -651,17 +652,18 @@ A **full turn divides by the count**, so eight copies land every 45 degrees and 
 
 `rotateCopies` matters more than it looks. A bolt hole does not care which way round it is; a spoke, a tooth or a vane does, and without it they all point the way the original did, which reads as a mistake rather than a pattern. The ring turns about its centre, so each copy keeps its distance from it.
 
-The count is an integer from 2 to 200; omitted count defaults to 4, and omitted kind defaults to `linear`. The response is `201` with the number created, selected kind, shape summaries, and new project revision. Invalid option types, fractional counts, or a count outside the range return `400`; a row with no step and a ring with no sweep are both `422`: every copy would land on top of the original, and a reply saying it added shapes you cannot see is worse than a refusal.
+The count is an integer from 2 to 200; omitted count defaults to 4, and omitted kind defaults to `linear`. The response is `201` with the number created, selected kind, shape summaries, and new project revision. Invalid option types, fractional counts, counts below 2, a row with no step, or a ring with no sweep return `400 invalid_request`; counts above 200 return `413 limit_exceeded`. A row with no step and a ring with no sweep would place every copy on top of the original, so the server rejects those options before writing.
 
 ### When they refuse
 
 | Status | When |
 | --- | --- |
-| `400` | Missing or invalid `ids`, a kind outside `linear`/`circular`, a count outside 2-200 or not an integer, non-finite numeric options, or a non-boolean `rotateCopies`. |
+| `400` | Missing or invalid `ids`, a kind outside `linear`/`circular`, a count below 2 or not an integer, non-finite numeric options, or a non-boolean `rotateCopies`. |
+| `413` | A count above 200; `code` is `limit_exceeded`. |
 | `401` | The API token is missing or invalid. |
 | `404` | No such project or a shape ID that is not in it; the error identifies missing shapes. |
 | `409` | The project is being written by another request. |
-| `422` | A row has no non-zero step or a ring has a zero sweep, so copies would overlap the original. |
+| `422` | Geometry could not be built for a valid pattern request. |
 | `500` | An unexpected server error occurred or the handler returned a response outside its contract. |
 | `503` | Project storage is not configured. |
 
@@ -766,7 +768,7 @@ format names answer `400` with `code: "unsupported_format"`, and a
 `view` the drawing does not know, or a `view` on any format but `svg`, answers
 `400` with `code: "invalid_request"`. `section` and `view` cannot be used
 together. A plane that misses the selected scene answers `422`; oversized
-sections also currently surface as `422` with `code: "geometry_failed"`. A
+sections answer `413 limit_exceeded`. A
 requested shape id outside the project answers `404`; a project with no
 exportable solid geometry answers `422` with `code: "geometry_failed"`.
 

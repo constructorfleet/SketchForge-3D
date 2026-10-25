@@ -23,6 +23,7 @@ export const API_ERROR_CODES = [
   "unsupported_format",
   "unapplicable_fields",
   "too_many_shapes",
+  "limit_exceeded",
   "geometry_failed",
   "cad_failed",
 ] as const;
@@ -82,6 +83,11 @@ export class SketchForgeApiError extends Error {
   /** The server has a token but no project directory, so it can store nothing. */
   get needsStorage() {
     return this.status === 503;
+  }
+
+  /** A size or count cap was reached; `too_many_shapes` is accepted during the compatibility window. */
+  get isLimitExceeded() {
+    return this.code ? this.code === "limit_exceeded" || this.code === "too_many_shapes" : this.status === 413;
   }
 
   /** Another write holds the project's lock. Retrying is the right response. */

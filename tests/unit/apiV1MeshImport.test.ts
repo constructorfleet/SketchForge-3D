@@ -209,7 +209,7 @@ describe("POST /imports", () => {
     }));
 
     expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toMatchObject({ code: "invalid_request" });
+    await expect(response.json()).resolves.toMatchObject({ code: "limit_exceeded" });
     expect((await storedShapes(projectId)).shapes).toHaveLength(0);
   });
 
@@ -270,6 +270,17 @@ describe("POST /imports", () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "invalid_body" });
     }
+  });
+
+  it("uses the limit error code when the raw upload body exceeds 64 MiB", async () => {
+    const projectId = await makeProject();
+    const response = await importMesh(new Request(`http://localhost/api/v1/imports?projectId=${projectId}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", "Content-Length": String(64 * 1024 * 1024 + 1) },
+      body: "{}",
+    }));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "limit_exceeded" });
   });
 
   it("returns contract-shaped authentication and project-id errors", async () => {

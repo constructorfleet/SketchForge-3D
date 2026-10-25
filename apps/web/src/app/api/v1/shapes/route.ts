@@ -52,7 +52,7 @@ async function postHandler(request: Request) {
   const requested = Array.isArray(body.shapes) ? body.shapes : [body];
   if (requested.length === 0) return apiError("No shapes were given.", 400, "invalid_request");
   if (requested.length > MAX_SHAPES_PER_REQUEST) {
-    return apiError(`A request can add at most ${MAX_SHAPES_PER_REQUEST} shapes.`, 413, "too_many_shapes");
+    return apiErrors.limitExceeded(`A request can add at most ${MAX_SHAPES_PER_REQUEST} shapes.`, MAX_SHAPES_PER_REQUEST, requested.length);
   }
   for (const [index, entry] of requested.entries()) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {

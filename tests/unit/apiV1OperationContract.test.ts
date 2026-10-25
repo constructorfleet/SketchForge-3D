@@ -53,7 +53,7 @@ describe("REST API v1 operation contract", () => {
     const result = { shape: { id: "mesh-1", kind: "mesh", name: "Plate", color: "#808080", hole: false, locked: false, hidden: false, x: 0, z: 0, elevation: 0, width: 10, depth: 10, height: 2, rotation: 0, rotationX: 0, rotationZ: 0 }, triangles: 12, revision: 3 };
     expect(contract.validateApiV1Response(key, 201, result)).toBe(true);
     expect(contract.validateApiV1Response(key, 201, { ...result, triangles: "12" })).toBe(false);
-    for (const [status, code] of [[400, "invalid_body"], [401, "unauthorized"], [404, "project_not_found"], [409, "project_busy"], [413, "invalid_request"], [415, "unsupported_format"], [422, "geometry_failed"], [503, "storage_unconfigured"]] as const) {
+    for (const [status, code] of [[400, "invalid_body"], [401, "unauthorized"], [404, "project_not_found"], [409, "project_busy"], [413, "limit_exceeded"], [415, "unsupported_format"], [422, "geometry_failed"], [503, "storage_unconfigured"]] as const) {
       expect(contract.validateApiV1Response(key, status, { error: "Failure", code })).toBe(true);
     }
     expect(contract.validateApiV1Response(key, 500, { error: "Failure", code: "internal_error" })).toBe(true);
@@ -172,7 +172,7 @@ describe("REST API v1 operation contract", () => {
     const operation = API_V1_OPERATIONS.find(({ method, path: route }) => `${method} ${route}` === key);
     expect(operation).toMatchObject({
       operationId: "patternShapes",
-      responses: [201, 400, 401, 404, 409, 413, 422, 500, 503],
+      responses: [201, 400, 401, 404, 409, 413, 500, 503],
       requestBody: { contentType: "application/json", required: true },
     });
     expect(contract.validateApiV1RequestBody(key, { ids: ["shape-a"], kind: "linear", count: 4, stepX: 10 })).toBe(true);
@@ -194,7 +194,8 @@ describe("REST API v1 operation contract", () => {
     expect(contract.validateApiV1Response(key, 401, { error: "No token", code: "unauthorized" })).toBe(true);
     expect(contract.validateApiV1Response(key, 409, { error: "Busy", code: "project_busy" })).toBe(true);
     expect(contract.validateApiV1Response(key, 404, { error: "Missing", code: "shape_not_found" })).toBe(true);
-    expect(contract.validateApiV1Response(key, 422, { error: "No step", code: "invalid_request" })).toBe(true);
+    expect(contract.validateApiV1Response(key, 413, { error: "Count exceeds limit", code: "limit_exceeded", limit: 200, given: 201 })).toBe(true);
+    expect(contract.validateApiV1Response(key, 413, { error: "Count exceeds limit", code: "invalid_request" })).toBe(false);
     expect(contract.validateApiV1Response(key, 500, { error: "Unexpected failure", code: "internal_error" })).toBe(true);
     expect(contract.validateApiV1Response(key, 503, { error: "No storage", code: "storage_unconfigured" })).toBe(true);
     expect(contract.validateApiV1Response(key, 418, {})).toBe(false);
@@ -563,7 +564,7 @@ describe("REST API v1 operation contract", () => {
     expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, minimum: Number.POSITIVE_INFINITY } })).toBeNull();
     expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, facesChecked: 1.5 } })).toBeNull();
     expect(contract.parseThicknessResponse({ thickness: { ...result.thickness, extra: true } })).toBeNull();
-    expect(contract.validateApiV1Response("GET /api/v1/thickness", 413, { error: "too many faces", code: "geometry_failed" })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/thickness", 413, { error: "too many faces", code: "limit_exceeded" })).toBe(true);
     expect(contract.validateApiV1Response("GET /api/v1/thickness", 409, { error: "busy", code: "project_busy" })).toBe(false);
   });
 

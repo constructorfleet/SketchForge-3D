@@ -13,7 +13,7 @@ describe("apiJsonBody request limits", () => {
 
     expect(result).toBeInstanceOf(Response);
     expect((result as Response).status).toBe(413);
-    await expect((result as Response).json()).resolves.toMatchObject({ code: "invalid_request" });
+    await expect((result as Response).json()).resolves.toMatchObject({ code: "limit_exceeded" });
   });
 
   it("rejects a streamed body that exceeds the limit", async () => {

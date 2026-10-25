@@ -25,6 +25,7 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "unsupported_format",
     "unapplicable_fields",
     "too_many_shapes",
+    "limit_exceeded",
     "geometry_failed",
     "cad_failed",
 )
@@ -79,6 +80,11 @@ class SketchForgeApiError(SketchForgeError):
     def needs_storage(self) -> bool:
         """The server has a token but no project directory, so it can store nothing."""
         return self.status == 503
+
+    @property
+    def is_limit_exceeded(self) -> bool:
+        """A size or count cap was reached; accepts the legacy shape-count code."""
+        return self.code in ("limit_exceeded", "too_many_shapes") if self.code else self.status == 413
 
     @property
     def is_project_busy(self) -> bool:

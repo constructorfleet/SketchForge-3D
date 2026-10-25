@@ -208,7 +208,8 @@ const shapeSummary = {
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
 } as const;
-const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] } }, additionalProperties: true } as const;
+const limitErrorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["limit_exceeded"] }, limit: int, given: int }, additionalProperties: false } as const;
 const faceError = (...codes: string[]): ApiV1FieldSchema => ({ type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: codes } }, additionalProperties: false });
 const vector3Schema = { type: "object", required: ["x", "y", "z"], properties: { x: num, y: num, z: num }, additionalProperties: false } as const;
 const faceItemSchema = {
@@ -413,7 +414,7 @@ export function validateApiV1Response(key: string, status: number, body: unknown
   const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
   const schema = (operation?.responseSchemas as Readonly<Record<number, ApiV1FieldSchema>> | undefined)?.[status];
   if (schema) return validateApiV1Schema(body, schema);
-  if (status === 413 && body && typeof body === "object") return (body as Record<string, unknown>).code === "invalid_request" && typeof (body as Record<string, unknown>).error === "string";
+  if (status === 413 && body && typeof body === "object") return (body as Record<string, unknown>).code === "limit_exceeded" && typeof (body as Record<string, unknown>).error === "string";
   return false;
 }
 
@@ -491,12 +492,12 @@ const patternErrors = {
   401: faceError("unauthorized"),
   404: faceError("api_disabled", "project_not_found", "shape_not_found"),
   409: faceError("project_busy"),
-  422: faceError("invalid_request"),
+  413: limitErrorSchema,
   500: faceError("internal_error"),
   503: faceError("storage_unconfigured"),
 } as const;
 const patternOperation = {
-  ...operation("POST", "/api/v1/patterns", "patternShapes", [201, 400, 401, 404, 409, 422, 500, 503], json(patternRequest)),
+  ...operation("POST", "/api/v1/patterns", "patternShapes", [201, 400, 401, 404, 409, 413, 500, 503], json(patternRequest)),
   description: "Create linear or circular copies of selected shapes.",
   query: projectQuery,
   responseSchemas: { 201: patternResponse, ...patternErrors },
@@ -615,8 +616,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     },
   },
   {
-    ...operation("POST", "/api/v1/exports", "exportProject", [200, 400, 401, 404, 422, 500, 503], exportRequestBody),
-    description: "Export project geometry as JSON/base64, or return the raw artifact when download=1. Binary downloads carry result metadata in the X-SketchForge-Metadata response header.",
+    ...operation("POST", "/api/v1/exports", "exportProject", [200, 400, 401, 404, 413, 422, 500, 503], exportRequestBody),
+    description: "Export project geometry as JSON/base64, or return the raw artifact when download=1. Binary downloads carry result metadata in the X-SketchForge-Metadata response header. Section size caps return 413 limit_exceeded; geometry failures return 422.",
     query: {
       required: ["projectId"],
       properties: {
@@ -629,6 +630,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       400: faceError("invalid_project_id", "invalid_body", "unsupported_format", "invalid_request"),
       401: faceError("unauthorized"),
       404: faceError("api_disabled", "project_not_found", "shape_not_found"),
+      413: limitErrorSchema,
       422: faceError("geometry_failed"),
       500: faceError("internal_error"),
       503: faceError("storage_unconfigured"),
@@ -710,7 +712,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
         },
       },
     }),
-    description: "Imports an STL, OBJ, or SVG file from base64 JSON or multipart form data, stores the source asset, and returns the imported mesh summary.",
+    description: "Imports an STL, OBJ, or SVG file from base64 JSON or multipart form data, stores the source asset, and returns the imported mesh summary. Requests and decoded files are size-limited and return 413 limit_exceeded when over the supported limit.",
     query: projectQuery,
     responseSchemas: {
       201: { type: "object", required: ["shape", "triangles", "revision"], properties: { shape: shapeSummary, triangles: int, revision: num }, additionalProperties: false },
@@ -718,7 +720,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       401: faceError("unauthorized"),
       404: faceError("api_disabled", "project_not_found"),
       409: faceError("project_busy"),
-      413: faceError("invalid_request"),
+      413: limitErrorSchema,
       415: faceError("unsupported_format"),
       422: faceError("geometry_failed"),
       500: faceError("internal_error"),
@@ -726,7 +728,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     },
   },
   {
-    ...operation("POST", "/api/v1/interference", "analyzeInterference", [200, 400, 401, 404, 409, 422, 500, 503], json({
+    ...operation("POST", "/api/v1/interference", "analyzeInterference", [200, 400, 401, 404, 409, 413, 422, 500, 503], json({
       type: "object",
       properties: {
         ids: { oneOf: [
@@ -737,7 +739,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       },
       additionalProperties: true,
     })),
-    description: "Reports exact gaps and overlap volumes for visible, non-cutter shapes, subject to 128-shape and 512-candidate limits.",
+    description: "Reports exact gaps and overlap volumes for visible, non-cutter shapes, subject to 128-shape and 512-candidate limits. Exceeding either cap returns 413 limit_exceeded.",
     query: projectQuery,
     responseSchemas: {
       200: {
@@ -762,7 +764,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
         },
       },
       400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema,
-      422: errorSchema, 500: errorSchema, 503: errorSchema,
+      413: limitErrorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema,
     },
   },
   {
@@ -918,7 +920,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       400: faceError("invalid_project_id", "invalid_shape_id"),
       401: faceError("unauthorized"),
       404: faceError("api_disabled", "project_not_found", "shape_not_found"),
-      413: faceError("geometry_failed"),
+      413: limitErrorSchema,
       422: faceError("geometry_failed"),
       500: faceError("cad_failed", "internal_error"),
       503: faceError("storage_unconfigured"),
@@ -933,7 +935,7 @@ export const API_V1_OPERATIONS: readonly ApiV1Operation[] = API_V1_OPERATIONS_BA
     ...item,
     maxRequestBytes: item.operationId === "importGeometry" ? 64 * 1024 * 1024 : DEFAULT_JSON_BODY_LIMIT_BYTES,
     responses: [...new Set([...(item.responses ?? []), 413])].sort((a, b) => a - b),
-    responseSchemas: { ...item.responseSchemas, 413: errorSchema },
+    responseSchemas: { 413: errorSchema, ...item.responseSchemas },
   }
   : item);
 

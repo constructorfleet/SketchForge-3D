@@ -464,11 +464,11 @@ describe("POST /patterns", () => {
     const [source] = await addShapes(projectId, [{ kind: "box", width: 6, depth: 4, height: 3, x: 5, z: 5 }]);
 
     const noStep = await pattern(projectId, { ids: [source], kind: "linear", count: 4 });
-    expect(noStep.status).toBe(422);
+    expect(noStep.status).toBe(400);
     expect(await noStep.json()).toMatchObject({ code: "invalid_request" });
 
     const noSweep = await pattern(projectId, { ids: [source], kind: "circular", count: 4, sweepAngle: 0 });
-    expect(noSweep.status).toBe(422);
+    expect(noSweep.status).toBe(400);
 
     // And nothing was written either time: a refused pattern leaves the
     // project as it was rather than adding the copies it could place.
@@ -480,7 +480,9 @@ describe("POST /patterns", () => {
     const [source] = await addShapes(projectId, [{ kind: "box", width: 6, depth: 4, height: 3, x: 5, z: 5 }]);
 
     expect((await pattern(projectId, { ids: [source], count: 1, stepX: 10 })).status).toBe(400);
-    expect((await pattern(projectId, { ids: [source], count: 500, stepX: 10 })).status).toBe(400);
+    const overLimit = await pattern(projectId, { ids: [source], count: 500, stepX: 10 });
+    expect(overLimit.status).toBe(413);
+    expect(await overLimit.json()).toMatchObject({ code: "limit_exceeded", limit: 200, given: 500 });
   });
 });
 
