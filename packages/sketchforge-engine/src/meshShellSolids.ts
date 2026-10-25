@@ -16,6 +16,7 @@
 
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { meshSolidShells, type MeshSolidShell } from "./meshMassProperties.js";
+import { MeshShellsOverlapError } from "./meshShellOverlap.js";
 import type { MeshData } from "./meshTransform.js";
 
 /**
@@ -68,7 +69,14 @@ export function nestedMeshShellSolid(
   mesh: MeshData,
   sewShell: (positions: number[]) => ShapeHandle,
 ): ShapeHandle | null {
-  const shells = meshSolidShells(mesh);
+  let shells: MeshSolidShell[] | null;
+  try {
+    shells = meshSolidShells(mesh);
+  } catch (error) {
+    // Bodies that overlap without nesting are found from the triangles (#529), before any sewing.
+    if (error instanceof MeshShellsOverlapError) throw new MeshShellSolidError("shells-overlap");
+    throw error;
+  }
   if (!shells || shells.length <= 1) return null;
   return solidFromMeshShells(cad, shells, sewShell);
 }
@@ -87,12 +95,13 @@ function isValidShape(cad: OcctKernel, shape: ShapeHandle) {
  * A shell at depth d lies inside one at depth d - 1, so every step only ever
  * works inside the region the step before it settled.
  *
- * Depth is read by ray parity from one vertex of each shell, so it assumes the
- * shells nest. Separate bodies that overlap without one enclosing the other --
- * common in an imported STL nobody unioned -- break that: a body poking into
- * another reads as its void, and the assembly is quietly the wrong solid. The
- * mesh's own signed volume is the check: a correctly read nesting assembles to
- * exactly it, so a solid that does not is refused rather than returned.
+ * Depth assumes the shells nest. Separate bodies that overlap without one
+ * enclosing the other -- common in an imported STL nobody unioned -- break
+ * that: a body poking into another reads as its void, and the assembly is
+ * quietly the wrong solid. `meshSolidShells` refuses those from the triangles
+ * before anything is sewn (#529); the mesh's own signed volume stays as the
+ * last check: a correctly read nesting assembles to exactly it, so a solid that
+ * does not is refused rather than returned.
  */
 function solidFromMeshShells(cad: OcctKernel, shells: MeshSolidShell[], sewShell: (positions: number[]) => ShapeHandle) {
   const byDepth = new Map<number, ShapeHandle[]>();

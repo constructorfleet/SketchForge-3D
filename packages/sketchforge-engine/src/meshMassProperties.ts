@@ -11,6 +11,9 @@
  * then counts as material or as a cavity is decided by how many other shells
  * enclose it (even: material, odd: void), not by the file's winding, which
  * imported meshes get wrong often enough that OCCT's path had to repair it.
+ * That reading needs the shells to nest; two bodies overlapping without one
+ * enclosing the other would have the overlap counted twice, so a mesh holding
+ * them gets no answer here (#529, see meshShellOverlap.ts).
  *
  * Only a mesh whose every shell is closed gets an answer. The signed volume of
  * an open fragment depends on where the origin is, so there is no honest number
@@ -21,6 +24,7 @@
  */
 
 import type { MeshData } from "./meshTransform.js";
+import { MeshShellsOverlapError, relateTouchingShells, shellPairKey } from "./meshShellOverlap.js";
 
 export type MeshMassProperties = {
   volume: number;
@@ -36,6 +40,12 @@ export type MeshMassProperties = {
  */
 const WELD_LADDER_MM = [1e-5, 1e-4, 1e-3, 1e-2];
 
+/**
+ * Two shells closer than this fraction of the mesh's largest coordinate touch
+ * rather than overlap or stand apart: sixteen float32 units in the last place.
+ */
+const FLOAT32_CONTACT = 16 * 2 ** -24;
+
 /** A direction no axis-aligned or 45-degree feature lines up with, so a ray along it rarely grazes an edge. */
 const RAY = (() => {
   const d = [0.5773502691896258 + 0.1234567, 0.5773502691896258 + 0.0456789, 0.5773502691896258 - 0.0789123];
@@ -43,9 +53,30 @@ const RAY = (() => {
   return [d[0] / length, d[1] / length, d[2] / length] as const;
 })();
 
-/** The mesh's mass properties, or `null` when its triangles do not bound a solid at any weld tolerance. */
+/**
+ * The mesh's mass properties, or `null` when its triangles do not bound a
+ * solid at any weld tolerance.
+ *
+ * Throws `MeshShellsOverlapError` when two of its closed bodies overlap without
+ * one enclosing the other (#529): adding them would count the overlap twice,
+ * and sewing them only for the kernel to refuse them held it for minutes on a
+ * large mesh, so the refusal comes from here.
+ */
 export function meshMassProperties(mesh: MeshData): MeshMassProperties | null {
-  return analyseMesh(mesh)?.properties ?? null;
+  const analysis = analyseMesh(mesh);
+  if (analysis?.overlapping) throw new MeshShellsOverlapError();
+  return analysis ? analysis.properties : null;
+}
+
+/**
+ * Whether two of the mesh's closed shells overlap without one enclosing the
+ * other; `null` when the mesh does not close, so it has no shells to compare.
+ * Shells that only touch -- on a face, an edge or a corner -- do not overlap:
+ * what they share has no volume.
+ */
+export function meshShellsOverlap(mesh: MeshData): boolean | null {
+  const analysis = analyseMesh(mesh);
+  return analysis ? analysis.overlapping : null;
 }
 
 /** One closed shell of a mesh, with its triangles wound as the mesh wound them. */
@@ -75,11 +106,13 @@ export type MeshSolidShell = {
  * The shells are those of the first weld tolerance that closes the mesh, so
  * their corners are the welded ones. Null unless every shell is closed and
  * consistently orientable, because only then is the nesting well defined. A
- * shell enclosing no volume is left out.
+ * shell enclosing no volume is left out. Throws `MeshShellsOverlapError` when
+ * two shells overlap without nesting, since no nesting assembles them.
  */
 export function meshSolidShells(mesh: MeshData): MeshSolidShell[] | null {
   const analysis = analyseMesh(mesh);
   if (!analysis) return null;
+  if (analysis.overlapping) throw new MeshShellsOverlapError();
   const { shells, depth, contribution, corners, points, origin } = analysis;
   return shells.flatMap((members, shell) => {
     if (depth[shell] < 0) return [];
@@ -133,11 +166,18 @@ function analyseMesh(mesh: MeshData) {
   const origin = [(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2] as const;
   let welded = cornerPoints(mesh, origin);
   const tight = Math.max(1, Math.hypot(xmax - xmin, ymax - ymin, zmax - zmin)) * 1e-9;
+  // How far apart two shells may be and still touch. An STL stores float32
+  // corners, rounded by up to half a unit in the last place of the coordinate's
+  // own size -- about 6e-8 of it, 1e-5 mm at 200 mm -- so a part resting on
+  // another, once rotated or moved, sits that far above or below it: far more
+  // than the weld's near-exact step, and far less than any real overlap.
+  const reach = Math.max(Math.abs(xmin), Math.abs(xmax), Math.abs(ymin), Math.abs(ymax), Math.abs(zmin), Math.abs(zmax));
+  const contact = FLOAT32_CONTACT * Math.max(1, reach, Math.hypot(xmax - xmin, ymax - ymin, zmax - zmin));
 
   // Each pass welds what the last one left, so it only sees distinct points.
   for (const tolerance of [tight, ...WELD_LADDER_MM.filter((step) => step > tight)]) {
     welded = compact(welded, weld(welded.points, tolerance));
-    const measured = measureWelded(welded, tolerance);
+    const measured = measureWelded(welded, tolerance, Math.max(contact, tolerance * 10));
     if (!measured) continue;
     const { volume, area, moment } = measured;
     const properties: MeshMassProperties = {
@@ -235,7 +275,7 @@ function weld(points: Float64Array, tolerance: number) {
 }
 
 /** Volume, area and first moment of the welded mesh, or `null` when some shell is open or cannot be wound consistently. */
-function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number) {
+function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number, contact: number) {
 
   // Triangles on the welded corners. A triangle with a repeated corner encloses
   // and bounds nothing. A triangle the file repeats counts once, and two that
@@ -340,6 +380,15 @@ function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number
     for (let at = 1; at < nets.length; at += 2) if (nets[at] !== 0) return null;
   }
 
+  // The triangle across each edge, where exactly two meet: the same joins the shells were made of.
+  const neighbours = new Int32Array(triangleCount * 3).fill(-1);
+  for (let t = 0; t < triangleCount; t += 1) {
+    for (let k = 0; k < 3; k += 1) {
+      const sharing = edgeTriangles.get(edgeKey(corners[3 * t + k], corners[3 * t + ((k + 1) % 3)]))!;
+      if (sharing.length === 2) neighbours[3 * t + k] = sharing[0] === t ? sharing[1] : sharing[0];
+    }
+  }
+
   // Per shell: signed volume, first moment, area and bounds, in its own winding.
   const shellVolume = new Float64Array(shells.length);
   const shellMoment = new Float64Array(shells.length * 3);
@@ -384,6 +433,14 @@ function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number
   // bounds overlap. Any shell enclosing this one overlaps the cell this one's
   // lowest corner is in, so only that cell's shells need comparing.
   const slack = tolerance * 10;
+
+  // Shells whose surfaces meet: whether any overlap without nesting, and for
+  // the rest which encloses which, read from their surfaces -- a ray from a
+  // point where two shells touch cannot tell (#529).
+  const touching = shells.length > 1
+    ? relateTouchingShells({ points, corners, shells, shellOf, neighbours, bounds: shellBounds }, contact)
+    : { overlapping: null, relations: new Map() };
+
   const perAxis = Math.max(1, Math.min(64, Math.ceil(Math.cbrt(shells.length))));
   const lows = [Infinity, Infinity, Infinity], highs = [-Infinity, -Infinity, -Infinity];
   for (let b = 0; b < shellBounds.length; b += 6) {
@@ -423,6 +480,11 @@ function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number
     const candidates = grid.get(cellAlong(0, shellBounds[s]) + perAxis * (cellAlong(1, shellBounds[s + 1]) + perAxis * cellAlong(2, shellBounds[s + 2]))) ?? [];
     for (const other of candidates) {
       if (other === shell) continue;
+      const relation = touching.relations.get(shellPairKey(shell, other, shells.length));
+      if (relation) {
+        if (relation === (shell < other ? "first-inside" : "second-inside")) depth += 1;
+        continue;
+      }
       const b = 6 * other;
       if (shellBounds[s] < shellBounds[b] - slack || shellBounds[s + 1] < shellBounds[b + 1] - slack || shellBounds[s + 2] < shellBounds[b + 2] - slack) continue;
       if (shellBounds[s + 3] > shellBounds[b + 3] + slack || shellBounds[s + 4] > shellBounds[b + 4] + slack || shellBounds[s + 5] > shellBounds[b + 5] + slack) continue;
@@ -463,7 +525,7 @@ function measureWelded({ points, corners: raw }: WeldedPoints, tolerance: number
     moment[2] += sign * shellMoment[3 * shell + 2];
   }
   if (!(volume > 0)) return null;
-  return { volume, area, moment, shells, depth, contribution, corners };
+  return { volume, area, moment, shells, depth, contribution, corners, overlapping: touching.overlapping !== null };
 }
 
 /** Möller-Trumbore: whether the ray from (px, py, pz) along RAY crosses triangle `t` beyond `minDistance`. */

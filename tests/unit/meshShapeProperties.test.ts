@@ -277,6 +277,66 @@ describe("mesh-native shape properties", () => {
     expect(properties.isValid).toBe(true);
   });
 
+  it.each([
+    // The case #529 reported: B's corner poked 5 mm into A. Summed, 2000 mm^3; the union is 1875.
+    ["one body's corner inside the other", boxTriangles([0, 0, 0], [10, 10, 10]), boxTriangles([5, 5, 5], [15, 15, 15])],
+    // Sharing a 5 mm slab, every face of the overlap coplanar with one of theirs: no two faces cross.
+    ["side by side, sharing a slab", boxTriangles([0, 0, 0], [10, 10, 10]), boxTriangles([5, 0, 0], [15, 10, 10])],
+    // Two bars crossing like a plus sign: no corner of either lies inside the other, only edges cross.
+    ["crossing bars, no corner inside the other", boxTriangles([-10, -1, -1], [10, 1, 1]), boxTriangles([-1, -10, -0.5], [1, 10, 1.5])],
+  ])("refuses closed bodies that overlap without nesting, as the exact path does: %s", async (_label, a, b) => {
+    // Summing them would count the overlap twice. The refusal comes straight
+    // from the triangles: sewing a large mesh only to refuse it held the kernel for minutes.
+    await expect(shapeProperties(meshShape([...a, ...b]))).rejects.toThrow(/overlap without one enclosing the other/);
+    expect(kernelCalls.count).toBe(0);
+  });
+
+  it("adds a body resting on another's face without sharing its triangles", async () => {
+    // A 2 mm cube on top of a 10 mm cube: coplanar contact over 4 mm^2, no overlap volume.
+    const positions = [...boxTriangles([0, 0, 0], [10, 10, 10]), ...boxTriangles([2, 10, 2], [4, 12, 4])];
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(1008, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo((1000 * 5 + 8 * 11) / 1008, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("adds bodies that touch only along an edge", async () => {
+    const positions = [...boxTriangles([0, 0, 0], [1, 1, 1]), ...boxTriangles([1, 1, 0], [2, 2, 1])];
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(2, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo(1, 6);
+  });
+
+  it("subtracts a void that touches its wall at the corner the nesting ray leaves from", async () => {
+    // The cavity's far corner is the part's own, so a ray from it never re-enters the part.
+    const positions = [...boxTriangles([0, 0, 0], [10, 10, 10]), ...boxTriangles([2, 2, 2], [10, 10, 10])];
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(1000 - 512, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo((1000 * 5 - 512 * 6) / 488, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("still measures an island floating in a void", async () => {
+    const positions = [
+      ...boxTriangles([-10, 0, -10], [10, 20, 10]),
+      ...boxTriangles([-6, 4, -6], [6, 16, 6], true),
+      ...boxTriangles([0, 8, -2], [4, 12, 2]),
+    ];
+    const properties = await shapeProperties(meshShape(positions));
+
+    const volume = 8000 - 1728 + 64;
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(volume, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo(10, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
   it("leaves a mesh that is not closed to the CAD kernel, which refuses it as before", async () => {
     // Open fragments have no volume of their own, so nothing is made up for them.
     const positions = boxTriangles([-1, 0, -1], [1, 2, 1]).slice(0, 9 * 11);

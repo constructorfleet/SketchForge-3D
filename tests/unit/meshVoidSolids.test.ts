@@ -157,6 +157,34 @@ describe("mesh solids with an internal void (#501)", () => {
     expect((failure as Error).message).toMatch(/overlap/);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it.each([
+    // The cavity's far corner, where the nesting ray starts, is the part's own: a ray from it never re-enters the part.
+    ["at the corner the nesting ray leaves from", boxTriangles([2, 2, 2], [10, 10, 10]), 488, [6, 6, 6]],
+    ["at the opposite corner", boxTriangles([0, 0, 0], [8, 8, 8]), 488, [4, 4, 4]],
+    ["against one wall", boxTriangles([2, 2, 2], [8, 8, 10]), 712, [5, 5, 6]],
+    ["against one wall, wound inward", boxTriangles([2, 2, 2], [8, 8, 10], true), 712, [5, 5, 6]],
+  ] as const)("cuts out a void that touches its part's wall %s", async (_label, cavity, volume, cavityCenter) => {
+    const measured = await measure([...boxTriangles([0, 0, 0], [10, 10, 10]), ...cavity]);
+    const removed = 1000 - volume;
+
+    expect(measured.volume).toBeCloseTo(volume, 3);
+    expect(measured.center.x).toBeCloseTo((1000 * 5 - removed * cavityCenter[0]) / volume, 4);
+    expect(measured.center.y).toBeCloseTo((1000 * 5 - removed * cavityCenter[1]) / volume, 4);
+    expect(measured.center.z).toBeCloseTo((1000 * 5 - removed * cavityCenter[2]) / volume, 4);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps an island standing on its void's floor", async () => {
+    const positions = [
+      ...boxTriangles([0, 0, 0], [10, 10, 10]),
+      ...boxTriangles([2, 2, 2], [8, 8, 8], true),
+      ...boxTriangles([4, 2, 4], [6, 4, 6]),
+    ];
+    const measured = await measure(positions);
+
+    expect(measured.volume).toBeCloseTo(1000 - 216 + 8, 3);
+    expect(measured.center.y).toBeCloseTo((1000 * 5 - 216 * 5 + 8 * 3) / 792, 4);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("refuses an open mesh without mentioning a fillet nobody asked for", async () => {
     const open = boxTriangles([-1, 0, -1], [1, 2, 1]).slice(0, 9 * 11);
     const failure = await withCadKernel((cad) => {
