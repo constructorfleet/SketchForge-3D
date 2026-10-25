@@ -26,6 +26,10 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 - [#361: Release exact-cut intermediate handles during an open edge-modifier session](https://github.com/constructorfleet/SketchForge-3D/issues/361) — implementation and real-kernel handle-baseline regression coverage complete; awaiting review. Cuts use an arena checkpoint and release their allocations on success or failure, preserving retained session geometry.
 
+## Group evaluation
+
+- [#500: Evaluate solid-only groups as a union](https://github.com/constructorfleet/SketchForge-3D/issues/500) — implementation and regression coverage complete; awaiting review. Properties, exports, sections, drawings, interference and thickness fuse a group record's children through OCCT, sewing mesh members from their triangles. Still open: a Manifold fallback for mesh members OCCT cannot sew, and fillets, chamfers and shells applied to a group record without ungrouping it first.
+
 ## Documentation suite open work
 
 - The [documentation suite specification](DOCUMENTATION_SUITE_SPEC.md) tracks partial source ownership diagnostics and broader task-workflow coverage as open work.

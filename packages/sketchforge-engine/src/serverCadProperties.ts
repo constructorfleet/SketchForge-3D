@@ -1,7 +1,7 @@
 /** Exact mass properties from the shape's positioned CAD solid. */
 
 import { withCadKernel } from "./serverCadKernel.js";
-import { placedSolidForShape } from "./serverShapeBooleans.js";
+import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ShapeGeometryProvenance = {
@@ -29,6 +29,14 @@ function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
   // when it also carries source STEP text. Report the geometry actually used.
   if (shape.importedMesh?.positions && shape.importedMesh.positions.length >= 9) {
     return { source: "mesh", precision: "tessellated" };
+  }
+  // A group record is measured as its children fused, so it is only as exact
+  // as the least exact of them.
+  if (isGroupRecord(shape)) {
+    const children = (shape.groupedShapes ?? []).map(geometryProvenance);
+    return children.find((child) => child.source === "mesh")
+      ?? children.find((child) => child.source === "brep")
+      ?? { source: "parametric", precision: "exact" };
   }
   return shape.cadBrep
     ? { source: "brep", precision: "exact" }

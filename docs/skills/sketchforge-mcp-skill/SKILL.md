@@ -76,7 +76,7 @@ Useful tools:
 - `sketchforge_import_mesh`: import STL-style mesh data into the editor.
 - `sketchforge_update_object`: set exact dimensions, position, color, name, hole state, and `rotation`/`rotationX`/`rotationZ`.
 - `sketchforge_align_objects`: align two or more ids using the same logic as the editor Alignment button.
-- `sketchforge_group_objects`: group selected ids using the normal SketchForge group/boolean path.
+- `sketchforge_group_objects`: group selected ids using the normal SketchForge group/boolean path. A group of solids with no hole stays a record of its children; `sketchforge_shape_properties` and `sketchforge_export_scene` treat it as the union of those children.
 - `sketchforge_boolean_cut`: pass `solidIds` and `holeIds`; the result replaces the operands.
 - `sketchforge_ungroup_objects`: restore grouped children while preserving edited child geometry.
 - `sketchforge_separate_parts`: split disconnected parts in one object.

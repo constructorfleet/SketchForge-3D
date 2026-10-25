@@ -399,10 +399,26 @@ export function unrotatedSolidForShape(cad: OcctKernel, shape: WorkplaneShape) {
       return solidOf(cad, cad.cut(dome, below));
     }
     default:
-      throw new UnbuildableShapeError(
-        `The server cannot build exact geometry for a ${shape.kind}. Do it in the editor instead.`,
-      );
+      throw new UnbuildableShapeError(unbuildableShapeMessage(shape));
   }
+}
+
+/**
+ * Why a shape has no exact solid, in words that name the actual problem.
+ *
+ * A `mesh` reaches here only when it carries no triangles, and a group record
+ * is a `mesh` too, so "cannot build exact geometry for a mesh" used to be the
+ * answer for two plain cylinders grouped together (#500) -- naming a mesh that
+ * was never there.
+ */
+function unbuildableShapeMessage(shape: WorkplaneShape) {
+  if (shape.groupedShapes?.length) {
+    return "That group is a record of the shapes it holds, not one solid, so this operation cannot work on it directly. Ungroup it and work on its parts.";
+  }
+  if (shape.kind === "mesh") {
+    return "That mesh shape has no triangles stored, so there is no geometry to build from.";
+  }
+  return `The server cannot build exact geometry for a ${shape.kind}. Do it in the editor instead.`;
 }
 
 /**
