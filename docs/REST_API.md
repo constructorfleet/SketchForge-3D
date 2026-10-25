@@ -791,7 +791,9 @@ edges instead of every triangle: an edge is drawn where its two triangles meet
 at more than `featureAngle` degrees (30 by default), and boundaries and
 silhouettes are always drawn. A flat face's triangulation and a curved
 surface's facets disappear; corners and outlines stay. Meshes and exact solids
-still hide one another. `featureAngle` takes 0 to 180 and applies only to an
+still hide one another. A mesh inside a group drawn with no hole among its
+members is drawn the same way, as a part of its own; a group that cuts a hole
+in a mesh is still sewn and drawn by the kernel, triangle by triangle. `featureAngle` takes 0 to 180 and applies only to an
 SVG projection; `0` draws every edge that is not flat, and `180` keeps only
 boundaries and silhouettes. Mesh edges never pass through the kernel's
 hidden-line removal, so a large import draws in about a second rather than

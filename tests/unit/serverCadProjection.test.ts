@@ -4,7 +4,7 @@ import { projectShapesToSvg } from "@constructorfleet/sketchforge-engine/serverC
 import { ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import { exportProjectScene } from "@constructorfleet/sketchforge-engine/sceneExport";
-import { meshShapeFromWorldPositions } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+import { groupedShapeFromSelection, meshShapeFromWorldPositions } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function shape(request: Record<string, unknown>) {
@@ -253,6 +253,42 @@ describe("projecting mesh shapes to SVG by feature edges", { timeout: CAD_TEST_T
     const onOutline = ([x, y]: readonly [number, number]) => Math.min(Math.abs(x - box.minX), Math.abs(x - box.maxX), Math.abs(y - box.minY), Math.abs(y - box.maxY)) < 1;
     expect(visible.every(onOutline)).toBe(true);
     expect(hiddenPoints(svg).some((point) => !onOutline(point))).toBe(true);
+  });
+
+  it("places a mesh on the same side as the kernel places an exact solid", async () => {
+    // A short exact box on -X and a tall mesh box on +X: in the front view the
+    // tall outline has to be on the right, or the mesh frame is mirrored in u.
+    const svg = await projectShapesToSvg([
+      shape({ kind: "box", width: 10, depth: 10, height: 10, x: -20 }),
+      meshShape(boxSoup([15, 0, -5], [25, 30, 5]), "tall"),
+    ], { view: "front", panelSize: 400 });
+
+    const visible = visiblePoints(svg);
+    const box = extent(visible);
+    const midX = (box.minX + box.maxX) / 2;
+    const top = visible.filter(([, y]) => Math.abs(y - box.minY) < 1);
+    expect(top.length).toBeGreaterThan(0);
+    expect(top.every(([x]) => x > midX)).toBe(true);
+  });
+
+  it("draws a mesh inside a group of solids by its feature edges too", async () => {
+    const cylinder = meshShape(cylinderSoup(15, 12, 64));
+    const block = shape({ kind: "box", width: 10, depth: 10, height: 10, x: 40 });
+    const group = groupedShapeFromSelection([cylinder, block]);
+    if (!group) throw new Error("group was not built");
+
+    const grouped = await projectShapesToSvg([group], { view: "top", panelSize: 400 });
+    const loose = await projectShapesToSvg([cylinder, block], { view: "top", panelSize: 400 });
+
+    // The cylinder is the left part of the drawing; none of its 64 cap spokes
+    // may reach in towards its centre.
+    const points = visiblePoints(grouped);
+    const box = extent(points);
+    const scale = (box.maxX - box.minX) / 60;
+    const centre = [box.minX + 15 * scale, (box.minY + box.maxY) / 2];
+    const radii = points.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1]));
+    expect(Math.min(...radii)).toBeGreaterThan(15 * scale * 0.9);
+    expect(strokeCount(grouped, "#111111")).toBe(strokeCount(loose, "#111111"));
   });
 
   it("refuses a feature angle outside 0 to 180 degrees", async () => {

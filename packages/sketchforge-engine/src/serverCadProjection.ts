@@ -51,8 +51,8 @@ import {
 } from "./meshEdgeProjection.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
-import { placedSolidForShape } from "./serverShapeBooleans.js";
-import { worldMeshForShape } from "./serverShapeGroups.js";
+import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
+import { restoreGroupedChildren, worldMeshForShape } from "./serverShapeGroups.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ProjectionOptions = {
@@ -77,6 +77,29 @@ const ORIGIN = { x: 0, y: 0, z: 0 };
 function drawingCompound(cad: OcctKernel, shapes: readonly WorkplaneShape[]): ShapeHandle {
   const solids = shapes.map((shape) => cad.transform(placedSolidForShape(cad, shape), [...EDITOR_TO_DRAWING_TRANSFORM]));
   return solids.length === 1 ? solids[0] : cad.makeCompound(solids);
+}
+
+/** Whether a mesh is anywhere among the shape or, for a group record, its members. */
+function holdsMesh(shape: WorkplaneShape): boolean {
+  if (worldMeshForShape(shape)) return true;
+  return isGroupRecord(shape) && restoreGroupedChildren(shape).some(holdsMesh);
+}
+
+/**
+ * The shapes to draw for one visible shape.
+ *
+ * A group record with a mesh among its members and no hole among them is
+ * drawn as its members, so each mesh goes down the feature-edge path rather
+ * than being sewn into the group's fused solid and drawn triangle by triangle
+ * (#506). A member group without a mesh stays whole, so its solids are still
+ * fused before the kernel draws them. A group that cuts holes has to be cut,
+ * which needs the sewn solid, so it stays on the kernel path.
+ */
+function drawingMembers(shape: WorkplaneShape): WorkplaneShape[] {
+  if (!isGroupRecord(shape) || !holdsMesh(shape)) return [shape];
+  const children = restoreGroupedChildren(shape);
+  if (children.some((child) => child.hole)) return [shape];
+  return children.flatMap(drawingMembers);
 }
 
 /** A mesh shape's triangles in the drawing frame: `[x, y, z]` becomes `[x, -z, y]`. */
@@ -193,7 +216,7 @@ export function projectShapesToSvg(shapes: readonly WorkplaneShape[], options: P
 
   const soups: Float64Array[] = [];
   const exactShapes: WorkplaneShape[] = [];
-  for (const shape of visible) {
+  for (const shape of visible.flatMap(drawingMembers)) {
     const soup = drawingSoup(shape);
     if (soup) soups.push(soup);
     else exactShapes.push(shape);
