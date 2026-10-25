@@ -43,6 +43,12 @@ export type MeshSolidShell = {
   positions: number[];
   /** How many other shells enclose it: even is material, odd is a void. */
   depth: number;
+  /**
+   * The volume it contributes to the mesh: positive for a body, negative for a
+   * void. Their sum is the mesh's own volume, which is what a solid assembled
+   * from the shells must come to if the nesting was read correctly.
+   */
+  volume: number;
 };
 
 /**
@@ -61,7 +67,7 @@ export type MeshSolidShell = {
 export function meshSolidShells(mesh: MeshData): MeshSolidShell[] | null {
   const analysis = analyseMesh(mesh);
   if (!analysis || !analysis.closed || !analysis.orientable) return null;
-  const { shells, depth, sign, corners, points, origin } = analysis;
+  const { shells, depth, sign, corners, points, origin, shellVolume } = analysis;
   return shells.flatMap((members, shell) => {
     if (!sign[shell]) return [];
     const positions: number[] = [];
@@ -71,7 +77,7 @@ export function meshSolidShells(mesh: MeshData): MeshSolidShell[] | null {
         positions.push(points[index] + origin[0], points[index + 1] + origin[1], points[index + 2] + origin[2]);
       }
     }
-    return [{ positions, depth: depth[shell] }];
+    return [{ positions, depth: depth[shell], volume: sign[shell] * shellVolume[shell] }];
   });
 }
 
@@ -296,7 +302,7 @@ function analyseMesh(mesh: MeshData) {
     bbox,
     isValid: closed && orientable && volume > 0,
   };
-  return { properties, shells, depth, sign, corners, points, origin: [ox, oy, oz] as const, closed, orientable };
+  return { properties, shells, depth, sign, shellVolume, corners, points, origin: [ox, oy, oz] as const, closed, orientable };
 }
 
 /** Möller-Trumbore: whether the ray from (px, py, pz) along RAY crosses triangle `t` beyond `minDistance`. */
