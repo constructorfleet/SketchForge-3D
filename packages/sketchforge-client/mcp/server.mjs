@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveMcpWritePath } from "./filesystemPaths.mjs";
+import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 import { callLocalEngineTool } from "./localEngine.mjs";
 
@@ -185,14 +185,32 @@ const tools = [
     },
   },
   {
-    name: "sketchforge_import_stl",
-    description: "Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
+    name: "sketchforge_import_file",
+    description: "Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
     inputSchema: {
       ...localProjectSchema,
       required: ["projectId", "filePath"],
       properties: {
         projectId: { type: "string" },
-        filePath: { type: "string", description: "Path to an STL file under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); with neither set, any host path is allowed." },
+        filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
+        name: { type: "string" },
+        color: { type: "string" },
+        x: { type: "number" },
+        z: { type: "number" },
+        elevation: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "sketchforge_import_stl",
+    description: "Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes.",
+    inputSchema: {
+      ...editorTargetSchema,
+      required: ["projectId", "filePath"],
+      properties: {
+        ...editorTargetSchema.properties,
+        projectId: { type: "string" },
+        filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
         name: { type: "string" },
         color: { type: "string" },
         x: { type: "number" },
@@ -643,6 +661,19 @@ async function callRemoteTool(name, args, baseUrl) {
       return bridgeCommand("create_shape", args, 15000, baseUrl);
     case "sketchforge_import_mesh":
       return bridgeCommand("import_mesh", args, 60000, baseUrl);
+    case "sketchforge_import_file":
+    case "sketchforge_import_stl": {
+      const sourcePath = await resolveMcpReadPath(args.filePath);
+      const extension = path.extname(sourcePath).toLowerCase();
+      const mediaType = extension === ".stl" ? "model/stl" : extension === ".obj" ? "model/obj" : extension === ".svg" ? "image/svg+xml" : undefined;
+      if (!mediaType) throw new Error("filePath must point to an .stl, .obj, or .svg file.");
+      const bytes = readFileSync(sourcePath);
+      return restRequest("POST", "/imports", {
+        query: { projectId: args.projectId },
+        body: { fileName: path.basename(sourcePath), data: bytes.toString("base64"), mediaType },
+        baseUrl,
+      });
+    }
     case "sketchforge_update_object":
       return bridgeCommand("update_object", args, 15000, baseUrl);
     case "sketchforge_align_objects":
@@ -787,9 +818,6 @@ function normalizedServerUrl(value) {
 
 async function callTool(name, args = {}) {
   const { url, ...toolArgs } = args || {};
-  if (name === "sketchforge_import_stl" && typeof url === "string" && url.trim()) {
-    throw new Error("sketchforge_import_stl is only available in local mode; omit url.");
-  }
   if (["sketchforge_list_projects", "sketchforge_create_project", "sketchforge_import_project"].includes(name) && typeof url === "string" && url.trim()) {
     throw new Error(`${name} is only available in local mode; omit url.`);
   }

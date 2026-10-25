@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
@@ -46,6 +47,33 @@ function listMcpTools(projectsDir: string) {
   });
   expect(run.status, run.stderr).toBe(0);
   return JSON.parse(run.stdout.trim().split(/\r?\n/)[1]).result.tools;
+}
+
+function callMcpAsync(projectsDir: string, name: string, args: Record<string, unknown>, extraEnvironment: Record<string, string> = {}) {
+  return new Promise<Record<string, any>[]>((resolve, reject) => {
+    const child = spawn(process.execPath, [server], {
+      cwd: root,
+      env: { ...process.env, SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "", SKETCHFORGE_URL: "", ...extraEnvironment },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) return reject(new Error(`MCP exited with ${code}: ${stderr}`));
+      try {
+        resolve(stdout.trim().split(/\r?\n/).filter((line) => line.trim().startsWith("{")).map((line) => JSON.parse(line)));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    child.stdin.end([
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } }),
+      JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: args } }),
+    ].join("\n") + "\n");
+  });
 }
 
 describe("local MCP engine mode", () => {
@@ -111,7 +139,7 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(exported[1].result.content[0].text).shapeCount).toBe(1);
 
     const imported = callMcp(projectsDir, 2, "sketchforge_import_project", { filePath: packagePath, name: "Imported copy" });
-    expect(imported[1].result.isError).toBeUndefined();
+    expect(imported[1].result.isError, imported[1].result.content[0].text).toBeUndefined();
     const importedProject = JSON.parse(imported[1].result.content[0].text);
     expect(importedProject).toMatchObject({ name: "Imported copy", shapeCount: 1 });
     expect(importedProject.projectId).not.toBe("source");
@@ -137,6 +165,98 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
       shape: expect.objectContaining({ name: "Triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
     });
+  }, 60_000);
+
+  it("imports an OBJ fixture through the file import tool", async () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-obj-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const filesDir = path.join(projectsDir, "files");
+    fs.mkdirSync(filesDir);
+    const canonicalFilesDir = await fs.promises.realpath(filesDir);
+    const fixturePath = path.join(filesDir, "triangle.obj");
+    fs.copyFileSync(path.join(root, "tests/fixtures/obj/triangle.obj"), fixturePath);
+    const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_import_file");
+    expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_file", { projectId: "case", filePath: fixturePath, name: "OBJ triangle" }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(imported[1].result.isError).toBeUndefined();
+    expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
+      shape: expect.objectContaining({ name: "OBJ triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "obj", triangleCount: 1 }) }),
+    });
+    const outsidePath = path.join(projectsDir, "outside.obj");
+    fs.copyFileSync(fixturePath, outsidePath);
+    const linkedPath = path.join(filesDir, "linked.obj");
+    fs.symlinkSync(outsidePath, linkedPath);
+    const escaped = callMcp(projectsDir, 3, "sketchforge_import_file", { projectId: "case", filePath: linkedPath }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(escaped[1].result.isError).toBe(true);
+    expect(escaped[1].result.content[0].text).toContain(canonicalFilesDir);
+  }, 60_000);
+
+  it("imports an SVG fixture as an extruded mesh in local mode", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-svg-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const filesDir = path.join(projectsDir, "files");
+    fs.mkdirSync(filesDir);
+    const svgPath = path.join(filesDir, "square.svg");
+    fs.copyFileSync(path.join(root, "tests/fixtures/svg/square.svg"), svgPath);
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_file", { projectId: "case", filePath: svgPath }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(imported[1].result.isError, imported[1].result.content[0].text).toBeUndefined();
+    expect(imported[1].result.content[0].text).not.toContain("DOMParser");
+    expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
+      shape: expect.objectContaining({ kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "svg" }) }),
+    });
+    const restored = callMcp(projectsDir, 3, "sketchforge_read_scene", { projectId: "case" });
+    expect(restored[1].result.isError).toBeUndefined();
+    expect(JSON.parse(restored[1].result.content[0].text).objects).toEqual([
+      expect.objectContaining({ name: "square", kind: "mesh" }),
+    ]);
+  }, 60_000);
+
+  it("sends confined STL, OBJ, and SVG files as base64 to REST imports in remote mode", async () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-remote-import-"));
+    temporaryDirectories.push(projectsDir);
+    const fixturePath = path.join(root, "tests/fixtures/obj/triangle.obj");
+    const filesDir = path.join(projectsDir, "files");
+    fs.mkdirSync(filesDir);
+    const bytes = fs.readFileSync(fixturePath);
+    const requests: Array<{ url: string; authorization: string | undefined; body: Record<string, unknown> }> = [];
+    const api = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requests.push({
+          url: request.url ?? "",
+          authorization: request.headers.authorization,
+          body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
+        });
+        response.writeHead(201, { "content-type": "application/json" });
+        response.end(JSON.stringify({ shape: { id: "remote-shape", name: "triangle", kind: "mesh" }, triangles: 1, revision: 2 }));
+      });
+    });
+    await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
+    const address = api.address();
+    if (!address || typeof address === "string") throw new Error("Mock API did not bind a TCP port.");
+    try {
+      for (const [index, extension] of ["stl", "obj", "svg"].entries()) {
+        const filePath = path.join(filesDir, `triangle.${extension}`);
+        fs.copyFileSync(fixturePath, filePath);
+        const responses = await callMcpAsync(projectsDir, "sketchforge_import_file", {
+          url: `http://127.0.0.1:${address.port}`,
+          projectId: "remote-project",
+          filePath,
+        }, { SKETCHFORGE_MCP_FILES_DIR: filesDir, SKETCHFORGE_API_TOKEN: "test-token" });
+        expect(requests[index]).toMatchObject({
+          url: "/api/v1/imports?projectId=remote-project",
+          authorization: "Bearer test-token",
+          body: { fileName: `triangle.${extension}`, data: bytes.toString("base64"), mediaType: extension === "svg" ? "image/svg+xml" : `model/${extension}` },
+        });
+        expect(responses[1].result.isError).toBeUndefined();
+        expect(JSON.parse(responses[1].result.content[0].text)).toMatchObject({ shape: { id: "remote-shape" }, triangles: 1, revision: 2 });
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) => api.close((error) => error ? reject(error) : resolve()));
+    }
   }, 60_000);
 
   it("confines MCP file access to its configured root and refuses existing output files", async () => {

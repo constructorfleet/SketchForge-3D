@@ -70,6 +70,7 @@ function compactMutationValue(value) {
 const MUTATION_TOOLS = new Set([
   "sketchforge_create_shape",
   "sketchforge_import_mesh",
+  "sketchforge_import_file",
   "sketchforge_import_stl",
   "sketchforge_update_object",
   "sketchforge_delete_objects",
@@ -374,14 +375,17 @@ async function callLocalEngineToolRaw(name, args = {}) {
       const changes = Object.fromEntries(["name", "color", "x", "z", "elevation"].filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
       return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;
     }
+    case "sketchforge_import_file":
     case "sketchforge_import_stl": {
       const sourcePath = await resolveMcpReadPath(args.filePath);
-      if (path.extname(sourcePath).toLowerCase() !== ".stl") throw new Error("filePath must point to an .stl file.");
+      const extension = path.extname(sourcePath).toLowerCase();
+      const mediaType = extension === ".stl" ? "model/stl" : extension === ".obj" ? "model/obj" : extension === ".svg" ? "image/svg+xml" : undefined;
+      if (!mediaType) throw new Error("filePath must point to an .stl, .obj, or .svg file.");
       const bytes = await readFile(sourcePath);
       const imported = await unwrap(await engine.importMesh(id, {
         fileName: path.basename(sourcePath),
         bytes,
-        mediaType: "model/stl",
+        mediaType,
       }));
       const changes = Object.fromEntries(["name", "color", "x", "z", "elevation"].filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
       return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;

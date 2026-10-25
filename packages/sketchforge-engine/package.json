@@ -36,6 +36,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.8.15",
     "brepjs": "^20.10.3",
     "fflate": "^0.8.3",
     "manifold-3d": "^3.5.0",

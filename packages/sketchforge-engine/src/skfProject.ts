@@ -6,7 +6,7 @@ import { importedShapeFromObj } from "./objImport.js";
 import { normalizeProjectAsset, sha256Hex } from "./projectAssets.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
 import { importedShapeFromStl } from "./stlImport.js";
-import { importedShapeFromSvg } from "./svgImport.js";
+import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
@@ -1568,7 +1568,7 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
 export async function importSkfSourceAsset(asset: ProjectAsset) {
   if (asset.sourceFormat === "stl") return importedShapeFromStl(asset.name, exactArrayBuffer(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "obj") return importedShapeFromObj(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
-  if (asset.sourceFormat === "svg") return importedShapeFromSvg(asset.name, strFromU8(asset.bytes)).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
+  if (asset.sourceFormat === "svg") return (await importedShapeFromSvgOnHost(asset.name, strFromU8(asset.bytes))).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;
   if (asset.sourceFormat === "step") {
     const { importedShapeFromStep } = await import("./stepImport.js");
     return (await importedShapeFromStep(asset.name, exactArrayBuffer(asset.bytes))).importedMesh as NonNullable<WorkplaneShape["importedMesh"]>;

@@ -12,7 +12,7 @@ sources:
 Generated from the running `tools/list` registry in `packages/sketchforge-client/mcp/server.mjs`.
 Regenerate with `node scripts/generate-mcp-reference.mjs`; `--check` verifies that this file matches the current public registry.
 
-The server currently exposes 39 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
+The server currently exposes 40 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
 
 ## sketchforge_list_projects
 
@@ -642,11 +642,11 @@ Import a triangle mesh into SketchForge from raw position and optional normal ar
   ]
 }
 ```
-## sketchforge_import_stl
+## sketchforge_import_file
 
 ### Description
 
-Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
+Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
 
 ### Input schema
 
@@ -659,7 +659,64 @@ Import an STL file from the MCP host filesystem into a local project. Available 
     },
     "filePath": {
       "type": "string",
-      "description": "Path to an STL file under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); with neither set, any host path is allowed."
+      "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
+    },
+    "name": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "x": {
+      "type": "number"
+    },
+    "z": {
+      "type": "number"
+    },
+    "elevation": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "projectId",
+    "filePath"
+  ]
+}
+```
+## sketchforge_import_stl
+
+### Description
+
+Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "editorNumber": {
+      "type": "number",
+      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
+    },
+    "editorId": {
+      "type": "string",
+      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
+    },
+    "timeoutMs": {
+      "type": "number",
+      "description": "Command timeout in milliseconds. Defaults to 15000."
+    },
+    "filePath": {
+      "type": "string",
+      "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
     },
     "name": {
       "type": "string"
