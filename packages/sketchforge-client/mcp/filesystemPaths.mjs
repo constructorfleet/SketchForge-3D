@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 
@@ -51,7 +51,7 @@ export async function resolveMcpWritePath(value, { overwrite = false } = {}) {
   const root = await getRoot();
   let resolved;
   if (existsSync(requested)) {
-    resolved = realpathSync(requested);
+    resolved = await realpath(requested);
     if (root) requireWithin(root, resolved);
     if (!overwrite) throw new Error(`Output file already exists; set overwrite: true to replace it: ${requested}`);
   } else {

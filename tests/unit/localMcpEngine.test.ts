@@ -139,13 +139,13 @@ describe("local MCP engine mode", () => {
     });
   }, 60_000);
 
-  it("confines MCP file access to its configured root and refuses existing output files", () => {
+  it("confines MCP file access to its configured root and refuses existing output files", async () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-root-"));
     const filesDir = path.join(projectsDir, "allowed");
     const outsideDir = path.join(projectsDir, "outside");
     fs.mkdirSync(filesDir);
     fs.mkdirSync(outsideDir);
-    const canonicalFilesDir = fs.realpathSync(filesDir);
+    const canonicalFilesDir = await fs.promises.realpath(filesDir);
     temporaryDirectories.push(projectsDir);
     fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
     const secret = path.join(outsideDir, "secret.skf");
