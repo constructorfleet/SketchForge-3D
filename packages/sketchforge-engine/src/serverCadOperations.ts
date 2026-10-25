@@ -36,6 +36,7 @@ import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
 import { meshDataFromPositions } from "./meshMassProperties.js";
+import { MeshShellsOverlapError } from "./meshShellOverlap.js";
 import { MeshShellSolidError, nestedMeshShellSolid } from "./meshShellSolids.js";
 import { draftSketchFace, draftPrismProfileOffset, faceIdsForCadResult, type SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
@@ -181,6 +182,11 @@ export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
     throw new ServerCadError(error.reason === "shells-overlap" ? MESH_SHELLS_OVERLAP : MESH_NOT_SOLID);
   }
   return nested ?? sewnMeshSolid(cad, positions);
+}
+
+/** The exact path's refusal for a mesh error the kernel-free measures throw; anything else unchanged. */
+export function asServerCadError(error: unknown) {
+  return error instanceof MeshShellsOverlapError ? new ServerCadError(MESH_SHELLS_OVERLAP) : error;
 }
 
 const MESH_SHELLS_OVERLAP =

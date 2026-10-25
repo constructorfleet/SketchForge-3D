@@ -11,6 +11,7 @@ import { withCadKernel } from "./serverCadKernel.js";
 import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
 import { worldMeshForShape } from "./serverShapeGroups.js";
 import { meshMassProperties } from "./meshMassProperties.js";
+import { asServerCadError } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ShapeGeometryProvenance = {
@@ -63,7 +64,14 @@ export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapePr
   const mesh = worldMeshForShape(shape);
   // A mesh that does not close at any weld tolerance has no volume to report:
   // the kernel's sewing gets the last word, and refuses it as it always has.
-  const fromMesh = mesh ? meshMassProperties(mesh) : null;
+  // Bodies overlapping without nesting are refused here, as the exact path
+  // refuses them, rather than sewn only for the kernel to refuse them (#529).
+  let fromMesh;
+  try {
+    fromMesh = mesh ? meshMassProperties(mesh) : null;
+  } catch (error) {
+    return Promise.reject(asServerCadError(error));
+  }
   if (fromMesh) return Promise.resolve({ ...fromMesh, isValid: true, provenance: geometryProvenance(shape) });
   return withCadKernel((cad) => {
     const solid = placedSolidForShape(cad, shape);
