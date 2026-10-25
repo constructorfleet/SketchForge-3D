@@ -63,6 +63,9 @@ function compactMutationValue(value) {
   if (isShape) {
     if (typeof value.cadBrep === "string") result.hasCadBrep = true;
     if (Array.isArray(value.cadDisplayEdges)) result.cadDisplayEdgeCount = value.cadDisplayEdges.length;
+    // `x`/`z` is the box centre; a partial revolve's axis is beside it (#503).
+    const axis = value.revolveAxisOffset ? backend?.package?.revolveAxisPosition?.(value) : null;
+    if (axis) result.revolveAxis = axis;
   }
   return result;
 }

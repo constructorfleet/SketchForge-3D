@@ -46,6 +46,16 @@ export type SketchRevolveMesh = {
    * core wrongly reports hundreds of these.
    */
   genus: number;
+  /**
+   * Where the mesh's bounding-box centre sits from the axis it was turned
+   * about, in the mesh's own X/Z frame (Y up, before any resize, mirror or
+   * rotation).
+   *
+   * The mesh is centred on its box like every other mesh in the app, which for
+   * a partial sweep moves the axis off the origin. This is how far, so the
+   * shape can be placed by its axis rather than its box (#503).
+   */
+  axisOffset: { x: number; z: number };
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -369,7 +379,9 @@ export function buildSketchRevolveMesh(runtime: ManifoldToplevel, profile: Sketc
  * A manifold solid as the editor's own mesh: Y up, centred on X and Z, resting
  * on y = 0.
  *
- * Manifold revolves around its Z axis, which is the editor's Y.
+ * Manifold revolves around its Z axis, which is the editor's Y. Centring moves
+ * that axis off the origin whenever the solid is not symmetric about it, and
+ * the distance is reported as `axisOffset` rather than lost.
  */
 function meshFromManifold(solid: InstanceType<ManifoldToplevel["Manifold"]>): SketchRevolveMesh {
     const manifoldPositions = manifoldMeshPositions(solid.getMesh());
@@ -408,5 +420,6 @@ function meshFromManifold(solid: InstanceType<ManifoldToplevel["Manifold"]>): Sk
       height: Math.max(0.01, maxY - minY),
       triangleCount: Math.floor(positions.length / 9),
       genus: solid.genus(),
+      axisOffset: { x: centerX, z: centerZ },
     };
 }

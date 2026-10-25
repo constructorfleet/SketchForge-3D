@@ -139,6 +139,26 @@ describe("local MCP engine mode", () => {
     expect(fs.statSync(exportPath).size).toBeGreaterThan(0);
   }, 60_000);
 
+  it("keeps a partial-sweep revolve about its axis rather than its box (#503)", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", {
+      projectId: "case", kind: "revolve", profile: [[50, 0], [75, 0], [75, 10], [50, 10]], sweepAngle: 90,
+    });
+    expect(created[1].result.isError).toBeUndefined();
+    const shape = JSON.parse(created[1].result.content[0].text).shapes[0];
+    expect(shape.revolveAxis).toEqual({ x: expect.closeTo(0, 6), z: expect.closeTo(0, 6) });
+
+    const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId: shape.id });
+    const properties = JSON.parse(read[1].result.content[0].text);
+    // A quarter of an annulus 50..75 swept from +X towards -Z about the origin.
+    const sectorRadius = (2 * Math.sin(Math.PI / 4) / (3 * Math.PI / 4)) * (75 ** 3 - 50 ** 3) / (75 ** 2 - 50 ** 2);
+    expect(properties.volume).toBeGreaterThan((Math.PI / 4) * (75 ** 2 - 50 ** 2) * 10 * 0.99);
+    expect(properties.centerOfMass.x).toBeCloseTo(sectorRadius * Math.SQRT1_2, 0);
+    expect(properties.centerOfMass.z).toBeCloseTo(-sectorRadius * Math.SQRT1_2, 0);
+  }, 60_000);
+
   it("checks exact interference locally without returning geometry arrays", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);

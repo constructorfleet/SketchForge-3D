@@ -8,7 +8,7 @@
  * again here: a parameter the API can set is a parameter it reports.
  */
 
-import { isRevolveShape, outlineFromProfile } from "@/lib/engine/revolveRequests";
+import { isRevolveShape, outlineFromProfile, revolveAxisPosition } from "@/lib/engine/revolveRequests";
 import { isRequestableShapeKind, shapeParameterNamesFor } from "@/lib/engine/shapeRequests";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -36,6 +36,9 @@ export function apiShapeSummary(shape: WorkplaneShape) {
   const requestKind = apiShapeRequestKind(shape);
   const revolve = isRevolveShape(shape) ? shape.sketchRevolve : undefined;
   const outline = shape.sketchProfile && revolve ? outlineFromProfile(shape.sketchProfile) : null;
+  // `x`/`z` is the box centre, as for every shape; a partial sweep's axis is
+  // off to one side of it, so it is reported where it is known (#503).
+  const axis = revolve ? revolveAxisPosition(shape) : null;
   const parameters: Record<string, unknown> = {};
   for (const name of shapeParameterNamesFor(shape.kind)) {
     if (shape[name] !== undefined) parameters[name] = shape[name];
@@ -69,7 +72,7 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     rotationX: shape.rotationX ?? 0,
     rotationZ: shape.rotationZ ?? 0,
     ...parameters,
-    ...(revolve ? { revolve: { ...revolve } } : {}),
+    ...(revolve ? { revolve: { ...revolve, ...(axis ? { axis } : {}) } } : {}),
     // The outline is the only part of a revolve that is not a number, and it is
     // what a fresh `POST` would have to carry, so it is reported alongside the
     // settings rather than left as the one field a round trip cannot recover.

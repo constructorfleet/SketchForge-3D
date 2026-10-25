@@ -484,7 +484,7 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "sweepAngle": {
       "type": "number",
-      "description": "For kind revolve with no pitch: how far round to revolve, in degrees (±360)."
+      "description": "For kind revolve with no pitch: how far round to revolve, in degrees (±360). x/z place the axis of revolution, so a partial sweep lies to one side of them; the result's x/z is its box centre, and local mode reports the axis as revolveAxis."
     },
     "name": {
       "type": "string"

@@ -162,7 +162,7 @@ const tools = [
         },
         clearance: { type: "number", description: "For kind thread with hole: how much wider to cut, per side, in mm (default 0.2 for printed parts)." },
         startAngle: { type: "number", description: "For kind revolve: rotation the sweep starts at, in degrees." },
-        sweepAngle: { type: "number", description: "For kind revolve with no pitch: how far round to revolve, in degrees (±360)." },
+        sweepAngle: { type: "number", description: "For kind revolve with no pitch: how far round to revolve, in degrees (±360). x/z place the axis of revolution, so a partial sweep lies to one side of them; the result's x/z is its box centre, and local mode reports the axis as revolveAxis." },
         name: { type: "string" },
         color: { type: "string" },
         x: { type: "number" },

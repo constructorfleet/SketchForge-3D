@@ -15,6 +15,7 @@
  */
 
 import type { ManifoldToplevel } from "manifold-3d";
+import * as THREE from "three";
 import { createLocalId } from "./localIds.js";
 import { sceneShape } from "./shapeCatalog.js";
 import { buildSketchRevolveMesh, normalizeSketchRevolveSettings } from "./sketchRevolve.js";
@@ -27,7 +28,7 @@ import {
   threadSize,
   threadTurnsForLength,
 } from "./threadCatalog.js";
-import { canonicalizeShape } from "./workplaneShapes.js";
+import { canonicalizeShape, meshYawDegrees, mirrorSign } from "./workplaneShapes.js";
 import type { SketchProfile, SketchRevolveSettings, WorkplaneShape } from "./domain/sketchforge.js";
 
 /** Turns to sweep when a request says neither turns nor a length. */
@@ -229,12 +230,81 @@ export function resolveThreadRequest(request: ThreadRequest): ResolvedThreadRequ
   };
 }
 
+export type RevolveAxis = { x: number; z: number };
+
+/**
+ * Where a revolve's box centre sits from its axis, in world X/Z.
+ *
+ * The offset is recorded in the mesh's natural frame, so it is put through the
+ * same resize, mirror and rotation the viewport applies to the mesh -- the
+ * order `transformMesh` uses, about the shape's mid-height.
+ */
+function centreFromAxis(shape: WorkplaneShape, offset: RevolveAxis): RevolveAxis {
+  const mesh = shape.importedMesh;
+  const ratio = (drawn: number, natural: number | undefined) => (natural && natural > 0 && drawn > 0 ? drawn / natural : 1);
+  const local = new THREE.Vector3(
+    offset.x * ratio(shape.width, mesh?.baseWidth) * mirrorSign(shape.mirrorX),
+    0,
+    offset.z * ratio(shape.depth, mesh?.baseDepth) * mirrorSign(shape.mirrorZ),
+  ).applyEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(shape.rotationX ?? 0),
+    THREE.MathUtils.degToRad(meshYawDegrees(shape)),
+    THREE.MathUtils.degToRad(shape.rotationZ ?? 0),
+    "XYZ",
+  ));
+  return { x: local.x, z: local.z };
+}
+
+/**
+ * The world X/Z of a revolve's axis, or null when it was never recorded.
+ *
+ * A shape's `x`/`z` is its box centre, as for every shape. A full turn is
+ * symmetric, so that is its axis too; a partial sweep's box centre is off to
+ * one side, which is what #503 lost.
+ */
+export function revolveAxisPosition(shape: WorkplaneShape): RevolveAxis | null {
+  if (!shape.revolveAxisOffset) return null;
+  const centre = centreFromAxis(shape, shape.revolveAxisOffset);
+  return { x: shape.x - centre.x, z: shape.z - centre.z };
+}
+
+/** The revolve moved so its axis is at `axis`, its orientation and size unchanged. */
+export function placeRevolveOnAxis<T extends WorkplaneShape>(shape: T, axis: RevolveAxis): T {
+  const centre = centreFromAxis(shape, shape.revolveAxisOffset ?? { x: 0, z: 0 });
+  return { ...shape, x: axis.x + centre.x, z: axis.z + centre.z };
+}
+
+/**
+ * A revolve's axis, recovering it from the sweep when it was not recorded.
+ *
+ * A revolve saved before the offset was kept (#503) sits wherever its box was
+ * put. Its own profile and settings still describe the sweep it was built
+ * from, so building that again says where its axis was, and its first rebuild
+ * keeps it in place rather than jumping by the offset. A shape whose sweep
+ * cannot be rebuilt keeps its box centre as the axis, which is what it had.
+ */
+export function recoveredRevolveAxis(runtime: ManifoldToplevel, shape: WorkplaneShape): RevolveAxis {
+  const recorded = revolveAxisPosition(shape);
+  if (recorded) return recorded;
+  if (!shape.sketchProfile || !shape.sketchRevolve) return { x: shape.x, z: shape.z };
+  try {
+    const { axisOffset } = buildSketchRevolveMesh(runtime, shape.sketchProfile, shape.sketchRevolve);
+    return revolveAxisPosition({ ...shape, revolveAxisOffset: axisOffset }) ?? { x: shape.x, z: shape.z };
+  } catch {
+    return { x: shape.x, z: shape.z };
+  }
+}
+
 /**
  * The shape a revolve request asks for, built with the given manifold runtime.
  *
  * Returns the same kind of record the editor's own revolve produces -- a mesh
  * carrying its profile and settings -- so a thread made over the API is still
  * editable as a revolve afterwards, with its pitch and turns in the inspector.
+ *
+ * `x` and `z` place the axis of revolution, not the box: a quarter ring asked
+ * for at the origin spans the quarter it turns through, rather than being
+ * centred on the origin (#503). For a full turn the two are the same point.
  */
 export function revolvedShapeFromRequest(
   runtime: ManifoldToplevel,
@@ -266,8 +336,9 @@ export function revolvedShapeFromRequest(
     sketchProfile: parsed.profile,
     sketchOperation: "revolve",
     sketchRevolve: parsed.settings,
+    revolveAxisOffset: mesh.axisOffset,
   });
-  return { ...shape, sketchSourceId: `sketch/${shape.id}` };
+  return placeRevolveOnAxis({ ...shape, sketchSourceId: `sketch/${shape.id}` }, { x: base.x ?? 0, z: base.z ?? 0 });
 }
 
 /**
@@ -277,6 +348,9 @@ export function revolvedShapeFromRequest(
  * of it, so changing one means sweeping the mesh again -- there is nothing to
  * edit in place. What survives is everything that is not geometry: the shape's
  * id, so references to it still resolve, and its placement, name and flags.
+ *
+ * Placement means the axis. A changed sweep angle moves the box centre, and
+ * keeping that instead would slide the solid round its own axis on every edit.
  *
  * The scale survives too. A revolve resized after it was made carries a ratio
  * between its mesh's natural size and the size it is drawn at, and a fresh
@@ -288,6 +362,7 @@ export function rebuiltRevolveShape(
   shape: WorkplaneShape,
   parsed: { profile: SketchProfile; settings: SketchRevolveSettings },
 ): WorkplaneShape {
+  const axis = recoveredRevolveAxis(runtime, shape);
   const rebuilt = revolvedShapeFromRequest(runtime, parsed, {
     name: shape.name,
     color: shape.color,
@@ -304,7 +379,7 @@ export function rebuiltRevolveShape(
   const heightScale = scale(shape.height, previous?.baseHeight);
   const width = Math.max(0.01, rebuilt.width * widthScale);
   const depth = Math.max(0.01, rebuilt.depth * depthScale);
-  return canonicalizeShape({
+  return placeRevolveOnAxis(canonicalizeShape({
     ...rebuilt,
     id: shape.id,
     sketchSourceId: shape.sketchSourceId ?? `sketch/${shape.id}`,
@@ -316,7 +391,7 @@ export function rebuiltRevolveShape(
     rotationZ: shape.rotationZ,
     locked: shape.locked,
     hidden: shape.hidden,
-  });
+  }), axis);
 }
 
 /**
