@@ -137,9 +137,18 @@ export function isGroupRecord(shape: WorkplaneShape) {
  * goes back through `placedSolidForShape`, so an exact child stays exact, a
  * mesh child is sewn from its triangles, and a group nested inside is fused
  * the same way. A group of holes is the region it removes, so it fuses too.
+ *
+ * A member hidden inside the group is left out, because the editor does not
+ * draw it either: what is measured and exported is what is on screen. The
+ * group's own `hidden` flag is not a member's, so it is read from the stored
+ * children rather than from the restored ones, which inherit it.
  */
 function groupRecordSolid(cad: OcctKernel, group: WorkplaneShape): ShapeHandle {
-  const children = restoreGroupedChildren(group);
+  const stored = group.groupedShapes ?? [];
+  const children = restoreGroupedChildren(group).filter((_, index) => !stored[index]?.hidden);
+  if (children.length === 0) {
+    throw new ServerCadError(`"${group.name}" is a group whose members are all hidden, so it has no geometry; show a member first.`);
+  }
   const solids = children.filter((child) => !child.hole);
   if (solids.length === 0) return fuseSolids(cad, children);
   const holes = children.filter((child) => child.hole);
