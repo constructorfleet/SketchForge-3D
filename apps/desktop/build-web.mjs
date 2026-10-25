@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import webBundle from "./webBundle.cjs";
 
 const desktopDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(desktopDir, "..", "..");
@@ -43,6 +44,16 @@ for (const requiredPath of requiredPaths) {
     console.error(`[desktop:web:build] Missing expected build output: ${requiredPath}`);
     process.exit(1);
   }
+}
+
+// Turbopack leaves each server external (occt-wasm, manifold-3d) as a hashed
+// link into the standalone root node_modules, which electron-builder does not
+// package, and the engine's STEP loader imports occt-wasm by its plain name.
+// Copy the real packages into .next/node_modules for both (#543).
+const standaloneDir = path.join(repoRoot, "apps", "web", ".next", "standalone");
+const materialized = webBundle.materializeServerExternals(standaloneDir);
+if (materialized.length > 0) {
+  console.log(`[desktop:web:build] Copied server externals into the bundle: ${materialized.join(", ")}`);
 }
 
 console.log("[desktop:web:build] Standalone SketchForge web bundle is ready.");

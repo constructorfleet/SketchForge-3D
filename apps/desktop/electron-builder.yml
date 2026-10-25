@@ -5,6 +5,10 @@ asar: true
 directories:
   output: dist/desktop
 
+# Fails the package when Resources/web has dangling links or linked server
+# externals, which leave the CAD kernels unloadable and break signing (#543).
+afterPack: apps/desktop/afterPack.cjs
+
 publish:
   provider: github
   owner: constructorfleet

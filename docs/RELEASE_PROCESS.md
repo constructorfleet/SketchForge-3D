@@ -108,3 +108,57 @@ release as latest. If the version has no release yet, the workflow creates a
 draft and publishes it only once every installer is attached. Run the workflow
 by hand only for recovery or an explicitly requested desktop rebuild. Normal
 application releases start by merging the Release Please pull request.
+
+### The packaged web bundle
+
+Each installer carries the Next standalone server in `Resources/web`
+(`resources/web` on Windows and Linux). The CAD kernels it loads, `occt-wasm`
+and `manifold-3d`, are `serverExternalPackages`, which the server loads with
+ES module imports. Those imports ignore the `NODE_PATH` the desktop main process
+points at `app.asar/node_modules`, so the packages must be on disk inside
+`Resources/web`. Two things keep them out:
+
+- electron-builder never copies a root `node_modules` out of an
+  `extraResources` source, so the standalone `node_modules` is dropped.
+- Turbopack imports each external by a hashed name such as
+  `occt-wasm-1b9e064a4904705b`, which `next build` writes as a symlink in
+  `apps/web/.next/node_modules` into that dropped directory. The engine's own
+  `import(/* webpackIgnore: true */ "occt-wasm")`, which STEP export, STEP
+  import and assembly explode load the kernel through, keeps the plain name,
+  which nothing in the bundle provides.
+
+The 1.27.0 installers, built with webpack, shipped no links but had the same
+problem: their chunks `import("occt-wasm")` and `import("manifold-3d")` with
+neither package on disk.
+
+```mermaid
+flowchart LR
+  B[next build] --> S[standalone: hashed links into root node_modules]
+  S --> M[desktop:web:build copies linked and plainly imported packages into .next/node_modules]
+  M --> E[electron-builder drops root node_modules]
+  E --> H{afterPack: every server import resolves inside Resources/web?}
+  H -- yes --> G[sign, build installers]
+  H -- no --> F[fail the package]
+```
+
+`npm run desktop:web:build`, which `desktop:pack` and `desktop:dist` run first,
+replaces each hashed link with a real copy of its package. It then copies in,
+under its plain name, any package a server chunk still imports by that name.
+The `afterPack` hook in `apps/desktop/electron-builder.yml`
+(`apps/desktop/afterPack.cjs`) checks the result on every platform, including
+a local `--dir` build. It runs before signing, so a bundle that cannot load the
+CAD kernels never becomes a release asset. It fails the package when:
+
+- `Resources/web` has a dangling link, or a server external that is a link;
+- a module the compiled server imports (Turbopack's `.y("…")` or a plain
+  `import("…")`) does not resolve on disk inside `Resources/web` (resolution
+  never looks above it, so a build packaged inside a checkout cannot pass on
+  the repository's own `node_modules`);
+- a module it requires through Turbopack's `.x("…")` is not a Node builtin,
+  not on disk, and not one of the packages Next's runtime takes from
+  `app.asar` through `NODE_PATH` (`next`, `react`, `react-dom`, `styled-jsx`).
+
+A plain `require("…")` is not checked: Next's runtime uses that form for
+optional, guarded requires, and CommonJS resolves through `NODE_PATH`.
+`tests/unit/desktopWebBundle.test.ts` covers both steps, including a bundle
+shaped like 1.27.0 that must fail.
