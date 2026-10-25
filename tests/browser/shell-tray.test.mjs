@@ -65,10 +65,10 @@ async function size(page) {
 
 /** The material card's volume readout, in cm3. */
 async function volume(page) {
-  const text = await page.locator(".material-readout div").filter({ hasText: "Volume" }).locator("dd").innerText();
+  const text = await page.locator(".exact-properties .material-readout div").filter({ hasText: "Volume" }).locator("dd").innerText();
   const value = Number.parseFloat(text.replace(",", "."));
-  assert.ok(Number.isFinite(value), `the volume readout should be a number: ${text}`);
-  return value;
+  assert.ok(Number.isFinite(value), `the exact CAD volume readout should be a number: ${text}`);
+  return value / 1000;
 }
 
 /** Poll the volume until `check` holds, so a commit has landed before it is judged. */
