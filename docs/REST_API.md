@@ -596,7 +596,9 @@ The editor's **Analysis** section in the scene list runs this same check, and `G
 
 ## Shape properties
 
-`GET /properties?projectId=&shapeId=` requires both query parameters and returns the measured properties for one stored shape. `volume` is in mm³, `area` is in mm², and `centerOfMass` and the axis-aligned `bbox` coordinates are project-space millimeters. `isValid` reports the CAD kernel validity result. `provenance.source` identifies the representation measured (`parametric`, `brep`, or `mesh`); `provenance.precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.
+`GET /properties?projectId=&shapeId=` requires both query parameters and returns the measured properties for one stored shape. `volume` is in mm³, `area` is in mm², and `centerOfMass` and the axis-aligned `bbox` coordinates are project-space millimeters. `provenance.source` identifies the representation measured (`parametric`, `brep`, or `mesh`); `provenance.precision` is `exact` for parametric and B-rep solids and `tessellated` for imported triangle meshes. This reports the geometry actually measured, including when a mesh import also retains source STEP text.
+
+Parametric and B-rep shapes are measured on their positioned OCCT solid, and `isValid` is the kernel's validity result. A mesh-sourced shape is measured directly from its placed triangles with the divergence theorem, without building a CAD solid, so a large imported mesh answers in milliseconds instead of holding the kernel. Every shell in the mesh counts: separate parts add, and a shell enclosed by an odd number of other shells is a void and is subtracted, whichever way the file wound its triangles. Individually flipped triangles are rewound to agree with their neighbours. `isValid` is `true` for a mesh only when every shell is closed and orientable and the volume is positive; an open mesh still returns its area and bounds with `isValid: false`, and its volume and center of mass are then not meaningful.
 
 ```json
 {

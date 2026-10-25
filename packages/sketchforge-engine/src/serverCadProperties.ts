@@ -1,11 +1,20 @@
-/** Exact mass properties from the shape's positioned CAD solid. */
+/**
+ * Mass properties of one shape where it stands in the project.
+ *
+ * An exact shape is measured on its positioned CAD solid. A mesh-sourced shape
+ * is measured on its placed triangles directly (#508): sewing them into a solid
+ * first cost over a minute on a large STL, held the single kernel the whole
+ * time, and could not improve on a result that is tessellated either way.
+ */
 
 import { withCadKernel } from "./serverCadKernel.js";
 import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
+import { worldMeshForShape } from "./serverShapeGroups.js";
+import { meshMassProperties } from "./meshMassProperties.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 export type ShapeGeometryProvenance = {
-  /** Which stored representation supplied the solid to the kernel. */
+  /** Which stored representation supplied the geometry that was measured. */
   source: "parametric" | "brep" | "mesh";
   /** Imported triangle meshes remain tessellated even after sewing into a solid. */
   precision: "exact" | "tessellated";
@@ -20,6 +29,11 @@ export type ServerCadShapeProperties = {
   centerOfMass: { x: number; y: number; z: number };
   /** Axis-aligned bounds in project coordinates, in mm. */
   bbox: { xmin: number; ymin: number; zmin: number; xmax: number; ymax: number; zmax: number };
+  /**
+   * Exact shapes: the kernel's validity check. Meshes: every shell closed and
+   * consistently orientable with positive volume; an open mesh still reports
+   * its area and bounds, but its volume and centre of mass mean nothing.
+   */
   isValid: boolean;
   provenance: ShapeGeometryProvenance;
 };
@@ -46,6 +60,10 @@ function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
 
 /** Measure one shape using the same project-space solid the engine's CAD tools use. */
 export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
+  // The same placed triangles placedSolidForShape would sew, measured as they are.
+  const mesh = worldMeshForShape(shape);
+  const fromMesh = mesh ? meshMassProperties(mesh) : null;
+  if (fromMesh) return Promise.resolve({ ...fromMesh, provenance: geometryProvenance(shape) });
   return withCadKernel((cad) => {
     const solid = placedSolidForShape(cad, shape);
     const query = cad.queryBatch([solid])[0];
