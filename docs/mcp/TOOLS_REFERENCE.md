@@ -2016,7 +2016,7 @@ The exact minimum distance between two CAD entities in a stored project, and the
 
 ### Description
 
-Read one stored shape's volume, surface area, center of mass, bounds and validity, with provenance identifying the geometry source and whether precision is exact or tessellated. A group of solids is measured as the union of its children. Exact shapes are measured by the CAD kernel; mesh-sourced shapes are measured directly from their triangles, counting every shell and subtracting enclosed voids, and report isValid false when the mesh is not closed. Works offline or against a server when url is supplied.
+Read one stored shape's volume, surface area, center of mass, bounds and validity, with provenance identifying the geometry source and whether precision is exact or tessellated. A group of solids is measured as the union of its children. Exact shapes are measured by the CAD kernel; closed mesh-sourced shapes are measured directly from their triangles, counting every shell and subtracting enclosed voids, and a mesh that does not close is left to the kernel, which refuses it. Works offline or against a server when url is supplied.
 
 ### Input schema
 

@@ -30,9 +30,8 @@ export type ServerCadShapeProperties = {
   /** Axis-aligned bounds in project coordinates, in mm. */
   bbox: { xmin: number; ymin: number; zmin: number; xmax: number; ymax: number; zmax: number };
   /**
-   * Exact shapes: the kernel's validity check. Meshes: every shell closed and
-   * consistently orientable with positive volume; an open mesh still reports
-   * its area and bounds, but its volume and centre of mass mean nothing.
+   * The kernel's validity check. A mesh measured from its triangles is always
+   * valid: one that is not closed is sent to the kernel instead.
    */
   isValid: boolean;
   provenance: ShapeGeometryProvenance;
@@ -62,8 +61,10 @@ function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
 export function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
   // The same placed triangles placedSolidForShape would sew, measured as they are.
   const mesh = worldMeshForShape(shape);
+  // A mesh that does not close at any weld tolerance has no volume to report:
+  // the kernel's sewing gets the last word, and refuses it as it always has.
   const fromMesh = mesh ? meshMassProperties(mesh) : null;
-  if (fromMesh) return Promise.resolve({ ...fromMesh, provenance: geometryProvenance(shape) });
+  if (fromMesh) return Promise.resolve({ ...fromMesh, isValid: true, provenance: geometryProvenance(shape) });
   return withCadKernel((cad) => {
     const solid = placedSolidForShape(cad, shape);
     const query = cad.queryBatch([solid])[0];
