@@ -33,6 +33,20 @@ Environment:
   SKETCHFORGE_PROJECT_ID  the project for a macro declaring project: "target"
 ```
 
+### Direct project and file commands
+
+The same executable can list, create, and delete projects, export a selected project, and import an STL, OBJ, or SVG file:
+
+```text
+sketchforge-macro projects list
+sketchforge-macro projects create <name>
+sketchforge-macro projects delete <project-id>
+sketchforge-macro export --format <fmt> --out <file> [--project <id>]
+sketchforge-macro import <file> [--project <id>]
+```
+
+Export uses `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file.
+
 ### `sketchforge-mcp`
 
 Starts the package's MCP server on stdio using JSON-RPC. Configure it as an MCP server (for example, `npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp`); it does not expose a separate shell command interface or a `--help` option. Local project access uses `SKETCHFORGE_PROJECTS_DIR`; remote REST calls require `SKETCHFORGE_API_TOKEN`. Tool behavior and configuration are documented in the package README.
