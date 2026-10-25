@@ -103,5 +103,11 @@ describe("API shape summaries", () => {
     expect(apiShapeSummary(shape).revolve).toMatchObject({ sweepAngle: 90, axis: { x: 0, z: 0 } });
     // A revolve saved before the axis was recorded says nothing rather than guessing.
     expect(apiShapeSummary({ ...shape, revolveAxisOffset: undefined }).revolve).not.toHaveProperty("axis");
+    // Tilted, the axis is no longer vertical, so no single workplane point is
+    // where it stands. Turned upside down it is vertical again, and the quarter
+    // flipped over the X axis lies on +Z of it.
+    expect(apiShapeSummary({ ...shape, rotationX: 30 }).revolve).not.toHaveProperty("axis");
+    expect(apiShapeSummary({ ...shape, rotationZ: 90 }).revolve).not.toHaveProperty("axis");
+    expect(apiShapeSummary({ ...shape, z: 37.5, rotationX: 180 }).revolve).toMatchObject({ axis: { x: expect.closeTo(0, 6), z: expect.closeTo(0, 6) } });
   });
 });

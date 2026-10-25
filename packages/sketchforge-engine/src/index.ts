@@ -97,6 +97,8 @@ export {
   revolvedShapeFromRequest,
   rebuiltRevolveShape,
   revolveAxisPosition,
+  bakedRevolveAxisOffset,
+  reportedRevolveAxis,
   placeRevolveOnAxis,
   recoveredRevolveAxis,
   type ParsedRevolveRequest,

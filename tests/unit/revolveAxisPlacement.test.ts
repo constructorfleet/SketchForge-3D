@@ -1,13 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import manifoldModule, { type ManifoldToplevel } from "manifold-3d";
 import {
+  bakedRevolveAxisOffset,
   parseRevolveRequest,
   rebuiltRevolveShape,
   revolveAxisPosition,
   revolvedShapeFromRequest,
   requestedRevolveSettings,
 } from "@constructorfleet/sketchforge-engine/revolveRequests";
-import { worldMeshForShape } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+import { meshShapeFromWorldPositions, worldMeshForShape } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 /**
@@ -93,6 +94,12 @@ describe("a partial revolve stays about its axis (#503)", () => {
     expect(axis.z).toBeCloseTo(5, 6);
     // Turning the shape keeps the solid at the same distance from its axis.
     expect(Math.hypot(centroid.x - 10, centroid.z - 5)).toBeCloseTo(QUARTER_RADIUS, 1);
+    // And in the direction the viewport turns it: a yaw of +90 takes the
+    // unturned quarter (+X, -Z) to (-X, -Z). A yaw or mirror applied with the
+    // wrong sign keeps the distance but not the side.
+    const offset = QUARTER_RADIUS * Math.SQRT1_2;
+    expect(centroid.x).toBeCloseTo(10 - offset, 1);
+    expect(centroid.z).toBeCloseTo(5 - offset, 1);
   });
 
   it("keeps the axis when the sweep angle is changed afterwards", () => {
@@ -110,15 +117,48 @@ describe("a partial revolve stays about its axis (#503)", () => {
     expect(revolveAxisPosition(rebuilt)).toEqual({ x: expect.closeTo(30, 6), z: expect.closeTo(40, 6) });
   });
 
-  it("keeps a resized revolve about its axis when rebuilt", () => {
+  it("keeps a resized revolve about its axis when its sweep is changed", () => {
     const shape = quarterRing(runtime, { x: 0, z: 0 });
     const doubled = { ...shape, width: shape.width * 2, depth: shape.depth * 2, x: shape.x * 2, z: shape.z * 2 };
     expect(revolveAxisPosition(doubled)).toEqual({ x: expect.closeTo(0, 6), z: expect.closeTo(0, 6) });
 
-    const rebuilt = rebuiltRevolveShape(runtime, doubled, { profile: shape.sketchProfile!, settings: shape.sketchRevolve! });
+    const settings = requestedRevolveSettings(shape.sketchRevolve!, { sweepAngle: 180 });
+    const rebuilt = rebuiltRevolveShape(runtime, doubled, { profile: shape.sketchProfile!, settings });
+    const { centroid } = worldMassProperties(rebuilt);
 
-    expect(rebuilt.x).toBeCloseTo(doubled.x, 6);
-    expect(rebuilt.z).toBeCloseTo(doubled.z, 6);
+    // The half ring keeps the doubled scale and the axis at the origin: centred
+    // on it in X, and twice the unscaled radius out on the -Z side.
+    expect(centroid.x).toBeCloseTo(0, 1);
+    expect(centroid.z).toBeCloseTo(-2 * sectorCentroidRadius(50, 75, Math.PI), 1);
+  });
+
+  it("keeps the axis and the solid in place when a turned, resized revolve's transform is baked", () => {
+    // The editor bakes a rotation into the mesh and drops it, re-centring the
+    // mesh on its new box. The recorded offset is measured again in that frame,
+    // so the axis stays where it was and a later sweep edit does not jump.
+    const quarter = quarterRing(runtime, { x: 10, z: 5, rotation: 90 });
+    const shape = { ...quarter, width: quarter.width * 1.5, depth: quarter.depth * 1.5 };
+    const axis = revolveAxisPosition(shape)!;
+    const before = worldMassProperties(shape);
+    const offset = 1.5 * QUARTER_RADIUS * Math.SQRT1_2;
+    expect(before.centroid.x).toBeCloseTo(axis.x - offset, 1);
+    expect(before.centroid.z).toBeCloseTo(axis.z - offset, 1);
+
+    const world = worldMeshForShape(shape)!;
+    const positions = world.faces.flatMap((face) => face.flatMap((index) => world.vertices[index]));
+    const { id, name, color, sketchProfile, sketchOperation, sketchRevolve, sketchSourceId } = shape;
+    const moved = meshShapeFromWorldPositions(positions, { id, name, color, sketchProfile, sketchOperation, sketchRevolve, sketchSourceId })!;
+    const baked = { ...moved, revolveAxisOffset: bakedRevolveAxisOffset(shape, moved) };
+
+    expect(revolveAxisPosition(baked)).toEqual({ x: expect.closeTo(axis.x, 6), z: expect.closeTo(axis.z, 6) });
+    const after = worldMassProperties(baked);
+    expect(after.volume).toBeCloseTo(before.volume, 0);
+    expect(after.centroid.x).toBeCloseTo(before.centroid.x, 3);
+    expect(after.centroid.z).toBeCloseTo(before.centroid.z, 3);
+
+    const settings = requestedRevolveSettings(baked.sketchRevolve!, { sweepAngle: 180 });
+    const rebuilt = rebuiltRevolveShape(runtime, baked, { profile: baked.sketchProfile!, settings });
+    expect(revolveAxisPosition(rebuilt)).toEqual({ x: expect.closeTo(axis.x, 6), z: expect.closeTo(axis.z, 6) });
   });
 
   it("does not move a revolve saved before the axis was recorded", () => {
@@ -138,6 +178,8 @@ describe("a partial revolve stays about its axis (#503)", () => {
     expect(rebuilt.revolveAxisOffset).toBeDefined();
   });
 
+  // A regression guard rather than a test of #503: a full turn is symmetric,
+  // so its box centre was its axis before the fix too.
   it("leaves a full turn where it was", () => {
     const parsed = parseRevolveRequest({ profile: QUARTER_RING, sides: 64 });
     if (!parsed.ok) throw new Error(parsed.error);

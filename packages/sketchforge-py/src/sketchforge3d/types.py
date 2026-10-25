@@ -440,7 +440,9 @@ def _optional_number(payload: Mapping[str, Any], key: str) -> Optional[float]:
 
 
 #: How far round a sweep goes and how fast it rises, as the server reports it.
-RevolveSummary = Mapping[str, float]
+#: Every value is a number except ``axis``, the ``{"x", "z"}`` workplane point
+#: its axis of revolution stands at (see ``ShapeSummary.revolve_axis``).
+RevolveSummary = Mapping[str, Union[float, Mapping[str, float]]]
 
 #: The per-kind parameters the server both accepts and reports back. Which of
 #: them a shape carries depends on its kind, so they live in ``parameters``
@@ -653,6 +655,24 @@ class ShapeSummary:
     def pitch(self) -> Optional[float]:
         """A thread's axial rise per turn, or ``None`` when this is not a sweep."""
         return None if self.revolve is None else float(self.revolve.get("pitch", 0.0))
+
+    @property
+    def revolve_axis(self) -> Optional[Tuple[float, float]]:
+        """
+        Where a revolve's axis of revolution stands, as ``(x, z)``.
+
+        A shape's ``x``/``z`` is the centre of its box, which for a partial
+        sweep is off to one side of its axis. ``None`` when this is not a
+        revolve, when it was saved before its axis was recorded (until it is
+        next rebuilt), or when it is tilted so its axis is not vertical.
+        """
+        axis = None if self.revolve is None else self.revolve.get("axis")
+        if not isinstance(axis, Mapping):
+            return None
+        x, z = axis.get("x"), axis.get("z")
+        if isinstance(x, bool) or isinstance(z, bool) or not isinstance(x, (int, float)) or not isinstance(z, (int, float)):
+            return None
+        return (float(x), float(z))
 
     @property
     def grouped_count(self) -> int:

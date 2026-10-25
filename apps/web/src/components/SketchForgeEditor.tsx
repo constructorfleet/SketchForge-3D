@@ -44,11 +44,11 @@ import {
 } from "@/lib/loftGeometry";
 import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/engine/distributeShapes";
 import {
+  bakedRevolveAxisOffset,
   parseRevolveRequest,
   placeRevolveOnAxis,
   recoveredRevolveAxis,
   resolveThreadRequest,
-  revolveAxisPosition,
   revolvedShapeFromRequest,
   type ThreadRequest,
 } from "@/lib/engine/revolveRequests";
@@ -2407,19 +2407,11 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape): WorkplaneShape {
     });
   });
 
-  // Baking re-centres the mesh and drops its rotation and mirror, so a
-  // revolve's recorded axis offset is re-measured from where the axis is.
-  const revolveAxis = revolveAxisPosition(shape);
-  const bakedX = cleanNearZero(centerX, 0.0005);
-  const bakedZ = cleanNearZero(centerZ, 0.0005);
-  return {
+  const baked: WorkplaneShape = {
     ...shape,
     kind: "mesh",
-    x: bakedX,
-    z: bakedZ,
-    revolveAxisOffset: revolveAxis
-      ? { x: (bakedX - revolveAxis.x) * (rawWidth / Math.max(width, 1e-9)), z: (bakedZ - revolveAxis.z) * (rawDepth / Math.max(depth, 1e-9)) }
-      : shape.revolveAxisOffset,
+    x: cleanNearZero(centerX, 0.0005),
+    z: cleanNearZero(centerZ, 0.0005),
     elevation: cleanNearZero(minY, 0.0005),
     width,
     depth,
@@ -2452,6 +2444,9 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape): WorkplaneShape {
     groupedBaseDepth: undefined,
     groupedBaseHeight: undefined,
   };
+  // Baking re-centres the mesh and drops its rotation and mirror, so a
+  // revolve's recorded axis offset is measured again from where its axis is.
+  return { ...baked, revolveAxisOffset: bakedRevolveAxisOffset(shape, baked) };
 }
 
 function readFileAsDataUrl(file: File) {

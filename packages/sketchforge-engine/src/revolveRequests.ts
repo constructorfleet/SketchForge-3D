@@ -268,10 +268,45 @@ export function revolveAxisPosition(shape: WorkplaneShape): RevolveAxis | null {
   return { x: shape.x - centre.x, z: shape.z - centre.z };
 }
 
+/**
+ * Where a revolve's axis stands, for reporting, or null when it has no one place.
+ *
+ * Tilted by `rotationX` or `rotationZ`, the axis is no longer vertical, so it
+ * crosses the workplane's X/Z at a different point at every height and no
+ * single `{ x, z }` says where it is. `revolveAxisPosition` still works there
+ * -- it is the point on the axis at the shape's mid-height, which is what
+ * placement uses -- but reporting it would read as the axis standing there.
+ * A half turn of tilt leaves the axis vertical, so it is reported again.
+ */
+export function reportedRevolveAxis(shape: WorkplaneShape): RevolveAxis | null {
+  const upright = (degrees: number | undefined) => Math.abs(Math.sin(THREE.MathUtils.degToRad(degrees ?? 0))) < 1e-9;
+  if (!upright(shape.rotationX) || !upright(shape.rotationZ)) return null;
+  return revolveAxisPosition(shape);
+}
+
 /** The revolve moved so its axis is at `axis`, its orientation and size unchanged. */
 export function placeRevolveOnAxis<T extends WorkplaneShape>(shape: T, axis: RevolveAxis): T {
   const centre = centreFromAxis(shape, shape.revolveAxisOffset ?? { x: 0, z: 0 });
   return { ...shape, x: axis.x + centre.x, z: axis.z + centre.z };
+}
+
+/**
+ * The axis offset a revolve carries once its transform is baked into its mesh.
+ *
+ * Baking moves the triangles into place, drops the rotation and mirror, and
+ * re-centres the mesh on its new box, so the offset recorded in the old mesh
+ * frame no longer says where the axis is. It is measured again from where the
+ * axis was, in the baked mesh's natural frame (its drawn size over the size
+ * its triangles are stored at). A revolve with no recorded axis keeps none.
+ */
+export function bakedRevolveAxisOffset(original: WorkplaneShape, baked: WorkplaneShape): RevolveAxis | undefined {
+  const axis = revolveAxisPosition(original);
+  if (!axis) return original.revolveAxisOffset;
+  const natural = (stored: number | undefined, drawn: number) => (stored && stored > 0 && drawn > 0 ? stored / drawn : 1);
+  return {
+    x: (baked.x - axis.x) * natural(baked.importedMesh?.baseWidth, baked.width),
+    z: (baked.z - axis.z) * natural(baked.importedMesh?.baseDepth, baked.depth),
+  };
 }
 
 /**

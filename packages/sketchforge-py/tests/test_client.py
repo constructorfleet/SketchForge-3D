@@ -898,6 +898,16 @@ class ShapeSummaryTests(unittest.TestCase):
         self.assertEqual(summary.sketch_operation, "revolve")
         self.assertEqual(summary.profile, [[3.0, 0.0], [4.0, 1.0], [3.0, 2.0]])
 
+    def test_reads_where_a_partial_sweeps_axis_is(self) -> None:
+        # x/z is the box centre; a partial sweep's axis is off to one side (#503).
+        revolve = {"startAngle": 0, "sweepAngle": 90, "sides": 64, "quality": 6, "pitch": 0, "turns": 1, "coreRadius": 0, "axis": {"x": 10, "z": -4.5}}
+        summary = ShapeSummary.from_payload(shape_payload(kind="mesh", sketchOperation="revolve", revolve=revolve))
+        self.assertEqual(summary.revolve_axis, (10.0, -4.5))
+        self.assertEqual(summary.pitch, 0.0)
+        legacy = {key: value for key, value in revolve.items() if key != "axis"}
+        self.assertIsNone(ShapeSummary.from_payload(shape_payload(kind="mesh", revolve=legacy)).revolve_axis)
+        self.assertIsNone(ShapeSummary.from_payload(shape_payload()).revolve_axis)
+
     def test_a_shape_with_no_sweep_has_no_pitch(self) -> None:
         self.assertIsNone(ShapeSummary.from_payload(shape_payload()).pitch)
 
