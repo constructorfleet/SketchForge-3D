@@ -36,17 +36,17 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "brepjs": "^20.10.3",
+    "brepjs": "^18.118.0",
     "fflate": "^0.8.3",
     "manifold-3d": "^3.5.0",
-    "occt-wasm": "^5.8.0",
-    "three": "^0.186.1",
+    "occt-wasm": "^3.6.1",
+    "three": "^0.184.0",
     "use-intl": "^4.14.9"
   },
   "devDependencies": {
+    "@types/three": "^0.184.0",
     "@types/node": "^22.15.18",
-    "@types/three": "^0.186.0",
-    "typescript": "^7.0.2"
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=20"
