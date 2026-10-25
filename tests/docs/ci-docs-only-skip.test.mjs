@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import { decide, isDocsOnlyPath, touchesCode } from "../../scripts/ci/classify-changes.mjs";
 
 const root = decodeURIComponent(new URL("../../", import.meta.url).pathname);

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const workflow = yaml.load(await readFile(path.join(root, ".github/workflows/desktop-release.yml"), "utf8"));

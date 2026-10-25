@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const root = decodeURIComponent(new URL("../../", import.meta.url).pathname);
 const workflowFile = path.join(root, ".github/workflows/release-auto-merge.yml");

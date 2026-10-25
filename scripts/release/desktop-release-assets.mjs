@@ -24,7 +24,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 export const PLATFORMS = ["windows", "linux", "macos-x64", "macos-arm64"];
 
