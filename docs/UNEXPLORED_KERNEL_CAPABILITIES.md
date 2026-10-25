@@ -162,7 +162,9 @@ These are implemented and should not be filed as missing features:
   edges of a straight, single-region, hole-free sketch extrusion records each
   edge by its sketch segment and cap (`sourceEdges`) and replays by that
   identity after a source-profile edit; a removed, missing, or ambiguous match,
-  or an edit that leaves the boundary, fails without a write (#350). Side
+  or an edit that leaves the boundary, fails without a write (#350). The
+  editor's Fillet/Chamfer tool records and replays the same lineage through
+  the same matcher in its CAD worker (#540). Side
   (vertical) edges, drafted, mirrored or already-treated extrusions, and
   sweeps and revolves have no selected-edge lineage yet. A source edit on a
   shape whose record holds a selected-edge treatment without lineage, a non-45°

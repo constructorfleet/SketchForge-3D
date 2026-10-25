@@ -1184,6 +1184,8 @@
       "meshImportReset": "Vybraný model se nepodařilo převést na uzavřené těleso. Modul pro zaoblení a zkosení byl restartován. Než přidáte zaoblení nebo zkosení, zkuste příkaz „Rozdělit na části“, zrušit seskupení nebo objekt zjednodušit.",
       "validatorReset": "V modulu pro zaoblení a zkosení selhala kontrola a modul byl restartován. Spusťte nástroj znovu, stránku není třeba načítat znovu.",
       "memoryFaultReset": "V modulu pro zaoblení a zkosení došlo k chybě paměti a modul byl restartován. Spusťte nástroj znovu, stránku není třeba načítat znovu.",
+      "draftNotReplayable": "Úkos, který tento tvar uchovává, nelze znovu vytvořit, protože tvar byl od jeho vytvoření zrcadlen, změněn ve velikosti, zaoblen nebo zkosen. Nejprve tuto změnu vraťte zpět; tvar i jeho náčrt zůstávají beze změny.",
+      "edgeTreatmentNotReplayable": "Náčrt nebyl aktualizován: zaoblení nebo zkosení, které tento tvar uchovává, nelze na upraveném profilu znovu vytvořit, protože hrana, kterou zaobluje, zmizela nebo už není jedinou hranou, tvar byl mezitím zrcadlen, nebo na něj byla znovu použita úprava hran či úkos. Vraťte profil zpět, nebo úpravu náčrtu zrušte.",
       "result": {
         "draftPrismMissing": "Modul CAD nevrátil těleso s úkosem",
         "draftPrismUnusable": "Úkos nevytvořil použitelné těleso",

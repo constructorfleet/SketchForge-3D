@@ -1184,6 +1184,8 @@
       "meshImportReset": "Nie udało się zamienić zaznaczonego modelu w zamkniętą bryłę. Moduł zaokrągleń i fazek został uruchomiony ponownie. Zanim dodasz zaokrąglenia lub fazki, użyj polecenia „Rozdziel na części”, rozgrupuj lub uprość obiekt.",
       "validatorReset": "Moduł zaokrągleń i fazek uległ awarii podczas sprawdzania i został uruchomiony ponownie. Otwórz narzędzie jeszcze raz – nie trzeba odświeżać strony.",
       "memoryFaultReset": "W module zaokrągleń i fazek wystąpił błąd pamięci i moduł został uruchomiony ponownie. Otwórz narzędzie jeszcze raz – nie trzeba odświeżać strony.",
+      "draftNotReplayable": "Nie można odtworzyć pochylenia tego kształtu, ponieważ od tego czasu kształt został odbity lustrzanie, przeskalowany, zaokrąglony lub sfazowany. Najpierw cofnij tę zmianę; kształt i jego szkic pozostają bez zmian.",
+      "edgeTreatmentNotReplayable": "Szkic nie został zaktualizowany: zaokrąglenia lub fazy tego kształtu nie da się odtworzyć na zmienionym profilu, ponieważ zaokrąglana krawędź zniknęła lub nie jest już jedną krawędzią, kształt został od tego czasu odbity lustrzanie albo ponownie obrobiony lub pochylony. Przywróć profil albo anuluj edycję szkicu.",
       "result": {
         "draftPrismMissing": "Moduł CAD nie zwrócił bryły z pochyleniem",
         "draftPrismUnusable": "Pochylenie nie dało użytecznej bryły",

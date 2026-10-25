@@ -1184,6 +1184,8 @@
       "meshImportReset": "Impossible de convertir le modèle sélectionné en solide fermé. Le module des arrondis et chanfreins a redémarré. Avant d’ajouter des arrondis ou des chanfreins, essayez « Séparer en parties », dissociez le groupe ou simplifiez l’objet.",
       "validatorReset": "Le module des arrondis et chanfreins a rencontré une erreur de vérification et a redémarré. Relancez l’outil ; inutile de recharger la page.",
       "memoryFaultReset": "Le module des arrondis et chanfreins a rencontré une erreur de mémoire et a redémarré. Relancez l’outil ; inutile de recharger la page.",
+      "draftNotReplayable": "La dépouille de cette forme ne peut pas être reconstruite, car la forme a depuis été mise en miroir, redimensionnée, arrondie ou chanfreinée. Annulez d’abord cette modification ; la forme et son esquisse restent inchangées.",
+      "edgeTreatmentNotReplayable": "L’esquisse n’a pas été mise à jour : le congé ou le chanfrein de cette forme ne peut pas être reconstruit sur le profil modifié, car une arête qu’il arrondit a disparu ou n’est plus une seule arête, la forme a été mise en miroir depuis, ou elle a de nouveau été traitée ou dépouillée. Rétablissez le profil ou annulez la modification de l’esquisse.",
       "result": {
         "draftPrismMissing": "Le module CAO n’a pas renvoyé de solide en dépouille",
         "draftPrismUnusable": "La dépouille n’a pas produit de solide exploitable",

@@ -1540,6 +1540,7 @@
       "memoryFaultReset": "The CAD kernel hit a memory fault and reset. Start the edge tool again; no page refresh is needed.",
       "draftNotRetained": "The face draft cannot be kept with the sketch: the drafted face is not flat, or no longer matches one side of the profile. Undo the change, or draft another face.",
       "draftNotReplayable": "The draft this shape keeps cannot be rebuilt, because the shape has been mirrored, resized, filleted or chamfered since it was drafted. Undo that change first; the shape and its sketch are left as they were.",
+      "edgeTreatmentNotReplayable": "The sketch was not updated: the fillet or chamfer this shape keeps cannot be rebuilt on the edited profile, because an edge it rounds is gone or is no longer one edge, the shape was mirrored since, or it was treated or drafted again. Change the profile back, or cancel the sketch edit.",
       "shell": {
         "thicknessInvalid": "Enter a wall thickness greater than zero.",
         "noVolume": "This shape has no volume to hollow out.",

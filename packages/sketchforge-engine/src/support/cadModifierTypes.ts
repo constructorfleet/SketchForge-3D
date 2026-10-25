@@ -1,5 +1,5 @@
 import type { LocalizedErrorPayload } from "./i18n/LocalizedError.js";
-import type { WorkplaneShape } from "./../domain/sketchforge.js";
+import type { EdgeTreatmentSourceEdge, WorkplaneShape } from "./../domain/sketchforge.js";
 import type { SketchProfile } from "./../domain/sketchforge.js";
 import type { ResolvedSketchFaceDraftSource, RetainedFaceDraftResolution } from "./../sketchFaceDraftKernel.js";
 import type { InterferenceOperand, InterferenceResult, WallThicknessResult } from "./../cadAnalysis.js";
@@ -18,6 +18,17 @@ export type CadModifierEdge = {
 };
 
 export type CadModifierQuality = "draft" | "standard" | "fine";
+
+/** What the lineage matcher reads of a shape: the bare sketch extrusion and the fields that rule it out (#540). */
+export type CadModifierEdgeLineageSource = Pick<WorkplaneShape,
+  | "sketchOperation" | "sketchProfile" | "cadBrep" | "faceDraft" | "draftPrismAngle" | "shell"
+  | "edgeTreatments" | "edgeTreatmentHistory" | "mirrorX" | "mirrorY" | "mirrorZ">;
+
+/** The prepared session's edge ids for recorded segments and caps, or why one cannot be found. */
+export type CadModifierLineageEdgeIds =
+  | { status: "matched"; edgeIds: number[] }
+  | { status: "unsupported" }
+  | { status: "missing" | "ambiguous"; sourceEdge: EdgeTreatmentSourceEdge };
 
 export type CadModifierDisplayEdge = {
   points: number[];
@@ -77,6 +88,14 @@ export type CadModifierWorkerRequest =
       quality: CadModifierQuality;
       chamferAngle: number;
     }
+  /**
+   * Name the prepared session's selected edges by sketch segment and cap
+   * (#540). `source` is the one part prepared, whose stored B-rep
+   * `brepTransform` placed; `sourceEdges` is null when they cannot be named.
+   */
+  | { type: "edge-lineage"; requestId: number; source: CadModifierEdgeLineageSource; brepTransform?: number[]; edgeIds: number[] }
+  /** Find the prepared session's edges for recorded segments and caps on a rebuilt extrusion (#540). */
+  | { type: "lineage-edge-ids"; requestId: number; source: CadModifierEdgeLineageSource; brepTransform?: number[]; sourceEdges: EdgeTreatmentSourceEdge[] }
   | { type: "boolean"; requestId: number; parts: CadModifierMeshPart[] }
   /** Read-only analysis (#380): exact gaps and overlap volumes between the operands. */
   | { type: "interference"; requestId: number; operands: Array<InterferenceOperand & { part: CadModifierMeshPart }>; clearance: number }
@@ -191,6 +210,8 @@ export type CadModifierWorkerResponse =
       volume: number;
       sourceVolume: number;
     }
+  | { type: "edge-lineage"; requestId: number; sourceEdges: EdgeTreatmentSourceEdge[] | null }
+  | { type: "lineage-edge-ids"; requestId: number; result: CadModifierLineageEdgeIds }
   | { type: "disposed"; requestId: number }
   | ({ type: "error"; requestId: number; resetSession?: boolean } & LocalizedErrorPayload);
 

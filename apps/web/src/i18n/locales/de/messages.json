@@ -1184,6 +1184,8 @@
       "meshImportReset": "Das ausgewählte Modell konnte nicht in einen geschlossenen Volumenkörper umgewandelt werden. Das Modul für Abrundungen und Fasen wurde neu gestartet. Versuchen Sie „In Teile zerlegen“, heben Sie die Gruppierung auf oder vereinfachen Sie das Objekt, bevor Sie Abrundungen oder Fasen hinzufügen.",
       "validatorReset": "Im Modul für Abrundungen und Fasen ist bei der Prüfung ein Fehler aufgetreten. Das Modul wurde neu gestartet. Öffnen Sie das Werkzeug erneut, die Seite muss nicht neu geladen werden.",
       "memoryFaultReset": "Im Modul für Abrundungen und Fasen ist ein Speicherfehler aufgetreten. Das Modul wurde neu gestartet. Öffnen Sie das Werkzeug erneut, die Seite muss nicht neu geladen werden.",
+      "draftNotReplayable": "Die Formschräge dieser Form lässt sich nicht neu erzeugen, weil die Form seitdem gespiegelt, skaliert, abgerundet oder angefast wurde. Machen Sie diese Änderung zuerst rückgängig; Form und Skizze bleiben unverändert.",
+      "edgeTreatmentNotReplayable": "Die Skizze wurde nicht aktualisiert: Die Abrundung oder Fase dieser Form lässt sich auf dem geänderten Profil nicht neu erzeugen, weil eine Kante, die sie bearbeitet, weggefallen oder keine einzelne Kante mehr ist, die Form inzwischen gespiegelt oder erneut bearbeitet oder mit Formschräge versehen wurde. Stellen Sie das Profil wieder her oder brechen Sie die Skizzenbearbeitung ab.",
       "result": {
         "draftPrismMissing": "Das CAD-Modul hat keinen Volumenkörper mit Formschräge zurückgegeben",
         "draftPrismUnusable": "Die Formschräge hat keinen brauchbaren Volumenkörper ergeben",
