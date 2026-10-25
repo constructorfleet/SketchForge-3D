@@ -57,7 +57,7 @@ const localProjectSchema = { type: "object", properties: {} };
 /** What group_objects and boolean_cut may name and colour the shape they leave behind. */
 const resultAttributeProperties = {
   name: { type: "string", description: "Name for the result (default \"Group\")." },
-  color: { type: "string", description: "Hex color for the result, such as #2a9d8f (default the first solid's color)." },
+  color: { type: "string", description: "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)." },
 };
 
 const tools = [

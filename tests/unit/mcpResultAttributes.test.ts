@@ -54,6 +54,11 @@ describe("result attributes on create, group and cut", () => {
       const { properties } = tool(projectsDir, name).inputSchema;
       expect(properties.name?.description, name).toMatch(/result/i);
       expect(properties.color?.description, name).toMatch(/result/i);
+      // The colour is stored as given, as create_shape and update_object store
+      // theirs; only faceColors is checked against a hex pattern, so the schema
+      // must not promise one here.
+      expect(properties.color?.description, name).not.toMatch(/hex/i);
+      expect(properties.color?.description, name).toMatch(/stored as given/i);
     }
   });
 

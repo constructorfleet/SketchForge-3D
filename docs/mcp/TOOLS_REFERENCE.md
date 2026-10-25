@@ -1134,7 +1134,7 @@ Group objects by id using SketchForge's normal grouping/boolean pipeline. A sele
     },
     "color": {
       "type": "string",
-      "description": "Hex color for the result, such as #2a9d8f (default the first solid's color)."
+      "description": "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)."
     }
   },
   "required": [
@@ -1236,7 +1236,7 @@ Cut solids with hole objects. Provide solidIds and holeIds; the result replaces 
     },
     "color": {
       "type": "string",
-      "description": "Hex color for the result, such as #2a9d8f (default the first solid's color)."
+      "description": "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)."
     }
   },
   "required": [
