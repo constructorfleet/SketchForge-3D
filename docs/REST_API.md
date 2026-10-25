@@ -909,7 +909,7 @@ Every solid named is fused before any hole is taken out, so a hole spanning two 
 
 ### What the cut works from
 
-Shapes are rebuilt as exact geometry by the same builders the fillet endpoint uses, so the kinds listed under "What it can work from" above are the kinds a cut can take; anything else answers `422` naming it. A shape that already carries a mesh -- an import, or anything previously cut or treated -- is cut from that mesh, because the triangles are the only description of it the project has.
+Shapes are rebuilt as exact geometry by the same builders the fillet endpoint uses, so the kinds listed under "What it can work from" above are the kinds a cut can take; anything else answers `422` naming it. A shape that already carries a mesh -- an import, or anything previously cut or treated -- is cut from that mesh, because the triangles are the only description of it the project has. A mesh made of several closed shells, such as a part with a sealed internal void or a previous cut that sealed a hole inside a solid, is built one shell at a time: a shell enclosed by an odd number of others is a void and is cut out of the one around it, whichever way the file wound its triangles. Interference checks and drawings build mesh shapes the same way. A mesh that is not closed answers `422` saying so.
 
 The result is stored the way the editor stores a cut: a mesh of the solid, with the operands kept as the group's children. Unlike the editor, the server also stores the exact geometry alongside it, so a fillet or a STEP export of a cut part reads true surfaces rather than triangles.
 

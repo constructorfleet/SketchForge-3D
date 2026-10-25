@@ -33,6 +33,7 @@ import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.
 import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
+import { meshDataFromPositions, meshSolidShells, type MeshSolidShell } from "./meshMassProperties.js";
 import { draftSketchFace, draftPrismProfileOffset, faceIdsForCadResult, type SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
 export type ServerCadEdge = {
@@ -160,8 +161,56 @@ function solidFromBrep(cad: OcctKernel, brep: string) {
   throw new ServerCadError("The stored exact geometry for that shape could not be read.");
 }
 
-/** A solid sewn from a flat list of triangle corners, which is how a stored mesh arrives. */
+/**
+ * A solid sewn from a flat list of triangle corners, which is how a stored mesh arrives.
+ *
+ * A mesh made of several closed shells -- a part with a sealed internal void,
+ * or separate bodies -- is built one shell at a time and put back together by
+ * nesting (#501). Sewn all at once, OCCT got a shell inside a shell, could make
+ * no one solid of it, and refused a watertight part outright.
+ */
 export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
+  const shells = meshSolidShells(meshDataFromPositions(positions));
+  if (shells && shells.length > 1) return solidFromMeshShells(cad, shells);
+  return sewnMeshSolid(cad, positions);
+}
+
+/**
+ * The solid several closed shells bound together.
+ *
+ * Depth by depth from the outside in: the outermost bodies fused, each layer of
+ * voids cut out of what encloses it, each body floating in a void fused back.
+ * A shell at depth d lies inside one at depth d - 1, so every step only ever
+ * works inside the region the step before it settled.
+ */
+function solidFromMeshShells(cad: OcctKernel, shells: MeshSolidShell[]) {
+  const byDepth = new Map<number, ShapeHandle[]>();
+  for (const shell of shells) {
+    const solid = sewnMeshSolid(cad, shell.positions);
+    byDepth.set(shell.depth, [...(byDepth.get(shell.depth) ?? []), solid]);
+  }
+  const deepest = Math.max(...byDepth.keys());
+  const union = (solids: ShapeHandle[]) => (solids.length === 1 ? solids[0] : cad.fuseAll(solids));
+  let result = union(byDepth.get(0) ?? []);
+  for (let depth = 1; depth <= deepest; depth += 1) {
+    const layer = byDepth.get(depth);
+    if (!layer?.length) continue;
+    result = depth % 2 === 1 ? cad.cut(result, union(layer)) : cad.fuse(result, union(layer));
+  }
+  const solids = cad.getSubShapes(result, "solid");
+  if (solids.length === 0 || !cadResultIsValid(cad, result)) throw new ServerCadError(MESH_NOT_SOLID);
+  return solids.length === 1 ? solids[0] : result;
+}
+
+/**
+ * Why a mesh could not become a solid. Shared by every exact path that reads a
+ * mesh -- properties, booleans, interference, drawings -- so it names none of
+ * them; it used to say "cannot be filleted" to all of them.
+ */
+const MESH_NOT_SOLID = "That shape's mesh is not a closed solid, so the CAD kernel cannot build exact geometry from it.";
+
+/** One shell's triangles sewn into a solid, loosening the tolerance until it closes. */
+function sewnMeshSolid(cad: OcctKernel, positions: number[]) {
   const imported = cad.importStl(asciiStlFromPositions(positions));
   let shape = cad.fixShape(imported);
   if (isValidSolid(cad, shape)) return shape;
@@ -178,7 +227,7 @@ export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
       // Try the next tolerance.
     }
   }
-  throw new ServerCadError("That shape's mesh is not a closed solid, so it cannot be filleted.");
+  throw new ServerCadError(MESH_NOT_SOLID);
 }
 
 /**
