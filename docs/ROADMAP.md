@@ -126,6 +126,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 - [#412: Preserve non-uniform resize in face-draft paths](https://github.com/constructorfleet/SketchForge-3D/issues/412) — P2, implementation and regression coverage in progress.
 - [#436: Preserve mirrors in REST face and prism drafts](https://github.com/constructorfleet/SketchForge-3D/issues/436) — implementation and regression coverage complete; awaiting merge.
 - [#503: Keep partial-sweep revolves about their axis](https://github.com/constructorfleet/SketchForge-3D/issues/503) — REST, MCP (local and editor) and editor revolves place and rebuild by the axis, which summaries report; regression coverage by volume and centre of mass complete; awaiting review.
+- [#504: Revolve resolution control](https://github.com/constructorfleet/SketchForge-3D/issues/504) — `sides` and `quality` are advertised on `create_shape` for revolves and threads and typed in both clients; regression coverage by volume and centre of mass complete; awaiting review. **Deferred:** measuring, booleans, interference and STEP export of a plain revolve still sew its mesh. A plain full turn already has an exact OCCT solid for edges, faces, fillets and drafts (`exactRevolveSolidForShape`); using it in `placedSolidForShape`, and extending it to partial sweeps about the recorded axis (#503), would make those exact and report `precision: "exact"`. That change touches the shared solid builder and is left for its own PR.
 
 ## STEP interoperability
 

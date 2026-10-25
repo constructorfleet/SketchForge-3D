@@ -17,6 +17,11 @@ class ShapeRequestTypeTests(unittest.TestCase):
         self.assertIn("teeth", sketchforge3d.types.GearShapeRequest.__optional_keys__)
         self.assertIn("loftTopShape", sketchforge3d.types.LoftShapeRequest.__optional_keys__)
         self.assertIn("profile", sketchforge3d.types.RevolveShapeRequest.__required_keys__)
+        # A revolve's resolution is two counts: facets per turn and curve
+        # sampling, 1 to 10. Neither is text (#504).
+        revolve_hints = get_type_hints(sketchforge3d.types.RevolveShapeRequest)
+        self.assertIs(revolve_hints["sides"], int)
+        self.assertIs(revolve_hints["quality"], int)
         self.assertIn("clearance", sketchforge3d.types.ThreadShapeRequest.__optional_keys__)
         self.assertIn("profile", sketchforge3d.types.SketchSweepShapeRequest.__required_keys__)
 

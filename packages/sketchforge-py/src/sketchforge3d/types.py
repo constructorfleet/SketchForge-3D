@@ -214,7 +214,7 @@ class RevolveShapeRequest(_RevolveShapeRequestBase, total=False):
     startAngle: float
     sweepAngle: float
     sides: int
-    quality: str
+    quality: int
     coreRadius: float
     outline: Sequence[Sequence[float]]
     revolve: Mapping[str, Any]
@@ -232,6 +232,8 @@ class ThreadShapeRequest(_ThreadShapeRequestBase, total=False):
     turns: float
     clearance: float
     core: bool
+    sides: int
+    quality: int
     profile: Sequence[Sequence[float]]
     outline: Sequence[Sequence[float]]
     revolve: Mapping[str, Any]
