@@ -22,7 +22,11 @@
       "failed": "Não foi possível iniciar o SketchForge",
       "webProcessExited": "O processo web do SketchForge foi encerrado com o código {code}.",
       "webProcessTimeout": "O SketchForge não iniciou seu processo web local a tempo.",
-      "webBundleMissing": "Os arquivos web do aplicativo para computador estão faltando: {path}"
+      "webBundleMissing": "Os arquivos web do aplicativo para computador estão faltando: {path}",
+      "portInUse": "A porta {port} já está sendo usada por outro programa, então o SketchForge não consegue iniciar seu processo web local. Feche esse programa ou defina {variable} com uma porta livre. Os projetos são salvos por porta, então outra porta começa com outra lista de projetos.",
+      "portAccessDenied": "O SketchForge não tem permissão para escutar na porta {port}, então não consegue iniciar seu processo web local. Portas abaixo de 1024 geralmente exigem permissões de administrador. Defina {variable} com uma porta entre 1024 e 65535. Os projetos são salvos por porta, então outra porta começa com outra lista de projetos.",
+      "portFallbackTitle": "O SketchForge está usando a porta padrão",
+      "portFallback": "{variable} está definida como “{value}”, que não é um número de porta entre 1 e 65535, então o SketchForge foi iniciado na porta {port}. Os projetos são salvos por porta, então projetos salvos em outra porta não aparecem aqui. Corrija ou remova {variable} e reinicie o SketchForge para vê-los."
     }
   }
 }

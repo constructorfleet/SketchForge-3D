@@ -22,7 +22,11 @@
       "failed": "Impossible de démarrer SketchForge",
       "webProcessExited": "Le processus web interne de SketchForge s’est arrêté avec le code {code}.",
       "webProcessTimeout": "SketchForge n’a pas pu démarrer à temps son processus web local.",
-      "webBundleMissing": "Fichiers de l’interface web introuvables : {path}"
+      "webBundleMissing": "Fichiers de l’interface web introuvables : {path}",
+      "portInUse": "Le port {port} est déjà utilisé par un autre programme, SketchForge ne peut donc pas démarrer son processus web local. Fermez ce programme ou définissez {variable} sur un port libre. Les projets sont enregistrés par port : un autre port commence avec une autre liste de projets.",
+      "portAccessDenied": "SketchForge n’est pas autorisé à écouter sur le port {port} et ne peut donc pas démarrer son processus web local. Les ports inférieurs à 1024 nécessitent généralement des droits d’administrateur. Définissez {variable} sur un port compris entre 1024 et 65535. Les projets sont enregistrés par port : un autre port commence avec une autre liste de projets.",
+      "portFallbackTitle": "SketchForge utilise le port par défaut",
+      "portFallback": "{variable} vaut « {value} », qui n’est pas un numéro de port compris entre 1 et 65535 ; SketchForge a donc démarré sur le port {port}. Les projets sont enregistrés par port : ceux enregistrés sous un autre port n’apparaissent pas ici. Corrigez ou supprimez {variable} et redémarrez SketchForge pour les retrouver."
     }
   }
 }

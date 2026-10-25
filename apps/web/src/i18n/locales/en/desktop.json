@@ -22,7 +22,11 @@
       "failed": "SketchForge could not start",
       "webProcessExited": "SketchForge web process exited with code {code}.",
       "webProcessTimeout": "SketchForge did not start its local web process in time.",
-      "webBundleMissing": "Desktop web bundle is missing: {path}"
+      "webBundleMissing": "Desktop web bundle is missing: {path}",
+      "portInUse": "Port {port} is already in use by another program, so SketchForge cannot start its local web process. Close that program, or set {variable} to a free port. Projects are stored per port, so a different port starts with a different project list.",
+      "portAccessDenied": "SketchForge is not allowed to listen on port {port}, so it cannot start its local web process. Ports below 1024 usually need administrator rights. Set {variable} to a port from 1024 to 65535. Projects are stored per port, so a different port starts with a different project list.",
+      "portFallbackTitle": "SketchForge is using the default port",
+      "portFallback": "{variable} is set to “{value}”, which is not a port number from 1 to 65535, so SketchForge started on port {port}. Projects are stored per port, so projects saved under another port do not appear here. Correct or remove {variable} and restart SketchForge to see them."
     }
   }
 }
