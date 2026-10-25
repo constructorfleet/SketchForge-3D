@@ -27,6 +27,10 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#338: Enforce request body size limits on REST routes](https://github.com/constructorfleet/SketchForge-3D/issues/338) — P2, open.
 
+## API contract accuracy
+
+- [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
+
 ## Editor parity with the engine and API
 
 Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).

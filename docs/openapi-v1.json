@@ -2677,6 +2677,18 @@
             "sketchForgeToken": []
           }
         ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4042,6 +4054,18 @@
           },
           {
             "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
           }
         ],
         "requestBody": {
