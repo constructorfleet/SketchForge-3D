@@ -61,6 +61,7 @@ Every refusal leaves the shape as it was, and says why in a notice:
 | Every face open | Leaving every face open would take the walls away rather than hollow anything. |
 | No flat face on that side | The shape has no flat face pointing that way to leave open. |
 | Surfaces cannot be offset | The skin is a spline, not an analytic surface: a ball with unequal radii, a pointed cone, a tube, ring, round roof or loft. Cut a cavity with a hole shape instead. |
+| More than one closed surface | The shape is already a sealed hollow, or its mesh has an internal void or separate bodies. Shell it before sealing, or shell each body on its own. |
 | Fillet, chamfer or draft | The shape carries an edge treatment or draft. Undo it, hollow the shape, then treat it again. |
 | Cannot be hollowed exactly | The shape has no exact surfaces to offset: text, a gear, an icosahedron, a mirrored primitive, a group of loose parts, or a plain imported mesh. |
 

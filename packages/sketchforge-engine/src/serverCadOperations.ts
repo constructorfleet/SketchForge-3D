@@ -12,7 +12,9 @@
  * talks to `self.postMessage` and is close to upstream's, and prising it apart
  * would conflict with every upstream change to it. What is shared instead is
  * the result format, so a shape filleted here is indistinguishable in the
- * editor from one filleted there.
+ * editor from one filleted there -- and, through `meshShellSolids`, how a mesh
+ * of several closed shells becomes one solid, so the two agree on which meshes
+ * with internal voids are solids (#527).
  */
 
 import type { EvolutionData, OcctKernel, ShapeHandle } from "occt-wasm";
@@ -33,7 +35,8 @@ import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.
 import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
-import { meshDataFromPositions, meshSolidShells, type MeshSolidShell } from "./meshMassProperties.js";
+import { meshDataFromPositions } from "./meshMassProperties.js";
+import { MeshShellSolidError, nestedMeshShellSolid } from "./meshShellSolids.js";
 import { draftSketchFace, draftPrismProfileOffset, faceIdsForCadResult, type SketchFaceDraftRequest } from "./sketchFaceDraftKernel.js";
 
 export type ServerCadEdge = {
@@ -170,57 +173,15 @@ function solidFromBrep(cad: OcctKernel, brep: string) {
  * no one solid of it, and refused a watertight part outright.
  */
 export function solidFromMeshPositions(cad: OcctKernel, positions: number[]) {
-  const shells = meshSolidShells(meshDataFromPositions(positions));
-  if (shells && shells.length > 1) return solidFromMeshShells(cad, shells);
-  return sewnMeshSolid(cad, positions);
+  let nested: ShapeHandle | null;
+  try {
+    nested = nestedMeshShellSolid(cad, meshDataFromPositions(positions), (shell) => sewnMeshSolid(cad, shell));
+  } catch (error) {
+    if (!(error instanceof MeshShellSolidError)) throw error;
+    throw new ServerCadError(error.reason === "shells-overlap" ? MESH_SHELLS_OVERLAP : MESH_NOT_SOLID);
+  }
+  return nested ?? sewnMeshSolid(cad, positions);
 }
-
-/**
- * The solid several closed shells bound together.
- *
- * Depth by depth from the outside in: the outermost bodies fused, each layer of
- * voids cut out of what encloses it, each body floating in a void fused back.
- * A shell at depth d lies inside one at depth d - 1, so every step only ever
- * works inside the region the step before it settled.
- *
- * Depth is read by ray parity from one vertex of each shell, so it assumes the
- * shells nest. Separate bodies that overlap without one enclosing the other --
- * common in an imported STL nobody unioned -- break that: a body poking into
- * another reads as its void, and the assembly is quietly the wrong solid. The
- * mesh's own signed volume is the check: a correctly read nesting assembles to
- * exactly it, so a solid that does not is refused rather than returned.
- */
-function solidFromMeshShells(cad: OcctKernel, shells: MeshSolidShell[]) {
-  const byDepth = new Map<number, ShapeHandle[]>();
-  for (const shell of shells) {
-    const solid = sewnMeshSolid(cad, shell.positions);
-    byDepth.set(shell.depth, [...(byDepth.get(shell.depth) ?? []), solid]);
-  }
-  const deepest = Math.max(...byDepth.keys());
-  const union = (solids: ShapeHandle[]) => (solids.length === 1 ? solids[0] : cad.fuseAll(solids));
-  let result = union(byDepth.get(0) ?? []);
-  for (let depth = 1; depth <= deepest; depth += 1) {
-    const layer = byDepth.get(depth);
-    if (!layer?.length) continue;
-    result = depth % 2 === 1 ? cad.cut(result, union(layer)) : cad.fuse(result, union(layer));
-  }
-  const solids = cad.getSubShapes(result, "solid");
-  if (solids.length === 0 || !cadResultIsValid(cad, result)) throw new ServerCadError(MESH_NOT_SOLID);
-  const meshVolume = shells.reduce((sum, shell) => sum + shell.volume, 0);
-  const scale = shells.reduce((sum, shell) => sum + Math.abs(shell.volume), 0);
-  if (!(meshVolume > 0) || Math.abs(cad.getVolume(result) - meshVolume) > SHELL_VOLUME_TOLERANCE * scale) {
-    throw new ServerCadError(MESH_SHELLS_OVERLAP);
-  }
-  return solids.length === 1 ? solids[0] : result;
-}
-
-/**
- * How far, as a fraction of all the shells' volume together, the assembled
- * solid may stray from the mesh's own. Sewing a tessellated curve may move it
- * by up to the loosest sewing tolerance; an overlap misread as a void moves it
- * by the overlap itself or more.
- */
-const SHELL_VOLUME_TOLERANCE = 1e-3;
 
 const MESH_SHELLS_OVERLAP =
   "That shape's mesh has closed bodies that overlap without one enclosing the other, so the CAD kernel cannot tell which side of each is material. Union the bodies in the mesh before importing it.";

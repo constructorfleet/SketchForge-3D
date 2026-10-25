@@ -74,7 +74,8 @@ export type CadShellRefusal =
   | "no-flat-face"
   | "every-face-open"
   | "too-thick"
-  | "cannot-offset";
+  | "cannot-offset"
+  | "several-shells";
 
 export class CadShellError extends Error {
   readonly reason: CadShellRefusal;
@@ -266,6 +267,9 @@ const TOO_THICK =
  * anything built by extruding a profile wire, because those surfaces are
  * splines however round they look.
  */
+const SEVERAL_SHELLS =
+  "That shape already has more than one closed surface (a sealed hollow, an internal void, or separate bodies), so it cannot be shelled again. Shell it before sealing it, or shell each body on its own.";
+
 const CANNOT_OFFSET =
   "OCCT could not hollow this shape: its surfaces cannot be offset inwards into a sound solid. A shape whose skin is a spline rather than an analytic surface -- a ball with unequal radii, a loft -- fails this way at any wall thickness, however round it looks.";
 
@@ -353,6 +357,11 @@ export function shellSolid(cad: OcctKernel, solid: ShapeHandle, request: CadShel
     throw new CadShellError("thickness", "The wall thickness must be greater than zero.", 400);
   }
   if (faces.length === 0) throw new CadShellError("no-faces", "That shape has no faces to hollow out.");
+  // A sealed hollow and a mesh with an internal void are one solid with
+  // several shells; separate bodies are several solids (#527). OCCT's offset
+  // hollows none of them, and its failure read as a spline skin, which named
+  // the wrong cause. Checked before offsetting so the refusal says what it is.
+  if (cad.getSubShapes(solid, "shell").length > 1) throw new CadShellError("several-shells", SEVERAL_SHELLS);
 
   const openFaces = resolveShellOpenFaces(request.openFaces ?? [], faces);
   if (openFaces.length === faces.length) {

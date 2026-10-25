@@ -142,6 +142,14 @@ function faceSamples(cad: OcctKernel, face: ShapeHandle) {
   return points;
 }
 
+/** Which of `shape`'s solids each face belongs to; all 0 when it is one solid. */
+function bodyOfEachFace(cad: OcctKernel, shape: ShapeHandle, faces: ShapeHandle[]) {
+  const solids = cad.getSubShapes(shape, "solid");
+  if (solids.length <= 1) return faces.map(() => 0);
+  const bodies = solids.map((solid) => cad.getSubShapes(solid, "face"));
+  return faces.map((face) => bodies.findIndex((bodyFaces) => bodyFaces.some((candidate) => cad.isSame(face, candidate))));
+}
+
 /**
  * The smallest sampled distance between opposing faces of `solid`. This is a
  * screening estimate, not a medial-axis or certified minimum-thickness result:
@@ -152,8 +160,13 @@ export function sampledWallThickness(cad: OcctKernel, solid: ShapeHandle): WallT
   if (!faces.length) throw new WallThicknessRefusal("no_faces");
   if (faces.length > WALL_THICKNESS_MAX_FACES) throw new WallThicknessRefusal("too_many_faces", WALL_THICKNESS_MAX_FACES);
   const sampled = faces.map((face) => faceSamples(cad, face));
+  // Faces are only paired within one body. A mesh of separate closed bodies
+  // (#527) is one compound, and two bodies facing each other across a gap
+  // would otherwise read that gap as a wall.
+  const body = bodyOfEachFace(cad, solid, faces);
   let minimum = Infinity;
   for (let i = 0; i < faces.length; i += 1) for (let j = i + 1; j < faces.length; j += 1) {
+    if (body[i] !== body[j]) continue;
     for (const source of sampled[i]!) {
       for (const target of sampled[j]!) {
         const dot = source.normal.x * target.normal.x + source.normal.y * target.normal.y + source.normal.z * target.normal.z;

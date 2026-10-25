@@ -12,6 +12,7 @@ import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 import { buildEditorShell } from "@/lib/engine/editorShell";
 import { interferenceBetweenSolids, sampledWallThickness, WallThicknessRefusal } from "@/lib/engine/cadAnalysis";
 import { cadModifierBoolean, cadShapeIsValid } from "@/lib/cadModifierBoolean";
+import { meshPartSolid } from "@/lib/cadModifierMeshSolid";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -103,43 +104,6 @@ function edgeAngle(cad: OcctKernel, points: number[], faceHashes: number[], face
   }
 }
 
-function meshPartToAsciiStl(part: CadModifierMeshPart) {
-  if (!part.positions || !part.indices) throw new LocalizedError("errors.cadModifier.noMeshData");
-  const lines = new Array<string>(part.indices.length / 3 + 2);
-  lines[0] = "solid sketchforge";
-  const { positions, indices } = part;
-  for (let offset = 0, face = 1; offset + 2 < indices.length; offset += 3, face += 1) {
-    const ai = indices[offset] * 3;
-    const bi = indices[offset + 1] * 3;
-    const ci = indices[offset + 2] * 3;
-    const ax = positions[ai];
-    const ay = positions[ai + 1];
-    const az = positions[ai + 2];
-    const bx = positions[bi];
-    const by = positions[bi + 1];
-    const bz = positions[bi + 2];
-    const cx = positions[ci];
-    const cy = positions[ci + 1];
-    const cz = positions[ci + 2];
-    const abx = bx - ax;
-    const aby = by - ay;
-    const abz = bz - az;
-    const acx = cx - ax;
-    const acy = cy - ay;
-    const acz = cz - az;
-    let nx = aby * acz - abz * acy;
-    let ny = abz * acx - abx * acz;
-    let nz = abx * acy - aby * acx;
-    const length = Math.hypot(nx, ny, nz) || 1;
-    nx /= length;
-    ny /= length;
-    nz /= length;
-    lines[face] = `facet normal ${nx} ${ny} ${nz}\n outer loop\n  vertex ${ax} ${ay} ${az}\n  vertex ${bx} ${by} ${bz}\n  vertex ${cx} ${cy} ${cz}\n endloop\nendfacet`;
-  }
-  lines[lines.length - 1] = "endsolid sketchforge";
-  return lines.join("\n");
-}
-
 function isCadTransform(transform: number[] | undefined): transform is number[] {
   return Boolean(transform?.length === 12 && transform.every(Number.isFinite));
 }
@@ -207,36 +171,7 @@ function reconstructSolid(cad: OcctKernel, part: CadModifierMeshPart) {
     }
     throw new LocalizedError("errors.cadModifier.storedFeatureInvalid");
   }
-  const imported = cad.importStl(meshPartToAsciiStl(part));
-  let shape = cad.fixShape(imported);
-  if (cad.isSolid(shape)) {
-    try {
-      shape = cad.healSolid(shape, 1e-4);
-      shape = cad.fixFaceOrientations(shape);
-      shape = cad.removeDegenerateEdges(shape);
-      shape = cad.unifySameDomain(shape);
-    } catch {
-      // Fall through to face sewing when the imported solid cannot be healed directly.
-    }
-    if (cad.isSolid(shape) && cadShapeIsValid(cad, shape)) return shape;
-  }
-
-  const faces = cad.getSubShapes(imported, "face");
-  if (faces.length === 0) throw new LocalizedError("errors.cadModifier.noClosedFaces");
-  for (const tolerance of [1e-5, 1e-4, 1e-3, 1e-2]) {
-    try {
-      let candidate = cad.sewAndSolidify(faces, tolerance);
-      candidate = cad.fixShape(candidate);
-      if (cad.isSolid(candidate)) candidate = cad.healSolid(candidate, tolerance);
-      candidate = cad.fixFaceOrientations(candidate);
-      candidate = cad.removeDegenerateEdges(candidate);
-      candidate = cad.unifySameDomain(candidate);
-      if (cad.isSolid(candidate) && cadShapeIsValid(cad, candidate)) return candidate;
-    } catch {
-      // Try the next tolerance. Curved tessellations can need looser vertex sewing.
-    }
-  }
-  throw new LocalizedError("errors.cadModifier.meshNotManifold");
+  return meshPartSolid(cad, part);
 }
 
 function reconstructParts(cad: OcctKernel, parts: CadModifierMeshPart[]) {
