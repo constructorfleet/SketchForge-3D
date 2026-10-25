@@ -23,6 +23,12 @@ class ShapeRequestTypeTests(unittest.TestCase):
         self.assertIs(revolve_hints["sides"], int)
         self.assertIs(revolve_hints["quality"], int)
         self.assertIn("clearance", sketchforge3d.types.ThreadShapeRequest.__optional_keys__)
+        # A thread is a revolve with the outline filled in, so it takes the
+        # same two resolution counts.
+        thread_hints = get_type_hints(sketchforge3d.types.ThreadShapeRequest)
+        self.assertIs(thread_hints["sides"], int)
+        self.assertIs(thread_hints["quality"], int)
+        self.assertLessEqual({"sides", "quality"}, sketchforge3d.types.ThreadShapeRequest.__optional_keys__)
         self.assertIn("profile", sketchforge3d.types.SketchSweepShapeRequest.__required_keys__)
 
     def test_request_union_covers_all_supported_create_kinds(self):
