@@ -658,6 +658,10 @@ Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. T
     "filePath"
   ],
   "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
     "projectId": {
       "type": "string"
     },
