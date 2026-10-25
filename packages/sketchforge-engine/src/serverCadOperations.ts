@@ -472,12 +472,16 @@ export function applyEdgeTreatment(shape: WorkplaneShape, treatment: ServerCadTr
         treated = cad.chamferDistAngle(solid, edges, treatment.amount, treatment.angle);
       }
     } catch (error) {
-      // OCCT fails when the radius does not fit the geometry, which is the
-      // common mistake: too large a radius for a thin wall or a short edge.
+      const message = error instanceof Error ? error.message : String(error);
+      const wasmFault = typeof WebAssembly !== "undefined"
+        && (error instanceof WebAssembly.Exception || error instanceof WebAssembly.RuntimeError);
+      if (wasmFault || /out of memory|memory access out of bounds|allocation failed|wasm.*abort/i.test(message)) {
+        throw error;
+      }
+      // Keep geometric sizing failures actionable without disguising runtime
+      // faults as a user mistake.
       throw new ServerCadError(
-        treatment.kind === "fillet"
-          ? "That radius is too large for this shape's edges. Try a smaller one."
-          : "That chamfer is too large for this shape's edges. Try a smaller one.",
+        `The requested ${treatment.kind} amount ${treatment.amount} could not be applied to ${edges.length} eligible edges. Try a smaller amount.`,
       );
     }
     // Both fillet and chamfer hand back a compound wrapping the result, and
@@ -795,7 +799,7 @@ export function applySketchFaceDraft(shape: WorkplaneShape, request: SketchFaceD
     }
     const faces = cad.getSubShapes(solid, "face");
     const ids = shape.faceIds?.length === faces.length ? shape.faceIds
-      : exactRevolve && !shape.faceColors ? faces.map((_, index) => `face_${encodeURIComponent(shape.id)}_${index}`)
+      : exactRevolve ? faces.map((_, index) => `face_${encodeURIComponent(shape.id)}_${index}`)
         : undefined;
     if (!ids || ids.length !== faces.length || new Set(ids).size !== faces.length) {
       throw new ServerCadError("Face drafting requires a complete, unique stable face ID list.");

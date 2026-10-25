@@ -561,11 +561,11 @@ function alignEntry(shape: WorkplaneShape, axis: AlignAxis): AlignEntry {
   return { id: shape.id, ...span, locked: shape.locked };
 }
 
-/** `ServerCadError` keeps its own wording and status; anything else has none to keep. */
+/** `ServerCadError` keeps its own wording; unexpected kernel errors stay visible in server logs. */
 function cadFailure(error: unknown): EngineFailure {
-  return error instanceof ServerCadError
-    ? { reason: "cad_refused", message: error.message, status: error.status }
-    : { reason: "cad_failed" };
+  if (error instanceof ServerCadError) return { reason: "cad_refused", message: error.message, status: error.status };
+  console.error("Unexpected CAD kernel failure", error);
+  return { reason: "cad_failed" };
 }
 
 /**
@@ -582,15 +582,6 @@ function cadFailure(error: unknown): EngineFailure {
  * and there is no reason to hold a project busy for it.
  */
 async function builtShape(request: ShapeRequest, index: number): Promise<EngineResult<WorkplaneShape>> {
-  if (request.kind === "sketchSweep") {
-    const invalidProfile = invalidSketchSweepProfile(request.profile);
-    if (invalidProfile) return failed({ reason: "invalid_shape_request", index, message: invalidProfile });
-    try {
-      return ok(await sketchSweepShapeFromRequest(request));
-    } catch (error) {
-      return failed({ reason: "sweep_failed", index, message: error instanceof Error ? error.message : "The sketch sweep could not be built." });
-    }
-  }
   if (request.kind === "sketchSweep") {
     const invalidProfile = invalidSketchSweepProfile(request.profile);
     if (invalidProfile) return failed({ reason: "invalid_shape_request", index, message: invalidProfile });
@@ -932,7 +923,12 @@ export function createEngine(store: ProjectStore): Engine {
       }
       if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
         && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
-        const currentOutputFaces = await shapeFaces(existing);
+        let currentOutputFaces: ServerCadFace[];
+        try {
+          currentOutputFaces = await shapeFaces(existing);
+        } catch (error) {
+          return failed(cadFailure(error));
+        }
         if (!canReselectUntreatedExtrusionFace
           || !existing.faceDraftSourceFaceIds?.includes(requestedFaceDraft.sourceFaceId)
           || currentOutputFaces.filter((face) => face.id === requestedFaceDraft.sourceFaceId && face.surfaceType === "plane").length !== 1) {

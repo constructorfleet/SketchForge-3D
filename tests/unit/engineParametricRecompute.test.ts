@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createEngine, type EngineResult } from "@constructorfleet/sketchforge-engine";
 import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforge-engine/projectStore";
 import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
@@ -112,6 +112,70 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("returns a structured failure without writing when face reselection cannot read the stored BREP", async () => {
+    const { store, document, writeCount } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "corrupt-reselection", sketchSourceId: "sketch/corrupt-reselection", name: "Corrupt reselection",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const faces = await shapeFaces(original);
+    const first = faces.find((face) => face.surfaceType === "plane")!;
+    const drafted = value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: first.id, angle: 5, pullDirection: "y" },
+    })).shape;
+    const nextSource = drafted.faceDraftSourceFaceIds?.find((id) => id !== drafted.faceDraft?.sourceFaceId);
+    expect(nextSource).toBeTruthy();
+    document.shapes = [{ ...drafted, cadBrep: "not a readable BREP" }];
+    const writesBefore = writeCount();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await engine.changeShape("recompute", original.id, {
+      faceDraft: { ...drafted.faceDraft!, sourceFaceId: nextSource! },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? undefined : result.failure.reason).toBe("cad_failed");
+    expect(errorLog).toHaveBeenCalledWith("Unexpected CAD kernel failure", expect.objectContaining({
+      message: expect.stringContaining("failed to read shape"),
+    }));
+    expect(writeCount()).toBe(writesBefore);
+    errorLog.mockRestore();
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays non-45-degree all-edge chamfers and keeps surviving planar face colors", async () => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const created = await sketchExtrusionShapeFromRequest({
+      id: "angled-chamfer", sketchSourceId: "sketch/angled-chamfer", name: "Angled chamfer",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [created];
+    const sourceFaces = await shapeFaces(created);
+    const coloredFace = sourceFaces.find((face) => face.surfaceType === "plane" && Math.abs(face.normal?.x ?? 0) > 0.99)!;
+    const colored = { ...created, faceColors: { [coloredFace.id]: "#123456" } };
+    document.shapes = [colored];
+
+    const result = await engine.treat("recompute", created.id, { kind: "chamfer", amount: 0.1, angle: 30 });
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    const treated = value(result).shape;
+    expect(treated.faceIds).toContain(coloredFace.id);
+    expect(treated.faceColors?.[coloredFace.id]).toBe("#123456");
+    expect(treated.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", chamferAngle: 30, allEdges: true });
+    expect(new Set(treated.faceIds).size).toBe(treated.faceIds?.length);
+    const restored = await importSkfProject(await exportSkfProject({
+      projectId: "recompute", projectName: document.projectName, createdAt: document.createdAt, modifiedAt: 2,
+      shapes: document.shapes, history: document.history, historyIndex: document.historyIndex, assets: document.assets,
+      workspace: document.workspace, snapGrid: document.snapGrid, placementElevation: document.placementElevation,
+      placementWorkplane: document.placementWorkplane, sketchPlacementWorkplane: document.sketchPlacementWorkplane,
+    }));
+    expect(restored.shapes[0]?.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", chamferAngle: 30 });
+    const replay = await engine.changeShape("recompute", created.sketchSourceId!, { sketchProfile: extrusionProfile(1.25) });
+    expect(replay.ok, JSON.stringify(replay)).toBe(true);
+    expect(value(replay).shape.edgeTreatments?.[0]).toMatchObject({ kind: "chamfer", chamferAngle: 30, allEdges: true });
+  }, CAD_TEST_TIMEOUT_MS);
   it.each(["prism draft", "shell"] as const)(
     "refuses %s on a persisted face-drafted extrusion without writing",
     async (operation) => {
@@ -1314,7 +1378,7 @@ describe("dependency-ordered feature recomputation", () => {
     expect((await store.read("recompute"))!.shapes[0]).toEqual(persisted);
   });
 
-  it.each(["selected-edge", "multiple", "non-45"] as const)(
+  it.each(["selected-edge", "multiple"] as const)(
     "refuses %s chamfer history when replaying an edited sketch extrusion",
     async (unsupported) => {
       const { store, writeCount } = projectStore();
@@ -1329,11 +1393,9 @@ describe("dependency-ordered feature recomputation", () => {
         cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
       };
       const validFeature = { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 12, allEdges: true as const };
-      const unsupportedFeature = unsupported === "non-45"
-        ? { ...validFeature, chamferAngle: 30 }
-        : unsupported === "selected-edge"
-          ? { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 1 }
-          : { ...validFeature, amount: 0.2 };
+      const unsupportedFeature = unsupported === "selected-edge"
+        ? { kind: "chamfer" as const, amount: 0.1, chamferAngle: 45, edgeCount: 1 }
+        : { ...validFeature, amount: 0.2 };
       const features = unsupported === "multiple" ? [validFeature, unsupportedFeature] : [unsupportedFeature];
       const histories = features.map((feature, index) => ({
         id: `unsupported-${unsupported}-${index}`,

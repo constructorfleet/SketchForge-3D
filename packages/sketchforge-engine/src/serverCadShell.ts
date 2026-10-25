@@ -50,9 +50,6 @@ function faceSummaries(cad: OcctKernel, solid: ShapeHandle, shape: WorkplaneShap
 export function shapeFaces(shape: WorkplaneShape, options: { topology?: "exact" } = {}): Promise<ServerCadFace[]> {
   return withCadKernel((cad) => {
     if (options.topology === "exact" && isPlainFullTurnSketchRevolve(shape)) {
-      if (shape.faceColors && Object.keys(shape.faceColors).length > 0) {
-        throw new ServerCadError("Exact revolve face listing is unavailable while legacy face colors are stored.");
-      }
       const exact = exactPlainSketchRevolveSolid(cad, shape.sketchProfile!, shape.sketchRevolve, shape);
       return faceSummaries(cad, exact, shape, false);
     }

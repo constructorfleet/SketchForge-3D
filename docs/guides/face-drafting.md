@@ -89,6 +89,16 @@ over the first. The draft is saved in `.skf` projects and is
 the same feature the REST API's `PATCH /shapes` `faceDraft` writes, so a script
 can change it too.
 
+The REST API can also draft a plain full-turn revolve that has legacy face
+colours keyed by mesh index. `GET /faces?topology=exact` builds the exact
+revolve first and returns the IDs used by `PATCH /shapes` `faceDraft`. Colours
+are retained only when a result face maps to the same exact face ID; unmatched
+colours are dropped deterministically when drafting changes that face.
+
+All-edge chamfers with an angle other than 45° can be replayed after editing a
+retained sketch profile. Surviving exact planar faces keep their IDs and
+colours, and recompute uses the stored chamfer angle.
+
 The **Draft prism** card works the same way. Once applied, it shows the angle
 the shape keeps and offers **Update draft**, and editing the sketch replays it.
 

@@ -593,7 +593,7 @@ describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     expect(response.status).toBe(200);
   });
 
-  it("reports a radius the geometry cannot take", async () => {
+  it("reports the requested radius and eligible edges when geometry cannot take it", async () => {
     const projectId = await makeProject("Thin");
     const created = await addShape(projectId, { kind: "box", width: 40, depth: 40, height: 1 });
     const shapeId = created.payload.shapes![0].id;
@@ -601,7 +601,7 @@ describe("REST API v1 edge treatments", { timeout: CAD_TEST_TIMEOUT_MS }, () => 
     const response = await treat(projectId, shapeId, { kind: "fillet", amount: 5 });
 
     expect(response.status).toBe(422);
-    expect((await response.json() as { error: string }).error).toMatch(/too large/);
+    expect((await response.json() as { error: string }).error).toMatch(/amount 5.*12 eligible edges/);
     // The project is left as it was, not half-treated.
     const document = await readProjectDocument(projectsRoot, projectId);
     expect(document?.shapes[0].cadBrep).toBeUndefined();

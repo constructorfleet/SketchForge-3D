@@ -34,6 +34,28 @@ function value<T>(result: EngineResult<T>): T {
 }
 
 describe("treated full-turn revolve face draft combined angle and axis edits", () => {
+  it("drafts a colored plain revolve using its exact topology face IDs", async () => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const created = value(await engine.addShapes("recompute", [{
+      kind: "revolve", name: "Colored revolve", profile: [[5, -5], [10, -5], [10, 5], [5, 5]], sides: 24,
+    }])).shapes[0]!;
+    const colored = { ...created, faceColors: { "0": "#123456" } };
+    document.shapes = [colored];
+    const sourceFace = (await shapeFaces(colored, { topology: "exact" })).find((face) =>
+      face.surfaceType === "plane" && face.normal?.y! < -0.99)!;
+
+    const result = await engine.changeShape("recompute", colored.id, {
+      faceDraft: { sourceFaceId: sourceFace.id, angle: 5, pullDirection: "z" },
+    });
+
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    const drafted = value(result).shape;
+    expect(drafted.faceDraft?.sourceFaceId).toBe(sourceFace.id);
+    expect(Object.entries(drafted.faceColors ?? {}).every(([id, color]) =>
+      drafted.faceIds?.includes(id) && color === "#123456")).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it.each([
     ["fillet", { kind: "fillet" as const, amount: 0.1 }],
     ["45-degree chamfer", { kind: "chamfer" as const, amount: 0.1, angle: 45 }],
