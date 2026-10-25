@@ -12,6 +12,42 @@ function cube(overrides: Record<string, unknown> = {}) {
   return shapeFromRequest({ kind: "box", width: 20, depth: 20, height: 20, ...overrides }) as WorkplaneShape;
 }
 
+type Vec3 = [number, number, number];
+
+/** An axis-aligned box's 12 triangles as flat corners, outward-wound unless `inward`. */
+function boxTriangles(min: Vec3, max: Vec3, inward = false): number[] {
+  const [x0, y0, z0] = min;
+  const [x1, y1, z1] = max;
+  const v: Vec3[] = [
+    [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
+    [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1],
+  ];
+  const faces: Vec3[] = [
+    [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
+    [0, 1, 5], [0, 5, 4], [3, 7, 6], [3, 6, 2],
+    [0, 4, 7], [0, 7, 3], [1, 2, 6], [1, 6, 5],
+  ];
+  return faces.flatMap(([a, b, c]) => (inward ? [a, c, b] : [a, b, c]).flatMap((index) => v[index]));
+}
+
+/** An imported mesh shape whose local triangles are `positions`. */
+function meshShape(positions: number[]): WorkplaneShape {
+  const span = (axis: number) => {
+    const values = positions.filter((_, index) => index % 3 === axis);
+    return Math.max(...values) - Math.min(...values);
+  };
+  const [width, height, depth] = [span(0), span(1), span(2)];
+  return sceneShape({
+    name: "mesh",
+    kind: "mesh",
+    color: "#123456",
+    width,
+    depth,
+    height,
+    importedMesh: { positions, baseWidth: width, baseDepth: depth, baseHeight: height, triangleCount: positions.length / 9, sourceFormat: "stl" },
+  }) as WorkplaneShape;
+}
+
 /**
  * What the stored exact geometry actually weighs and balances on.
  *
@@ -254,6 +290,24 @@ describe("hollowing a solid on the server", { timeout: CAD_TEST_TIMEOUT_MS }, ()
       // route as a 500. Where OCCT gives up on these varies, so only the kind
       // of failure is pinned.
       await expect(applyShell(shape, { thickness: 2 }), kind).rejects.toThrow(ServerCadError);
+    }
+  });
+
+  it.each([
+    // A sealed hollow is one solid with an outer and an inner shell, as is a
+    // mesh with an internal void; separate bodies are several solids. OCCT's
+    // offset cannot hollow any of them, and its failure used to come back as
+    // the spline-skin refusal above, which named the wrong cause (#527).
+    ["a part already hollowed sealed", async () => ({ ...cube(), cadBrep: (await applyShell(cube(), { thickness: 2 })).brep } as WorkplaneShape)],
+    ["a mesh with an internal void", async () => meshShape([...boxTriangles([-10, 0, -10], [10, 20, 10]), ...boxTriangles([-5, 5, -5], [5, 15, 5], true)])],
+    ["a mesh of two separate bodies", async () => meshShape([...boxTriangles([-10, 0, -2], [-6, 4, 2]), ...boxTriangles([6, 0, -2], [10, 4, 2])])],
+  ])("refuses %s, saying it has more than one closed surface", async (_label, shape) => {
+    const source = await shape();
+    for (const request of [{ thickness: 1 }, { thickness: 1, openFaces: ["top"] }]) {
+      const failure = await applyShell(source, request).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(ServerCadError);
+      expect((failure as Error).message).toMatch(/more than one closed surface/);
+      expect((failure as ServerCadError).status).toBe(422);
     }
   });
 

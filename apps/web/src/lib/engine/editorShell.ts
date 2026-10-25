@@ -33,6 +33,7 @@ const REFUSAL_KEYS: Record<CadShellRefusal, ErrorKey> = {
   "every-face-open": "errors.cadModifier.shell.everyFaceOpen",
   "too-thick": "errors.cadModifier.shell.tooThick",
   "cannot-offset": "errors.cadModifier.shell.cannotOffset",
+  "several-shells": "errors.cadModifier.shell.severalShells",
 };
 
 /**

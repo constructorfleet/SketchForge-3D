@@ -87,7 +87,7 @@ Common fields: `name`, `color`, `x`, `z`, `elevation`, `width`, `depth`, `height
 
 `format: "dxf"` requires `section: { "plane": "xy", "offset": 4 }` (also `xz` or `yz`). It exports sampled section polylines. SVG section export uses the same contours.
 
-`GET /thickness?projectId=&shapeId=` returns `{ "thickness": { "minimum": 8, "unit": "mm", "method": "sampled-opposing-surface-distance", "samplesPerFace": 25, "facesChecked": 6 } }`. It samples a 5 × 5 UV grid on each face. `minimum` is `null` if no opposing pair is found. It can miss thin regions between samples and is not a certified minimum-thickness result. Both query values are trimmed before validation. A shape with more than 256 faces returns `413 limit_exceeded`.
+`GET /thickness?projectId=&shapeId=` returns `{ "thickness": { "minimum": 8, "unit": "mm", "method": "sampled-opposing-surface-distance", "samplesPerFace": 25, "facesChecked": 6 } }`. It samples a 5 × 5 UV grid on each face. `minimum` is `null` if no opposing pair is found. Opposing faces are paired only within one body, so in a shape made of separate bodies the gap between them is not counted as a wall. It can miss thin regions between samples and is not a certified minimum-thickness result. Both query values are trimmed before validation. A shape with more than 256 faces returns `413 limit_exceeded`.
 
 Per kind:
 
@@ -478,6 +478,8 @@ What OCCT will not offset is a **spline** skin -- at any thickness, and at every
 
 Those answer `422` saying so rather than approximating a wall, because a wall that is nearly right is a part that nearly holds water.
 
+A shape that already has **more than one closed surface** is refused too, before OCCT is asked: a part already hollowed sealed, a mesh with an internal void, or a mesh of separate bodies. Its answer is `422` saying so, rather than the spline refusal OCCT's failure used to come back as. Shell a part before sealing it, or shell each body on its own.
+
 Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /booleans`. That is a different operation with a different result -- a boolean cavity has the shape you gave it rather than a constant wall -- but it works on anything.
 
 ### When it refuses
@@ -487,7 +489,7 @@ Cut one out instead: make the inner shape, mark it `hole: true`, and `POST /bool
 | `400` | No `thickness`, a thickness of zero or less, a face index out of range, or a direction that is not one of the six. |
 | `404` | No such project, or no such shape in it. |
 | `409` | The shape is locked, or another write holds the project. |
-| `422` | A kind the server cannot build exactly, a kind OCCT will not offset, every face named open, or a wall too thick for the part. |
+| `422` | A kind the server cannot build exactly, a kind OCCT will not offset, a shape with more than one closed surface, every face named open, or a wall too thick for the part. |
 
 **A wall thicker than the part fails cleanly, and this took some doing.** Past the thickness that fits, OCCT does not raise an error: depending on the shape and the faces left open it hands back an empty compound, a solid that fails its own validity check while reporting the right bounding box, or -- worst -- the original solid untouched, valid and the right size, having hollowed nothing at all. None of those is distinguishable by extents, so the server weighs the result: hollowing always removes the cavity, and a result that weighs what it started at did nothing. All three answer `422` and the project is left exactly as it was.
 
