@@ -3,10 +3,10 @@ import { createLocalId } from "./localIds.js";
 import { LocalizedError } from "./support/i18n/LocalizedError.js";
 import { importedShapeFromTriangleSoup } from "./stlImport.js";
 import { stepComponentMetadata, stepShapeKey } from "./stepComponentMetadata.js";
+import { MAX_EXPLODE_SOLIDS, MAX_EXPLODE_SOURCE_BYTES } from "./stepAssemblyExplode.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
 const IMPORT_TESSELLATION = { linearDeflection: 0.1, angularDeflection: 0.5 } as const;
-const EXACT_GEOMETRY_LIMITS = { solids: 200, sourceBytes: 8 * 1024 * 1024 } as const;
 
 export type StepImportSummary = {
   shape: WorkplaneShape;
@@ -98,8 +98,9 @@ export async function importedShapeFromStepWithKernel(cad: OcctKernel, fileName:
 
   const shape = importedShapeFromTriangleSoup(fileName, positions, hasNormals ? normals : undefined, "step");
   if (shape.importedMesh && faceGroups.length) shape.importedMesh.faceGroups = faceGroups;
-  const stepMetadataIsWithinBudget = solids.length <= EXACT_GEOMETRY_LIMITS.solids
-    && new TextEncoder().encode(stepText).byteLength <= EXACT_GEOMETRY_LIMITS.sourceBytes;
+  const sourceBytes = new TextEncoder().encode(stepText).byteLength;
+  const stepMetadataIsWithinBudget = solids.length <= MAX_EXPLODE_SOLIDS
+    && sourceBytes <= MAX_EXPLODE_SOURCE_BYTES;
   const componentMetadata = stepMetadataIsWithinBudget ? stepComponentMetadata(cad, stepText) : undefined;
   const colorsByFace = componentMetadata
     ? componentColorsByFace(cad, componentMetadata.bySolid, solids, faces)
@@ -111,8 +112,8 @@ export async function importedShapeFromStepWithKernel(cad: OcctKernel, fileName:
   }
 
   const bounds = meshBounds(positions);
-  const worthKeepingExact = solids.length <= EXACT_GEOMETRY_LIMITS.solids
-    && new TextEncoder().encode(stepText).byteLength <= EXACT_GEOMETRY_LIMITS.sourceBytes;
+  const worthKeepingExact = solids.length <= MAX_EXPLODE_SOLIDS
+    && sourceBytes <= MAX_EXPLODE_SOURCE_BYTES;
   if (shape.importedMesh && bounds && worthKeepingExact) {
     try {
       const turned = cad.rotate(imported, { point: { x: 0, y: 0, z: 0 }, direction: { x: 1, y: 0, z: 0 } }, -Math.PI / 2);

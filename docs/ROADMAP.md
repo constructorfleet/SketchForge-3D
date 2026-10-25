@@ -106,3 +106,8 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 ## STEP interoperability
 
 - [#353: Export native nested STEP assembly hierarchy](https://github.com/constructorfleet/SketchForge-3D/issues/353) — native XCAF group occurrences and nested reimport coverage implemented; direct editing of imported occurrence placements remains open.
+
+## Engine limits and regression coverage
+
+- [#358: Document engine limits in the REST reference](https://github.com/constructorfleet/SketchForge-3D/issues/358) — thresholds, status behavior, and a regression check for exported limits are documented; STEP import and explosion share one limit definition.
+- [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — direct tests for STEP helpers, rotated/mirrored geometry, and recompute placement are tracked on a separate branch.

@@ -12,10 +12,10 @@ export type SectionOptions = { plane: SectionPlane; offset: number };
 
 const MAX_SECTION_SHAPES = 100;
 const MAX_SECTION_SPAN = 8_000;
-const MAX_SECTION_FACE_SPAN = 10_000;
+export const MAX_SECTION_FACE_SPAN = 10_000;
 const MAX_MESH_TRIANGLES = 50_000;
-const MAX_CONTOURS = 10_000;
-const MAX_SAMPLED_POINTS = 100_000;
+export const MAX_CONTOURS = 10_000;
+export const MAX_SAMPLED_POINTS = 100_000;
 
 type Bounds = { xmin: number; xmax: number; ymin: number; ymax: number; zmin: number; zmax: number };
 type PlaneFrame = { normal: "x" | "y" | "z"; u: "x" | "y" | "z"; v: "x" | "y" | "z"; matrix: (minU: number, minV: number, offset: number) => number[] };
