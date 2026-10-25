@@ -243,10 +243,11 @@
       "name": "SKETCHFORGE_DESKTOP_PORT",
       "default": "62158",
       "required": false,
-      "validation": "Parsed as a base-10 integer and used as the loopback port for the packaged desktop web server; the parsed value is not validated before startup. Changing it changes the browser storage origin used by the desktop app.",
+      "validation": "Whole number from 1 to 65535, surrounding whitespace ignored, used as the loopback port for the packaged desktop web server. Unset or blank uses 62158. Any other value, including 0, a negative or fractional number, or trailing text, is ignored and 62158 is used instead: the app writes a warning to the console and shows a notice in the app window naming the rejected value, the port used and this variable. If another program already holds the port, or the user may not listen on it, the app shows a startup error naming the port and this variable instead of a generic web-process failure. Changing it changes the browser storage origin used by the desktop app.",
       "sensitive": false,
       "subsystem": "Desktop application origin",
       "source": "../apps/desktop/main.cjs",
+      "additionalSources": ["../apps/desktop/port.cjs"],
       "ownerPage": "OPERATOR_CONFIGURATION.md#desktop-settings"
     },
     {

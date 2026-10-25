@@ -22,7 +22,11 @@
       "failed": "No se pudo iniciar SketchForge",
       "webProcessExited": "El proceso web interno de SketchForge terminó con el código {code}.",
       "webProcessTimeout": "SketchForge no pudo iniciar a tiempo su proceso web interno.",
-      "webBundleMissing": "Faltan los archivos de la interfaz web: {path}"
+      "webBundleMissing": "Faltan los archivos de la interfaz web: {path}",
+      "portInUse": "Otro programa ya está usando el puerto {port}, así que SketchForge no puede iniciar su proceso web interno. Cierra ese programa o asigna a {variable} un puerto libre. Los proyectos se guardan por puerto, así que otro puerto empieza con otra lista de proyectos.",
+      "portAccessDenied": "SketchForge no tiene permiso para escuchar en el puerto {port}, así que no puede iniciar su proceso web interno. Los puertos por debajo de 1024 suelen requerir permisos de administrador. Asigna a {variable} un puerto entre 1024 y 65535. Los proyectos se guardan por puerto, así que otro puerto empieza con otra lista de proyectos.",
+      "portFallbackTitle": "SketchForge está usando el puerto predeterminado",
+      "portFallback": "{variable} vale «{value}», que no es un número de puerto entre 1 y 65535, así que SketchForge se inició en el puerto {port}. Los proyectos se guardan por puerto, así que los proyectos guardados con otro puerto no aparecen aquí. Corrige o elimina {variable} y reinicia SketchForge para verlos."
     }
   }
 }

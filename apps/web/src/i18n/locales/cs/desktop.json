@@ -22,7 +22,11 @@
       "failed": "SketchForge se nepodařilo spustit",
       "webProcessExited": "Webový proces SketchForge skončil s kódem {code}.",
       "webProcessTimeout": "SketchForge nespustil svůj místní webový proces včas.",
-      "webBundleMissing": "Chybí soubory webové části aplikace: {path}"
+      "webBundleMissing": "Chybí soubory webové části aplikace: {path}",
+      "portInUse": "Port {port} už používá jiný program, takže SketchForge nemůže spustit svůj místní webový proces. Ukončete tento program, nebo nastavte {variable} na volný port. Projekty se ukládají zvlášť pro každý port, takže jiný port začne s jiným seznamem projektů.",
+      "portAccessDenied": "SketchForge nemá oprávnění naslouchat na portu {port}, a proto nemůže spustit svůj místní webový proces. Porty pod 1024 obvykle vyžadují práva správce. Nastavte {variable} na port od 1024 do 65535. Projekty se ukládají zvlášť pro každý port, takže jiný port začne s jiným seznamem projektů.",
+      "portFallbackTitle": "SketchForge používá výchozí port",
+      "portFallback": "{variable} je nastaveno na „{value}“, což není číslo portu od 1 do 65535, takže se SketchForge spustil na portu {port}. Projekty se ukládají zvlášť pro každý port, takže projekty uložené pod jiným portem se zde nezobrazí. Opravte nebo odstraňte {variable} a restartujte SketchForge, abyste je viděli."
     }
   }
 }

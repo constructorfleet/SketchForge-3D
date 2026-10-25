@@ -4,20 +4,29 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createDesktopI18n } = require("./i18n.cjs");
+const {
+  assertPortAvailable,
+  listenFailure,
+  listenFailureMessage,
+  portFallbackMessage,
+  resolveDesktopPort,
+} = require("./port.cjs");
 const { createProjectFileQueue, readProjectFile, skfPathsFromArgv } = require("./projectFiles.cjs");
+const { createUpdateInstaller, settlesWithin, singleFlight, stopProcess, watchProcess } = require("./webProcess.cjs");
+const { whenWindowReady } = require("./windowReady.cjs");
 
 const devUrl = process.env.SKETCHFORGE_DESKTOP_DEV_URL?.trim() || "";
-// Keep the desktop origin stable. localStorage and IndexedDB are scoped to the
-// full origin (including the port), so a random port made projects appear to
-// vanish after every restart.
-const DESKTOP_PORT = Number.parseInt(process.env.SKETCHFORGE_DESKTOP_PORT || "62158", 10);
 
 const isLinux = process.platform === "linux";
 
 let mainWindow = null;
 let tray = null;
 let webServer = null;
+let webServerWatch = null;
+let webServerUrl = null;
 let webServerOutput = "";
+// The SKETCHFORGE_DESKTOP_PORT value that was rejected, until the window shows the notice.
+let rejectedPortValue = null;
 let isQuitting = false;
 let updaterConfigured = false;
 let desktopIpcConfigured = false;
@@ -40,12 +49,18 @@ function appendServerOutput(chunk) {
   }
 }
 
-async function waitForServer(url, timeoutMs = 30_000) {
+async function waitForServer(url, port, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
 
   while (Date.now() < deadline) {
-    if (webServer && webServer.exitCode !== null) {
+    if (webServer && (webServer.exitCode !== null || webServerWatch.isClosed())) {
+      // `exit` can come before the last stderr chunk, which is where a listen
+      // error is reported, so read the output only once the streams have ended.
+      // Another program can still take the port between the check and the listen.
+      await settlesWithin(webServerWatch.closed, 2_000);
+      const failure = listenFailure(webServerOutput);
+      if (failure) throw new Error(listenFailureMessage(t, failure, port));
       throw new Error(t("desktop.startup.webProcessExited", { code: webServer.exitCode }));
     }
 
@@ -64,15 +79,37 @@ async function waitForServer(url, timeoutMs = 30_000) {
 }
 
 async function startPackagedWebServer() {
+  // Starting again (macOS `activate` after the window closed) reuses the running
+  // web process; a second one would find SketchForge's own port taken.
+  if (webServer && webServerUrl && !webServerWatch.isClosed()) return webServerUrl;
+
   const webRoot = path.join(process.resourcesPath, "web");
   const serverPath = path.join(webRoot, "apps", "web", "server.js");
   if (!fs.existsSync(serverPath)) {
     throw new Error(t("desktop.startup.webBundleMissing", { path: serverPath }));
   }
 
-  const port = DESKTOP_PORT;
+  // Keep the desktop origin stable. localStorage and IndexedDB are scoped to
+  // the full origin (including the port), so a random port made projects appear
+  // to vanish after every restart. An invalid value uses the default, with a
+  // console warning and a notice in the window, because the default port is a
+  // different origin and so a different project list.
+  const requestedPort = process.env.SKETCHFORGE_DESKTOP_PORT;
+  const port = resolveDesktopPort(requestedPort, (warning) => {
+    console.warn(warning);
+    rejectedPortValue = requestedPort;
+  });
+  try {
+    await assertPortAvailable(port, "127.0.0.1");
+  } catch (error) {
+    const failure = listenFailure(error);
+    if (failure) throw new Error(listenFailureMessage(t, failure, port));
+    throw error;
+  }
+
   const packagedNodeModules = path.join(process.resourcesPath, "app.asar", "node_modules");
 
+  webServerOutput = "";
   webServer = spawn(process.execPath, [serverPath], {
     cwd: path.dirname(serverPath),
     windowsHide: true,
@@ -91,21 +128,32 @@ async function startPackagedWebServer() {
     },
   });
 
+  webServerWatch = watchProcess(webServer);
   webServer.stdout?.on("data", appendServerOutput);
   webServer.stderr?.on("data", appendServerOutput);
 
   const url = `http://127.0.0.1:${port}`;
-  await waitForServer(url);
+  await waitForServer(url, port);
+  webServerUrl = url;
   return url;
 }
 
-function stopPackagedWebServer() {
-  if (!webServer || webServer.exitCode !== null) return;
-  try {
-    webServer.kill();
-  } catch {
-    // The process may already be gone while Electron is shutting down.
-  }
+/** Stops the web process; resolves once it has exited and released its port. */
+async function stopPackagedWebServer() {
+  if (!webServer || !webServerWatch) return;
+  webServerUrl = null;
+  await stopProcess(webServer, webServerWatch);
+}
+
+/** Tells the user, once the window is up, that an invalid port value was replaced by the default. */
+function showPortFallbackNotice(window) {
+  if (rejectedPortValue === null) return;
+  const rejected = rejectedPortValue;
+  rejectedPortValue = null;
+  whenWindowReady(window, () => {
+    const { title, message } = portFallbackMessage(t, rejected);
+    void dialog.showMessageBox(window, { type: "warning", title, message });
+  });
 }
 
 function appIconPath() {
@@ -141,11 +189,17 @@ function openProjectFiles(filePaths) {
   showMainWindow();
 }
 
-function installDownloadedUpdate() {
+// The installer relaunches SketchForge, and the new instance needs the port the
+// old web process holds, so the install waits for it to exit first.
+const updateInstaller = createUpdateInstaller({
+  stop: () => stopPackagedWebServer(),
+  install: () => autoUpdater.quitAndInstall(false, true),
+});
+
+async function installDownloadedUpdate() {
   if (!downloadedUpdateReady) return;
   isQuitting = true;
-  stopPackagedWebServer();
-  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  await updateInstaller.start();
 }
 
 async function downloadAndInstallDesktopUpdate() {
@@ -278,11 +332,21 @@ function setupDesktopUpdater() {
   autoUpdater.on("update-downloaded", (info) => {
     downloadedUpdateReady = true;
     setTrayTooltip(() => t("desktop.tray.updateReady", { version: info.version }));
-    if (updateInstallRequested) installDownloadedUpdate();
+    if (updateInstallRequested) void installDownloadedUpdate();
   });
 
   autoUpdater.on("error", (error) => {
     setTrayTooltip(() => "SketchForge");
+    if (updateInstaller.isInProgress()) {
+      // The installer failed instead of quitting. Its web process is already
+      // stopped, so stop offering the install and let Quit simply quit.
+      updateInstaller.failed();
+      downloadedUpdateReady = false;
+      updateInstallRequested = false;
+      manualUpdateCheck = false;
+      dialog.showErrorBox(t("desktop.updates.installFailed"), error instanceof Error ? error.message : String(error));
+      return;
+    }
     if (!manualUpdateCheck) return;
     manualUpdateCheck = false;
     dialog.showErrorBox(t("desktop.updates.installFailed"), error instanceof Error ? error.message : String(error));
@@ -313,8 +377,9 @@ function refreshTrayText() {
     {
       label: t("desktop.tray.quit"),
       click: () => {
-        if (downloadedUpdateReady) {
-          installDownloadedUpdate();
+        // While an install is already under way, Quit quits rather than waiting on it.
+        if (downloadedUpdateReady && !updateInstaller.isInProgress()) {
+          void installDownloadedUpdate();
           return;
         }
         isQuitting = true;
@@ -418,7 +483,10 @@ function createMainWindow(url) {
   void mainWindow.loadURL(url);
 }
 
-async function startDesktop() {
+// macOS can send `activate` while the first start is still waiting for the web
+// process, before the window exists; that call joins the start in flight
+// instead of spawning a second web process onto SketchForge's own port.
+const startDesktop = singleFlight(async () => {
   Menu.setApplicationMenu(null);
 
   try {
@@ -426,6 +494,7 @@ async function startDesktop() {
     setupDesktopIpc();
     createTray();
     createMainWindow(url);
+    showPortFallbackNotice(mainWindow);
     setupDesktopUpdater();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -436,7 +505,7 @@ async function startDesktop() {
     );
     app.quit();
   }
-}
+});
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -465,6 +534,9 @@ if (!hasSingleInstanceLock) {
     void startDesktop();
 
     app.on("activate", () => {
+      // The update install has stopped the web process on purpose; starting
+      // again would report its own port as busy, or quit before the install.
+      if (updateInstaller.isInProgress()) return;
       if (mainWindow) {
         showMainWindow();
       } else if (BrowserWindow.getAllWindows().length === 0) {
@@ -476,7 +548,7 @@ if (!hasSingleInstanceLock) {
 
 app.on("before-quit", () => {
   isQuitting = true;
-  stopPackagedWebServer();
+  void stopPackagedWebServer();
 });
 
 app.on("window-all-closed", () => {

@@ -118,6 +118,15 @@ test('desktop runtime settings have explicit ownership while the development URL
   }
   assert.equal(byName.get('SKETCHFORGE_DESKTOP_PORT').default, '62158', 'desktop port default must stay documented');
   assert.equal(byName.get('SKETCHFORGE_DESKTOP_PORT').source, '../apps/desktop/main.cjs');
+  assert.deepEqual(byName.get('SKETCHFORGE_DESKTOP_PORT').additionalSources, ['../apps/desktop/port.cjs'], 'the port validator must be linked as a reader');
+  const portValidation = byName.get('SKETCHFORGE_DESKTOP_PORT').validation;
+  assert.doesNotMatch(portValidation, /not validated/i, 'the desktop port is validated before startup');
+  assert.match(portValidation, /1 to 65535/, 'the accepted port range must be documented');
+  assert.match(portValidation, /warning/i, 'the fallback warning must be documented, because it changes the storage origin');
+  assert.match(portValidation, /notice in the app window/i, 'the fallback is shown in the app, not only logged');
+  assert.doesNotMatch(portValidation, /warning in the desktop log/i, 'the packaged app has no log the user can read');
+  assert.match(portValidation, /may not listen on it/i, 'the permission-denied startup error must be documented');
+  assert.match(portValidation, /already holds the port/i, 'the busy-port startup error must be documented');
   assert.equal(byName.get('SKETCHFORGE_LOCAL_DOWNLOAD_ROOT').source, '../apps/web/src/app/api/local-download/route.ts');
   assert.deepEqual(byName.get('SKETCHFORGE_LOCAL_DOWNLOAD_ROOT').additionalSources, ['../apps/desktop/main.cjs']);
   assert.equal(byName.has('SKETCHFORGE_DESKTOP_DEV_URL'), false, 'internal development handoffs are not supported user configuration');
