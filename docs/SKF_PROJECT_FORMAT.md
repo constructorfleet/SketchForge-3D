@@ -34,7 +34,7 @@ project.skf
 
 `project.json` contains these top-level sections:
 
-- `schema`, `formatVersion`, `minimumReaderVersion`, and `createdWithVersion`
+- `schema`, `formatVersion`, `minimumReaderVersion`, and `createdWithVersion` (the SketchForge release that wrote the package, kept equal to the engine package version by release-please; readers record it for support and do not use it to decide compatibility)
 - `metadata`: project name, source project ID, units, and timestamps
 - `assets`: path, type, byte length, SHA-256, source format, and media type
 - `states`: explicit root node IDs and editable object graphs for the active scene and undo/redo states

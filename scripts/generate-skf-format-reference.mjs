@@ -76,7 +76,7 @@ For automated project export from a server-backed project, see [\`POST /exports\
 | Schema | \`${constant("SKF_SCHEMA_ID").replaceAll('"', "")}\` |
 | Current writer format | ${constant("SKF_FORMAT_VERSION")} |
 | Minimum reader format | ${constant("SKF_MINIMUM_READER_VERSION")} |
-| Created-with version | \`${constant("SKF_CREATED_WITH_VERSION").replaceAll('"', "")}\` |
+| Created-with version | \`${constant("SKF_CREATED_WITH_VERSION").replaceAll('"', "")}\` | <!-- x-release-please-version -->
 | Media type | \`${constant("SKF_MEDIA_TYPE").replaceAll('"', "")}\` |
 
 A packaged file is a ZIP with a root \`project.json\` and binary or JSON payloads below \`assets/\`. The archive is validated before restoration. ZIP64 and encrypted entries are not supported.
