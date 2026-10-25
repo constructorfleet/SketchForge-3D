@@ -623,6 +623,13 @@ export function importedShapeFromSvg(fileName: string, source: string): Workplan
   };
 }
 
+/** Import an SVG using the browser parser, or the Node-only fallback when needed. */
+export async function importedShapeFromSvgOnHost(fileName: string, source: string): Promise<WorkplaneShape> {
+  if (typeof globalThis.DOMParser !== "undefined") return importedShapeFromSvg(fileName, source);
+  const { withNodeSvgDomParser } = await import("./nodeSvgDomParser.js");
+  return withNodeSvgDomParser(() => importedShapeFromSvg(fileName, source));
+}
+
 /** Why an imported SVG mesh is not a closed solid, or null when it is. Show it with `errorText`. */
 export function invalidSvgMeshError(shape: WorkplaneShape): Error | null {
   if (shape.importedMesh?.sourceFormat !== "svg") return null;

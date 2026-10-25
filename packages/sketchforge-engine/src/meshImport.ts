@@ -34,7 +34,7 @@ import {
   sourceFormatForFileName,
 } from "./projectAssets.js";
 import { importedShapeFromStl } from "./stlImport.js";
-import { importedShapeFromSvg } from "./svgImport.js";
+import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import type { ProjectAsset, WorkplaneShape } from "./domain/sketchforge.js";
 
 /** The file formats an import can read with no browser and no CAD kernel. */
@@ -49,21 +49,6 @@ export function importableMeshFormat(fileName: string): ImportableMeshFormat | n
   const format = sourceFormatForFileName(fileName);
   return format && (IMPORTABLE_MESH_FORMATS as readonly string[]).includes(format)
     ? (format as ImportableMeshFormat)
-    : null;
-}
-
-/**
- * Why an import could not be read, in words, or null when it can be.
- *
- * SVG is read by `three`'s `SVGLoader`, which parses with a `DOMParser`. A
- * browser has one and a bare Node process does not, and the difference shows
- * up as a `ReferenceError` from inside a loader -- so it is said plainly here
- * instead, before any bytes are touched.
- */
-function unreadableReason(format: ImportableMeshFormat): string | null {
-  if (format !== "svg") return null;
-  return typeof DOMParser === "undefined"
-    ? "SVG import needs a DOMParser, which this runtime does not provide; export the drawing as STL or OBJ instead."
     : null;
 }
 
@@ -86,13 +71,10 @@ export async function importedMeshFromFile(
   if (!format) {
     throw new Error(`Cannot import "${fileName}": the readable formats are ${IMPORTABLE_MESH_FORMATS.join(", ")}.`);
   }
-  const unreadable = unreadableReason(format);
-  if (unreadable) throw new Error(unreadable);
-
   const shape = format === "obj"
     ? importedShapeFromObj(fileName, new TextDecoder().decode(bytes))
     : format === "svg"
-      ? importedShapeFromSvg(fileName, new TextDecoder().decode(bytes))
+      ? await importedShapeFromSvgOnHost(fileName, new TextDecoder().decode(bytes))
       // A fresh buffer rather than the view's own: an importer reads the whole
       // `ArrayBuffer`, and a `Uint8Array` decoded from base64 or read off a
       // form may be a window onto a larger one.

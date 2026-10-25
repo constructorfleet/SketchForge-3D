@@ -12,7 +12,7 @@ sources:
 Generated from the running `tools/list` registry in `packages/sketchforge-client/mcp/server.mjs`.
 Regenerate with `node scripts/generate-mcp-reference.mjs`; `--check` verifies that this file matches the current public registry.
 
-The server currently exposes 39 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
+The server currently exposes 40 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
 
 ## sketchforge_list_projects
 
@@ -642,24 +642,58 @@ Import a triangle mesh into SketchForge from raw position and optional normal ar
   ]
 }
 ```
-## sketchforge_import_stl
+## sketchforge_import_file
 
 ### Description
 
-Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
+Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. The source filename supplies the shape name; color and placement use importer defaults. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
 
 ### Input schema
 
 ```json
 {
   "type": "object",
+  "required": [
+    "projectId",
+    "filePath"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "filePath": {
+      "type": "string",
+      "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
+    }
+  }
+}
+```
+## sketchforge_import_stl
+
+### Description
+
+Local-only compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files. Optional name, color, and placement fields override the imported shape. A remote url is not supported.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId",
+    "filePath"
+  ],
   "properties": {
     "projectId": {
       "type": "string"
     },
     "filePath": {
       "type": "string",
-      "description": "Path to an STL file under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); with neither set, any host path is allowed."
+      "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
     },
     "name": {
       "type": "string"
@@ -676,11 +710,7 @@ Import an STL file from the MCP host filesystem into a local project. Available 
     "elevation": {
       "type": "number"
     }
-  },
-  "required": [
-    "projectId",
-    "filePath"
-  ]
+  }
 }
 ```
 ## sketchforge_update_object
