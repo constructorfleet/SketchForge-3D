@@ -779,3 +779,18 @@ describe("shapePatchFromSummary", () => {
     });
   });
 });
+
+describe("exact topology face listings", () => {
+  it("passes topology through resource and bound handle while preserving the default", async () => {
+    const server = fakeServer({ body: { faces: [] } });
+    const api = client(server);
+    await api.faces.list("p1", "s1", { topology: "exact" });
+    await api.project("p1").faces("s1", { topology: "exact" });
+    await api.faces.list("p1", "s1");
+    expect(server.calls.map((call) => call.url)).toEqual([
+      "http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1&topology=exact",
+      "http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1&topology=exact",
+      "http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1",
+    ]);
+  });
+});

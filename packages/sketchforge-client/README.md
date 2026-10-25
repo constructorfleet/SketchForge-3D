@@ -87,7 +87,7 @@ client.treatments.apply(projectId, shapeId, { kind, amount, angle?, edges? }): P
 client.treatments.fillet(projectId, shapeId, radius, edges?): Promise<TreatmentResult>
 client.treatments.chamfer(projectId, shapeId, distance, { angle?, edges? }): Promise<TreatmentResult>
 
-client.faces.list(projectId, shapeId): Promise<FaceSummary[]>
+client.faces.list(projectId, shapeId, { topology? }?): Promise<FaceSummary[]>
 client.faces.facing(projectId, shapeId, direction): Promise<number[]>
 
 client.measurements.list(projectId, shapeId): Promise<MeasurementSummary[]>
@@ -140,7 +140,7 @@ A `ProjectHandle` is the same surface with the project id bound, which is what a
 project.get() | delete() | listShapes() | add(shape) | addMany(shapes) | update(id, changes)
 project.remove(id) | clear() | edges(id) | filletableEdges(id)
 project.treat(id, treatment) | fillet(id, radius, edges?) | chamfer(id, distance, options?)
-project.faces(id) | facesFacing(id, direction)
+project.faces(id, { topology? }?) | facesFacing(id, direction)
 project.measurements(id) | measurementsWithRadius(id) | measureBetween(from, to) | propertiesOf(id) | interferenceReport({ ids?, clearance? })
 project.sectionDrawing({ plane: "xy", offset: 3, shapeIds? })
 project.sectionDxf({ plane: "xy", offset: 3, shapeIds? }) | estimateWallThickness(id) | explodeStepAssembly(id)
@@ -189,6 +189,11 @@ const stl = await project.export({ format: "stl", name: "bracket" });
 await writeFile(stl.filename, stl.data);
 const top = await project.export({ format: "svg", view: "top" });
 ```
+
+`client.faces.list(projectId, shapeId, { topology: "exact" })` and
+`project.faces(shapeId, { topology: "exact" })` select analytic faces, including
+plain revolves. Omitting the option preserves the default mesh listing;
+`topology: "mesh"` selects it explicitly.
 
 `ShapePatch` also accepts `faceDraft` to retain one face draft on a sketch extrusion. The source face is named by its stable ID from `GET /faces`; the draft stores the signed local pull axis and angle. Profile edits replay it only when one planar face matches its original normal. Send `faceDraft: null` to clear the operation. `.skf` preserves the operation and source frame; prism drafts and edge treatments cannot be combined with it yet.
 

@@ -12,7 +12,7 @@ import base64
 import json
 import os
 import urllib.parse
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, cast, overload
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast, overload
 
 from ._http import DEFAULT_RETRY_ON_BUSY, DEFAULT_TIMEOUT_SECONDS, Transport
 from .errors import SketchForgeApiError, SketchForgeTransportError
@@ -48,6 +48,7 @@ from .types import (
     ShapeWriteResult,
     ShellResult,
     TreatmentResult,
+    WallThicknessEstimate,
 )
 
 
@@ -284,9 +285,12 @@ class Faces:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
 
-    def list(self, project_id: str, shape_id: str) -> List[FaceSummary]:
+    def list(
+        self, project_id: str, shape_id: str, *,
+        topology: Optional[Literal["mesh", "exact"]] = None,
+    ) -> List[FaceSummary]:
         payload = self._transport.send(
-            "GET", "/faces", {"projectId": project_id, "shapeId": shape_id}
+            "GET", "/faces", {"projectId": project_id, "shapeId": shape_id, "topology": topology}
         ) or {}
         return [FaceSummary.from_payload(entry) for entry in payload.get("faces", [])]
 
@@ -523,6 +527,35 @@ class Parts:
             shapes=[ShapeSummary.from_payload(shape) for shape in payload.get("shapes") or []],
             revision=int(payload.get("revision") or 0),
         )
+
+
+class Explosions:
+    """Explodes an imported STEP assembly into its component solids."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def explode(self, project_id: str, shape_id: str) -> ShapeCollectionResult:
+        payload = self._transport.send(
+            "POST", "/explode", {"projectId": project_id, "shapeId": shape_id}, {}, retryable=True
+        ) or {}
+        return ShapeCollectionResult(
+            shapes=[ShapeSummary.from_payload(shape) for shape in payload.get("shapes") or []],
+            revision=int(payload.get("revision") or 0),
+        )
+
+
+class Thickness:
+    """Samples opposing surfaces to estimate wall thickness."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def estimate(self, project_id: str, shape_id: str) -> WallThicknessEstimate:
+        payload = self._transport.send(
+            "GET", "/thickness", {"projectId": project_id, "shapeId": shape_id}
+        ) or {}
+        return WallThicknessEstimate.from_payload(payload.get("thickness") or {})
 
 
 class Align:
@@ -827,7 +860,7 @@ class Exports:
             "POST", "/exports", {"projectId": project_id}, body, retryable=False
         ) or {}
         export_format = payload.get("format") or format
-        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg"):
+        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"):
             export_format = format
         return ExportResult(
             format=cast(ExportFormat, export_format),
@@ -860,7 +893,7 @@ class Exports:
         metadata_raw = urllib.parse.unquote(headers.get("x-sketchforge-metadata", ""))
         metadata = json.loads(metadata_raw) if metadata_raw else {}
         export_format = metadata.get("format") or format
-        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg"):
+        if export_format not in ("stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"):
             export_format = format
         return ExportResult(
             format=cast(ExportFormat, export_format),
@@ -904,6 +937,8 @@ class SketchForgeClient:
         self.booleans = Booleans(self._transport)
         self.groups = Groups(self._transport)
         self.parts = Parts(self._transport)
+        self.explosions = Explosions(self._transport)
+        self.thickness = Thickness(self._transport)
         self.align = Align(self._transport)
         self.mirrors = Mirrors(self._transport)
         self.distribute = Distribute(self._transport)
@@ -1043,8 +1078,16 @@ class ProjectHandle:
     ) -> TreatmentResult:
         return self._client.treatments.chamfer(self.id, shape_id, distance, angle, edges)
 
-    def faces(self, shape_id: str) -> List[FaceSummary]:
-        return self._client.faces.list(self.id, shape_id)
+    def explode(self, shape_id: str) -> ShapeCollectionResult:
+        return self._client.explosions.explode(self.id, shape_id)
+
+    def estimate_wall_thickness(self, shape_id: str) -> WallThicknessEstimate:
+        return self._client.thickness.estimate(self.id, shape_id)
+
+    def faces(
+        self, shape_id: str, *, topology: Optional[Literal["mesh", "exact"]] = None,
+    ) -> List[FaceSummary]:
+        return self._client.faces.list(self.id, shape_id, topology=topology)
 
     def faces_facing(self, shape_id: str, direction: str) -> List[int]:
         return self._client.faces.facing(self.id, shape_id, direction)

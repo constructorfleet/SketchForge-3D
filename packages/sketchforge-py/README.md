@@ -57,7 +57,7 @@ client.treatments.fillet(project_id, shape_id, radius, edges=None) -> TreatmentR
 client.treatments.chamfer(project_id, shape_id, distance, angle=None, edges=None) -> TreatmentResult
 client.draft_prisms.apply(project_id, shape_id, angle) -> TreatmentResult
 
-client.faces.list(project_id, shape_id) -> list[FaceSummary]
+client.faces.list(project_id, shape_id, topology=None) -> list[FaceSummary]
 client.faces.facing(project_id, shape_id, direction) -> list[int]
 
 client.measurements.list(project_id, shape_id) -> list[MeasurementSummary]
@@ -89,13 +89,36 @@ client.patterns.ring(project_id, ids, count, center=(0, 0), sweep_angle=None, ro
 client.imports.apply(project_id, file_name, data, media_type=None) -> MeshImportResult
 client.imports.file(project_id, path) -> MeshImportResult
 
+client.explosions.explode(project_id, shape_id) -> ShapeCollectionResult
+client.thickness.estimate(project_id, shape_id) -> WallThicknessEstimate
+
 client.exports.export(project_id, format, shape_ids=None, name=None, view=None, section=None) -> ExportResult
 client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None, section=None) -> ExportResult
 ```
 
-For an SVG section drawing, set `section={"plane": "xy", "offset": 3}` instead
+For an SVG or DXF section drawing, set `section={"plane": "xy", "offset": 3}` instead
 of `view`. The supported planes are `xy`, `xz`, and `yz` in drawing coordinates;
 the plane must intersect the selected shapes.
+
+Use `client.faces.list(project_id, shape_id, topology="exact")` or
+`project.faces(shape_id, topology="exact")` to list analytic faces, including
+plain revolves. Omitting `topology` keeps the server's default mesh listing;
+`"mesh"` selects that listing explicitly.
+
+`project.explode(shape_id)` replaces an imported STEP assembly with its component
+solids and returns their summaries and the new project revision.
+`project.estimate_wall_thickness(shape_id)` returns a frozen `WallThicknessEstimate`
+with `minimum` (millimetres, or `None` when no opposing surface was found),
+`unit`, `method`, `samples_per_face`, and `faces_checked`. This sampled estimate
+is not a certified minimum wall thickness.
+
+```python
+section = client.exports.export(
+    project_id, format="dxf", section={"plane": "xy", "offset": 3}
+)
+```
+
+DXF exports require a section plane; they do not support projection `view`.
 
 Baked mirror reflects exact parameter-built solids across their selected bounds midpoint and stores exact BREP. Imported meshes, groups, and previously treated shapes are refused rather than silently tessellated.
 
@@ -135,21 +158,23 @@ A `ProjectHandle` is the same surface with the project id bound, which is what a
 project.get() | delete() | list_shapes() | add(shape) | add_many(shapes) | update(id, changes)
 project.remove(id) | clear() | edges(id) | filletable_edges(id)
 project.fillet(id, radius, edges=None) | chamfer(id, distance, angle=None, edges=None)
-project.faces(id) | faces_facing(id, direction)
+project.faces(id, topology=None) | faces_facing(id, direction)
 project.measurements(id) | measurements_with_radius(id) | measure_between(from_, to) | properties_of(id) | check_interference(ids=None, clearance=None)
 project.shell(id, thickness, open_faces=None) | hollow(id, thickness) | tray(id, thickness, open_faces=None)
 project.draft_prism(id, angle)
-project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id)
+project.cut(solid_ids, hole_ids) | group(ids) | ungroup(id) | separate(id) | explode(id)
+project.estimate_wall_thickness(id)
 project.align(ids, axis, target, anchor_id=None) | align_tops(ids, anchor_id=None) | mirror_baked(ids, axis)
 project.distribute(ids, axis=None, spacing=None) | row(ids, count, step_x, step_z=None)
 project.ring(ids, count, center=(0, 0), sweep_angle=None, rotate_copies=None)
 project.import_mesh(file_name, data) | import_file(path)
-project.export(format, shape_ids=None, name=None, view=None) | export_file(format, path, shape_ids=None, name=None, view=None)
+project.export(format, shape_ids=None, name=None, view=None, section=None)
+project.export_file(format, path, shape_ids=None, name=None, view=None, section=None)
 ```
 
 `import_file` uploads multipart form data, avoiding base64 expansion; `import_mesh`
 continues to accept bytes and uses the JSON API. Exports support `stl`, `obj`,
-`3mf`, `step`, `skf`, `zip`, and `svg`. An `svg` is a hidden-line drawing of the
+`3mf`, `step`, `skf`, `zip`, `svg`, and `dxf`. An `svg` is a hidden-line drawing of the
 exact geometry; `view` picks `multiview` (the default front, top, right and iso
 grid) or any one of `EXPORT_VIEWS`, and the server refuses `view` on any other
 format. `export` returns artifact metadata and bytes;

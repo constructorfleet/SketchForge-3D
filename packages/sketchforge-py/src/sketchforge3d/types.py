@@ -394,7 +394,7 @@ MeasurementEnd = Mapping[str, Any]
 #: The fields a PATCH may change. Anything else needs a new shape.
 ShapePatch = Mapping[str, Any]
 
-ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip", "svg"]
+ExportFormat = Literal["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"]
 
 #: What an ``svg`` export shows: one of the kernel's named views, or the
 #: four-view grid (front, top, right, iso), which is the default.
@@ -890,6 +890,27 @@ class MeasurementPair:
             distance=_number(payload, "distance"),
             angle_degrees=_optional_number(payload, "angleDegrees"),
             angle_unavailable=unavailable if isinstance(unavailable, str) else None,
+        )
+
+
+@dataclass(frozen=True)
+class WallThicknessEstimate:
+    """Sampled opposing-surface distance, not a certified minimum thickness."""
+
+    minimum: Optional[float]
+    unit: Literal["mm"]
+    method: Literal["sampled-opposing-surface-distance"]
+    samples_per_face: int
+    faces_checked: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "WallThicknessEstimate":
+        return cls(
+            minimum=_optional_number(payload, "minimum"),
+            unit="mm",
+            method="sampled-opposing-surface-distance",
+            samples_per_face=int(_number(payload, "samplesPerFace")),
+            faces_checked=int(_number(payload, "facesChecked")),
         )
 
 

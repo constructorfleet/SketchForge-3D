@@ -968,5 +968,67 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(client(opener).check(), {"ok": True, "projects": 1})
 
 
+class ClientParityTests(unittest.TestCase):
+    def test_explode_resource_and_handle(self):
+        opener = FakeOpener({'shapes': [shape_payload('part')], 'revision': 4})
+        api = client(opener)
+        for result in (api.explosions.explode('p1', 's1'), api.project('p1').explode('s1')):
+            self.assertIsInstance(result, ShapeCollectionResult)
+            self.assertEqual(result.shapes[0].id, 'part')
+            self.assertEqual(result.revision, 4)
+        for call in opener.calls:
+            self.assertEqual(call.method, 'POST')
+            self.assertEqual(call.url, 'http://localhost:3100/api/v1/explode?projectId=p1&shapeId=s1')
+            self.assertEqual(call.body, {})
+
+    def test_thickness_resource_and_handle_preserve_unknown_minimum(self):
+        from sketchforge3d import WallThicknessEstimate
+        thickness = {
+            'minimum': 1.25, 'unit': 'mm', 'method': 'sampled-opposing-surface-distance',
+            'samplesPerFace': 9, 'facesChecked': 6,
+        }
+        opener = FakeOpener(
+            {'thickness': thickness},
+            {'thickness': {**thickness, 'minimum': None, 'facesChecked': 0}},
+        )
+        api = client(opener)
+        result = api.thickness.estimate('p1', 's1')
+        self.assertIsInstance(result, WallThicknessEstimate)
+        self.assertEqual(
+            (result.minimum, result.unit, result.method, result.samples_per_face, result.faces_checked),
+            (1.25, 'mm', 'sampled-opposing-surface-distance', 9, 6),
+        )
+        self.assertIsNone(api.project('p1').estimate_wall_thickness('s1').minimum)
+        self.assertEqual(opener.calls[0].method, 'GET')
+        self.assertEqual(opener.calls[0].url, 'http://localhost:3100/api/v1/thickness?projectId=p1&shapeId=s1')
+
+    def test_faces_exact_topology_resource_and_handle(self):
+        opener = FakeOpener({'faces': []})
+        api = client(opener)
+        api.faces.list('p1', 's1', topology='exact')
+        api.project('p1').faces('s1', topology='exact')
+        for call in opener.calls:
+            self.assertEqual(call.url, 'http://localhost:3100/api/v1/faces?projectId=p1&shapeId=s1&topology=exact')
+
+    def test_dxf_is_a_declared_export_format(self):
+        from typing import get_args
+        from sketchforge3d import ExportFormat
+        self.assertIn('dxf', get_args(ExportFormat))
+
+    def test_dxf_section_export_and_download(self):
+        section = {'plane': 'xy', 'offset': 3}
+        opener = FakeOpener({'format': 'dxf', 'base64': base64.b64encode(b'drawing').decode()})
+        result = client(opener).exports.export('p1', format='dxf', section=section)
+        self.assertEqual((result.format, result.data), ('dxf', b'drawing'))
+        self.assertEqual(opener.calls[0].body, {'format': 'dxf', 'section': section})
+        download = TransferOpener(b'drawing', {'x-sketchforge-metadata': json.dumps({'format': 'dxf'})})
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, 'section.dxf')
+            result = client(download).project('p1').export_file('dxf', path, section=section)
+            self.assertEqual(result.format, 'dxf')
+            with open(path, 'rb') as artifact:
+                self.assertEqual(artifact.read(), b'drawing')
+
+
 if __name__ == "__main__":
     unittest.main()

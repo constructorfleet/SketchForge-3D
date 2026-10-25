@@ -103,6 +103,10 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 - [#381: 3D measurements and exact B-rep inspector properties](https://github.com/constructorfleet/SketchForge-3D/issues/381) — implementation and browser coverage complete; awaiting review.
 - [#382: Section view and kernel hidden-line SVG/DXF export](https://github.com/constructorfleet/SketchForge-3D/issues/382) — implementation and browser coverage complete; awaiting review.
 
+## Client parity
+
+- [#364: Python CAD resources and exact face listings](https://github.com/constructorfleet/SketchForge-3D/issues/364) — Python STEP explosion, sampled wall thickness, DXF export, and exact face listing in both clients implemented with regression coverage; awaiting review.
+
 ## CAD geometry correctness
 
 - [#354: Preserve face lineage and replay non-45° chamfers](https://github.com/constructorfleet/SketchForge-3D/issues/354) — implementation and regression coverage complete; awaiting review.
