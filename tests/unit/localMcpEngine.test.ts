@@ -114,6 +114,31 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(read[1].result.content[0].text)).toMatchObject({ volume: 120, area: 148, provenance: { source: "parametric", precision: "exact" } });
   }, 60_000);
 
+  it("measures and exports a group of solids as their union (#500)", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const shapeId = (response: Record<string, any>[]) => JSON.parse(response[1].result.content[0].text).shapes[0].id;
+    const large = shapeId(callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "cylinder", width: 20, depth: 20, height: 10 }));
+    const small = shapeId(callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "cylinder", width: 10, depth: 10, height: 10, x: 10, elevation: 5 }));
+    const grouped = callMcp(projectsDir, 2, "sketchforge_group_objects", { projectId: "case", ids: [large, small] });
+    expect(grouped[1].result.isError).toBeUndefined();
+    const groupId = JSON.parse(grouped[1].result.content[0].text).shape.id;
+
+    const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId: groupId });
+    expect(read[1].result.isError, read[1].result.content[0].text).toBeUndefined();
+    const properties = JSON.parse(read[1].result.content[0].text);
+    // The two cylinders' volumes less their 5mm-tall lens of overlap, counted once.
+    const lens = 100 * Math.acos(175 / 200) + 25 * Math.acos(25 / 100) - 0.5 * Math.sqrt(5 * 15 * 5 * 25);
+    expect(properties.volume).toBeCloseTo(Math.PI * 1250 - lens * 5, 3);
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
+
+    const exportPath = path.join(projectsDir, "union.stl");
+    const exported = callMcp(projectsDir, 4, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: exportPath, overwrite: true });
+    expect(exported[1].result.isError, exported[1].result.content[0].text).toBeUndefined();
+    expect(fs.statSync(exportPath).size).toBeGreaterThan(0);
+  }, 60_000);
+
   it("checks exact interference locally without returning geometry arrays", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);

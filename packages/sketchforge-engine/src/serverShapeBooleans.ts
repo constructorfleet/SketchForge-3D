@@ -27,6 +27,7 @@ import {
   expandGroupsForBoolean,
   groupedShapeFromSelection,
   meshShapeFromWorldPositions,
+  restoreGroupedChildren,
   shapeAsGroupChild,
   shapePlacementMatrix,
   worldMeshForShape,
@@ -94,6 +95,7 @@ function meshTrianglePositions(mesh: MeshData) {
 export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
   const mesh = worldMeshForShape(shape);
   if (mesh) return solidFromMeshPositions(cad, meshTrianglePositions(mesh));
+  if (isGroupRecord(shape)) return groupRecordSolid(cad, shape);
 
   let solid: ShapeHandle;
   try {
@@ -114,6 +116,39 @@ function singleSolid(cad: OcctKernel, shape: ShapeHandle) {
   if (cad.isSolid(shape)) return shape;
   const solids = cad.getSubShapes(shape, "solid");
   return solids.length === 1 ? solids[0] : shape;
+}
+
+/**
+ * Whether the shape is a group held only as a record of its children.
+ *
+ * Grouping solids with no hole among them stores the children and nothing
+ * else, in the editor and here alike, so there is no mesh or BREP to read.
+ */
+export function isGroupRecord(shape: WorkplaneShape) {
+  return Boolean(shape.groupedShapes?.length) && !shape.cadBrep && !worldMeshForShape(shape);
+}
+
+/**
+ * A group record as the one solid it stands for: its children, put back where
+ * they appear, fused (#500).
+ *
+ * Built when asked for rather than baked when grouping, because the record is
+ * what the editor stores and reads, and what ungrouping takes apart. Each child
+ * goes back through `placedSolidForShape`, so an exact child stays exact, a
+ * mesh child is sewn from its triangles, and a group nested inside is fused
+ * the same way. A group of holes is the region it removes, so it fuses too.
+ */
+function groupRecordSolid(cad: OcctKernel, group: WorkplaneShape): ShapeHandle {
+  const children = restoreGroupedChildren(group);
+  const solids = children.filter((child) => !child.hole);
+  if (solids.length === 0) return fuseSolids(cad, children);
+  const holes = children.filter((child) => child.hole);
+  return holes.length ? cutSolids(cad, solids, holes).cut : fuseSolids(cad, solids);
+}
+
+function fuseSolids(cad: OcctKernel, shapes: WorkplaneShape[]) {
+  const handles = shapes.map((shape) => placedSolidForShape(cad, shape));
+  return singleSolid(cad, handles.length === 1 ? handles[0] : cad.fuseAll(handles));
 }
 
 /**

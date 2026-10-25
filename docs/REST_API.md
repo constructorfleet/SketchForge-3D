@@ -878,6 +878,8 @@ Shapes are rebuilt as exact geometry by the same builders the fillet endpoint us
 
 The result is stored the way the editor stores a cut: a mesh of the solid, with the operands kept as the group's children. Unlike the editor, the server also stores the exact geometry alongside it, so a fillet or a STEP export of a cut part reads true surfaces rather than triangles.
 
+A group with no hole among its members is stored the way the editor stores one: as a record of its children, with no mesh of its own, so ungrouping gives back exactly the shapes that went in. Anything that needs the group as a solid -- `GET /properties`, exports, sections, drawings, interference, wall thickness, and whole-shape distance measurements -- fuses its children when it is asked: exact members stay exact and the result reports `provenance.precision: "exact"`, while a member carrying a mesh (an import, a revolve, a previous cut) is sewn from its triangles and the result reports `"tessellated"`. Edge and face listings, fillets, chamfers and shells still work on one stored solid at a time, so for a group record they answer `422` asking you to ungroup it first.
+
 The editor grows every cutter by 0.05mm before subtracting it, because a mesh CSG resolves two coplanar faces unpredictably. An exact boolean does not need that dodge, so a hole cut here is the size that was asked for -- a flush-bottomed pocket comes out at its stated depth rather than 0.05mm deeper.
 
 ### Separating parts

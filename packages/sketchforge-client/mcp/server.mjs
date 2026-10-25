@@ -547,7 +547,7 @@ const tools = [
   },
   {
     name: "sketchforge_shape_properties",
-    description: "Read one stored shape's volume, surface area, center of mass, bounds and validity, with provenance identifying the geometry source and whether precision is exact or tessellated. Works offline or against a server when url is supplied.",
+    description: "Read one stored shape's volume, surface area, center of mass, bounds and validity, with provenance identifying the geometry source and whether precision is exact or tessellated. A group of solids is measured as the union of its children. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId", "shapeId"],
