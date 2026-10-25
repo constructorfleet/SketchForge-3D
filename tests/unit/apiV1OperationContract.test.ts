@@ -300,7 +300,7 @@ describe("REST API v1 operation contract", () => {
     }
     expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { kind: "box" })).toBe(true);
     expect(contract.validateApiV1RequestBody("POST /api/v1/shapes", { width: 2 })).toBe(false);
-    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: [] })).toBe(true);
+    expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: [], nextCursor: null })).toBe(true);
     expect(contract.validateApiV1Response("GET /api/v1/projects", 200, { projects: "many" })).toBe(false);
     expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=../bad&shapeId=a"))).toMatchObject({ ok: false, invalid: ["projectId"] });
     expect(contract.parseApiV1Query("PATCH /api/v1/shapes", new Request("https://example.test/api/v1/shapes?projectId=p&shapeId=%20"))).toMatchObject({ ok: false, invalid: ["shapeId"] });
