@@ -16,7 +16,7 @@
 
 import type { OcctKernel } from "occt-wasm";
 import type { EdgeTreatmentSourceEdge, WorkplaneShape } from "./domain/sketchforge.js";
-import { edgeSolidForShape } from "./serverCadOperations.js";
+import { edgeSolidForShape, resizedSketchExtrusionProfile } from "./serverCadOperations.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import {
   edgeMatchesSegmentAtY,
@@ -66,7 +66,9 @@ function lineageSegments(shape: WorkplaneShape): SegmentEndpoints[] | null {
   if (shape.faceDraft !== undefined || shape.draftPrismAngle !== undefined || shape.shell
     || (shape.edgeTreatments?.length ?? 0) > 0 || (shape.edgeTreatmentHistory?.length ?? 0) > 0
     || shape.mirrorX || shape.mirrorY || shape.mirrorZ) return null;
-  return segmentEndpoints(shape.sketchProfile);
+  // A resized extrusion's edges are listed at its drawn size, so its segments
+  // are matched at that size too (#539).
+  return segmentEndpoints(resizedSketchExtrusionProfile(shape) ?? shape.sketchProfile);
 }
 
 function listedEdges(cad: OcctKernel, shape: WorkplaneShape) {
