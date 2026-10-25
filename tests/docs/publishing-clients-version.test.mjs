@@ -5,13 +5,14 @@ import test from "node:test";
 const read = (file) => readFile(new URL(`../../${file}`, import.meta.url), "utf8");
 
 test("publishing clients table shows the current release-please version", async () => {
-  const [guide, manifestText, rootText, engineText, clientText, python] = await Promise.all([
+  const [guide, manifestText, rootText, engineText, clientText, python, pythonInit] = await Promise.all([
     read("docs/PUBLISHING_CLIENTS.md"),
     read(".release-please-manifest.json"),
     read("package.json"),
     read("packages/sketchforge-engine/package.json"),
     read("packages/sketchforge-client/package.json"),
     read("packages/sketchforge-py/pyproject.toml"),
+    read("packages/sketchforge-py/src/sketchforge3d/__init__.py"),
   ]);
   const version = JSON.parse(manifestText)["."];
   assert.match(version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
@@ -19,6 +20,11 @@ test("publishing clients table shows the current release-please version", async 
     assert.equal(JSON.parse(packageText).version, version);
   }
   assert.match(python, new RegExp(`^version\\s*=\\s*"${version.replaceAll(".", "\\.")}"`, "m"));
+  assert.match(
+    pythonInit,
+    new RegExp(`^__version__\\s*=\\s*"${version.replaceAll(".", "\\.")}"\\s+# x-release-please-version$`, "m"),
+    "Python __version__ should match the release-please manifest and be updated on each release",
+  );
 
   for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
     const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));
@@ -33,6 +39,12 @@ test("publishing clients table shows the current release-please version", async 
       (file) => file.type === "generic" && file.path === "docs/PUBLISHING_CLIENTS.md",
     ),
     "release-please should update the publishing versions as part of every release PR",
+  );
+  assert.ok(
+    releaseConfig.packages["."]["extra-files"].some(
+      (file) => file.type === "generic" && file.path === "packages/sketchforge-py/src/sketchforge3d/__init__.py",
+    ),
+    "release-please should update the Python package version on every release PR",
   );
   for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
     const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));

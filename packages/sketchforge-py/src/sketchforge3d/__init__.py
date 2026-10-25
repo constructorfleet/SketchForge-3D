@@ -146,7 +146,7 @@ from .types import (
     Vector3,
 )
 
-__version__ = "0.1.0"
+__version__ = "1.27.0"  # x-release-please-version
 
 __all__ = [
     "ALIGN_AXES",

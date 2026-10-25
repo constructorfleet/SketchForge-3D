@@ -59,6 +59,10 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#374: Add direct project, import, and export commands to the macro CLI](https://github.com/constructorfleet/SketchForge-3D/issues/374) — implementation, generated reference, and mocked-server coverage complete; awaiting review.
 
+## Client package releases
+
+- [#370: Keep the Python package version in sync](https://github.com/constructorfleet/SketchForge-3D/issues/370) — ensure `sketchforge3d.__version__` follows release-please.
+
 ## MCP bridge
 
 - [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.

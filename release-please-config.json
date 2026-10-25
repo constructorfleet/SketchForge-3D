@@ -28,6 +28,10 @@
         },
         {
           "type": "generic",
+          "path": "packages/sketchforge-py/src/sketchforge3d/__init__.py"
+        },
+        {
+          "type": "generic",
           "path": "docs/PUBLISHING_CLIENTS.md"
         }
       ],
