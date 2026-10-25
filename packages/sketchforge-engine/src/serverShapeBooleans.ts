@@ -21,6 +21,8 @@ import { withCadKernel } from "./serverCadKernel.js";
 import { exactRevolveAngularDeflection, exactRevolveLocalSolid, hasExactRevolveSolid,localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "./serverCadOperations.js";
 import { mirroredInShapeFrame, UnbuildableShapeError } from "./cadSolids.js";
 import { createLocalId } from "./localIds.js";
+import { solidFromBrepOnKernel } from "./sketchFaceDraftKernel.js";
+import { shapeDepth, shapeHasTaper, shapeWidth } from "./workplaneShapes.js";
 import type { MeshData } from "./meshTransform.js";
 import {
   boundsForPositions,
@@ -93,6 +95,42 @@ function meshTrianglePositions(mesh: MeshData) {
  * `generalTransform` because a reflection is not a rigid placement.
  */
 export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
+  return placedSolid(cad, shape).solid;
+}
+
+/** Which stored representation supplied the geometry, and whether it is exact. */
+export type ShapeGeometryProvenance = {
+  /** Which stored representation supplied the geometry that was measured. */
+  source: "parametric" | "brep" | "mesh";
+  /** Imported triangle meshes remain tessellated even after sewing into a solid. */
+  precision: "exact" | "tessellated";
+};
+
+export type PlacedSolid = { solid: ShapeHandle; provenance: ShapeGeometryProvenance };
+
+const PARAMETRIC: ShapeGeometryProvenance = { source: "parametric", precision: "exact" };
+const BREP: ShapeGeometryProvenance = { source: "brep", precision: "exact" };
+const MESH: ShapeGeometryProvenance = { source: "mesh", precision: "tessellated" };
+
+/**
+ * Several solids' provenance as one: only as exact as the least exact of them.
+ * A group record is reported this way from the members it actually fused, so
+ * a member that fell back to its triangles -- a cut resized with its group,
+ * or one whose B-rep failed its check -- makes the record tessellated.
+ */
+function combinedProvenance(sources: readonly ShapeGeometryProvenance[]): ShapeGeometryProvenance {
+  return sources.find((source) => source.source === "mesh")
+    ?? sources.find((source) => source.source === "brep")
+    ?? PARAMETRIC;
+}
+
+/**
+ * The shape as a placed solid, together with the representation it was
+ * actually built from. Reported by the builder rather than guessed from the
+ * shape's fields beforehand, because only building it can tell whether a
+ * stored B-rep passed its check or a group member fell back to its mesh.
+ */
+export function placedSolid(cad: OcctKernel, shape: WorkplaneShape): PlacedSolid {
   // A plain revolve is stored as its sweep's mesh, but its profile describes
   // it exactly (#523). It is built in the mesh's own frame and placed the way
   // the mesh is, with the mirror applied exactly about the same centre rather
@@ -101,12 +139,23 @@ export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): Sha
   if (revolve) {
     const mirrored = mirroredInShapeFrame(cad, revolve, shape, { x: 0, y: shape.height / 2, z: 0 });
     const rigid = { ...shape, mirrorX: false, mirrorY: false, mirrorZ: false };
-    return cad.transform(mirrored, rowMajorTransform(shapePlacementMatrix(rigid)));
+    return { solid: cad.transform(mirrored, rowMajorTransform(shapePlacementMatrix(rigid))), provenance: PARAMETRIC };
   }
+  // A boolean result keeps its exact solid beside the mesh it is drawn with
+  // (#541), and the triangles are only ever an approximation of it.
+  const stored = placedResultBrepSolid(cad, shape);
+  if (stored) return { solid: stored, provenance: BREP };
   const mesh = worldMeshForShape(shape);
-  if (mesh) return solidFromMeshPositions(cad, meshTrianglePositions(mesh));
-  if (isGroupRecord(shape)) return groupRecordSolid(cad, shape);
+  if (mesh) return { solid: solidFromMeshPositions(cad, meshTrianglePositions(mesh)), provenance: MESH };
+  if (isGroupRecord(shape)) {
+    const sources: ShapeGeometryProvenance[] = [];
+    const solid = groupRecordSolid(cad, shape, sources);
+    return { solid, provenance: combinedProvenance(sources) };
+  }
+  return { solid: placedLocalSolid(cad, shape), provenance: shape.cadBrep ? BREP : PARAMETRIC };
+}
 
+function placedLocalSolid(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle {
   let solid: ShapeHandle;
   try {
     solid = localSolidForShape(cad, shape);
@@ -120,6 +169,132 @@ export function placedSolidForShape(cad: OcctKernel, shape: WorkplaneShape): Sha
   return shape.mirrorX || shape.mirrorY || shape.mirrorZ
     ? cad.generalTransform(solid, matrix)
     : cad.transform(solid, matrix);
+}
+
+/**
+ * Whether the shape is a boolean result whose stored B-rep is still the exact
+ * form of the mesh it is drawn with (#541).
+ *
+ * A cut stores two descriptions of one solid: the triangles the viewport
+ * draws, and the B-rep they were tessellated from, both in the result's own
+ * frame -- centred in X and Z, base at Y = 0. While the two agree, the B-rep is
+ * the better answer to "what is this solid", so measurement, interference and
+ * a further boolean read it instead of sewing the triangles back up.
+ *
+ * They stop agreeing when an edit reaches the mesh and not the B-rep. Moving,
+ * turning and mirroring do not: they are placement, applied to both alike. A
+ * resize does, because it stretches the stored triangles and the B-rep keeps
+ * its original size; so does a taper, and so does a frame recorded with a
+ * baked `sourceTransform`, which puts the B-rep somewhere other than the
+ * mesh's frame. A result made from a mesh operand is left out too: its B-rep
+ * was sewn from triangles, so calling it exact would be a claim about
+ * geometry nobody ever had.
+ *
+ * Edge treatments, drafts and shells rewrite the B-rep under their own rules
+ * and stay on the paths they had.
+ */
+export function hasCurrentResultBrep(shape: WorkplaneShape): boolean {
+  const mesh = shape.importedMesh;
+  if (!shape.cadBrep || !shape.cadBrepFrame || shape.cadBrepFrame.sourceTransform) return false;
+  if (!shape.groupedShapes?.length || !mesh || mesh.positions.length < 9) return false;
+  if (shape.edgeTreatments?.length || shape.faceDraft || shape.shell || shapeHasTaper(shape)) return false;
+  const unresized = (current: number, base: number) => Math.abs(current - base) <= RESULT_SIZE_TOLERANCE_MM;
+  if (!unresized(shapeWidth(shape), mesh.baseWidth)
+    || !unresized(shapeDepth(shape), mesh.baseDepth)
+    || !unresized(shape.height, mesh.baseHeight)) return false;
+  return shape.groupedShapes.every(operandIsExact);
+}
+
+/**
+ * Stored sizes are rounded to a thousandth of a millimetre while the mesh's
+ * base size is not, so an untouched result differs from its mesh by up to
+ * half of that. Absolute, not relative to the size: a 200 mm cut stretched by
+ * 0.15 mm is a resize, and a relative tolerance would call it untouched and
+ * measure the stale B-rep.
+ */
+const RESULT_SIZE_TOLERANCE_MM = 1e-3;
+
+/** Whether an operand went into a cut as exact geometry rather than as triangles. */
+function operandIsExact(child: WorkplaneShape): boolean {
+  if (hasExactRevolveSolid(child) || hasCurrentResultBrep(child)) return true;
+  if ((child.importedMesh?.positions.length ?? 0) >= 9) return false;
+  return child.groupedShapes?.length ? child.groupedShapes.every(operandIsExact) : true;
+}
+
+/**
+ * How far a result's B-rep may sit from its mesh's box: the cut is meshed to
+ * a tenth of a millimetre of chord height, so its corners can fall that far
+ * inside the true surfaces, with a margin on top for a large part.
+ */
+const RESULT_BREP_MATCH_MM = 0.25;
+const RESULT_BREP_MATCH_FRACTION = 0.01;
+
+/**
+ * How far a result's B-rep volume may differ from its mesh's, per mm² of the
+ * B-rep's surface. Every triangle lies within the 0.1 mm chord height of the
+ * true surface it was tessellated from, so the faceting can move at most
+ * that much depth across the whole area; twice it leaves room for OCCT
+ * treating the deflection as a target rather than a hard bound. A flat face
+ * contributes nothing, so a box-like part sits far inside this.
+ */
+const RESULT_BREP_VOLUME_MM_PER_AREA = 0.2;
+
+/** The volume a closed triangle list encloses, by the divergence theorem. */
+function enclosedVolume(positions: readonly number[]) {
+  let sixTimes = 0;
+  for (let index = 0; index + 8 < positions.length; index += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(index, index + 9);
+    sixTimes += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  }
+  return Math.abs(sixTimes) / 6;
+}
+
+/**
+ * A boolean result's stored B-rep, placed where the shape stands, or null to
+ * use its mesh instead.
+ *
+ * Placed the way the mesh is placed, since the two share a frame: mirrored
+ * exactly about the shape's centre, then moved rigidly, so the cut's
+ * cylinders stay cylinders. `cadBrepFrame` is deliberately not read for the
+ * position: a cut records the result's placement there rather than the
+ * B-rep's own bounds, so `cadBrepTransformForShape` would leave it at the
+ * origin.
+ *
+ * The B-rep is checked against the mesh before it is trusted, because the
+ * structural test cannot see an edit that replaced the triangles and left the
+ * B-rep behind. The triangles' corners lie on the true surfaces, so the two
+ * boxes agree to within the meshing tolerance; a B-rep that misses by more is
+ * describing something else, and the mesh is what is on screen.
+ */
+export function placedResultBrepSolid(cad: OcctKernel, shape: WorkplaneShape): ShapeHandle | null {
+  if (!hasCurrentResultBrep(shape)) return null;
+  const meshBounds = boundsForPositions(shape.importedMesh!.positions);
+  if (!meshBounds) return null;
+  let solid: ShapeHandle;
+  try {
+    solid = solidFromBrepOnKernel(cad, shape.cadBrep!);
+  } catch {
+    return null;
+  }
+  const box = cad.getBoundingBox(solid);
+  const size = Math.max(meshBounds.maxX - meshBounds.minX, meshBounds.maxY - meshBounds.minY, meshBounds.maxZ - meshBounds.minZ);
+  const tolerance = RESULT_BREP_MATCH_MM + RESULT_BREP_MATCH_FRACTION * size;
+  const agrees = [
+    [box.xmin, meshBounds.minX], [box.xmax, meshBounds.maxX],
+    [box.ymin, meshBounds.minY], [box.ymax, meshBounds.maxY],
+    [box.zmin, meshBounds.minZ], [box.zmax, meshBounds.maxZ],
+  ].every(([exact, meshed]) => Number.isFinite(exact) && Math.abs(exact - meshed) <= tolerance);
+  if (!agrees) return null;
+  // A box cannot see inside: the uncut plate has the same one as the plate
+  // with a bore through it. The volume can.
+  const query = cad.queryBatch([solid])[0];
+  if (!query || !Number.isFinite(query.volume)
+    || Math.abs(query.volume - enclosedVolume(shape.importedMesh!.positions)) > RESULT_BREP_VOLUME_MM_PER_AREA * query.area) {
+    return null;
+  }
+  const mirrored = mirroredInShapeFrame(cad, solid, shape, { x: 0, y: shape.height / 2, z: 0 });
+  const rigid = { ...shape, mirrorX: false, mirrorY: false, mirrorZ: false };
+  return cad.transform(mirrored, rowMajorTransform(shapePlacementMatrix(rigid)));
 }
 
 /**
@@ -163,20 +338,29 @@ export function isGroupRecord(shape: WorkplaneShape) {
  * group's own `hidden` flag is not a member's, so it is read from the stored
  * children rather than from the restored ones, which inherit it.
  */
-function groupRecordSolid(cad: OcctKernel, group: WorkplaneShape): ShapeHandle {
+function groupRecordSolid(cad: OcctKernel, group: WorkplaneShape, sources: ShapeGeometryProvenance[]): ShapeHandle {
   const stored = group.groupedShapes ?? [];
   const children = restoreGroupedChildren(group).filter((_, index) => !stored[index]?.hidden);
   if (children.length === 0) {
     throw new ServerCadError(`"${group.name}" is a group whose members are all hidden, so it has no geometry; show a member first.`);
   }
   const solids = children.filter((child) => !child.hole);
-  if (solids.length === 0) return fuseSolids(cad, children);
+  if (solids.length === 0) return fuseSolids(cad, children, sources);
   const holes = children.filter((child) => child.hole);
-  return holes.length ? cutSolids(cad, solids, holes).cut : fuseSolids(cad, solids);
+  return holes.length ? cutSolids(cad, solids, holes, sources).cut : fuseSolids(cad, solids, sources);
 }
 
-function fuseSolids(cad: OcctKernel, shapes: WorkplaneShape[]) {
-  const handles = shapes.map((shape) => placedSolidForShape(cad, shape));
+/** Each shape placed, with the representation it came from added to `sources`. */
+function placedHandles(cad: OcctKernel, shapes: WorkplaneShape[], sources?: ShapeGeometryProvenance[]) {
+  return shapes.map((shape) => {
+    const placed = placedSolid(cad, shape);
+    sources?.push(placed.provenance);
+    return placed.solid;
+  });
+}
+
+function fuseSolids(cad: OcctKernel, shapes: WorkplaneShape[], sources?: ShapeGeometryProvenance[]) {
+  const handles = placedHandles(cad, shapes, sources);
   return singleSolid(cad, handles.length === 1 ? handles[0] : cad.fuseAll(handles));
 }
 
@@ -195,9 +379,9 @@ type CutOutcome = {
   cutVolume: number;
 };
 
-function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[]): CutOutcome {
-  const solidHandles = solids.map((shape) => placedSolidForShape(cad, shape));
-  const holeHandles = holes.map((shape) => placedSolidForShape(cad, shape));
+function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneShape[], sources?: ShapeGeometryProvenance[]): CutOutcome {
+  const solidHandles = placedHandles(cad, solids, sources);
+  const holeHandles = placedHandles(cad, holes, sources);
   const fused = singleSolid(cad, solidHandles.length === 1 ? solidHandles[0] : cad.fuseAll(solidHandles));
   // Measured, because `cutAll` returns the solid untouched when nothing met it
   // and says nothing about having done so. The worker path has reported these
