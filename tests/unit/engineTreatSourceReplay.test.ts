@@ -206,7 +206,7 @@ describe("engine.treat records a replayable treatment for source edits", () => {
 
   const unreplayable: Array<[string, (engine: ReturnType<typeof createEngine>, id: string) => Promise<EngineResult<unknown>>]> = [
     ["a shell", (engine, id) => engine.shell("treat", id, { thickness: 0.2, openFaces: ["top"] })],
-    ["a selected-edge fillet", (engine, id) => engine.treat("treat", id, { kind: "fillet", amount: 0.2, edges: [0] })],
+    ["a selected side-edge fillet, which has no sketch-segment lineage", (engine, id) => engine.treat("treat", id, { kind: "fillet", amount: 0.2, edges: [0] })],
   ];
 
   it.each(unreplayable)("refuses a source-profile edit after %s and writes nothing", async (_label, operate) => {

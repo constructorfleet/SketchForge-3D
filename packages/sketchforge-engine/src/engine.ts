@@ -88,6 +88,7 @@ import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
 import { sketchExtrusionShapeFromRequest } from "./sketchExtrusionRequest.js";
+import { sketchSourceEdgesForEdgeIndexes } from "./sketchEdgeSegmentLineage.js";
 import {
   edgeTreatmentAppliedFrame,
   findSketchOutput,
@@ -1648,7 +1649,11 @@ export function createEngine(store: ProjectStore): Engine {
       }
     }),
 
-    treat: (projectId, shapeId, treatment) => cadTreatment(
+    treat: (projectId, shapeId, requested) => {
+      // An edge named twice is one edge: rounding it once is what the caller
+      // gets, so it is counted, and recorded, once.
+      const treatment = requested.edges ? { ...requested, edges: [...new Set(requested.edges)] } : requested;
+      return cadTreatment(
       projectId,
       shapeId,
       (treatment.edges === undefined || treatment.edges.length === 0)
@@ -1663,15 +1668,19 @@ export function createEngine(store: ProjectStore): Engine {
         // Every treatment is recorded, as the editor records its own. A source
         // edit rebuilds the solid from the sketch and replays this record; with
         // no record it rebuilt a bare solid and silently dropped the treatment.
-        // A selected-edge or non-45-degree chamfer record cannot be replayed,
-        // so a later source edit is refused rather than lossy.
+        // Selected edges are recorded by sketch lineage -- segment and cap --
+        // when every one of them has exactly one, never by their transient
+        // indexes (#350). A selected-edge record without lineage cannot be
+        // replayed, so a later source edit is refused rather than lossy.
         const allEdges = treatment.edges === undefined || treatment.edges.length === 0;
+        const lineage = allEdges ? undefined : await sketchSourceEdgesForEdgeIndexes(shape, treatment.edges!);
         const feature: EdgeTreatmentFeature = {
           kind: treatment.kind,
           amount: treatment.amount,
           edgeCount: allEdges ? await allEdgeTreatmentEdgeCount(shape, treatment.kind) : treatment.edges!.length,
           ...(allEdges ? { allEdges: true as const } : {}),
           ...(treatment.kind === "chamfer" ? { chamferAngle: treatment.angle ?? 45 } : {}),
+          ...(lineage?.status === "matched" ? { sourceEdges: lineage.sourceEdges } : {}),
         };
         // The snapshot drops its own history, as the editor's does, so each
         // treatment does not nest a copy of every earlier one.
@@ -1691,7 +1700,8 @@ export function createEngine(store: ProjectStore): Engine {
           ],
         };
       },
-    ),
+    );
+    },
 
     draftPrism: (projectId, shapeId, angle) => cadTreatment(projectId, shapeId, "prism-draft", async (shape) => ({
       ...retainDraftSourceMirrors(shapeWithCadResult(shape, await applyDraftPrism(shape, { angle })), shape),

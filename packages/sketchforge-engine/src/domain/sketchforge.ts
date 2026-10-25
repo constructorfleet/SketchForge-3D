@@ -222,6 +222,19 @@ export type EdgeTreatmentFeature = {
   chamferAngle?: number;
   /** The operation selected every currently available edge, so it can be replayed without topology indices. */
   allEdges?: true;
+  /**
+   * The selected edges by sketch lineage rather than by transient edge index:
+   * each is the edge a straight sketch segment sweeps along the extrusion's
+   * bottom or top cap. Present only when every selected edge had exactly one
+   * such source, so a sketch edit can find the same edges again (#350).
+   */
+  sourceEdges?: EdgeTreatmentSourceEdge[];
+};
+
+/** A cap edge of a sketch extrusion, named by the sketch segment that bounds it and the cap it lies on. */
+export type EdgeTreatmentSourceEdge = {
+  segmentId: string;
+  cap: "top" | "bottom";
 };
 
 export type EdgeTreatmentHistoryEntry = {
