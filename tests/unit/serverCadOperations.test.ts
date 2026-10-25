@@ -55,6 +55,138 @@ describe("server-side fillet and chamfer", { timeout: CAD_TEST_TIMEOUT_MS }, () 
     expect(result.positions.length).toBe(result.triangleCount * 9);
   });
 
+  describe("draft prism profile order (#349)", () => {
+    type Point = { id: string; x: number; z: number; handleIn?: { x: number; z: number }; handleOut?: { x: number; z: number } };
+    type Segment = { id: string; startId: string; endId: string; kind?: "line" | "bezier" | "smooth" };
+    const loop = (points: Point[], prefix = "edge"): Segment[] => points.map((point, index) => ({
+      id: `${prefix}-${index}`, startId: point.id, endId: points[(index + 1) % points.length].id, kind: "line",
+    }));
+    const extrusionOf = (points: Point[], segments: Segment[]) => ({
+      ...box(), sketchOperation: "extrude", sketchProfile: { points, segments },
+    }) as WorkplaneShape;
+    const rotated = (segments: Segment[]) => [...segments.slice(2), ...segments.slice(0, 2)];
+    const reversed = (segments: Segment[]) => segments.map(({ startId, endId, ...rest }) => ({ ...rest, startId: endId, endId: startId })).reverse();
+    const measure = async (shape: WorkplaneShape) => {
+      const result = await applyDraftPrism(shape, { angle: 5 });
+      return withCadKernel((cad) => cad.queryBatch([cad.fromBREP(result.brep)])[0]!);
+    };
+
+    // The square from the issue's probe, and an asymmetric pentagon whose
+    // centre of mass would move if a reordered loop were built misplaced.
+    const square: Point[] = [
+      { id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: -20 },
+      { id: "c", x: 20, z: 20 }, { id: "d", x: -20, z: 20 },
+    ];
+    const pentagon: Point[] = [
+      { id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: -20 },
+      { id: "c", x: 20, z: 6 }, { id: "d", x: 2, z: 20 }, { id: "e", x: -20, z: 14 },
+    ];
+
+    it.each([["square", square], ["asymmetric pentagon", pentagon]])(
+      "drafts a %s identically whatever the segment order or direction",
+      async (_name, points) => {
+        const segments = loop(points);
+        const ordered = await measure(extrusionOf(points, segments));
+        expect(ordered.volume).toBeGreaterThan(0);
+        for (const variant of [rotated(segments), reversed(segments), rotated(reversed(segments))]) {
+          const actual = await measure(extrusionOf(points, variant));
+          expect(Math.abs(actual.volume - ordered.volume)).toBeLessThan(1e-6);
+          expect(actual.centerOfMass.x).toBeCloseTo(ordered.centerOfMass.x, 6);
+          expect(actual.centerOfMass.y).toBeCloseTo(ordered.centerOfMass.y, 6);
+          expect(actual.centerOfMass.z).toBeCloseTo(ordered.centerOfMass.z, 6);
+        }
+      },
+    );
+
+    it("refuses a curved profile and says the curve is the reason", async () => {
+      // b -> c is a cubic: both of its handles are set, as sampledPath and the
+      // extrusion builder require before they draw a curve.
+      const points: Point[] = square.map((point, index) => index === 1
+        ? { ...point, handleOut: { x: 26, z: -10 } }
+        : index === 2 ? { ...point, handleIn: { x: 26, z: 10 } } : point);
+      for (const kind of ["bezier", "smooth", undefined] as const) {
+        const segments = loop(points).map((segment, index) => index === 1 ? { ...segment, kind } : segment);
+        await expect(applyDraftPrism(extrusionOf(points, segments), { angle: 5 })).rejects.toThrow(/straight segments.*curved/);
+      }
+    });
+
+    it("drafts a segment the extrusion draws straight as straight, whatever its kind says", async () => {
+      // sampledPath draws a cubic only when the segment is not a line and both
+      // of its handles are set. Anything less is a straight edge in the
+      // extrusion, so the draft treats it as one rather than calling it curved.
+      const ordered = await measure(extrusionOf(square, loop(square)));
+      const handleless = loop(square).map((segment, index) => index < 2 ? { ...segment, kind: index === 0 ? "bezier" as const : "smooth" as const } : segment);
+      const oneSided = square.map((point, index) => index === 1 ? { ...point, handleOut: { x: 26, z: -10 } } : point);
+      const untyped = loop(oneSided).map(({ kind: _kind, ...segment }) => segment);
+      for (const [points, segments] of [[square, handleless], [oneSided, untyped]] as const) {
+        const actual = await measure(extrusionOf([...points], [...segments]));
+        expect(Math.abs(actual.volume - ordered.volume)).toBeLessThan(1e-6);
+        expect(actual.centerOfMass.x).toBeCloseTo(ordered.centerOfMass.x, 6);
+        expect(actual.centerOfMass.z).toBeCloseTo(ordered.centerOfMass.z, 6);
+      }
+    });
+
+    it("refuses an outline that crosses itself and says so", async () => {
+      // A symmetric bow tie encloses no net area; a lopsided one does, and
+      // would otherwise reach the kernel as a face it cannot build.
+      for (const points of [
+        [{ id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: 20 }, { id: "c", x: 20, z: -20 }, { id: "d", x: -20, z: 20 }],
+        [{ id: "a", x: -20, z: -20 }, { id: "b", x: 20, z: 20 }, { id: "c", x: 20, z: -20 }, { id: "d", x: -20, z: 40 }],
+      ]) {
+        await expect(applyDraftPrism(extrusionOf(points, loop(points)), { angle: 5 })).rejects.toThrow(/crosses itself/);
+      }
+    });
+
+    it("refuses a closed outline that encloses no area and says so", async () => {
+      const points: Point[] = [{ id: "a", x: -20, z: 0 }, { id: "b", x: 0, z: 0 }, { id: "c", x: 20, z: 0 }];
+      await expect(applyDraftPrism(extrusionOf(points, loop(points)), { angle: 5 })).rejects.toThrow(/encloses no area/);
+    });
+
+    it("drafts an outline whose closing point is repeated with a zero-length segment as the plain outline", async () => {
+      const ordered = await measure(extrusionOf(square, loop(square)));
+      const repeated = extrusionOf([...square, { ...square[0] }], [...loop(square), { id: "closing", startId: "a", endId: "a", kind: "line" }]);
+      const actual = await measure(repeated);
+      expect(Math.abs(actual.volume - ordered.volume)).toBeLessThan(1e-6);
+      expect(actual.centerOfMass.x).toBeCloseTo(ordered.centerOfMass.x, 6);
+      expect(actual.centerOfMass.z).toBeCloseTo(ordered.centerOfMass.z, 6);
+    });
+
+    it("refuses two points that share an id but not a position and says so", async () => {
+      const shape = extrusionOf([...square, { id: "a", x: 30, z: 30 }], loop(square));
+      await expect(applyDraftPrism(shape, { angle: 5 })).rejects.toThrow(/share the id "a"/);
+    });
+
+    it("refuses a profile with a hole and says the hole is the reason", async () => {
+      const hole: Point[] = [
+        { id: "h1", x: -5, z: -5 }, { id: "h2", x: 5, z: -5 },
+        { id: "h3", x: 5, z: 5 }, { id: "h4", x: -5, z: 5 },
+      ];
+      const shape = extrusionOf([...square, ...hole], [...loop(square), ...loop(hole, "hole")]);
+      await expect(applyDraftPrism(shape, { angle: 5 })).rejects.toThrow(/hole/);
+    });
+
+    it("refuses a profile with points or segments outside its closed outline and says so", async () => {
+      // A stray point would move the bounds centre the draft is built about
+      // away from the outline it drafts, so it is refused rather than drafted.
+      const stray = extrusionOf([...square, { id: "e", x: 30, z: 30 }], loop(square));
+      await expect(applyDraftPrism(stray, { angle: 5 })).rejects.toThrow(/outside its closed outline/);
+      const construction = extrusionOf(
+        [...square, { id: "e", x: 30, z: 30 }, { id: "f", x: 40, z: 30 }],
+        [...loop(square), { id: "construction", startId: "e", endId: "f", kind: "line" }],
+      );
+      await expect(applyDraftPrism(construction, { angle: 5 })).rejects.toThrow(/3 points or segments outside its closed outline/);
+    });
+
+    it("refuses a profile with several separate regions and says so", async () => {
+      const other: Point[] = [
+        { id: "o1", x: 30, z: -5 }, { id: "o2", x: 40, z: -5 },
+        { id: "o3", x: 40, z: 5 }, { id: "o4", x: 30, z: 5 },
+      ];
+      const shape = extrusionOf([...square, ...other], [...loop(square), ...loop(other, "other")]);
+      await expect(applyDraftPrism(shape, { angle: 5 })).rejects.toThrow(/2 separate closed regions/);
+    });
+  });
+
   it("rejects zero and excessive draft angles before invoking the kernel", async () => {
     await expect(applyDraftPrism(box(), { angle: 45 })).rejects.toThrow(/between -45 and 45/);
     await expect(applyDraftPrism(box(), { angle: 5 })).rejects.toThrow(/source profile retained/);

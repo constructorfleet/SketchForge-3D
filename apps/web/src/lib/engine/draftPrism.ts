@@ -1,5 +1,6 @@
 import { type OcctKernel } from "occt-wasm";
 import type { SketchProfile } from "@/types/sketchforge";
+import { draftPrismLoop } from "@constructorfleet/sketchforge-engine/sketchCadProfile";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 
 export type DraftPrismBuildRequest = {
@@ -18,27 +19,25 @@ export type DraftPrismBuildResult = {
   faceGroups: number[];
 };
 
-/** Builds an exact drafted solid from the editor's supported straight sketch profile. */
+/** Builds an exact drafted solid from the editor's supported straight sketch profile, in any segment order. */
 export function buildDraftPrism(cad: OcctKernel, request: DraftPrismBuildRequest): DraftPrismBuildResult {
-  const { points, segments } = request.profile;
   if (!Number.isFinite(request.height) || request.height <= 0
-    || !Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45
-    || points.length < 3 || segments.length !== points.length
-    || segments.some((segment, index) => (segment.kind && segment.kind !== "line")
-      || segment.startId !== points[index]?.id
-      || segment.endId !== points[(index + 1) % points.length]?.id)
-    || points.some((point) => point.handleIn || point.handleOut || !Number.isFinite(point.x) || !Number.isFinite(point.z))) {
-    throw new Error("Draft prism requires one straight closed sketch profile and an angle between -45 and 45 degrees, excluding zero.");
+    || !Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
+    throw new Error("Draft prism requires a positive height and an angle between -45 and 45 degrees, excluding zero.");
   }
+  // The same loop, and the same refusals, as the REST draft (#349).
+  const loop = draftPrismLoop(request.profile);
+  if (typeof loop === "string") throw new Error(loop);
 
+  const { points } = request.profile;
   const minX = Math.min(...points.map(({ x }) => x));
   const maxX = Math.max(...points.map(({ x }) => x));
   const minZ = Math.min(...points.map(({ z }) => z));
   const maxZ = Math.max(...points.map(({ z }) => z));
   const centerX = (minX + maxX) / 2;
   const centerZ = (minZ + maxZ) / 2;
-  const edges = points.map((point, index) => {
-    const next = points[(index + 1) % points.length];
+  const edges = loop.map((point, index) => {
+    const next = loop[(index + 1) % loop.length];
     return cad.makeLineEdge(
       { x: point.x - centerX, y: 0, z: point.z - centerZ },
       { x: next.x - centerX, y: 0, z: next.z - centerZ },
