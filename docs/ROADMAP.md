@@ -22,6 +22,10 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
 
+## CAD worker reliability
+
+- [#361: Release exact-cut intermediate handles during an open edge-modifier session](https://github.com/constructorfleet/SketchForge-3D/issues/361) — implementation and real-kernel handle-baseline regression coverage complete; awaiting review. Cuts use an arena checkpoint and release their allocations on success or failure, preserving retained session geometry.
+
 ## Documentation suite open work
 
 - The [documentation suite specification](DOCUMENTATION_SUITE_SPEC.md) tracks partial source ownership diagnostics and broader task-workflow coverage as open work.
