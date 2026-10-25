@@ -132,6 +132,7 @@ import { faceEditingCanBeEnabled } from "@/lib/shapeFaces";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
 import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
+import { downloadBlob, type DownloadResult } from "@/lib/downloadFile";
 import { projectExportFileName } from "@/lib/exportNames";
 import type { AutosaveNotice } from "@/lib/autosaveNotice";
 import { meshVolumeMm3 } from "@/lib/materialPresets";
@@ -262,7 +263,6 @@ type EdgeFeatureRevertOption = {
   removesNewerCount: number;
 };
 type ManifoldSolid = ReturnType<ManifoldToplevel["Manifold"]["cube"]>;
-type DownloadResult = { mode: "browser" } | { mode: "folder"; path: string };
 type GroupBuildResult = {
   group: WorkplaneShape | null;
   booleanSelection: WorkplaneShape[];
@@ -2624,29 +2624,12 @@ async function downloadTextFile(filename: string, content: string, type: string)
   return { mode: "browser" };
 }
 
-async function downloadBlobFile(filename: string, blob: Blob): Promise<DownloadResult> {
-  const mode = window.localStorage.getItem(DOWNLOAD_MODE_STORAGE_KEY);
-  const folder = window.localStorage.getItem(DOWNLOAD_FOLDER_STORAGE_KEY)?.trim() ?? "";
-  if (!STATIC_EXPORT_BUILD && mode === "folder" && folder) {
-    const formData = new FormData();
-    formData.set("file", blob, filename);
-    formData.set("filename", filename);
-    formData.set("folder", folder);
-    const response = await fetch("/api/local-download", { method: "POST", body: formData });
-    const payload = (await response.json().catch(() => null)) as { error?: string; path?: string } | null;
-    if (!response.ok || !payload?.path) throw payload?.error ? new Error(payload.error) : new LocalizedError("errors.editor.saveExport");
-    return { mode: "folder", path: payload.path };
-  }
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return { mode: "browser" };
+function downloadBlobFile(filename: string, blob: Blob): Promise<DownloadResult> {
+  return downloadBlob(filename, blob, {
+    mode: window.localStorage.getItem(DOWNLOAD_MODE_STORAGE_KEY) === "folder" ? "folder" : "browser",
+    folder: window.localStorage.getItem(DOWNLOAD_FOLDER_STORAGE_KEY) ?? "",
+    localDownloadAvailable: !STATIC_EXPORT_BUILD,
+  });
 }
 
 function shapeAabb(shape: WorkplaneShape): Cuboid {
@@ -5425,6 +5408,7 @@ export function SketchForgeEditor({
   projectModifiedAt = Date.now(),
   projectRevision = 0,
   showProjectNameInToolbar = true,
+  projectsStoredOnServer = false,
   sharedProjectsEnabled = false,
   challengeTutorial = null,
   onChallengeTutorialFinish,
@@ -5475,6 +5459,8 @@ export function SketchForgeEditor({
   projectModifiedAt?: number;
   projectRevision?: number;
   showProjectNameInToolbar?: boolean;
+  /** Projects live in the server directory, not browser storage; Workspace settings > Storage says so. */
+  projectsStoredOnServer?: boolean;
   sharedProjectsEnabled?: boolean;
   challengeTutorial?: ChallengeTutorialId | null;
   onChallengeTutorialFinish?: () => void;
@@ -10370,6 +10356,7 @@ export function SketchForgeEditor({
           initialWorkspace={workspaceSettings}
           workspaceSettingsKey={projectId ?? "local-workplane"}
           showProjectNameInToolbar={showProjectNameInToolbar}
+          projectsStoredOnServer={projectsStoredOnServer}
           onShowProjectNameInToolbarChange={onShowProjectNameInToolbarChange}
           onAddShape={addShape}
           onAlignAnchorChange={chooseAlignAnchor}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Clock3, Download, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SketchForgeEditor, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg } from "@/components/SketchForgeEditor";
 import ChallengesDashboard from "@/components/official/ChallengesDashboard";
@@ -51,6 +51,9 @@ import {
 } from "@/lib/serverProjectStore";
 import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
+import { downloadBlob } from "@/lib/downloadFile";
+import { PROJECTS_BACKUP_MEDIA_TYPE, newerBackupSource, projectsBackupFileName, storedBackupRevision, writeProjectsBackup, type ProjectBackupEntry } from "@/lib/projectBackup";
+import { browserStorageManager, readStorageStatus, requestPersistentStorageOnce, storageNearQuota, storageUsageFraction, type StorageStatus } from "@/lib/storageHealth";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -288,6 +291,9 @@ async function loadProjectShapes(projectId: string) {
       skfPackage: packageBytes,
       updatedAt: restored.modifiedAt || Date.now(),
       revision: restored.modifiedAt || Date.now(),
+      // The package's own time, possibly missing; "Export all projects"
+      // compares by this so a stand-in "now" cannot outrank unsaved edits.
+      packageModifiedAt: restored.modifiedAt,
       shapes: restored.shapes,
       history: restored.history,
       historyIndex: restored.historyIndex,
@@ -372,9 +378,10 @@ async function loadProjectShapes(projectId: string) {
   };
 }
 
-async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
+/** The `.skf` package autosave stores for a project; "Export all projects" packs the same bytes. */
+function projectSkfPackage(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
   const autosaveHistory = editorHistoryForAutosave(entry.history, entry.historyIndex);
-  const skfPackage = await exportSkfProject({
+  return exportSkfProject({
     projectId,
     projectName: context.projectName,
     createdAt: context.createdAt,
@@ -390,6 +397,10 @@ async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntr
     sketchPlacementWorkplane: context.sketchPlacementWorkplane,
     compressionLevel: 1,
   });
+}
+
+async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
+  const skfPackage = await projectSkfPackage(projectId, entry, context);
   if (serverProjectStorageActive) {
     await saveServerProjectPackage(projectId, skfPackage, entry.revision);
     return;
@@ -652,6 +663,11 @@ export default function Home() {
     autosaveNoticeControllerRef.current = createAutosaveNoticeController(setAutosaveNotice);
   }
   const [projectStorageMode, setProjectStorageMode] = useState<ProjectStorageMode>("browser");
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
+  // Whether the server-storage probe has answered. A static build has no
+  // server to ask, so it starts settled in browser mode.
+  const [storageProbeSettled, setStorageProbeSettled] = useState(STATIC_EXPORT_BUILD);
+  const [exportingAllProjects, setExportingAllProjects] = useState(false);
   const [sharedProjects, setSharedProjects] = useState<SharedProject[]>([]);
   const [sharedProjectsEnabled, setSharedProjectsEnabled] = useState(false);
   const [sharedProjectsLoading, setSharedProjectsLoading] = useState(false);
@@ -882,7 +898,9 @@ export default function Home() {
       if (requestedProjectId && serverProjects.some((project) => project.id === requestedProjectId)) {
         setActiveProjectId((current) => current ?? requestedProjectId);
       }
-    })();
+    })().finally(() => {
+      if (!canceled) setStorageProbeSettled(true);
+    });
     return () => {
       canceled = true;
     };
@@ -1456,6 +1474,91 @@ export default function Home() {
     [openSkfProjectFromFile, projects.length, t],
   );
 
+  // Browser-held projects are best-effort storage that the browser may evict
+  // (issue #333). Ask once per profile to keep them, and re-read the usage
+  // estimate whenever the dashboard is shown so the quota warning is current.
+  // The request waits for the server-storage probe, so a server-mode profile
+  // is not asked, and does not spend its one request, for storage it never uses.
+  useEffect(() => {
+    if (!mounted || !storageProbeSettled || projectStorageMode !== "browser" || view !== "dashboard") return;
+    let canceled = false;
+    void (async () => {
+      const storage = browserStorageManager();
+      let preferences: Storage | null = null;
+      try {
+        preferences = window.localStorage;
+      } catch {
+        preferences = null;
+      }
+      await requestPersistentStorageOnce(storage, preferences);
+      const status = await readStorageStatus(storage);
+      if (!canceled) setStorageStatus(status);
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [mounted, projectStorageMode, storageProbeSettled, view]);
+
+  const exportAllProjects = useCallback(async () => {
+    if (exportingAllProjects || projects.length === 0) return;
+    setExportingAllProjects(true);
+    setDashboardNotice(t("dashboard.backup.preparing", { count: projects.length }));
+    try {
+      const entries: ProjectBackupEntry[] = [];
+      const skipped: string[] = [];
+      for (const project of projects) {
+        try {
+          // The in-session copy may hold edits still queued for autosave, but
+          // another tab or server client may have stored a newer one since.
+          // Read the stored copy and back up whichever revision is higher.
+          const inSession: ProjectShapeCacheEntry | null = projectShapesById[project.id] ?? null;
+          let stored: ProjectShapeCacheEntry | null = null;
+          try {
+            const record = await loadProjectShapes(project.id);
+            stored = record
+              ? projectShapeCacheEntry(storedBackupRevision(record), record.shapes ?? [], record.history, record.historyIndex, record.assets)
+              : null;
+          } catch (error) {
+            if (!inSession) throw error;
+          }
+          const entry = newerBackupSource(inSession, stored);
+          if (!entry) {
+            skipped.push(project.name);
+            continue;
+          }
+          entries.push({
+            projectName: project.name,
+            modifiedAt: entry.revision,
+            package: await projectSkfPackage(project.id, entry, projectShapeSaveContext(project)),
+          });
+        } catch {
+          skipped.push(project.name);
+        }
+      }
+      if (entries.length === 0) {
+        setDashboardNotice(t("dashboard.backup.failed"));
+        return;
+      }
+      const bytes = writeProjectsBackup(entries);
+      const fileName = projectsBackupFileName(new Date());
+      const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      const result = await downloadBlob(fileName, new Blob([body], { type: PROJECTS_BACKUP_MEDIA_TYPE }), {
+        mode: downloadMode,
+        folder: downloadFolder,
+        localDownloadAvailable: !STATIC_EXPORT_BUILD && localDownloadEnabled,
+      });
+      const exported = t("dashboard.backup.exported", {
+        count: entries.length,
+        fileName: result.mode === "folder" ? result.path : fileName,
+      });
+      setDashboardNotice(skipped.length ? `${exported} ${t("dashboard.backup.skipped", { names: skipped.join(", ") })}` : exported);
+    } catch (error) {
+      setDashboardNotice(errorText(t, error, "dashboard.backup.failed"));
+    } finally {
+      setExportingAllProjects(false);
+    }
+  }, [downloadFolder, downloadMode, exportingAllProjects, localDownloadEnabled, projectShapesById, projects, t]);
+
   const openLatestProject = () => {
     const latest = [...projects].sort((a, b) => b.updatedAt - a.updatedAt)[0];
     if (latest) {
@@ -1548,6 +1651,12 @@ export default function Home() {
         <Dashboard
           dashboardSection={dashboardSection}
           dashboardNotice={dashboardNotice}
+          exportingAllProjects={exportingAllProjects}
+          projectCount={projects.length}
+          storageWarningPercent={projectStorageMode === "browser" && storageStatus && storageNearQuota(storageStatus)
+            ? storageUsageFraction(storageStatus)
+            : null}
+          onExportAllProjects={() => void exportAllProjects()}
           downloadFolder={downloadFolder}
           downloadMode={downloadMode}
           localDownloadEnabled={localDownloadEnabled}
@@ -1606,6 +1715,7 @@ export default function Home() {
             initialPlacementElevation={activeProject?.placementElevation ?? 0}
             initialPlacementWorkplane={activeProject?.placementWorkplane}
             onHome={openDashboard}
+            projectsStoredOnServer={projectStorageMode === "server"}
             onOpenSkfProjectFile={openSkfProjectFromFile}
             onSaveSharedProject={saveActiveProjectToShared}
             onProjectShapesChange={updateProjectShapes}
@@ -1717,6 +1827,10 @@ function EditorLoadingSkeleton() {
 function Dashboard({
   dashboardSection,
   dashboardNotice,
+  exportingAllProjects,
+  projectCount,
+  storageWarningPercent,
+  onExportAllProjects,
   downloadFolder,
   downloadMode,
   localDownloadEnabled,
@@ -1754,6 +1868,12 @@ function Dashboard({
 }: {
   dashboardSection: DashboardSection;
   dashboardNotice: string;
+  exportingAllProjects: boolean;
+  /** Every project, not only those the search shows; "Export all projects" packs them all. */
+  projectCount: number;
+  /** Used share of the browser quota once it passes the warning threshold; null hides the warning. */
+  storageWarningPercent: number | null;
+  onExportAllProjects: () => void;
   downloadFolder: string;
   downloadMode: DownloadMode;
   localDownloadEnabled: boolean;
@@ -2166,7 +2286,25 @@ function Dashboard({
                   </span>
                   <span>{t("dashboard.actions.continue")}</span>
                 </button>
+                <button className="dashboard-action-tile" type="button" onClick={onExportAllProjects} disabled={projectCount === 0 || exportingAllProjects}>
+                  <span className="dashboard-action-icon">
+                    <Download size={24} strokeWidth={2.4} />
+                  </span>
+                  <span>{t("dashboard.backup.exportAll")}</span>
+                </button>
               </div>
+              {storageWarningPercent !== null ? (
+                <div className="dashboard-storage-warning" role="alert">
+                  <span>
+                    {t("dashboard.storageWarning.message", {
+                      percent: new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(storageWarningPercent),
+                    })}
+                  </span>
+                  <button type="button" onClick={onExportAllProjects} disabled={projectCount === 0 || exportingAllProjects}>
+                    {t("dashboard.backup.exportAll")}
+                  </button>
+                </div>
+              ) : null}
               {dashboardNotice ? (
                 <div className="dashboard-import-notice" role="status">
                   {dashboardNotice}

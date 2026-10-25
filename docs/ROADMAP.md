@@ -45,6 +45,7 @@ Tracked under [epic #324](https://github.com/constructorfleet/SketchForge-3D/iss
 
 - [#332: Surface autosave failures while editing](https://github.com/constructorfleet/SketchForge-3D/issues/332) — P0, open.
 - [#336: Secure local folder downloads](https://github.com/constructorfleet/SketchForge-3D/issues/336) — P0, open.
+- [#333: Request persistent storage, warn on quota, and export all projects](https://github.com/constructorfleet/SketchForge-3D/issues/333) — P2. Implementation complete with ZIP writer, threshold, and round-trip unit coverage and a dashboard browser test; awaiting review. The dashboard cannot yet import a backup ZIP directly, so each `.skf` file is opened separately.
 - [#377: Handle failed project thumbnail captures](https://github.com/constructorfleet/SketchForge-3D/issues/377) — capture failures are logged and retried; zero-size or lost-context canvases return an empty thumbnail; implementation and regression coverage complete, awaiting review.
 
 ## API request safety
