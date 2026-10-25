@@ -213,6 +213,7 @@ export type ThreadShapeRequest = {
   core?: boolean;
   /** Facets per full turn, as for a revolve (default 64). */
   sides?: number;
+  /** How finely curved profile segments are sampled, 1 to 10 (default 6), as for a revolve. */
   quality?: number;
   /** Overrides the catalog's 60-degree V. */
   profile?: readonly ProfilePoint[];

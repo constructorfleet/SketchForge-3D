@@ -10,7 +10,7 @@ import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/proj
 import { exportSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
-import type { RevolveShapeRequest } from "../../packages/sketchforge-client/src/types";
+import type { RevolveShapeRequest, ThreadShapeRequest } from "../../packages/sketchforge-client/src/types";
 
 const root = path.resolve(__dirname, "../..");
 const server = path.join(root, "packages/sketchforge-client/mcp/server.mjs");
@@ -167,8 +167,13 @@ describe("local MCP engine mode", () => {
     const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_create_shape");
     // An agent only sends what the schema offers, so the sweep's resolution has
     // to be advertised for revolves rather than only for prisms.
-    expect(tool.inputSchema.properties.sides.description).toMatch(/revolve/);
-    expect(tool.inputSchema.properties.quality).toMatchObject({ type: "number", description: expect.stringMatching(/revolve/) });
+    // Match the revolve clauses themselves, so a description that merely
+    // mentions revolves (or says they are unsupported) does not pass.
+    expect(tool.inputSchema.properties.sides.description).toMatch(/revolve\/thread: facets per full turn of the sweep, 3-512 \(default 64\)/);
+    expect(tool.inputSchema.properties.quality).toMatchObject({
+      type: "number",
+      description: expect.stringMatching(/revolve\/thread: how finely curved segments of the profile are sampled, 1-10 \(default 6\)/),
+    });
 
     const ring: RevolveShapeRequest = { kind: "revolve", profile: [[50, 0], [75, 0], [75, 10], [50, 10]], sides: 256, quality: 8 };
     const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", ...ring });
@@ -176,6 +181,9 @@ describe("local MCP engine mode", () => {
     const shape = JSON.parse(created[1].result.content[0].text).shapes[0];
     expect(shape.sketchRevolve).toMatchObject({ sides: 256, quality: 8 });
 
+    // The volume and centre-of-mass checks below guard the engine path, which
+    // already read `sides` and `quality` from a flat request before #504; what
+    // #504 changed is the schema above and the typed request.
     const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId: shape.id });
     const properties = JSON.parse(read[1].result.content[0].text);
     // A 256-gon annulus, 50..75 mm, 10 mm tall: within 0.01% of the true ring,
@@ -186,6 +194,12 @@ describe("local MCP engine mode", () => {
     expect(properties.centerOfMass.x).toBeCloseTo(0, 3);
     expect(properties.centerOfMass.y).toBeCloseTo(5, 3);
     expect(properties.centerOfMass.z).toBeCloseTo(0, 3);
+
+    // A thread takes the same two settings, through its own typed request.
+    const bolt: ThreadShapeRequest = { kind: "thread", size: "M8", turns: 2, sides: 128, quality: 4 };
+    const threaded = callMcp(projectsDir, 4, "sketchforge_create_shape", { projectId: "case", ...bolt });
+    expect(threaded[1].result.isError).toBeUndefined();
+    expect(JSON.parse(threaded[1].result.content[0].text).shapes[0].sketchRevolve).toMatchObject({ sides: 128, quality: 4 });
   }, 60_000);
 
   it("checks exact interference locally without returning geometry arrays", () => {
