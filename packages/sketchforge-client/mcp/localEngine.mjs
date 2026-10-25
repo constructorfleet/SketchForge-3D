@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
+
+// SKETCHFORGE_MCP_FILES_DIR is resolved by the shared MCP filesystem path policy.
 
 const projectsDir = process.env.SKETCHFORGE_PROJECTS_DIR;
 let backend;
@@ -148,9 +151,9 @@ async function exportScene(args) {
     base64: Buffer.from(bytes).toString("base64"),
   };
   if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-    const destination = path.resolve(args.outputPath);
-    writeFileSync(destination, bytes);
-    return { ...response, base64: undefined, savedTo: destination };
+    const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+    writeFileSync(destination, bytes, { flag: args.overwrite === true ? "w" : "wx" });
+    return { ...response, base64: undefined, savedTo: path.resolve(args.outputPath) };
   }
   return response;
 }
@@ -246,9 +249,9 @@ async function projectView(args) {
   const svg = Buffer.from(artifact.data).toString("utf8");
   const response = { view, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.data.byteLength, shapeCount: artifact.shapeCount };
   if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-    const destination = path.resolve(args.outputPath);
-    writeFileSync(destination, artifact.data);
-    return { ...response, savedTo: destination };
+    const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+    writeFileSync(destination, artifact.data, { flag: args.overwrite === true ? "w" : "wx" });
+    return { ...response, savedTo: path.resolve(args.outputPath) };
   }
   return { ...response, svg };
 }
@@ -273,9 +276,9 @@ async function sectionView(args) {
   const svg = Buffer.from(artifact.data).toString("utf8");
   const response = { plane: args.plane, offset: args.offset, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.data.byteLength, shapeCount: artifact.shapeCount };
   if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-    const destination = path.resolve(args.outputPath);
-    writeFileSync(destination, artifact.data);
-    return { ...response, savedTo: destination };
+    const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+    writeFileSync(destination, artifact.data, { flag: args.overwrite === true ? "w" : "wx" });
+    return { ...response, savedTo: path.resolve(args.outputPath) };
   }
   return { ...response, svg };
 }
@@ -326,7 +329,7 @@ async function callLocalEngineToolRaw(name, args = {}) {
     return { projectId: id, name: projectName, shapeCount: 0, revision: 1 };
   }
   if (name === "sketchforge_import_project") {
-    const sourcePath = path.resolve(String(args.filePath ?? ""));
+    const sourcePath = await resolveMcpReadPath(args.filePath);
     if (path.extname(sourcePath).toLowerCase() !== ".skf") throw new Error("filePath must point to a .skf project file.");
     const bytes = await readFile(sourcePath);
     const imported = await enginePackage.importSkfProject(bytes);
@@ -372,7 +375,7 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;
     }
     case "sketchforge_import_stl": {
-      const sourcePath = path.resolve(String(args.filePath ?? ""));
+      const sourcePath = await resolveMcpReadPath(args.filePath);
       if (path.extname(sourcePath).toLowerCase() !== ".stl") throw new Error("filePath must point to an .stl file.");
       const bytes = await readFile(sourcePath);
       const imported = await unwrap(await engine.importMesh(id, {

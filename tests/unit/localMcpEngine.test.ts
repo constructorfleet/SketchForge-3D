@@ -107,7 +107,7 @@ describe("local MCP engine mode", () => {
     const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "source", kind: "box", name: "Imported box", width: 12, depth: 8, height: 4 });
     const shapeId = JSON.parse(created[1].result.content[0].text).shapes[0].id;
     const packagePath = path.join(projectsDir, "source.skf");
-    const exported = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "source", format: "skf", outputPath: packagePath });
+    const exported = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "source", format: "skf", outputPath: packagePath, overwrite: true });
     expect(JSON.parse(exported[1].result.content[0].text).shapeCount).toBe(1);
 
     const imported = callMcp(projectsDir, 2, "sketchforge_import_project", { filePath: packagePath, name: "Imported copy" });
@@ -137,6 +137,46 @@ describe("local MCP engine mode", () => {
     expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
       shape: expect.objectContaining({ name: "Triangle", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
     });
+  }, 60_000);
+
+  it("confines MCP file access to its configured root and refuses existing output files", async () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-root-"));
+    const filesDir = path.join(projectsDir, "allowed");
+    const outsideDir = path.join(projectsDir, "outside");
+    fs.mkdirSync(filesDir);
+    fs.mkdirSync(outsideDir);
+    const canonicalFilesDir = await fs.promises.realpath(filesDir);
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const secret = path.join(outsideDir, "secret.skf");
+    fs.writeFileSync(secret, "private");
+    const linkedSecret = path.join(filesDir, "linked.skf");
+    fs.symlinkSync(secret, linkedSecret);
+
+    const escape = callMcp(projectsDir, 2, "sketchforge_import_project", { filePath: linkedSecret }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(escape[1].result.isError).toBe(true);
+    expect(escape[1].result.content[0].text).toContain(canonicalFilesDir);
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box" });
+    expect(created[1].result.isError).toBeUndefined();
+
+    const outputEscape = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: path.join(outsideDir, "missing", "escaped.stl") }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(outputEscape[1].result.isError).toBe(true);
+    expect(outputEscape[1].result.content[0].text).toContain(canonicalFilesDir);
+    const outsideExisting = path.join(outsideDir, "existing.stl");
+    fs.writeFileSync(outsideExisting, "keep outside");
+    const existingEscape = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: outsideExisting }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(existingEscape[1].result.isError).toBe(true);
+    expect(existingEscape[1].result.content[0].text).toContain(canonicalFilesDir);
+
+    const exportPath = path.join(filesDir, "existing.stl");
+    fs.writeFileSync(exportPath, "keep me");
+    const overwrite = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: exportPath }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(overwrite[1].result.isError).toBe(true);
+    expect(overwrite[1].result.content[0].text).toContain("overwrite: true");
+    expect(fs.readFileSync(exportPath, "utf8")).toBe("keep me");
+    const allowedOverwrite = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: exportPath, overwrite: true }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
+    expect(allowedOverwrite[1].result.isError).toBeUndefined();
+    expect(fs.readFileSync(exportPath, "utf8")).not.toBe("keep me");
   }, 60_000);
 
   it("imports a STEP-backed SKF project locally and explodes its nested assembly", async () => {
@@ -219,7 +259,7 @@ describe("local MCP engine mode", () => {
     expect(scene).not.toHaveProperty("rawShapes");
 
     const outputPath = path.join(projectsDir, "Local case.skf");
-    const exported = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "skf", outputPath });
+    const exported = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "skf", outputPath, overwrite: true });
     const artifact = JSON.parse(exported[1].result.content[0].text);
     expect(artifact).toMatchObject({ filename: "Local case.skf", savedTo: outputPath, shapeCount: 2 });
     expect(fs.statSync(outputPath).size).toBeGreaterThan(0);
@@ -268,7 +308,7 @@ describe("local MCP engine mode", () => {
 
     for (const format of ["stl", "obj", "3mf", "svg"]) {
       const target = path.join(projectsDir, `Local case.${format}`);
-      const result = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format, shapeIds: [plate.id], outputPath: target });
+      const result = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format, shapeIds: [plate.id], outputPath: target, ...(format === "svg" ? { overwrite: true } : {}) });
       expect(JSON.parse(result[1].result.content[0].text)).toMatchObject({ savedTo: target, shapeCount: 1 });
       expect(fs.statSync(target).size).toBeGreaterThan(0);
       if (format === "3mf") {

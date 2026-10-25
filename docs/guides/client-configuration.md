@@ -23,6 +23,10 @@ The same variables work with the JavaScript [`clientFromEnvironment`](../../pack
 
 Set `SKETCHFORGE_PROJECTS_DIR` in the MCP process to use the local engine against project files on disk. The bridge creates this directory when needed and reads and writes the same `.json` metadata and `.skf` project files as the server. When set, local MCP tools operate directly on these files without an HTTP server or API token. For the server-backed web application and REST API, the same variable selects server-side project storage; see [server-backed projects](./deployment.md#server-backed-projects).
 
+## MCP host file access
+
+Set `SKETCHFORGE_MCP_FILES_DIR` to confine MCP imports and exports to one directory. When it is unset, `SKETCHFORGE_PROJECTS_DIR` is used as the file root. Reads resolve symlinks before checking containment; writes also resolve the destination's parent and reject paths outside the root. Existing output files are preserved unless the tool call explicitly sets `overwrite: true`. If neither directory variable is set, file paths remain unrestricted for compatibility.
+
 ## MCP macro execution
 
 Macro discovery and execution are disabled until `SKETCHFORGE_MACRO_DIR` points to a directory containing reviewed `.mjs`, `.js`, or `.py` files. MCP tools list files from that directory and accept a listed filename, not arbitrary code.

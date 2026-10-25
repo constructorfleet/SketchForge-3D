@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveMcpWritePath } from "./filesystemPaths.mjs";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 import { callLocalEngineTool } from "./localEngine.mjs";
 
@@ -52,8 +53,8 @@ const tools = [
   },
   {
     name: "sketchforge_import_project",
-    description: "Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.",
-    inputSchema: { ...localProjectSchema, required: ["filePath"], properties: { filePath: { type: "string" }, name: { type: "string" } } },
+    description: "Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
+    inputSchema: { ...localProjectSchema, required: ["filePath"], properties: { filePath: { type: "string", description: "Path to a .skf under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set." }, name: { type: "string" } } },
   },
   {
     name: "sketchforge_list_editors",
@@ -185,13 +186,13 @@ const tools = [
   },
   {
     name: "sketchforge_import_stl",
-    description: "Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath.",
+    description: "Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
     inputSchema: {
       ...localProjectSchema,
       required: ["projectId", "filePath"],
       properties: {
         projectId: { type: "string" },
-        filePath: { type: "string", description: "Path to an STL file readable by the MCP host." },
+        filePath: { type: "string", description: "Path to an STL file under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); with neither set, any host path is allowed." },
         name: { type: "string" },
         color: { type: "string" },
         x: { type: "number" },
@@ -382,8 +383,8 @@ const tools = [
   },
   {
     name: "sketchforge_export_scene",
-    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings, or section DXF. DXF needs section {plane, offset}. Set outputPath to save directly on the MCP host.",
-    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] }, view: { type: "string", enum: PROJECTION_LAYOUTS, description: "For svg only: one named view, or the multiview grid (default)." }, section: { type: "object", description: "For svg or dxf section export.", properties: { plane: { type: "string", enum: ["xy", "xz", "yz"] }, offset: { type: "number" } }, required: ["plane", "offset"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids." }, name: { type: "string" }, outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server." } } },
+    description: "Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings, or section DXF. DXF needs section {plane, offset}. Set outputPath to save on the MCP host; writes are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset. If both are unset, paths are unrestricted. Existing files require overwrite: true.",
+    inputSchema: { ...editorTargetSchema, required: ["format"], properties: { ...editorTargetSchema.properties, format: { type: "string", enum: ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] }, view: { type: "string", enum: PROJECTION_LAYOUTS, description: "For svg only: one named view, or the multiview grid (default)." }, section: { type: "object", description: "For svg or dxf section export.", properties: { plane: { type: "string", enum: ["xy", "xz", "yz"] }, offset: { type: "number" } }, required: ["plane", "offset"] }, shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids." }, name: { type: "string" }, outputPath: { type: "string", description: "Destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set." }, overwrite: { type: "boolean", description: "Set true to replace an existing output file." } } },
   },
   {
     name: "sketchforge_project_view",
@@ -397,7 +398,8 @@ const tools = [
         view: { type: "string", enum: PROJECTION_LAYOUTS, description: "One named view, or the multiview grid (default)." },
         shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." },
         name: { type: "string", description: "Optional base name for the file." },
-        outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise." },
+        outputPath: { type: "string", description: "Optional destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set. SVG text is returned inline otherwise." },
+        overwrite: { type: "boolean", description: "Set true to replace an existing output file." },
       },
     },
   },
@@ -414,7 +416,8 @@ const tools = [
         offset: { type: "number", description: "Coordinate of the omitted axis in millimetres; must intersect the selected scene." },
         shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." },
         name: { type: "string", description: "Optional base name for the file." },
-        outputPath: { type: "string", description: "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise." },
+        outputPath: { type: "string", description: "Optional destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set. SVG text is returned inline otherwise." },
+        overwrite: { type: "boolean", description: "Set true to replace an existing output file." },
       },
     },
   },
@@ -703,9 +706,9 @@ async function callRemoteTool(name, args, baseUrl) {
       const bytes = Buffer.from(artifact.base64, "base64");
       const response = { view: args.view ?? "multiview", filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount };
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-        const destination = path.resolve(args.outputPath);
-        writeFileSync(destination, bytes);
-        return { ...response, savedTo: destination };
+        const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+        writeFileSync(destination, bytes, { flag: args.overwrite === true ? "w" : "wx" });
+        return { ...response, savedTo: path.resolve(args.outputPath) };
       }
       return { ...response, svg: bytes.toString("utf8") };
     }
@@ -723,9 +726,9 @@ async function callRemoteTool(name, args, baseUrl) {
       const bytes = Buffer.from(artifact.base64, "base64");
       const response = { plane: args.plane, offset: args.offset, filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount };
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-        const destination = path.resolve(args.outputPath);
-        writeFileSync(destination, bytes);
-        return { ...response, savedTo: destination };
+        const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+        writeFileSync(destination, bytes, { flag: args.overwrite === true ? "w" : "wx" });
+        return { ...response, savedTo: path.resolve(args.outputPath) };
       }
       return { ...response, svg: bytes.toString("utf8") };
     }
@@ -746,9 +749,9 @@ async function callRemoteTool(name, args, baseUrl) {
         })
         : await bridgeCommand("export_scene", args, 60000, baseUrl);
       if (typeof args.outputPath === "string" && args.outputPath.trim()) {
-        const destination = path.resolve(args.outputPath);
-        writeFileSync(destination, Buffer.from(artifact.base64, "base64"));
-        return { filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount, savedTo: destination };
+        const destination = await resolveMcpWritePath(args.outputPath, { overwrite: args.overwrite === true });
+        writeFileSync(destination, Buffer.from(artifact.base64, "base64"), { flag: args.overwrite === true ? "w" : "wx" });
+        return { filename: artifact.filename, mimeType: artifact.mimeType, bytes: artifact.bytes, shapeCount: artifact.shapeCount, savedTo: path.resolve(args.outputPath) };
       }
       return artifact;
     }

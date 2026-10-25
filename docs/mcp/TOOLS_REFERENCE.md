@@ -53,7 +53,7 @@ Create an empty project in the local SKETCHFORGE_PROJECTS_DIR.
 
 ### Description
 
-Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.
+Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
 
 ### Input schema
 
@@ -62,7 +62,8 @@ Import a local .skf file as a new project in SKETCHFORGE_PROJECTS_DIR.
   "type": "object",
   "properties": {
     "filePath": {
-      "type": "string"
+      "type": "string",
+      "description": "Path to a .skf under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set."
     },
     "name": {
       "type": "string"
@@ -645,7 +646,7 @@ Import a triangle mesh into SketchForge from raw position and optional normal ar
 
 ### Description
 
-Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath.
+Import an STL file from the MCP host filesystem into a local project. Available in local mode; provide projectId and filePath. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.
 
 ### Input schema
 
@@ -658,7 +659,7 @@ Import an STL file from the MCP host filesystem into a local project. Available 
     },
     "filePath": {
       "type": "string",
-      "description": "Path to an STL file readable by the MCP host."
+      "description": "Path to an STL file under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); with neither set, any host path is allowed."
     },
     "name": {
       "type": "string"
@@ -1409,7 +1410,7 @@ Capture a PNG image from current/home/top/bottom/front/back/right/left view. Edi
 
 ### Description
 
-Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings, or section DXF. DXF needs section {plane, offset}. Set outputPath to save directly on the MCP host.
+Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP kit, SVG drawings, or section DXF. DXF needs section {plane, offset}. Set outputPath to save on the MCP host; writes are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset. If both are unset, paths are unrestricted. Existing files require overwrite: true.
 
 ### Input schema
 
@@ -1497,7 +1498,11 @@ Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP ki
     },
     "outputPath": {
       "type": "string",
-      "description": "Optional destination path on the computer running the SketchForge MCP server."
+      "description": "Destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set."
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "Set true to replace an existing output file."
     }
   },
   "required": [
@@ -1555,7 +1560,11 @@ Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true cu
     },
     "outputPath": {
       "type": "string",
-      "description": "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise."
+      "description": "Optional destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set. SVG text is returned inline otherwise."
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "Set true to replace an existing output file."
     }
   }
 }
@@ -1611,7 +1620,11 @@ Return an exact CAD section drawing as SVG by cutting the stored solids with one
     },
     "outputPath": {
       "type": "string",
-      "description": "Optional destination path on the computer running the SketchForge MCP server; the SVG text is returned inline otherwise."
+      "description": "Optional destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set. SVG text is returned inline otherwise."
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "Set true to replace an existing output file."
     }
   }
 }

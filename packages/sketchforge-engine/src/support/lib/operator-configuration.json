@@ -73,6 +73,17 @@
       "additionalSources": ["../packages/sketchforge-client/mcp/localEngine.mjs", "../packages/sketchforge-client/mcp/localMacroRunner.mjs"]
     },
     {
+      "name": "SKETCHFORGE_MCP_FILES_DIR",
+      "default": "SKETCHFORGE_PROJECTS_DIR; unrestricted when both are unset.",
+      "required": false,
+      "validation": "Filesystem root for MCP file imports and exports. Resolved symlinks must remain inside this directory.",
+      "sensitive": false,
+      "subsystem": "MCP host file access",
+      "source": "../packages/sketchforge-client/mcp/filesystemPaths.mjs",
+      "ownerPage": "guides/client-configuration.md#mcp-host-file-access",
+      "additionalSources": ["../packages/sketchforge-client/mcp/server.mjs", "../packages/sketchforge-client/mcp/localEngine.mjs"]
+    },
+    {
       "name": "SKETCHFORGE_API_TOKEN",
       "default": "Unset; REST API authorization is disabled.",
       "required": false,

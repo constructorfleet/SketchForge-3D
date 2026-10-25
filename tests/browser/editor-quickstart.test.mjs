@@ -172,9 +172,12 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
     stdio: ["ignore", "pipe", "pipe"],
   });
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-step-editor-mcp-"));
-  const packagePath = path.join(tempDir, "nested-assembly.skf");
   const projectsDir = path.join(tempDir, "mcp-projects");
+  const packagePath = path.join(projectsDir, "nested-assembly.skf");
   const fixturePath = path.join(process.cwd(), "tests/fixtures/step/nested-assembly.step");
+  fs.mkdirSync(projectsDir, { recursive: true });
+  const allowedFixturePath = path.join(projectsDir, path.basename(fixturePath));
+  fs.copyFileSync(fixturePath, allowedFixturePath);
   const mcpServer = path.join(process.cwd(), "packages/sketchforge-client/mcp/server.mjs");
   let logs = "";
   const keepLogs = (chunk) => { logs = `${logs}${chunk}`.slice(-8_000); };
@@ -191,7 +194,7 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
       cwd: process.cwd(),
       input,
       encoding: "utf8",
-      env: { ...process.env, SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "", SKETCHFORGE_URL: "http://127.0.0.1:1" },
+      env: { ...process.env, SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_MCP_FILES_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "", SKETCHFORGE_URL: "http://127.0.0.1:1" },
       timeout: 180_000,
     });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
@@ -210,7 +213,7 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
     const page = await context.newPage();
     await page.goto(baseURL);
     await page.getByRole("button", { name: "Open SKF or import geometry" }).click();
-    await page.locator('input[type="file"][accept*=".step"]').setInputFiles(fixturePath);
+    await page.locator('input[type="file"][accept*=".step"]').setInputFiles(allowedFixturePath);
     await page.getByRole("textbox", { name: "Project name" }).waitFor({ state: "visible", timeout: 120_000 });
     assert.equal(await page.getByRole("textbox", { name: "Project name" }).inputValue(), "nested-assembly");
     await page.getByRole("button", { name: "nested-assembly", exact: true }).click();

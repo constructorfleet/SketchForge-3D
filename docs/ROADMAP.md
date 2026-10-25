@@ -35,6 +35,10 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.
 
+## MCP host filesystem safety
+
+- [#339: Confine MCP host file access and refuse silent overwrites](https://github.com/constructorfleet/SketchForge-3D/issues/339) — implemented on `security/339-mcp-filesystem-root`; awaiting review.
+
 ## Editor parity with the engine and API
 
 Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
