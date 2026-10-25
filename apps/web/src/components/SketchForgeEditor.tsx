@@ -24,6 +24,7 @@ import {
 } from "@/i18n";
 import type { AppThemePreference, ResolvedAppTheme } from "@/lib/appTheme";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { EDITOR_SHORTCUTS, matchesEditorShortcut } from "@/lib/editorShortcuts";
 import type { ChallengeTutorialId } from "@/lib/challenges";
 import { manifoldModuleSource } from "@/generated/manifoldModuleSource";
 import { manifoldWasmBase64 } from "@/generated/manifoldWasmBase64";
@@ -5490,6 +5491,8 @@ export function SketchForgeEditor({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [measureDialogOpen, setMeasureDialogOpen] = useState(false);
   const measureDialogRef = useDialogFocus<HTMLElement>({ active: measureDialogOpen, onEscape: () => setMeasureDialogOpen(false) });
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const shortcutHelpRef = useDialogFocus<HTMLElement>({ active: shortcutHelpOpen, onEscape: () => setShortcutHelpOpen(false) });
   const [measureFromEntity, setMeasureFromEntity] = useState<"shape" | "edge" | "face">("shape");
   const [measureToEntity, setMeasureToEntity] = useState<"shape" | "edge" | "face">("shape");
   const [measureFromIndex, setMeasureFromIndex] = useState("0");
@@ -9970,6 +9973,12 @@ export function SketchForgeEditor({
       const key = event.key.toLowerCase();
       const shortcut = event.ctrlKey || event.metaKey;
 
+      if (matchesEditorShortcut(event, EDITOR_SHORTCUTS.shortcutHelp)) {
+        event.preventDefault();
+        setShortcutHelpOpen(true);
+        return;
+      }
+
       if (!isMovementKey(event.key) && !["Shift", "Control", "Meta", "Alt"].includes(event.key)) {
         keyboardMovement.finish();
       }
@@ -10072,15 +10081,15 @@ export function SketchForgeEditor({
         return;
       }
 
-      if (shortcut && key === "l") {
+      if (matchesEditorShortcut(event, EDITOR_SHORTCUTS.lockSelection)) {
         event.preventDefault();
         toggleLocked();
         return;
       }
 
-      if (shortcut && key === "h") {
+      if (matchesEditorShortcut(event, EDITOR_SHORTCUTS.hideSelection) || matchesEditorShortcut(event, EDITOR_SHORTCUTS.showHidden)) {
         event.preventDefault();
-        if (event.shiftKey) {
+        if (matchesEditorShortcut(event, EDITOR_SHORTCUTS.showHidden)) {
           showHidden();
         } else {
           toggleHidden();
@@ -10150,6 +10159,25 @@ export function SketchForgeEditor({
 
   return (
     <div className="sketchforge-editor">
+      {shortcutHelpOpen ? (
+        <div className="measure-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShortcutHelpOpen(false); }}>
+          <section ref={shortcutHelpRef} className="top-action-panel keyboard-shortcuts-dialog" role="dialog" aria-modal="true" aria-label={t("editor.keyboardShortcuts.title")} tabIndex={-1}>
+            <header><strong>{t("editor.keyboardShortcuts.title")}</strong><button type="button" aria-label={t("editor.keyboardShortcuts.close")} onClick={() => setShortcutHelpOpen(false)}><X size={18} /></button></header>
+            <p>{t("editor.keyboardShortcuts.helpHint")}</p>
+            <dl>
+              <div><dt>{t("editor.keyboardShortcuts.lockSelection")}</dt><dd><kbd>Shift</kbd>+<kbd>L</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.hideSelection")}</dt><dd><kbd>Shift</kbd>+<kbd>H</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.showHidden")}</dt><dd><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.undo")}</dt><dd><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.redo")}</dt><dd><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Y</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.copy")}</dt><dd><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>C</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.paste")}</dt><dd><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.duplicate")}</dt><dd><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>D</kbd></dd></div>
+              <div><dt>{t("editor.keyboardShortcuts.delete")}</dt><dd><kbd>Delete</kbd></dd></div>
+            </dl>
+          </section>
+        </div>
+      ) : null}
       {measureDialogOpen ? (
         <div className="measure-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setMeasureDialogOpen(false); }}>
           <section ref={measureDialogRef} className="top-action-panel" role="dialog" aria-modal="true" aria-label="Measure 3D entities" tabIndex={-1}>

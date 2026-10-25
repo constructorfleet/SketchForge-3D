@@ -122,6 +122,29 @@ test("editor shortcuts stay inert while the Workspace Settings modal is open", {
     assert.equal(await page.getByRole("button", { name: "Workspace settings" }).evaluate((element) => element === document.activeElement), true, "closing Settings should return focus to its trigger");
     assert.equal(await selectedRows.count(), 1, "Escape closes the modal without also clearing the selection");
 
+    await page.keyboard.press("?");
+    const shortcutHelp = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await shortcutHelp.waitFor({ state: "visible", timeout: 5_000 });
+    assert.equal(await shortcutHelp.getByText("Shift+L", { exact: true }).isVisible(), true);
+    assert.equal(await shortcutHelp.getByText("Shift+H", { exact: true }).isVisible(), true);
+    assert.equal(await shortcutHelp.evaluate((dialog) => dialog.contains(document.activeElement)), true, "opening the shortcut list should move focus into it");
+    const shortcutAxe = await page.evaluate(async () => window.axe.run(document.querySelector('[role="dialog"][aria-label="Keyboard shortcuts"]'), {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+    }));
+    assert.deepEqual(shortcutAxe.violations, [], `shortcut dialog axe violations: ${JSON.stringify(shortcutAxe.violations)}`);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/editor-keyboard-shortcuts.png` });
+    await page.keyboard.press("Escape");
+    await shortcutHelp.waitFor({ state: "hidden" });
+
+    await page.keyboard.press("Shift+L");
+    await page.getByRole("status").getByText("Selection locked", { exact: true }).waitFor({ state: "visible" });
+    await page.keyboard.press("Shift+L");
+    await page.getByRole("status").getByText("Selection unlocked", { exact: true }).waitFor({ state: "visible" });
+    await page.keyboard.press("Shift+H");
+    await page.getByRole("status").getByText("Selection hidden", { exact: true }).waitFor({ state: "visible" });
+    await page.keyboard.press("Alt+Shift+H");
+    await page.getByRole("status").getByText("Showed 1 hidden shape", { exact: true }).waitFor({ state: "visible" });
+
     const exportTrigger = page.getByRole("button", { name: "Export", exact: true });
     await exportTrigger.click();
     const exportDialog = page.getByRole("dialog", { name: "Export" });

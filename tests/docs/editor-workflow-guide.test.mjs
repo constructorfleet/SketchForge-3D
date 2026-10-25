@@ -42,6 +42,15 @@ test("editor workflow guide covers create, edit, save, and export with supportin
   assert.match(browserTestText, /Save SketchForge Project/);
 });
 
+test("editor quickstart documents discoverable keyboard shortcuts with screenshot evidence", async () => {
+  const quickstartText = await readFile(quickstart, "utf8");
+  assert.match(quickstartText, /## Keyboard shortcuts/);
+  assert.match(quickstartText, /\*\*Shift\+L\*\*/);
+  assert.match(quickstartText, /\*\*Shift\+H\*\*/);
+  assert.match(quickstartText, /\*\*Alt\+Shift\+H\*\*/);
+  assert.match(quickstartText, /editor-keyboard-shortcuts\.png/);
+});
+
 test("face drafting guide links a supported editor workflow to browser acceptance and screenshot evidence", async () => {
   const [guideText, browserTestText] = await Promise.all([
     readFile(faceDraftGuide, "utf8"),
