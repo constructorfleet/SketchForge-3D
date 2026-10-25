@@ -23,6 +23,11 @@ test("publishing clients table shows the current release-please version", async 
   assert.match(pythonInit, /from importlib\.metadata import PackageNotFoundError, version as _distribution_version/);
   assert.match(pythonInit, /return _distribution_version\("sketchforge3d"\)/);
   assert.match(pythonInit, /except PackageNotFoundError:/);
+  assert.match(
+    pythonInit,
+    new RegExp(`^_SOURCE_VERSION\\s*=\\s*"${version.replaceAll(".", "\\.")}"\\s+# x-release-please-version$`, "m"),
+    "Python source fallback should match the release-please manifest",
+  );
   assert.match(pythonInit, /__version__ = _read_version\(\)/);
 
   for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {

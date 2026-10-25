@@ -15,7 +15,7 @@ class PackageVersionTest(unittest.TestCase):
 
     def test_version_falls_back_when_distribution_metadata_is_unavailable(self) -> None:
         with patch.object(sketchforge3d, "_distribution_version", side_effect=PackageNotFoundError):
-            self.assertEqual(sketchforge3d._read_version(), "1.27.0")
+            self.assertEqual(sketchforge3d._read_version(), sketchforge3d._SOURCE_VERSION)
 
 
 if __name__ == "__main__":

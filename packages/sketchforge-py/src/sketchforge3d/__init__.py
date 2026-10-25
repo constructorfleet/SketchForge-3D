@@ -152,9 +152,10 @@ def _read_version() -> str:
     try:
         return _distribution_version("sketchforge3d")
     except PackageNotFoundError:
-        return "1.27.0"  # x-release-please-version
+        return _SOURCE_VERSION
 
 
+_SOURCE_VERSION = "1.27.0"  # x-release-please-version
 __version__ = _read_version()
 
 __all__ = [
