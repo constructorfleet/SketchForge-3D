@@ -111,7 +111,10 @@ nextProcess.on("exit", (code) => {
 try {
   await waitForUrl(url, nextProcess);
 
-  electronProcess = spawn(electronPath, [electronMain], {
+  // `npm run desktop:dev -- Bracket.skf` opens that project, as a double-click
+  // would. npm runs scripts from the repository root, and Electron starts
+  // there too, so a relative path is read from the repository root.
+  electronProcess = spawn(electronPath, [electronMain, ...process.argv.slice(2)], {
     cwd: repoRoot,
     stdio: "inherit",
     env: {

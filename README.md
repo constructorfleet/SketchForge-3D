@@ -91,6 +91,32 @@ To get a menu entry and an icon, install [AppImageLauncher](https://github.com/T
 
 Closing the SketchForge window quits the application. On desktops that provide a system tray, SketchForge also adds a tray icon while it runs.
 
+To open a project, pass its path when you start SketchForge. The project opens in the editor as a new local project. If SketchForge is already running, the file opens in the existing window.
+
+```bash
+./SketchForge-*-x86_64.AppImage Bracket.skf
+```
+
+Double-clicking a `.skf` file does not work out of the box on Linux. The AppImage's desktop entry lists the `application/vnd.sketchforge.project+zip` type, but an AppImage cannot install the MIME definition that tells the desktop `.skf` files have that type. To enable double-click, integrate the AppImage first (for example with AppImageLauncher, above), then register the type for your user:
+
+```bash
+mkdir -p ~/.local/share/mime/packages
+cat > ~/.local/share/mime/packages/sketchforge-project.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.sketchforge.project+zip">
+    <comment>SketchForge Project</comment>
+    <glob pattern="*.skf" weight="60"/>
+  </mime-type>
+</mime-info>
+EOF
+update-mime-database ~/.local/share/mime
+ls ~/.local/share/applications | grep -i sketchforge
+xdg-mime default <desktop-file-from-ls> application/vnd.sketchforge.project+zip
+```
+
+Replace `<desktop-file-from-ls>` with the `.desktop` file name the `ls` line printed. `xdg-mime query filetype Bracket.skf` should then print `application/vnd.sketchforge.project+zip`.
+
 ### Ubuntu 24.04 and Debian 13
 
 These releases restrict unprivileged user namespaces, which the Chromium sandbox inside Electron needs. Starting the AppImage from a terminal then fails, often without a visible error. Check whether the restriction is active:
@@ -133,6 +159,8 @@ open /Applications/SketchForge.app
 ```
 
 Do not open the app from Safari's Downloads folder or directly from the mounted DMG. Copy it to `Applications` first.
+
+Once SketchForge is in `Applications`, double-click a `.skf` file or drop it on the Dock icon to open it. The project opens in the editor as a new local project, in the running app if SketchForge is already open. The Windows installer registers `.skf` files the same way.
 
 ### macOS Virtual Machines
 
@@ -425,6 +453,12 @@ Outside a checkout, the same bridge is a published binary -- see "MCP" below:
 
 ```bash
 npx -y -p @constructorfleet/sketchforge3d sketchforge-mcp
+```
+
+Run the desktop app against the dev server, optionally opening a project the way a double-click would. A relative path is read from the repository root:
+
+```bash
+npm run desktop:dev -- /path/to/Bracket.skf
 ```
 
 Create a production build:

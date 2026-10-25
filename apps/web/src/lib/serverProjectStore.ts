@@ -76,9 +76,19 @@ async function serverProjectError(response: Response, fallbackKey: ErrorKey) {
   return errorFromResponse(payload) ?? new LocalizedError(fallbackKey);
 }
 
+/**
+ * How long the start-up probe waits for the server. The page holds back
+ * files the desktop shell opened until the probe answers, so a server that
+ * never answers must not hold them forever; a probe that gives up is treated
+ * like an unreachable server, and the browser keeps the projects.
+ */
+export const SERVER_PROJECTS_PROBE_TIMEOUT_MS = 15_000;
+
 /** Ask the server whether it is holding projects. A server that is not configured answers `enabled: false`. */
-export async function probeServerProjects(): Promise<ServerProjectListing & { error?: Record<string, unknown> }> {
-  const response = await fetch(SERVER_PROJECTS_ENDPOINT, { cache: "no-store" });
+export async function probeServerProjects(
+  { timeoutMs = SERVER_PROJECTS_PROBE_TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<ServerProjectListing & { error?: Record<string, unknown> }> {
+  const response = await fetch(SERVER_PROJECTS_ENDPOINT, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
   const payload = await response.json().catch(() => ({})) as Partial<ServerProjectListing> & Record<string, unknown>;
   const enabled = Boolean(payload.enabled);
   return {

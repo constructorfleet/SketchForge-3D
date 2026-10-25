@@ -15,8 +15,21 @@ files:
   - apps/desktop/main.cjs
   - apps/desktop/i18n.cjs
   - apps/desktop/preload.cjs
+  - apps/desktop/projectFiles.cjs
   - apps/web/src/i18n/locales/*/desktop.json
   - package.json
+
+# Double-clicking a .skf opens it in SketchForge. mimeType must equal the
+# engine's SKF_MEDIA_TYPE (packages/sketchforge-engine/src/skfProject.ts);
+# tests/unit/desktopProjectFiles.test.ts fails if they drift. On Linux it
+# becomes the desktop entry's MimeType; macOS and Windows register by extension.
+fileAssociations:
+  - ext: skf
+    name: SketchForge Project
+    description: SketchForge Project
+    mimeType: application/vnd.sketchforge.project+zip
+    role: Editor
+    rank: Owner
 
 extraResources:
   - from: apps/web/.next/standalone

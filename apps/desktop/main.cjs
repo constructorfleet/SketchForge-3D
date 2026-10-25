@@ -4,6 +4,7 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createDesktopI18n } = require("./i18n.cjs");
+const { createProjectFileQueue, readProjectFile, skfPathsFromArgv } = require("./projectFiles.cjs");
 
 const devUrl = process.env.SKETCHFORGE_DESKTOP_DEV_URL?.trim() || "";
 // Keep the desktop origin stable. localStorage and IndexedDB are scoped to the
@@ -120,6 +121,26 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+// Files the OS asked SketchForge to open. They wait here until the page has
+// subscribed through the preload, because macOS sends `open-file` before the
+// app is ready and a first launch's argv is known before the window exists.
+// The queue reads one file at a time and keeps any file the page stopped
+// listening for while it was read.
+const projectFileQueue = createProjectFileQueue({
+  read: (filePath) => readProjectFile(filePath),
+  send: (file) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    mainWindow.webContents.send("sketchforge:open-project-file", file);
+    return true;
+  },
+});
+
+function openProjectFiles(filePaths) {
+  if (!filePaths.length) return;
+  projectFileQueue.add(filePaths);
+  showMainWindow();
+}
+
 function installDownloadedUpdate() {
   if (!downloadedUpdateReady) return;
   isQuitting = true;
@@ -212,6 +233,12 @@ function setupDesktopIpc() {
   ipcMain.handle("sketchforge:install-update", () => downloadAndInstallDesktopUpdate());
   ipcMain.on("sketchforge:set-language", (_event, locale) => {
     if (desktopI18n.setLocale(locale)) refreshTrayText();
+  });
+  ipcMain.on("sketchforge:project-files-ready", (event) => {
+    if (mainWindow && event.sender === mainWindow.webContents) projectFileQueue.rendererReady();
+  });
+  ipcMain.on("sketchforge:project-files-unready", (event) => {
+    if (mainWindow && event.sender === mainWindow.webContents) projectFileQueue.rendererGone();
   });
 }
 
@@ -362,6 +389,13 @@ function createMainWindow(url) {
     }
   });
 
+  // A reload or a crash drops the page's subscription without unsubscribing,
+  // so hold files again until the new page subscribes.
+  mainWindow.webContents.on("did-start-navigation", (details) => {
+    if (details.isMainFrame && !details.isSameDocument) projectFileQueue.rendererGone();
+  });
+  mainWindow.webContents.on("render-process-gone", () => projectFileQueue.rendererGone());
+
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
@@ -378,6 +412,7 @@ function createMainWindow(url) {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    projectFileQueue.rendererGone();
   });
 
   void mainWindow.loadURL(url);
@@ -408,7 +443,21 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", showMainWindow);
+  // Windows and Linux pass a double-clicked file on the command line: to this
+  // process on first launch, or to the running one through `second-instance`.
+  openProjectFiles(skfPathsFromArgv(process.argv, process.cwd()));
+
+  app.on("second-instance", (_event, argv, workingDirectory) => {
+    showMainWindow();
+    openProjectFiles(skfPathsFromArgv(argv, workingDirectory || process.cwd()));
+  });
+
+  // macOS sends files through `open-file` instead, before `ready` when the
+  // file launched the app, so this listener is registered at startup.
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault();
+    openProjectFiles(skfPathsFromArgv([process.execPath, filePath], process.cwd()));
+  });
 
   app.whenReady().then(() => {
     if (process.platform === "win32") app.setAppUserModelId("com.sketchforge.desktop");
