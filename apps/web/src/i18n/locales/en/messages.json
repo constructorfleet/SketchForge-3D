@@ -246,6 +246,20 @@
     }
   },
   "editor": {
+    "keyboardShortcuts": {
+      "title": "Keyboard shortcuts",
+      "helpHint": "Press ? to open this list. Press Escape to close it.",
+      "lockSelection": "Lock or unlock selection",
+      "hideSelection": "Hide or show selection",
+      "showHidden": "Show all hidden shapes",
+      "undo": "Undo",
+      "redo": "Redo",
+      "copy": "Copy",
+      "paste": "Paste",
+      "duplicate": "Duplicate",
+      "delete": "Delete selection",
+      "close": "Close keyboard shortcuts"
+    },
     "autosave": {
       "pending": "Saving “{projectName}” is taking longer than expected.",
       "failed": "Could not save “{projectName}”. Your recent changes may not be saved.",

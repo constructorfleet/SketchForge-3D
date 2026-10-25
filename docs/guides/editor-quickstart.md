@@ -42,6 +42,18 @@ Choose **Export**. In the export dialog, select **SKF: Editable project**, then 
 
 The same dialog can export mesh or CAD formats such as STL, 3MF, OBJ, and STEP. Choose STL or 3MF for a 3D-printing workflow; keep the `.skf` file when you want to reopen and continue editing the project.
 
+## Keyboard shortcuts
+
+Press **?** in the editor to open the keyboard-shortcuts list. Press **Escape** to close it. The list includes the common edit shortcuts; selection visibility and locking use bindings that do not collide with macOS or browser-reserved keys:
+
+- **Shift+L** locks or unlocks the selection.
+- **Shift+H** hides or shows the selection.
+- **Alt+Shift+H** shows all hidden shapes.
+
+The `?` key may require **Shift+/** on keyboards where `?` shares the slash key.
+
+![The editor keyboard-shortcuts dialog.](../screenshots/editor-keyboard-shortcuts.png)
+
 ## Verified workflow
 
 The browser acceptance test starts from an empty dashboard, creates a project, adds the rectangle through the sketch toolbar, finishes the extrusion, renames and reloads the project, then downloads the `.skf` file. Run it with:
