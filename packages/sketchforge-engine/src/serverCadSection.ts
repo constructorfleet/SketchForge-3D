@@ -24,9 +24,12 @@ const MAX_SECTION_SHAPES = 100;
 const MAX_SECTION_SPAN = 8_000;
 export const MAX_SECTION_FACE_SPAN = 10_000;
 /**
- * Triangles a section reads, across every mesh in it. Slicing is linear, so
- * this bounds memory -- each triangle is copied once into the drawing frame --
- * rather than time.
+ * Triangles a section reads, across every mesh in it, counted from the stored
+ * positions as well as the recorded count. Slicing is linear, so this bounds
+ * memory rather than time: placing a mesh builds a vertex array, a transformed
+ * copy, and a Float64Array in the drawing frame, about 400 bytes a triangle
+ * at peak. Measured by hand, not in the perf lane (which stops at 240,000): a
+ * 1,965,600-triangle section ran out of a 1 GiB heap and completed in 1.5 GiB.
  */
 export const MAX_SECTION_MESH_TRIANGLES = 2_000_000;
 export const MAX_CONTOURS = 10_000;
@@ -56,17 +59,29 @@ function axisBounds(bounds: Bounds, axis: "x" | "y" | "z") {
   return { min: bounds.zmin, max: bounds.zmax };
 }
 
+/** Triangles a shape's stored mesh holds, read from the positions themselves as well as the count beside them. */
+function meshTriangleCount(shape: WorkplaneShape) {
+  const mesh = shape.importedMesh;
+  if (!mesh) return 0;
+  return Math.max(mesh.triangleCount ?? 0, Math.floor((mesh.positions?.length ?? 0) / 9));
+}
+
 function validateRequest(shapes: readonly WorkplaneShape[], options: SectionOptions): asserts options is SectionOptions {
   if (!options || !SECTION_PLANES.includes(options.plane)) throw new ServerCadError(`plane must be one of: ${SECTION_PLANES.join(", ")}.`, 400);
   if (!Number.isFinite(options.offset) || Math.abs(options.offset) > 100_000) {
     throw new ServerCadError("Section offset must be a finite coordinate between -100000 and 100000.", 400);
   }
   if (shapes.length > MAX_SECTION_SHAPES) throw new ServerCadError(`A section drawing supports a maximum of ${MAX_SECTION_SHAPES} shapes.`, 413);
-  const triangles = shapes.reduce((sum, shape) => sum + (shape.importedMesh?.triangleCount ?? 0), 0);
+  const counts = shapes.map(meshTriangleCount);
+  const triangles = counts.reduce((sum, count) => sum + count, 0);
   if (triangles > MAX_SECTION_MESH_TRIANGLES) {
+    const alone = counts.some((count) => count > MAX_SECTION_MESH_TRIANGLES);
     throw new ServerCadError(
-      `Section drawing supports a maximum of ${MAX_SECTION_MESH_TRIANGLES} mesh triangles across the selected shapes; these have ${triangles}. `
-        + "Pass shapeIds to section fewer shapes at a time, or reduce the mesh before importing it.",
+      alone
+        ? `Section drawing supports a maximum of ${MAX_SECTION_MESH_TRIANGLES} mesh triangles; one selected mesh has ${Math.max(...counts)}. `
+          + "Reduce the mesh before importing it."
+        : `Section drawing supports a maximum of ${MAX_SECTION_MESH_TRIANGLES} mesh triangles across the selected shapes; these have ${triangles}. `
+          + "Pass shapeIds to section fewer shapes at a time, or reduce the meshes before importing them.",
       413,
     );
   }
