@@ -19,7 +19,7 @@ const BUDGETS = {
   cut20: { wallMs: 30_000, heapDeltaMb: 128 },
   explode200: { wallMs: 60_000, heapDeltaMb: 256 },
   interference128: { wallMs: 30_000, heapDeltaMb: 128 },
-  section50000: { wallMs: 180_000, heapDeltaMb: 512 },
+  section240000: { wallMs: 10_000, heapDeltaMb: 512 },
   revolveFillet: { wallMs: 15_000, heapDeltaMb: 128 },
 } satisfies Record<string, KernelBudget>;
 
@@ -92,24 +92,35 @@ describe("bounded kernel operation benchmarks", () => {
     for (const pair of result.value.pairs) expect(pair.overlapVolume).toBeCloseTo(4, 6);
   });
 
-  it("sections an actual 50,000-triangle closed mesh", async () => {
-    const indexed = new THREE.BoxGeometry(10, 10, 10, 50, 50, 100);
+  it("sections an actual 240,000-triangle closed mesh", async () => {
+    const indexed = new THREE.BoxGeometry(10, 10, 10, 100, 100, 250);
     const geometry = indexed.toNonIndexed();
     const positions = Array.from(geometry.getAttribute("position").array);
     indexed.dispose();
     geometry.dispose();
-    expect(positions.length / 9).toBe(50_000);
+    expect(positions.length / 9).toBe(240_000);
     const shape = importedShapeFromTriangleSoup("dense-box.stl", positions, undefined);
-    expect(shape.importedMesh?.triangleCount).toBe(50_000);
-    const svg = await measure("section50000", () => sectionShapesToSvg([shape], { plane: "xy", offset: 5 }));
-    expect(svg).toContain("<svg");
-    expect(svg).toMatch(/<path[^>]+d="M/);
-    const coordinates = [...svg.matchAll(/[ML](-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)]
-      .map((match) => [Number(match[1]), Number(match[2])]);
-    for (const axis of [0, 1]) {
-      expect(Math.min(...coordinates.map((point) => point[axis]!))).toBeCloseTo(-5, 4);
-      expect(Math.max(...coordinates.map((point) => point[axis]!))).toBeCloseTo(5, 4);
-    }
+    expect(shape.importedMesh?.triangleCount).toBe(240_000);
+    const svg = await measure("section240000", () => sectionShapesToSvg([shape], { plane: "xy", offset: 5 }));
+    const paths = [...svg.matchAll(/ d="([^"]+)"/g)];
+    expect(paths).toHaveLength(1);
+    const subpaths = paths[0][1].split("M").filter(Boolean);
+    expect(subpaths).toHaveLength(1);
+    const points = [...("M" + subpaths[0]).matchAll(/[ML](-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g)]
+      .map((match) => [Number(match[1]), Number(match[2])] as const);
+    let twiceArea = 0;
+    let cu = 0;
+    let cv = 0;
+    points.forEach(([u0, v0], index) => {
+      const [u1, v1] = points[(index + 1) % points.length];
+      const cross = u0 * v1 - u1 * v0;
+      twiceArea += cross;
+      cu += (u0 + u1) * cross;
+      cv += (v0 + v1) * cross;
+    });
+    expect(Math.abs(twiceArea / 2)).toBeCloseTo(100, 3);
+    expect(cu / (3 * twiceArea)).toBeCloseTo(0, 3);
+    expect(cv / (3 * twiceArea)).toBeCloseTo(0, 3);
   }, 240_000);
 
   it("fillets every edge of a 24-sided display revolve using exact topology", async () => {

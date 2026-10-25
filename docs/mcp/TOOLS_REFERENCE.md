@@ -1692,7 +1692,7 @@ Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true cu
 
 ### Description
 
-Return an exact CAD section drawing as SVG by cutting the stored solids with one axis-aligned plane in drawing coordinates. offset is the coordinate of the omitted axis, in millimetres. Works offline or against a server when url is supplied.
+Return a CAD section drawing as SVG by cutting the stored solids with one axis-aligned plane in drawing coordinates. offset is the coordinate of the omitted axis, in millimetres. Exact shapes are cut by the OCCT kernel; mesh shapes (imported STL/OBJ and other mesh-backed shapes) are sliced directly, up to 2,000,000 triangles across the selection -- pass shapeIds to section fewer shapes when over that. Works offline or against a server when url is supplied.
 
 ### Input schema
 
