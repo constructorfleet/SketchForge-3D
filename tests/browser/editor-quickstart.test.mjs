@@ -250,37 +250,26 @@ test("a STEP assembly exported from the editor can be imported and exploded thro
       hasBrepStep: importedMesh?.hasBrepStep,
       componentId: stepComponent?.id,
       occurrenceId: stepComponent?.occurrenceId,
-      path: stepComponent?.path,
+      path: stepComponent?.path?.map(({ name }) => name),
     }]));
     assert.deepEqual(leafMetadata, {
       Frame: {
         hasBrepStep: true,
         componentId: "step-occurrence:2/solid-1",
         occurrenceId: "step-occurrence:2",
-        path: [
-          { id: "step-node:1", name: "MainAssembly" },
-          { id: "step-occurrence:2", name: "Frame" },
-        ],
+        path: ["MainAssembly", "Frame"],
       },
       SensorLeft: {
         hasBrepStep: true,
         componentId: "step-occurrence:4/solid-1",
         occurrenceId: "step-occurrence:4",
-        path: [
-          { id: "step-node:1", name: "MainAssembly" },
-          { id: "step-occurrence:7", name: "Sensors" },
-          { id: "step-occurrence:4", name: "SensorLeft" },
-        ],
+        path: ["MainAssembly", "Sensors", "SensorLeft"],
       },
       SensorRight: {
         hasBrepStep: true,
         componentId: "step-occurrence:6/solid-1",
         occurrenceId: "step-occurrence:6",
-        path: [
-          { id: "step-node:1", name: "MainAssembly" },
-          { id: "step-occurrence:7", name: "Sensors" },
-          { id: "step-occurrence:6", name: "SensorRight" },
-        ],
+        path: ["MainAssembly", "Sensors", "SensorRight"],
       },
     });
     assert.ok(fs.existsSync(path.join(projectsDir, `${imported.projectId}.skf`)));

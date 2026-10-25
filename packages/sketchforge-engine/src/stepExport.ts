@@ -305,17 +305,18 @@ export function aabbsOverlap(a: Aabb, b: Aabb): boolean {
 export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<StepExportResult> {
   const brep = await loadBrepWithOcct();
 
-  type ExportEntry = { shape: WorkplaneShape; productPath: string[] };
+  type ExportEntry = { shape: WorkplaneShape; productPath: string[]; productKeys: string[] };
   const entries: ExportEntry[] = [];
-  const appendShape = (shape: WorkplaneShape, productPath: string[]) => {
+  const appendShape = (shape: WorkplaneShape, productPath: string[], productKeys: string[]) => {
     if (shape.groupedShapes?.length) {
       const path = [...productPath, shape.name];
-      for (const child of restoreGroupedChildren(shape)) appendShape(child, path);
+      const keys = [...productKeys, shape.id];
+      for (const child of restoreGroupedChildren(shape)) appendShape(child, path, keys);
       return;
     }
-    entries.push({ shape, productPath: [...productPath, shape.name] });
+    entries.push({ shape, productPath: [...productPath, shape.name], productKeys: [...productKeys, shape.id] });
   };
-  for (const shape of shapes) appendShape(shape, []);
+  for (const shape of shapes) appendShape(shape, [], []);
 
   const skipped: SkippedShape[] = [];
   const holes: { box: Aabb; solid: BrepSolid }[] = [];
@@ -335,8 +336,8 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   const isImportedBody = (shape: WorkplaneShape) => shape.kind === "mesh" && Boolean(shape.importedMesh?.brepStep);
   const hasStoredCadBrep = (shape: WorkplaneShape) => typeof shape.cadBrep === "string" && shape.cadBrep.length > 0;
 
-  const parts: { shape: BrepSolid; name: string; color: string }[] = [];
-  for (const { shape, productPath } of entries.filter(({ shape }) => !shape.hole)) {
+  const parts: { shape: BrepSolid; productPath: string[]; productKeys: string[]; color: string }[] = [];
+  for (const { shape, productPath, productKeys } of entries.filter(({ shape }) => !shape.hole)) {
     let built: BuildOutcome;
     if (isImportedBody(shape)) {
       built = await buildImportedBody(brep, shape);
@@ -366,7 +367,7 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
       }
     }
 
-    parts.push({ shape: toCadZUp(brep, solid), name: productPath.join(" / "), color: shape.color });
+    parts.push({ shape: toCadZUp(brep, solid), productPath, productKeys, color: shape.color });
   }
 
   if (parts.length === 0) {
@@ -383,29 +384,62 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
 
   const kernel = await loadOcctKernel();
   try {
-    const rootName = shapes.length === 1 && shapes[0]?.groupedShapes?.length ? shapes[0].name : "SketchForge Assembly";
+    const hasNamedRoot = shapes.length === 1 && Boolean(shapes[0]?.groupedShapes?.length);
+    const rootName = hasNamedRoot ? shapes[0]!.name : "SketchForge Assembly";
     const document = kernel.createXCAFDocument();
+    const emptyCompounds: ReturnType<typeof brep.compound>[] = [];
     try {
-      const first = parts[0]!;
-      const firstId = (first.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1];
-      const root = document.addShape(firstId, { name: rootName });
-      for (const part of parts.slice(1)) {
-        const color = parseHexColor(part.color);
-        document.addChild(root, (part.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1], {
-          name: part.name,
-          color,
-        });
-      }
-      if (parts.length > 1) {
-        const firstComponent = document.getChildren(root)[0];
-        if (firstComponent) {
-          document.setName(firstComponent, first.name);
-          document.setColor(firstComponent, parseHexColor(first.color));
+      type AssemblyNode = { key: string; name: string; children: AssemblyNode[]; part?: typeof parts[number] };
+      const rootNode: AssemblyNode = { key: "root", name: rootName, children: [] };
+      for (const part of parts) {
+        let current = rootNode;
+        const path = part.productPath.slice(hasNamedRoot ? 1 : 0);
+        const keys = part.productKeys.slice(hasNamedRoot ? 1 : 0);
+        for (const [index, name] of path.entries()) {
+          let child = current.children.find((candidate) => candidate.key === keys[index]);
+          if (!child) {
+            child = { key: keys[index]!, name, children: [] };
+            current.children.push(child);
+          }
+          if (index === path.length - 1) child.part = part;
+          current = child;
         }
       }
+
+      // XCAF's assembly writer emits each direct component as a real
+      // NEXT_ASSEMBLY_USAGE_OCCURRENCE. Empty compounds provide named group
+      // prototypes; adding children to their referred labels turns them into
+      // nested assemblies without embedding duplicate group geometry.
+      const emptyCompound = () => {
+        const compound = brep.compound([]);
+        emptyCompounds.push(compound);
+        return compound;
+      };
+      const root = document.addShape(
+        (emptyCompound().wrapped as unknown as { id: number }).id as Parameters<typeof document.addShape>[0],
+        { name: rootName, assembly: true },
+      );
+      const addChildren = (parent: typeof root, node: AssemblyNode) => {
+        for (const child of node.children) {
+          const shapeId = child.part
+            ? (child.part.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1]
+            : (emptyCompound().wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1];
+          const occurrence = document.addChild(parent, shapeId, {
+            name: child.name,
+            ...(child.part ? { color: parseHexColor(child.part.color) } : {}),
+          });
+          if (child.children.length) {
+            const prototype = document.getReferredLabel(occurrence);
+            if (!prototype) throw new Error(`Missing STEP group prototype for ${child.name}`);
+            addChildren(prototype, child);
+          }
+        }
+      };
+      addChildren(root, rootNode);
       return { blob: new Blob([document.exportSTEP()], { type: "model/step" }), exportedCount: parts.length, skipped };
     } finally {
       document.close();
+      for (const compound of emptyCompounds) compound.delete();
     }
   } catch (error) {
     throw new LocalizedError("errors.step.exportFailed", { detail: String(error instanceof Error ? error.message : error) });
