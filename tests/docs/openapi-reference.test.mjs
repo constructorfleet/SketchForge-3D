@@ -6,6 +6,19 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("every resource operation declares its required projectId query parameter", async () => {
+  const spec = JSON.parse(await readFile(path.join(root, "docs/openapi-v1.json"), "utf8"));
+  for (const [route, methods] of Object.entries(spec.paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      if (method === "options" || (route === "/api/v1/projects" && ["get", "post"].includes(method))) continue;
+      assert.ok(
+        operation.parameters?.some(({ name, in: location, required }) => name === "projectId" && location === "query" && required),
+        `${method.toUpperCase()} ${route} must declare required projectId in query`,
+      );
+    }
+  }
+});
+
 test("generated OpenAPI is a source-backed subset and calls out omitted operations", async () => {
   const spec = JSON.parse(await readFile(path.join(root, "docs/openapi-v1.json"), "utf8"));
 

@@ -561,11 +561,13 @@ const distributeResponse = {
 const arrangementOperations = [
   {
     ...operation("POST", "/api/v1/align", "alignShapes", [200, 400, 401, 404, 409, 422, 500, 503], json(alignRequest)),
+    query: projectQuery,
     description: "Align selected shapes by a shared minimum, centre, or maximum coordinate.",
     responseSchemas: { 200: alignResponse, ...arrangementErrors },
   },
   {
     ...operation("POST", "/api/v1/distribute", "distributeShapes", [200, 400, 401, 404, 409, 422, 500, 503], json(distributeRequest)),
+    query: projectQuery,
     description: "Evenly space three or more selected shapes while keeping the outermost shapes fixed.",
     responseSchemas: { 200: distributeResponse, ...arrangementErrors },
   },
