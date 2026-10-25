@@ -19,6 +19,7 @@ import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforg
 import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import { groupedShapeFromSelection } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 
 const CAD_TIMEOUT_MS = 60_000;
 
@@ -136,6 +137,94 @@ describe("a group of solids evaluates as their union (#500)", () => {
     expect(properties.centerOfMass.x).toBeCloseTo(15, 4);
     expect(properties.centerOfMass.z).toBeCloseTo(-5 / 3, 4);
     expect(properties.centerOfMass.y).toBeCloseTo(12, 4);
+    // The boxes do not touch, so the union is two solids in one compound.
+    expect(properties.isValid).toBe(true);
+  }, CAD_TIMEOUT_MS);
+
+  it("exports a group whose members do not touch as both of them", async () => {
+    const { engine, shapes } = projectWith([
+      box("small", 10, 10, 10),
+      box("long", 20, 10, 10, { x: 25 }),
+    ]);
+    value(await engine.group("union", ["small", "long"]));
+
+    const meshes = await meshProjectShapes(shapes());
+    expect(meshes).toHaveLength(1);
+    expect(meshVolume(meshes[0].vertices, meshes[0].faces)).toBeCloseTo(3000, 3);
+  }, CAD_TIMEOUT_MS);
+
+  it("measures a group of holes as the region it removes", async () => {
+    const { engine, shapes } = projectWith([
+      cylinder("large", 20, 10, { hole: true }),
+      cylinder("small", 10, 10, { x: 10, elevation: 5, hole: true }),
+    ]);
+    const group = value(await engine.group("union", ["large", "small"])).shape;
+    expect(group.hole).toBe(true);
+    expect(shapes()).toHaveLength(1);
+
+    const properties = value(await engine.properties("union", group.id));
+    const largeVolume = Math.PI * 100 * 10;
+    const smallVolume = Math.PI * 25 * 10;
+    const overlap = lensArea(10, 5, 10) * 5;
+    const volume = largeVolume + smallVolume - overlap;
+    expect(properties.volume).toBeCloseTo(volume, 3);
+    expect(properties.volume).toBeGreaterThan(0);
+  }, CAD_TIMEOUT_MS);
+
+  it("cuts the holes out of the solids when a record holds both", async () => {
+    // engine.group cuts such a selection at once; a record holding both comes
+    // from older projects and from groups nested before the cut was applied.
+    const record = groupedShapeFromSelection([
+      box("plate", 20, 20, 10),
+      cylinder("bore", 10, 12, { x: 5, elevation: -1, hole: true }),
+    ])!;
+    expect(record.hole).toBe(false);
+    const { engine } = projectWith([record]);
+
+    const properties = value(await engine.properties("union", record.id));
+    const plateVolume = 4000;
+    const boreVolume = Math.PI * 25 * 10;
+    const volume = plateVolume - boreVolume;
+    expect(properties.volume).toBeCloseTo(volume, 3);
+    // The bore sits 5mm to +x, so what is left leans the other way.
+    expect(properties.centerOfMass.x).toBeCloseTo(-(boreVolume * 5) / volume, 4);
+    expect(properties.centerOfMass.z).toBeCloseTo(0, 4);
+    expect(properties.centerOfMass.y).toBeCloseTo(5, 4);
+  }, CAD_TIMEOUT_MS);
+
+  it("leaves out a member that is hidden, as the editor does", async () => {
+    const { engine: meshEngine } = projectWith([]);
+    const ring = value(await meshEngine.addShapes("union", [
+      { kind: "revolve", name: "Ring", profile: [[5, -4], [10, -4], [10, 4], [5, 4]], sides: 24, x: 40 },
+    ])).shapes[0];
+    const record = groupedShapeFromSelection([
+      box("shown", 10, 10, 10),
+      box("hidden", 10, 10, 10, { x: 20, hidden: true }),
+      { ...ring, hidden: true },
+    ])!;
+    const { engine, shapes } = projectWith([record]);
+
+    const properties = value(await engine.properties("union", record.id));
+    expect(properties.volume).toBeCloseTo(1000, 4);
+    // The only meshed member is hidden, so what is measured is exact.
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
+    expect(properties.centerOfMass.x).toBeCloseTo(0, 4);
+
+    const meshes = await meshProjectShapes(shapes());
+    expect(meshes).toHaveLength(1);
+    expect(meshVolume(meshes[0].vertices, meshes[0].faces)).toBeCloseTo(1000, 3);
+  }, CAD_TIMEOUT_MS);
+
+  it("refuses a group every member of which is hidden, saying so", async () => {
+    const record = groupedShapeFromSelection([
+      box("a", 10, 10, 10, { hidden: true }),
+      box("b", 10, 10, 10, { x: 20, hidden: true }),
+    ])!;
+    const { engine } = projectWith([record]);
+
+    const result = await engine.properties("union", record.id);
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(!result.ok && result.failure)).toContain("hidden");
   }, CAD_TIMEOUT_MS);
 
   it("fuses a meshed revolve with the cylinder that fills its bore, and says it is tessellated", async () => {
@@ -156,6 +245,34 @@ describe("a group of solids evaluates as their union (#500)", () => {
     expect(properties.centerOfMass.x).toBeCloseTo(core.x, 3);
     expect(properties.centerOfMass.z).toBeCloseTo(core.z, 3);
     expect(properties.centerOfMass.y).toBeCloseTo((core.elevation ?? 0) + 4, 3);
+    expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+  }, CAD_TIMEOUT_MS);
+
+  it("fuses two meshed revolves without counting their overlap twice", async () => {
+    const { engine } = projectWith([]);
+    const added = value(await engine.addShapes("union", [
+      { kind: "revolve", name: "Outer", profile: [[5, -4], [10, -4], [10, 4], [5, 4]], sides: 96 },
+      { kind: "revolve", name: "Inner", profile: [[3, -4], [7, -4], [7, 4], [3, 4]], sides: 96, elevation: 4 },
+    ]));
+    const [outer, inner] = added.shapes;
+    expect(outer.importedMesh).toBeDefined();
+    expect(inner.importedMesh).toBeDefined();
+    expect((inner.elevation ?? 0) - (outer.elevation ?? 0)).toBeCloseTo(4, 6);
+    const outerAlone = value(await engine.properties("union", outer.id));
+    const innerAlone = value(await engine.properties("union", inner.id));
+    const group = value(await engine.group("union", [outer.id, inner.id])).shape;
+
+    const properties = value(await engine.properties("union", group.id));
+    // Both are faceted alike, so the overlap -- radii 5..7, 4mm tall -- carries
+    // the same faceting factor as the outer ring's 600*pi.
+    const overlap = outerAlone.volume * (96 / 600);
+    const volume = outerAlone.volume + innerAlone.volume - overlap;
+    expect(properties.volume / volume).toBeCloseTo(1, 3);
+    const outerY = outerAlone.centerOfMass.y;
+    expect(properties.centerOfMass.y).toBeCloseTo(
+      (outerAlone.volume * outerY + innerAlone.volume * (outerY + 4) - overlap * (outerY + 2)) / volume,
+      2,
+    );
     expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
   }, CAD_TIMEOUT_MS);
 

@@ -31,9 +31,10 @@ function geometryProvenance(shape: WorkplaneShape): ShapeGeometryProvenance {
     return { source: "mesh", precision: "tessellated" };
   }
   // A group record is measured as its children fused, so it is only as exact
-  // as the least exact of them.
+  // as the least exact of them. A hidden member is left out of the fuse, so
+  // it is left out here too.
   if (isGroupRecord(shape)) {
-    const children = (shape.groupedShapes ?? []).map(geometryProvenance);
+    const children = (shape.groupedShapes ?? []).filter((child) => !child.hidden).map(geometryProvenance);
     return children.find((child) => child.source === "mesh")
       ?? children.find((child) => child.source === "brep")
       ?? { source: "parametric", precision: "exact" };

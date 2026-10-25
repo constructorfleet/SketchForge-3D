@@ -28,7 +28,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 ## Group evaluation
 
-- [#500: Evaluate solid-only groups as a union](https://github.com/constructorfleet/SketchForge-3D/issues/500) — implementation and regression coverage complete; awaiting review. Properties, exports, sections, drawings, interference and thickness fuse a group record's children through OCCT, sewing mesh members from their triangles. Still open: a Manifold fallback for mesh members OCCT cannot sew, and fillets, chamfers and shells applied to a group record without ungrouping it first.
+- [#500: Evaluate solid-only groups as a union](https://github.com/constructorfleet/SketchForge-3D/issues/500) — completed in [#510](https://github.com/constructorfleet/SketchForge-3D/pull/510). Properties, exports, sections, drawings, interference and thickness fuse a group record's visible children through OCCT, sewing mesh members from their triangles; a member hidden inside the group is left out, as the editor leaves it undrawn. Deferred: a Manifold fallback for mesh members OCCT cannot sew, and fillets, chamfers and shells applied to a group record without ungrouping it first.
 
 ## Documentation suite open work
 
