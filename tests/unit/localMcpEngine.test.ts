@@ -145,6 +145,7 @@ describe("local MCP engine mode", () => {
     const outsideDir = path.join(projectsDir, "outside");
     fs.mkdirSync(filesDir);
     fs.mkdirSync(outsideDir);
+    const canonicalFilesDir = fs.realpathSync(filesDir);
     temporaryDirectories.push(projectsDir);
     fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
     const secret = path.join(outsideDir, "secret.skf");
@@ -154,18 +155,18 @@ describe("local MCP engine mode", () => {
 
     const escape = callMcp(projectsDir, 2, "sketchforge_import_project", { filePath: linkedSecret }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
     expect(escape[1].result.isError).toBe(true);
-    expect(escape[1].result.content[0].text).toContain(filesDir);
+    expect(escape[1].result.content[0].text).toContain(canonicalFilesDir);
     const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box" });
     expect(created[1].result.isError).toBeUndefined();
 
     const outputEscape = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: path.join(outsideDir, "missing", "escaped.stl") }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
     expect(outputEscape[1].result.isError).toBe(true);
-    expect(outputEscape[1].result.content[0].text).toContain(filesDir);
+    expect(outputEscape[1].result.content[0].text).toContain(canonicalFilesDir);
     const outsideExisting = path.join(outsideDir, "existing.stl");
     fs.writeFileSync(outsideExisting, "keep outside");
     const existingEscape = callMcp(projectsDir, 2, "sketchforge_export_scene", { projectId: "case", format: "stl", outputPath: outsideExisting }, { SKETCHFORGE_MCP_FILES_DIR: filesDir });
     expect(existingEscape[1].result.isError).toBe(true);
-    expect(existingEscape[1].result.content[0].text).toContain(filesDir);
+    expect(existingEscape[1].result.content[0].text).toContain(canonicalFilesDir);
 
     const exportPath = path.join(filesDir, "existing.stl");
     fs.writeFileSync(exportPath, "keep me");
