@@ -100,6 +100,7 @@ import {
   withHoleMode,
   workplaneShapesEqual,
 } from "@/lib/engine/workplaneShapes";
+import { withResultAttributes } from "@/lib/engine/shapeRequests";
 import { workplaneCenteringOffset } from "@/lib/workplaneCentering";
 import { bakeCadMetadataForShapeTransform, cadBrepTransformForShape, cadModifierPrimitiveForAnalyticBox, cadModifierPrimitiveForBakedShape } from "@/lib/engine/cadBakeMetadata";
 import { hasOneToOneCadComponentMapping } from "@/lib/engine/cadModifierGroups";
@@ -8970,7 +8971,10 @@ export function SketchForgeEditor({
         } else {
           throw new Error("MCP create_shape currently supports box, cube, cylinder, text, loft, and sketch");
         }
-        const committedShape = canonicalizeShape(bakeShapeTransformIntoMesh(shape));
+        // Every kind can be created as a cutter, as revolves and threads already
+        // could, so a hole does not need a second update_object call (#505).
+        const bakedShape = canonicalizeShape(bakeShapeTransformIntoMesh(shape));
+        const committedShape = params.hole === true ? withHoleMode(bakedShape, true) : bakedShape;
         commitShapes([...currentShapes(), committedShape], committedShape.id, notice((t) => t("editor.mcp.added", { name: committedShape.name })));
         return { object: mcpShapeSummary(committedShape) };
       }
@@ -9200,7 +9204,7 @@ export function SketchForgeEditor({
           }
           throw new Error(englishText(result.failureNotice));
         }
-        const editableGroup = canonicalizeShape({ ...result.group, groupOperation: "group" });
+        const editableGroup = canonicalizeShape(withResultAttributes({ ...result.group, groupOperation: "group" }, params));
         commitShapes([...currentShapes().filter((shape) => !ids.has(shape.id)), editableGroup], editableGroup.id, notice((t) => t("editor.mcp.grouped", { count: groupable.length })));
         return { object: mcpShapeSummary(editableGroup) };
       }
@@ -9243,7 +9247,7 @@ export function SketchForgeEditor({
         if (!result.group) {
           throw new Error(englishText(result.failureNotice));
         }
-        const editableGroup = canonicalizeShape({ ...result.group, groupOperation: "group" });
+        const editableGroup = canonicalizeShape(withResultAttributes({ ...result.group, groupOperation: "group" }, params));
         commitShapes([...remainingShapes, editableGroup], editableGroup.id, notice((t) => t("editor.mcp.cutComplete")));
         return { object: mcpShapeSummary(editableGroup) };
       }

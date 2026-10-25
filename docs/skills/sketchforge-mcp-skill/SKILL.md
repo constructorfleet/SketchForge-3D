@@ -72,12 +72,12 @@ Useful tools:
 
 - `sketchforge_select_objects`: select ids in the live editor.
 - `sketchforge_delete_objects`: delete ids in the live editor, or delete the current selection when ids are omitted.
-- `sketchforge_create_shape`: create a shape by `kind`. Local mode builds every parameterized kind (`box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`) plus `revolve` and `thread`. An open editor builds `box`, `cube`, `cylinder`, `text`, `loft`, `sketch`, `revolve`, and `thread`. `sketch` is editor-only, and local mode refuses it. On `tube` and `ring`, `bevel` is the wall thickness in mm (default 4).
+- `sketchforge_create_shape`: create a shape by `kind`. Local mode builds every parameterized kind (`box`, `cube`, `cylinder`, `cone`, `sphere`, `halfSphere`, `torus`, `tube`, `ring`, `polygon`, `pyramid`, `roof`, `roundRoof`, `wedge`, `icosahedron`, `text`, `loft`, `gear`) plus `revolve` and `thread`. An open editor builds `box`, `cube`, `cylinder`, `text`, `loft`, `sketch`, `revolve`, and `thread`. `sketch` is editor-only, and local mode refuses it. On `tube` and `ring`, `bevel` is the wall thickness in mm (default 4). Pass `hole: true` on any kind to create it as a cutter, so it needs no follow-up `update_object` call.
 - `sketchforge_import_mesh`: import STL-style mesh data into the editor.
 - `sketchforge_update_object`: set exact dimensions, position, color, name, hole state, and `rotation`/`rotationX`/`rotationZ`.
 - `sketchforge_align_objects`: align two or more ids using the same logic as the editor Alignment button.
-- `sketchforge_group_objects`: group selected ids using the normal SketchForge group/boolean path. A group of solids with no hole stays a record of its children; `sketchforge_shape_properties` and `sketchforge_export_scene` treat it as the union of those children.
-- `sketchforge_boolean_cut`: pass `solidIds` and `holeIds`; the result replaces the operands.
+- `sketchforge_group_objects`: group selected ids using the normal SketchForge group/boolean path. A group of solids with no hole stays a record of its children; `sketchforge_shape_properties` and `sketchforge_export_scene` treat it as the union of those children. Optional `name` and `color` set the result's name and color; otherwise it is named "Group" and takes the first solid's color.
+- `sketchforge_boolean_cut`: pass `solidIds` and `holeIds`; the result replaces the operands. It takes the same optional `name` and `color`.
 - `sketchforge_ungroup_objects`: restore grouped children while preserving edited child geometry.
 - `sketchforge_separate_parts`: split disconnected parts in one object.
 - `sketchforge_inspect_errors`: read the editor notice, edge modifier error, and last MCP error.

@@ -414,19 +414,21 @@ async function callLocalEngineToolRaw(name, args = {}) {
     case "sketchforge_pattern_objects":
       return unwrap(await engine.pattern(id, { ...args, ids: args.ids?.length ? args.ids : selectedObjectIds, kind: args.kind ?? "linear", count: args.count ?? 4 }));
     case "sketchforge_group_objects":
-      return unwrap(await engine.group(id, args.ids?.length ? args.ids : selectedObjectIds));
+      return unwrap(await engine.group(id, args.ids?.length ? args.ids : selectedObjectIds, { name: args.name, color: args.color }));
     case "sketchforge_ungroup_objects": {
       const results = [];
       for (const shapeId of args.ids ?? (args.id ? [args.id] : selectedObjectIds)) results.push(await unwrap(await engine.ungroup(id, shapeId)));
       return { results };
     }
     case "sketchforge_boolean_cut": {
-      if (args.solidIds && args.holeIds) return unwrap(await engine.cut(id, { solidIds: args.solidIds, holeIds: args.holeIds }));
+      const result = { name: args.name, color: args.color };
+      if (args.solidIds && args.holeIds) return unwrap(await engine.cut(id, { solidIds: args.solidIds, holeIds: args.holeIds, ...result }));
       const project = await unwrap(await engine.project(id));
       const selected = project.shapes.filter((shape) => selectedObjectIds.includes(shape.id));
       return unwrap(await engine.cut(id, {
         solidIds: selected.filter((shape) => !shape.hole).map((shape) => shape.id),
         holeIds: selected.filter((shape) => shape.hole).map((shape) => shape.id),
+        ...result,
       }));
     }
     case "sketchforge_separate_parts":
