@@ -70,14 +70,13 @@ function loopAreaAndCentroid(points: [number, number][]) {
 }
 
 describe("section drawings of meshes above the old 50,000-triangle cap", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
-  it("slices a 62,400-triangle mesh directly, where it stands, in well under the OCCT path's time", async () => {
+  it("slices a 62,400-triangle mesh where it stands", async () => {
     const mesh = denseBoxMesh(10, 10, 6, [60, 100, 60]);
     expect(mesh.importedMesh?.triangleCount).toBe(62_400);
     // Off-centre and turned, so a misplaced, mirrored, or unrotated slice is visible in the centroid and area.
     const placed: WorkplaneShape = { ...mesh, x: 7, z: 3, rotation: 30 };
-    const started = performance.now();
+    // How fast is the perf lane's business (tests/perf/kernel-operations.perf.ts).
     const svg = await sectionShapesToSvg([placed], { plane: "xy", offset: 5 });
-    expect(performance.now() - started).toBeLessThan(10_000);
     const loops = svgLoops(svg);
     expect(loops).toHaveLength(1);
     const { area, centroid } = loopAreaAndCentroid(loops[0]);
@@ -96,6 +95,54 @@ describe("section drawings of meshes above the old 50,000-triangle cap", { timeo
     expect(area).toBeCloseTo(60, 3);
     expect(centroid[0]).toBeCloseTo(-4, 3);
     expect(centroid[1]).toBeCloseTo(0, 3);
+  });
+
+  it("draws both outlines where the plane lies on a downward face inside the mesh", async () => {
+    // A T profile extruded 2 deep: a 2-wide stem from 0 to 5 under a 6-wide
+    // cap from 5 to 7. The cap's underside lies on the plane at 5, and the
+    // exact kernel draws its edges there as well as the stem's.
+    const profile = new THREE.Shape([
+      new THREE.Vector2(-1, 0), new THREE.Vector2(1, 0), new THREE.Vector2(1, 5), new THREE.Vector2(3, 5),
+      new THREE.Vector2(3, 7), new THREE.Vector2(-3, 7), new THREE.Vector2(-3, 5), new THREE.Vector2(-1, 5),
+    ]);
+    const extruded = new THREE.ExtrudeGeometry(profile, { depth: 2, bevelEnabled: false });
+    const soup = extruded.index ? extruded.toNonIndexed() : extruded;
+    const tee = importedShapeFromTriangleSoup("tee.stl", Array.from(soup.getAttribute("position").array), undefined) as WorkplaneShape;
+    extruded.dispose();
+    const placed: WorkplaneShape = { ...tee, x: 5, z: -2 };
+    const measured = (offset: number) => sectionShapesToSvg([placed], { plane: "xy", offset })
+      .then((svg) => svgLoops(svg).map(loopAreaAndCentroid).sort((left, right) => left.area - right.area));
+
+    const onFace = await measured(5);
+    expect(onFace).toHaveLength(2);
+    expect(onFace[0].area).toBeCloseTo(4, 3);
+    expect(onFace[1].area).toBeCloseTo(12, 3);
+    for (const loop of onFace) {
+      expect(loop.centroid[0]).toBeCloseTo(5, 3);
+      expect(loop.centroid[1]).toBeCloseTo(2, 3);
+    }
+    // Off the face, each side is the one body it cuts.
+    expect((await measured(4.9)).map((loop) => Number(loop.area.toFixed(3)))).toEqual([4]);
+    expect((await measured(5.1)).map((loop) => Number(loop.area.toFixed(3)))).toEqual([12]);
+  });
+
+  it("draws a body resting on the plane beside one the plane crosses, in one mesh", async () => {
+    // Two 2x2x2 cubes in one STL: one from height 1 to 3 at x = -5, one from 0 to 2 at x = 5.
+    const cube = (x: number, y: number) => {
+      const box = new THREE.BoxGeometry(2, 2, 2).toNonIndexed();
+      box.translate(x, y, 0);
+      const positions = Array.from(box.getAttribute("position").array);
+      box.dispose();
+      return positions;
+    };
+    const pair = importedShapeFromTriangleSoup("pair.stl", [...cube(-5, 2), ...cube(5, 1)], undefined) as WorkplaneShape;
+    const measured = svgLoops(await sectionShapesToSvg([pair], { plane: "xy", offset: 1 })).map(loopAreaAndCentroid)
+      .sort((left, right) => left.centroid[0] - right.centroid[0]);
+    expect(measured).toHaveLength(2);
+    expect(measured[0].area).toBeCloseTo(4, 3);
+    expect(measured[0].centroid[0]).toBeCloseTo(-5, 3);
+    expect(measured[1].area).toBeCloseTo(4, 3);
+    expect(measured[1].centroid[0]).toBeCloseTo(5, 3);
   });
 
   it("interpolates where the plane crosses a sloped wall", async () => {
@@ -214,7 +261,27 @@ describe("section drawings from stored shapes", { timeout: CAD_TEST_TIMEOUT_MS }
     };
     const refusal = sectionShapesToSvg([imported], { plane: "xy", offset: 0.5 });
     await expect(refusal).rejects.toThrow(/maximum of 2000000 mesh triangles/i);
-    // The refusal says what to do about it, not only what the limit is.
+    // The refusal says what to do about it: one mesh can only be reduced.
+    await expect(refusal).rejects.toThrow(/reduce the mesh/i);
+    await expect(refusal).rejects.not.toThrow(/shapeIds/);
+  });
+
+  it("refuses meshes that are too large together by naming shapeIds", async () => {
+    const half = {
+      ...shape({ kind: "box", width: 1, depth: 1, height: 1 }),
+      importedMesh: { positions: [], baseWidth: 1, baseDepth: 1, baseHeight: 1, triangleCount: 1_000_001, sourceFormat: "stl" as const },
+    };
+    const refusal = sectionShapesToSvg([half, { ...half, id: "other" }], { plane: "xy", offset: 0.5 });
+    await expect(refusal).rejects.toThrow(/these have 2000002/);
     await expect(refusal).rejects.toThrow(/shapeIds/);
+  });
+
+  it("counts a mesh's stored triangles, not only the count recorded beside them", async () => {
+    // A holey array: its length says 2,000,001 triangles without allocating them.
+    const imported = {
+      ...shape({ kind: "box", width: 1, depth: 1, height: 1 }),
+      importedMesh: { positions: new Array<number>(9 * 2_000_001), baseWidth: 1, baseDepth: 1, baseHeight: 1, triangleCount: 12, sourceFormat: "stl" as const },
+    };
+    await expect(sectionShapesToSvg([imported], { plane: "xy", offset: 0.5 })).rejects.toThrow(/maximum of 2000000 mesh triangles/i);
   });
 });

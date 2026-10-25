@@ -262,7 +262,7 @@ are identified by their status in the route description above or below.
 | `MAX_SVG_TRIANGLES` | 200,000 | Mesh produced from SVG; an importer refusal returns `422 geometry_failed`. |
 | `MAX_CUSTOM_SHAPE_DIMENSION` | 2,000 mm | Client-side custom shape settings; no REST response. |
 | `MAX_HIGH_RESOLUTION_SIDES` | 512 | Revolve tessellation and client-side custom shape settings. |
-| `MAX_SECTION_MESH_TRIANGLES` | 2,000,000 | `POST /exports` SVG/DXF section, summed over the selected mesh shapes; excess returns `413 limit_exceeded` naming the count and suggesting `shapeIds`. |
+| `MAX_SECTION_MESH_TRIANGLES` | 2,000,000 | `POST /exports` SVG/DXF section, summed over the selected mesh shapes; counted from the stored positions as well as the recorded `triangleCount`; excess returns `413 limit_exceeded` naming the count and suggesting `shapeIds`, or only reducing the mesh when one mesh is over the limit by itself. |
 | `MAX_SECTION_FACE_SPAN` | 10,000 mm | `POST /exports` SVG/DXF section face span; excess returns `413 limit_exceeded`. |
 | `MAX_CONTOURS` | 10,000 | `POST /exports` SVG/DXF section contours; excess returns `413 limit_exceeded`. |
 | `MAX_SAMPLED_POINTS` | 100,000 | `POST /exports` SVG/DXF section points; excess returns `413 limit_exceeded`. |
@@ -792,10 +792,12 @@ the selected scene. Shapes the project describes exactly are cut by the OCCT
 kernel; shapes stored only as triangles (imported STL/OBJ meshes and other
 mesh-backed shapes) are sliced directly, triangle by triangle, so their
 contours are the mesh's own polyline and a large mesh sections in well under a
-second. The server limits a section to 100 shapes,
+second. A plane lying on a face, such as the top of a post or the underside
+of a ledge, draws that face's edges as well as the walls it crosses, as the
+kernel does for exact shapes. The server limits a section to 100 shapes,
 `MAX_SECTION_MESH_TRIANGLES` (2,000,000) mesh triangles across the selected
 shapes, and an 8,000 mm maximum span. Over the triangle limit, section fewer
-shapes at a time with `shapeIds`. Each section face is also limited
+shapes at a time with `shapeIds`, or reduce a mesh that is over it alone. Each section face is also limited
 to `MAX_SECTION_FACE_SPAN` (10,000 mm) per side; more than `MAX_CONTOURS`
 (10,000) contours or `MAX_SAMPLED_POINTS` (100,000) sampled points returns
 `413 limit_exceeded`.

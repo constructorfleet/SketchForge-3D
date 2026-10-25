@@ -14,7 +14,11 @@
  * A vertex lying exactly on the plane is counted as above it (a symbolic
  * perturbation), so every crossing is on exactly one edge, and a closed mesh
  * gives closed loops even where the plane passes through its vertices or along
- * its faces.
+ * its faces. That cut is taken just below the plane, so it misses a face lying
+ * on the plane and facing down -- the underside of a ledge. When any vertex is
+ * on the plane the mesh is cut again with them counted as below, which is the
+ * cut just above, and the loops that cut adds are kept too. Between them they
+ * draw every edge of every face on the plane, as the exact kernel does.
  */
 
 export type MeshSectionAxis = 0 | 1 | 2;
@@ -40,7 +44,11 @@ function edgeKey(a: string, b: string) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
-type Crossing = { u: number; v: number };
+/**
+ * Where a segment crosses an edge, and what identifies that point in either
+ * cut: the vertex, when it lies on the plane, or else the edge itself.
+ */
+type Crossing = { u: number; v: number; point: string };
 
 /**
  * Segments of a triangle soup's section, each as the keys of the two edges it
@@ -52,11 +60,13 @@ function sectionSegments(positions: ArrayLike<number>, options: MeshSectionOptio
   const crossings = new Map<string, Crossing>();
   const corner = [0, 0, 0];
   const distance = [0, 0, 0];
+  let touches = false;
   for (let base = 0; base + 8 < positions.length; base += 9) {
     let above = 0;
     for (let k = 0; k < 3; k += 1) {
       corner[k] = base + k * 3;
       distance[k] = positions[corner[k] + normal] - offset;
+      if (distance[k] === 0) touches = true;
       if (distance[k] > 0 || (onPlaneIsAbove && distance[k] === 0)) above |= 1 << k;
     }
     if (above === 0 || above === 7) continue;
@@ -64,7 +74,9 @@ function sectionSegments(positions: ArrayLike<number>, options: MeshSectionOptio
     for (let k = 0; k < 3; k += 1) {
       const next = (k + 1) % 3;
       if (((above >> k) & 1) === ((above >> next) & 1)) continue;
-      const key = edgeKey(vertexKey(positions, corner[k]), vertexKey(positions, corner[next]));
+      const from = vertexKey(positions, corner[k]);
+      const to = vertexKey(positions, corner[next]);
+      const key = edgeKey(from, to);
       if (!crossings.has(key)) {
         const t = distance[k] / (distance[k] - distance[next]);
         const a = corner[k];
@@ -72,13 +84,14 @@ function sectionSegments(positions: ArrayLike<number>, options: MeshSectionOptio
         crossings.set(key, {
           u: positions[a + u] + (positions[b + u] - positions[a + u]) * t,
           v: positions[a + v] + (positions[b + v] - positions[a + v]) * t,
+          point: distance[k] === 0 ? from : distance[next] === 0 ? to : key,
         });
       }
       ends.push(key);
     }
     if (ends.length === 2 && ends[0] !== ends[1]) segments.push({ from: ends[0], to: ends[1] });
   }
-  return { segments, crossings };
+  return { segments, crossings, touches };
 }
 
 /** Join segments that share a crossed edge into polylines, closed where the mesh is. */
@@ -92,7 +105,7 @@ function joinSegments(segments: readonly { from: string; to: string }[], crossin
     }
   });
   const used = new Uint8Array(segments.length);
-  const contours: number[][] = [];
+  const contours: { contour: number[]; points: string }[] = [];
   const nextSegment = (key: string) => neighbours.get(key)?.find((index) => !used[index]);
 
   for (let start = 0; start < segments.length; start += 1) {
@@ -116,14 +129,16 @@ function joinSegments(segments: readonly { from: string; to: string }[], crossin
     }
     const keys = [...backward.reverse(), ...forward];
     const contour: number[] = [];
+    const points = new Set<string>();
     for (const key of keys) {
       const point = crossings.get(key)!;
+      points.add(point.point);
       const last = contour.length;
       // A crossing at a vertex on the plane repeats its neighbour's point.
       if (last >= 2 && Math.abs(contour[last - 2] - point.u) <= WELD && Math.abs(contour[last - 1] - point.v) <= WELD) continue;
       contour.push(point.u, point.v);
     }
-    if (contour.length >= 4) contours.push(contour);
+    if (contour.length >= 4) contours.push({ contour, points: [...points].sort().join(";") });
   }
   return contours;
 }
@@ -131,13 +146,22 @@ function joinSegments(segments: readonly { from: string; to: string }[], crossin
 /**
  * The polylines where a plane cuts a triangle soup, as [u0, v0, u1, v1, ...].
  *
- * `positions` holds three vertices per triangle. A plane that touches the mesh
- * only along its lowest faces, where counting on-plane vertices as above it
- * leaves nothing crossing, is retried with them counted as below, so the
- * section at either end of a solid is its outline, as the exact kernel draws it.
+ * `positions` holds three vertices per triangle. Where vertices lie on the
+ * plane, the cuts just below and just above it are both taken, and a loop the
+ * second adds through the same points as one the first found is dropped. So a
+ * plane along a solid's end face draws its outline, and a plane along a face
+ * inside it -- the top of a post, the underside of a ledge -- draws that
+ * face's edges as well as the walls it crosses.
  */
 export function sectionTriangleSoup(positions: ArrayLike<number>, options: MeshSectionOptions): number[][] {
-  let result = sectionSegments(positions, options, true);
-  if (!result.segments.length) result = sectionSegments(positions, options, false);
-  return joinSegments(result.segments, result.crossings);
+  const below = sectionSegments(positions, options, true);
+  const loops = joinSegments(below.segments, below.crossings);
+  if (below.touches) {
+    const seen = new Set(loops.map((loop) => loop.points));
+    const above = sectionSegments(positions, options, false);
+    for (const loop of joinSegments(above.segments, above.crossings)) {
+      if (!seen.has(loop.points)) loops.push(loop);
+    }
+  }
+  return loops.map((loop) => loop.contour);
 }
