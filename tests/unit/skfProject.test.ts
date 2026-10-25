@@ -285,6 +285,20 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.shapes[0]).toMatchObject({ faceIds: part.faceIds, faceColors: part.faceColors });
   });
 
+  it("round-trips a partial revolve's axis offset and rejects a malformed one", async () => {
+    const revolve = shape("box", "partial-revolve-axis", { revolveAxisOffset: { x: 37.5, z: -37.5 } });
+    const archive = await exportSkfProject(input([revolve]));
+    const restored = await importSkfProject(archive);
+    expect(restored.shapes[0].revolveAxisOffset).toEqual({ x: 37.5, z: -37.5 });
+
+    const malformed = mutateProject(archive, (document) => {
+      const node = document.states.find((state) => state.id === document.sceneStateId)?.nodes.find((entry) => entry.objectId === revolve.id);
+      expect(node).toBeDefined();
+      (node!.definition as Record<string, unknown>).revolveAxisOffset = { x: "far", z: 0 };
+    });
+    await expect(importSkfProject(malformed)).rejects.toThrow(/revolveAxisOffset\.x/);
+  });
+
   it("round-trips imported STEP assembly names and their parent-child tree", async () => {
     const stepAssembly = [{
       name: "MainAssembly",

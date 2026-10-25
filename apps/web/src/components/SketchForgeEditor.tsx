@@ -45,7 +45,10 @@ import {
 import { distributeShifts, widestDistributeAxis, type DistributeSpacing } from "@/lib/engine/distributeShapes";
 import {
   parseRevolveRequest,
+  placeRevolveOnAxis,
+  recoveredRevolveAxis,
   resolveThreadRequest,
+  revolveAxisPosition,
   revolvedShapeFromRequest,
   type ThreadRequest,
 } from "@/lib/engine/revolveRequests";
@@ -775,7 +778,10 @@ async function shapeFromRevolvedSketchProfile(
   const runtime = await getManifoldRuntime();
   const normalizedSettings = normalizeSketchRevolveSettings(settings);
   const mesh = buildSketchRevolveMesh(runtime, profile, normalizedSettings);
-  return canonicalizeShape({
+  // The sketch's x = 0 is the axis, and an edited revolve keeps the axis it
+  // had: placing the box instead slides a partial sweep round its axis (#503).
+  const axis = existing ? recoveredRevolveAxis(runtime, existing) : { x: 0, z: 0 };
+  return placeRevolveOnAxis(canonicalizeShape({
     id: existing?.id ?? createLocalId("sketch-revolve"),
     name: existing?.name ?? "Sketch revolve",
     kind: "mesh",
@@ -806,9 +812,10 @@ async function shapeFromRevolvedSketchProfile(
     sketchOperation: "revolve",
     sketchSourceId: existing?.sketchSourceId ?? createLocalId("sketch"),
     sketchRevolve: normalizedSettings,
+    revolveAxisOffset: mesh.axisOffset,
     locked: existing?.locked ?? false,
     hidden: existing?.hidden ?? false,
-  } satisfies WorkplaneShape);
+  } satisfies WorkplaneShape), axis);
 }
 
 function cleanModelDimension(value: number) {
@@ -2400,11 +2407,19 @@ function bakeShapeTransformIntoMesh(shape: WorkplaneShape): WorkplaneShape {
     });
   });
 
+  // Baking re-centres the mesh and drops its rotation and mirror, so a
+  // revolve's recorded axis offset is re-measured from where the axis is.
+  const revolveAxis = revolveAxisPosition(shape);
+  const bakedX = cleanNearZero(centerX, 0.0005);
+  const bakedZ = cleanNearZero(centerZ, 0.0005);
   return {
     ...shape,
     kind: "mesh",
-    x: cleanNearZero(centerX, 0.0005),
-    z: cleanNearZero(centerZ, 0.0005),
+    x: bakedX,
+    z: bakedZ,
+    revolveAxisOffset: revolveAxis
+      ? { x: (bakedX - revolveAxis.x) * (rawWidth / Math.max(width, 1e-9)), z: (bakedZ - revolveAxis.z) * (rawDepth / Math.max(depth, 1e-9)) }
+      : shape.revolveAxisOffset,
     elevation: cleanNearZero(minY, 0.0005),
     width,
     depth,
@@ -7239,18 +7254,19 @@ export function SketchForgeEditor({
       const source = shapesRef.current.find((shape) => shape.id === id);
       if (!source?.sketchProfile || source.sketchOperation !== "revolve") return;
       setNotice(notice((t) => t("editor.sketch.revolvePreviewUpdating")));
-      void shapeFromRevolvedSketchProfile(source.sketchProfile, settings, source)
-        .then((generated) => {
+      void Promise.all([shapeFromRevolvedSketchProfile(source.sketchProfile, settings, source), getManifoldRuntime()])
+        .then(([generated, runtime]) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) !== requestId) return;
           const current = shapesRef.current.find((shape) => shape.id === id);
           if (!current?.importedMesh || current.sketchOperation !== "revolve") return;
+          const axis = recoveredRevolveAxis(runtime, current);
           const widthScale = current.width / Math.max(0.001, current.importedMesh.baseWidth);
           const depthScale = current.depth / Math.max(0.001, current.importedMesh.baseDepth);
           const heightScale = current.height / Math.max(0.001, current.importedMesh.baseHeight);
           const width = generated.width * widthScale;
           const depth = generated.depth * depthScale;
           const height = generated.height * heightScale;
-          const updated = canonicalizeShape({
+          const updated = placeRevolveOnAxis(canonicalizeShape({
             ...generated,
             id: current.id,
             name: current.name,
@@ -7272,7 +7288,7 @@ export function SketchForgeEditor({
             locked: current.locked,
             hidden: current.hidden,
             sketchRevolve: settings,
-          });
+          }), axis);
           commitShapes(shapesRef.current.map((shape) => shape.id === id ? updated : shape), selectedIdsRef.current, notice((t) => t("editor.sketch.revolveShapeUpdated")));
         })
         .catch((error) => {

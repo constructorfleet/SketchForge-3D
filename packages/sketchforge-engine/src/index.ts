@@ -96,7 +96,11 @@ export {
   resolveThreadRequest,
   revolvedShapeFromRequest,
   rebuiltRevolveShape,
+  revolveAxisPosition,
+  placeRevolveOnAxis,
+  recoveredRevolveAxis,
   type ParsedRevolveRequest,
+  type RevolveAxis,
 } from "./revolveRequests.js";
 
 // --- geometry ---------------------------------------------------------------

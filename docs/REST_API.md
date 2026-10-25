@@ -128,7 +128,7 @@ Everything above can be read as well as set, which is what makes **read a shape,
 
 `sketchOperation` names the operation the geometry came out of, for the shapes that have one -- `revolve` for these.
 
-A revolve also reports `revolve` (the sweep: its pitch, turns, sweep angle, start angle, facets per turn, sampling quality, and the radius of the core it is fused to) and `profile` (the outline it ran round, as `[x, z]` pairs with distances written positive, the way a request writes them). `profile` is omitted when the outline was drawn in the editor rather than described: a drawn profile can be several paths with curve handles, which no flat list of pairs describes, and guessing one would be worse than saying nothing.
+A revolve also reports `revolve` (the sweep: its pitch, turns, sweep angle, start angle, facets per turn, sampling quality, the radius of the core it is fused to, and `axis`, the workplane `{ x, z }` its axis of revolution stands at) and `profile` (the outline it ran round, as `[x, z]` pairs with distances written positive, the way a request writes them). `profile` is omitted when the outline was drawn in the editor rather than described: a drawn profile can be several paths with curve handles, which no flat list of pairs describes, and guessing one would be worse than saying nothing.
 
 ## Changing a shape
 
@@ -212,7 +212,8 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | `pitch` | Axial rise per full turn, in mm. `0` is a plain revolve. **Negative is a left-hand thread.** |
 | `turns` | How many full turns to sweep (0.1–20; `MAX_REVOLVE_TURNS` is 20). Values are clamped to this range. |
 | `startAngle` | Rotation the sweep starts at. |
-| `sweepAngle` | How far round to revolve when there is no pitch (±360). |
+| `sweepAngle` | How far round to revolve when there is no pitch (±360). The sweep starts on +X and turns towards -Z. |
+| `x`, `z` | Where the **axis of revolution** stands on the workplane. A full turn is centred on it; a partial sweep lies to one side of it, so a quarter ring asked for at the origin spans x 0..R and z -R..0. |
 | `size` | `thread` only: a catalog designation that carries its own pitch. Includes ISO metric coarse sizes, selected ISO metric fine sizes (such as `M8x1`, `M10x1.25`), Unified UNC sizes, and selected UNF sizes (such as `1/4-28 UNF`). Coarse defaults are unchanged; default `M8`. An unknown size is refused with the list of known ones. |
 | `diameter` | `thread` only: outside diameter, for a size the catalog does not list. With `pitch`, it gives the ISO 60-degree profile. |
 | `length` | `thread` only: how long the thread should be, instead of counting turns. |

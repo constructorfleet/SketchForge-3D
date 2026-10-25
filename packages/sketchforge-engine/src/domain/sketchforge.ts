@@ -375,6 +375,17 @@ export type WorkplaneShape = {
   /** Stable identity of the editable sketch consumed by this sketch feature. */
   sketchSourceId?: string;
   sketchRevolve?: SketchRevolveSettings;
+  /**
+   * Where a revolve's mesh centre sits from its axis of revolution, in the
+   * mesh's natural local X/Z frame (before resize, mirror and rotation).
+   *
+   * A partial sweep is not symmetric about its axis, so its box centre -- the
+   * shape's `x`/`z` -- is not on the axis. This records the difference, so the
+   * axis can be reported and kept when the revolve is rebuilt. Absent on
+   * revolves saved before it was recorded; their axis is recovered from the
+   * sweep itself when they are next rebuilt.
+   */
+  revolveAxisOffset?: { x: number; z: number };
   /** Non-zero prism draft angle retained so source sketch edits can rebuild the feature. */
   draftPrismAngle?: number;
   /** Sketch extrusion dimensions/frame before draft, retained as rebuild inputs. */

@@ -79,4 +79,29 @@ describe("API shape summaries", () => {
       draftPrismAngle: 12,
     });
   });
+
+  it("reports where a partial revolve's axis is, beside its box centre (#503)", () => {
+    const shape = {
+      id: "quarter-ring",
+      name: "Revolve",
+      kind: "mesh",
+      color: "#78b96b",
+      x: 37.5,
+      z: -37.5,
+      size: 75,
+      width: 75,
+      depth: 75,
+      height: 10,
+      rotation: 0,
+      importedMesh: { positions: [], baseWidth: 75, baseDepth: 75, baseHeight: 10, triangleCount: 0, sourceFormat: "json" },
+      sketchProfile: { points: [], segments: [], images: [] },
+      sketchOperation: "revolve",
+      sketchRevolve: { startAngle: 0, sweepAngle: 90, sides: 64, quality: 6, pitch: 0, turns: 1, coreRadius: 0 },
+      revolveAxisOffset: { x: 37.5, z: -37.5 },
+    } as WorkplaneShape;
+
+    expect(apiShapeSummary(shape).revolve).toMatchObject({ sweepAngle: 90, axis: { x: 0, z: 0 } });
+    // A revolve saved before the axis was recorded says nothing rather than guessing.
+    expect(apiShapeSummary({ ...shape, revolveAxisOffset: undefined }).revolve).not.toHaveProperty("axis");
+  });
 });

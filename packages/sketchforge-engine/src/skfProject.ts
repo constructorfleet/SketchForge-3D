@@ -1175,6 +1175,11 @@ function validateShapeDefinition(
       if (settings[field] !== undefined) finiteNumber(settings[field], `${label}.sketchRevolve.${field}`);
     });
   }
+  // Recorded since #503, so a project written before has none and still reads.
+  if (definition.revolveAxisOffset !== undefined) {
+    const offset = objectRecord(definition.revolveAxisOffset, `${label}.revolveAxisOffset`);
+    ["x", "z"].forEach((field) => finiteNumber(offset[field], `${label}.revolveAxisOffset.${field}`));
+  }
   if (definition.faceDraft !== undefined) {
     const draft = objectRecord(definition.faceDraft, `${label}.faceDraft`);
     const revolveSettings = definition.sketchRevolve && typeof definition.sketchRevolve === "object" && !Array.isArray(definition.sketchRevolve)
