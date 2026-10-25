@@ -31,7 +31,7 @@ import {
 import { canonicalizeShape } from "./workplaneShapes.js";
 import { createLocalId } from "./localIds.js";
 import type { SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
-import { cadSketchRegions, type OrderedCadSketchPath } from "./sketchCadProfile.js";
+import { cadSketchRegions, draftPrismLoop, type OrderedCadSketchPath } from "./sketchCadProfile.js";
 import { sketchExtrusionSolid } from "./sketchExtrusionSolid.js";
 import { normalizeSketchRevolveSettings, sketchProfileToRevolvePolygons } from "./sketchRevolve.js";
 import { triangleFaceGroups } from "./cadFaceMesh.js";
@@ -753,19 +753,13 @@ export function applyDraftPrism(shape: WorkplaneShape, request: { angle: number 
   }
   const scale = sketchResizeFactors(shape);
   const profile = scaledSketchProfile(shape.sketchProfile, scale.width, scale.depth);
-  const { points, segments } = profile;
-  if (points.length < 3 || segments.length !== points.length
-    || segments.some((segment, index) => segment.kind && segment.kind !== "line"
-      || segment.startId !== points[index].id
-      || segment.endId !== points[(index + 1) % points.length].id)
-    || points.some((point) => point.handleIn || point.handleOut || !Number.isFinite(point.x) || !Number.isFinite(point.z))) {
-    return Promise.reject(new ServerCadError("Draft prism currently requires one closed polygonal sketch profile made from straight segments.", 400));
-  }
+  const loop = draftPrismLoop(profile);
+  if (typeof loop === "string") return Promise.reject(new ServerCadError(loop, 400));
 
   return withCadKernel((cad) => {
     const { x: centerX, z: centerZ } = draftPrismProfileOffset(profile);
-    const edges = points.map((point, index) => {
-      const next = points[(index + 1) % points.length];
+    const edges = loop.map((point, index) => {
+      const next = loop[(index + 1) % loop.length];
       return cad.makeLineEdge(
         { x: point.x - centerX, y: 0, z: point.z - centerZ },
         { x: next.x - centerX, y: 0, z: next.z - centerZ },

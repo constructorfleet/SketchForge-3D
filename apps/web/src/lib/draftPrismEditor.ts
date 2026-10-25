@@ -1,3 +1,4 @@
+import { draftPrismLoop } from "@constructorfleet/sketchforge-engine/sketchCadProfile";
 import type { SketchProfile, WorkplaneShape } from "@/types/sketchforge";
 
 export type DraftPrismControlState = {
@@ -5,15 +6,9 @@ export type DraftPrismControlState = {
   disabledReason: "not-sketch-extrusion" | "unsupported-profile" | null;
 };
 
+/** The same test the draft itself applies, so the card is offered exactly when the draft can be built (#349). */
 function hasSupportedProfile(profile: SketchProfile | undefined) {
-  if (!profile) return false;
-  const { points, segments } = profile;
-  return points.length >= 3
-    && segments.length === points.length
-    && segments.every((segment, index) => (!segment.kind || segment.kind === "line")
-      && segment.startId === points[index]?.id
-      && segment.endId === points[(index + 1) % points.length]?.id)
-    && points.every((point) => !point.handleIn && !point.handleOut && Number.isFinite(point.x) && Number.isFinite(point.z));
+  return Boolean(profile) && typeof draftPrismLoop(profile!) !== "string";
 }
 
 /** Describes whether the selected sketch shape can use the bounded draft control. */
