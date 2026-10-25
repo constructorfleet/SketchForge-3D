@@ -20,10 +20,10 @@ The following are regression ceilings with headroom for shared CI runners, not i
 | Cut 20 overlapping boxes with one cutter | 30 seconds | 128 MiB | Remaining exact volume is 61 mm³ |
 | Explode a 200-solid STEP document below the 8 MiB cap | 60 seconds | 256 MiB | 200 parts retain exact STEP geometry |
 | Interference among 128 shapes, arranged into 64 penetrating pairs | 30 seconds | 128 MiB | 64 pairs, each with 4 mm³ overlap |
-| Section a closed mesh with 50,000 actual triangles | 180 seconds | 512 MiB | SVG section contour spans 10 × 10 mm |
+| Section a closed mesh with 240,000 actual triangles | 10 seconds | 512 MiB | One SVG section loop enclosing 100 mm² centred on the origin |
 | All-edge fillet of a revolve with 24 display sides | 15 seconds | 128 MiB | Exact volume matches the analytical rounded annular section |
 
-The interference workload exercises the shape-count limit and real narrow-phase intersections; it does not saturate the separate 512-candidate cap. The section fixture is a subdivided cube, so this measures the triangle-count limit without claiming to represent every possible 50,000-triangle topology. The revolve uses current exact topology, rather than forcing the old tessellated fallback.
+The interference workload exercises the shape-count limit and real narrow-phase intersections; it does not saturate the separate 512-candidate cap. The section fixture is a subdivided cube. Meshes are sliced directly rather than sewn into an OCCT solid, so this measures the linear slicer and the mesh placement before it, at well above the 50,000 triangles the sewn path used to be capped at; it does not claim to represent every topology of that size. The revolve uses current exact topology, rather than forcing the old tessellated fallback.
 
 Heap delta is `process.memoryUsage().heapUsed` after minus before the operation. It measures retained JavaScript heap at those two instants, not peak process memory or WebAssembly linear memory. Garbage collection can make it negative. The ceilings allow this variability; a dedicated memory profiler is needed to diagnose kernel allocations.
 
