@@ -110,4 +110,4 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 ## Engine limits and regression coverage
 
 - [#358: Document engine limits in the REST reference](https://github.com/constructorfleet/SketchForge-3D/issues/358) — thresholds, status behavior, and a regression check for exported limits are documented; STEP import and explosion share one limit definition.
-- [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — direct tests for STEP helpers, rotated/mirrored geometry, and recompute placement are tracked on a separate branch.
+- [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — STEP hierarchy bounds and ambiguous metadata fallback, transformed separation/interference, and the recompute ancestor placement matrix have direct unit coverage; awaiting review.
