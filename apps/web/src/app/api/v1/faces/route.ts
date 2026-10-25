@@ -18,7 +18,7 @@ const getFaces = async (request: Request) => {
   }
   const { projectId, shapeId, topology } = query.values;
 
-  const faces = await apiEngine(context.root).faces(projectId, shapeId, topology === "exact" ? "exact" : undefined);
+  const faces = await apiEngine(context.root, request).faces(projectId, shapeId, topology === "exact" ? "exact" : undefined);
   if (!faces.ok) {
     return apiEngineError(faces.failure, { oneShape: true, cadFailed: "The CAD kernel could not read that shape." });
   }

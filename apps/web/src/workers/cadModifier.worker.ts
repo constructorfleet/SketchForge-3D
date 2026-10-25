@@ -4,13 +4,14 @@ import { OcctKernel, type ShapeHandle } from "occt-wasm";
 import { LocalizedError, localizedErrorPayload } from "@/i18n/LocalizedError";
 import type { CadModifierComponentMesh, CadModifierDisplayEdge, CadModifierEdge, CadModifierMeshPart, CadModifierPrimitivePart, CadModifierQuality, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
 import { CAD_MODIFIER_RUNTIME_BASE, cadModifierTopologyEdgeIsSelectable, cadTransformRequiresGeneralTransform, isCadModifierWasmMemoryFault } from "@/lib/cadModifierRuntime";
-import { exactCutFromParts, exactPartSolid, meshedExactCut } from "@/lib/engine/exactBooleanSolids";
+import { exactPartSolid } from "@/lib/engine/exactBooleanSolids";
 import { buildDraftPrism } from "@/lib/engine/draftPrism";
 import { buildFaceDraft } from "@/lib/engine/draftFace";
 import { retainedSketchFaceDraft, SketchFaceDraftError } from "@/lib/engine/sketchFaceDraftKernel";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
 import { buildEditorShell } from "@/lib/engine/editorShell";
 import { interferenceBetweenSolids, sampledWallThickness, WallThicknessRefusal } from "@/lib/engine/cadAnalysis";
+import { cadModifierBoolean, cadShapeIsValid } from "@/lib/cadModifierBoolean";
 
 const HASH_UPPER_BOUND = 2_147_483_647;
 const CAD_EDGE_WIREFRAME_DEFLECTION = 0.035;
@@ -54,16 +55,6 @@ function releaseSession(cad: OcctKernel) {
   baseSolids = [];
   edgeHandles = [];
   edgeOwners = [];
-}
-
-function cadShapeIsValid(cad: OcctKernel, shape: ShapeHandle) {
-  const validator = (cad as { isValid?: unknown }).isValid;
-  if (typeof validator !== "function") throw new Error("isValid is not a function");
-  try {
-    return Boolean(validator.call(cad, shape));
-  } catch {
-    return false;
-  }
 }
 
 function orientedFaceNormal(cad: OcctKernel, face: ShapeHandle, point: { x: number; y: number; z: number }) {
@@ -408,15 +399,11 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
       return;
     }
     if (request.type === "boolean") {
-      // An exact cut is one operation with nothing kept for a follow-up
-      // request, so the handle arena is emptied afterwards -- unless an edge
-      // modifier session is open, whose retained handles `releaseAll` would
-      // take with it.
+      // The cut releases its own temporary handles. Only reset the entire
+      // arena when there is no edge-modifier session to preserve.
       const sessionOpen = baseShape !== null;
       try {
-        const exact = exactCutFromParts(activeCad, request.parts, (part) => reconstructSolid(activeCad, part));
-        if (!cadShapeIsValid(activeCad, exact.cut)) throw new LocalizedError("errors.cadModifier.invalidResult");
-        const meshed = meshedExactCut(activeCad, exact.cut);
+        const meshed = cadModifierBoolean(activeCad, request.parts, (part) => reconstructSolid(activeCad, part));
         post(
           {
             type: "boolean",
@@ -425,8 +412,8 @@ self.onmessage = async (event: MessageEvent<CadModifierWorkerRequest>) => {
             normals: meshed.normals,
             triangleCount: meshed.triangleCount,
             brep: meshed.brep,
-            fusedVolume: exact.fusedVolume,
-            cutVolume: exact.cutVolume,
+            fusedVolume: meshed.fusedVolume,
+            cutVolume: meshed.cutVolume,
           },
           [meshed.positions.buffer, meshed.normals.buffer],
         );

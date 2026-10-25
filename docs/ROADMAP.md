@@ -22,6 +22,10 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
 
+## CAD worker reliability
+
+- [#361: Release exact-cut intermediate handles during an open edge-modifier session](https://github.com/constructorfleet/SketchForge-3D/issues/361) — implementation and real-kernel handle-baseline regression coverage complete; awaiting review. Cuts use an arena checkpoint and release their allocations on success or failure, preserving retained session geometry.
+
 ## Documentation suite open work
 
 - The [documentation suite specification](DOCUMENTATION_SUITE_SPEC.md) tracks partial source ownership diagnostics and broader task-workflow coverage as open work.
@@ -47,6 +51,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 ## API contract accuracy
 
+- [#367: Honour If-Match on v1 write routes](https://github.com/constructorfleet/SketchForge-3D/issues/367) — P2, implementation and route/client coverage complete; awaiting review.
 - [#366: Declare the projectId query on align and distribute](https://github.com/constructorfleet/SketchForge-3D/issues/366) — implementation and contract regression coverage complete; awaiting review.
 - [#373: Add limit and cursor paging to project and shape listings](https://github.com/constructorfleet/SketchForge-3D/issues/373) — implementation and route/client coverage complete; awaiting review.
 - [#372: Normalize status and error codes for limit violations across v1 routes](https://github.com/constructorfleet/SketchForge-3D/issues/372) — implementation and contract tests complete; awaiting review.
@@ -59,8 +64,13 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 - [#374: Add direct project, import, and export commands to the macro CLI](https://github.com/constructorfleet/SketchForge-3D/issues/374) — implementation, generated reference, and mocked-server coverage complete; awaiting review.
 
+## Client package releases
+
+- [#370: Keep the Python package version in sync](https://github.com/constructorfleet/SketchForge-3D/issues/370) — ensure `sketchforge3d.__version__` follows release-please.
+
 ## MCP bridge
 
+- [#369: Document local STL import and executable MCP workflows](https://github.com/constructorfleet/SketchForge-3D/issues/369) — the README and agent skill describe local project tools and path rules; the guides include an executable STL import, measure, and export workflow.
 - [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.
 
 ## MCP host filesystem safety
@@ -113,7 +123,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 - [#358: Document engine limits in the REST reference](https://github.com/constructorfleet/SketchForge-3D/issues/358) — thresholds, status behavior, and a regression check for exported limits are documented; STEP import and explosion share one limit definition.
 - [#360: Benchmark bounded kernel operations](https://github.com/constructorfleet/SketchForge-3D/issues/360) — cut, STEP explode, interference, section, and revolve fillet benchmarks with enforced budgets are implemented; awaiting review. See [performance budgets](PERFORMANCE.md).
-- [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — direct tests for STEP hierarchy bounds, ambiguous metadata fallback, transformed separation/interference, and recompute placement are implemented; awaiting review.
+- [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — STEP hierarchy bounds, ambiguous metadata fallback, transformed separation/interference, and recompute placement coverage merged in #489; follow-up signed-volume/centroid assertions and a mirror-preserving interference fixture are awaiting review.
 
 ## Sketch constraints
 

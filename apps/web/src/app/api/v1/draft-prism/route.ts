@@ -22,7 +22,7 @@ const postDraftPrism = async (request: Request) => {
   }
   if (!validateApiV1RequestBody("POST /api/v1/draft-prism", { angle: body.angle })) return apiError("The draft-prism request does not match its contract.", 400, "invalid_request");
 
-  const drafted = await apiEngine(context.root).draftPrism(projectId, shapeId, body.angle);
+  const drafted = await apiEngine(context.root, request).draftPrism(projectId, shapeId, body.angle);
   if (!drafted.ok) return apiEngineError(drafted.failure, { oneShape: true });
   return apiJson({
     shape: apiShapeSummary(drafted.value.shape),

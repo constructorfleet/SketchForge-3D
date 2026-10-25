@@ -15,7 +15,7 @@ async function getMeasurements(request: Request) {
   if (!query.ok) return query.error === "invalid_project_id" ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
   const { projectId, shapeId } = query;
 
-  const measured = await apiEngine(context.root).measurements(projectId, shapeId);
+  const measured = await apiEngine(context.root, request).measurements(projectId, shapeId);
   if (!measured.ok) {
     return apiEngineError(measured.failure, { oneShape: true, cadFailed: CAD_FAILED });
   }
@@ -38,7 +38,7 @@ async function measureEntities(request: Request) {
   const ends = parseMeasureBetweenRequest(body);
   if (!ends.ok) return apiError(`"${ends.side}" ${ends.error}`, 400, "invalid_request");
 
-  const measured = await apiEngine(context.root).measureBetween(projectId, ends.from, ends.to);
+  const measured = await apiEngine(context.root, request).measureBetween(projectId, ends.from, ends.to);
   if (!measured.ok) {
     return apiEngineError(measured.failure, { cadFailed: CAD_FAILED });
   }

@@ -49,7 +49,7 @@ const postAlign = async (request: Request) => {
     return apiError("The alignment request does not match its contract.", 400, "invalid_request");
   }
 
-  const aligned = await apiEngine(context.root).align(projectId, {
+  const aligned = await apiEngine(context.root, request).align(projectId, {
     ids,
     axis: axis as AlignAxis,
     target: target as AlignTarget,

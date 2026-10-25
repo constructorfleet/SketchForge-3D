@@ -39,7 +39,7 @@ const postTreatment = async (request: Request) => {
   const contractBody = { kind, amount: body.amount, ...(body.angle === undefined ? {} : { angle: body.angle }), ...(body.edges === undefined ? {} : { edges: body.edges }) };
   if (!validateApiV1RequestBody("POST /api/v1/treatments", contractBody)) return apiError("The treatment request does not match its contract.", 400, "invalid_request");
 
-  const treated = await apiEngine(context.root).treat(projectId, shapeId, {
+  const treated = await apiEngine(context.root, request).treat(projectId, shapeId, {
     kind,
     amount: body.amount,
     angle: body.angle as number | undefined,

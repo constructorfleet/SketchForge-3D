@@ -9,6 +9,10 @@ owner: "Contributors"
 
 ## Unreleased
 
+- The Python package's `sketchforge3d.__version__` now matches its published distribution version and is updated by release-please on each release.
+- Exact cuts now release their temporary CAD kernel handles even while an edge-modifier session is open, including after failed cuts, while preserving the session’s retained geometry.
+
+- MCP documentation now lists the local project tools and file-root rules, with an executable STL import, property inspection, and export example.
 - Project thumbnail capture failures no longer escape as unhandled rejections; the editor logs the failure and retries after its next idle capture window. Zero-size canvases and lost 2D contexts return an empty thumbnail.
 - Editor selection shortcuts avoid browser and macOS reserved keys: Shift+L locks or unlocks, Shift+H hides or shows, and Alt+Shift+H reveals hidden shapes. Press ? in the editor for an accessible shortcut list.
 - REST reference now documents the engine's exported size and count limits, including revolve profiles and turn counts, section drawing bounds, and the associated error behavior.
@@ -17,6 +21,7 @@ owner: "Contributors"
 
 Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.
 
+- v1 project writes now accept `If-Match: "<revision>"` and return `409 revision_mismatch` with the current revision when the project has changed. Successful writes return the new revision as an ETag. The TypeScript and Python clients can send an expected revision on write requests.
 - Editor dialogs now move keyboard focus into the opened panel, contain Tab navigation in modal dialogs, return focus to the opener, and close on Escape.
 - `sketchforge-macro` now has direct `projects list|create|delete`, `export --format <fmt> --out <file>`, and `import <file>` commands alongside the macro runner. Import creates a project from the filename unless `--project` or `SKETCHFORGE_PROJECT_ID` selects an existing one; export requires a selected project.
 - `GET /api/v1/projects` and `GET /api/v1/shapes` now accept optional `limit` and `cursor` query parameters and return a `nextCursor` for the next page. The TypeScript and Python clients expose `projects.listPage` / `projects.list_page` and `shapes.listPage` / `shapes.list_page` page methods; existing list methods and requests without pagination options continue to return the full listing.

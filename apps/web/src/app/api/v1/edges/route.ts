@@ -14,7 +14,7 @@ const getEdges = async (request: Request) => {
   if (!query.ok) return query.invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiErrors.shapeIdRequired();
   const { projectId, shapeId } = query.values;
 
-  const edges = await apiEngine(context.root).edges(projectId, shapeId);
+  const edges = await apiEngine(context.root, request).edges(projectId, shapeId);
   if (!edges.ok) {
     return apiEngineError(edges.failure, { oneShape: true, cadFailed: "The CAD kernel could not read that shape." });
   }

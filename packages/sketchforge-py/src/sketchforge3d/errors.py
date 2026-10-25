@@ -19,6 +19,7 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "project_not_found",
     "project_exists",
     "project_busy",
+    "revision_mismatch",
     "shape_not_found",
     "shape_locked",
     "unsupported_kind",
@@ -90,6 +91,17 @@ class SketchForgeApiError(SketchForgeError):
     def is_project_busy(self) -> bool:
         """Another write holds the project's lock; retrying is the right response."""
         return self._is("project_busy", 409, "being changed")
+
+    @property
+    def is_revision_mismatch(self) -> bool:
+        """The project changed since the supplied If-Match revision."""
+        return self._is("revision_mismatch", 409, "changed since")
+
+    @property
+    def current_revision(self) -> Optional[int]:
+        """The current project revision returned with a 409 mismatch."""
+        revision = self.body.get("revision") if isinstance(self.body, dict) else None
+        return revision if isinstance(revision, int) and not isinstance(revision, bool) else None
 
     @property
     def is_shape_locked(self) -> bool:

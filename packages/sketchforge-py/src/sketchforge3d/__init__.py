@@ -12,6 +12,8 @@ Installed as ``sketchforge3d``; imported the same way.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version as _distribution_version
+
 from . import layout
 from .client import (
     Align,
@@ -146,7 +148,15 @@ from .types import (
     Vector3,
 )
 
-__version__ = "0.1.0"
+def _read_version() -> str:
+    try:
+        return _distribution_version("sketchforge3d")
+    except PackageNotFoundError:
+        return _SOURCE_VERSION
+
+
+_SOURCE_VERSION = "1.27.0"  # x-release-please-version
+__version__ = _read_version()
 
 __all__ = [
     "ALIGN_AXES",
