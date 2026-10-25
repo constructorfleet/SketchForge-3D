@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "Zaoblení nebo zkosení se nepodařilo vytvořit",
       "meshImportReset": "Vybraný model se nepodařilo převést na uzavřené těleso. Modul pro zaoblení a zkosení byl restartován. Než přidáte zaoblení nebo zkosení, zkuste příkaz „Rozdělit na části“, zrušit seskupení nebo objekt zjednodušit.",
       "validatorReset": "V modulu pro zaoblení a zkosení selhala kontrola a modul byl restartován. Spusťte nástroj znovu, stránku není třeba načítat znovu.",
-      "memoryFaultReset": "V modulu pro zaoblení a zkosení došlo k chybě paměti a modul byl restartován. Spusťte nástroj znovu, stránku není třeba načítat znovu."
+      "memoryFaultReset": "V modulu pro zaoblení a zkosení došlo k chybě paměti a modul byl restartován. Spusťte nástroj znovu, stránku není třeba načítat znovu.",
+      "result": {
+        "draftPrismMissing": "Modul CAD nevrátil těleso s úkosem",
+        "draftPrismUnusable": "Úkos nevytvořil použitelné těleso",
+        "faceDraftMissing": "Modul CAD nevrátil těleso s úkosem stěny",
+        "faceDraftUnusable": "Úkos stěny nevytvořil použitelné těleso",
+        "faceDraftFaceCount": "Úkos stěny nevrátil platný počet stěn",
+        "shellMissing": "Modul CAD nevrátil duté těleso",
+        "shellUnusable": "Skořepina nevytvořila použitelné těleso",
+        "shellFaceCount": "Duté těleso neuvedlo platný počet stěn",
+        "exactMissing": "Modul CAD nevrátil přesné těleso",
+        "exactEmpty": "Jádro CAD vrátilo prázdné těleso",
+        "draftPrismInvalid": "Úkos nevytvořil platné těleso.",
+        "interferenceMissing": "Modul CAD nevrátil zprávu o kolizích",
+        "wallThicknessMissing": "Modul CAD nevrátil tloušťku stěny"
+      },
+      "worker": {
+        "couldNotStart": "Modul CAD se nepodařilo spustit",
+        "closed": "Modul CAD byl ukončen",
+        "notReady": "Modul CAD není připraven",
+        "timedOut": "Čekání na modul CAD vypršelo; modul byl restartován",
+        "rejected": "Modul CAD požadavek odmítl"
+      },
+      "draftPrismRange": "Úkos hranolu vyžaduje kladnou výšku a úhel mezi -45 a 45 stupni, kromě nuly.",
+      "draftNoFace": "Úkos stěny uložený s náčrtem potřebuje stěnu, na kterou působí."
     },
     "mesh": {
       "incompleteTriangles": "Trojúhelníková síť neobsahuje úplné trojúhelníky",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "Vytváření tělesa z náčrtu trvalo příliš dlouho. Zkuste náčrt zjednodušit",
       "sketchWorkerFailed": "Nepodařilo se spustit modul pro vytváření těles z náčrtu",
       "svgNoArea": "Tvar „{name}“ nemá v pohledu shora žádnou oblast k exportu",
-      "svgOutline": "Tvar „{name}“ se nepodařilo převést na uzavřený obrys SVG"
+      "svgOutline": "Tvar „{name}“ se nepodařilo převést na uzavřený obrys SVG",
+      "exportFailedStatus": "Export se nezdařil (HTTP {status})."
     },
     "download": {
       "localOnly": "Ukládat do složky lze jen v SketchForge spuštěném v tomto počítači",

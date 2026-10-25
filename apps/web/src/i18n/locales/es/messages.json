@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "No se pudo crear el redondeo o chaflán",
       "meshImportReset": "No se pudo convertir el modelo seleccionado en un sólido cerrado. El módulo de redondeos y chaflanes se reinició. Antes de agregar redondeos o chaflanes, intenta usar «Separar en partes», desagrupar o simplificar el objeto.",
       "validatorReset": "El módulo de redondeos y chaflanes falló durante una comprobación y se reinició. Vuelve a abrir la herramienta; no hace falta volver a cargar la página.",
-      "memoryFaultReset": "El módulo de redondeos y chaflanes tuvo un error de memoria y se reinició. Vuelve a abrir la herramienta; no hace falta volver a cargar la página."
+      "memoryFaultReset": "El módulo de redondeos y chaflanes tuvo un error de memoria y se reinició. Vuelve a abrir la herramienta; no hace falta volver a cargar la página.",
+      "result": {
+        "draftPrismMissing": "El módulo CAD no devolvió un sólido con ángulo de desmoldeo",
+        "draftPrismUnusable": "El ángulo de desmoldeo no dio un sólido utilizable",
+        "faceDraftMissing": "El módulo CAD no devolvió un sólido con la cara inclinada",
+        "faceDraftUnusable": "La inclinación de la cara no dio un sólido utilizable",
+        "faceDraftFaceCount": "La inclinación de la cara no devolvió un número de caras válido",
+        "shellMissing": "El módulo CAD no devolvió un sólido vaciado",
+        "shellUnusable": "El vaciado no dio un sólido utilizable",
+        "shellFaceCount": "El sólido vaciado no indicó un número de caras válido",
+        "exactMissing": "El módulo CAD no devolvió un sólido exacto",
+        "exactEmpty": "El núcleo CAD devolvió un sólido vacío",
+        "draftPrismInvalid": "El ángulo de desmoldeo no dio un sólido válido.",
+        "interferenceMissing": "El módulo CAD no devolvió un informe de interferencias",
+        "wallThicknessMissing": "El módulo CAD no devolvió un espesor de pared"
+      },
+      "worker": {
+        "couldNotStart": "No se pudo iniciar el módulo CAD",
+        "closed": "El módulo CAD se cerró",
+        "notReady": "El módulo CAD no está listo",
+        "timedOut": "Se agotó el tiempo de espera del módulo CAD; se reinició",
+        "rejected": "El módulo CAD rechazó la solicitud"
+      },
+      "draftPrismRange": "El desmoldeo del prisma necesita una altura positiva y un ángulo entre -45 y 45 grados, distinto de cero.",
+      "draftNoFace": "Una inclinación de cara guardada con el boceto necesita una cara sobre la que actuar."
     },
     "mesh": {
       "incompleteTriangles": "La malla contiene triángulos incompletos",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "La creación del sólido a partir del boceto tardó demasiado. Intenta simplificar el boceto",
       "sketchWorkerFailed": "No se pudo iniciar la creación de sólidos a partir de bocetos",
       "svgNoArea": "La vista superior de «{name}» no tiene área para exportar",
-      "svgOutline": "No se pudo convertir «{name}» en un contorno SVG cerrado"
+      "svgOutline": "No se pudo convertir «{name}» en un contorno SVG cerrado",
+      "exportFailedStatus": "La exportación falló (HTTP {status})."
     },
     "download": {
       "localOnly": "Guardar en una carpeta solo funciona en SketchForge abierto en este equipo",

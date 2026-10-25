@@ -20,6 +20,7 @@ import {
   type WallThicknessResult,
 } from "@/lib/engine/cadAnalysis";
 import type { CadModifierMeshPart, CadModifierWorkerRequest, CadModifierWorkerResponse } from "@/lib/cadModifierTypes";
+import { LocalizedError } from "@/i18n/LocalizedError";
 import type { Translator } from "@/i18n/translator";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -127,14 +128,14 @@ export function createSceneAnalysisRunner(post: SceneAnalysisPost, meshFor: Scen
       const operands = operandsFor(shapes, meshFor);
       if (!Array.isArray(operands)) return { ok: false, refusal: operands };
       const response = await post({ type: "interference", operands, clearance: 0 }, sceneAnalysisTransfer(operands), SCENE_ANALYSIS_TIMEOUT_MS);
-      if (response.type !== "interference") throw new Error("The CAD worker did not return an interference report");
+      if (response.type !== "interference") throw new LocalizedError("errors.cadModifier.result.interferenceMissing");
       return response.result;
     },
     async wallThickness(shape) {
       const operands = operandsFor([shape], meshFor);
       if (!Array.isArray(operands)) return { ok: false, refusal: operands };
       const response = await post({ type: "wall-thickness", part: operands[0]!.part }, sceneAnalysisTransfer(operands), SCENE_ANALYSIS_TIMEOUT_MS);
-      if (response.type !== "wall-thickness") throw new Error("The CAD worker did not return a wall thickness");
+      if (response.type !== "wall-thickness") throw new LocalizedError("errors.cadModifier.result.wallThicknessMissing");
       return response.result;
     },
   };

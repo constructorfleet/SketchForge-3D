@@ -1292,7 +1292,31 @@
         "unreadable": "The hollowed solid could not be stored. Try a different wall thickness.",
         "unsupported": "This shape cannot be hollowed exactly. Hollow a box, cylinder, polygon, pyramid, roof, wedge, sphere, torus or cone with a flat top, or a shape that already has exact faces.",
         "treated": "A shape with a fillet, chamfer or draft cannot be hollowed, because nothing could rebuild the treatment on the wall. Undo the treatment, hollow the shape, then treat it again."
-      }
+      },
+      "result": {
+        "draftPrismMissing": "The CAD worker did not return a drafted solid",
+        "draftPrismUnusable": "The draft did not produce a usable solid",
+        "faceDraftMissing": "The CAD worker did not return a drafted face solid",
+        "faceDraftUnusable": "The face draft did not produce a usable solid",
+        "faceDraftFaceCount": "The face draft did not return a valid face count",
+        "shellMissing": "The CAD worker did not return a hollowed solid",
+        "shellUnusable": "The shell did not produce a usable solid",
+        "shellFaceCount": "The hollowed solid did not report a valid face count",
+        "exactMissing": "The CAD worker did not return an exact solid",
+        "exactEmpty": "The CAD kernel returned an empty solid",
+        "draftPrismInvalid": "The draft did not produce a valid solid.",
+        "interferenceMissing": "The CAD worker did not return an interference report",
+        "wallThicknessMissing": "The CAD worker did not return a wall thickness"
+      },
+      "worker": {
+        "couldNotStart": "The CAD worker could not start",
+        "closed": "The CAD worker was closed",
+        "notReady": "The CAD worker is not ready",
+        "timedOut": "Timed out waiting for the CAD worker; the worker was restarted",
+        "rejected": "The CAD worker rejected the request"
+      },
+      "draftPrismRange": "Draft prism requires a positive height and an angle between -45 and 45 degrees, excluding zero.",
+      "draftNoFace": "A retained face draft needs a face to act on."
     },
     "mesh": {
       "incompleteTriangles": "Mesh does not contain complete triangles",
@@ -1500,7 +1524,8 @@
       "sketchTimedOut": "OpenCascade timed out while building the sketch",
       "sketchWorkerFailed": "The OpenCascade sketch worker failed to start",
       "svgNoArea": "Top view of {name} has no exportable area",
-      "svgOutline": "Could not convert {name} into a watertight SVG outline"
+      "svgOutline": "Could not convert {name} into a watertight SVG outline",
+      "exportFailedStatus": "Export failed (HTTP {status})."
     },
     "download": {
       "localOnly": "Local folder downloads are only available from this localhost app",

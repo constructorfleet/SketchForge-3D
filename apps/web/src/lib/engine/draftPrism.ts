@@ -1,4 +1,5 @@
 import { type OcctKernel } from "occt-wasm";
+import { LocalizedError } from "@/i18n/LocalizedError";
 import type { SketchProfile } from "@/types/sketchforge";
 import { draftPrismLoop } from "@constructorfleet/sketchforge-engine/sketchCadProfile";
 import { meshShapeWithFaceGroups } from "@/lib/engine/cadFaceMesh";
@@ -23,7 +24,7 @@ export type DraftPrismBuildResult = {
 export function buildDraftPrism(cad: OcctKernel, request: DraftPrismBuildRequest): DraftPrismBuildResult {
   if (!Number.isFinite(request.height) || request.height <= 0
     || !Number.isFinite(request.angle) || request.angle === 0 || Math.abs(request.angle) >= 45) {
-    throw new Error("Draft prism requires a positive height and an angle between -45 and 45 degrees, excluding zero.");
+    throw new LocalizedError("errors.cadModifier.draftPrismRange");
   }
   // The same loop, and the same refusals, as the REST draft (#349).
   const loop = draftPrismLoop(request.profile);
@@ -45,7 +46,7 @@ export function buildDraftPrism(cad: OcctKernel, request: DraftPrismBuildRequest
   });
   const face = cad.makeFace(cad.makeWire(edges));
   const solid = cad.draftPrism(face, 0, request.height, 0, request.angle);
-  if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new Error("The draft did not produce a valid solid.");
+  if (!cad.isValid(solid) || !cad.isSolid(solid)) throw new LocalizedError("errors.cadModifier.result.draftPrismInvalid");
   const mesh = meshShapeWithFaceGroups(cad, solid, { linearDeflection: 0.035, angularDeflection: 0.16 });
   return {
     positions: mesh.positions,

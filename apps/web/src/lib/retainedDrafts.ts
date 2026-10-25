@@ -14,6 +14,7 @@ import { createLocalId } from "@/lib/engine/localIds";
 import { cadSketchRegions } from "@/lib/sketchCadProfile";
 import { draftPrismControlForShape } from "@/lib/draftPrismEditor";
 import { shapeFaceCount } from "@/lib/shapeFaces";
+import { LocalizedError } from "@/i18n/LocalizedError";
 import type { SketchProfile, WorkplaneShape } from "@/types/sketchforge";
 
 /**
@@ -323,7 +324,7 @@ export function retainedFaceDraftResolution(
   profileChanged: boolean,
 ): RetainedFaceDraftResolution {
   const sourceFaceId = request.sourceFaceId ?? existing.faceDraft?.sourceFaceId;
-  if (!sourceFaceId) throw new Error("A retained face draft needs a face to act on.");
+  if (!sourceFaceId) throw new LocalizedError("errors.cadModifier.draftNoFace");
   return {
     existing: priorOf(existing),
     source: sourceOf(base),

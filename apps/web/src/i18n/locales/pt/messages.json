@@ -1183,7 +1183,31 @@
       "edgeTreatmentFailed": "O módulo de arredondamentos e chanfros não conseguiu concluir este acabamento de arestas",
       "meshImportReset": "Não foi possível converter o modelo selecionado em um sólido fechado. O módulo de arredondamentos e chanfros foi reiniciado. Antes de adicionar arredondamentos ou chanfros, tente “Separar partes”, desagrupar ou simplificar o objeto.",
       "validatorReset": "O módulo de arredondamentos e chanfros falhou durante uma verificação e foi reiniciado. Abra a ferramenta de arestas de novo; não é preciso recarregar a página.",
-      "memoryFaultReset": "O módulo de arredondamentos e chanfros teve um erro de memória e foi reiniciado. Abra a ferramenta de arestas de novo; não é preciso recarregar a página."
+      "memoryFaultReset": "O módulo de arredondamentos e chanfros teve um erro de memória e foi reiniciado. Abra a ferramenta de arestas de novo; não é preciso recarregar a página.",
+      "result": {
+        "draftPrismMissing": "O módulo CAD não retornou um sólido com ângulo de saída",
+        "draftPrismUnusable": "O ângulo de saída não gerou um sólido utilizável",
+        "faceDraftMissing": "O módulo CAD não retornou um sólido com a face inclinada",
+        "faceDraftUnusable": "A inclinação da face não gerou um sólido utilizável",
+        "faceDraftFaceCount": "A inclinação da face não retornou uma contagem de faces válida",
+        "shellMissing": "O módulo CAD não retornou um sólido oco",
+        "shellUnusable": "A casca não gerou um sólido utilizável",
+        "shellFaceCount": "O sólido oco não informou uma contagem de faces válida",
+        "exactMissing": "O módulo CAD não retornou um sólido exato",
+        "exactEmpty": "O núcleo CAD retornou um sólido vazio",
+        "draftPrismInvalid": "O ângulo de saída não gerou um sólido válido.",
+        "interferenceMissing": "O módulo CAD não retornou um relatório de interferência",
+        "wallThicknessMissing": "O módulo CAD não retornou uma espessura de parede"
+      },
+      "worker": {
+        "couldNotStart": "Não foi possível iniciar o módulo CAD",
+        "closed": "O módulo CAD foi fechado",
+        "notReady": "O módulo CAD não está pronto",
+        "timedOut": "O módulo CAD não respondeu a tempo e foi reiniciado",
+        "rejected": "O módulo CAD recusou a solicitação"
+      },
+      "draftPrismRange": "O ângulo de saída do prisma exige uma altura positiva e um ângulo entre -45 e 45 graus, exceto zero.",
+      "draftNoFace": "Uma inclinação de face mantida com o esboço precisa de uma face sobre a qual agir."
     },
     "mesh": {
       "incompleteTriangles": "A malha não contém triângulos completos",
@@ -1389,7 +1413,8 @@
       "sketchTimedOut": "O OpenCascade demorou demais para construir o esboço",
       "sketchWorkerFailed": "O módulo de esboço do OpenCascade não conseguiu iniciar",
       "svgNoArea": "A vista superior de “{name}” não tem área que possa ser exportada",
-      "svgOutline": "Não foi possível converter “{name}” em um contorno SVG fechado"
+      "svgOutline": "Não foi possível converter “{name}” em um contorno SVG fechado",
+      "exportFailedStatus": "A exportação falhou (HTTP {status})."
     },
     "download": {
       "localOnly": "Salvar em uma pasta só funciona no SketchForge aberto neste computador",
