@@ -81,6 +81,9 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.equal(spec.paths["/api/v1/projects"].post.requestBody.content["application/json"].schema.properties.name.maxLength, 80);
   assert.ok(spec.paths["/api/v1/projects"].post.responses["201"].content["application/json"].schema);
   assert.deepEqual(spec.paths["/api/v1/projects"].post.security, [{ bearerAuth: [] }, { sketchForgeToken: [] }]);
+  const deleteProject = spec.paths["/api/v1/projects"].delete;
+  assert.equal(deleteProject.responses["200"].content["application/json"].schema.properties.revision.type, "number");
+  assert.equal(deleteProject.responses["200"].headers.ETag.schema.type, "string");
   assert.deepEqual(spec.paths["/api/v1/projects"].get.parameters[0], {
     name: "projectId", in: "query", required: false,
     schema: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },

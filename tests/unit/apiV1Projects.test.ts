@@ -123,6 +123,8 @@ describe("REST API v1", () => {
     }));
     expect(mismatch.status).toBe(409);
     expect(await mismatch.json()).toMatchObject({ code: "revision_mismatch", revision: createdPayload.revision });
+    const afterMismatch = await (await getShapes(authorized(`/api/v1/shapes?projectId=${projectId}`))).json() as { shapes: Array<{ id: string; name: string }> };
+    expect(afterMismatch.shapes.find(({ id }) => id === createdPayload.shapes[0]!.id)?.name).toBe("A");
 
     const absent = await patchShape(authorized(`/api/v1/shapes?projectId=${projectId}&shapeId=${createdPayload.shapes[0]!.id}`, {
       method: "PATCH",
@@ -482,10 +484,13 @@ describe("REST API v1", () => {
   it("deletes a project and everything it held", async () => {
     const projectId = await makeProject();
     await addShape(projectId, { kind: "cube", size: 10 });
+    const current = await readProjectDocument(projectsRoot, projectId);
 
     const response = await deleteProject(authorized(`/api/v1/projects?projectId=${projectId}`, { method: "DELETE" }));
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("etag")).toBe(`"${current?.metadata.revision}"`);
+    expect(await response.json()).toMatchObject({ deleted: true, id: projectId, revision: current?.metadata.revision });
     expect(await fs.readdir(projectsRoot)).toEqual([]);
   });
 });

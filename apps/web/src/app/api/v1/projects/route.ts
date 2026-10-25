@@ -112,7 +112,7 @@ async function deleteHandler(request: Request) {
       return apiErrors.revisionMismatch(currentRevision);
     }
     const existed = await deleteProjectFiles(context.root, projectId);
-    return existed ? apiJson({ deleted: true, id: projectId }) : apiErrors.projectNotFound();
+    return existed ? apiJson({ deleted: true, id: projectId, revision: currentRevision }) : apiErrors.projectNotFound();
   });
   return locked.busy ? apiErrors.projectBusy() : locked.result;
 }

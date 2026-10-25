@@ -18874,7 +18874,8 @@
                   "type": "object",
                   "required": [
                     "deleted",
-                    "id"
+                    "id",
+                    "revision"
                   ],
                   "properties": {
                     "deleted": {
@@ -18882,6 +18883,9 @@
                     },
                     "id": {
                       "type": "string"
+                    },
+                    "revision": {
+                      "type": "number"
                     }
                   }
                 }
