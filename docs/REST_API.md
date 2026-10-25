@@ -10,6 +10,8 @@ sources:
 
 # REST API
 
+Kernel workload regression ceilings and measurement details are documented in [Performance budgets](PERFORMANCE.md).
+
 A scripting surface for SketchForge projects (upstream issue [#55](https://github.com/Formsmith746/SketchForge-3D/issues/55)). Shapes are described as data, so an LLM or a build script can generate a parameterised design -- a plate with a computed row of holes, a family of brackets at four sizes -- without driving the editor.
 
 It is **headless**: it reads and writes the projects that server-side storage holds, with no browser open anywhere. A dashboard that has the project open picks the change up on its next load, because every write advances the project's revision.
