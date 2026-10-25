@@ -639,6 +639,10 @@
         "skf": {
           "description": "Bearbeitbares Projekt",
           "note": "Speichert das bearbeitbare Projekt mit Änderungsverlauf, Skizzen, Gruppen, CAD-Daten und importierten Originaldateien."
+        },
+        "dxf": {
+          "description": "Schnittzeichnung",
+          "note": "Erfordert eine Schnittebene. Die Geometrie wird vom CAD-Kern gezeichnet."
         }
       },
       "historyTitle": "Gespeicherter Änderungsverlauf",

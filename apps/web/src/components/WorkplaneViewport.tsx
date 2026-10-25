@@ -5805,6 +5805,7 @@ export function WorkplaneViewport({
         {selectedShape && !modifierActive && !rulerMode && !rulerDeleteMode && !rulerMoveMode ? (
           <ShapeInspector
             shape={selectedShape}
+            projectId={workspaceSettingsKey ?? undefined}
             snap={snap}
             snapOpen={snapOpen}
             workspace={workspace}

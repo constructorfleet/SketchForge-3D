@@ -639,6 +639,10 @@
         "skf": {
           "description": "Projet modifiable",
           "note": "Conserve le projet modifiable, l’historique des modifications, les esquisses, les groupes, les données CAO et les fichiers importés d’origine."
+        },
+        "dxf": {
+          "description": "Dessin en coupe",
+          "note": "Nécessite un plan de coupe. La géométrie est dessinée par le noyau CAO."
         }
       },
       "historyTitle": "Historique enregistré",

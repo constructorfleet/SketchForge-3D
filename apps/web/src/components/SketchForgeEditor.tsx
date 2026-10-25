@@ -162,6 +162,7 @@ import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
+import { editorExportRequest, editorMeasureRequest, type EditorSection } from "@/lib/editorCadRequests";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import {
@@ -214,7 +215,7 @@ import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset,
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
 type TopPanel = "import" | "export" | "profile" | "settings" | null;
-type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "skf";
+type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "dxf" | "skf";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
@@ -5486,6 +5487,11 @@ export function SketchForgeEditor({
   const [shapes, setShapes] = useState<WorkplaneShape[]>(() => initialSceneRef.current as WorkplaneShape[]);
   const [projectAssets, setProjectAssets] = useState<ProjectAsset[]>(() => dedupeProjectAssets(initialAssets));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [measureDialogOpen, setMeasureDialogOpen] = useState(false);
+  const [measureFromEntity, setMeasureFromEntity] = useState<"shape" | "edge" | "face">("shape");
+  const [measureToEntity, setMeasureToEntity] = useState<"shape" | "edge" | "face">("shape");
+  const [measureFromIndex, setMeasureFromIndex] = useState("0");
+  const [measureToIndex, setMeasureToIndex] = useState("0");
   const [clipboard, setClipboard] = useState<WorkplaneShape[]>([]);
   const [systemClipboardSupported, setSystemClipboardSupported] = useState(false);
   const [history, setHistory] = useState<EditorHistoryEntry[]>(() => (initialHistoryStateRef.current as EditorHistoryState).entries);
@@ -9560,14 +9566,16 @@ export function SketchForgeEditor({
     void run();
   }, [commitShapes]);
 
-  const exportDesign = useCallback((format: DirectExportFormat, exportName: string) => {
+  const exportDesign = useCallback((format: DirectExportFormat, exportName: string, drawing?: { section?: EditorSection; kernel?: boolean }) => {
     const sourceShapes = hasSelection ? selectedShapes : shapes;
     const exportable = sourceShapes.filter((shape) => !shape.hole && !shape.hidden);
     if (exportable.length === 0) {
       setNotice(notice((t) => t(hasSelection ? "editor.export.needSolidSelected" : "editor.export.needSolid")));
       return;
     }
-    const invalidSvg = exportable.map(invalidSvgMeshError).find((error): error is Error => Boolean(error));
+    const invalidSvg = (format === "svg" && !drawing?.kernel && !drawing?.section)
+      ? exportable.map(invalidSvgMeshError).find((error): error is Error => Boolean(error))
+      : null;
     if (invalidSvg) {
       setNotice(notice((t) => t("editor.export.invalidSvg", { reason: errorText(t, invalidSvg, "editor.export.failed", { format: "SVG" }) })));
       return;
@@ -9584,6 +9592,26 @@ export function SketchForgeEditor({
     const failNotice = (label: string, error: unknown) => {
       setNotice(notice((t) => errorText(t, error, "editor.export.failed", { format: label })));
     };
+    if ((format === "dxf" || (format === "svg" && (drawing?.kernel || drawing?.section))) && projectId) {
+      const request = editorExportRequest(projectId, format as "svg" | "dxf", exportName, drawing?.section, exportable);
+      setNotice(notice((t) => t("editor.export.buildingSvg")));
+      void fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) })
+        .then(async (response) => {
+          if (!response.ok) {
+            const body = await response.json().catch(() => null) as { error?: string } | null;
+            throw new Error(body?.error || `Export failed (${response.status}).`);
+          }
+          return response.blob();
+        })
+        .then((blob) => downloadBlobFile(projectExportFileName(exportName, format), blob))
+        .then((result) => finishNotice(format.toUpperCase(), result))
+        .catch((error: unknown) => failNotice(format.toUpperCase(), error));
+      return;
+    }
+    if (format === "dxf") {
+      setNotice(notice((t) => t("editor.export.failed", { format: "DXF" })));
+      return;
+    }
     if (format === "svg") {
       setNotice(notice((t) => t("editor.export.buildingSvg")));
       void toSvg(exportable, exportName.trim() || projectName)
@@ -9614,7 +9642,30 @@ export function SketchForgeEditor({
     void downloadTextFile(projectExportFileName(exportName, "obj"), exportMeshesToObj(meshes), "text/plain")
       .then((result) => finishNotice("OBJ", result))
       .catch((error: unknown) => failNotice("OBJ", error));
-  }, [hasSelection, projectName, selectedShapes, shapes, t]);
+  }, [hasSelection, projectId, projectName, selectedShapes, shapes, t]);
+
+  const measureSelectedShapes = useCallback(() => {
+    if (!projectId || selectedIds.length !== 2) {
+      setNotice(notice(() => "Select two shapes to measure their exact distance."));
+      return;
+    }
+    setMeasureDialogOpen(true);
+  }, [projectId, selectedIds.length, setNotice]);
+
+  const runSelectedMeasurement = useCallback(() => {
+    const first = shapes.find((shape) => shape.id === selectedIds[0]);
+    const second = shapes.find((shape) => shape.id === selectedIds[1]);
+    if (!first || !second) return;
+    const request = editorMeasureRequest(projectId ?? "local", first, second, measureFromEntity, Number(measureFromIndex), measureToEntity, Number(measureToIndex));
+    void fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) })
+      .then(async (response) => {
+        const body = await response.json() as { distance?: number; angleDegrees?: number | null; angleUnavailable?: string | null; error?: string };
+        if (!response.ok) throw new Error(body.error || `Measurement unavailable (${response.status}).`);
+        setMeasureDialogOpen(false);
+        setNotice(notice(() => `Exact distance: ${Number(body.distance).toFixed(2)} mm${body.angleDegrees === null ? ` · Angle unavailable: ${body.angleUnavailable}` : body.angleDegrees === undefined ? "" : ` · Angle: ${body.angleDegrees.toFixed(2)}°`}`));
+      })
+      .catch((error: unknown) => setNotice(notice(() => error instanceof Error ? error.message : String(error))));
+  }, [projectId, selectedIds, setNotice, shapes, measureFromEntity, measureFromIndex, measureToEntity, measureToIndex]);
 
   const exportStepDesign = useCallback(async (exportName: string) => {
     if (stepExporting) {
@@ -10095,6 +10146,23 @@ export function SketchForgeEditor({
 
   return (
     <div className="sketchforge-editor">
+      {measureDialogOpen ? (
+        <div className="measure-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setMeasureDialogOpen(false); }}>
+          <section className="top-action-panel" role="dialog" aria-modal="true" aria-label="Measure 3D entities">
+            <header><strong>Measure 3D entities</strong><button type="button" aria-label="Close measurement" onClick={() => setMeasureDialogOpen(false)}>×</button></header>
+            <div className="export-dialog-body">
+              {[{ label: "First entity", entity: measureFromEntity, setEntity: setMeasureFromEntity, index: measureFromIndex, setIndex: setMeasureFromIndex }, { label: "Second entity", entity: measureToEntity, setEntity: setMeasureToEntity, index: measureToIndex, setIndex: setMeasureToIndex }].map((end) => (
+                <section key={end.label} className="export-setting-section">
+                  <strong>{end.label}</strong>
+                  <label><span>Type</span><select aria-label={`${end.label} type`} value={end.entity} onChange={(event) => end.setEntity(event.target.value as "shape" | "edge" | "face")}><option value="shape">Shape</option><option value="face">Face</option><option value="edge">Edge</option></select></label>
+                  {end.entity !== "shape" ? <label><span>Index (zero-based)</span><input aria-label={`${end.label} index`} type="number" min="0" step="1" value={end.index} onChange={(event) => end.setIndex(event.target.value)} /></label> : null}
+                </section>
+              ))}
+              <button className="export-primary-button" type="button" onClick={runSelectedMeasurement}>Measure distance and angle</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <SecondaryToolbar
         toolbarMode={toolbarMode}
         projectName={projectName}
@@ -10145,6 +10213,7 @@ export function SketchForgeEditor({
         onSketchCancel={cancelSketch}
         onHome={onHome}
         onAlign={toggleAlignMode}
+        onMeasure={measureSelectedShapes}
         onChamfer={() => edgeModifier?.kind === "chamfer" ? cancelEdgeModifier() : startEdgeModifier("chamfer")}
         onCopy={copySelected}
         onDelete={deleteSelected}
@@ -10359,7 +10428,7 @@ export function SketchForgeEditor({
           shapeCount={exportableShapeCount}
           scopeLabel={exportScopeLabel}
           onClose={() => setTopPanel(null)}
-          onExport={exportDesign}
+          onExport={(format, name, drawing) => exportDesign(format, name, drawing)}
           onExportSkf={exportSkfDesign}
           onExportStep={exportStepDesign}
           sharedProjectsEnabled={sharedProjectsEnabled}
@@ -10517,6 +10586,7 @@ function SecondaryToolbar({
   onSketchCancel,
   onHome,
   onAlign,
+  onMeasure,
   onChamfer,
   onCopy,
   onDelete,
@@ -10581,6 +10651,7 @@ function SecondaryToolbar({
   onSketchCancel: () => void;
   onHome?: () => void;
   onAlign: () => void;
+  onMeasure: () => void;
   onChamfer: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -10898,6 +10969,7 @@ function SecondaryToolbar({
     { id: "intersection", label: t("editor.toolbar.intersection"), icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect },
   ];
   const modifyTools = [
+    { id: "measure-3d", label: "Measure selected shapes", icon: ToolbarAlignIcon, action: onMeasure, enabled: selectionCount === 2 },
     { id: "align", label: t("editor.toolbar.align"), icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
     { id: "mirror", label: t("editor.toolbar.mirror"), icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection, active: mirrorMode },
     { id: "snap", label: t("editor.toolbar.snapToGrid"), icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection },
@@ -11651,7 +11723,7 @@ function TopActionPanel({
   shapeCount: number;
   scopeLabel: "selected" | "total";
   onClose: () => void;
-  onExport: (format: DirectExportFormat, exportName: string) => void;
+  onExport: (format: DirectExportFormat, exportName: string, drawing?: { section?: EditorSection; kernel?: boolean }) => void;
   onExportSkf: (exportName: string, historyLimit: SkfHistoryLimit, target?: SkfExportTarget) => void;
   onExportStep: (exportName: string) => void;
   sharedProjectsEnabled: boolean;
@@ -11665,6 +11737,10 @@ function TopActionPanel({
   const t = useTranslations();
   const [exportFormat, setExportFormat] = useState<ExportFormat>("stl");
   const [exportName, setExportName] = useState(projectName);
+  const [sectionPlane, setSectionPlane] = useState<EditorSection["plane"]>("xy");
+  const [sectionOffset, setSectionOffset] = useState("0");
+  const [sectionEnabled, setSectionEnabled] = useState(false);
+  const [kernelSvg, setKernelSvg] = useState(false);
   const previousProjectNameRef = useRef(projectName);
   const [skfHistoryLimit, setSkfHistoryLimit] = useState<SkfHistoryLimit>("unlimited");
   useEffect(() => {
@@ -11685,7 +11761,12 @@ function TopActionPanel({
   const runSelectedExport = () => {
     if (exportFormat === "step") onExportStep(exportName);
     else if (exportFormat === "skf") onExportSkf(exportName, skfHistoryLimit);
-    else onExport(exportFormat, exportName);
+    else onExport(exportFormat, exportName, {
+      ...(exportFormat === "dxf" || (exportFormat === "svg" && sectionEnabled && Number.isFinite(Number(sectionOffset)) && sectionOffset !== "")
+        ? { section: { plane: sectionPlane, offset: Number(sectionOffset) } }
+        : {}),
+      ...(exportFormat === "svg" ? { kernel: kernelSvg } : {}),
+    });
   };
 
   return (
@@ -11765,7 +11846,7 @@ function TopActionPanel({
               </span>
             </div>
             <div className="export-format-slider" data-format={exportFormat} role="radiogroup" aria-label={t("editor.panel.exportFormat")}>
-              {(["stl", "3mf", "obj", "step", "svg", "skf"] as const).map((format) => (
+              {(["stl", "3mf", "obj", "step", "svg", "dxf", "skf"] as const).map((format) => (
                 <button
                   key={format}
                   type="button"
@@ -11779,6 +11860,33 @@ function TopActionPanel({
               ))}
             </div>
           </section>
+
+          {exportFormat === "svg" || exportFormat === "dxf" ? (
+            <section className="export-setting-section" aria-label="Drawing options">
+              {exportFormat === "svg" ? (
+                <label>
+                  <input type="checkbox" checked={sectionEnabled} onChange={(event) => setSectionEnabled(event.target.checked)} />
+                  <span>Section view</span>
+                </label>
+              ) : null}
+              <label>
+                <span>Section plane</span>
+                <select aria-label="Section plane" value={sectionPlane} onChange={(event) => setSectionPlane(event.target.value as EditorSection["plane"])}>
+                  <option value="xy">XY</option><option value="xz">XZ</option><option value="yz">YZ</option>
+                </select>
+              </label>
+              <label>
+                <span>Section offset (mm)</span>
+                <input aria-label="Section offset (mm)" type="number" value={sectionOffset} onChange={(event) => setSectionOffset(event.target.value)} />
+              </label>
+              {exportFormat === "svg" ? (
+                <label>
+                  <input type="checkbox" checked={kernelSvg} onChange={(event) => setKernelSvg(event.target.checked)} />
+                  <span>Hidden-line (kernel)</span>
+                </label>
+              ) : null}
+            </section>
+          ) : null}
 
           {exportFormat === "skf" ? (
             <section className="export-setting-section skf-history-section">

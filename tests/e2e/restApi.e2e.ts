@@ -503,6 +503,27 @@ describe("the REST API over HTTP", () => {
     expect(sectionSvg).toContain("<path");
   });
 
+  it("keeps the editor's kernel SVG and section DXF byte-for-byte in step with REST", async () => {
+    const created = await api("/projects", { method: "POST", body: JSON.stringify({ name: "Editor parity" }) });
+    const drawingProject = ((created.body.project as Record<string, string>) ?? {}).id;
+    await api(`/shapes?projectId=${drawingProject}`, { method: "POST", body: JSON.stringify({ shapes: [{ kind: "box", name: "Plate", width: 20, depth: 12, height: 8 }] }) });
+    const detail = await api(`/projects?projectId=${drawingProject}`);
+    const shapes = ((detail.body.project as Record<string, unknown>).shapes as Array<Record<string, unknown>>);
+
+    const restSvg = await api(`/exports?projectId=${drawingProject}`, { method: "POST", body: JSON.stringify({ format: "svg", view: "top" }) });
+    const editorSvg = await fetch(`${origin}/api/editor/cad`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ operation: "export", projectId: drawingProject, format: "svg", name: "Editor parity", view: "top", shapes }) });
+    expect(restSvg.status).toBe(200);
+    expect(editorSvg.status).toBe(200);
+    expect(Buffer.from(await editorSvg.arrayBuffer()).toString("utf8")).toBe(Buffer.from(restSvg.body.base64 as string, "base64").toString("utf8"));
+
+    const section = { plane: "xy", offset: 4 };
+    const restDxf = await api(`/exports?projectId=${drawingProject}`, { method: "POST", body: JSON.stringify({ format: "dxf", section }) });
+    const editorDxf = await fetch(`${origin}/api/editor/cad`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ operation: "export", projectId: drawingProject, format: "dxf", name: "Editor parity", section, shapes }) });
+    expect(restDxf.status).toBe(200);
+    expect(editorDxf.status).toBe(200);
+    expect(Buffer.from(await editorDxf.arrayBuffer()).toString("utf8")).toBe(Buffer.from(restDxf.body.base64 as string, "base64").toString("utf8"));
+  });
+
   it("repeats, aligns and distributes a row over HTTP", async () => {
     // Its own project: this walks the three arranging routes in the order a
     // script would -- make the copies, line them up, space them out -- and the

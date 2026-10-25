@@ -37,6 +37,22 @@ Choose **Export**, select **SKF: Editable project**, then choose **Save SketchFo
 
 ![The export dialog with SKF selected as the editable project format.](../screenshots/editor-quickstart-export.png)
 
+## 5. Measure geometry and export a technical drawing
+
+Select two shapes in the scene list, then choose **Measure selected shapes**. The measurement panel can compare the whole shapes or a face or edge index on each one. It reports exact minimum distance and, for two planar faces, their angle. An unavailable angle includes the kernel's reason. The inspector shows volume, area, centroid and bounds; imported meshes are labeled tessellated.
+
+Choose **Export**, then select **DXF** and set the section plane and offset to export a kernel section drawing. For SVG, enable **Hidden-line (kernel)** for an exact projected drawing, or enable **Section view** for a section SVG. DXF always requires a section plane.
+
+![The editor reporting the exact 10 mm distance between two shapes.](../screenshots/editor-cad-measurement.png)
+
+The inspector distinguishes exact B-rep values from measurements derived from an imported mesh.
+
+![The inspector showing exact volume, area, centroid and bounds.](../screenshots/editor-cad-properties.png)
+
+![The editor's kernel drawing export controls.](../screenshots/editor-cad-tools.png)
+
+![The DXF section plane picker.](../screenshots/editor-cad-dxf.png)
+
 ## Verified workflow
 
 The browser acceptance test performs these steps: it creates the rectangular extrusion, opens **Edit sketch**, adds the circle, finishes the edit, renames and reloads the project, reopens the sketch to confirm the added segments persisted, then downloads the `.skf` file. Run it with:

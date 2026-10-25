@@ -639,6 +639,10 @@
         "skf": {
           "description": "Projeto editável",
           "note": "Preserva o projeto editável, o histórico de desfazer e refazer, esboços, grupos, dados CAD e os arquivos importados originais."
+        },
+        "dxf": {
+          "description": "Desenho em corte",
+          "note": "Requer um plano de corte. A geometria é desenhada pelo núcleo CAD."
         }
       },
       "historyTitle": "Histórico de ações salvo",

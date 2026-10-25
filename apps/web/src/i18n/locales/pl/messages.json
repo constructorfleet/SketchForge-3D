@@ -639,6 +639,10 @@
         "skf": {
           "description": "Edytowalny projekt",
           "note": "Zachowuje edytowalny projekt, historię zmian (cofanie i ponawianie), szkice, grupy, dane CAD i zaimportowane pliki źródłowe."
+        },
+        "dxf": {
+          "description": "Rysunek przekroju",
+          "note": "Wymaga płaszczyzny przekroju. Geometria jest rysowana przez jądro CAD."
         }
       },
       "historyTitle": "Zapisywana historia zmian",

@@ -639,6 +639,10 @@
         "skf": {
           "description": "Upravitelný projekt",
           "note": "Zachová upravitelný projekt, historii změn, náčrty, skupiny, data CAD a importované zdrojové soubory."
+        },
+        "dxf": {
+          "description": "Výkres řezu",
+          "note": "Vyžaduje rovinu řezu. Geometrie je vykreslena geometrickým jádrem CAD."
         }
       },
       "historyTitle": "Uložená historie akcí",

@@ -4,6 +4,7 @@ import { Box, ChevronDown, ChevronUp, LockKeyhole, LockKeyholeOpen, Network, Spl
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { ToolbarHideSelectedIcon } from "@/components/icons";
 import { normalizeGearType } from "@/lib/gearGeometry";
+import { editorPropertiesRequest } from "@/lib/editorCadRequests";
 import {
   MATERIAL_PRESETS,
   formatMaterialNumber,
@@ -126,6 +127,7 @@ export function ShapeInspector({
   onInteractionActiveChange,
   volumeMm3,
   onMaterialPriceChange,
+  projectId,
 }: {
   shape: WorkplaneShape;
   snap: GridSize;
@@ -155,6 +157,7 @@ export function ShapeInspector({
   /** Solid volume of this shape in mm3; absent when nothing has been measured. */
   volumeMm3?: number;
   onMaterialPriceChange?: (materialId: MaterialId, pricePerKg: number) => void;
+  projectId?: string;
 }) {
   const t = useTranslations();
   const solidColor = shape.color;
@@ -183,6 +186,29 @@ export function ShapeInspector({
   const isSketchRevolve = shape.sketchOperation === "revolve" || Boolean(shape.sketchRevolve);
   const inspectorRef = useRef<HTMLElement>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [cadProperties, setCadProperties] = useState<Record<string, unknown> | null>(null);
+  const [cadPropertiesError, setCadPropertiesError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!projectId) {
+      setCadProperties(null);
+      setCadPropertiesError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCadProperties(null);
+    setCadPropertiesError(null);
+    const request = editorPropertiesRequest(projectId, shape);
+    void fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body), signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json() as { properties?: Record<string, unknown>; error?: string };
+        if (!response.ok || !body.properties) throw new Error(body.error || `Properties unavailable (${response.status}).`);
+        setCadProperties(body.properties);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setCadPropertiesError(error instanceof Error ? error.message : String(error));
+      });
+    return () => controller.abort();
+  }, [projectId, shape]);
   const [placementOpen, setPlacementOpen] = useState(true);
   const [taperOpen, setTaperOpen] = useState(false);
   const [gearTeethOpen, setGearTeethOpen] = useState(true);
@@ -520,6 +546,9 @@ export function ShapeInspector({
               onUpdate={onUpdate}
               onMaterialPriceChange={onMaterialPriceChange}
               onInteractionActiveChange={onInteractionActiveChange}
+              projectId={projectId}
+              cadProperties={cadProperties}
+              cadPropertiesError={cadPropertiesError}
             />
           </div>
         ) : null}
@@ -805,6 +834,9 @@ function MaterialProperties({
   onUpdate,
   onMaterialPriceChange,
   onInteractionActiveChange,
+  projectId,
+  cadProperties,
+  cadPropertiesError,
 }: {
   shape: WorkplaneShape;
   workspace: WorkplaneWorkspaceSettings;
@@ -813,6 +845,9 @@ function MaterialProperties({
   onUpdate: ShapeInspectorUpdate;
   onMaterialPriceChange?: (materialId: MaterialId, pricePerKg: number) => void;
   onInteractionActiveChange?: (active: boolean) => void;
+  projectId?: string;
+  cadProperties: Record<string, unknown> | null;
+  cadPropertiesError: string | null;
 }) {
   const t = useTranslations();
   const preset = materialPreset(shape.material);
@@ -873,6 +908,22 @@ function MaterialProperties({
         </label>
       ) : null}
       {preset && shape.hole ? <p className="material-readout-hint">{t("panels.material.holeHint")}</p> : null}
+      {projectId ? (
+        <section className="exact-properties" aria-label="CAD properties">
+          <strong>CAD properties</strong>
+          {cadProperties ? (
+            <>
+              <p>{cadProperties.provenance && (cadProperties.provenance as { precision?: string }).precision === "exact" ? "Exact B-rep" : "Tessellated mesh"}</p>
+              <dl className="material-readout">
+                <div><dt>Volume</dt><dd>{formatMaterialNumber(cadProperties.volume as number, 2)} mm³</dd></div>
+                <div><dt>Area</dt><dd>{formatMaterialNumber(cadProperties.area as number, 2)} mm²</dd></div>
+                <div><dt>Centroid</dt><dd>{formatMaterialNumber((cadProperties.centerOfMass as { x: number }).x, 2)}, {formatMaterialNumber((cadProperties.centerOfMass as { y: number }).y, 2)}, {formatMaterialNumber((cadProperties.centerOfMass as { z: number }).z, 2)} mm</dd></div>
+                <div><dt>Bounds</dt><dd>{formatMaterialNumber((cadProperties.bbox as { xmin: number }).xmin, 2)}–{formatMaterialNumber((cadProperties.bbox as { xmax: number }).xmax, 2)} × {formatMaterialNumber((cadProperties.bbox as { ymin: number }).ymin, 2)}–{formatMaterialNumber((cadProperties.bbox as { ymax: number }).ymax, 2)} × {formatMaterialNumber((cadProperties.bbox as { zmin: number }).zmin, 2)}–{formatMaterialNumber((cadProperties.bbox as { zmax: number }).zmax, 2)} mm</dd></div>
+              </dl>
+            </>
+          ) : cadPropertiesError ? <p role="status">{cadPropertiesError}</p> : <p>Measuring…</p>}
+        </section>
+      ) : null}
       {estimate ? (
         <>
           <p className="material-readout-hint">{t(materialVolumePrecisionMessage("tessellated"))}</p>
