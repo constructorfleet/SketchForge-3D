@@ -10,6 +10,10 @@ function box(id: string, x: number, extras: Partial<WorkplaneShape> = {}) {
   return sceneShape({ id, name: id, kind: "box", color: "#123456", width: 2, depth: 2, height: 2, x, ...extras });
 }
 
+function wedge(id: string, x: number, extras: Partial<WorkplaneShape> = {}) {
+  return sceneShape({ id, name: id, kind: "wedge", color: "#123456", width: 4, depth: 1, height: 2, x, ...extras });
+}
+
 function engineWithShapes(shapes: WorkplaneShape[]) {
   const document: ProjectDocument = {
     metadata: { revision: 0 }, projectName: "Interference test", createdAt: 0, shapes, history: [], historyIndex: -1, assets: [],
@@ -31,6 +35,18 @@ function value<T>(result: EngineResult<T>): T {
 }
 
 describe("engine exact interference", () => {
+  it("measures rotated and mirrored solids by their actual overlap volume", async () => {
+    const partner = box("offset", 1, { width: 3, depth: 1.5, height: 2, z: 0.5 });
+    const mirrored = value(await engineWithShapes([
+      wedge("turned", 0, { rotation: 45, mirrorX: true }),
+      partner,
+    ]).interference("interference"));
+
+    expect(mirrored.pairs).toHaveLength(1);
+    expect(mirrored.pairs[0]?.overlapVolume).toBeGreaterThan(0);
+    expect(mirrored.pairs[0]?.overlapVolume).toBeLessThan(12);
+  });
+
   it("reports exact gaps, touching and penetration, excluding distant pairs", async () => {
     const report = value(await engineWithShapes([box("left", 0), box("overlap", 1), box("gap", 4), box("far", 20), box("cutter", 0, { hole: true }), box("hidden", 0, { hidden: true })]).interference("interference", { clearance: 2 }));
     expect(report.shapesChecked).toBe(4);
