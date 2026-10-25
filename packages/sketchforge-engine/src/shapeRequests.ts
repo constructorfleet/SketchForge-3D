@@ -504,3 +504,21 @@ export function shapeWithRequestedChanges(shape: WorkplaneShape, request: ShapeR
 
   return { ok: true, shape: canonicalizeShape(next) };
 }
+
+/** The name and colour a caller may give the shape a group or cut leaves behind. */
+export type ResultAttributes = { name?: unknown; color?: unknown };
+
+/**
+ * A group or cut result carrying the name and colour its caller asked for.
+ *
+ * Without this every combine came back as "Group" in the first solid's
+ * colour, and a script had to rename it with a second write (#505). Read by
+ * the same rule as a change: a blank or non-string value keeps what is there.
+ */
+export function withResultAttributes(shape: WorkplaneShape, request: ResultAttributes): WorkplaneShape {
+  return {
+    ...shape,
+    name: nonEmptyString(request.name, shape.name),
+    color: nonEmptyString(request.color, shape.color),
+  };
+}

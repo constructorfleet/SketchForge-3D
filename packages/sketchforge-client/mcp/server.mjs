@@ -50,6 +50,11 @@ const editorTargetSchema = {
   },
 };
 const localProjectSchema = { type: "object", properties: {} };
+/** What group_objects and boolean_cut may name and colour the shape they leave behind. */
+const resultAttributeProperties = {
+  name: { type: "string", description: "Name for the result (default \"Group\")." },
+  color: { type: "string", description: "Hex color for the result, such as #2a9d8f (default the first solid's color)." },
+};
 
 const tools = [
   {
@@ -155,7 +160,10 @@ const tools = [
         turns: { type: "number", description: "For kind revolve/thread: how many full turns to sweep (default 8 for a thread)." },
         diameter: { type: "number", description: "For kind thread: outside diameter in mm, for a size the catalog does not list. The 60-degree ISO profile follows from this and the pitch." },
         length: { type: "number", description: "For kind thread: how long the thread should be in mm, instead of giving turns." },
-        hole: { type: "boolean", description: "For kind thread: cut the form wider by a clearance so a bolt of that size fits, and mark the shape as a hole so grouping it with a solid taps that solid." },
+        hole: {
+          type: "boolean",
+          description: "Any kind: create the shape as a hole (a cutter), so grouping it with a solid cuts it out of that solid without a separate update_object call. For kind thread it also cuts the form wider by a clearance so a bolt of that size fits, which taps the solid.",
+        },
         clearance: { type: "number", description: "For kind thread with hole: how much wider to cut, per side, in mm (default 0.2 for printed parts)." },
         startAngle: { type: "number", description: "For kind revolve: rotation the sweep starts at, in degrees." },
         sweepAngle: { type: "number", description: "For kind revolve with no pitch: how far round to revolve, in degrees (±360)." },
@@ -332,13 +340,14 @@ const tools = [
   },
   {
     name: "sketchforge_group_objects",
-    description: "Group objects by id using SketchForge's normal grouping/boolean pipeline.",
+    description: "Group objects by id using SketchForge's normal grouping/boolean pipeline. A selection holding a hole comes back cut. Optional name and color are set on the result.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["ids"],
       properties: {
         ...editorTargetSchema.properties,
         ids: { type: "array", items: { type: "string" } },
+        ...resultAttributeProperties,
       },
     },
   },
@@ -356,7 +365,7 @@ const tools = [
   },
   {
     name: "sketchforge_boolean_cut",
-    description: "Cut solids with hole objects. Provide solidIds and holeIds; the result replaces the operands.",
+    description: "Cut solids with hole objects. Provide solidIds and holeIds; the result replaces the operands. Optional name and color are set on the result.",
     inputSchema: {
       ...editorTargetSchema,
       required: ["solidIds", "holeIds"],
@@ -364,6 +373,7 @@ const tools = [
         ...editorTargetSchema.properties,
         solidIds: { type: "array", items: { type: "string" } },
         holeIds: { type: "array", items: { type: "string" } },
+        ...resultAttributeProperties,
       },
     },
   },
