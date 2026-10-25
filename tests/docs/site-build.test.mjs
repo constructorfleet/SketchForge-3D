@@ -409,7 +409,10 @@ test("a mermaid diagram on a built page renders with labels that fit their nodes
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.goto(`http://127.0.0.1:${address.port}/SketchForge-3D/docs/DOCUMENTATION_SUITE_SPEC.html`);
-    await page.waitForSelector(".mermaid svg", { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll(".mermaid svg .node").length === 5,
+      { timeout: 30_000 },
+    );
 
     const diagram = await page.$eval(".mermaid svg", (svg) => ({
       nodes: svg.querySelectorAll(".node").length,

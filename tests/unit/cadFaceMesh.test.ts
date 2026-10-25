@@ -11,6 +11,7 @@ import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { meshShapeWithFaceGroups } from "@constructorfleet/sketchforge-engine/cadFaceMesh";
 import { meshedCadResult } from "@constructorfleet/sketchforge-engine/serverCadOperations";
+import { buildFaceDraft } from "@/lib/engine/draftFace";
 
 type Groups = ArrayLike<number>;
 
@@ -82,6 +83,31 @@ describe("face-grouped CAD meshes", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
         expect(after.faceGroups.length / 3).toBe(cad.getSubShapes(restored, "face").length);
         expect(groupedTriangles(after.faceGroups)).toBe(after.triangleCount);
         expect(after.faceGroups).toEqual(before.faceGroups);
+      } finally {
+        cad.releaseAll();
+      }
+    });
+  });
+
+  it("keeps viewport face groups on a solid after drafting one face", async () => {
+    await withCadKernel((cad) => {
+      try {
+        const box = cad.makeBox(20, 20, 20);
+        const faces = cad.getSubShapes(box, "face");
+        const faceIds = faces.map((_, index) => `face-${index}`);
+        const drafted = buildFaceDraft(cad, {
+          brep: cad.toBREP(box),
+          faceIds,
+          faceId: faceIds[0]!,
+          angle: 5,
+          pullDirection: "y",
+        });
+
+        expect(drafted.faceGroups.length / 3).toBe(drafted.faceCount);
+        expect(groupedTriangles(drafted.faceGroups)).toBe(drafted.triangleCount);
+        expect(drafted.faceGroups.filter((_, index) => index % 3 === 2).sort()).toEqual(
+          Array.from({ length: drafted.faceCount }, (_, index) => index),
+        );
       } finally {
         cad.releaseAll();
       }
