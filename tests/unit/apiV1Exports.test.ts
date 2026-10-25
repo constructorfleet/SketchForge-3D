@@ -270,6 +270,27 @@ describe("REST API v1 project exports", () => {
     expect(await misplaced.json()).toMatchObject({ code: "invalid_request" });
   });
 
+  it("takes a crease angle for an SVG drawing and refuses one anywhere else", async () => {
+    const projectId = await makeProject();
+    const post = (body: Record<string, unknown>) => exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }));
+
+    expect((await post({ format: "svg", view: "top", featureAngle: 15 })).status).toBe(200);
+    for (const body of [
+      { format: "svg", featureAngle: -1 },
+      { format: "svg", featureAngle: 181 },
+      { format: "svg", featureAngle: "30" },
+      { format: "stl", featureAngle: 30 },
+      { format: "svg", section: { plane: "xy", offset: 2 }, featureAngle: 30 },
+    ]) {
+      const response = await post(body);
+      expect(response.status, JSON.stringify(body)).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "invalid_request", error: expect.stringContaining("featureAngle") });
+    }
+  }, 90_000);
+
   it("rejects an unsupported format before building geometry", async () => {
     const projectId = await makeProject();
     const response = await exportProject(authorized(`/api/v1/exports?projectId=${projectId}`, {

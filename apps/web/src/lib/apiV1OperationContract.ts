@@ -326,6 +326,7 @@ const exportRequestBody = json({
     shapeIds: exportShapeIds,
     name: { type: "string", maximumLength: 120, description: "Optional output basename; an empty or omitted value uses the project name." },
     view: { type: "string", enum: exportViews, description: "SVG only; section and view are mutually exclusive." },
+    featureAngle: { type: "number", minimum: 0, maximum: 180, description: "SVG projection only: crease angle in degrees for mesh shapes. An edge between two triangles is drawn only where they meet at more than this, besides boundaries and silhouettes. Defaults to 30; exact solids ignore it." },
     section: {
       type: "object",
       required: ["plane", "offset"],

@@ -1,6 +1,7 @@
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiShapeIds, apiTarget } from "@/lib/apiV1";
 import { readProjectDocument } from "@/lib/engine/serverProjectDocument";
 import { parseProjectionLayout, PROJECTION_LAYOUTS } from "@constructorfleet/sketchforge-engine/cadProjection";
+import { isFeatureAngle } from "@constructorfleet/sketchforge-engine/meshEdgeProjection";
 import { SECTION_PLANES, type SectionPlane } from "@constructorfleet/sketchforge-engine/cadSection";
 import { exportProjectScene, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "@constructorfleet/sketchforge-engine/sceneExport";
 import { ServerCadError } from "@constructorfleet/sketchforge-engine/serverCadOperations";
@@ -52,6 +53,15 @@ async function postExport(request: Request) {
     if (body.view !== undefined) return apiError("section and view cannot be used together.", 400, "invalid_request");
     section = { plane: request.plane as SectionPlane, offset: request.offset };
   }
+  // A crease angle only means something to a projected drawing of meshes.
+  if (body.featureAngle !== undefined) {
+    if (body.format !== "svg" || section) {
+      return apiError("featureAngle only applies to svg projection drawings.", 400, "invalid_request");
+    }
+    if (!isFeatureAngle(body.featureAngle)) {
+      return apiError("featureAngle must be a number of degrees from 0 to 180.", 400, "invalid_request");
+    }
+  }
   if (body.format === "dxf" && !section) {
     return apiError("A section plane is required for DXF export.", 400, "invalid_request");
   }
@@ -74,6 +84,7 @@ async function postExport(request: Request) {
       shapeIds: shapeIds ?? undefined,
       name: body.name as string | undefined,
       ...(section ? { section } : { view }),
+      ...(body.featureAngle === undefined ? {} : { featureAngle: body.featureAngle as number }),
     });
     if (new URL(request.url).searchParams.get("download") === "1") {
       // The metadata header includes every field returned by JSON exports,

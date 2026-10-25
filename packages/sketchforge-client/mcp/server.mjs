@@ -430,6 +430,7 @@ const tools = [
       properties: {
         ...editorTargetSchema.properties,
         face: { type: "string", enum: ["current", "home", "top", "bottom", "front", "back", "right", "left"] },
+        featureAngle: { type: "number", minimum: 0, maximum: 180, description: "Crease angle in degrees for mesh shapes (imported, mesh-derived, boolean results): an edge between two triangles is drawn only where they meet at more than this, besides boundaries and silhouettes. Default 30; 0 draws every edge that is not flat. Exact solids ignore it. Local project mode only; the live editor viewport ignores it." },
       },
     },
   },
@@ -440,7 +441,7 @@ const tools = [
   },
   {
     name: "sketchforge_project_view",
-    description: "Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true curves, hidden edges dashed, a gnomon per view and the overall size. The multiview grid (front, top, right, iso) is the readable picture of the geometry; a single view is a 2D drawing of that face. Works offline or against a server when url is supplied.",
+    description: "Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true curves, hidden edges dashed, a gnomon per view and the overall size. Mesh shapes are drawn by feature edges (see featureAngle), silhouettes and boundaries rather than every triangle. The multiview grid (front, top, right, iso) is the readable picture of the geometry; a single view is a 2D drawing of that face. Works offline or against a server when url is supplied.",
     inputSchema: {
       type: "object",
       required: ["projectId"],
@@ -448,6 +449,7 @@ const tools = [
         url: { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." },
         projectId: { type: "string", description: "The server-side project id." },
         view: { type: "string", enum: PROJECTION_LAYOUTS, description: "One named view, or the multiview grid (default)." },
+        featureAngle: { type: "number", minimum: 0, maximum: 180, description: "Crease angle in degrees for mesh shapes (imported, mesh-derived, boolean results): an edge between two triangles is drawn only where they meet at more than this, besides boundaries and silhouettes. Default 30; 0 draws every edge that is not flat. Exact solids ignore it." },
         shapeIds: { type: "array", items: { type: "string" }, description: "Optional object ids; defaults to the current selection, or the whole scene when nothing is selected." },
         name: { type: "string", description: "Optional base name for the file." },
         outputPath: { type: "string", description: "Optional destination path under SKETCHFORGE_MCP_FILES_DIR (or SKETCHFORGE_PROJECTS_DIR when unset); unrestricted if neither is set. SVG text is returned inline otherwise." },
@@ -762,6 +764,7 @@ async function callRemoteTool(name, args, baseUrl) {
         body: {
           format: "svg",
           ...(args.view === undefined ? {} : { view: args.view }),
+          ...(args.featureAngle === undefined ? {} : { featureAngle: args.featureAngle }),
           ...(args.shapeIds === undefined ? {} : { shapeIds: args.shapeIds }),
           ...(args.name === undefined ? {} : { name: args.name }),
         },

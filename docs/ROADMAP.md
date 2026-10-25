@@ -109,6 +109,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 - [#381: 3D measurements and exact B-rep inspector properties](https://github.com/constructorfleet/SketchForge-3D/issues/381) — implementation and browser coverage complete; awaiting review.
 - [#382: Section view and kernel hidden-line SVG/DXF export](https://github.com/constructorfleet/SketchForge-3D/issues/382) — implementation and browser coverage complete; awaiting review.
+- [#506: Feature-edge (crease angle) drawing for mesh shapes](https://github.com/constructorfleet/SketchForge-3D/issues/506) — SVG projections and local `capture_image` draw meshes by feature edges, silhouettes and boundaries with an optional `featureAngle`; meshes and exact solids still occlude each other. Implemented with regression coverage; awaiting review. Deferred: typed `featureAngle` on the TypeScript and Python `exports` helpers (the REST body already accepts it).
 
 ## Client parity
 
