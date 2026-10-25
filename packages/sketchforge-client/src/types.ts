@@ -184,6 +184,10 @@ export type RevolveSettings = {
   startAngle?: number;
   /** How far round to revolve when there is no pitch, +/-360. */
   sweepAngle?: number;
+  /** Facets per full turn of the sweep, 3 to 512 (default 64). Not a prism's side count. */
+  sides?: number;
+  /** How finely curved profile segments are sampled, 1 to 10 (default 6). A point outline has none. */
+  quality?: number;
   /** The solid the sweep is fused into. `0` leaves the bare ribbon. */
   coreRadius?: number;
 };
@@ -207,6 +211,9 @@ export type ThreadShapeRequest = {
   clearance?: number;
   /** `false` leaves the bare helix, with no shank and no drilled hole. */
   core?: boolean;
+  /** Facets per full turn, as for a revolve (default 64). */
+  sides?: number;
+  quality?: number;
   /** Overrides the catalog's 60-degree V. */
   profile?: readonly ProfilePoint[];
 } & ShapePlacement;

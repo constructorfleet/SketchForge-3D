@@ -530,7 +530,11 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
     },
     "sides": {
       "type": "number",
-      "description": "For cylinder, cone, pyramid and roundRoof: number of sides around the axis (at least 3, default 96)."
+      "description": "For cylinder, cone, pyramid and roundRoof: number of sides around the axis (at least 3, default 96). For kind revolve/thread: facets per full turn of the sweep, 3-512 (default 64). On a 150 mm ring 64 facets are about 7.4 mm wide and 256 about 1.8 mm; the triangle count grows with it."
+    },
+    "quality": {
+      "type": "number",
+      "description": "For kind revolve/thread: how finely curved segments of the profile are sampled, 1-10 (default 6). An outline of [x, z] points is all straight segments, so it changes nothing there; raise sides to smooth the turn."
     },
     "steps": {
       "type": "number",

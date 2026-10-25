@@ -213,6 +213,8 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 | `turns` | How many full turns to sweep (0.1–20; `MAX_REVOLVE_TURNS` is 20). Values are clamped to this range. |
 | `startAngle` | Rotation the sweep starts at. |
 | `sweepAngle` | How far round to revolve when there is no pitch (±360). The sweep starts on +X and turns towards -Z. |
+| `sides` | Facets per full turn of the sweep, 3–512 (default 64). On a 150 mm ring, 64 facets are about 7.4 mm wide and 256 about 1.8 mm; the triangle count grows in proportion. For a helix it is facets per turn, and the whole sweep is capped at `MAX_REVOLVE_RINGS`. |
+| `quality` | How finely curved segments of the profile are sampled, 1–10 (default 6). An outline of `[x, z]` points is all straight segments, so `quality` only matters for a profile drawn with curves in the editor; raise `sides` to smooth the turn itself. |
 | `x`, `z` | Where the **axis of revolution** stands on the workplane. A full turn is centred on it; a partial sweep lies to one side of it, so a quarter ring asked for at the origin spans x 0..R and z -R..0. |
 | `size` | `thread` only: a catalog designation that carries its own pitch. Includes ISO metric coarse sizes, selected ISO metric fine sizes (such as `M8x1`, `M10x1.25`), Unified UNC sizes, and selected UNF sizes (such as `1/4-28 UNF`). Coarse defaults are unchanged; default `M8`. An unknown size is refused with the list of known ones. |
 | `diameter` | `thread` only: outside diameter, for a size the catalog does not list. With `pitch`, it gives the ISO 60-degree profile. |
@@ -224,6 +226,8 @@ curl -X POST "$HOST/shapes?projectId=$PROJECT" \
 A thread comes with its core: a bolt is the thread standing on its shank, and a tapped hole is the thread plus the hole it is cut into, so neither is useful as a bare helix. The core's radius is the thread's root, is fused into one solid, and appears as **Core radius** in the object panel -- set it to 0 there, or pass `core: false`, for the ribbon on its own (a spring, say).
 
 Catalog pitches and nominal diameters reference ISO 261 / ISO 262 for metric threads and ASME B1.1 for Unified threads. UNF pitches in millimetres are calculated from the standard threads-per-inch values using 25.4 mm per inch. The generated geometry is a simplified nominal 60-degree model; it does not encode thread classes, tolerance limits, or gaging dimensions and is not a manufacturing acceptance model. See [ISO 261](https://www.iso.org/standard/4165.html), [ISO 262:2023](https://www.iso.org/standard/85105.html), [ASME B1.1](https://www.asme.org/codes-standards/find-codes-standards/b1-1-unified-inch-screw-threads-un-unr-thread-form), and the [NIST federal screw-thread standards handbook](https://nvlpubs.nist.gov/nistpubs/Legacy/hb/nbshandbook28supp1963.pdf).
+
+A revolve is stored as a mesh at the resolution it was asked for, and its shape properties report `precision: "tessellated"`. Edge listings, fillets, chamfers and exact face listings of a plain full turn already rebuild the exact solid from the profile (see below); measuring, booleans and exports through the exact kernel still use the mesh.
 
 A `thread` is a `revolve` with the outline filled in; pass your own `profile` to override it. Either way the result is a mesh that keeps its profile and settings, so **its pitch and turns stay editable afterwards** -- in the editor's inspector, and over this API: a thread reads back with its sweep under `revolve`, and a `PATCH` changing the pitch sweeps it again.
 

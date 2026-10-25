@@ -10,6 +10,7 @@ import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/proj
 import { exportSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import type { RevolveShapeRequest } from "../../packages/sketchforge-client/src/types";
 
 const root = path.resolve(__dirname, "../..");
 const server = path.join(root, "packages/sketchforge-client/mcp/server.mjs");
@@ -157,6 +158,34 @@ describe("local MCP engine mode", () => {
     expect(properties.volume).toBeGreaterThan((Math.PI / 4) * (75 ** 2 - 50 ** 2) * 10 * 0.99);
     expect(properties.centerOfMass.x).toBeCloseTo(sectorRadius * Math.SQRT1_2, 0);
     expect(properties.centerOfMass.z).toBeCloseTo(-sectorRadius * Math.SQRT1_2, 0);
+  }, 60_000);
+
+  it("advertises and honours a revolve's resolution on create_shape (#504)", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_create_shape");
+    // An agent only sends what the schema offers, so the sweep's resolution has
+    // to be advertised for revolves rather than only for prisms.
+    expect(tool.inputSchema.properties.sides.description).toMatch(/revolve/);
+    expect(tool.inputSchema.properties.quality).toMatchObject({ type: "number", description: expect.stringMatching(/revolve/) });
+
+    const ring: RevolveShapeRequest = { kind: "revolve", profile: [[50, 0], [75, 0], [75, 10], [50, 10]], sides: 256, quality: 8 };
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", ...ring });
+    expect(created[1].result.isError).toBeUndefined();
+    const shape = JSON.parse(created[1].result.content[0].text).shapes[0];
+    expect(shape.sketchRevolve).toMatchObject({ sides: 256, quality: 8 });
+
+    const read = callMcp(projectsDir, 3, "sketchforge_shape_properties", { projectId: "case", shapeId: shape.id });
+    const properties = JSON.parse(read[1].result.content[0].text);
+    // A 256-gon annulus, 50..75 mm, 10 mm tall: within 0.01% of the true ring,
+    // where the default 64 facets fall 0.16% short of it.
+    const facetedRing = (sides: number) => (sides / 2) * Math.sin((2 * Math.PI) / sides) * (75 ** 2 - 50 ** 2) * 10;
+    expect(properties.volume).toBeCloseTo(facetedRing(256), 0);
+    expect(properties.volume).toBeGreaterThan(facetedRing(64) + 100);
+    expect(properties.centerOfMass.x).toBeCloseTo(0, 3);
+    expect(properties.centerOfMass.y).toBeCloseTo(5, 3);
+    expect(properties.centerOfMass.z).toBeCloseTo(0, 3);
   }, 60_000);
 
   it("checks exact interference locally without returning geometry arrays", () => {
