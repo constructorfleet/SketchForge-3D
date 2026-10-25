@@ -20,11 +20,10 @@ test("publishing clients table shows the current release-please version", async 
     assert.equal(JSON.parse(packageText).version, version);
   }
   assert.match(python, new RegExp(`^version\\s*=\\s*"${version.replaceAll(".", "\\.")}"`, "m"));
-  assert.match(
-    pythonInit,
-    new RegExp(`^__version__\\s*=\\s*"${version.replaceAll(".", "\\.")}"\\s+# x-release-please-version$`, "m"),
-    "Python __version__ should match the release-please manifest and be updated on each release",
-  );
+  assert.match(pythonInit, /from importlib\.metadata import PackageNotFoundError, version as _distribution_version/);
+  assert.match(pythonInit, /return _distribution_version\("sketchforge3d"\)/);
+  assert.match(pythonInit, /except PackageNotFoundError:/);
+  assert.match(pythonInit, /__version__ = _read_version\(\)/);
 
   for (const name of ["@constructorfleet/sketchforge3d", "@constructorfleet/sketchforge-engine", "sketchforge3d"]) {
     const row = guide.split("\n").find((line) => line.startsWith(`| \`${name}\` |`));
