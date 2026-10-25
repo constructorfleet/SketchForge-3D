@@ -74,6 +74,24 @@ function meshShape(id: string, positions: number[], placement: { x?: number; ele
   };
 }
 
+/** Each `M...` subpath of every path in an SVG, as its points. */
+function svgSubpaths(svg: string): [number, number][][] {
+  return [...svg.matchAll(/ d="([^"]+)"/g)].flatMap((path) =>
+    path[1].split("M").filter(Boolean).map((sub) =>
+      [...sub.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m): [number, number] => [Number(m[1]), Number(m[2])])));
+}
+
+/** A loop's distinct corner points in a fixed order: collinear midpoints dropped, so loops compare by shape. */
+function sortedCorners(points: [number, number][]) {
+  const distinct = [...new Map(points.map((p) => [p.join(","), p])).values()];
+  const isCorner = (p: [number, number]) => {
+    const xs = distinct.map((q) => q[0]);
+    const ys = distinct.map((q) => q[1]);
+    return (p[0] === Math.min(...xs) || p[0] === Math.max(...xs)) && (p[1] === Math.min(...ys) || p[1] === Math.max(...ys));
+  };
+  return distinct.filter(isCorner).map((p) => p.join(",")).sort();
+}
+
 // The cube's material: 8000 - 1000 mm^3, with the void's centroid at x=3, y=10.
 const HOLLOW_VOLUME = 7000;
 const HOLLOW_CENTER_X = (8000 * 0 - 1000 * 3) / 7000;
@@ -116,6 +134,29 @@ describe("mesh solids with an internal void (#501)", () => {
     expect(measured.center.y).toBeCloseTo((64 * 2 + 8 * 1) / 72, 4);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it.each([
+    // A pokes its corner into B: A's extreme vertex along the nesting ray lies
+    // inside B, so by parity alone A reads as B's void (review of #522).
+    ["one body's corner inside the other", [0, 0, 0] as Vec3, [5, 5, 5] as Vec3],
+    // Overlapping along X only: neither extreme vertex is inside the other.
+    ["side by side, sharing a slab", [0, 0, 0] as Vec3, [5, 0, 0] as Vec3],
+  ])("refuses closed shells that overlap without nesting: %s", async (_label, a, b) => {
+    const cube = (at: Vec3) => boxTriangles(at, [at[0] + 10, at[1] + 10, at[2] + 10]);
+    const failure = await withCadKernel((cad) => {
+      try {
+        const solid = solidFromMeshPositions(cad, [...cube(a), ...cube(b)]);
+        return { volume: cad.getVolume(solid), center: cad.getCenterOfMass(solid) };
+      } catch (error) {
+        return error;
+      }
+    });
+
+    // Not B less A (875 mm^3), and not a silent union either: the mesh's own
+    // signed volume disagrees with any solid the kernel could assemble.
+    expect(failure).toBeInstanceOf(ServerCadError);
+    expect((failure as Error).message).toMatch(/overlap/);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("refuses an open mesh without mentioning a fillet nobody asked for", async () => {
     const open = boxTriangles([-1, 0, -1], [1, 2, 1]).slice(0, 9 * 11);
     const failure = await withCadKernel((cad) => {
@@ -139,6 +180,9 @@ describe("mesh solids with an internal void (#501)", () => {
       const properties = await shapeProperties(hollow());
 
       expect(properties.volume).toBeCloseTo(HOLLOW_VOLUME, 3);
+      expect(properties.centerOfMass.x).toBeCloseTo(HOLLOW_CENTER_X, 4);
+      expect(properties.centerOfMass.y).toBeCloseTo(10, 4);
+      expect(properties.centerOfMass.z).toBeCloseTo(0, 4);
       expect(properties.isValid).toBe(true);
     }, CAD_TEST_TIMEOUT_MS);
 
@@ -169,6 +213,8 @@ describe("mesh solids with an internal void (#501)", () => {
       if (!("group" in outcome) || !outcome.group) return;
       const properties = await shapeProperties(outcome.group);
       expect(properties.volume).toBeCloseTo(HOLLOW_VOLUME - 160, 2);
+      // The bore is off-centre at x=3, so x is what a misplaced cut would move.
+      expect(properties.centerOfMass.x).toBeCloseTo((HOLLOW_VOLUME * HOLLOW_CENTER_X - 160 * 3) / (HOLLOW_VOLUME - 160), 3);
       expect(properties.centerOfMass.y).toBeCloseTo(10, 3);
       expect(properties.isValid).toBe(true);
     }, CAD_TEST_TIMEOUT_MS);
@@ -196,16 +242,65 @@ describe("mesh solids with an internal void (#501)", () => {
       expect(properties.centerOfMass.y).toBeCloseTo(10, 3);
     }, CAD_TEST_TIMEOUT_MS);
 
-    it("draws a section through the void", async () => {
-      const svg = await sectionShapesToSvg([hollow()], { plane: "xy", offset: 0 });
+    it("cuts again into a group that sealed a curved chamber, as the issue's revolve recipe does", async () => {
+      // Tessellated curved shells -- a cylindrical chamber sealed in a block,
+      // then a cylindrical bore -- are what need the sewing tolerance ladder,
+      // which flat boxes never reach.
+      const block = sceneShape({ id: "block", name: "Block", kind: "box", color: "#123456", width: 20, depth: 20, height: 20 });
+      const chamber = { ...sceneShape({ id: "chamber", name: "Chamber", kind: "cylinder", color: "#123456", width: 10, depth: 10, height: 10 }), elevation: 5, hole: true };
+      const sealed = await buildGroupFromSelection([block, chamber]);
+      expect("group" in sealed ? null : sealed).toBeNull();
+      if (!("group" in sealed) || !sealed.group) return;
+      const before = await shapeProperties(sealed.group);
+      // The chamber is a faceted cylinder, so a little smaller than pi r^2 h.
+      expect(Math.abs(before.volume / (8000 - Math.PI * 25 * 10) - 1)).toBeLessThan(0.02);
 
-      expect(svg).toContain("<svg");
+      // A 4 mm bore along Y at x=7.5 runs through the wall beside the chamber.
+      const bore = { ...sceneShape({ id: "bore", name: "Bore", kind: "cylinder", color: "#000000", width: 4, depth: 4, height: 30 }), x: 7.5, elevation: -5, z: 0, hole: true };
+      const cut = await buildGroupFromSelection([sealed.group, bore]);
+
+      expect("group" in cut ? null : cut).toBeNull();
+      if (!("group" in cut) || !cut.group) return;
+      const after = await shapeProperties(cut.group);
+      const removed = before.volume - after.volume;
+      // A 20 mm length of a 4 mm faceted bore, within 2% of pi r^2 L.
+      expect(Math.abs(removed / (Math.PI * 4 * 20) - 1)).toBeLessThan(0.02);
+      // Taken from beside the chamber at x=7.5, not from the chamber's side.
+      expect(after.centerOfMass.x).toBeCloseTo((before.volume * before.centerOfMass.x - removed * 7.5) / after.volume, 2);
+      expect(after.centerOfMass.y).toBeCloseTo(10, 2);
+      expect(after.isValid).toBe(true);
     }, CAD_TEST_TIMEOUT_MS);
 
-    it("draws a hidden-line projection, as project_view and capture_image do", async () => {
+    // Section and projection read the mesh directly (#511, #513) rather than
+    // through the sewing this file fixes, so these two are regression cover for
+    // a void mesh, not proof of #501: they check the void is in the drawing.
+    it("draws a section through the void with the void's own loop", async () => {
+      // Plan section at mid-height: the outer 20 mm square and the void's
+      // 10 mm square, x -2..8 by -5..5.
+      const svg = await sectionShapesToSvg([hollow()], { plane: "xy", offset: 10 });
+
+      const loops = svgSubpaths(svg).map(sortedCorners);
+      expect(loops).toContainEqual(sortedCorners([[-10, -10], [10, -10], [10, 10], [-10, 10]]));
+      expect(loops).toContainEqual(sortedCorners([[-2, -5], [8, -5], [8, 5], [-2, 5]]));
+    }, CAD_TEST_TIMEOUT_MS);
+
+    it("draws the void as hidden lines in a projection, as project_view and capture_image do", async () => {
       const svg = await projectShapesToSvg([hollow()]);
 
-      expect(svg).toContain("<svg");
+      // The front view's visible outline spans the cube's 20 mm in X; its
+      // hidden lines include the void's sides at x=-2 and x=8.
+      const front = svg.slice(0, svg.indexOf("</g>"));
+      const xs = (stroke: RegExp) => {
+        const d = front.match(stroke)?.[1] ?? "";
+        return [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+      };
+      const visible = xs(/<path d="([^"]+)" fill="none" stroke="#111111"/);
+      const hidden = xs(/<path d="([^"]+)" fill="none" stroke="#9aa0a6"[^>]*stroke-dasharray/);
+      const left = Math.min(...visible);
+      const perMm = (Math.max(...visible) - left) / 20;
+      const at = (x: number) => left + (x + 10) * perMm;
+      expect(hidden.some((x) => Math.abs(x - at(-2)) < 0.05)).toBe(true);
+      expect(hidden.some((x) => Math.abs(x - at(8)) < 0.05)).toBe(true);
     }, CAD_TEST_TIMEOUT_MS);
   });
 });
