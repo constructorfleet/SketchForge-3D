@@ -9,7 +9,6 @@ import { callLocalEngineTool } from "./localEngine.mjs";
 import {
   CREATE_SHAPE_KINDS,
   EDITOR_SHAPE_KINDS,
-  LOCAL_MESH_KINDS,
   LOCAL_SHAPE_KINDS,
   LOCAL_SOLID_KINDS,
   LOCAL_STORED_KINDS,
@@ -144,7 +143,6 @@ const tools = [
           description: [
             `Local mode builds ${LOCAL_SOLID_KINDS.join(", ")} as solids that measure and export as STL.`,
             "A roundRoof's height may be at most half its width; a taller one fails to build.",
-            `${LOCAL_MESH_KINDS.join(", ")} exports as STL but cannot be measured.`,
             `${LOCAL_STORED_KINDS.join(", ")} are stored only: local mode records the parameters but cannot measure or export them; open the project in an editor for those.`,
             `STEP export holds only ${STEP_KINDS.join(", ")}; export the other solids as STL.`,
             "sketch is editor-only: it needs an open editor (url), and local mode refuses it.",

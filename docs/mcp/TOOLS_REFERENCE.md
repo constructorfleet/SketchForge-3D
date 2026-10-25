@@ -440,7 +440,7 @@ Create a parameterized shape, extruded sketch, revolve, or standard screw thread
         "thread",
         "sketch"
       ],
-      "description": "Local mode builds box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, loft, revolve as solids that measure and export as STL. A roundRoof's height may be at most half its width; a taller one fails to build. thread exports as STL but cannot be measured. icosahedron, text, gear are stored only: local mode records the parameters but cannot measure or export them; open the project in an editor for those. STEP export holds only box, cube, cylinder, cone, sphere; export the other solids as STL. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only box, cube, cylinder, text, loft, sketch, revolve, thread."
+      "description": "Local mode builds box, cube, cylinder, cone, sphere, halfSphere, torus, tube, ring, polygon, pyramid, roof, roundRoof, wedge, loft, revolve, thread as solids that measure and export as STL. A roundRoof's height may be at most half its width; a taller one fails to build. icosahedron, text, gear are stored only: local mode records the parameters but cannot measure or export them; open the project in an editor for those. STEP export holds only box, cube, cylinder, cone, sphere; export the other solids as STL. sketch is editor-only: it needs an open editor (url), and local mode refuses it. An editor builds only box, cube, cylinder, text, loft, sketch, revolve, thread."
     },
     "profile": {
       "type": "array",

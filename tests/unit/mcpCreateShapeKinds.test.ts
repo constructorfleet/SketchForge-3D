@@ -8,7 +8,6 @@ import { REQUESTABLE_SHAPE_KINDS, SHAPE_PARAMETER_NAMES } from "@constructorflee
 import * as createShapeKinds from "../../packages/sketchforge-client/mcp/createShapeKinds.mjs";
 
 const {
-  LOCAL_MESH_KINDS,
   LOCAL_SHAPE_KINDS,
   LOCAL_SOLID_KINDS,
   LOCAL_STORED_KINDS,
@@ -141,8 +140,8 @@ describe("sketchforge_create_shape kind schema", () => {
     expect(tool.inputSchema.properties.kind.description).toMatch(/sketch.*editor/i);
   });
 
-  it("sorts every local kind into exactly one of solid, mesh-only, and stored-only", () => {
-    const sorted = [...LOCAL_SOLID_KINDS, ...LOCAL_MESH_KINDS, ...LOCAL_STORED_KINDS];
+  it("sorts every local kind into exactly one of solid and stored-only", () => {
+    const sorted = [...LOCAL_SOLID_KINDS, ...LOCAL_STORED_KINDS];
     expect([...sorted].sort()).toEqual([...LOCAL_SHAPE_KINDS].sort());
   });
 
@@ -170,23 +169,17 @@ describe("sketchforge_create_shape kind schema", () => {
     expect(failures).toEqual([]);
   }, 300_000);
 
-  it("names the mesh-only and stored-only kinds in the kind description, and they still behave that way", () => {
+  it("names the stored-only kinds in the kind description, and they still behave that way", () => {
     const description: string = createShapeTool(projectDirectory()).inputSchema.properties.kind.description;
-    for (const kind of [...LOCAL_MESH_KINDS, ...LOCAL_STORED_KINDS]) expect(description).toContain(kind);
+    for (const kind of LOCAL_STORED_KINDS) expect(description).toContain(kind);
     expect(description).toMatch(/stored/i);
 
     const results = createThen(
-      Object.fromEntries([...LOCAL_MESH_KINDS, ...LOCAL_STORED_KINDS].map((kind) => [kind, requestFor(kind)])),
+      Object.fromEntries(LOCAL_STORED_KINDS.map((kind) => [kind, requestFor(kind)])),
       { properties, stl: exportAs("stl") },
     );
     // If one of these starts measuring, it belongs in the solid list and the
     // description should stop warning about it.
-    for (const kind of LOCAL_MESH_KINDS) {
-      const result = results.get(kind)!;
-      expect(result.create?.isError, `${kind}: ${text(result.create)}`).toBeFalsy();
-      expect(result.properties?.isError, `${kind} measured`).toBe(true);
-      expect(result.stl?.isError, `${kind}: ${text(result.stl)}`).toBeFalsy();
-    }
     for (const kind of LOCAL_STORED_KINDS) {
       const result = results.get(kind)!;
       expect(result.create?.isError, `${kind}: ${text(result.create)}`).toBeFalsy();

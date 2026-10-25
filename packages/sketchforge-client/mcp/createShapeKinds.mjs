@@ -23,16 +23,14 @@ export const LOCAL_SHAPE_KINDS = [
  *
  * A `roundRoof` is here with a limit: its exact solid is half an ellipse with
  * semi-axes of half the width and the height, so a roof taller than half its
- * width fails to build. The tool description says so.
+ * width fails to build. The tool description says so. A `thread` is a mesh,
+ * measured from its triangles.
  */
 export const LOCAL_SOLID_KINDS = [
   "box", "cube", "cylinder", "cone", "sphere", "halfSphere", "torus",
   "tube", "ring", "polygon", "pyramid", "roof", "roundRoof", "wedge",
-  "loft", "revolve",
+  "loft", "revolve", "thread",
 ];
-
-/** Kinds local mode builds as a mesh only: STL export works, measuring does not. */
-export const LOCAL_MESH_KINDS = ["thread"];
 
 /**
  * Kinds local mode stores as a parameter record it cannot build: neither
