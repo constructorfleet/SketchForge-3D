@@ -106,6 +106,16 @@ const ISSUE_387_KEYS = [
   "errors.editor.exportFailedStatus",
 ] as const satisfies readonly ErrorKey[];
 
+/**
+ * Why a sketch edit refuses to rebuild a draft or an edge treatment (#384,
+ * #540): the message is the only explanation the person gets for the sketch
+ * staying open, so it is translated in every catalog too.
+ */
+const SKETCH_REPLAY_REFUSAL_KEYS = [
+  "errors.cadModifier.draftNotReplayable",
+  "errors.cadModifier.edgeTreatmentNotReplayable",
+] as const satisfies readonly ErrorKey[];
+
 const lookup = (tree: object, key: string): unknown => key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], tree);
 
 describe("errors the editor shows in the status bar", () => {
@@ -160,7 +170,7 @@ describe("errors the editor shows in the status bar", () => {
 
   it.each(LOCALES.filter((locale) => locale.code !== "en").map((locale) => locale.code))("are all translated in %s", (code) => {
     const catalog = localeCatalog(code);
-    const untranslated = ISSUE_387_KEYS.filter((key) => {
+    const untranslated = [...ISSUE_387_KEYS, ...SKETCH_REPLAY_REFUSAL_KEYS].filter((key) => {
       const value = lookup(catalog, key);
       return typeof value !== "string" || !value.trim() || value === lookup(SOURCE_MESSAGES, key);
     });

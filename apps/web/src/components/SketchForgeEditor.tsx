@@ -123,6 +123,7 @@ import {
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
+import { edgeTreatmentFeatureWithLineage, edgeTreatmentLineageTarget, selectedEdgeTreatmentReplay } from "@/lib/edgeTreatmentLineage";
 import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/engine/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
@@ -220,7 +221,7 @@ import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketc
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
 import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
-import type { AlignAxis, AlignHandleStatus, AlignTarget, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { AlignAxis, AlignHandleStatus, AlignTarget, EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, EdgeTreatmentSourceEdge, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
@@ -5582,6 +5583,11 @@ export function SketchForgeEditor({
   const [editingSketchShapeId, setEditingSketchShapeId] = useState<string | null>(null);
   const [edgeModifier, setEdgeModifier] = useState<EdgeModifierSession | null>(null);
   const edgeModifierRef = useRef<EdgeModifierSession | null>(null);
+  // Apply waits on the CAD worker for the selection's sketch lineage (#540).
+  // Until it answers, the session is frozen: no edge, amount or setting can
+  // change under the treatment about to be committed, and Apply cannot run twice.
+  const applyEdgeModifierPendingRef = useRef(false);
+  const [edgeModifierApplying, setEdgeModifierApplying] = useState(false);
   const cadModifierWorkerRef = useRef<Worker | null>(null);
   const cadModifierPendingRef = useRef(new Map<number, {
     resolve: (message: CadModifierWorkerResponse) => void;
@@ -5955,6 +5961,7 @@ export function SketchForgeEditor({
     return meshVolumeMm3(meshForShape(selectedShape));
   }, [selectedShape]);
   const toggleModifierEdge = useCallback((id: number, singleEdge = false) => {
+    if (applyEdgeModifierPendingRef.current) return;
     setEdgeModifier((current) => {
       if (!current || current.busy) return current;
       const allowed = new Set(current.edges.filter((edge) => selectableCadModifierEdge(edge, current.sharpAngle)).map((edge) => edge.id));
@@ -7035,8 +7042,16 @@ export function SketchForgeEditor({
   // The CAD worker helpers that replay a retained draft are declared further
   // down, after the worker plumbing they need; finishing a sketch reaches them here.
   const replayRetainedDraftRef = useRef<((existing: WorkplaneShape, profile: SketchProfile) => Promise<WorkplaneShape | null>) | null>(null);
+  const replaySelectedEdgeTreatmentRef = useRef<((
+    existing: WorkplaneShape,
+    profile: SketchProfile,
+    workplane: PlacementWorkplane,
+    feature: EdgeTreatmentFeature & { sourceEdges: EdgeTreatmentSourceEdge[] },
+    entry: EdgeTreatmentHistoryEntry,
+  ) => Promise<WorkplaneShape>) | null>(null);
 
-  const finishSketch = useCallback(async () => {
+  const finishSketchPendingRef = useRef(false);
+  const runFinishSketch = useCallback(async () => {
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
     // Nothing can replay a shell on a rebuilt solid, so, as on the REST path,
@@ -7056,6 +7071,14 @@ export function SketchForgeEditor({
         resolved = placeSketchExtrusion(sweep, activeSketchWorkplane, existing);
       } else {
         setNotice(notice((t) => t("editor.sketch.building")));
+        // A fillet or chamfer kept by sketch lineage (#540) is rounded again on
+        // the rebuilt extrusion. One the edit cannot replay refuses the edit,
+        // as the REST path does, rather than dropping it; the sketch stays open.
+        const treatmentReplay = existing ? selectedEdgeTreatmentReplay(existing) : { status: "none" as const };
+        if (treatmentReplay.status === "blocked") {
+          setNotice(notice((t) => t("errors.cadModifier.edgeTreatmentNotReplayable")));
+          return;
+        }
         let replayed: WorkplaneShape | null = null;
         if (existing && (existing.faceDraft || existing.draftPrismAngle !== undefined)) {
           try {
@@ -7071,6 +7094,13 @@ export function SketchForgeEditor({
         }
         if (replayed) {
           resolved = replayed;
+        } else if (existing && treatmentReplay.status === "replay") {
+          try {
+            resolved = await replaySelectedEdgeTreatmentRef.current!(existing, sketchProfile, activeSketchWorkplane, treatmentReplay.feature, treatmentReplay.entry);
+          } catch (error) {
+            setNotice(notice((t) => errorText(t, error, "errors.cadModifier.edgeTreatmentNotReplayable")));
+            return;
+          }
         } else {
           // No draft that can be replayed; any record left over describes
           // geometry the rebuilt extrusion no longer has.
@@ -7100,6 +7130,19 @@ export function SketchForgeEditor({
     setEditingSketchShapeId(null);
     setToolbarMode("geometry");
   }, [activeSketchWorkplane, commitShapes, editingSketchShapeId, shapes, sketchOperation, sketchProfile, sketchRevolveSettings, t]);
+
+  // Finishing waits on CAD workers -- the rebuild, and a draft or edge
+  // treatment replayed on it -- and the button stays live meanwhile. A second
+  // press would rebuild from the same sketch and commit twice.
+  const finishSketch = useCallback(async () => {
+    if (finishSketchPendingRef.current) return;
+    finishSketchPendingRef.current = true;
+    try {
+      await runFinishSketch();
+    } finally {
+      finishSketchPendingRef.current = false;
+    }
+  }, [runFinishSketch]);
 
   useEffect(() => {
     if (!projectId) {
@@ -7941,6 +7984,71 @@ export function SketchForgeEditor({
   }, [postCadModifierRequestAsync, rebuildRetainedDraftBase, runRetainedFaceDraft]);
   replayRetainedDraftRef.current = replayRetainedDraft;
 
+  /**
+   * Rebuild a sketch extrusion that keeps one selected-edge fillet or chamfer
+   * by sketch lineage from its edited profile, and round the same edges again
+   * (#540): each recorded segment and cap must name exactly one edge of the
+   * rebuilt extrusion, through the engine's matcher, or this rejects and the
+   * edit is refused. The bare extrusion is placed where the untreated shape
+   * would stand now, as a plain sketch edit places it.
+   */
+  const replaySelectedEdgeTreatment = useCallback(async (
+    existing: WorkplaneShape,
+    profile: SketchProfile,
+    workplane: PlacementWorkplane,
+    feature: EdgeTreatmentFeature & { sourceEdges: EdgeTreatmentSourceEdge[] },
+    entry: EdgeTreatmentHistoryEntry,
+  ) => {
+    const untreated = restoreShapeBeforeEdgeTreatment(existing, entry);
+    const extrusion = await cadShapeFromSketchProfile(profile, untreated.height, { ...untreated, ...CLEARED_RETAINED_DRAFT_FIELDS });
+    const bare = placeSketchExtrusion(extrusion, workplane, untreated);
+    const target = edgeTreatmentLineageTarget(bare, [bare]);
+    if (!target || !bare.cadBrep) throw new LocalizedError("errors.cadModifier.edgeTreatmentNotReplayable");
+    invalidateCadModifierSession();
+    try {
+      const prepared = await postCadModifierRequestAsync({
+        type: "prepare",
+        parts: [{ brep: bare.cadBrep, brepTransform: target.brepTransform, hole: false }],
+        sharpAngle: 25,
+      }, [], cadModifierPrepareTimeoutMs(0));
+      if (prepared.type !== "ready") throw new LocalizedError("errors.cadModifier.edgeTreatmentNotReplayable");
+      const found = await postCadModifierRequestAsync({ type: "lineage-edge-ids", ...target, sourceEdges: feature.sourceEdges }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      if (found.type !== "lineage-edge-ids" || found.result.status !== "matched") throw new LocalizedError("errors.cadModifier.edgeTreatmentNotReplayable");
+      const edgeIds = found.result.edgeIds;
+      const preview = await postCadModifierRequestAsync({
+        type: "preview",
+        kind: feature.kind,
+        edgeIds,
+        amount: feature.amount,
+        quality: "standard",
+        chamferAngle: feature.chamferAngle ?? 45,
+      }, [], 30000);
+      if (preview.type !== "preview") throw new LocalizedError("errors.cadModifier.edgeTreatmentFailed");
+      const raw = shapeFromCadMesh(bare, preview.positions, preview.normals, preview.indices, preview.brep, preview.faceGroups);
+      if (!raw) throw new LocalizedError("errors.cadModifier.edgeTreatmentFailed");
+      const previewShape = canonicalizeShape({
+        ...raw,
+        cadDisplayEdges: cadDisplayEdgesForShape(raw, preview.displayEdges),
+        cadDisplayEdgesVersion: 2 as const,
+      });
+      const treated = shapeWithEdgeTreatmentRecord(
+        bakedEdgeTreatmentPreview(previewShape, bare),
+        bare,
+        { ...feature, edgeCount: edgeIds.length },
+        existing.edgeResizeMode === "preserve",
+        entry.createdAt,
+      );
+      // The same treatment, rebuilt: its history entry keeps its identity.
+      return {
+        ...treated,
+        edgeTreatmentHistory: treated.edgeTreatmentHistory?.map((record, index, records) => index === records.length - 1 ? { ...record, id: entry.id } : record),
+      };
+    } finally {
+      postCadModifierRequestAsync({ type: "dispose" }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS).catch(() => undefined);
+    }
+  }, [invalidateCadModifierSession, postCadModifierRequestAsync]);
+  replaySelectedEdgeTreatmentRef.current = replaySelectedEdgeTreatment;
+
   // Rebuild a primitive as an exact solid in place, so it has B-rep faces to
   // colour and draft. Undoable like any other edit; the result is the same kind
   // of exact mesh shape a fillet leaves.
@@ -8132,6 +8240,24 @@ export function SketchForgeEditor({
     return { response, sourceParts };
   }, [postCadModifierRequestAsync]);
 
+  /**
+   * The open session's selected edges by sketch segment and cap (#540), or
+   * null when they have none. Shared by the Fillet/Chamfer tool and the MCP
+   * bridge. Lineage is what lets a sketch edit replay the treatment; without
+   * it the treatment is applied and recorded as it always was, so a worker
+   * that cannot answer leaves the treatment alone.
+   */
+  const cadModifierEdgeLineage = useCallback(async (base: WorkplaneShape, sourceParts: WorkplaneShape[], edgeIds: number[]) => {
+    const target = edgeTreatmentLineageTarget(base, sourceParts);
+    if (!target || edgeIds.length === 0) return null;
+    try {
+      const response = await postCadModifierRequestAsync({ type: "edge-lineage", ...target, edgeIds }, [], CAD_MODIFIER_REQUEST_TIMEOUT_MS);
+      return response.type === "edge-lineage" ? response.sourceEdges : null;
+    } catch {
+      return null;
+    }
+  }, [postCadModifierRequestAsync]);
+
   const applyCadModifierForMcp = useCallback(async (
     shape: WorkplaneShape,
     params: Record<string, unknown>,
@@ -8176,13 +8302,13 @@ export function SketchForgeEditor({
       cadDisplayEdges: cadDisplayEdgesForShape(rawPreview, previewResponse.displayEdges),
       cadDisplayEdgesVersion: 2 as const,
     });
-    const feature = {
+    const feature = edgeTreatmentFeatureWithLineage({
       kind,
       amount,
       edgeCount: selectedEdgeIds.length,
       ...(cadModifierSelectionIsAllEdges(selectedEdgeIds, response.edges, sharpAngle) ? { allEdges: true as const } : {}),
       ...(kind === "chamfer" ? { chamferAngle } : {}),
-    } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
+    } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number], await cadModifierEdgeLineage(shape, sourceParts, selectedEdgeIds));
     const session: EdgeModifierSession = {
       kind,
       edges: response.edges,
@@ -8226,7 +8352,7 @@ export function SketchForgeEditor({
       selectedEdgeIds,
       selectableEdgeIds: selectableIds,
     };
-  }, [commitShapes, invalidateCadModifierSession, prepareCadModifierForMcp, postCadModifierRequestAsync]);
+  }, [cadModifierEdgeLineage, commitShapes, invalidateCadModifierSession, prepareCadModifierForMcp, postCadModifierRequestAsync]);
 
   useEffect(() => {
     const base = cadModifierBaseShapeRef.current;
@@ -8237,13 +8363,32 @@ export function SketchForgeEditor({
     setNotice(notice((t) => t("editor.edgeModifier.cancelledObjectChanged")));
   }, [edgeModifier, invalidateCadModifierSession, shapes, t]);
 
-  const applyEdgeModifier = useCallback(() => {
+  const applyEdgeModifier = useCallback(async () => {
     const base = cadModifierBaseShapeRef.current;
     if (!edgeModifier?.preview || !base) {
       setNotice(notice((t) => t("editor.edgeModifier.waitForPreview")));
       return;
     }
-    const feature = {
+    if (applyEdgeModifierPendingRef.current) return;
+    // Each prepared session has its own prepare request; cancelling or
+    // restarting the tool replaces it, as a changed shape does.
+    const sessionToken = cadModifierPrepareRef.current;
+    applyEdgeModifierPendingRef.current = true;
+    setEdgeModifierApplying(true);
+    let sourceEdges: EdgeTreatmentSourceEdge[] | null;
+    try {
+      sourceEdges = await cadModifierEdgeLineage(base, cadModifierSourcePartsRef.current, edgeModifier.selectedEdgeIds);
+    } finally {
+      applyEdgeModifierPendingRef.current = false;
+      setEdgeModifierApplying(false);
+    }
+    // Nothing is committed for a session that closed or changed while the
+    // worker answered: cancelled, restarted, its shape edited, or its preview
+    // or selection replaced.
+    const current = edgeModifierRef.current;
+    if (cadModifierPrepareRef.current !== sessionToken || cadModifierBaseShapeRef.current !== base
+      || current?.preview !== edgeModifier.preview || current.selectedEdgeIds !== edgeModifier.selectedEdgeIds) return;
+    const feature = edgeTreatmentFeatureWithLineage({
       kind: edgeModifier.kind,
       amount: edgeModifier.amount,
       edgeCount: edgeModifier.selectedEdgeIds.length,
@@ -8251,7 +8396,7 @@ export function SketchForgeEditor({
         ? { allEdges: true as const }
         : {}),
       ...(edgeModifier.kind === "chamfer" ? { chamferAngle: edgeModifier.chamferAngle } : {}),
-    } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number];
+    } satisfies NonNullable<WorkplaneShape["edgeTreatments"]>[number], sourceEdges);
     const createdAt = Date.now();
     const previewShape = canonicalizeShape({
       ...edgeModifier.preview,
@@ -8276,12 +8421,12 @@ export function SketchForgeEditor({
       createdAt,
     );
     commitShapes(
-      shapes.map((shape) => shape.id === base.id ? modifiedShape : shape),
+      shapesRef.current.map((shape) => shape.id === base.id ? modifiedShape : shape),
       base.id,
       notice((t) => t(`editor.edgeModifier.applied.${edgeModifier.kind}`, { count: edgeModifier.selectedEdgeIds.length })),
     );
     invalidateCadModifierSession();
-  }, [commitShapes, edgeModifier, invalidateCadModifierSession, shapes, t]);
+  }, [cadModifierEdgeLineage, commitShapes, edgeModifier, invalidateCadModifierSession, t]);
 
   useEffect(() => {
     if (!edgeModifier) return;
@@ -8289,11 +8434,11 @@ export function SketchForgeEditor({
       if (event.key === "Escape") {
         event.preventDefault();
         cancelEdgeModifier();
-      } else if (event.key === "Enter" && edgeModifier.preview && edgeModifier.selectedEdgeIds.length > 0 && !edgeModifier.busy && !edgeModifier.error) {
+      } else if (event.key === "Enter" && edgeModifier.preview && edgeModifier.selectedEdgeIds.length > 0 && !edgeModifier.busy && !edgeModifier.error && !applyEdgeModifierPendingRef.current) {
         const target = event.target instanceof HTMLElement ? event.target : null;
         if (target?.closest("input, select, textarea, button, [contenteditable='true']")) return;
         event.preventDefault();
-        applyEdgeModifier();
+        void applyEdgeModifier();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -10433,7 +10578,7 @@ export function SketchForgeEditor({
           historyOptions={selectedEdgeHistoryOptions}
           selectedCount={edgeModifier.selectedEdgeIds.length}
           availableCount={modifierAvailableEdgeIds.length}
-          busy={edgeModifier.busy}
+          busy={edgeModifier.busy || edgeModifierApplying}
           prepared={edgeModifier.prepared}
           error={edgeModifier.error ? errorText(t, edgeModifier.error, "editor.edgeModifier.needsAdjustment") : null}
           onAmountChange={(value) => setEdgeModifier((current) => current?.prepared ? { ...current, amount: Math.max(MIN_EDGE_MODIFIER_AMOUNT, Math.min(edgeModifierMaxAmount, value)), preview: null, busy: true, error: null } : current)}

@@ -1184,6 +1184,8 @@
       "meshImportReset": "Não foi possível converter o modelo selecionado em um sólido fechado. O módulo de arredondamentos e chanfros foi reiniciado. Antes de adicionar arredondamentos ou chanfros, tente “Separar partes”, desagrupar ou simplificar o objeto.",
       "validatorReset": "O módulo de arredondamentos e chanfros falhou durante uma verificação e foi reiniciado. Abra a ferramenta de arestas de novo; não é preciso recarregar a página.",
       "memoryFaultReset": "O módulo de arredondamentos e chanfros teve um erro de memória e foi reiniciado. Abra a ferramenta de arestas de novo; não é preciso recarregar a página.",
+      "draftNotReplayable": "O ângulo de saída desta forma não pode ser reconstruída, porque a forma foi espelhada, redimensionada, arredondada ou chanfrada desde então. Desfaça primeiro essa alteração; a forma e o seu esboço ficam como estavam.",
+      "edgeTreatmentNotReplayable": "O esboço não foi atualizado: o filete ou chanfro desta forma não pode ser reconstruído no perfil editado, porque uma aresta que ele arredonda deixou de existir ou já não é uma única aresta, a forma foi espelhada depois, ou recebeu outro tratamento ou ângulo de saída. Reponha o perfil ou cancele a edição do esboço.",
       "result": {
         "draftPrismMissing": "O módulo CAD não retornou um sólido com ângulo de saída",
         "draftPrismUnusable": "O ângulo de saída não gerou um sólido utilizável",

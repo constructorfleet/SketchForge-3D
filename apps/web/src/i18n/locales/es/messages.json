@@ -1184,6 +1184,8 @@
       "meshImportReset": "No se pudo convertir el modelo seleccionado en un sólido cerrado. El módulo de redondeos y chaflanes se reinició. Antes de agregar redondeos o chaflanes, intenta usar «Separar en partes», desagrupar o simplificar el objeto.",
       "validatorReset": "El módulo de redondeos y chaflanes falló durante una comprobación y se reinició. Vuelve a abrir la herramienta; no hace falta volver a cargar la página.",
       "memoryFaultReset": "El módulo de redondeos y chaflanes tuvo un error de memoria y se reinició. Vuelve a abrir la herramienta; no hace falta volver a cargar la página.",
+      "draftNotReplayable": "El ángulo de desmoldeo que conserva esta forma no se puede reconstruir, porque la forma se ha reflejado, redimensionado, redondeado o achaflanado desde entonces. Deshaz primero ese cambio; la forma y su boceto quedan como estaban.",
+      "edgeTreatmentNotReplayable": "No se actualizó el boceto: el redondeo o chaflán que conserva esta forma no se puede reconstruir en el perfil editado, porque una arista que redondea ya no existe o ya no es una sola arista, la forma se reflejó después, o se volvió a tratar o a aplicar un ángulo de desmoldeo. Devuelve el perfil a como estaba o cancela la edición del boceto.",
       "result": {
         "draftPrismMissing": "El módulo CAD no devolvió un sólido con ángulo de desmoldeo",
         "draftPrismUnusable": "El ángulo de desmoldeo no dio un sólido utilizable",
