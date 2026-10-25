@@ -653,6 +653,10 @@ Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. T
 ```json
 {
   "type": "object",
+  "required": [
+    "projectId",
+    "filePath"
+  ],
   "properties": {
     "projectId": {
       "type": "string"
@@ -661,53 +665,48 @@ Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. T
       "type": "string",
       "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
     }
-  },
-  "required": [
-    "projectId",
-    "filePath"
-  ]
+  }
 }
 ```
 ## sketchforge_import_stl
 
 ### Description
 
-Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes. The source filename supplies the shape name; color and placement use importer defaults.
+Local-only compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files. Optional name, color, and placement fields override the imported shape. A remote url is not supported.
 
 ### Input schema
 
 ```json
 {
   "type": "object",
+  "required": [
+    "projectId",
+    "filePath"
+  ],
   "properties": {
-    "url": {
-      "type": "string",
-      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
-    },
     "projectId": {
       "type": "string"
-    },
-    "editorNumber": {
-      "type": "number",
-      "description": "The 5-digit SketchForge editor number from sketchforge_list_editors."
-    },
-    "editorId": {
-      "type": "string",
-      "description": "Optional internal editor id. Prefer editorNumber for human-directed use."
-    },
-    "timeoutMs": {
-      "type": "number",
-      "description": "Command timeout in milliseconds. Defaults to 15000."
     },
     "filePath": {
       "type": "string",
       "description": "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set."
+    },
+    "name": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "x": {
+      "type": "number"
+    },
+    "z": {
+      "type": "number"
+    },
+    "elevation": {
+      "type": "number"
     }
-  },
-  "required": [
-    "projectId",
-    "filePath"
-  ]
+  }
 }
 ```
 ## sketchforge_update_object

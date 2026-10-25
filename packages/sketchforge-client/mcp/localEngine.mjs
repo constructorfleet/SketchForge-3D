@@ -387,7 +387,9 @@ async function callLocalEngineToolRaw(name, args = {}) {
         bytes,
         mediaType,
       }));
-      return imported;
+      if (name === "sketchforge_import_file") return imported;
+      const changes = Object.fromEntries(["name", "color", "x", "z", "elevation"].filter((key) => args[key] !== undefined).map((key) => [key, args[key]]));
+      return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;
     }
     case "sketchforge_update_object": {
       const { id: shapeId, projectId, editorNumber, editorId, timeoutMs, ...changes } = args;

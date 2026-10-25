@@ -160,22 +160,39 @@ describe("local MCP engine mode", () => {
 
     const tool = listMcpTools(projectsDir).find((candidate: { name: string }) => candidate.name === "sketchforge_import_stl");
     expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
-    const imported = callMcp(projectsDir, 2, "sketchforge_import_stl", { projectId: "case", filePath: stlPath });
+    const imported = callMcp(projectsDir, 2, "sketchforge_import_stl", {
+      projectId: "case",
+      filePath: stlPath,
+      name: "Triangle",
+      color: "#ff00aa",
+      x: 5,
+      z: 6,
+      elevation: 7,
+    });
     expect(imported[1].result.isError).toBeUndefined();
     expect(JSON.parse(imported[1].result.content[0].text)).toMatchObject({
-      shape: expect.objectContaining({ name: "tetrahedron", kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
+      shape: expect.objectContaining({ name: "Triangle", color: "#ff00aa", x: 5, z: 6, elevation: 7, kind: "mesh", importedMesh: expect.objectContaining({ sourceFormat: "stl", triangleCount: 1 }) }),
     });
   }, 60_000);
 
-  it("advertises only file targeting fields for both local and remote file imports", () => {
+  it("advertises narrow fields for canonical and legacy file imports", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-import-schema-"));
     temporaryDirectories.push(projectsDir);
     const tools = listMcpTools(projectsDir);
-    for (const name of ["sketchforge_import_file", "sketchforge_import_stl"]) {
-      const tool = tools.find((candidate: { name: string }) => candidate.name === name);
-      expect(tool.inputSchema.required).toEqual(["projectId", "filePath"]);
-      expect(Object.keys(tool.inputSchema.properties)).not.toEqual(expect.arrayContaining(["name", "color", "x", "z", "elevation"]));
-    }
+    const canonical = tools.find((candidate: { name: string }) => candidate.name === "sketchforge_import_file");
+    const alias = tools.find((candidate: { name: string }) => candidate.name === "sketchforge_import_stl");
+    expect(canonical.inputSchema.required).toEqual(["projectId", "filePath"]);
+    expect(Object.keys(canonical.inputSchema.properties)).toEqual(["url", "projectId", "filePath"]);
+    expect(alias.inputSchema.required).toEqual(["projectId", "filePath"]);
+    expect(Object.keys(alias.inputSchema.properties)).toEqual(["projectId", "filePath", "name", "color", "x", "z", "elevation"]);
+  });
+
+  it("keeps the legacy STL alias local-only when url is supplied", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-stl-alias-"));
+    temporaryDirectories.push(projectsDir);
+    const response = callMcp(projectsDir, 2, "sketchforge_import_stl", { url: "http://127.0.0.1:1", projectId: "case", filePath: "/tmp/unused.stl" });
+    expect(response[1].result.isError).toBe(true);
+    expect(response[1].result.content[0].text).toContain("only available in local mode");
   });
 
   it("imports an OBJ fixture through the file import tool", async () => {

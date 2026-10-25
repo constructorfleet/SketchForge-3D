@@ -188,9 +188,10 @@ const tools = [
     name: "sketchforge_import_file",
     description: "Import an STL, OBJ, or SVG file from the MCP host filesystem into SketchForge. The source filename supplies the shape name; color and placement use importer defaults. In local mode provide projectId and filePath; with url, the file is sent to POST /api/v1/imports. File reads are confined to SKETCHFORGE_MCP_FILES_DIR, or SKETCHFORGE_PROJECTS_DIR when unset; if both are unset, paths are unrestricted.",
     inputSchema: {
-      ...localProjectSchema,
+      type: "object",
       required: ["projectId", "filePath"],
       properties: {
+        url: editorTargetSchema.properties.url,
         projectId: { type: "string" },
         filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
       },
@@ -198,14 +199,18 @@ const tools = [
   },
   {
     name: "sketchforge_import_stl",
-    description: "Compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files in local and remote modes. The source filename supplies the shape name; color and placement use importer defaults.",
+    description: "Local-only compatibility alias for sketchforge_import_file. Accepts STL, OBJ, or SVG files. Optional name, color, and placement fields override the imported shape. A remote url is not supported.",
     inputSchema: {
-      ...editorTargetSchema,
+      type: "object",
       required: ["projectId", "filePath"],
       properties: {
-        ...editorTargetSchema.properties,
         projectId: { type: "string" },
         filePath: { type: "string", description: "Path to an .stl, .obj, or .svg file under the configured MCP files root; unrestricted when no root is set." },
+        name: { type: "string" },
+        color: { type: "string" },
+        x: { type: "number" },
+        z: { type: "number" },
+        elevation: { type: "number" },
       },
     },
   },
@@ -651,8 +656,7 @@ async function callRemoteTool(name, args, baseUrl) {
       return bridgeCommand("create_shape", args, 15000, baseUrl);
     case "sketchforge_import_mesh":
       return bridgeCommand("import_mesh", args, 60000, baseUrl);
-    case "sketchforge_import_file":
-    case "sketchforge_import_stl": {
+    case "sketchforge_import_file": {
       const sourcePath = await resolveMcpReadPath(args.filePath);
       const extension = path.extname(sourcePath).toLowerCase();
       const mediaType = extension === ".stl" ? "model/stl" : extension === ".obj" ? "model/obj" : extension === ".svg" ? "image/svg+xml" : undefined;
@@ -808,6 +812,9 @@ function normalizedServerUrl(value) {
 
 async function callTool(name, args = {}) {
   const { url, ...toolArgs } = args || {};
+  if (name === "sketchforge_import_stl" && typeof url === "string" && url.trim()) {
+    throw new Error("sketchforge_import_stl is only available in local mode; omit url.");
+  }
   if (["sketchforge_list_projects", "sketchforge_create_project", "sketchforge_import_project"].includes(name) && typeof url === "string" && url.trim()) {
     throw new Error(`${name} is only available in local mode; omit url.`);
   }
