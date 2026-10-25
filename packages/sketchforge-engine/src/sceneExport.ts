@@ -113,6 +113,12 @@ export type ProjectExportOptions = {
   view?: ProjectionLayout;
   /** Section contours for a named drawing-coordinate plane; SVG or DXF. */
   section?: SectionOptions;
+  /**
+   * Crease angle in degrees for mesh shapes in an SVG drawing: only edges
+   * whose triangles meet at more than this are drawn, besides boundaries and
+   * silhouettes. SVG projection only.
+   */
+  featureAngle?: number;
 };
 
 export async function exportProjectScene(
@@ -125,6 +131,9 @@ export async function exportProjectScene(
   const format = options.format;
   if (options.section && format !== "svg" && format !== "dxf") throw new Error("section only applies to svg and dxf formats.");
   if (options.section && options.view !== undefined) throw new Error("section and view cannot be used together.");
+  if (options.featureAngle !== undefined && (format !== "svg" || options.section)) {
+    throw new Error("featureAngle only applies to svg projection drawings.");
+  }
 
   if (format === "skf") {
     const data = await skfBytes(document, shapes);
@@ -149,7 +158,7 @@ export async function exportProjectScene(
     if (format === "dxf") throw new Error("A section plane is required for DXF export.");
     // Drawn from the exact solids by hidden-line removal, not from the meshes
     // below: a projected circle stays a circle.
-    const svg = await projectShapesToSvg(visible, { view: options.view });
+    const svg = await projectShapesToSvg(visible, { view: options.view, featureAngle: options.featureAngle });
     return { format, filename: `${baseName}.svg`, mimeType: "image/svg+xml", data: new TextEncoder().encode(svg), shapeCount: visible.length };
   }
   const meshes = await meshProjectShapes(visible);

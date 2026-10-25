@@ -467,6 +467,16 @@ describe("local MCP engine mode", () => {
     expect(projected.svg.startsWith("<svg")).toBe(true);
     for (const label of ["Front", "Top", "Right", "Iso"]) expect(projected.svg).toContain(`>${label}</text>`);
 
+    // The crease angle reaches the engine, which refuses one out of range.
+    const creased = callMcp(projectsDir, 2, "sketchforge_project_view", { projectId: "case", view: "top", featureAngle: 12 });
+    expect(creased[1].result.isError, JSON.stringify(creased[1].result.content)).toBeUndefined();
+    const badAngle = callMcp(projectsDir, 2, "sketchforge_project_view", { projectId: "case", featureAngle: 200 });
+    expect(badAngle[1].result.isError).toBe(true);
+    expect(badAngle[1].result.content[0].text).toContain("featureAngle");
+    const badCapture = callMcp(projectsDir, 2, "sketchforge_capture_image", { projectId: "case", face: "top", featureAngle: 200 });
+    expect(badCapture[1].result.isError).toBe(true);
+    expect(badCapture[1].result.content[0].text).toContain("featureAngle");
+
     const drawingPath = path.join(projectsDir, "Local case.svg");
     const singleView = callMcp(projectsDir, 2, "sketchforge_project_view", { projectId: "case", view: "front", shapeIds: [plate.id], outputPath: drawingPath });
     expect(JSON.parse(singleView[1].result.content[0].text)).toMatchObject({ view: "front", savedTo: drawingPath, shapeCount: 1 });
@@ -570,6 +580,9 @@ describe("local MCP engine mode", () => {
     expect(tools.find((tool: { name: string }) => tool.name === "sketchforge_explode_step_assembly").inputSchema.required).toContain("shapeId");
     const projectView = tools.find((tool: { name: string }) => tool.name === "sketchforge_project_view");
     expect(projectView.inputSchema.properties.view.enum).toEqual(["multiview", "front", "back", "top", "bottom", "left", "right", "iso"]);
+    expect(projectView.inputSchema.properties.featureAngle).toMatchObject({ type: "number", minimum: 0, maximum: 180 });
+    const captureImage = tools.find((tool: { name: string }) => tool.name === "sketchforge_capture_image");
+    expect(captureImage.inputSchema.properties.featureAngle).toMatchObject({ type: "number", minimum: 0, maximum: 180 });
     const sectionView = tools.find((tool: { name: string }) => tool.name === "sketchforge_section_view");
     expect(sectionView.inputSchema.properties.plane.enum).toEqual(["xy", "xz", "yz"]);
     expect(sectionView.inputSchema.required).toEqual(["projectId", "plane", "offset"]);

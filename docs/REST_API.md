@@ -785,6 +785,25 @@ are left out, as every mesh export leaves them out. The editor's own SVG
 export still flattens the top view of a mesh in the browser; this one needs
 the server's kernel and takes no mesher.
 
+A shape that carries a mesh -- an STL or OBJ import, a mesh-derived boolean
+or revolve result -- has no exact edges, so the drawing shows its feature
+edges instead of every triangle: an edge is drawn where its two triangles meet
+at more than `featureAngle` degrees (30 by default), and boundaries and
+silhouettes are always drawn. A flat face's triangulation and a curved
+surface's facets disappear; corners and outlines stay. Meshes and exact solids
+still hide one another. A mesh inside a group drawn with no hole among its
+members is drawn the same way, as a part of its own; a group that cuts a hole
+in a mesh is still sewn and drawn by the kernel, triangle by triangle. `featureAngle` takes 0 to 180 and applies only to an
+SVG projection; `0` draws every edge that is not flat, and `180` keeps only
+boundaries and silhouettes. Mesh edges never pass through the kernel's
+hidden-line removal, so a large import draws in about a second rather than
+minutes.
+
+```json
+// POST /exports?projectId=...
+{ "format": "svg", "view": "iso", "featureAngle": 20 }
+```
+
 For a cut through the model, pass `section` instead of `view`. Plane names use
 the drawing's Z-up frame: `xy` omits Z, `xz` omits Y and `yz` omits X; `offset`
 is the coordinate of that omitted axis in millimetres. The plane must intersect

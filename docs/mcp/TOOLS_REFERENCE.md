@@ -1521,6 +1521,12 @@ Capture a PNG image from current/home/top/bottom/front/back/right/left view. Edi
         "right",
         "left"
       ]
+    },
+    "featureAngle": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Crease angle in degrees for mesh shapes (imported, mesh-derived, boolean results): an edge between two triangles is drawn only where they meet at more than this, besides boundaries and silhouettes. Default 30; 0 draws every edge that is not flat. Exact solids ignore it. Local project mode only; the live editor viewport ignores it."
     }
   }
 }
@@ -1633,7 +1639,7 @@ Export selected objects or the whole scene as STL, OBJ, 3MF, STEP, SKF, a ZIP ki
 
 ### Description
 
-Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true curves, hidden edges dashed, a gnomon per view and the overall size. The multiview grid (front, top, right, iso) is the readable picture of the geometry; a single view is a 2D drawing of that face. Works offline or against a server when url is supplied.
+Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true curves, hidden edges dashed, a gnomon per view and the overall size. Mesh shapes are drawn by feature edges (see featureAngle), silhouettes and boundaries rather than every triangle. The multiview grid (front, top, right, iso) is the readable picture of the geometry; a single view is a 2D drawing of that face. Works offline or against a server when url is supplied.
 
 ### Input schema
 
@@ -1665,6 +1671,12 @@ Draw a stored project as an SVG by the CAD kernel's hidden-line removal: true cu
         "iso"
       ],
       "description": "One named view, or the multiview grid (default)."
+    },
+    "featureAngle": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Crease angle in degrees for mesh shapes (imported, mesh-derived, boolean results): an edge between two triangles is drawn only where they meet at more than this, besides boundaries and silhouettes. Default 30; 0 draws every edge that is not flat. Exact solids ignore it."
     },
     "shapeIds": {
       "type": "array",

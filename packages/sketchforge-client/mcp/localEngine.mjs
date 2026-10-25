@@ -239,6 +239,7 @@ async function drawProject(args, view) {
     view,
     shapeIds: requestedIds.length ? requestedIds : undefined,
     name: args.name,
+    ...(args.featureAngle === undefined ? {} : { featureAngle: args.featureAngle }),
   });
 }
 
