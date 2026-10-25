@@ -122,6 +122,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 ## Engine limits and regression coverage
 
 - [#358: Document engine limits in the REST reference](https://github.com/constructorfleet/SketchForge-3D/issues/358) — thresholds, status behavior, and a regression check for exported limits are documented; STEP import and explosion share one limit definition.
+- [#360: Benchmark bounded kernel operations](https://github.com/constructorfleet/SketchForge-3D/issues/360) — cut, STEP explode, interference, section, and revolve fillet benchmarks with enforced budgets are implemented; awaiting review. See [performance budgets](PERFORMANCE.md).
 - [#359: Add direct engine regression coverage](https://github.com/constructorfleet/SketchForge-3D/issues/359) — STEP hierarchy bounds, ambiguous metadata fallback, transformed separation/interference, and recompute placement coverage merged in #489; follow-up signed-volume/centroid assertions and a mirror-preserving interference fixture are awaiting review.
 
 ## Sketch constraints
