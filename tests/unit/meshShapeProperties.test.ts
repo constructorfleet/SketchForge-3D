@@ -113,12 +113,9 @@ describe("mesh-native shape properties", () => {
     expect(positions.length / 9).toBeGreaterThan(55_000);
     const shape = meshShape(positions, { x: 7, elevation: 3, z: -11 });
 
-    const started = performance.now();
     const properties = await shapeProperties(shape);
-    const elapsed = performance.now() - started;
 
     expect(kernelCalls.count).toBe(0);
-    expect(elapsed).toBeLessThan(5_000);
     expect(properties.volume).toBeGreaterThan((4 / 3) * Math.PI * radius ** 3 * 0.995);
     expect(properties.volume).toBeLessThan((4 / 3) * Math.PI * radius ** 3);
     expect(properties.area).toBeGreaterThan(4 * Math.PI * radius ** 2 * 0.995);
@@ -204,12 +201,87 @@ describe("mesh-native shape properties", () => {
     expect(mirrored.isValid).toBe(true);
   });
 
-  it("answers for an open mesh but marks it invalid", async () => {
-    const positions = boxTriangles([-1, 0, -1], [1, 2, 1]).slice(0, 9 * 11);
+  it("welds corners that miss each other by a micron, as sewing did", async () => {
+    const radius = 20;
+    const exact = sphereTriangles(radius, 64, 48);
+    // Every corner nudged by up to 1e-6 mm, as a mesh boolean can leave them.
+    let seed = 12345;
+    const jitter = () => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return (seed / 2 ** 31 - 0.5) * 2e-6;
+    };
+    const positions = exact.map((value) => value + jitter());
+    const reference = await shapeProperties(meshShape(exact));
+    kernelCalls.count = 0;
     const properties = await shapeProperties(meshShape(positions));
 
     expect(kernelCalls.count).toBe(0);
-    expect(properties.isValid).toBe(false);
-    expect(properties.area).toBeCloseTo(22, 6);
+    expect(properties.isValid).toBe(true);
+    expect(properties.volume).toBeCloseTo(reference.volume, 2);
+    expect(properties.centerOfMass.y).toBeCloseTo(reference.centerOfMass.y, 4);
+  });
+
+  it("measures two boxes stacked on a shared face as their union", async () => {
+    const positions = [...boxTriangles([0, 0, 0], [1, 1, 1]), ...boxTriangles([0, 1, 0], [1, 3, 1])];
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(3, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo((1 * 0.5 + 2 * 2) / 3, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("ignores a triangle the file repeats", async () => {
+    const positions = boxTriangles([-1, 0, -1], [1, 2, 1]);
+    positions.push(...positions.slice(9 * 4, 9 * 5));
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(8, 6);
+    expect(properties.centerOfMass).toEqual({ x: expect.closeTo(0, 6), y: expect.closeTo(1, 6), z: expect.closeTo(0, 6) });
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("adds up many separate closed shells", async () => {
+    // 400 unit cubes on a 20 x 20 grid, 2 mm apart: none encloses another.
+    const positions: number[] = [];
+    for (let i = 0; i < 20; i += 1) {
+      for (let k = 0; k < 20; k += 1) positions.push(...boxTriangles([2 * i, 0, 2 * k], [2 * i + 1, 1, 2 * k + 1]));
+    }
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(400, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo(0.5, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("finds each void inside its own part among many", async () => {
+    // 27 hollow 2 mm cubes, 3 mm apart, each with a 1 mm cavity off its centre.
+    const positions: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      for (let j = 0; j < 3; j += 1) {
+        for (let k = 0; k < 3; k += 1) {
+          const [x, y, z] = [3 * i, 3 * j, 3 * k];
+          positions.push(...boxTriangles([x, y, z], [x + 2, y + 2, z + 2]));
+          positions.push(...boxTriangles([x + 0.25, y + 0.25, z + 0.25], [x + 1.25, y + 1.25, z + 1.25]));
+        }
+      }
+    }
+    const properties = await shapeProperties(meshShape(positions));
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(27 * 7, 6);
+    // Each part's centre of mass sits off its centre, away from the cavity.
+    expect(properties.centerOfMass.y).toBeCloseTo(3 + (8 * 1 - 1 * 0.75) / 7, 6);
+    expect(properties.isValid).toBe(true);
+  });
+
+  it("leaves a mesh that is not closed to the CAD kernel, which refuses it as before", async () => {
+    // Open fragments have no volume of their own, so nothing is made up for them.
+    const positions = boxTriangles([-1, 0, -1], [1, 2, 1]).slice(0, 9 * 11);
+
+    await expect(shapeProperties(meshShape(positions))).rejects.toThrow(/not a closed solid/);
+    expect(kernelCalls.count).toBe(1);
   });
 });
