@@ -69,6 +69,7 @@ Tracked under [route security epic #325](https://github.com/constructorfleet/Ske
 
 ## MCP bridge
 
+- [#369: Document local STL import and executable MCP workflows](https://github.com/constructorfleet/SketchForge-3D/issues/369) — the README and agent skill describe local project tools and path rules; the guides include an executable STL import, measure, and export workflow.
 - [#368: Remove editor-only fields from local MCP tools](https://github.com/constructorfleet/SketchForge-3D/issues/368) — implementation and tests complete; awaiting review.
 
 ## MCP host filesystem safety

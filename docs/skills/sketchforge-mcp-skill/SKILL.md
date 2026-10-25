@@ -36,6 +36,12 @@ The MCP server talks to the app through `/api/sketchforge-mcp`. Open editor tabs
 
 For a complete executable example that creates, reads, and exports a temporary local project, see [MCP examples](../../mcp/EXAMPLES.md).
 
+## Local Project Tools
+
+When no `url` is supplied, project tools read and write files under `SKETCHFORGE_PROJECTS_DIR`. Use `sketchforge_list_projects`, `sketchforge_create_project`, and `sketchforge_import_project` to find or prepare projects; `sketchforge_read_scene`, `sketchforge_list_objects`, and `sketchforge_shape_properties` to inspect them; and `sketchforge_create_shape`, `sketchforge_import_file`, `sketchforge_import_stl`, and the other mutation tools to change them. The `sketchforge_import_stl` alias is local-only and accepts an STL, OBJ, or SVG file plus optional name, color, and placement overrides. `sketchforge_export_scene` can save STL, OBJ, 3MF, STEP, SKF, ZIP, SVG, or DXF output.
+
+Import and export file paths must resolve under `SKETCHFORGE_MCP_FILES_DIR`, or under `SKETCHFORGE_PROJECTS_DIR` when the file root is unset. Existing export files are preserved unless `overwrite: true` is supplied. If neither root is configured, paths are unrestricted for compatibility. `sketchforge_import_stl` does not accept `url`; use `sketchforge_import_file` for imports through a configured server URL.
+
 ## Client Compatibility
 
 Codex can use this folder as a skill and the MCP server as tools. Install the folder under `~/.codex/skills/sketchforge-mcp-skill` and configure the MCP server in Codex.
