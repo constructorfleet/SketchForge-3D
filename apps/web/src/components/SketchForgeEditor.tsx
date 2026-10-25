@@ -134,7 +134,7 @@ import { analyzeMeshTopology } from "@/lib/engine/meshValidation";
 import { projectedMeshContours } from "@/lib/engine/svgMeshProjection";
 import { exportMeshesToObj } from "@/lib/objExport";
 import { rotateSketchPoints, selectedClosedSketchPoints } from "@/lib/sketchRotation";
-import { PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
+import { captureProjectThumbnail, PROJECT_THUMBNAIL_IDLE_MS, projectThumbnailSceneChanged, type ProjectThumbnailSceneKey } from "@/lib/projectThumbnail";
 import { publicAssetPath } from "@/lib/publicAssetPath";
 import { importedShapeFromObj } from "@/lib/engine/objImport";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
@@ -6023,9 +6023,11 @@ export function SketchForgeEditor({
       if (stopped || projectSnapshotRunRef.current !== runId) {
         return true;
       }
-      const image = window.sketchforgeCaptureCanvasAsync
-        ? await window.sketchforgeCaptureCanvasAsync()
-        : window.sketchforgeCaptureCanvas?.() ?? "";
+      const image = await captureProjectThumbnail(async () => window.sketchforgeCaptureCanvasAsync
+        ? window.sketchforgeCaptureCanvasAsync()
+        : window.sketchforgeCaptureCanvas?.() ?? "", (error) => {
+        console.error("Unable to capture project thumbnail", error);
+      });
       if (stopped || projectSnapshotRunRef.current !== runId) {
         return true;
       }
