@@ -360,8 +360,16 @@ describe("local MCP engine mode", () => {
     const sectionView = tools.find((tool: { name: string }) => tool.name === "sketchforge_section_view");
     expect(sectionView.inputSchema.properties.plane.enum).toEqual(["xy", "xz", "yz"]);
     expect(sectionView.inputSchema.required).toEqual(["projectId", "plane", "offset"]);
+    const localOnlyToolNames = ["sketchforge_list_projects", "sketchforge_create_project", "sketchforge_import_project", "sketchforge_import_stl"];
+    for (const name of localOnlyToolNames) {
+      const tool = tools.find((candidate: { name: string }) => candidate.name === name);
+      expect(tool.inputSchema.properties).not.toHaveProperty("url");
+      expect(tool.inputSchema.properties).not.toHaveProperty("editorNumber");
+      expect(tool.inputSchema.properties).not.toHaveProperty("editorId");
+      expect(tool.inputSchema.properties).not.toHaveProperty("timeoutMs");
+    }
     expect(listEditors.inputSchema.properties.url).toMatchObject({ type: "string" });
-    for (const tool of tools.filter((candidate: { name: string }) => candidate.name !== "sketchforge_list_macros")) {
+    for (const tool of tools.filter((candidate: { name: string }) => candidate.name !== "sketchforge_list_macros" && !localOnlyToolNames.includes(candidate.name))) {
       expect(tool.inputSchema.properties.url).toMatchObject({ type: "string" });
     }
 
@@ -371,4 +379,18 @@ describe("local MCP engine mode", () => {
     expect(message).not.toContain("needs an open SketchForge editor");
     expect(message).toMatch(/fetch failed|ECONNREFUSED/i);
   });
+
+  it("ignores editor targeting and timeout fields when locally updating an object", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box", width: 4, depth: 5, height: 6 });
+    const shapeId = JSON.parse(created[1].result.content[0].text).shapes[0].id;
+    const updated = callMcp(projectsDir, 3, "sketchforge_update_object", {
+      projectId: "case", id: shapeId, width: 8, editorNumber: 12345, editorId: "ignored", timeoutMs: 1000,
+    });
+    expect(updated[1].result.isError).toBeUndefined();
+    expect(JSON.parse(updated[1].result.content[0].text).shape).toMatchObject({ id: shapeId, width: 8 });
+  }, 60_000);
 });

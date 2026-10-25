@@ -384,7 +384,7 @@ async function callLocalEngineToolRaw(name, args = {}) {
       return Object.keys(changes).length ? unwrap(await engine.changeShape(id, imported.shape.id, changes)) : imported;
     }
     case "sketchforge_update_object": {
-      const { id: shapeId, projectId, ...changes } = args;
+      const { id: shapeId, projectId, editorNumber, editorId, timeoutMs, ...changes } = args;
       return unwrap(await engine.changeShape(id, shapeId, changes));
     }
     case "sketchforge_delete_objects": {
