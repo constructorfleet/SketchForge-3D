@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { FontData } from "three/examples/jsm/loaders/FontLoader.js";
-import droidMonoFontJson from "three/examples/fonts/droid/droid_sans_mono_regular.typeface.json";
-import droidSansBoldFontJson from "three/examples/fonts/droid/droid_sans_bold.typeface.json";
-import droidSerifBoldFontJson from "three/examples/fonts/droid/droid_serif_bold.typeface.json";
-import gentilisBoldFontJson from "three/examples/fonts/gentilis_bold.typeface.json";
-import helvetikerBoldFontJson from "three/examples/fonts/helvetiker_bold.typeface.json";
-import optimerBoldFontJson from "three/examples/fonts/optimer_bold.typeface.json";
+import droidMonoFontJson from "../../apps/web/src/assets/fonts/droid/droid_sans_mono_regular.typeface.json";
+import droidSansBoldFontJson from "../../apps/web/src/assets/fonts/droid/droid_sans_bold.typeface.json";
+import droidSerifBoldFontJson from "../../apps/web/src/assets/fonts/droid/droid_serif_bold.typeface.json";
+import gentilisBoldFontJson from "../../apps/web/src/assets/fonts/gentilis_bold.typeface.json";
+import helvetikerBoldFontJson from "../../apps/web/src/assets/fonts/helvetiker_bold.typeface.json";
+import optimerBoldFontJson from "../../apps/web/src/assets/fonts/optimer_bold.typeface.json";
 import { DEFAULT_TEXT_FONT, TEXT_FONTS, textFont } from "@/lib/textFonts";
 
 const RUSSIAN = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";

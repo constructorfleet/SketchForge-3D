@@ -1,13 +1,13 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { SketchProfile } from "@/types/sketchforge";
+
 
 // Load the real OCCT kernel directly (same approach as stepRoundTrip.e2e.ts).
 vi.mock("@/lib/brepKernel", async () => {
   const brep = await import("brepjs");
   const { OcctKernel } = await import("occt-wasm");
-  const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+  const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
   let ready: Promise<typeof brep> | null = null;
   return {
     loadBrepWithOcct: () =>
@@ -57,7 +57,7 @@ describe("Sketch CAD profile → B-Rep extrusion (real OCCT kernel)", () => {
     expect(regions[0].outer.closed).toBe(true);
     expect(regions[0].holes).toHaveLength(0);
 
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const kernel = await OcctKernel.init({ wasm });
 
     const edges = regions[0].outer.steps.map(({ from, to }) =>
@@ -90,7 +90,7 @@ describe("Sketch CAD profile → B-Rep extrusion (real OCCT kernel)", () => {
     expect(regions).toHaveLength(1);
     expect(regions[0].holes).toHaveLength(1);
 
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const kernel = await OcctKernel.init({ wasm });
 
     const outerEdges = regions[0].outer.steps.map(({ from, to }) =>
@@ -123,7 +123,7 @@ describe("Sketch CAD profile → B-Rep extrusion (real OCCT kernel)", () => {
     const regions = cadSketchRegions(profile);
     expect(regions).toHaveLength(2);
 
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const kernel = await OcctKernel.init({ wasm });
 
     const solids = regions.map((region) => {
@@ -160,7 +160,7 @@ describe("Sketch CAD profile → B-Rep extrusion (real OCCT kernel)", () => {
     expect(outerRegion!.holes).toHaveLength(1);
     expect(islandRegion!.holes).toHaveLength(0);
 
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const kernel = await OcctKernel.init({ wasm });
 
     const buildSolid = (region: { outer: typeof regions[0]["outer"]; holes: typeof regions[0]["holes"] }) => {

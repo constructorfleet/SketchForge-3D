@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import * as ts from "typescript-legacy";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contractPath = path.join(root, "apps/web/src/lib/apiV1OperationContract.ts");

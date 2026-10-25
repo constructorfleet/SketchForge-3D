@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { WorkplaneShape } from "@/types/sketchforge";
 import { explodeStepAssembly } from "@constructorfleet/sketchforge-engine/serverStepExplode";
 import type { ProjectAsset } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+
 
 // Drive the REAL exporter/importer against the REAL OpenCascade kernel, loaded
 // from node_modules instead of the browser-only /occt/ URL. Everything else in
@@ -12,7 +12,7 @@ import { restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/ser
 vi.mock("@/lib/brepKernel", async () => {
   const brep = await import("brepjs");
   const { OcctKernel } = await import("occt-wasm");
-  const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+  const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
   let ready: Promise<typeof brep> | null = null;
   let kernel: Awaited<ReturnType<typeof OcctKernel.init>> | null = null;
   const loadKernel = async () => (kernel ??= await OcctKernel.init({ wasm }));

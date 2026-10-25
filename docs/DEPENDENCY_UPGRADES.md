@@ -7,7 +7,7 @@ owner: Contributors
 
 # Major dependency upgrade spikes
 
-The package registry survey below was run on 2026-10-24 with `npm view <package> version`. It confirms the candidate release numbers from [issue #398](https://github.com/constructorfleet/SketchForge-3D/issues/398); it does not establish compatibility. No candidate major has been installed or validated by this survey. Each isolated spike must record the exact build and test results in its issue before an upgrade is proposed for merge.
+The 2026-10-24 package survey identified the candidate versions for issues [#460–#468](https://github.com/constructorfleet/SketchForge-3D/issues/460). The original PR #472 merged Electron 45 and js-yaml 5 only. The 2026-10-25 follow-up branch upgrades the remaining packages together; its verification record is in [the combined dependency report](./dependency-spikes/460-468.md).
 
 | Package | Current range in the repository | Candidate | Spike | Required focus |
 | --- | --- | --- | --- | --- |
@@ -21,10 +21,6 @@ The package registry survey below was run on 2026-10-24 with `npm view <package>
 | mermaid | `^11.17.2` | `12.2.0` | [#467](https://github.com/constructorfleet/SketchForge-3D/issues/467) | VitePress plugin, docs build, diagram rendering |
 | js-yaml | `^4.3.2` | `5.5.0` | [#468](https://github.com/constructorfleet/SketchForge-3D/issues/468) | Node support, parser compatibility, YAML consumers |
 
-## Suggested sequencing
-
-Start Electron before the next desktop release, then evaluate Next and test tooling. Evaluate the CAD kernel packages last and independently: their spikes must pass STEP round-trip browser/e2e coverage and the engine performance lane before adoption. Keep `occt-wasm` and `brepjs` separate so a failure can be attributed to one package. The order remains a maintainer decision; this page does not authorize or imply a production dependency upgrade.
-
 ## Verification record
 
-The Electron spike built the web bundle and a macOS arm64 directory package with Electron 45.0.0 on 2026-10-24; the two desktop release workflow test files passed (13 tests). The first packaging attempt ran out of disk space; after clearing this worktree's generated `dist` directory, packaging completed. macOS code signing was skipped because no valid Developer ID identity was available. Windows, Linux, macOS x64, signed installers, and installed-app update behavior remain unverified. The other eight spikes await build/test results. Do not report package upgrades as tested or green beyond the specific checks recorded here.
+The Electron spike built the web bundle and a macOS arm64 directory package with Electron 45.0.0. macOS code signing was skipped because no valid Developer ID identity was available; other platform packaging remains unverified. The follow-up's unit suite and typechecks pass. Grouped STEP face colors still need to pass under OCCT 5.8; see the combined report for the current result and remaining gates.

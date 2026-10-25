@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import * as ts from "typescript-legacy";
 import { describe, expect, it } from "vitest";
 
 const packageRoot = path.resolve(__dirname, "../../packages/sketchforge-engine/src");

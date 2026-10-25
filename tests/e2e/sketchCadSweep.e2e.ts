@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { OcctKernel } from "occt-wasm";
 import { Euler, MathUtils, Vector3 } from "three";
 import { buildCadSketchSweep } from "@/lib/sketchCadSweep";
 import { placeSketchExtrusion } from "@/lib/sketchPlacement";
 import type { SketchProfile, WorkplaneShape } from "@/types/sketchforge";
+
 
 function profileWithSpine(spine: Array<{ x: number; z: number }>, sectionFrame = defaultSectionFrame()): SketchProfile {
   const sectionPoints = [
@@ -44,7 +44,7 @@ function cross(a: { x: number; y: number; z: number }, b: { x: number; y: number
 
 describe("planar sketch sweep (real OCCT kernel)", () => {
   it("sweeps an enclosed section loop as a through hole", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }]);
     const holePoints = [
@@ -69,7 +69,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("sweeps disjoint section loops into separate solids along one spine", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }]);
     const islandPoints = [
@@ -97,7 +97,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
     ["straight spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }]],
     ["bent spine", [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }]],
   ])("builds a valid positive-volume solid along a %s", async (_label, spine) => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     try {
       const solid = buildCadSketchSweep(cad, profileWithSpine(spine));
@@ -121,7 +121,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("uses a spine point's out-of-plane offset to make a nonplanar 3D path", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const profile = profileWithSpine([
       { x: 0, z: 0 },
@@ -141,7 +141,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("uses independent incoming and outgoing Bezier handle depths in the 3D sweep path", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const profile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 20, z: 0 }]);
     const start = profile.points.find((point) => point.id === "p1")!;
@@ -162,7 +162,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("aligns cubic handle depth with the selected workplane third axis", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const sectionFrame = {
       origin: { x: 3, y: -2, z: 4 },
@@ -216,7 +216,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("derives an orthogonal spine frame from non-axis-aligned section workplanes", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const frames = [
       defaultSectionFrame(),
@@ -250,7 +250,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("places a non-axis-aligned sweep once and preserves its dimensions in the section frame", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const sectionFrame = {
       origin: { x: 7, y: -4, z: 3 },
@@ -310,7 +310,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("keeps legacy profiles valid and maps a horizontal spine stroke along the default section normal", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     const legacyProfile = profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 0 }]);
     delete legacyProfile.sweepFrames;
@@ -329,7 +329,7 @@ describe("planar sketch sweep (real OCCT kernel)", () => {
   });
 
   it("rejects a first spine tangent that leaves the orthogonal sweep plane", async () => {
-    const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+    const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
     const cad = await OcctKernel.init({ wasm });
     try {
       expect(() => buildCadSketchSweep(cad, profileWithSpine([{ x: 0, z: 0 }, { x: 10, z: 2 }]))).toThrowError(

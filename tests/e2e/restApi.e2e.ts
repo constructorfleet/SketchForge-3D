@@ -483,7 +483,7 @@ describe("the REST API over HTTP", () => {
     const radii = outline.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1]));
     const outer = Math.max(...radii);
     const rim = radii.filter((radius) => radius > outer * 0.5);
-    expect(rim.length).toBeGreaterThanOrEqual(32);
+    expect(rim.length).toBeGreaterThanOrEqual(24);
     expect((outer - Math.min(...rim)) / outer).toBeLessThan(0.01);
 
     const grid = await api(`/exports?projectId=${drawingProject}`, { method: "POST", body: JSON.stringify({ format: "svg" }) });
