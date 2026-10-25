@@ -164,6 +164,14 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(opener.calls[1].headers["content-type"], "application/json")
         self.assertEqual(opener.calls[1].body, {"name": "Plate"})
 
+    def test_sends_expected_revision_only_on_writes(self) -> None:
+        opener = FakeOpener({"projects": []}, (201, {"project": project_payload("p1", "Plate")}))
+        instance = SketchForgeClient(base_url="http://localhost:3100", token="t", opener=opener, expected_revision=42)
+        instance.projects.list()
+        instance.projects.create("Plate")
+        self.assertNotIn("if-match", opener.calls[0].headers)
+        self.assertEqual(opener.calls[1].headers["if-match"], '"42"')
+
     def test_raises_the_servers_message_with_its_status(self) -> None:
         opener = FakeOpener((422, {"error": "too large for this shape's edges"}))
         with self.assertRaises(SketchForgeApiError) as caught:
@@ -915,6 +923,13 @@ class ShapeSummaryTests(unittest.TestCase):
 
 
 class ErrorCodeTests(unittest.TestCase):
+    def test_exposes_current_revision_when_a_conditional_write_is_stale(self) -> None:
+        opener = FakeOpener((409, {"error": "The project changed since the supplied revision.", "code": "revision_mismatch", "revision": 17}))
+        with self.assertRaises(SketchForgeApiError) as caught:
+            client(opener).shapes.update("p1", "s1", {"x": 1})
+        self.assertTrue(caught.exception.is_revision_mismatch)
+        self.assertEqual(caught.exception.current_revision, 17)
+
     def test_recognizes_new_and_legacy_limit_codes(self) -> None:
         self.assertIn("limit_exceeded", API_ERROR_CODES)
         self.assertIn("too_many_shapes", API_ERROR_CODES)

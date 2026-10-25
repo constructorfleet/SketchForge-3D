@@ -12,7 +12,7 @@
  * stay `400`, while geometry refusals stay `422`.
  */
 
-import { apiError, apiErrors, type ApiErrorCode } from "@/lib/apiV1";
+import { apiError, apiErrors, apiExpectedRevision, type ApiErrorCode } from "@/lib/apiV1";
 // The two modules, not the `@/lib/engine` barrel. The barrel re-exports the STEP
 // exporter, which reaches the browser's OCCT loader, and no route needs that in
 // its module graph -- importing the barrel here would put it in all seven.
@@ -20,8 +20,9 @@ import { createEngine, type Engine, type EngineFailure } from "@/lib/engine/engi
 import { directoryProjectStore } from "@/lib/engine/projectStore";
 
 /** The engine over a request's project directory. */
-export function apiEngine(root: string): Engine {
-  return createEngine(directoryProjectStore(root));
+export function apiEngine(root: string, request?: Request): Engine {
+  const expectedRevision = request ? apiExpectedRevision(request) : undefined;
+  return createEngine(directoryProjectStore(root, expectedRevision));
 }
 
 /**

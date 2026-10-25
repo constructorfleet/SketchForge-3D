@@ -54,7 +54,7 @@ const postShell = async (request: Request) => {
   }
   if (!validateApiV1RequestBody("POST /api/v1/shell", { thickness, ...(body.openFaces === undefined && body.open === undefined ? {} : { openFaces: body.openFaces ?? body.open }) })) return apiError("The shell request does not match its contract.", 400, "invalid_request");
 
-  const hollowed = await apiEngine(context.root).shell(projectId, shapeId, { thickness, openFaces: faces });
+  const hollowed = await apiEngine(context.root, request).shell(projectId, shapeId, { thickness, openFaces: faces });
   if (!hollowed.ok) return apiEngineError(hollowed.failure, { oneShape: true });
   return apiJson({
     shape: apiShapeSummary(hollowed.value.shape),

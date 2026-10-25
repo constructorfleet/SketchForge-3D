@@ -17,6 +17,7 @@ export const API_ERROR_CODES = [
   "project_not_found",
   "project_exists",
   "project_busy",
+  "revision_mismatch",
   "shape_not_found",
   "shape_locked",
   "unsupported_kind",
@@ -93,6 +94,16 @@ export class SketchForgeApiError extends Error {
   /** Another write holds the project's lock. Retrying is the right response. */
   get isProjectBusy() {
     return this.is("project_busy", 409, /being changed/i);
+  }
+
+  /** The project changed since the supplied If-Match revision. */
+  get isRevisionMismatch() {
+    return this.is("revision_mismatch", 409, /changed since/i);
+  }
+
+  get currentRevision(): number | undefined {
+    const revision = (this.body as { revision?: unknown } | undefined)?.revision;
+    return typeof revision === "number" ? revision : undefined;
   }
 
   /** That shape is locked. Retrying will not help; unlock it first. */

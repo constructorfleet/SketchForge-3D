@@ -15,7 +15,7 @@ async function postExplode(request: Request) {
   const { projectId, shapeId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
   if (!shapeId) return apiErrors.shapeIdRequired();
-  const result = await apiEngine(context.root).explode(projectId, shapeId);
+  const result = await apiEngine(context.root, request).explode(projectId, shapeId);
   if (!result.ok) return apiEngineError(result.failure, { oneShape: true, cadFailed: "The STEP assembly could not be exploded." });
   return apiJson({ shapes: result.value.shapes.map(apiShapeSummary), revision: result.value.revision });
 }

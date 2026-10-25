@@ -18,7 +18,7 @@ async function getHandler(request: Request) {
   const { projectId } = apiTarget(request);
   if (!projectId) return apiErrors.invalidProjectId();
 
-  const project = await apiEngine(context.root).project(projectId);
+  const project = await apiEngine(context.root, request).project(projectId);
   if (!project.ok) return apiEngineError(project.failure);
   const page = paginateApiV1(project.value.shapes, new URL(request.url).searchParams.get("limit") ?? undefined, new URL(request.url).searchParams.get("cursor") ?? undefined);
   if (!page) return apiError("The limit or cursor is invalid.", 400, "invalid_request");
@@ -63,7 +63,7 @@ async function postHandler(request: Request) {
     return apiError('Each shape request must include a "kind".', 400, "invalid_request");
   }
 
-  const added = await apiEngine(context.root).addShapes(projectId, requested as Record<string, unknown>[]);
+  const added = await apiEngine(context.root, request).addShapes(projectId, requested as Record<string, unknown>[]);
   if (!added.ok) return apiEngineError(added.failure);
   return apiJson({ shapes: added.value.shapes.map(apiShapeSummary), revision: added.value.revision }, 201);
 }
@@ -95,7 +95,7 @@ async function patchHandler(request: Request) {
       : apiError("faceColors must be an object of six or eight digit hex colors.", 422, "unapplicable_fields", { fields: ["faceColors"] });
   }
 
-  const changed = await apiEngine(context.root).changeShape(projectId, shapeId, parsed.body);
+  const changed = await apiEngine(context.root, request).changeShape(projectId, shapeId, parsed.body);
   if (!changed.ok) {
     return apiEngineError(changed.failure, { oneShape: true, locked: () => LOCKED_FOR_CHANGE });
   }
@@ -109,7 +109,7 @@ async function deleteHandler(request: Request) {
   if (!projectId) return apiErrors.invalidProjectId();
   if (!shapeId) return apiErrors.shapeIdRequired();
 
-  const removed = await apiEngine(context.root).removeShape(projectId, shapeId);
+  const removed = await apiEngine(context.root, request).removeShape(projectId, shapeId);
   if (!removed.ok) return apiEngineError(removed.failure, { oneShape: true });
   return apiJson({ deleted: true, id: removed.value.id, revision: removed.value.revision });
 }

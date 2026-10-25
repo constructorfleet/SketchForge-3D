@@ -44,20 +44,39 @@ export type ProjectStore = {
   list(): Promise<ServerProjectRecord[]>;
 };
 
+/** Raised by an HTTP store when a conditional write sees a stale revision. */
+class ProjectRevisionMismatchError extends Error {
+  constructor(readonly currentRevision: number) {
+    super("The project changed since the supplied revision.");
+    this.name = "ProjectRevisionMismatchError";
+  }
+}
+
 /**
  * The store over a server project directory.
  *
  * `root` is the directory `SKETCHFORGE_PROJECTS_DIR` names, already created --
  * `apiContext` does that, and so would a macro runner's own setup.
  */
-export function directoryProjectStore(root: string): ProjectStore {
+export function directoryProjectStore(root: string, expectedRevision?: string): ProjectStore {
   return {
     read: (projectId) => readProjectDocument(root, projectId),
     write: async (projectId, document, shapes) => {
       const { revision } = await writeProjectDocument(root, projectId, document, shapes);
       return { revision };
     },
-    withLock: (projectId, work) => withProjectLock(root, projectId, work),
+    withLock: (projectId, work) => withProjectLock(root, projectId, async () => {
+      if (expectedRevision !== undefined && expectedRevision !== "*") {
+        const document = await readProjectDocument(root, projectId);
+        if (document) {
+          const revision = typeof document.metadata.revision === "number" && Number.isFinite(document.metadata.revision)
+            ? document.metadata.revision
+            : 0;
+          if (expectedRevision !== String(revision)) throw new ProjectRevisionMismatchError(revision);
+        }
+      }
+      return work();
+    }),
     list: () => listProjectRecords(root),
   };
 }

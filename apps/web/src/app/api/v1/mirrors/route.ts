@@ -27,7 +27,7 @@ async function postMirrors(request: Request) {
     return apiError("The mirror request does not match its contract.", 400, "invalid_request");
   }
 
-  const mirrored = await apiEngine(context.root).mirrorBaked(projectId, ids, axis);
+  const mirrored = await apiEngine(context.root, request).mirrorBaked(projectId, ids, axis);
   if (!mirrored.ok) return apiEngineError(mirrored.failure, {
     tooFewShapes: () => "Select at least one shape to mirror.",
     locked: (locked) => `Unlock these shapes before mirroring: ${locked.join(", ")}.`,
