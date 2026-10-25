@@ -484,7 +484,13 @@
       "buildingSweep": "Criando varredura plana",
       "cannotSweep": "Não foi possível criar a varredura plana",
       "sweepCreated": "Varredura plana criada",
-      "sweepUpdated": "Varredura plana atualizada"
+      "sweepUpdated": "Varredura plana atualizada",
+      "constraints": {
+        "addTangent": "Tangente",
+        "kinds": {
+          "tangent": "Tangente"
+        }
+      }
     },
     "export": {
       "needSolidSelected": "Selecione pelo menos uma forma sólida antes de exportar",

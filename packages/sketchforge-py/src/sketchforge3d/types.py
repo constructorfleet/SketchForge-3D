@@ -255,10 +255,52 @@ class SketchSweepSegment(TypedDict, total=False):
     kind: Literal["line", "bezier", "smooth"]
 
 
+class SketchFixedConstraint(TypedDict):
+    id: str
+    kind: Literal["fixed"]
+    pointId: str
+    xMm: float
+    zMm: float
+
+
+class SketchCoincidentConstraint(TypedDict):
+    id: str
+    kind: Literal["coincident"]
+    pointIds: Tuple[str, str]
+
+
+class SketchAxisConstraint(TypedDict):
+    id: str
+    kind: Literal["horizontal", "vertical"]
+    segmentId: str
+
+
+class SketchSegmentPairConstraint(TypedDict):
+    id: str
+    kind: Literal["parallel", "perpendicular", "tangent"]
+    segmentIds: Tuple[str, str]
+
+
+class SketchDistanceConstraint(TypedDict):
+    id: str
+    kind: Literal["distance"]
+    pointIds: Tuple[str, str]
+    valueMm: float
+
+
+SketchConstraint = Union[
+    SketchFixedConstraint,
+    SketchCoincidentConstraint,
+    SketchAxisConstraint,
+    SketchSegmentPairConstraint,
+    SketchDistanceConstraint,
+]
+
+
 class SketchSweepProfile(TypedDict, total=False):
     points: Sequence[SketchSweepPoint]
     segments: Sequence[SketchSweepSegment]
-    constraints: Sequence[Mapping[str, Any]]
+    constraints: Sequence[SketchConstraint]
     sweepFrames: Mapping[str, Any]
 
 

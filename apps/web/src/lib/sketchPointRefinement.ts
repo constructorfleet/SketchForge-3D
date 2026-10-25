@@ -151,6 +151,13 @@ export function splitSketchSegment(
       const segmentIds: [string, string] = [...constraint.segmentIds];
       segmentIds[segmentIds.indexOf(segmentId)] = secondSegmentId;
       result.push(constraint, { ...constraint, id: createId("sketch-constraint"), segmentIds });
+    } else if (constraint.kind === "tangent" && constraint.segmentIds.includes(segmentId)) {
+      const otherId = constraint.segmentIds.find((id) => id !== segmentId)!;
+      const other = profile.segments.find(({ id }) => id === otherId);
+      const sharedId = other && [start.id, end.id].find((id) => id === other.startId || id === other.endId);
+      const segmentIds: [string, string] = [...constraint.segmentIds];
+      segmentIds[segmentIds.indexOf(segmentId)] = sharedId === end.id ? secondSegmentId : segmentId;
+      result.push({ ...constraint, segmentIds });
     } else {
       result.push(constraint);
     }
@@ -272,6 +279,28 @@ export function addLineIntersectionPoints(
   });
 
   const constraints = profile.constraints?.reduce<SketchConstraint[]>((result, constraint) => {
+    if (constraint.kind === "tangent") {
+      const resolveTangentPiece = (segmentId: string, otherId: string) => {
+        const original = profile.segments.find(({ id }) => id === segmentId);
+        const other = profile.segments.find(({ id }) => id === otherId);
+        if (!original || !other) return segmentId;
+        const sharedId = [original.startId, original.endId].find((id) => id === other.startId || id === other.endId);
+        if (!sharedId) return segmentId;
+        const pieces = pieceIdsByOriginal.get(segmentId);
+        if (!pieces) return segmentId;
+        const attachedPiece = segments.find((piece) => pieces.includes(piece.id)
+          && (piece.startId === sharedId || piece.endId === sharedId));
+        return attachedPiece?.id ?? segmentId;
+      };
+      result.push({
+        ...constraint,
+        segmentIds: [
+          resolveTangentPiece(constraint.segmentIds[0], constraint.segmentIds[1]),
+          resolveTangentPiece(constraint.segmentIds[1], constraint.segmentIds[0]),
+        ],
+      });
+      return result;
+    }
     if (constraint.kind === "parallel") {
       const firstPieces = pieceIdsByOriginal.get(constraint.segmentIds[0]) ?? [constraint.segmentIds[0]];
       const secondPieces = pieceIdsByOriginal.get(constraint.segmentIds[1]) ?? [constraint.segmentIds[1]];

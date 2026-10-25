@@ -121,6 +121,35 @@ describe("solveSketchConstraints", () => {
     expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
   });
 
+  it("keeps a line tangent to an attached Bezier while the shared endpoint is dragged", () => {
+    const tangent = { id: "tangent", kind: "tangent" as const, segmentIds: ["line", "curve"] as [string, string] };
+    const source = profile({
+      points: [
+        { id: "a", x: 0, z: 0 },
+        { id: "b", x: 4, z: 4, handleOut: { x: 8, z: 4 } },
+        { id: "c", x: 4, z: 8, handleIn: { x: 4, z: 6 } },
+      ],
+      segments: [
+        { id: "line", startId: "a", endId: "b", kind: "line" },
+        { id: "curve", startId: "b", endId: "c", kind: "bezier" },
+      ],
+      constraints: [tangent],
+    });
+
+    const result = solveSketchConstraints(source, ["a", "c"]);
+    const shared = result.profile.points.find(({ id }) => id === "b")!;
+    const line = result.profile.points.find(({ id }) => id === "a")!;
+    const dx = shared.x - line.x;
+    const dz = shared.z - line.z;
+    const bezierDx = shared.handleOut!.x - shared.x;
+    const bezierDz = shared.handleOut!.z - shared.z;
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(Math.abs(dx * bezierDz - dz * bezierDx)).toBeLessThan(1e-5);
+    const unconstrained = sketchConstraintDegreesOfFreedom({ ...source, constraints: undefined });
+    expect(unconstrained.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(source).degreesOfFreedom!).toBe(1);
+  });
+
   it("counts a perpendicular relation as one independent equation in the local freedom estimate", () => {
     const report = sketchConstraintDegreesOfFreedom(profile({
       points: [

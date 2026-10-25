@@ -491,8 +491,10 @@
           "vertical": "Vertical",
           "parallel": "Parallel",
           "perpendicular": "Perpendicular",
-          "distance": "Distance"
-        }
+          "distance": "Distance",
+          "tangent": "Tangent"
+        },
+        "addTangent": "Tangent"
       },
       "primitive": {
         "rectangle": "Rectangle",

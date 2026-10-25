@@ -8,10 +8,15 @@ const sketch: WorkplaneShape = {
   id: "profile", name: "profile", kind: "box", color: "#12a4cc", x: 0, z: 0,
   size: 10, width: 10, depth: 10, height: 10, rotation: 0,
   sketchProfile: {
-    points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 }],
+    points: [
+      { id: "a", x: 0, z: 0 },
+      { id: "b", x: 10, z: 0, handleOut: { x: 12, z: 0 } },
+      { id: "c", x: 10, z: 5, handleIn: { x: 10, z: 3 } },
+    ],
     segments: [
       { id: "line", startId: "a", endId: "b" },
       { id: "other", startId: "b", endId: "a" },
+      { id: "curve", startId: "b", endId: "c", kind: "bezier" },
     ],
     constraints: [
       { id: "c", kind: "coincident", pointIds: ["a", "b"] },
@@ -19,6 +24,7 @@ const sketch: WorkplaneShape = {
       { id: "v", kind: "vertical", segmentId: "line" },
       { id: "parallel", kind: "parallel", segmentIds: ["line", "other"] },
       { id: "p", kind: "perpendicular", segmentIds: ["line", "other"] },
+      { id: "t", kind: "tangent", segmentIds: ["line", "curve"] },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
       { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
     ],
@@ -64,4 +70,20 @@ it("rejects parallel constraints that reference a missing segment", async () => 
     workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0,
   });
   await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentIds/);
+});
+
+it("rejects tangent constraints without a shared line and Bezier endpoint", async () => {
+  const invalid = {
+    ...sketch,
+    sketchProfile: {
+      ...sketch.sketchProfile!,
+      constraints: [{ id: "t", kind: "tangent" as const, segmentIds: ["line", "other"] as [string, string] }],
+    },
+  };
+  const bytes = await exportSkfProject({
+    projectName: "Invalid tangent constraint", createdAt: 1, modifiedAt: 1, shapes: [invalid],
+    history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [],
+    workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0,
+  });
+  await expect(importSkfProject(bytes)).rejects.toThrow();
 });
