@@ -41,6 +41,9 @@ test("built docs emit the project-site shell, imported README, and local search"
   assert.deepEqual(JSON.parse(readFileSync(openapiPath, "utf8")), JSON.parse(readFileSync(path.join(rootPath, "docs/openapi-v1.json"), "utf8")));
   const restApi = readFileSync(path.join(output, "docs/REST_API.html"), "utf8");
   assert.match(restApi, /href="\/SketchForge-3D\/openapi-v1\.json"/, "the REST reference should link to the OpenAPI download under the project-site prefix");
+  const mcpExamples = readFileSync(path.join(output, "docs/mcp/EXAMPLES.html"), "utf8");
+  assert.equal((mcpExamples.match(/class="language-sh\b/g) ?? []).length, 2,
+    "the MCP guide should publish both executable local project workflows");
 });
 
 test("Pages artifact contains generated TypeScript and Python package references", () => {
