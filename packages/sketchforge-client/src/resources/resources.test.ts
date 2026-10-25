@@ -61,6 +61,12 @@ describe("projects", () => {
     expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/projects");
   });
 
+  it("returns a project page and forwards its cursor", async () => {
+    const server = fakeServer({ body: { projects: [], nextCursor: "Mg" } });
+    await expect(client(server).projects.listPage({ limit: 2, cursor: "MQ" })).resolves.toEqual({ items: [], nextCursor: "Mg" });
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/projects?limit=2&cursor=MQ");
+  });
+
   it("asks for one project by query parameter", async () => {
     const server = fakeServer({ body: { project: { id: "p1", name: "Plate", createdAt: 0, snapGrid: {}, workspace: {}, shapes: [] } } });
     await client(server).projects.get("p1");
@@ -82,6 +88,12 @@ describe("projects", () => {
 });
 
 describe("shapes", () => {
+  it("returns a shape page and forwards its cursor", async () => {
+    const server = fakeServer({ body: { shapes: [], nextCursor: null } });
+    await expect(client(server).shapes.listPage("p1", { limit: 25, cursor: "MQ" })).resolves.toEqual({ items: [], nextCursor: null });
+    expect(server.calls[0]?.url).toBe("http://localhost:3100/api/v1/shapes?projectId=p1&limit=25&cursor=MQ");
+  });
+
   it("keeps STEP component ancestry in summaries without echoing it into patches", () => {
     const stepAssembly = [{ id: "step-node:0", name: "MainAssembly", children: [{ id: "step-occurrence:8", name: "Sensors", children: [{ id: "step-occurrence:12", name: "SensorLeft", children: [] }] }] }];
     const stepComponent = {

@@ -76,6 +76,10 @@ export const MAX_DIMENSION = 10_000;
 /** One POST may carry at most this many shapes. */
 export const MAX_SHAPES_PER_REQUEST = 200;
 
+/** One page from a paginated project or shape listing. */
+export type ListPage<Item> = { items: Item[]; nextCursor: string | null };
+export type ListPageOptions = { limit?: number; cursor?: string };
+
 export type ShapePlacement = {
   name?: string;
   /** A CSS hex colour, as the editor stores it. */

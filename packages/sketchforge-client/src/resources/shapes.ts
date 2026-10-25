@@ -1,6 +1,8 @@
 import type { Transport } from "../http.js";
 import {
   MAX_SHAPES_PER_REQUEST,
+  type ListPage,
+  type ListPageOptions,
   type DeleteResult,
   type ShapePatch,
   type ShapePatchResult,
@@ -54,6 +56,15 @@ export class Shapes {
       query: { projectId },
     });
     return payload.shapes;
+  }
+
+  async listPage(projectId: string, options: ListPageOptions = {}): Promise<ListPage<ShapeSummary>> {
+    const payload = await this.transport.send<{ shapes: ShapeSummary[]; nextCursor: string | null }>({
+      method: "GET",
+      path: "/shapes",
+      query: { projectId, ...(options.limit === undefined ? {} : { limit: String(options.limit) }), ...(options.cursor ? { cursor: options.cursor } : {}) },
+    });
+    return { items: payload.shapes, nextCursor: payload.nextCursor };
   }
 
   /** One shape. The created shape comes back with the id later calls need. */

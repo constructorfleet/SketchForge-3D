@@ -33,6 +33,7 @@ from .types import (
     MeasurementPair,
     MeasurementSummary,
     InterferenceReport,
+    ListPage,
     ShapeProperties,
     MeshImportResult,
     PatternResult,
@@ -57,6 +58,15 @@ def chunk(items: Sequence[Any], size: int) -> List[List[Any]]:
     return [list(items[start : start + size]) for start in range(0, len(items), size)]
 
 
+def _listing_query(limit: Optional[int], cursor: Optional[str]) -> Dict[str, str]:
+    if limit is not None and (isinstance(limit, bool) or not 1 <= limit <= 1000):
+        raise ValueError("A listing limit must be between 1 and 1000.")
+    return {
+        **({"limit": str(limit)} if limit is not None else {}),
+        **({"cursor": cursor} if cursor is not None else {}),
+    }
+
+
 class Projects:
     def __init__(self, transport: Transport) -> None:
         self._transport = transport
@@ -64,6 +74,11 @@ class Projects:
     def list(self) -> List[ProjectSummary]:
         payload = self._transport.send("GET", "/projects") or {}
         return [ProjectSummary.from_payload(entry) for entry in payload.get("projects", [])]
+
+    def list_page(self, limit: Optional[int] = None, cursor: Optional[str] = None) -> ListPage[ProjectSummary]:
+        query = _listing_query(limit, cursor)
+        payload = self._transport.send("GET", "/projects", query or None) or {}
+        return ListPage([ProjectSummary.from_payload(entry) for entry in payload.get("projects", [])], payload.get("nextCursor"))
 
     def get(self, project_id: str) -> ProjectDetail:
         payload = self._transport.send("GET", "/projects", {"projectId": project_id}) or {}
@@ -95,6 +110,11 @@ class Shapes:
     def list(self, project_id: str) -> List[ShapeSummary]:
         payload = self._transport.send("GET", "/shapes", {"projectId": project_id}) or {}
         return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])]
+
+    def list_page(self, project_id: str, limit: Optional[int] = None, cursor: Optional[str] = None) -> ListPage[ShapeSummary]:
+        query = {"projectId": project_id, **_listing_query(limit, cursor)}
+        payload = self._transport.send("GET", "/shapes", query) or {}
+        return ListPage([ShapeSummary.from_payload(entry) for entry in payload.get("shapes", [])], payload.get("nextCursor"))
 
     @overload
     def create(self, project_id: str, shape: ShapeSpec) -> ShapeSummary: pass

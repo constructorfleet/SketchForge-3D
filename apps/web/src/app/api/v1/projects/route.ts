@@ -13,6 +13,7 @@ import {
 } from "@/lib/engine/serverProjectFiles";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@/lib/engine/workplaneSettings";
 import { parseCreateProjectRequest, withApiV1Contract } from "@/lib/apiV1OperationContract";
+import { paginateApiV1 } from "@/lib/apiV1Pagination";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -51,7 +52,9 @@ async function getHandler(request: Request) {
   }
 
   const records = await listProjectRecords(context.root);
-  return apiJson({ projects: records.map((record) => projectSummary(record.projectId, record.metadata, record.updatedAt, record.packageBytes)) });
+  const page = paginateApiV1(records, new URL(request.url).searchParams.get("limit") ?? undefined, new URL(request.url).searchParams.get("cursor") ?? undefined);
+  if (!page) return apiError("The limit or cursor is invalid.", 400, "invalid_request");
+  return apiJson({ projects: page.items.map((record) => projectSummary(record.projectId, record.metadata, record.updatedAt, record.packageBytes)), nextCursor: page.nextCursor });
 }
 
 async function postHandler(request: Request) {

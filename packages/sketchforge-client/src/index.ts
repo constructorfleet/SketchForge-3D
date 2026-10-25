@@ -20,6 +20,7 @@ export { Properties } from "./resources/properties.js";
 export { Drawings } from "./resources/drawings.js";
 export { Shell } from "./resources/shell.js";
 export { Treatments } from "./resources/treatments.js";
+export type { ListPage, ListPageOptions } from "./types.js";
 export {
   BASE_URL_ENV,
   DEFAULT_BASE_URL,

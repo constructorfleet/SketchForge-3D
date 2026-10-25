@@ -12,7 +12,9 @@ client built against an older server still round-trips what a newer one sends.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict, Union, cast, get_args
+from typing import Any, Dict, Generic, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict, TypeVar, Union, cast, get_args
+
+TPageItem = TypeVar("TPageItem")
 
 PARAMETRIC_SHAPE_KINDS: Tuple[str, ...] = (
     "box",
@@ -928,6 +930,12 @@ class ShapeProperties:
 class ShapeWriteResult:
     shapes: List[ShapeSummary]
     revision: int
+
+
+@dataclass(frozen=True)
+class ListPage(Generic[TPageItem]):
+    items: List[TPageItem]
+    next_cursor: Optional[str]
 
 
 @dataclass(frozen=True)

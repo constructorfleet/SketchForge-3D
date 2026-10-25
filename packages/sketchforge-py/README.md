@@ -35,12 +35,14 @@ client.check() -> dict
 client.project(project_id) -> ProjectHandle
 
 client.projects.list() -> list[ProjectSummary]
+client.projects.list_page(limit=None, cursor=None) -> ListPage[ProjectSummary]
 client.projects.get(project_id) -> ProjectDetail
 client.projects.create(name) -> ProjectSummary
 client.projects.delete(project_id) -> bool
 client.projects.find_by_name(name) -> ProjectSummary | None
 
 client.shapes.list(project_id) -> list[ShapeSummary]
+client.shapes.list_page(project_id, limit=None, cursor=None) -> ListPage[ShapeSummary]
 client.shapes.create(project_id, shape) -> ShapeSummary
 client.shapes.create_many(project_id, shapes) -> ShapeWriteResult
 client.shapes.update(project_id, shape_id, changes) -> ShapeSummary

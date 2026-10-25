@@ -1,5 +1,5 @@
 import type { Transport } from "../http.js";
-import type { DeleteResult, ProjectDetail, ProjectSummary } from "../types.js";
+import type { DeleteResult, ListPage, ListPageOptions, ProjectDetail, ProjectSummary } from "../types.js";
 
 export class Projects {
   constructor(private readonly transport: Transport) {}
@@ -10,6 +10,15 @@ export class Projects {
       path: "/projects",
     });
     return payload.projects;
+  }
+
+  async listPage(options: ListPageOptions = {}): Promise<ListPage<ProjectSummary>> {
+    const payload = await this.transport.send<{ projects: ProjectSummary[]; nextCursor: string | null }>({
+      method: "GET",
+      path: "/projects",
+      query: { ...(options.limit === undefined ? {} : { limit: String(options.limit) }), ...(options.cursor ? { cursor: options.cursor } : {}) },
+    });
+    return { items: payload.projects, nextCursor: payload.nextCursor };
   }
 
   async get(projectId: string): Promise<ProjectDetail> {

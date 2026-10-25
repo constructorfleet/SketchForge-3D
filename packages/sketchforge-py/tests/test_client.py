@@ -135,6 +135,20 @@ class ChunkTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_lists_a_project_page(self) -> None:
+        opener = FakeOpener({"projects": [project_payload("p1", "Plate")], "nextCursor": "Mg"})
+        page = client(opener).projects.list_page(limit=2, cursor="MQ")
+        self.assertEqual([project.id for project in page.items], ["p1"])
+        self.assertEqual(page.next_cursor, "Mg")
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/projects?limit=2&cursor=MQ")
+
+    def test_lists_a_shape_page(self) -> None:
+        opener = FakeOpener({"shapes": [shape_payload("s1")], "nextCursor": None})
+        page = client(opener).shapes.list_page("p1", limit=2)
+        self.assertEqual([shape.id for shape in page.items], ["s1"])
+        self.assertIsNone(page.next_cursor)
+        self.assertEqual(opener.calls[0].url, "http://localhost:3100/api/v1/shapes?projectId=p1&limit=2")
+
     def test_sends_the_token_as_a_bearer_header(self) -> None:
         opener = FakeOpener({"projects": []})
         client(opener).projects.list()
