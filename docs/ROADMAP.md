@@ -12,7 +12,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 ## Dependency maintenance
 
 - [#397: Keep Vitest's mocker out of production installs](https://github.com/constructorfleet/SketchForge-3D/issues/397) — security dependency fix.
-- [#398: Plan major dependency upgrades](https://github.com/constructorfleet/SketchForge-3D/issues/398) — spike candidates after maintainers choose sequencing; keep the CAD kernel pair gated on STEP round-trip e2e and engine performance checks.
+- [#398: Plan major dependency upgrades](https://github.com/constructorfleet/SketchForge-3D/issues/398) — nine package-major spikes are tracked separately; see [the upgrade spike plan](DEPENDENCY_UPGRADES.md). Keep the CAD kernel pair gated on STEP round-trip e2e and engine performance checks.
 
 ## Project storage durability
 
