@@ -9,6 +9,8 @@ owner: "Contributors"
 
 ## Unreleased
 
+Current OpenAPI coverage is 28 of 32 registered operations; the four omitted handlers are `OPTIONS` preflights.
+
 - `sketchforge-macro` now has direct `projects list|create|delete`, `export --format <fmt> --out <file>`, and `import <file>` commands alongside the macro runner. Import creates a project from the filename unless `--project` or `SKETCHFORGE_PROJECT_ID` selects an existing one; export requires a selected project.
 - Local MCP tools now omit editor targeting and timeout arguments from their schemas, and local `sketchforge_update_object` ignores those remote-only fields if they are supplied.
 - Local and remote MCP file imports and exports now stay under `SKETCHFORGE_MCP_FILES_DIR`, falling back to `SKETCHFORGE_PROJECTS_DIR`; symlinks are resolved before checking the boundary. Exporting to an existing file now requires `overwrite: true`. When neither root is set, paths remain unrestricted for compatibility.
@@ -124,12 +126,12 @@ owner: "Contributors"
   and source-profile edits replay the sweep, face draft, then chamfer atomically.
 - `POST /imports` now documents and validates both base64 JSON and multipart
   uploads, its shape/triangle-count/revision response, and reachable JSON
-  errors. The generated OpenAPI subset covers 26 of 32 operations; 6 remain
-  omitted.
+  errors. At that point, the generated OpenAPI subset covered 26 of 32
+  operations; 6 remained omitted.
 - `POST /patterns` now validates normalized IDs, defaults, integral count limits,
   finite numeric options, its 201 shape-summary response, and reachable errors.
-  The generated OpenAPI subset covers 26 of 32 registered operations; 6 remain
-  omitted.
+  At the time of this entry, the generated OpenAPI subset covered 26 of 32
+  registered operations; 6 remained omitted.
 - `POST /explode` now validates trimmed project and shape query IDs, returned
   STEP assembly shape summaries and revision, and reachable errors. The
   generated contract includes its request parameters and response schemas.
