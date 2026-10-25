@@ -1,6 +1,6 @@
 "use client";
 
-import { Box as BoxIcon, ChevronDown, Grid3X3, History, Palette, RotateCcw, Ruler, X } from "lucide-react";
+import { Box as BoxIcon, ChevronDown, Grid3X3, HardDrive, History, Palette, RotateCcw, Ruler, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { HexColorInput, HexColorPicker } from "react-colorful";
@@ -15,6 +15,7 @@ import {
   type Translator,
 } from "@/i18n";
 import { textFontLabel } from "@/components/workplane/ShapeInspector";
+import { WorkspaceStorageSection } from "@/components/workplane/WorkspaceStorageSection";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { gearCenterHoleLimits, gearToothPitch } from "@/lib/gearGeometry";
 import { normalizeScaleForUnits, parseMeasurementInput, scaleOptionsForUnits, snapGridLabel, WORKSPACE_UNIT_OPTIONS, workspaceScaleLabel, workspaceUnitsLabel } from "@/lib/measurementUnits";
@@ -23,7 +24,7 @@ import { DEFAULT_WORKPLANE_WORKSPACE, MAX_CUSTOM_SHAPE_DIMENSION, MAX_HIGH_RESOL
 import type { GearType, GridSize, ShapeCustomization, ShapeKind, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 type WorkspaceSettings = WorkplaneWorkspaceSettings;
-type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history";
+type WorkspaceSettingsSection = "appearance" | "measurement" | "workplane" | "shapes" | "history" | "storage";
 
 const GRID_SIZES: GridSize[] = ["Off", "0.1 mm", "0.25 mm", "0.5 mm", "1.0 mm", "2.0 mm", "5.0 mm", "Brick"];
 const MIN_WORKSPACE_SIZE = 60;
@@ -147,6 +148,7 @@ export function WorkspaceSettingsModal({
   themePreference,
   moveDimensionsEnabled,
   showProjectNameInToolbar,
+  projectsStoredOnServer = false,
   preferClassicRotateHandles,
   onWorkspaceChange,
   onSnapChange,
@@ -162,6 +164,8 @@ export function WorkspaceSettingsModal({
   themePreference: AppThemePreference;
   moveDimensionsEnabled: boolean;
   showProjectNameInToolbar: boolean;
+  /** Server-mode projects are not in browser storage, so the Storage section does not describe browser eviction. */
+  projectsStoredOnServer?: boolean;
   preferClassicRotateHandles: boolean;
   onWorkspaceChange: (next: WorkspaceSettings) => void;
   onSnapChange: (next: GridSize) => void;
@@ -345,6 +349,10 @@ export function WorkspaceSettingsModal({
             <button className={activeSection === "history" ? "active" : ""} aria-current={activeSection === "history" ? "page" : undefined} onClick={() => setActiveSection("history")}>
               <History size={18} />
               <span>{t("panels.settings.history.nav")}</span>
+            </button>
+            <button className={activeSection === "storage" ? "active" : ""} aria-current={activeSection === "storage" ? "page" : undefined} onClick={() => setActiveSection("storage")}>
+              <HardDrive size={18} />
+              <span>{t("panels.settings.storage.nav")}</span>
             </button>
           </nav>
 
@@ -732,6 +740,8 @@ export function WorkspaceSettingsModal({
                   </div>
                 </>
               ) : null}
+
+              {activeSection === "storage" ? <WorkspaceStorageSection projectsStoredOnServer={projectsStoredOnServer} /> : null}
             </div>
 
             <div className="workspace-modal-footer">

@@ -81,12 +81,23 @@
     "fileSize": {
       "bytes": "{size} B",
       "kilobytes": "{size} KB",
-      "megabytes": "{size} MB"
+      "megabytes": "{size} MB",
+      "gigabytes": "{size} GB"
     },
     "actions": {
       "create": "Create new 3D design",
       "import": "Open SKF or import geometry",
       "continue": "Continue workplane"
+    },
+    "backup": {
+      "exportAll": "Export all projects",
+      "preparing": "{count, plural, one {Packing {count} project…} other {Packing {count} projects…}}",
+      "exported": "{count, plural, one {Exported {count} project to {fileName}.} other {Exported {count} projects to {fileName}.}}",
+      "skipped": "Could not include: {names}.",
+      "failed": "Could not export your projects."
+    },
+    "storageWarning": {
+      "message": "This browser has used {percent} of the space it allows for your projects. Export a backup before it runs out."
     },
     "projects": {
       "title": "Projects",
@@ -1330,6 +1341,24 @@
         "unlimited": "Unlimited",
         "retain": "Actions to retain",
         "note": "100 actions is the default. Lower limits permanently discard older Undo states from this project."
+      },
+      "storage": {
+        "nav": "Storage",
+        "title": "Browser storage",
+        "description": "How this browser keeps the projects saved on this device.",
+        "checking": "Checking storage…",
+        "persistence": "Persistent storage",
+        "persisted": "On. The browser will not clear your projects to free space.",
+        "bestEffort": "Off. The browser may clear your projects when the device runs low on space.",
+        "unsupported": "This browser does not say whether it keeps your projects.",
+        "server": "Your projects are saved on the server, not in this browser, so clearing the browser does not remove them.",
+        "request": "Ask the browser to keep projects",
+        "requestDeclined": "The browser declined. Keep backups with Export all projects.",
+        "usage": "Space used",
+        "usageValue": "{used} of {quota} ({percent})",
+        "usageUnknown": "This browser does not report how much space it uses.",
+        "usageMeter": "Share of browser storage used",
+        "backupNote": "Export all projects on the dashboard saves every project as one ZIP of SKF files."
       },
       "footer": {
         "description": "Save the current settings for this project.",

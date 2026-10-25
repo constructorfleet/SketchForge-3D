@@ -42,6 +42,23 @@ Choose **Export**. In the export dialog, select **SKF: Editable project**, then 
 
 The same dialog can export mesh or CAD formats such as STL, 3MF, OBJ, and STEP. Choose STL or 3MF for a 3D-printing workflow; keep the `.skf` file when you want to reopen and continue editing the project.
 
+## Back up every project at once
+
+Projects saved in the browser live in that browser profile's storage. The first time the dashboard is shown, SketchForge asks the browser to keep that storage persistent. It asks once per profile. Without persistence the browser may clear it when the device runs low on space. Some browsers grant the request silently, some ask you, and some decline it.
+
+To check, open **Workspace settings** in the editor and choose **Storage**. The section shows whether persistent storage is on and how much of the browser's allowance is in use. When persistence is off, **Ask the browser to keep projects** asks again. Some browsers grant persistence only when you ask with a click. When projects are stored in a server directory, the section says so instead, because clearing the browser does not remove them. SketchForge does not ask for persistent storage in that mode.
+
+On the dashboard, choose **Export all projects**. The browser downloads one ZIP named `sketchforge-projects-YYYY-MM-DD.zip`, holding a `.skf` file for each project. It includes all your projects, even those a search is hiding, and keeps the undo history autosave keeps. When another tab has saved a newer version of a project, the export uses that version. Entries named after a Windows device such as `CON` start with `_`, and leading dots are dropped, so the archive extracts on any system. Dashboard thumbnails are left out because SketchForge creates them again from the model. When **Settings** saves downloads to a folder, the ZIP goes there instead.
+
+When the browser has used 80 percent or more of its allowance, the dashboard shows a warning with its own **Export all projects** button. To restore a project, unzip the archive and open its `.skf` file with **Open SKF or import geometry**. Open one `.skf` file at a time.
+
+```mermaid
+flowchart LR
+  A[Dashboard] -->|Export all projects| B[sketchforge-projects-YYYY-MM-DD.zip]
+  B --> C[One .skf per project]
+  C -->|Open SKF or import geometry| D[Restored project]
+```
+
 ## Keyboard shortcuts
 
 Press **?** in the editor to open the keyboard-shortcuts list. Press **Escape** to close it. The list includes the common edit shortcuts; selection visibility and locking use bindings that do not collide with macOS or browser-reserved keys:

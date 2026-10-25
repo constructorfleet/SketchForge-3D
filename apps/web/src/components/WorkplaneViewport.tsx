@@ -213,6 +213,7 @@ type WorkplaneViewportProps = {
   initialWorkspace?: WorkplaneWorkspaceSettings;
   workspaceSettingsKey?: string | null;
   showProjectNameInToolbar?: boolean;
+  projectsStoredOnServer?: boolean;
   onShowProjectNameInToolbarChange?: (show: boolean) => void;
   onAddShape: (shape: ShapeAsset, point?: PlacementPoint) => void;
   onAlignAnchorChange: (id: string) => void;
@@ -2398,6 +2399,7 @@ export function WorkplaneViewport({
   initialWorkspace,
   workspaceSettingsKey,
   showProjectNameInToolbar = true,
+  projectsStoredOnServer = false,
   onShowProjectNameInToolbarChange,
   onAddShape,
   onAlignAnchorChange,
@@ -5842,6 +5844,7 @@ export function WorkplaneViewport({
           themePreference={themePreference}
           moveDimensionsEnabled={moveDimensionsEnabled}
           showProjectNameInToolbar={showProjectNameInToolbar}
+          projectsStoredOnServer={projectsStoredOnServer}
           preferClassicRotateHandles={preferClassicRotateHandles}
           onWorkspaceChange={chooseWorkspace}
           onSnapChange={chooseSnapGrid}
