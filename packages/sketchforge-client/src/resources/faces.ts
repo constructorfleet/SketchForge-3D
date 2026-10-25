@@ -5,11 +5,11 @@ export class Faces {
   constructor(private readonly transport: Transport) {}
 
   /** Every face, numbered as a shell request refers to them. */
-  async list(projectId: string, shapeId: string): Promise<FaceSummary[]> {
+  async list(projectId: string, shapeId: string, options?: { topology?: "mesh" | "exact" }): Promise<FaceSummary[]> {
     const payload = await this.transport.send<{ faces: FaceSummary[] }>({
       method: "GET",
       path: "/faces",
-      query: { projectId, shapeId },
+      query: { projectId, shapeId, topology: options?.topology },
     });
     return payload.faces;
   }

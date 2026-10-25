@@ -211,8 +211,8 @@ export class ProjectHandle {
     return this.client.treatments.chamfer(this.id, shapeId, distance, options);
   }
 
-  faces(shapeId: string): Promise<FaceSummary[]> {
-    return this.client.faces.list(this.id, shapeId);
+  faces(shapeId: string, options?: { topology?: "mesh" | "exact" }): Promise<FaceSummary[]> {
+    return this.client.faces.list(this.id, shapeId, options);
   }
 
   facesFacing(shapeId: string, direction: FaceDirection): Promise<number[]> {
