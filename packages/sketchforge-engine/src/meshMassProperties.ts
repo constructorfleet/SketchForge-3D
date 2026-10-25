@@ -34,6 +34,63 @@ const RAY = (() => {
 })();
 
 export function meshMassProperties(mesh: MeshData): MeshMassProperties | null {
+  return analyseMesh(mesh)?.properties ?? null;
+}
+
+/** One closed shell of a mesh, with its triangles wound as the mesh wound them. */
+export type MeshSolidShell = {
+  /** Flat triangle corners in the mesh's own coordinates. */
+  positions: number[];
+  /** How many other shells enclose it: even is material, odd is a void. */
+  depth: number;
+};
+
+/**
+ * The closed shells a mesh is made of, each with its nesting depth (#501).
+ *
+ * OCCT sews one shell into one solid; a mesh with a sealed internal void, or
+ * with several separate bodies, has more than one, and sewing them together
+ * fails. A caller builds each shell into a solid and puts them back together:
+ * material at even depth, voids at odd depth taken out of what encloses them.
+ * The winding is left alone, since the depth -- not the winding -- says which
+ * side is material, and the sewing orients each solid outward by itself.
+ *
+ * Null unless every shell is closed and consistently orientable, because only
+ * then is the nesting well defined. A shell enclosing no volume is left out.
+ */
+export function meshSolidShells(mesh: MeshData): MeshSolidShell[] | null {
+  const analysis = analyseMesh(mesh);
+  if (!analysis || !analysis.closed || !analysis.orientable) return null;
+  const { shells, depth, sign, corners, points, origin } = analysis;
+  return shells.flatMap((members, shell) => {
+    if (!sign[shell]) return [];
+    const positions: number[] = [];
+    for (const t of members) {
+      for (let k = 0; k < 3; k += 1) {
+        const index = 3 * corners[3 * t + k];
+        positions.push(points[index] + origin[0], points[index + 1] + origin[1], points[index + 2] + origin[2]);
+      }
+    }
+    return [{ positions, depth: depth[shell] }];
+  });
+}
+
+/** Flat triangle corners, as a stored mesh holds them, as `MeshData`. */
+export function meshDataFromPositions(positions: readonly number[]): MeshData {
+  const vertices: [number, number, number][] = [];
+  const faces: [number, number, number][] = [];
+  for (let index = 0; index + 8 < positions.length; index += 9) {
+    const first = vertices.length;
+    for (let corner = 0; corner < 3; corner += 1) {
+      const at = index + corner * 3;
+      vertices.push([positions[at], positions[at + 1], positions[at + 2]]);
+    }
+    faces.push([first, first + 1, first + 2]);
+  }
+  return { name: "mesh", vertices, faces };
+}
+
+function analyseMesh(mesh: MeshData) {
   if (!mesh.vertices.length || !mesh.faces.length) return null;
 
   // Bounds, from every vertex a triangle uses.
@@ -199,10 +256,12 @@ export function meshMassProperties(mesh: MeshData): MeshMassProperties | null {
 
   let volume = 0, mx = 0, my = 0, mz = 0;
   const sign = new Int8Array(shells.length);
+  const depth = new Int32Array(shells.length);
   for (let shell = 0; shell < shells.length; shell += 1) {
     const own = shellVolume[shell];
     if (own === 0) continue;
-    const wanted = shells.length > 1 && enclosingCount(shell) % 2 === 1 ? -1 : 1;
+    depth[shell] = shells.length > 1 ? enclosingCount(shell) : 0;
+    const wanted = depth[shell] % 2 === 1 ? -1 : 1;
     sign[shell] = Math.sign(own) === wanted ? 1 : -1;
     volume += sign[shell] * own;
     mx += sign[shell] * shellMoment[3 * shell];
@@ -230,13 +289,14 @@ export function meshMassProperties(mesh: MeshData): MeshMassProperties | null {
   const centerOfMass = volume !== 0
     ? { x: ox + mx / volume, y: oy + my / volume, z: oz + mz / volume }
     : { x: ox, y: oy, z: oz };
-  return {
+  const properties: MeshMassProperties = {
     volume,
     area,
     centerOfMass,
     bbox,
     isValid: closed && orientable && volume > 0,
   };
+  return { properties, shells, depth, sign, corners, points, origin: [ox, oy, oz] as const, closed, orientable };
 }
 
 /** Möller-Trumbore: whether the ray from (px, py, pz) along RAY crosses triangle `t` beyond `minDistance`. */
