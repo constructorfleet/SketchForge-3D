@@ -62,6 +62,12 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
+  turbopack: {
+    resolveAlias: {
+      "brepkit-wasm": false,
+      "brepjs-opencascade": false,
+    },
+  },
   ...(isStaticExport
     ? {
         output: "export" as const,

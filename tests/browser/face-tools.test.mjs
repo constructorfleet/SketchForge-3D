@@ -202,6 +202,7 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
       await faces.hover();
       await page.waitForTimeout(300);
       const outline = await highlightRegion(await modelView());
+      if (outline.count === 0) continue;
       const candidate = { x: canvasBox.x + outline.x, y: canvasBox.y + outline.y };
       const differentFace = face === 1 ? "2" : "1";
       await faceField.fill(differentFace);

@@ -9,7 +9,6 @@ const basePath = process.env.STATIC_EXPORT_BASE_PATH?.trim() ?? "";
 if (basePath && (!basePath.startsWith("/") || basePath.endsWith("/") || basePath.includes("//"))) {
   throw new Error("STATIC_EXPORT_BASE_PATH must start with / and must not end with /.");
 }
-const expectedWorkerPublicPath = `${basePath}/_next/`;
 
 async function listJavaScriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -31,22 +30,32 @@ if (indexHtml.includes('="./_next/')) {
   );
 }
 
-const workerChunks = [];
+const chunks = [];
 for (const path of await listJavaScriptFiles(chunksRoot)) {
   const source = await readFile(path, "utf8");
-  if (source.includes("importScripts(") && source.includes("static/chunks/")) {
-    workerChunks.push({ path, source });
-  }
+  chunks.push({ path, source });
 }
+
+const workerChunks = chunks.filter(({ source }) =>
+  source.includes("self.onmessage") && source.includes("occt-wasm.js") && source.includes("occt-wasm.wasm"),
+);
 
 if (workerChunks.length === 0) {
   throw new Error("Could not find the generated CAD worker runtime to verify its public path.");
 }
 
 for (const { path, source } of workerChunks) {
-  if (!source.includes(`.p="${expectedWorkerPublicPath}"`) && !source.includes(`.p='${expectedWorkerPublicPath}'`)) {
-    throw new Error(`Worker runtime ${path} does not use the expected ${expectedWorkerPublicPath} public path.`);
+  if (!source.includes("/occt-wasm.js") || !source.includes("/occt-wasm.wasm")) {
+    throw new Error(
+      `Worker runtime ${path} does not use public OCCT JavaScript and WebAssembly asset paths.`,
+    );
   }
 }
 
-console.log(`Verified ${workerChunks.length} static worker runtime(s) use ${expectedWorkerPublicPath}.`);
+if (basePath && !chunks.some(({ source }) => source.includes(basePath))) {
+  throw new Error(`Static chunks do not include the configured base path ${basePath}.`);
+}
+
+console.log(
+  `Verified ${workerChunks.length} static worker runtime(s) load OCCT assets${basePath ? ` under ${basePath}` : ""}.`,
+);

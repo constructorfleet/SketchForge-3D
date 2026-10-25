@@ -44,6 +44,60 @@ export function stepShapeKey(cad: OcctKernel, shape: ShapeHandle) {
     .join(":");
 }
 
+function stepColorsInShapeOrder(step: string, expectedCount: number): string[] | undefined {
+  const entities = [...step.matchAll(/^#(\d+)\s*=\s*([\s\S]*?);/gm)].map((match) => ({
+    id: Number(match[1]),
+    text: match[2]!,
+  }));
+  const byId = new Map(entities.map((entity) => [entity.id, entity.text]));
+  const refs = (text: string) => [...text.matchAll(/#(\d+)/g)].map((match) => Number(match[1]));
+  const colorFrom = (id: number, seen = new Set<number>()): string | undefined => {
+    if (seen.has(id)) return undefined;
+    seen.add(id);
+    const text = byId.get(id);
+    if (!text) return undefined;
+    const rgb = /^COLOUR_RGB\([^,]*,\s*([\d.e+-]+),\s*([\d.e+-]+),\s*([\d.e+-]+)\s*\)$/i.exec(text.trim());
+    if (rgb) {
+      // OCCT 8 serializes the supplied RGB values through its linear color
+      // conversion. Convert them back to the sRGB hex values used by the app.
+      const channels = rgb.slice(1).map((value) => {
+        const channel = Number(value);
+        const linear = channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+        return Math.round(linear * 255);
+      });
+      return `#${channels.map((value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0")).join("")}`;
+    }
+    for (const child of refs(text)) {
+      const color = colorFrom(child, seen);
+      if (color) return color;
+    }
+    return undefined;
+  };
+
+  const colorByShape = new Map<number, string>();
+  for (const { text } of entities.filter(({ text }) => /^STYLED_ITEM\(/i.test(text.trim()))) {
+    const references = refs(text);
+    const target = references.at(-1);
+    if (target === undefined) continue;
+    for (const style of references.slice(0, -1)) {
+      const color = colorFrom(style);
+      if (color) {
+        colorByShape.set(target, color);
+        break;
+      }
+    }
+  }
+
+  const ordered = new Map<number, { representation: number; color: string }>();
+  for (const { id, text } of entities.filter(({ text }) => /^ADVANCED_BREP_SHAPE_REPRESENTATION\(/i.test(text.trim()))) {
+    const shapeId = refs(text).find((reference) => colorByShape.has(reference));
+    const color = shapeId === undefined ? undefined : colorByShape.get(shapeId);
+    if (shapeId !== undefined && color && !ordered.has(shapeId)) ordered.set(shapeId, { representation: id, color });
+  }
+  const colors = [...ordered.values()].sort((a, b) => a.representation - b.representation).map(({ color }) => color);
+  return colors.length === expectedCount ? colors : undefined;
+}
+
 function colorHex(color: [number, number, number]) {
   return `#${color.map((channel) => Math.round(Math.max(0, Math.min(1, channel)) * 255).toString(16).padStart(2, "0")).join("")}`;
 }
@@ -137,6 +191,15 @@ export function stepComponentMetadata(cad: OcctKernel, step: string) {
           ...(color ? { color } : {}),
         });
         metadataBySolid.set(key, metadata);
+      }
+    }
+
+    if ([...metadataBySolid.values()].every((candidates) => candidates.every(({ color }) => !color))) {
+      const colors = stepColorsInShapeOrder(step, metadataBySolid.size);
+      if (colors) {
+        [...metadataBySolid.values()].forEach((candidates, index) => {
+          for (const candidate of candidates) candidate.color = colors[index];
+        });
       }
     }
 

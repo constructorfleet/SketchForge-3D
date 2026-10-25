@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { CAD_TEST_TIMEOUT_MS } from "../unit/support/cadTestTimeout";
 import type { SketchProfile } from "@/types/sketchforge";
+
 
 let buildDraftPrism: typeof import("@/lib/engine/draftPrism").buildDraftPrism;
 let kernel: import("occt-wasm").OcctKernel;
@@ -25,7 +25,7 @@ const profile: SketchProfile = {
 beforeAll(async () => {
   ({ buildDraftPrism } = await import("@/lib/engine/draftPrism"));
   const { OcctKernel } = await import("occt-wasm");
-  const wasm = join(dirname(fileURLToPath(import.meta.resolve("occt-wasm"))), "occt-wasm.wasm");
+  const wasm = join(process.cwd(), "node_modules/occt-wasm/dist/occt-wasm.wasm");
   kernel = await OcctKernel.init({ wasm });
 });
 

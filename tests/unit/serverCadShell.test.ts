@@ -257,15 +257,15 @@ describe("hollowing a solid on the server", { timeout: CAD_TEST_TIMEOUT_MS }, ()
     }
   });
 
-  it("refuses a result OCCT can build but cannot write out", async () => {
-    // A hollowed loft passes every check OCCT can answer -- a valid solid,
-    // smaller than it started -- and then `toBREP` reads past the end of its
-    // own memory. There is nothing to store, so it has to be a refusal rather
-    // than a WASM exception reaching the route as a 500.
+  it("writes out a hollowed loft that older OCCT could not serialize", async () => {
+    // OCCT 5 fixes the prior toBREP failure for this valid hollowed loft.
     const loft = shapeFromRequest({ kind: "loft", width: 20, depth: 20, height: 20 }) as WorkplaneShape;
+    const hollow = await applyShell(loft, { thickness: 2 });
+    const after = await measure(hollow.brep);
 
-    await expect(applyShell(loft, { thickness: 2 })).rejects.toThrow(/cannot read back/);
-    await expect(applyShell(loft, { thickness: 2 })).rejects.toThrow(ServerCadError);
+    expect(hollow.brep).toContain("CASCADE Topology");
+    expect(after.volume).toBeGreaterThan(0);
+    expect(after.type).toBe("solid");
   });
 
   it("says what it cannot work from rather than approximating it", async () => {

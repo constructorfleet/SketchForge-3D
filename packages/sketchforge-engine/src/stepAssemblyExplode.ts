@@ -158,7 +158,7 @@ export function explodeStepAssemblyWithKernel(cad: OcctKernel, shape: WorkplaneS
     } : undefined;
     const path = metadata?.occurrenceId
       ? paths.find((candidate) => candidate.at(-1)?.id === metadata.occurrenceId)
-      : metadata?.name ? uniqueNamedPath(paths, metadata.name) : undefined;
+      : metadata?.name ? uniqueNamedPath(paths, metadata.name.split(" / ").at(-1) ?? metadata.name) : undefined;
     const occurrenceId = path?.at(-1)?.id;
     const occurrencePartIndex = occurrenceId ? (occurrencePartIndexes.get(occurrenceId) ?? 0) : 0;
     if (occurrenceId) occurrencePartIndexes.set(occurrenceId, occurrencePartIndex + 1);

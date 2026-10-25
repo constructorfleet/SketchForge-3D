@@ -382,33 +382,33 @@ export async function exportShapesToStep(shapes: WorkplaneShape[]): Promise<Step
   }
 
   const kernel = await loadOcctKernel();
-  const document = kernel.createXCAFDocument();
   try {
-    // The current XCAF wrapper can author one assembly level. A grouped project
-    // is therefore represented as a named assembly with each solid named by
-    // its full group path (for example, "Sensors / SensorLeft"). Geometry is
-    // already in world coordinates, so occurrence placements remain correct.
     const rootName = shapes.length === 1 && shapes[0]?.groupedShapes?.length ? shapes[0].name : "SketchForge Assembly";
-    const shapeIds = parts.map(({ shape }) => (shape.wrapped as unknown as { id: number }).id);
-    const rootShape = kernel.makeCompound(shapeIds as Parameters<typeof kernel.makeCompound>[0]);
-    const root = document.addShape(rootShape, { name: rootName });
-    for (const part of parts) {
-      const color = parseHexColor(part.color);
-      const partId = (part.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1];
-      // Register the named product definition before adding its occurrence.
-      // XCAF's STEP writer otherwise writes the product as "SOLID" and emits
-      // an empty occurrence name, losing the component's identity on import.
-      document.addShape(partId, { name: part.name, color });
-      document.addChild(root, partId, {
-        name: part.name,
-        color,
-      });
+    const document = kernel.createXCAFDocument();
+    try {
+      const first = parts[0]!;
+      const firstId = (first.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1];
+      const root = document.addShape(firstId, { name: rootName });
+      for (const part of parts.slice(1)) {
+        const color = parseHexColor(part.color);
+        document.addChild(root, (part.shape.wrapped as unknown as { id: number }).id as Parameters<typeof document.addChild>[1], {
+          name: part.name,
+          color,
+        });
+      }
+      if (parts.length > 1) {
+        const firstComponent = document.getChildren(root)[0];
+        if (firstComponent) {
+          document.setName(firstComponent, first.name);
+          document.setColor(firstComponent, parseHexColor(first.color));
+        }
+      }
+      return { blob: new Blob([document.exportSTEP()], { type: "model/step" }), exportedCount: parts.length, skipped };
+    } finally {
+      document.close();
     }
-    return { blob: new Blob([document.exportSTEP()], { type: "model/step" }), exportedCount: parts.length, skipped };
   } catch (error) {
     throw new LocalizedError("errors.step.exportFailed", { detail: String(error instanceof Error ? error.message : error) });
-  } finally {
-    document.close();
   }
 }
 
