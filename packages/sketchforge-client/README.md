@@ -228,6 +228,20 @@ SKETCHFORGE_API_TOKEN=... npx sketchforge-macro macros/bolt-plate.macro.mjs --ho
 
 The context carries everything the macro needs -- `client`, `project`, `params`, `layout`, `log` -- so a macro file imports nothing and can live in any folder.
 
+### Direct command-line operations
+
+Use the same `sketchforge-macro` executable for project management and file transfer without writing a macro:
+
+```bash
+npx sketchforge-macro projects list
+npx sketchforge-macro projects create "Bracket"
+npx sketchforge-macro projects delete <project-id>
+npx sketchforge-macro export --format stl --out bracket.stl --project <project-id>
+npx sketchforge-macro import bracket.stl
+```
+
+Export uses `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes into that selected project when given; without one, it creates a project named after the file. Direct file import supports STL, OBJ, and SVG; export supports STL, OBJ, 3MF, STEP, SKF, ZIP, SVG, and DXF.
+
 ### Project modes, and why there is no default
 
 The second run is what makes a macro useful or dangerous. A script that appends to a project it found doubles the part every time, and nobody notices until they open the project. So the mode is declared and the runner, not the macro body, acts on it:

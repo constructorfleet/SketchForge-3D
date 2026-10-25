@@ -10,11 +10,20 @@
 
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 import { clientFromEnvironment, targetProjectFromEnvironment, MissingConfigurationError } from "./environment.js";
+import type { Environment } from "./environment.js";
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
+import type { SketchForgeClient } from "./client.js";
+import { IMPORTABLE_MESH_FORMATS, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "./types.js";
 import { macroFromModule, runMacro, type MacroRunReport } from "./macro.js";
 
 const USAGE = `sketchforge-macro <macro-file> [--param=value ...] [--project=<id>] [--json]
+sketchforge-macro projects list
+sketchforge-macro projects create <name>
+sketchforge-macro projects delete <project-id>
+sketchforge-macro export --format <fmt> --out <file> [--project <id>]
+sketchforge-macro import <file> [--project <id>]
 
 Environment:
   SKETCHFORGE_API_TOKEN   required; the server's API token
@@ -65,7 +74,111 @@ export function describeReport(report: MacroRunReport) {
   return lines.join("\n");
 }
 
-export async function main(argv: readonly string[]) {
+function optionValues(arguments_: readonly string[]) {
+  const values = new Map<string, string>();
+  for (let index = 0; index < arguments_.length; index += 1) {
+    const argument = arguments_[index]!;
+    if (!argument.startsWith("--")) throw new Error(`Unexpected argument "${argument}".`);
+    const equals = argument.indexOf("=");
+    const name = equals < 0 ? argument.slice(2) : argument.slice(2, equals);
+    const value = equals < 0 ? arguments_[++index] : argument.slice(equals + 1);
+    if (!name || !value || value.startsWith("--")) throw new Error(`Expected a value for --${name || "?"}.`);
+    if (values.has(name)) throw new Error(`Option --${name} may only be given once.`);
+    values.set(name, value);
+  }
+  return values;
+}
+
+function requiredOption(options: Map<string, string>, name: string) {
+  const value = options.get(name);
+  if (!value) throw new Error(`--${name} is required.`);
+  return value;
+}
+
+function rejectUnknownOptions(options: Map<string, string>, allowed: readonly string[]) {
+  const unknown = [...options.keys()].find((name) => !allowed.includes(name));
+  if (unknown) throw new Error(`Unknown option --${unknown}.`);
+}
+
+function selectedProject(options: Map<string, string>, environment: Environment) {
+  const projectId = options.get("project") ?? targetProjectFromEnvironment(environment);
+  if (!projectId) throw new Error("Choose a project with --project <id> or SKETCHFORGE_PROJECT_ID.");
+  return projectId;
+}
+
+/** Execute one direct project, import, or export command using the public client resources. */
+export async function executeDirectCommand(argv: readonly string[], client: SketchForgeClient, environment: Environment = process.env): Promise<string> {
+  const [command, ...rest] = argv;
+  if (command === "projects") {
+    const [action, ...arguments_] = rest;
+    if (action === "list" && arguments_.length === 0) {
+      const projects = await client.projects.list();
+      return projects.length
+        ? projects.map((project) => `${project.id}\t${project.name}\t${project.shapes} shapes`).join("\n")
+        : "No projects.";
+    }
+    if (action === "create" && arguments_.length === 1) {
+      const project = await client.projects.create(arguments_[0]!);
+      return `Created project ${project.id} (${project.name}).`;
+    }
+    if (action === "delete" && arguments_.length === 1) {
+      const deleted = await client.projects.delete(arguments_[0]!);
+      if (!deleted.deleted) throw new Error(`Project ${arguments_[0]} was not found.`);
+      return `Deleted project ${arguments_[0]}.`;
+    }
+    throw new Error("Use projects list, projects create <name>, or projects delete <project-id>.");
+  }
+
+  if (command === "export") {
+    const options = optionValues(rest);
+    rejectUnknownOptions(options, ["format", "out", "project"]);
+    const format = requiredOption(options, "format");
+    if (!(PROJECT_EXPORT_FORMATS as readonly string[]).includes(format)) {
+      throw new Error(`--format must be one of: ${PROJECT_EXPORT_FORMATS.join(", ")}.`);
+    }
+    const outputPath = path.resolve(requiredOption(options, "out"));
+    const projectId = selectedProject(options, environment);
+    const artifact = await client.exports.export(projectId, { format: format as ProjectExportFormat });
+    await fs.writeFile(outputPath, artifact.data);
+    return `Exported ${artifact.filename} (${artifact.bytes} bytes) to ${outputPath}.`;
+  }
+
+  if (command === "import") {
+    const [file, ...arguments_] = rest;
+    if (!file) throw new Error("Use import <file> [--project <id>].");
+    const options = optionValues(arguments_);
+    rejectUnknownOptions(options, ["project"]);
+    const absolute = path.resolve(file);
+    const fileName = path.basename(absolute);
+    if (!(IMPORTABLE_MESH_FORMATS as readonly string[]).some((extension) => fileName.toLowerCase().endsWith(`.${extension}`))) {
+      throw new Error(`Import supports: ${IMPORTABLE_MESH_FORMATS.join(", ")}.`);
+    }
+    const bytes = new Uint8Array(await fs.readFile(absolute));
+    let projectId = options.get("project") ?? targetProjectFromEnvironment(environment);
+    let created = false;
+    if (!projectId) {
+      const name = path.parse(fileName).name || "Imported design";
+      projectId = (await client.projects.create(name)).id;
+      created = true;
+    }
+    const imported = await client.imports.apply(projectId, { fileName, bytes });
+    return `Imported ${fileName} into project ${projectId}${created ? " (created)" : ""}; shape ${imported.shape.id}.`;
+  }
+
+  throw new Error(`Unknown direct command "${command ?? ""}".`);
+}
+
+export async function main(argv: readonly string[], environment: Environment = process.env, fetch?: typeof globalThis.fetch) {
+  if (["projects", "export", "import"].includes(argv[0] ?? "")) {
+    if (argv.includes("--help") || argv.includes("-h")) {
+      process.stdout.write(`${USAGE}\n`);
+      return 0;
+    }
+    const client = clientFromEnvironment(environment, fetch ? { fetch } : {});
+    process.stdout.write(`${await executeDirectCommand(argv, client, environment)}\n`);
+    return 0;
+  }
+
   const options = parseArguments(argv);
   if (options.help || !options.file) {
     process.stdout.write(`${USAGE}\n`);

@@ -21,7 +21,14 @@ function requiredMatch(text, expression, description) {
 function npmMacroHelp() {
   const source = readFileSync(path.join(root, "packages/sketchforge-client/src/cli.ts"), "utf8");
   const help = requiredMatch(source, /const USAGE = `([\s\S]*?)`;/, "the published npm macro runner help text")[1];
-  return help.trimEnd();
+  const directStart = help.indexOf("\nsketchforge-macro projects");
+  return `${help.slice(0, directStart)}${help.slice(help.indexOf("\n\nEnvironment:", directStart))}`.trimEnd();
+}
+
+function npmDirectHelp() {
+  const source = readFileSync(path.join(root, "packages/sketchforge-client/src/cli.ts"), "utf8");
+  const help = requiredMatch(source, /const USAGE = `([\s\S]*?)`;/, "the published npm direct command help text")[1];
+  return help.split("\n").filter((line) => line.startsWith("sketchforge-macro ") && !line.startsWith("sketchforge-macro <macro-file>")).join("\n");
 }
 
 function pythonScriptMetadata() {
@@ -93,6 +100,16 @@ Run a macro file against the SketchForge REST API. Use \`SKETCHFORGE_API_TOKEN\`
 \`\`\`text
 ${npmMacroHelp()}
 \`\`\`
+
+### Direct project and file commands
+
+The same executable can list, create, and delete projects, export a selected project, and import an STL, OBJ, or SVG file:
+
+\`\`\`text
+${npmDirectHelp()}
+\`\`\`
+
+Export uses \`--project\` or \`SKETCHFORGE_PROJECT_ID\`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file.
 
 ### \`${npmMcp[0]}\`
 
