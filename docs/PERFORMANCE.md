@@ -1,3 +1,14 @@
+---
+slug: "/docs/PERFORMANCE"
+title: "Kernel performance budgets"
+audience: "Contributors and API operators"
+owner: "Engine"
+sources:
+  - "tests/perf/kernel-operations.perf.ts"
+  - "tests/perf/support/kernelBudget.ts"
+  - ".github/workflows/perf.yml"
+---
+
 # Kernel performance budgets
 
 Run `npm run engine:build && npm run perf` to execute the import/persistence and exact-kernel performance lanes. The kernel benchmarks print one JSON row per operation with `wallMs`, `heapDeltaMb`, and its enforced budget. The Performance workflow runs on pushes to `main`, weekly, and on manual dispatch; its `performance-report-<run id>` artifact contains the complete output even when a test fails.
