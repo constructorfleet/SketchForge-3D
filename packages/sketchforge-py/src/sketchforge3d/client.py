@@ -906,6 +906,34 @@ class Exports:
         )
 
 
+# REST operation ids implemented by each public client resource. Keep this
+# inventory beside the client resource construction list so parity tests can
+# compare it with the server's operation registry.
+CLIENT_RESOURCE_OPERATIONS = {
+    "projects": ("listProjectsOrGetProject", "createProject", "deleteProject"),
+    "shapes": ("listShapes", "createShapes", "updateShape", "deleteShape"),
+    "edges": ("listEdges",),
+    "faces": ("listFaces",),
+    "measurements": ("listMeasurements", "measureEntities"),
+    "properties": ("getShapeProperties",),
+    "interference": ("analyzeInterference",),
+    "treatments": ("treatShape",),
+    "draft_prisms": ("draftPrism",),
+    "shell": ("shellShape",),
+    "booleans": ("booleanShapes",),
+    "groups": ("groupShapes", "ungroupShape"),
+    "parts": ("splitParts",),
+    "explosions": ("explodeAssembly",),
+    "thickness": ("estimateThickness",),
+    "align": ("alignShapes",),
+    "mirrors": ("mirrorShapes",),
+    "distribute": ("distributeShapes",),
+    "patterns": ("patternShapes",),
+    "imports": ("importGeometry",),
+    "exports": ("exportProject",),
+}
+
+
 class SketchForgeClient:
     def __init__(
         self,

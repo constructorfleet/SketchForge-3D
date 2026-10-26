@@ -68,6 +68,34 @@ import type {
 
 export type SketchForgeClientOptions = TransportOptions;
 
+/** REST operation ids implemented by each public client resource. Keep these
+ * beside the resource list so parity tests can compare clients to the server
+ * registry when a route is added. */
+export const CLIENT_RESOURCE_OPERATIONS = {
+  projects: ["listProjectsOrGetProject", "createProject", "deleteProject"],
+  shapes: ["listShapes", "createShapes", "updateShape", "deleteShape"],
+  edges: ["listEdges"],
+  explosions: ["explodeAssembly"],
+  faces: ["listFaces"],
+  measurements: ["listMeasurements", "measureEntities"],
+  mirrors: ["mirrorShapes"],
+  properties: ["getShapeProperties"],
+  treatments: ["treatShape"],
+  drawings: [],
+  draftPrism: ["draftPrism"],
+  shell: ["shellShape"],
+  align: ["alignShapes"],
+  distribute: ["distributeShapes"],
+  patterns: ["patternShapes"],
+  imports: ["importGeometry"],
+  interference: ["analyzeInterference"],
+  thickness: ["estimateThickness"],
+  exports: ["exportProject"],
+  booleans: ["booleanShapes"],
+  groups: ["groupShapes", "ungroupShape"],
+  parts: ["splitParts"],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+
 export class SketchForgeClient {
   readonly projects: Projects;
   readonly shapes: Shapes;
