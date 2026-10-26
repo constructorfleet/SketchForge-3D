@@ -143,7 +143,7 @@ Some virtual machines do not provide hardware WebGL. Launch SketchForge with sof
 
 ## Windows Desktop Release
 
-GitHub releases include the 64-bit Windows installer `SketchForge-Setup-<version>-x64.exe`.
+GitHub releases include the 64-bit Windows installer `SketchForge-Setup-<version>-x64.exe`, its update blockmap `SketchForge-Setup-<version>-x64.exe.blockmap`, and the `latest.yml` manifest used by automatic updates. Download the `.exe` installer.
 
 1. Download and run the installer.
 2. If Windows SmartScreen warns that the app is unrecognized, verify that you downloaded it from the SketchForge GitHub release, then choose **More info** and **Run anyway**.
