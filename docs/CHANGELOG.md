@@ -9,6 +9,8 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Plain partial revolves saved before their axis was recorded can now be measured, cut, analyzed and exported to STEP exactly when replaying their retained profile reproduces their stored triangles. Recovery preserves placement, mirroring and even radial scale without rewriting a project on reads; changed or unreplayable meshes keep their previous tessellated behavior. Server section and SVG projection drawings now use the exact solid for eligible plain revolves, including recovered legacy ones, instead of drawing their stored facets ([#542](https://github.com/constructorfleet/SketchForge-3D/issues/542)).
+
 - The desktop local-folder download route now caps JSON and multipart request bodies while reading them, before parsing. Text downloads remain limited to 25 MiB and binary downloads to 512 MiB; oversized streamed bodies return 413 without parsing or writing a file.
 - The TypeScript export helper now accepts `featureAngle` for SVG projections of mesh shapes, matching the REST API. It refuses this option for other formats and section drawings before sending the request ([#328](https://github.com/constructorfleet/SketchForge-3D/issues/328), [#506](https://github.com/constructorfleet/SketchForge-3D/issues/506)).
 - Plain sketch revolves now keep Bezier and smooth profile edges as exact CAD curves when their control points stay on the revolve side and within the axial bounds. Properties use the resulting exact solid; profiles that cross the axis or exceed those bounds remain tessellated ([#542](https://github.com/constructorfleet/SketchForge-3D/issues/542)).

@@ -39,6 +39,7 @@ import {
 import { withCadKernel } from "./serverCadKernel.js";
 import { edgeSolidForShape, orientedSolidForShape, ServerCadError, treatmentBakesRotation } from "./serverCadOperations.js";
 import { faceOutwardNormal } from "./serverCadShell.js";
+import { recoverLegacyRevolveShape } from "./serverRevolveRecovery.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
 import { shapePlacementMatrix } from "./serverShapeGroups.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
@@ -246,7 +247,9 @@ function resolveTarget(cad: OcctKernel, target: MeasurementTarget, label: string
  * Both solids are built inside one `withCadKernel` call because the kernel
  * releases every handle when that call returns.
  */
-export function measureBetween(from: MeasurementTarget, to: MeasurementTarget): Promise<ServerCadMeasurementPair> {
+export async function measureBetween(from: MeasurementTarget, to: MeasurementTarget): Promise<ServerCadMeasurementPair> {
+  from = { ...from, shape: await recoverLegacyRevolveShape(from.shape) };
+  to = { ...to, shape: await recoverLegacyRevolveShape(to.shape) };
   return withCadKernel((cad) => {
     const a = resolveTarget(cad, from, "from");
     const b = resolveTarget(cad, to, "to");

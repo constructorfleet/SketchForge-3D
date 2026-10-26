@@ -129,6 +129,46 @@ describe("a plain revolve is measured as its exact solid (#523)", () => {
     expect(resized.provenance.precision).toBe("exact");
   }, CAD_TIMEOUT_MS);
 
+  it("measures a legacy partial sweep exactly without changing its saved placement (#542)", async () => {
+    const { engine: creator } = projectWith([]);
+    const [quarter] = value(await creator.addShapes("revolve", [
+      { kind: "revolve", profile: RING, sides: 24, sweepAngle: 90, x: 100, z: -20, elevation: 3 },
+    ])).shapes;
+    const legacy = { ...quarter, revolveAxisOffset: undefined };
+    const { engine } = projectWith([legacy]);
+    const properties = value(await engine.properties("revolve", legacy.id));
+    const offset = 140 / (9 * Math.PI);
+
+    expect(properties.provenance).toEqual({ source: "parametric", precision: "exact" });
+    expect(properties.volume).toBeCloseTo(150 * Math.PI, 6);
+    expect(properties.centerOfMass.x).toBeCloseTo(100 + offset, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo(7, 6);
+    expect(properties.centerOfMass.z).toBeCloseTo(-20 - offset, 6);
+    expect(legacy.revolveAxisOffset).toBeUndefined();
+  }, CAD_TIMEOUT_MS);
+
+  it("exports a turned, mirrored and resized legacy partial sweep exactly (#542)", async () => {
+    const { engine } = projectWith([]);
+    const [quarter] = value(await engine.addShapes("revolve", [
+      { kind: "revolve", profile: RING, sides: 24, sweepAngle: 90, x: 100, z: -20, elevation: 3 },
+    ])).shapes;
+    const legacy = { ...quarter, revolveAxisOffset: undefined, rotation: 30, mirrorZ: true,
+      width: quarter.width * 1.5, depth: quarter.depth * 1.5 };
+    const { document } = projectWith([legacy]);
+    const artifact = await exportProjectScene(document(), { format: "step" });
+    expect(artifact.exportedCount).toBe(1);
+    const step = new TextDecoder().decode(artifact.data);
+    expect(step.match(/CYLINDRICAL_SURFACE/g)?.length).toBe(2);
+    const imported = await withCadKernel((cad) => cad.queryBatch([cad.importStep(step)])[0]!);
+    const delta = 1.5 * (140 / (9 * Math.PI) - 5);
+    const cosine = Math.sqrt(3) / 2;
+    expect(imported.volume).toBeCloseTo(337.5 * Math.PI, 5);
+    expect(imported.centerOfMass.x).toBeCloseTo(105 + delta * (cosine + 0.5), 5);
+    expect(imported.centerOfMass.y).toBeCloseTo(25 - delta * (cosine - 0.5), 5);
+    expect(imported.centerOfMass.z).toBeCloseTo(7, 5);
+    expect(legacy.revolveAxisOffset).toBeUndefined();
+  }, CAD_TIMEOUT_MS);
+
   it("turns a negative partial sweep from where it ends, as the mesh sweep does", async () => {
     const { engine } = projectWith([]);
     const [arc] = value(await engine.addShapes("revolve", [
@@ -144,6 +184,43 @@ describe("a plain revolve is measured as its exact solid (#523)", () => {
     expect(properties.centerOfMass.z).toBeCloseTo(15 - radius * Math.sin(middle), 6);
   }, CAD_TIMEOUT_MS);
 
+  it("recovers a legacy asymmetric profile with negative sweep, start angle and odd facet count (#542)", async () => {
+    const { engine: creator } = projectWith([]);
+    const [arc] = value(await creator.addShapes("revolve", [
+      { kind: "revolve", profile: TRIANGLE, sides: 25, sweepAngle: -90, startAngle: 30, x: -40, z: 15, elevation: 3 },
+    ])).shapes;
+    const { engine } = projectWith([{ ...arc, revolveAxisOffset: undefined }]);
+    const properties = value(await engine.properties("revolve", arc.id));
+    const radius = 18 * Math.SQRT2 / Math.PI;
+    const middle = -Math.PI / 12;
+    expect(properties.provenance.precision).toBe("exact");
+    expect(properties.volume).toBeCloseTo(625 * Math.PI / 3, 5);
+    expect(properties.centerOfMass.x).toBeCloseTo(-40 + radius * Math.cos(middle), 5);
+    expect(properties.centerOfMass.y).toBeCloseTo(10, 5);
+    expect(properties.centerOfMass.z).toBeCloseTo(15 - radius * Math.sin(middle), 5);
+  }, CAD_TIMEOUT_MS);
+
+  it.each(["changed triangles", "unreplayable source"])("keeps a legacy sweep tessellated after %s (#542)", async (reason) => {
+    const { engine: creator } = projectWith([]);
+    const [quarter] = value(await creator.addShapes("revolve", [
+      { kind: "revolve", profile: RING, sides: 3, sweepAngle: 90, x: 20, z: -10 },
+    ])).shapes;
+    const legacy = { ...quarter, revolveAxisOffset: undefined };
+    if (reason === "changed triangles") {
+      legacy.importedMesh = { ...quarter.importedMesh!, positions: quarter.importedMesh!.positions.map((value, index) => value + (index % 3 === 0 ? 0.25 : 0)) };
+    } else {
+      legacy.sketchProfile = { ...quarter.sketchProfile!, segments: [] };
+    }
+    const { engine } = projectWith([legacy]);
+    const properties = value(await engine.properties("revolve", legacy.id));
+    const offset = 35 * (2 + Math.sqrt(3)) / 27;
+    expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+    expect(properties.volume).toBeCloseTo(450, 3);
+    expect(properties.centerOfMass.x).toBeCloseTo(20 + offset + (reason === "changed triangles" ? 0.25 : 0), 4);
+    expect(properties.centerOfMass.y).toBeCloseTo(4, 4);
+    expect(properties.centerOfMass.z).toBeCloseTo(-10 - offset, 4);
+  }, CAD_TIMEOUT_MS);
+
   it("leaves a helical revolve tessellated", async () => {
     const { engine } = projectWith([]);
     const [spring] = value(await engine.addShapes("revolve", [
@@ -151,6 +228,35 @@ describe("a plain revolve is measured as its exact solid (#523)", () => {
     ])).shapes;
     const properties = value(await engine.properties("revolve", spring.id));
     expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+  }, CAD_TIMEOUT_MS);
+
+  it("keeps legacy revolve members exact when measuring their group (#542)", async () => {
+    const { engine: creator } = projectWith([]);
+    const quarters = value(await creator.addShapes("revolve", [
+      { kind: "revolve", profile: RING, sides: 3, sweepAngle: 90, x: 0 },
+      { kind: "revolve", profile: RING, sides: 3, sweepAngle: 90, x: 30 },
+    ])).shapes;
+    const { engine } = projectWith(quarters.map((shape) => ({ ...shape, revolveAxisOffset: undefined })));
+    const group = value(await engine.group("revolve", quarters.map((shape) => shape.id))).shape;
+    const properties = value(await engine.properties("revolve", group.id));
+    const offset = 140 / (9 * Math.PI);
+    expect(properties.provenance.precision).toBe("exact");
+    expect(properties.volume).toBeCloseTo(300 * Math.PI, 5);
+    expect(properties.centerOfMass.x).toBeCloseTo(15 + offset, 5);
+    expect(properties.centerOfMass.y).toBeCloseTo(4, 5);
+    expect(properties.centerOfMass.z).toBeCloseTo(-offset, 5);
+  }, CAD_TIMEOUT_MS);
+
+  it("checks interference against a legacy partial sweep as exact (#542)", async () => {
+    const { engine: creator } = projectWith([]);
+    const [quarter] = value(await creator.addShapes("revolve", [
+      { kind: "revolve", profile: RING, sides: 25, sweepAngle: -90, startAngle: 30 },
+    ])).shapes;
+    const block = sceneShape({ id: "block", name: "block", kind: "box", color: "#336699", width: 30, depth: 30, height: 8 });
+    const { engine } = projectWith([block, { ...quarter, revolveAxisOffset: undefined }]);
+    const report = value(await engine.interference("revolve", {}));
+    expect(report.pairs).toHaveLength(1);
+    expect(report.pairs[0].precision).toBe("exact");
   }, CAD_TIMEOUT_MS);
 
   it("reports interference against a revolve as exact", async () => {

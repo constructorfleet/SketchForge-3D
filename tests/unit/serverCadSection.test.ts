@@ -1,3 +1,5 @@
+import manifoldModule from "manifold-3d";
+import { parseRevolveRequest, revolvedShapeFromRequest } from "@constructorfleet/sketchforge-engine/revolveRequests";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
@@ -68,6 +70,23 @@ function loopAreaAndCentroid(points: [number, number][]) {
   }
   return { area: Math.abs(twiceArea / 2), centroid: [cu / (3 * twiceArea), cv / (3 * twiceArea)] as [number, number] };
 }
+
+describe("exact sections of plain revolves (#542)", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it.each([false, true])("sections the analytic sweep when legacy=%s", async (legacy) => {
+    const runtime = await manifoldModule();
+    runtime.setup();
+    const request = parseRevolveRequest({ profile: [[5, 0], [10, 0], [10, 8], [5, 8]], sides: 3, sweepAngle: 90 });
+    if (!request.ok) throw new Error(request.error);
+    const quarter = revolvedShapeFromRequest(runtime, request, { x: 20, z: -10 });
+    const svg = await sectionShapesToSvg([{ ...quarter, revolveAxisOffset: legacy ? undefined : quarter.revolveAxisOffset }], { plane: "xy", offset: 4 });
+    const loops = svgLoops(svg);
+    expect(loops).toHaveLength(1);
+    const { area, centroid } = loopAreaAndCentroid(loops[0]);
+    expect(Math.abs(area / (75 * Math.PI / 4) - 1)).toBeLessThan(0.008);
+    expect(centroid[0]).toBeCloseTo(20 + 140 / (9 * Math.PI), 1);
+    expect(centroid[1]).toBeCloseTo(10 + 140 / (9 * Math.PI), 1);
+  });
+});
 
 describe("section drawings of meshes above the old 50,000-triangle cap", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   it("slices a 62,400-triangle mesh where it stands", async () => {

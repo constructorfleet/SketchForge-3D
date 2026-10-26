@@ -5,6 +5,7 @@
  * shares; this places the stored shapes and runs it on the server's kernel.
  */
 
+import { recoverLegacyRevolveShapes } from "./serverRevolveRecovery.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { placedSolid } from "./serverShapeBooleans.js";
 import { interferenceBetweenSolids, interferenceRequestRefusal, type InterferenceResult } from "./cadAnalysis.js";
@@ -28,10 +29,11 @@ export type InterferenceRequest = { ids?: readonly string[]; clearance?: number 
 export async function checkInterference(shapes: readonly WorkplaneShape[], request: InterferenceRequest = {}): Promise<InterferenceResult> {
   const clearance = request.clearance ?? 0;
   const ids = request.ids ? new Set(request.ids) : null;
-  const selected = shapes.filter((shape) => !shape.hidden && !shape.hole && (!ids || ids.has(shape.id)));
+  let selected = shapes.filter((shape) => !shape.hidden && !shape.hole && (!ids || ids.has(shape.id)));
   // Refuse before the kernel is even reached: an oversized request costs nothing.
   const refusal = interferenceRequestRefusal(selected.length, clearance);
   if (refusal) return { ok: false, refusal };
+  selected = await recoverLegacyRevolveShapes(selected);
 
   return withCadKernel((cad) => interferenceBetweenSolids(
     cad,

@@ -49,6 +49,8 @@ import {
   type MeshEdgeSet,
   type TriangleSoup,
 } from "./meshEdgeProjection.js";
+import { recoverLegacyRevolveShapes } from "./serverRevolveRecovery.js";
+import { hasExactRevolveSolid } from "./serverCadOperations.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import { isGroupRecord, placedSolidForShape } from "./serverShapeBooleans.js";
@@ -81,6 +83,7 @@ function drawingCompound(cad: OcctKernel, shapes: readonly WorkplaneShape[]): Sh
 
 /** Whether a mesh is anywhere among the shape or, for a group record, its members. */
 function holdsMesh(shape: WorkplaneShape): boolean {
+  if (hasExactRevolveSolid(shape)) return false;
   if (worldMeshForShape(shape)) return true;
   return isGroupRecord(shape) && restoreGroupedChildren(shape).some(holdsMesh);
 }
@@ -104,6 +107,7 @@ function drawingMembers(shape: WorkplaneShape): WorkplaneShape[] {
 
 /** A mesh shape's triangles in the drawing frame: `[x, y, z]` becomes `[x, -z, y]`. */
 function drawingSoup(shape: WorkplaneShape): Float64Array | null {
+  if (hasExactRevolveSolid(shape)) return null;
   const mesh = worldMeshForShape(shape);
   if (!mesh) return null;
   const soup = new Float64Array(mesh.faces.length * 9);
@@ -202,7 +206,7 @@ function soupBounds(soups: readonly Float64Array[]) {
  * Refuses, as the mesh exports do, when nothing is left to draw, and refuses
  * a crease angle outside 0 to 180 degrees.
  */
-export function projectShapesToSvg(shapes: readonly WorkplaneShape[], options: ProjectionOptions = {}): Promise<string> {
+export async function projectShapesToSvg(shapes: readonly WorkplaneShape[], options: ProjectionOptions = {}): Promise<string> {
   const visible = shapes.filter((shape) => shape.hidden !== true && shape.hole !== true);
   if (!visible.length) {
     return Promise.reject(new ServerCadError("No visible solid objects to draw.", 422));
@@ -216,7 +220,7 @@ export function projectShapesToSvg(shapes: readonly WorkplaneShape[], options: P
 
   const soups: Float64Array[] = [];
   const exactShapes: WorkplaneShape[] = [];
-  for (const shape of visible.flatMap(drawingMembers)) {
+  for (const shape of (await recoverLegacyRevolveShapes(visible)).flatMap(drawingMembers)) {
     const soup = drawingSoup(shape);
     if (soup) soups.push(soup);
     else exactShapes.push(shape);

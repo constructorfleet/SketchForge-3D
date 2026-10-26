@@ -1,3 +1,5 @@
+import manifoldModule from "manifold-3d";
+import { parseRevolveRequest, revolvedShapeFromRequest } from "@constructorfleet/sketchforge-engine/revolveRequests";
 import { describe, expect, it } from "vitest";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { projectShapesToSvg } from "@constructorfleet/sketchforge-engine/serverCadProjection";
@@ -21,6 +23,29 @@ function visiblePoints(svg: string) {
   const paths = [...svg.matchAll(/<path d="([^"]+)" fill="none" stroke="#111111"/g)].map((match) => match[1]);
   return paths.flatMap((d) => [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((match) => [Number(match[1]), Number(match[2])] as const));
 }
+
+describe("exact projections of plain revolves (#542)", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it.each([false, true])("draws the curved rim when legacy=%s", async (legacy) => {
+    const runtime = await manifoldModule();
+    runtime.setup();
+    const request = parseRevolveRequest({ profile: [[5, 0], [10, 0], [10, 8], [5, 8]], sides: 3, sweepAngle: 90 });
+    if (!request.ok) throw new Error(request.error);
+    const quarter = revolvedShapeFromRequest(runtime, request, { x: 20, z: -10 });
+    const svg = await projectShapesToSvg([{ ...quarter, revolveAxisOffset: legacy ? undefined : quarter.revolveAxisOffset }], { view: "top", panelSize: 400 });
+    // Three sweep segments leave a visibly polygonal quarter rim.
+    // The exact rim must include intermediate curve samples in the SVG.
+    const points = new Set(visiblePoints(svg).map(([x, y]) => `${x},${y}`));
+    expect(points.size).toBeGreaterThan(12);
+    const vertices = visiblePoints(svg);
+    const axisX = Math.min(...vertices.map(([x]) => x));
+    const axisY = Math.max(...vertices.map(([, y]) => y));
+    const radius = Math.max(...vertices.map(([x]) => x)) - axisX;
+    for (const [x, y] of vertices) {
+      const distance = Math.hypot(x - axisX, y - axisY);
+      expect(Math.min(Math.abs(distance - radius), Math.abs(distance - radius / 2)) / radius).toBeLessThan(0.001);
+    }
+  });
+});
 
 describe("projecting stored shapes to SVG on the server", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
   it("draws the default four-view grid with the part's size in the drawing frame", async () => {
