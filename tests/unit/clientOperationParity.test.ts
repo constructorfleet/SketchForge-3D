@@ -132,7 +132,7 @@ function operationLookup() {
   return new Map(API_V1_OPERATIONS.map((operation) => [operation.operationId, operation]));
 }
 
-async function captureTypeScriptDeleteAllRequests(): Promise<CapturedRequest[]> {
+async function captureTypeScriptDeleteAllRequests(lockedShape = true): Promise<CapturedRequest[]> {
   const requests: CapturedRequest[] = [];
   const client = new SketchForgeClient({
     baseUrl: "http://parity.test",
@@ -141,7 +141,7 @@ async function captureTypeScriptDeleteAllRequests(): Promise<CapturedRequest[]> 
       const url = new URL(input);
       requests.push({ method: init?.method ?? "GET", pathname: url.pathname, query: url.search, body: typeof init?.body === "string" ? init.body : undefined });
       const body = url.pathname.endsWith("/shapes") && (init?.method ?? "GET") === "GET"
-        ? JSON.stringify({ shapes: [{ id: SHAPE_ID, locked: true }] })
+        ? JSON.stringify({ shapes: [{ id: SHAPE_ID, locked: lockedShape }] })
         : "{}";
       return new Response(body, { status: 200 });
     },
@@ -190,7 +190,7 @@ async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
   return requests;
 }
 
-function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[] } {
+function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[]; unlockedCompositeRequests: CapturedRequest[] } {
   const python = process.platform === "win32" ? "python" : "python3";
   const source = [
     "import json, tempfile, urllib.parse",
@@ -201,11 +201,11 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     "    def __exit__(self, *args): return False",
     "    def read(self): return self.body",
     "class Opener:",
-    "    def __init__(self): self.requests = []",
+    "    def __init__(self, locked_shape=True): self.requests = []; self.locked_shape = locked_shape",
     "    def open(self, request, timeout=None):",
     "        parsed = urllib.parse.urlsplit(request.full_url)",
     "        self.requests.append({'method': request.get_method(), 'pathname': parsed.path, 'query': parsed.query, 'body': request.data.decode() if request.data else None})",
-    "        if parsed.path == '/api/v1/shapes' and request.get_method() == 'GET': return Reply(b'{\"shapes\":[{\"id\":\"parity-shape\",\"locked\":true}]}')",
+    "        if parsed.path == '/api/v1/shapes' and request.get_method() == 'GET': return Reply(json.dumps({'shapes': [{'id': 'parity-shape', 'locked': self.locked_shape}]}).encode())",
     "        return Reply()",
     "opener = Opener()",
     "client = SketchForgeClient('http://parity.test', 'test', opener=opener)",
@@ -228,14 +228,17 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     "composite_opener = Opener()",
     "composite_client = SketchForgeClient('http://parity.test', 'test', opener=composite_opener)",
     "composite_client.shapes.delete_all('parity-project')",
-    "print(json.dumps({'requests': opener.requests, 'calls': calls, 'compositeRequests': composite_opener.requests}))",
+    "unlocked_opener = Opener(locked_shape=False)",
+    "unlocked_client = SketchForgeClient('http://parity.test', 'test', opener=unlocked_opener)",
+    "unlocked_client.shapes.delete_all('parity-project')",
+    "print(json.dumps({'requests': opener.requests, 'calls': calls, 'compositeRequests': composite_opener.requests, 'unlockedCompositeRequests': unlocked_opener.requests}))",
   ].join("\n");
   const output = execFileSync(python, ["-c", source, JSON.stringify({ ...PYTHON_CALL_ARGUMENTS, ...PY_METHOD_ARGUMENTS })], {
     cwd: path.join(root, "packages/sketchforge-py"),
     env: { ...process.env, PYTHONPATH: "src" },
     encoding: "utf8",
   });
-  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[] };
+  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[]; unlockedCompositeRequests: CapturedRequest[] };
 }
 
 function captureMcpRequest(toolName: string, args: Record<string, unknown>, filesDir: string): CapturedRequest[] {
@@ -348,8 +351,9 @@ describe("REST client operation parity", () => {
       expect(call?.queries[0], `Python ${resource}.list_page limit`).toContain("limit=10");
       expect(call?.queries[0], `Python ${resource}.list_page cursor`).toContain("cursor=next-page");
     }
+    const pythonProjectGet = pythonCaptured.calls.find((candidate) => candidate.resource === "projects" && candidate.method === "get");
+    expect(pythonProjectGet?.queries[0], "Python projects.get projectId").toContain("projectId=parity-project");
     expect(pythonCaptured.requests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(pythonExpected);
-    expect(pythonCaptured.requests.find(({ query }) => query?.includes("projectId=parity-project"))).toBeDefined();
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("limit=10"))).toBeDefined();
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("cursor=next-page"))).toBeDefined();
 
@@ -377,6 +381,23 @@ describe("REST client operation parity", () => {
     expect(pythonCaptured.compositeRequests[2]?.query).toContain("shapeId=parity-shape");
     expect(pythonCaptured.compositeRequests[0]?.body).toBeNull();
     expect(pythonCaptured.compositeRequests[2]?.body).toBeNull();
+
+    const unlockedDeleteAllIds = ["listShapes", "deleteShape"];
+    const unlockedDeleteAllExpected = unlockedDeleteAllIds.map((operationId) => {
+      const operation = operationById.get(operationId)!;
+      return { method: operation.method, pathname: operation.path };
+    });
+    const typeScriptUnlockedDeleteAll = await captureTypeScriptDeleteAllRequests(false);
+    expect(typeScriptUnlockedDeleteAll.map(({ method, pathname }) => ({ method, pathname }))).toEqual(unlockedDeleteAllExpected);
+    expect(typeScriptUnlockedDeleteAll[0]?.query).toContain("projectId=parity-project");
+    expect(typeScriptUnlockedDeleteAll[1]?.query).toContain("projectId=parity-project");
+    expect(typeScriptUnlockedDeleteAll[1]?.query).toContain("shapeId=parity-shape");
+    expect(typeScriptUnlockedDeleteAll.every(({ body }) => body === undefined)).toBe(true);
+    expect(pythonCaptured.unlockedCompositeRequests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(unlockedDeleteAllExpected);
+    expect(pythonCaptured.unlockedCompositeRequests[0]?.query).toContain("projectId=parity-project");
+    expect(pythonCaptured.unlockedCompositeRequests[1]?.query).toContain("projectId=parity-project");
+    expect(pythonCaptured.unlockedCompositeRequests[1]?.query).toContain("shapeId=parity-shape");
+    expect(pythonCaptured.unlockedCompositeRequests.every(({ body }) => body == null)).toBe(true);
 
     const filesDir = mkdtempSync(path.join(tmpdir(), "sketchforge-client-parity-"));
     try {
