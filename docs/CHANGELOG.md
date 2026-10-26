@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Deployment guidance now explains that server-backed and shared project routes have no user authentication, that the REST API token covers only `/api/v1`, and that untrusted deployments need an authenticating reverse proxy ([#340](https://github.com/constructorfleet/SketchForge-3D/issues/340)).
 - The packaged desktop app now closes its web server when the app is force-killed, and a restart recognizes and reuses a SketchForge server left by an older build instead of showing a false busy-port error ([#545](https://github.com/constructorfleet/SketchForge-3D/issues/545)).
 
 - Exact solids stored by the editor now keep analytic faces when the CAD worker moves or rotates them for exact operations. Previously, even a rigid placement converted cylindrical faces to splines, making volume and downstream operations less accurate. Non-uniform scaling and shear still use the general affine transform ([#558](https://github.com/constructorfleet/SketchForge-3D/issues/558)).

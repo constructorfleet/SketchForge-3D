@@ -21,6 +21,17 @@ The compose files publish container port `3000` on host port `3000` by default. 
 
 Set `SKETCHFORGE_PROJECTS_DIR` to a writable persistent directory to store a user's projects on the server instead of in browser-local storage. The Docker compose configuration maps `/data/my-projects` to the `sketchforge-projects` volume by default; `SKETCHFORGE_PROJECTS_VOLUME` changes that volume or bind-mount source. See [server-side project storage](https://github.com/constructorfleet/SketchForge-3D#server-side-project-storage) for migration and persistence behavior.
 
+## Who can do what
+
+Server-backed projects and the shared project library are available to any caller that can reach the SketchForge server. They do not require a user account or an API token:
+
+- `GET /api/projects` is unauthenticated: it lists every server-backed project, and `GET /api/projects?projectId=…` reads that project's `.skf` file. When `SKETCHFORGE_PROJECTS_DIR` is configured, `POST` creates or overwrites a project and `DELETE` removes it.
+- `GET /api/shared-projects` is unauthenticated: it lists or downloads shared projects and thumbnails. When `SKETCHFORGE_SHARED_PROJECTS_DIR` is configured, `POST` publishes or replaces a shared project and `DELETE` removes one.
+- The write and delete handlers reject browser requests whose `Origin` does not match the server origin. They accept requests with no `Origin` header, which includes common command-line and scripted clients. A non-browser caller can also set request headers itself, so this same-origin check is a cross-site request defense, not authentication or an authorization boundary.
+- `SKETCHFORGE_API_TOKEN` protects the separate scripting API under `/api/v1`. It does not protect `/api/projects` or `/api/shared-projects`.
+
+For a trusted classroom or lab network, limit access to the server to that network. For deployments reachable by untrusted users, put SketchForge behind a reverse proxy or identity gateway that authenticates and authorizes requests to these routes. Keep the application port inaccessible to clients that could bypass the proxy; proxy authentication only protects requests that pass through it. The REST API token alone does not secure server-backed or shared project storage.
+
 ## REST API access
 
 Set `SKETCHFORGE_API_TOKEN` together with `SKETCHFORGE_PROJECTS_DIR` to enable authenticated REST API access. Treat the token as a secret: use a high-entropy value, store it in the deployment's secret manager, and keep it out of browser code and logs. See the [REST API deployment instructions](https://github.com/constructorfleet/SketchForge-3D#rest-api).
