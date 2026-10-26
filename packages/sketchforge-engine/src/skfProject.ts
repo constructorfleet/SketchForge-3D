@@ -5,6 +5,7 @@ import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWo
 import { importedShapeFromObj } from "./objImport.js";
 import { normalizeProjectAsset, sha256Hex } from "./projectAssets.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
+import { migratePre548CutBrepFrames } from "./cutBrepFrameMigration.js";
 import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
@@ -1805,6 +1806,12 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
     )));
     restoredStates.set(state.id, shapes);
   }
+  // Cuts saved before #548 recorded where they stood instead of where their
+  // B-rep is. Corrected on every load, not by version: the correction leaves
+  // a frame already at the origin alone, so it is a no-op on cuts saved since,
+  // and the format stays readable by releases from before the fix.
+  const migrationMemo = new Map<WorkplaneShape, WorkplaneShape>();
+  for (const [stateId, shapes] of restoredStates) restoredStates.set(stateId, migratePre548CutBrepFrames(shapes, migrationMemo));
   const history = document.history.entries.map((entry) => editorHistoryEntry(restoredStates.get(entry.stateId) ?? [], entry.selectedObjectIds));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
   const hydrated = liveEditorHistoryState(shapes, history, document.history.index);

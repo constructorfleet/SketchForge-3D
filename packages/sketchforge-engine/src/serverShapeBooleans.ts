@@ -255,10 +255,13 @@ function enclosedVolume(positions: readonly number[]) {
  *
  * Placed the way the mesh is placed, since the two share a frame: mirrored
  * exactly about the shape's centre, then moved rigidly, so the cut's
- * cylinders stay cylinders. `cadBrepFrame` is deliberately not read for the
- * position: a cut records the result's placement there rather than the
- * B-rep's own bounds, so `cadBrepTransformForShape` would leave it at the
- * origin.
+ * cylinders stay cylinders. A cut's B-rep is in the result's own frame, at the
+ * origin -- what `cadBrepFrame` records for a cut since #548, and what loading
+ * a project corrects an older cut's frame to (`migratePre548CutBrepFrames`) --
+ * so the frame's position is not needed here; `cadBrepTransformForShape` would
+ * give the same placement, only with the mirror folded into an affine scale.
+ * A B-rep stored anywhere else fails the bounds check below and falls back to
+ * the mesh.
  *
  * The B-rep is checked against the mesh before it is trusted, because the
  * structural test cannot see an edit that replaced the triangles and left the
@@ -469,7 +472,9 @@ export async function buildGroupFromSelection(selection: WorkplaneShape[]): Prom
         normals: result.meshed.normals?.length === group.importedMesh!.positions.length ? result.meshed.normals : undefined,
       },
       cadBrep: result.brep,
-      cadBrepFrame: { x: group.x, z: group.z, elevation: group.elevation ?? 0, width, depth, height: group.height },
+      // Where the B-rep is, not where the shape is: it was recentred above
+      // into the result's own frame, at the origin (#548).
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width, depth, height: group.height },
       groupedBaseWidth: width,
       groupedBaseDepth: depth,
       groupedBaseHeight: group.height,
