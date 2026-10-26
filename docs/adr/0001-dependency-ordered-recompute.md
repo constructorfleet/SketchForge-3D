@@ -1,3 +1,10 @@
+---
+slug: /docs/adr/0001-dependency-ordered-recompute
+title: Dependency-ordered parametric recomputation
+audience: Contributors
+owner: Engine
+---
+
 # ADR 0001: Dependency-ordered parametric recomputation
 
 - Status: Proposed
