@@ -21,6 +21,18 @@ test("pull request unit workflows run the Python client unit suite", () => {
   }
 });
 
+test("CI runs the Python client unit suite exactly once", () => {
+  const workflow = load("ci.yml");
+  const commands = Object.values(workflow.jobs)
+    .flatMap((job) => job.steps ?? [])
+    .map((step) => (step.run ?? "").trim());
+  assert.equal(
+    commands.filter((command) => command === "npm run client:test:py").length,
+    1,
+    "CI runs the Python client unit suite more than once",
+  );
+});
+
 test("performance workflow runs on main and preserves its report artifact", () => {
   const workflow = load("perf.yml");
   const triggers = workflow.on ?? workflow[true];
