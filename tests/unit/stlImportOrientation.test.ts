@@ -31,6 +31,14 @@ describe("STL import orientation", () => {
     expect(shape.importedMesh?.baseDepth).toBeCloseTo(60);
   });
 
+  it("keeps tall Z-up models upright instead of inferring Y-up from their proportions", () => {
+    const shape = importedShapeFromStl("tall-cylinder.stl", boxStl(49, 49, 150));
+
+    expect(shape.importedMesh?.baseWidth).toBeCloseTo(49);
+    expect(shape.importedMesh?.baseHeight).toBeCloseTo(150);
+    expect(shape.importedMesh?.baseDepth).toBeCloseTo(49);
+  });
+
   it("preserves an unmistakably flat Y-up legacy model", () => {
     const shape = importedShapeFromStl("raspberry-pi-like.stl", boxStl(89, 20, 58));
 

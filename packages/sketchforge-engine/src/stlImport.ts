@@ -23,9 +23,13 @@ function stlUsesSketchForgeYUp(buffer: ArrayBuffer, position: THREE.BufferAttrib
 
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
   for (let i = 0; i < position.count; i += 1) {
+    minX = Math.min(minX, position.getX(i));
+    maxX = Math.max(maxX, position.getX(i));
     minY = Math.min(minY, position.getY(i));
     maxY = Math.max(maxY, position.getY(i));
     minZ = Math.min(minZ, position.getZ(i));
@@ -34,10 +38,14 @@ function stlUsesSketchForgeYUp(buffer: ArrayBuffer, position: THREE.BufferAttrib
 
   const ySpan = maxY - minY;
   const zSpan = maxZ - minZ;
+  const xSpan = maxX - minX;
   // Some legacy/model-library STLs (including the Raspberry Pi fixture) are
   // unmistakably flat on Y. Keep that established orientation; ambiguous STL
   // files follow the slicer-standard Z-up convention.
-  return Number.isFinite(ySpan) && Number.isFinite(zSpan) && ySpan <= zSpan * 0.55;
+  // A small Y span alone is not enough: a tall Z-up part often has Y equal to
+  // its width. Legacy Y-up models are recognizable when Y is much smaller
+  // than both horizontal dimensions.
+  return Number.isFinite(ySpan) && Number.isFinite(xSpan) && Number.isFinite(zSpan) && ySpan <= Math.min(xSpan, zSpan) * 0.55;
 }
 
 export function importedShapeFromTriangleSoup(
