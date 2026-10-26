@@ -13,9 +13,6 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 | Epic | Status |
 | --- | --- |
-| [#324: Project storage durability](https://github.com/constructorfleet/SketchForge-3D/issues/324) | Open; autosave, server volume, and project provenance work is tracked below the epic. |
-| [#325: Server route and local MCP safety](https://github.com/constructorfleet/SketchForge-3D/issues/325) | Open; route hardening and caller isolation work is tracked below the epic. |
-| [#326: Desktop release installers](https://github.com/constructorfleet/SketchForge-3D/issues/326) | Open; cross-platform installer and release work is in progress. |
 | [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Open; the dependency scheduler for source edits is implemented in PR #580, with broader editable feature history remaining. |
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Open; REST, TypeScript, Python, MCP, and CLI parity work is tracked below the epic. |
 | [#329: Editor parity with engine and API](https://github.com/constructorfleet/SketchForge-3D/issues/329) | Open; editor parity work is tracked below the epic. |
@@ -49,22 +46,6 @@ This page summarizes active tracked work. Issue status remains authoritative.
 ## Dependency maintenance
 
 - [#397: Keep Vitest's mocker out of production installs](https://github.com/constructorfleet/SketchForge-3D/issues/397) — security dependency fix.
-
-## Project storage durability
-
-Tracked under [epic #324](https://github.com/constructorfleet/SketchForge-3D/issues/324).
-
-- [#340: Document access to server-backed and shared projects](https://github.com/constructorfleet/SketchForge-3D/issues/340) — the deployment guide states that storage routes are unauthenticated and recommends an authenticating reverse proxy when the server is reachable by untrusted users.
-- [#332: Surface autosave failures while editing](https://github.com/constructorfleet/SketchForge-3D/issues/332) — P0, open.
-- [#336: Secure local folder downloads](https://github.com/constructorfleet/SketchForge-3D/issues/336) — P0, open; the route is opt-in, confines writes to its configured root, and bounds JSON and multipart bodies before parsing. The route still cannot inspect the socket peer address, so the packaged app binds to loopback and the helper must not be enabled on a network listener.
-- [#333: Request persistent storage, warn on quota, and export all projects](https://github.com/constructorfleet/SketchForge-3D/issues/333) — P2. Implementation complete with ZIP writer, threshold, and round-trip unit coverage and a dashboard browser test; awaiting review. The dashboard cannot yet import a backup ZIP directly, so each `.skf` file is opened separately.
-- [#377: Handle failed project thumbnail captures](https://github.com/constructorfleet/SketchForge-3D/issues/377) — capture failures are logged and retried; zero-size or lost-context canvases return an empty thumbnail; implementation and regression coverage complete, awaiting review.
-
-## API request safety
-
-Tracked under [route security epic #325](https://github.com/constructorfleet/SketchForge-3D/issues/325).
-
-- [#338: Enforce request body size limits on REST routes](https://github.com/constructorfleet/SketchForge-3D/issues/338) — P2, open.
 
 ## API contract accuracy
 
