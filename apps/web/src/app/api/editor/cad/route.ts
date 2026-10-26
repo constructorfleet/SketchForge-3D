@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     }
     if (body.operation === "export") {
       if (!Array.isArray(body.shapes) || !body.shapes.length || !body.shapes.every(validShape)) return json({ error: "At least one valid shape is required." }, 400);
-      if (body.format !== "svg" && body.format !== "dxf") return json({ error: "Only kernel SVG and section DXF are supported." }, 400);
+      if (body.format !== "svg" && body.format !== "dxf" && body.format !== "step") return json({ error: "Only kernel STEP, SVG and section DXF are supported." }, 400);
       const artifact = await exportProjectScene(
         { projectName: typeof body.name === "string" ? body.name : "SketchForge design", shapes: body.shapes } as Parameters<typeof exportProjectScene>[0],
         {
@@ -55,7 +55,13 @@ export async function POST(request: Request) {
           ...(typeof body.view === "string" ? { view: body.view as "front" | "back" | "top" | "bottom" | "left" | "right" | "iso" | "multiview" } : {}),
         },
       );
-      return new Response(Buffer.from(artifact.data), { headers: { "Content-Type": artifact.mimeType, "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(artifact.filename)}`, "Cache-Control": "no-store" } });
+      return new Response(Buffer.from(artifact.data), { headers: {
+        "Content-Type": artifact.mimeType,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(artifact.filename)}`,
+        "Cache-Control": "no-store",
+        ...(artifact.exportedCount === undefined ? {} : { "X-SketchForge-Exported-Count": String(artifact.exportedCount) }),
+        ...(artifact.skipped === undefined ? {} : { "X-SketchForge-Skipped-Count": String(artifact.skipped.length) }),
+      } });
     }
     return json({ error: "Unknown editor CAD operation." }, 400);
   } catch (error) {

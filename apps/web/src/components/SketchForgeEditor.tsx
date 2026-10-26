@@ -9819,15 +9819,32 @@ export function SketchForgeEditor({
     setStepExporting(true);
     setNotice(notice((t) => t("editor.export.buildingBrep")));
     try {
-      const { exportShapesToStep } = await import("@/lib/engine/stepExport");
-      const { blob, exportedCount, skipped } = await exportShapesToStep(sourceShapes);
-      const text = await blob.text();
+      let text: string;
+      let exportedCount: number;
+      let skippedCount: number;
+      if (STATIC_EXPORT_BUILD) {
+        const { exportShapesToStep } = await import("@/lib/engine/stepExport");
+        const result = await exportShapesToStep(sourceShapes);
+        text = await result.blob.text();
+        exportedCount = result.exportedCount;
+        skippedCount = result.skipped.length;
+      } else {
+        const request = editorExportRequest(projectId ?? "local", "step", exportName, undefined, sourceShapes);
+        const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null) as ErrorResponseFields | null;
+          throw errorFromResponse(body) ?? new LocalizedError("errors.editor.exportFailedStatus", { status: response.status });
+        }
+        text = await response.text();
+        exportedCount = Number(response.headers.get("X-SketchForge-Exported-Count") ?? sourceShapes.length);
+        skippedCount = Number(response.headers.get("X-SketchForge-Skipped-Count") ?? 0);
+      }
       const result = await downloadTextFile(projectExportFileName(exportName, "step"), text, "application/step");
       const exportedNotice = (t: Translator) => result.mode === "folder"
         ? t("editor.export.stepSaved", { count: exportedCount, path: result.path })
         : t("editor.export.stepExported", { count: exportedCount });
-      setNotice(notice((t) => skipped.length > 0
-        ? t("editor.notice.withDetail", { message: exportedNotice(t), detail: t("editor.export.stepSkipped", { count: skipped.length }) })
+      setNotice(notice((t) => skippedCount > 0
+        ? t("editor.notice.withDetail", { message: exportedNotice(t), detail: t("editor.export.stepSkipped", { count: skippedCount }) })
         : exportedNotice(t)));
     } catch (error: unknown) {
       setNotice(notice((t) => errorText(t, error, "editor.export.failed", { format: "STEP" })));
