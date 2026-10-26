@@ -1,6 +1,5 @@
 const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
-const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createDesktopI18n } = require("./i18n.cjs");
@@ -12,7 +11,15 @@ const {
   resolveDesktopPort,
 } = require("./port.cjs");
 const { createProjectFileQueue, readProjectFile, skfPathsFromArgv } = require("./projectFiles.cjs");
-const { createUpdateInstaller, settlesWithin, singleFlight, stopProcess, watchProcess } = require("./webProcess.cjs");
+const {
+  createUpdateInstaller,
+  isSketchForgeDesktopServer,
+  settlesWithin,
+  singleFlight,
+  spawnOwnedWebServer,
+  stopProcess,
+  watchProcess,
+} = require("./webProcess.cjs");
 const { whenWindowReady } = require("./windowReady.cjs");
 
 const devUrl = process.env.SKETCHFORGE_DESKTOP_DEV_URL?.trim() || "";
@@ -81,7 +88,7 @@ async function waitForServer(url, port, timeoutMs = 30_000) {
 async function startPackagedWebServer() {
   // Starting again (macOS `activate` after the window closed) reuses the running
   // web process; a second one would find SketchForge's own port taken.
-  if (webServer && webServerUrl && !webServerWatch.isClosed()) return webServerUrl;
+  if (webServerUrl && (!webServer || !webServerWatch || !webServerWatch.isClosed())) return webServerUrl;
 
   const webRoot = path.join(process.resourcesPath, "web");
   const serverPath = path.join(webRoot, "apps", "web", "server.js");
@@ -99,10 +106,17 @@ async function startPackagedWebServer() {
     console.warn(warning);
     rejectedPortValue = requestedPort;
   });
+  const url = `http://127.0.0.1:${port}`;
   try {
     await assertPortAvailable(port, "127.0.0.1");
   } catch (error) {
     const failure = listenFailure(error);
+    if (failure === "inUse" && await isSketchForgeDesktopServer(url)) {
+      // A process left by a forced quit of an older build still serves the
+      // desktop app. Reuse it so the user can reopen their work immediately.
+      webServerUrl = url;
+      return url;
+    }
     if (failure) throw new Error(listenFailureMessage(t, failure, port));
     throw error;
   }
@@ -110,7 +124,10 @@ async function startPackagedWebServer() {
   const packagedNodeModules = path.join(process.resourcesPath, "app.asar", "node_modules");
 
   webServerOutput = "";
-  webServer = spawn(process.execPath, [serverPath], {
+  // Preserve the standalone server's argv while adding the IPC disconnect
+  // handler that makes it exit if Electron is force-killed.
+  const serverScript = `const serverPath = ${JSON.stringify(serverPath)};\nprocess.argv = [process.execPath, serverPath];\nrequire(serverPath);`;
+  webServer = spawnOwnedWebServer(process.execPath, serverScript, {
     cwd: path.dirname(serverPath),
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -132,7 +149,6 @@ async function startPackagedWebServer() {
   webServer.stdout?.on("data", appendServerOutput);
   webServer.stderr?.on("data", appendServerOutput);
 
-  const url = `http://127.0.0.1:${port}`;
   await waitForServer(url, port);
   webServerUrl = url;
   return url;
@@ -140,8 +156,8 @@ async function startPackagedWebServer() {
 
 /** Stops the web process; resolves once it has exited and released its port. */
 async function stopPackagedWebServer() {
-  if (!webServer || !webServerWatch) return;
   webServerUrl = null;
+  if (!webServer || !webServerWatch) return;
   await stopProcess(webServer, webServerWatch);
 }
 

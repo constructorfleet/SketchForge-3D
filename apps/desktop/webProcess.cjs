@@ -1,6 +1,38 @@
 // Lifecycle helpers for the packaged desktop app's web process. No Electron
 // imports so they can be unit-tested.
 
+const { spawn } = require("node:child_process");
+
+const SKETCHFORGE_PAGE_MARKER = "Browser-based SketchForge editor workspace";
+
+/**
+ * Starts a packaged web server with an IPC lifetime channel. If Electron is
+ * force-killed, Node closes that channel and the server exits instead of
+ * keeping the desktop port occupied as an orphan.
+ */
+function spawnOwnedWebServer(execPath, script, options = {}) {
+  const stdio = options.stdio ?? ["ignore", "pipe", "pipe"];
+  const bootstrap = `process.on("disconnect", () => process.exit(0));\n${script}`;
+  return spawn(execPath, ["-e", bootstrap], {
+    ...options,
+    stdio: [...stdio, "ipc"],
+  });
+}
+
+/** True when the loopback port already serves SketchForge's web app. */
+async function isSketchForgeDesktopServer(url, fetchImpl = globalThis.fetch) {
+  try {
+    const response = await fetchImpl(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) return false;
+    return (await response.text()).includes(SKETCHFORGE_PAGE_MARKER);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Tracks when a child process is fully closed: exited *and* its stdio streams
  * ended. `exit` can fire before the last stderr chunk arrives, and that chunk
@@ -103,4 +135,12 @@ function createUpdateInstaller({ stop, install }) {
   };
 }
 
-module.exports = { createUpdateInstaller, settlesWithin, singleFlight, stopProcess, watchProcess };
+module.exports = {
+  createUpdateInstaller,
+  isSketchForgeDesktopServer,
+  settlesWithin,
+  singleFlight,
+  spawnOwnedWebServer,
+  stopProcess,
+  watchProcess,
+};

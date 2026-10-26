@@ -1,6 +1,6 @@
 /** Types for webProcess.cjs, which the desktop main process loads as plain CommonJS. */
 
-import type { ChildProcess } from "node:child_process";
+import type { ChildProcess, SpawnOptions } from "node:child_process";
 
 export type ProcessWatch = {
   /** Settles once the process exited and its stdio streams ended, or it never spawned. */
@@ -9,6 +9,10 @@ export type ProcessWatch = {
 };
 
 declare const webProcess: {
+  /** Starts a server child that exits when its parent IPC channel closes. */
+  spawnOwnedWebServer: (execPath: string, script: string, options?: SpawnOptions) => ChildProcess;
+  /** True when the supplied URL serves SketchForge's HTML page marker. */
+  isSketchForgeDesktopServer: (url: string, fetchImpl?: typeof fetch) => Promise<boolean>;
   watchProcess: (child: ChildProcess) => ProcessWatch;
   /** True when the promise settled within `ms`. */
   settlesWithin: (promise: Promise<unknown>, ms: number) => Promise<boolean>;

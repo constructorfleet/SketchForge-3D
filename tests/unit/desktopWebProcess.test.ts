@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
 import webProcessModule from "../../apps/desktop/webProcess.cjs";
 
-const { createUpdateInstaller, singleFlight, stopProcess, watchProcess } = webProcessModule;
+const { createUpdateInstaller, isSketchForgeDesktopServer, singleFlight, spawnOwnedWebServer, stopProcess, watchProcess } = webProcessModule;
 
 const children: ChildProcess[] = [];
 afterEach(() => {
@@ -49,6 +49,36 @@ describe("watchProcess", () => {
     const child = spawn("sketchforge-command-that-does-not-exist", [], { stdio: "ignore" });
     child.on("error", () => {});
     await watchProcess(child).closed;
+  });
+});
+
+describe("desktop web server ownership", () => {
+  it("recognises the SketchForge page on an occupied loopback port", async () => {
+    const fetcher = async () => new Response(
+      '<html><head><meta name="description" content="Browser-based SketchForge editor workspace"></head></html>',
+      { status: 200, headers: { "content-type": "text/html" } },
+    );
+    await expect(isSketchForgeDesktopServer("http://127.0.0.1:62158", fetcher)).resolves.toBe(true);
+  });
+
+  it("does not adopt another app's page or a failed HTTP response", async () => {
+    await expect(isSketchForgeDesktopServer("http://127.0.0.1:62158", async () => new Response("Hello", { status: 200 }))).resolves.toBe(false);
+    await expect(isSketchForgeDesktopServer("http://127.0.0.1:62158", async () => new Response("SketchForge", { status: 503 }))).resolves.toBe(false);
+  });
+
+  it("stops the owned server when its parent IPC channel closes", async () => {
+    const child = spawnOwnedWebServer(process.execPath, "setInterval(() => {}, 1000); console.log('ready');", {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    children.push(child);
+    await firstLine(child);
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
+      child.once("exit", (code, signal) => resolve({ code, signal }));
+    });
+    child.disconnect();
+    await expect(exited).resolves.toEqual({ code: 0, signal: null });
   });
 });
 
