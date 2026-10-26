@@ -1216,7 +1216,8 @@ export function shapeWithCadResult(shape: WorkplaneShape, result: ServerCadResul
     // was created -- which is where a test shape sits -- subtracts zero.
     //
     // These are the result's own bounds, which is what the editor's worker
-    // records for exactly the same reason.
+    // records for exactly the same reason, and what both cut writers now
+    // record for a cut's recentred B-rep (#548).
     cadBrepFrame: { x: centerX, z: centerZ, elevation: minY, width, depth, height },
     cadPrimitiveFrame: undefined,
     cadDisplayEdges: undefined,

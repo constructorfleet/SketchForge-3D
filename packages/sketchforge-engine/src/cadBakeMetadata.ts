@@ -166,6 +166,15 @@ export function bakedBoxSelectionFrame(shape: WorkplaneShape) {
   };
 }
 
+/**
+ * The transform that puts a shape's stored B-rep where the shape is drawn.
+ *
+ * `cadBrepFrame` says where the stored B-rep *is* -- the placement and size it
+ * was stored at -- on every shape, and is read here as exactly that, with no
+ * guessing from other fields. A cut stores its recentred B-rep at the origin
+ * and says so (#548); cuts saved before then said where the shape stood, and
+ * are corrected once, when the project is opened (`cutBrepFrameMigration`).
+ */
 export function cadBrepTransformForShape(shape: WorkplaneShape) {
   const frame = shape.cadBrepFrame;
   if (!frame) return undefined;

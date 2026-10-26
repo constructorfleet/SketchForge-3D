@@ -78,6 +78,14 @@ New saves use format version 2 and minimum reader version 2. Older applications 
 
 Future schema changes should add a version-to-version migration, run validation after every migration, and never mutate the user's original file.
 
+### Cut frames ([#548](https://github.com/constructorfleet/SketchForge-3D/issues/548))
+
+A shape's `cadBrepFrame` records where its stored B-rep is. A cut, made by the editor's exact cut or by `POST /booleans` or `POST /groups` with a hole, stores its B-rep recentred in its own frame, so its `cadBrepFrame` has `x`, `z` and `elevation` 0. Before #548 a cut recorded its placement in the project there instead, and readers placed its B-rep at the workplane origin.
+
+The format version did not change. Every load corrects such cuts, in the scene and in every undo state: a shape whose frame is away from the origin and that has members with a hole among them, a mesh and a B-rep, and no sign of having been rewritten since, gets an origin frame. A frame already at the origin is left alone, so a cut saved since the fix passes through unchanged, and a release from before the fix reads a new file's cuts correctly. The signs that rule a shape out are a fillet or chamfer record on it or any of its members, `edgeResizeMode`, `shell`, a retained draft, face IDs, B-rep face ranges on its mesh (`importedMesh.faceGroups`), and a baked `cadBrepFrame.sourceTransform`. Some old cuts carry one of these and are left as they were, still read at the origin: one given a face colour by face ID through the REST API, one cut from an operand that was already filleted or chamfered, and one with an edge resize mode. Ungrouping such a cut and cutting again fixes it.
+
+Because the correction runs on every load, writers must keep to this rule: a shape that holds members with a hole among them, a mesh and a B-rep, and whose `cadBrepFrame` is away from the origin, must carry one of those signs. A writer that stores a world-placed B-rep on such a shape without one would have it moved to the origin the next time the project is opened. The writers that do this today (the Fillet/Chamfer tool on a group, a shell of a cut, a baked face draft of a cut) all carry one, and `tests/unit/cutResultBrepFrame.test.ts` checks them.
+
 ## Current limitations
 
 - Projects created before source-asset tracking cannot recover the exact original STL/SVG file. Their existing normalized editable mesh is preserved as a deduplicated legacy cache and is identified by the absence of a source asset.

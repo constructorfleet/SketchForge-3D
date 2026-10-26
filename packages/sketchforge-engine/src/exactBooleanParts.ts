@@ -147,8 +147,10 @@ export type ExactCutResultGeometry = {
  * `cadBrep` is what a later fillet, chamfer or STEP export of the cut part
  * reads, so the cylinder this cut made stays a cylinder instead of coming back
  * as the triangles that were drawn for it. `cadBrepFrame` says which frame the
- * BREP is in, so the two can be put back together after the shape is moved or
- * resized -- the same pair the edge modifier stores.
+ * BREP is in -- the result's own, centred at the origin with its base on
+ * y = 0 -- so the two can be put back together after the shape is moved or
+ * resized, the same pair the edge modifier stores. Recording the shape's world
+ * placement there instead left every reader's copy at the origin (#548).
  */
 export function withExactBooleanBrep(group: WorkplaneShape, result: ExactCutResultGeometry): WorkplaneShape {
   const stored = group.importedMesh;
@@ -163,7 +165,9 @@ export function withExactBooleanBrep(group: WorkplaneShape, result: ExactCutResu
         }
       : stored,
     cadBrep: result.brep,
-    cadBrepFrame: { x: group.x, z: group.z, elevation: group.elevation ?? 0, width, depth, height: group.height },
+    // Where the B-rep is, not where the shape is: the worker recentred it into
+    // the result's own frame, at the origin (#548).
+    cadBrepFrame: { x: 0, z: 0, elevation: 0, width, depth, height: group.height },
     cadPrimitiveFrame: undefined,
     cadDisplayEdges: undefined,
     cadDisplayEdgesVersion: undefined,
