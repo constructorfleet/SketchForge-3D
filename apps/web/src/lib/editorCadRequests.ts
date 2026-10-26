@@ -5,6 +5,7 @@ export type EditorMeasurementEnd = {
 };
 
 export type EditorSection = { plane: "xy" | "xz" | "yz"; offset: number };
+export type EditorCadExportFormat = "svg" | "dxf" | "step";
 
 export function editorMeasureRequest(
   projectId: string,
@@ -32,7 +33,7 @@ export function editorPropertiesRequest(projectId: string, shape: object) {
 
 export function editorExportRequest(
   projectId: string,
-  format: "svg" | "dxf",
+  format: EditorCadExportFormat,
   name: string,
   section?: EditorSection,
   shapes?: object[],

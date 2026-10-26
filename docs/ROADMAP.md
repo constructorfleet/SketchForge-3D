@@ -159,7 +159,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
   - Measure a stored cut or treated result from its exact B-rep rather than its display mesh, so `GET /properties` of a cut through a revolve reports `exact`. Cut results are filed as [#541](https://github.com/constructorfleet/SketchForge-3D/issues/541): a cut whose B-rep still matches its mesh is measured, checked for interference and cut again from that B-rep and reports `source: "brep"`, `precision: "exact"`; a cut resized or tapered after it was made, one made from a mesh operand, or one whose B-rep no longer matches its mesh keeps the mesh path. Regression coverage by volume and centre of mass complete; awaiting review. Treated (filleted, chamfered, drafted, shelled) results still measure their mesh.
   - Build curved (Bezier/smooth) profile edges as exact curves, so a revolve of an arc is a torus and its STEP export carries toroidal surfaces; today such a revolve stays tessellated.
   - Draw section and SVG projection drawings of a plain revolve from its exact solid rather than its mesh.
-  - Rebuild plain revolves in the editor's own STEP export, which still skips them.
+  - Server-backed editor STEP export now sends its current in-memory selection through the exact STEP route, which rebuilds plain revolves from their retained profiles; the browser download and configured folder save retain the same exported/skipped counts. Static exports have no CAD route and keep their local exporter behavior.
   - Recover the axis of a partial sweep saved without `revolveAxisOffset` (including editor-made ones) so it can be exact too.
 
 ## STEP interoperability
