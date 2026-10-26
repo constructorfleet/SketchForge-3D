@@ -9,6 +9,8 @@ owner: "Contributors"
 
 ## Unreleased
 
+- The packaged desktop app now closes its web server when the app is force-killed, and a restart recognizes and reuses a SketchForge server left by an older build instead of showing a false busy-port error ([#545](https://github.com/constructorfleet/SketchForge-3D/issues/545)).
+
 - Tall Z-up STL imports now stay upright. The importer only preserves an unmarked legacy Y-up STL when its Y span is much smaller than both horizontal spans; previously, a tall part whose width matched its Y span could be mistaken for a legacy Y-up model and imported on its side ([#560](https://github.com/constructorfleet/SketchForge-3D/issues/560)).
 - Changing the angle of a face draft now keeps a sketch extrusion's height resize made after the draft, matching the editor's retained-draft behavior ([#554](https://github.com/constructorfleet/SketchForge-3D/issues/554)).
 - MCP file exports now create missing parent directories recursively after resolving and checking the destination against the configured file root, so nested STL, SKF and other scene exports no longer fail with `ENOENT` ([#562](https://github.com/constructorfleet/SketchForge-3D/issues/562)).
