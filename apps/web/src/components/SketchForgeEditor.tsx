@@ -133,6 +133,7 @@ import { CUTTER_RESIDUAL_INSET, paddedCutterShape } from "@/lib/engine/cutterPad
 import { exactBooleanPlacement, exactCutPartsForSelection, exactCutRequestTransfer, withExactBooleanBrep } from "@/lib/engine/exactBooleanParts";
 import { createSceneAnalysisRunner } from "@/lib/sceneAnalysis";
 import { faceEditingCanBeEnabled } from "@/lib/shapeFaces";
+import { parseClipboardShapes, pasteClipboardShapes } from "@/lib/editorClipboard";
 import { transformMesh, type MeshData, type Vec3 } from "@/lib/engine/meshTransform";
 import { createLocalId } from "@/lib/engine/localIds";
 import { createButtonTooltipSync } from "@/lib/buttonTooltips";
@@ -824,24 +825,6 @@ async function shapeFromRevolvedSketchProfile(
 
 function cleanModelDimension(value: number) {
   return Math.max(MIN_SHAPE_DIMENSION, Number(value.toFixed(MODEL_DIMENSION_PRECISION)));
-}
-
-function parseClipboardShapes(serialized: string) {
-  try {
-    const parsed = JSON.parse(serialized);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.flatMap((shape: Partial<WorkplaneShape>) => {
-      const { name, kind, color } = shape;
-      if (typeof name !== "string" || typeof kind !== "string" || typeof color !== "string") {
-        return [];
-      }
-      return [canonicalizeShape(sceneShape({ ...shape, name, kind, color }))];
-    });
-  } catch {
-    return [];
-  }
 }
 
 function readSharedClipboard() {
@@ -7512,14 +7495,7 @@ export function SketchForgeEditor({
     if (serializeShapesForSync(sourceClipboard) !== serializeShapesForSync(clipboard)) {
       setClipboard(sourceClipboard);
     }
-    const pasted = sourceClipboard.map((shape) => {
-      const pastedShape = cloneWorkplaneShapeTreeWithFreshIds(shape, "paste");
-      return {
-        ...pastedShape,
-        x: Math.min(110, shape.x + 12),
-        z: Math.min(110, shape.z + 12),
-      };
-    });
+    const pasted = pasteClipboardShapes(sourceClipboard);
     commitShapes([...shapesRef.current, ...pasted], pasted.map((shape) => shape.id), notice((t) => t("editor.notice.pasted", { count: pasted.length })));
   }, [clipboard, commitShapes, t]);
 
