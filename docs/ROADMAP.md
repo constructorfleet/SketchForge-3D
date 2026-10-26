@@ -15,7 +15,6 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | --- | --- |
 | [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Open; the dependency scheduler for source edits is implemented in PR #580, with broader editable feature history remaining. |
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Open; REST, TypeScript, Python, MCP, and CLI parity work is tracked below the epic. |
-| [#329: Editor parity with engine and API](https://github.com/constructorfleet/SketchForge-3D/issues/329) | Open; editor parity work is tracked below the epic. |
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
 
@@ -83,33 +82,11 @@ This page summarizes active tracked work. Issue status remains authoritative.
 - [#339: Confine MCP host file access and refuse silent overwrites](https://github.com/constructorfleet/SketchForge-3D/issues/339) — implemented on `security/339-mcp-filesystem-root`; awaiting review.
 - [#365: Import STL, OBJ, and SVG files through the MCP bridge](https://github.com/constructorfleet/SketchForge-3D/issues/365) — implemented on `feat/365-mcp-import-obj-svg-stack`; awaiting review.
 
-## Editor parity with the engine and API
-
-Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
-
-- [#385: Manage keyboard focus in editor dialogs](https://github.com/constructorfleet/SketchForge-3D/issues/385) — initial focus, modal Tab handling, Escape, and focus return are implemented with browser and axe coverage; in review.
-- [#376: Avoid reserved editor shortcut keys](https://github.com/constructorfleet/SketchForge-3D/issues/376) — lock and visibility bindings avoid browser and macOS reserved keys; the editor has a keyboard-shortcuts dialog and guide section.
-- [#379: Shell and tray (hollow) operation in the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/379) — P2, implemented with browser coverage; in review.
-
 ## Geometry placement
 
 - [#424: Keep server treatments in place on tilted shapes](https://github.com/constructorfleet/SketchForge-3D/issues/424) — P2, open.
 
-## Editor parity
-
-Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
-
-- [#378: Explode imported STEP assemblies from the shape inspector](https://github.com/constructorfleet/SketchForge-3D/issues/378) — P2, implemented and in review.
-- [#380: Interference check and wall-thickness analysis in the editor](https://github.com/constructorfleet/SketchForge-3D/issues/380) — P2, implemented and in review.
-- [#386: Cover the core editor workflows in browser tests](https://github.com/constructorfleet/SketchForge-3D/issues/386) — browser regressions now cover file import/export, boolean hole grouping, edge treatments, pattern, mirror, align, distribution, prism draft and touch; implementation is ready for review.
-
 ## Editor CAD tools
-
-Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/issues/329).
-
-- [#559: Preserve exact B-reps when copying and pasting shapes](https://github.com/constructorfleet/SketchForge-3D/issues/559) — clipboard parsing keeps CAD geometry and migrates legacy cut frames; implementation and real-kernel volume/centre coverage complete, awaiting review.
-- [#381: 3D measurements and exact B-rep inspector properties](https://github.com/constructorfleet/SketchForge-3D/issues/381) — implementation and browser coverage complete; awaiting review.
-- [#382: Section view and kernel hidden-line SVG/DXF export](https://github.com/constructorfleet/SketchForge-3D/issues/382) — implementation and browser coverage complete; awaiting review.
 - [#506: Feature-edge (crease angle) drawing for mesh shapes](https://github.com/constructorfleet/SketchForge-3D/issues/506) — SVG projections and local `capture_image` draw meshes by feature edges, silhouettes and boundaries with an optional `featureAngle`; meshes and exact solids still occlude each other, and a mesh inside a group with no hole draws the same way. Implemented with regression coverage; the TypeScript `exports` helper now accepts `featureAngle`. Deferred: a group that cuts a hole in a mesh is still sewn and drawn by kernel hidden-line removal; the Python `exports` helper still needs typed `featureAngle` support.
 
 ## Client parity
