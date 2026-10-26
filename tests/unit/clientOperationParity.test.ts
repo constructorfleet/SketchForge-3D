@@ -81,6 +81,8 @@ const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   booleanShapes: [PROJECT_ID, [SHAPE_ID], ["cutter"]],
 };
 const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
+  "drawings.section": [PROJECT_ID, { plane: "xy", offset: 0 }],
+  "drawings.dxf": [PROJECT_ID, { plane: "xy", offset: 0 }],
   "projects.listPage": [{ limit: 10, cursor: "next-page" }],
   "projects.get": [PROJECT_ID],
   "projects.findByName": ["Parity project"],
@@ -169,7 +171,7 @@ async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
   return requests;
 }
 
-function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number }[] } {
+function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[] } {
   const python = process.platform === "win32" ? "python" : "python3";
   const source = [
     "import json, tempfile, urllib.parse",
@@ -201,7 +203,7 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     "                    with tempfile.NamedTemporaryFile(suffix='.stl') as fixture: getattr(getattr(client, resource_name), method_name)(call_args[0], call_args[1], fixture.name)",
     "                else: getattr(getattr(client, resource_name), method_name)(*call_args)",
     "            except Exception: pass",
-    "            calls.append({'resource': resource_name, 'method': method_name, 'requestCount': len(opener.requests) - before})",
+    "            calls.append({'resource': resource_name, 'method': method_name, 'requestCount': len(opener.requests) - before, 'queries': [request['query'] for request in opener.requests[before:]]})",
     "print(json.dumps({'requests': opener.requests, 'calls': calls}))",
   ].join("\n");
   const output = execFileSync(python, ["-c", source, JSON.stringify({ ...PYTHON_CALL_ARGUMENTS, ...PY_METHOD_ARGUMENTS })], {
@@ -209,7 +211,7 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     env: { ...process.env, PYTHONPATH: "src" },
     encoding: "utf8",
   });
-  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number }[] };
+  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[] };
 }
 
 function captureMcpRequest(toolName: string, args: Record<string, unknown>, filesDir: string): CapturedRequest[] {
@@ -256,7 +258,7 @@ describe("REST client operation parity", () => {
     expect(Object.keys(CLIENT_RESOURCE_OPERATIONS).sort()).toEqual(tsResources.sort());
     expect(Object.keys(py.operations).sort()).toEqual(py.resources.sort());
     const expectedSecondaryMethods = {
-      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"] },
+      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"] },
       python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"] },
     } as const;
     for (const [resourceName, methods] of Object.entries(expectedSecondaryMethods.typescript)) {
@@ -312,6 +314,11 @@ describe("REST client operation parity", () => {
     const pythonCaptured = capturePythonRequests();
     for (const call of pythonCaptured.calls) {
       expect(call.requestCount, `Python ${call.resource}.${call.method} should emit exactly one REST request`).toBe(1);
+    }
+    for (const resource of ["projects", "shapes"]) {
+      const call = pythonCaptured.calls.find((candidate) => candidate.resource === resource && candidate.method === "list_page");
+      expect(call?.queries[0], `Python ${resource}.list_page limit`).toContain("limit=10");
+      expect(call?.queries[0], `Python ${resource}.list_page cursor`).toContain("cursor=next-page");
     }
     expect(pythonCaptured.requests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(pythonExpected);
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("projectId=parity-project"))).toBeDefined();

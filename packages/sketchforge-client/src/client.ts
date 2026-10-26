@@ -81,7 +81,7 @@ export const CLIENT_RESOURCE_OPERATIONS = {
   mirrors: { mirrorShapes: ["bake"] },
   properties: { getShapeProperties: ["get"] },
   treatments: { treatShape: ["apply", "fillet", "chamfer"] },
-  drawings: [],
+  drawings: { exportProject: ["section", "dxf"] },
   draftPrism: { draftPrism: ["apply"] },
   shell: { shellShape: ["apply", "hollow", "tray"] },
   align: { alignShapes: ["apply", "tops", "bottoms", "centers"] },
