@@ -189,6 +189,11 @@ describe("serverModuleReferences", () => {
 });
 
 describe("verifyPackagedWebBundle", () => {
+  it("normalizes bundle-relative paths to forward slashes", () => {
+    expect(webBundleModule.normalizeRelativePath("apps\\web\\.next\\node_modules\\occt-wasm"))
+      .toBe("apps/web/.next/node_modules/occt-wasm");
+  });
+
   it("reports the dangling CAD links the unmaterialized bundle ships with", () => {
     const { standalone, rootModules } = standaloneFixture();
     fs.rmSync(rootModules, { recursive: true, force: true });

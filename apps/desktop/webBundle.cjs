@@ -49,6 +49,11 @@ function isInside(child, parent) {
   return relative === "" || (!relative.startsWith("..") && !nodePath.isAbsolute(relative));
 }
 
+/** Normalize a path shown in bundle diagnostics to `/` on every platform. */
+function normalizeRelativePath(relativePath) {
+  return relativePath.replace(/\\/g, "/");
+}
+
 /** A bare specifier's package name and the path inside it: `@a/b/c` -> `@a/b`, `c`. */
 function splitSpecifier(specifier) {
   const parts = specifier.split("/");
@@ -163,7 +168,7 @@ function cadKernelPackageCopies(webRoot) {
           const { name } = JSON.parse(fs.readFileSync(nodePath.join(entryPath, "package.json"), "utf8"));
           if (CAD_KERNEL_PACKAGES.has(name)) {
             const paths = copies.get(name) ?? [];
-            paths.push(nodePath.relative(webRoot, entryPath));
+            paths.push(normalizeRelativePath(nodePath.relative(webRoot, entryPath)));
             copies.set(name, paths);
           }
         } catch {
@@ -347,6 +352,7 @@ module.exports = {
   SERVER_EXTERNALS_DIR,
   findDanglingLinks,
   cadKernelPackageCopies,
+  normalizeRelativePath,
   materializeServerExternals,
   packagedResourcesDir,
   serverModuleReferences,

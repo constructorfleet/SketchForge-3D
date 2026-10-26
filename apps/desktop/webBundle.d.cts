@@ -7,6 +7,8 @@ declare const webBundle: {
   SERVER_EXTERNALS_DIR: string;
   /** Symlinks under rootDir whose target is missing, relative to rootDir. */
   findDanglingLinks: (rootDir: string) => string[];
+  /** Normalize bundle-relative diagnostic paths to `/` on every platform. */
+  normalizeRelativePath: (relativePath: string) => string;
   /** Copy linked and plainly imported server externals into .next/node_modules; returns the names copied. */
   materializeServerExternals: (standaloneDir: string) => string[];
   /** The packaged resources directory for an electron-builder afterPack target. */
