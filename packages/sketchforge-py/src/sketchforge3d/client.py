@@ -935,7 +935,7 @@ CLIENT_RESOURCE_OPERATIONS = {
 
 # Convenience helpers that emit a sequence of REST operations rather than one route.
 CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
-    "shapes": {"delete_all": ("listShapes", "deleteShape")},
+    "shapes": {"delete_all": ("listShapes", "updateShape", "deleteShape")},
 }
 
 

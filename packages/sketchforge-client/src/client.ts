@@ -98,7 +98,7 @@ export const CLIENT_RESOURCE_OPERATIONS = {
 
 /** Convenience methods that emit a sequence of REST operations rather than one route. */
 export const CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
-  shapes: { deleteAll: ["listShapes", "deleteShape"] },
+  shapes: { deleteAll: ["listShapes", "updateShape", "deleteShape"] },
 } as const;
 
 export class SketchForgeClient {

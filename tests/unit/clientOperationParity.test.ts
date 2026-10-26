@@ -141,7 +141,7 @@ async function captureTypeScriptDeleteAllRequests(): Promise<CapturedRequest[]> 
       const url = new URL(input);
       requests.push({ method: init?.method ?? "GET", pathname: url.pathname, query: url.search, body: typeof init?.body === "string" ? init.body : undefined });
       const body = url.pathname.endsWith("/shapes") && (init?.method ?? "GET") === "GET"
-        ? JSON.stringify({ shapes: [{ id: SHAPE_ID, locked: false }] })
+        ? JSON.stringify({ shapes: [{ id: SHAPE_ID, locked: true }] })
         : "{}";
       return new Response(body, { status: 200 });
     },
@@ -205,7 +205,7 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     "    def open(self, request, timeout=None):",
     "        parsed = urllib.parse.urlsplit(request.full_url)",
     "        self.requests.append({'method': request.get_method(), 'pathname': parsed.path, 'query': parsed.query, 'body': request.data.decode() if request.data else None})",
-    "        if parsed.path == '/api/v1/shapes' and request.get_method() == 'GET': return Reply(b'{\"shapes\":[{\"id\":\"parity-shape\",\"locked\":false}]}')",
+    "        if parsed.path == '/api/v1/shapes' and request.get_method() == 'GET': return Reply(b'{\"shapes\":[{\"id\":\"parity-shape\",\"locked\":true}]}')",
     "        return Reply()",
     "opener = Opener()",
     "client = SketchForgeClient('http://parity.test', 'test', opener=opener)",
@@ -281,9 +281,9 @@ describe("REST client operation parity", () => {
 
     expect(Object.keys(CLIENT_RESOURCE_OPERATIONS).sort()).toEqual(tsResources.sort());
     expect(Object.keys(py.operations).sort()).toEqual(py.resources.sort());
-    expect(CLIENT_COMPOSITE_RESOURCE_OPERATIONS.shapes.deleteAll).toEqual(["listShapes", "deleteShape"]);
+    expect(CLIENT_COMPOSITE_RESOURCE_OPERATIONS.shapes.deleteAll).toEqual(["listShapes", "updateShape", "deleteShape"]);
     expect(typeof tsClient.shapes.deleteAll).toBe("function");
-    expect(py.compositeOperations.shapes.delete_all).toEqual(["listShapes", "deleteShape"]);
+    expect(py.compositeOperations.shapes.delete_all).toEqual(["listShapes", "updateShape", "deleteShape"]);
     expect(py.methods.shapes).toContain("delete_all");
     const expectedSecondaryMethods = {
       typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"] },
@@ -363,12 +363,20 @@ describe("REST client operation parity", () => {
     expect(typeScriptDeleteAll[0]?.query).toContain("projectId=parity-project");
     expect(typeScriptDeleteAll[1]?.query).toContain("projectId=parity-project");
     expect(typeScriptDeleteAll[1]?.query).toContain("shapeId=parity-shape");
-    expect(typeScriptDeleteAll.every(({ body }) => body === undefined)).toBe(true);
+    expect(JSON.parse(typeScriptDeleteAll[1]?.body ?? "{}")).toEqual({ locked: false });
+    expect(typeScriptDeleteAll[2]?.query).toContain("projectId=parity-project");
+    expect(typeScriptDeleteAll[2]?.query).toContain("shapeId=parity-shape");
+    expect(typeScriptDeleteAll[0]?.body).toBeUndefined();
+    expect(typeScriptDeleteAll[2]?.body).toBeUndefined();
     expect(pythonCaptured.compositeRequests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(deleteAllExpected);
     expect(pythonCaptured.compositeRequests[0]?.query).toContain("projectId=parity-project");
     expect(pythonCaptured.compositeRequests[1]?.query).toContain("projectId=parity-project");
     expect(pythonCaptured.compositeRequests[1]?.query).toContain("shapeId=parity-shape");
-    expect(pythonCaptured.compositeRequests.every(({ body }) => body == null)).toBe(true);
+    expect(JSON.parse(pythonCaptured.compositeRequests[1]?.body ?? "{}")).toEqual({ locked: false });
+    expect(pythonCaptured.compositeRequests[2]?.query).toContain("projectId=parity-project");
+    expect(pythonCaptured.compositeRequests[2]?.query).toContain("shapeId=parity-shape");
+    expect(pythonCaptured.compositeRequests[0]?.body).toBeNull();
+    expect(pythonCaptured.compositeRequests[2]?.body).toBeNull();
 
     const filesDir = mkdtempSync(path.join(tmpdir(), "sketchforge-client-parity-"));
     try {
