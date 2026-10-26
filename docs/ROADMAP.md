@@ -17,7 +17,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Open; REST, TypeScript, Python, MCP, and CLI parity work is tracked below the epic. |
 | [#329: Editor parity with engine and API](https://github.com/constructorfleet/SketchForge-3D/issues/329) | Open; editor parity work is tracked below the epic. |
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Open; translation coverage for the seven shipped locales remains active work. |
-| [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; remaining CI and planning tasks are tracked below the epic. |
+| [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; PR #586 adds the documented production app build check to pull request CI. |
 
 ## Desktop release installers
 
