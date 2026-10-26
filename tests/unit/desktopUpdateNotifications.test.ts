@@ -5,12 +5,12 @@ describe("desktop update notifications", () => {
   it("notifies when a background check finds an update", () => {
     const showNotice = vi.fn();
     const clearManualCheck = vi.fn();
+    const notifiedVersions = new Set<string>();
 
-    handleUpdateAvailable(
-      { version: "1.2.3" },
-      { manualUpdateCheck: false, clearManualCheck, showNotice },
-    );
+    handleUpdateAvailable({ version: "1.2.3" }, { manualUpdateCheck: false, clearManualCheck, showNotice, notifiedVersions });
+    handleUpdateAvailable({ version: "1.2.3" }, { manualUpdateCheck: false, clearManualCheck, showNotice, notifiedVersions });
 
+    expect(showNotice).toHaveBeenCalledTimes(1);
     expect(showNotice).toHaveBeenCalledWith({ version: "1.2.3" });
     expect(clearManualCheck).not.toHaveBeenCalled();
   });
@@ -24,6 +24,7 @@ describe("desktop update notifications", () => {
         manualUpdateCheck: true,
         clearManualCheck: () => calls.push("clear"),
         showNotice: () => calls.push("notify"),
+        notifiedVersions: new Set<string>(),
       },
     );
 

@@ -320,6 +320,7 @@ function setupDesktopUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
+  const notifiedUpdateVersions = new Set();
 
   autoUpdater.on("update-available", (info) => {
     handleUpdateAvailable(info, {
@@ -335,6 +336,7 @@ function setupDesktopUpdater() {
           detail: t("desktop.updates.availableDetail"),
         });
       },
+      notifiedVersions: notifiedUpdateVersions,
     });
   });
 

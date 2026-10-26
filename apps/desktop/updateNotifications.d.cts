@@ -6,6 +6,7 @@ export interface UpdateNotificationOptions {
   manualUpdateCheck: boolean;
   clearManualCheck: () => void;
   showNotice: (info: UpdateAvailableInfo) => void;
+  notifiedVersions: Set<string>;
 }
 
 export function handleUpdateAvailable(
