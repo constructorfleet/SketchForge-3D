@@ -26,6 +26,10 @@ files:
   - apps/desktop/windowReady.cjs
   - apps/web/src/i18n/locales/*/desktop.json
   - package.json
+  # The standalone web bundle carries these server externals in Resources/web.
+  # Do not also include their root production dependency copies in app.asar.
+  - '!node_modules/occt-wasm{,/**/*}'
+  - '!node_modules/manifold-3d{,/**/*}'
 
 # Double-clicking a .skf opens it in SketchForge. mimeType must equal the
 # engine's SKF_MEDIA_TYPE (packages/sketchforge-engine/src/skfProject.ts);

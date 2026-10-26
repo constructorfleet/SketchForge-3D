@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { load as loadYaml } from "js-yaml";
+import { createPackage } from "@electron/asar";
 import webBundleModule from "../../apps/desktop/webBundle.cjs";
 import afterPackModule from "../../apps/desktop/afterPack.cjs";
 
@@ -94,26 +95,31 @@ afterEach(() => {
 });
 
 describe("materializeServerExternals", () => {
-  it("replaces each hashed external link with a real copy of its package", () => {
+  it("normalizes hashed external imports to one copy at the package name", () => {
     const { standalone, rootModules, externals } = standaloneFixture();
 
     const copied = materializeServerExternals(standalone);
 
-    expect(copied.sort()).toEqual(["manifold-3d-da2d2d8b0ea51a45", "occt-wasm-1b9e064a4904705b"]);
-    const occt = path.join(externals, "occt-wasm-1b9e064a4904705b");
+    expect(copied.sort()).toEqual(["manifold-3d", "occt-wasm"]);
+    const occt = path.join(externals, "occt-wasm");
     expect(fs.lstatSync(occt).isSymbolicLink()).toBe(false);
     expect(fs.lstatSync(occt).isDirectory()).toBe(true);
     expect(fs.readFileSync(path.join(occt, "dist", "kernel.wasm"), "utf8")).toBe("occt-wasm bytes");
+    expect(fs.existsSync(path.join(externals, "occt-wasm-1b9e064a4904705b"))).toBe(false);
+    expect(fs.readFileSync(path.join(standalone, "apps/web/.next/server/chunks/route.js"), "utf8"))
+      .not.toContain("occt-wasm-1b9e064a4904705b");
+    expect(fs.existsSync(path.join(rootModules, "occt-wasm"))).toBe(false);
+    expect(fs.existsSync(path.join(rootModules, "manifold-3d"))).toBe(false);
 
     // electron-builder drops the standalone root node_modules; the copy must
     // stand on its own once that directory is gone.
     fs.rmSync(rootModules, { recursive: true, force: true });
-    expect(fs.readFileSync(path.join(externals, "manifold-3d-da2d2d8b0ea51a45", "package.json"), "utf8"))
+    expect(fs.readFileSync(path.join(externals, "manifold-3d", "package.json"), "utf8"))
       .toContain("manifold-3d");
     expect(findDanglingLinks(standalone)).toEqual([]);
   });
 
-  it("copies a package a chunk imports by its plain name next to the hashed externals", () => {
+  it("shares the normalized package with chunks that already import its plain name", () => {
     const { standalone, rootModules, externals } = standaloneFixture({
       "chunks/route.js": TURBOPACK_CHUNK,
       "chunks/step.js": BARE_IMPORT_CHUNK,
@@ -121,9 +127,10 @@ describe("materializeServerExternals", () => {
 
     const copied = materializeServerExternals(standalone);
 
-    expect(copied).toContain("occt-wasm");
+    expect(copied.filter((name) => name === "occt-wasm")).toHaveLength(1);
     fs.rmSync(rootModules, { recursive: true, force: true });
     expect(fs.readFileSync(path.join(externals, "occt-wasm", "dist", "occt-wasm.js"), "utf8")).toBe("occt-wasm glue");
+    expect(fs.existsSync(path.join(externals, "occt-wasm-1b9e064a4904705b"))).toBe(false);
     expect(verifyPackagedWebBundle(standalone)).toEqual([]);
   });
 
@@ -182,6 +189,11 @@ describe("serverModuleReferences", () => {
 });
 
 describe("verifyPackagedWebBundle", () => {
+  it("normalizes bundle-relative paths to forward slashes", () => {
+    expect(webBundleModule.normalizeRelativePath("apps\\web\\.next\\node_modules\\occt-wasm"))
+      .toBe("apps/web/.next/node_modules/occt-wasm");
+  });
+
   it("reports the dangling CAD links the unmaterialized bundle ships with", () => {
     const { standalone, rootModules } = standaloneFixture();
     fs.rmSync(rootModules, { recursive: true, force: true });
@@ -246,9 +258,94 @@ describe("verifyPackagedWebBundle", () => {
 
     expect(verifyPackagedWebBundle(standalone)).toEqual([]);
   });
+
+  it("rejects duplicate CAD kernel package copies in the standalone web bundle", () => {
+    const { standalone, rootModules } = standaloneFixture();
+    materializeServerExternals(standalone);
+    writePackage(rootModules, "occt-wasm");
+
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toMatch(/duplicate CAD kernel package/);
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toContain("node_modules/occt-wasm");
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toContain("apps/web/.next/node_modules/occt-wasm");
+  });
 });
 
 describe("desktop afterPack hook", () => {
+  it("keeps OCCT and Manifold only in the standalone web bundle, not app.asar", () => {
+    const config = loadYaml(fs.readFileSync(path.join(repoRoot, "apps/desktop/electron-builder.yml"), "utf8")) as {
+      files?: string[];
+    };
+
+    expect(config.files).toContain("!node_modules/occt-wasm{,/**/*}");
+    expect(config.files).toContain("!node_modules/manifold-3d{,/**/*}");
+  });
+
+  it("does not keep the obsolete second public OCCT copy", () => {
+    expect(fs.existsSync(path.join(repoRoot, "apps/web/public/assets/occt"))).toBe(false);
+  });
+
+  it("detects CAD kernel copies in app.asar", async () => {
+    const appDir = scratch();
+    const appAsar = path.join(scratch(), "app.asar");
+    writeFile(path.join(appDir, "node_modules/occt-wasm/package.json"), "{}");
+    writeFile(path.join(appDir, "node_modules/manifold-3d/package.json"), "{}");
+    await createPackage(appDir, appAsar);
+
+    await expect(afterPackModule.packagedKernelDuplicates(appAsar)).resolves.toEqual(expect.arrayContaining([
+      "node_modules/occt-wasm/package.json",
+      "node_modules/manifold-3d/package.json",
+    ]));
+  });
+
+  it("normalizes Windows archive paths when matching CAD kernel packages", () => {
+    expect(afterPackModule.packagedKernelDuplicatesFromEntries([
+      "\\node_modules\\occt-wasm\\package.json",
+      "\\node_modules\\manifold-3d\\package.json",
+      "\\node_modules\\some-other-package\\package.json",
+    ])).toEqual([
+      "node_modules/occt-wasm/package.json",
+      "node_modules/manifold-3d/package.json",
+    ]);
+  });
+
+  it("rejects a package when a CAD kernel remains in app.asar", async () => {
+    const appOutDir = scratch();
+    const resourcesDir = path.join(appOutDir, "resources");
+    const { standalone } = standaloneFixture();
+    materializeServerExternals(standalone);
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    fs.cpSync(standalone, path.join(resourcesDir, "web"), { recursive: true });
+
+    const appDir = scratch();
+    writeFile(path.join(appDir, "node_modules/occt-wasm/package.json"), "{}");
+    await createPackage(appDir, path.join(resourcesDir, "app.asar"));
+
+    await expect(afterPackModule({
+      appOutDir,
+      electronPlatformName: "linux",
+      packager: { appInfo: { productFilename: "SketchForge" } },
+    })).rejects.toThrow(/CAD kernels are duplicated in app\.asar/);
+  });
+
+  it("rejects a package when a CAD kernel remains duplicated in Resources/web", async () => {
+    const appOutDir = scratch();
+    const resourcesDir = path.join(appOutDir, "resources");
+    const { standalone, rootModules } = standaloneFixture();
+    materializeServerExternals(standalone);
+    writePackage(rootModules, "occt-wasm");
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    fs.cpSync(standalone, path.join(resourcesDir, "web"), { recursive: true });
+
+    const appDir = scratch();
+    await createPackage(appDir, path.join(resourcesDir, "app.asar"));
+
+    await expect(afterPackModule({
+      appOutDir,
+      electronPlatformName: "linux",
+      packager: { appInfo: { productFilename: "SketchForge" } },
+    })).rejects.toThrow(/duplicate CAD kernel package/);
+  });
+
   it("finds Resources inside the macOS app and resources beside the Windows and Linux executable", () => {
     expect(packagedResourcesDir({ appOutDir: "/out/mac-arm64", electronPlatformName: "darwin", productFilename: "SketchForge" }))
       .toBe(path.join("/out/mac-arm64", "SketchForge.app", "Contents", "Resources"));
