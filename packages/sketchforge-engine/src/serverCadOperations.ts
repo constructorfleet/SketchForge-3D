@@ -722,6 +722,16 @@ function profileHasCurvedSegment(profile: SketchProfile) {
     && Boolean(points.get(segment.startId)?.handleOut) && Boolean(points.get(segment.endId)?.handleIn));
 }
 
+/** Whether all Bezier control points stay on the revolve side and below its axial top. */
+function curveProfileStaysOnRevolveSide(profile: SketchProfile) {
+  const maxZ = Math.max(...profile.points.map((point) => point.z));
+  return profile.points.every((point) => point.x <= 1e-9
+    && (point.handleIn?.x ?? -Infinity) <= 1e-9
+    && (point.handleOut?.x ?? -Infinity) <= 1e-9
+    && (point.handleIn?.z ?? -Infinity) <= maxZ + 1e-9
+    && (point.handleOut?.z ?? -Infinity) <= maxZ + 1e-9);
+}
+
 /**
  * Why a revolve stored as a mesh is not measured, cut or exported as its exact
  * solid, or null when it is.
@@ -740,7 +750,9 @@ function revolveWithoutExactSolid(shape: WorkplaneShape): string | null {
   if (shapeHasTaper(shape)) return "a taper is applied to the mesh, not to a revolve";
   const fullTurn = Math.abs(Math.abs(settings.sweepAngle) - 360) <= 1e-6;
   if (!storedRevolveAxis(shape, fullTurn)) return "a partial sweep saved without its axis";
-  if (profileHasCurvedSegment(shape.sketchProfile!)) return "a curved profile edge is sampled into straight segments, so no exact solid describes it";
+  if (profileHasCurvedSegment(shape.sketchProfile!) && !curveProfileStaysOnRevolveSide(shape.sketchProfile!)) {
+    return "a curved profile crosses the revolve axis or exceeds its axial bounds, so it cannot be revolved exactly";
+  }
   try {
     if (cadSketchRegions(revolveSectionProfile(shape.sketchProfile!, settings, { radial: 1, axial: 1 })).length !== 1) {
       return "the profile has several closed regions";
@@ -843,6 +855,28 @@ function revolveSectionProfile(
   sketchRevolve: WorkplaneShape["sketchRevolve"],
   sectionScale: { radial: number; axial: number },
 ): SketchProfile {
+  const pointById = new Map(sketchProfile.points.map((point) => [point.id, point]));
+  const maxZ = Math.max(...sketchProfile.points.map((point) => point.z));
+  const hasCurves = sketchProfile.segments.some((segment) => segment.kind !== "line"
+    && Boolean(pointById.get(segment.startId)?.handleOut) && Boolean(pointById.get(segment.endId)?.handleIn));
+  if (hasCurves && curveProfileStaysOnRevolveSide(sketchProfile)) {
+    // Bezier curves stay within the convex hull of their controls. Profiles
+    // wholly on the revolve side need no axis clipping and can retain the
+    // exact curve that the sketch stores.
+    const mapPoint = (point: { x: number; z: number }) => ({
+      x: -point.x * sectionScale.radial,
+      z: (maxZ - point.z) * sectionScale.axial,
+    });
+    return {
+      ...sketchProfile,
+      points: sketchProfile.points.map((point) => ({
+        ...point,
+        ...mapPoint(point),
+        ...(point.handleIn ? { handleIn: mapPoint(point.handleIn) } : {}),
+        ...(point.handleOut ? { handleOut: mapPoint(point.handleOut) } : {}),
+      })),
+    };
+  }
   const polygons = sketchProfileToRevolvePolygons(sketchProfile, sketchRevolve);
   if (polygons.length === 0) throw new ServerCadError("The retained revolve profile has no closed region.");
   return {
@@ -876,10 +910,18 @@ function revolvedSectionSolid(
   sectionScale: { radial: number; axial: number },
 ) {
   const profile = revolveSectionProfile(sketchProfile, sketchRevolve, sectionScale);
-  const pathWire = (path: OrderedCadSketchPath) => cad.makeWire(path.steps.map(({ from, to }) => cad.makeLineEdge(
-    { x: from.x, y: from.z, z: 0 },
-    { x: to.x, y: to.z, z: 0 },
-  )));
+  const pathWire = (path: OrderedCadSketchPath) => cad.makeWire(path.steps.map(({ segment, from, to }) => {
+    const forward = segment.startId === from.id;
+    const first = forward ? from.handleOut : from.handleIn;
+    const second = forward ? to.handleIn : to.handleOut;
+    if (segment.kind !== "line" && first && second) {
+      return cad.makeBezierEdge([
+        { x: from.x, y: from.z, z: 0 }, { x: first.x, y: first.z, z: 0 },
+        { x: second.x, y: second.z, z: 0 }, { x: to.x, y: to.z, z: 0 },
+      ]);
+    }
+    return cad.makeLineEdge({ x: from.x, y: from.z, z: 0 }, { x: to.x, y: to.z, z: 0 });
+  }));
   const regions = cadSketchRegions(profile);
   if (regions.length !== 1) {
     throw new ServerCadError("Exact revolve geometry requires one closed profile region, and this revolve's profile has several.");
