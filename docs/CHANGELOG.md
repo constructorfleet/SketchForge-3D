@@ -10,6 +10,7 @@ owner: "Contributors"
 ## Unreleased
 
 - The desktop local-folder download route now caps JSON and multipart request bodies while reading them, before parsing. Text downloads remain limited to 25 MiB and binary downloads to 512 MiB; oversized streamed bodies return 413 without parsing or writing a file.
+- The TypeScript export helper now accepts `featureAngle` for SVG projections of mesh shapes, matching the REST API. It refuses this option for other formats and section drawings before sending the request ([#328](https://github.com/constructorfleet/SketchForge-3D/issues/328), [#506](https://github.com/constructorfleet/SketchForge-3D/issues/506)).
 - Deployment guidance now explains that server-backed and shared project routes have no user authentication, that the REST API token covers only `/api/v1`, and that untrusted deployments need an authenticating reverse proxy ([#340](https://github.com/constructorfleet/SketchForge-3D/issues/340)).
 - The desktop app now shows a notification when a background update check finds a newer release, so updates discovered between manual checks are visible in the app ([#345](https://github.com/constructorfleet/SketchForge-3D/issues/345)).
 - Windows releases now have an install guide for `SketchForge-Setup-<version>-x64.exe`. Until a code-signing certificate is configured, the installer is unsigned and Windows may show a SmartScreen warning; the setup and release guides document this policy ([#343](https://github.com/constructorfleet/SketchForge-3D/issues/343)).

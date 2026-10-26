@@ -746,6 +746,8 @@ export type ProjectExportRequest = {
   name?: string;
   /** SVG only. Cannot be combined with `section`. */
   view?: ExportView;
+  /** SVG projection only: crease angle in degrees for mesh feature edges. */
+  featureAngle?: number;
   /** SVG or DXF only. Cannot be combined with `view`. */
   section?: ExportSection;
 };

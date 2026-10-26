@@ -38,6 +38,9 @@ function refusal(request: ProjectExportRequest): string | undefined {
   if (request.section !== undefined && request.format !== "svg" && request.format !== "dxf") {
     return "section only applies to svg and dxf formats.";
   }
+  if (request.featureAngle !== undefined && (request.format !== "svg" || request.section !== undefined)) {
+    return "featureAngle only applies to svg projection drawings.";
+  }
   if (request.section !== undefined && request.view !== undefined) return "section and view cannot be used together.";
   return undefined;
 }
@@ -74,6 +77,7 @@ export class Exports {
         ...(request.shapeIds === undefined ? {} : { shapeIds: [...request.shapeIds] }),
         ...(request.name === undefined ? {} : { name: request.name }),
         ...(request.view === undefined ? {} : { view: request.view }),
+        ...(request.featureAngle === undefined ? {} : { featureAngle: request.featureAngle }),
         ...(request.section === undefined ? {} : { section: { plane: request.section.plane, offset: request.section.offset } }),
       },
     });
