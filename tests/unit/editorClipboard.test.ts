@@ -20,6 +20,39 @@ function shape(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
 }
 
 describe("editor clipboard shapes", () => {
+  it("preserves mirror flags on exact geometry when parsing clipboard payloads", () => {
+    const mirrored: WorkplaneShape = {
+      ...shape({
+        id: "mirrored-exact",
+        kind: "mesh",
+        importedMesh: {
+          positions: [0, 0, 0, 1, 0, 0, 0, 0, 1],
+          baseWidth: 10,
+          baseDepth: 10,
+          baseHeight: 10,
+          triangleCount: 1,
+          sourceFormat: "json",
+        },
+      }),
+      mirrorX: true,
+      mirrorY: false,
+      mirrorZ: true,
+      cadBrep: "opaque-exact-brep",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 10, depth: 10, height: 10 },
+    };
+
+    const [parsed] = parseClipboardShapes(JSON.stringify([mirrored]));
+
+    expect(parsed).toMatchObject({ mirrorX: true, mirrorZ: true });
+    expect(Boolean(parsed?.mirrorY)).toBe(false);
+    expect(parsed?.cadBrep).toBe("opaque-exact-brep");
+    expect(cadBrepTransformForShape(parsed!)).toEqual([
+      -1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, -1, 0,
+    ]);
+  });
+
   it("keeps exact cut geometry and migrates legacy cut frames while parsing", () => {
     const oldCut: WorkplaneShape = {
       ...shape({

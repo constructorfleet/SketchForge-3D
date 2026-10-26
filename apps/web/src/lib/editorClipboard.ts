@@ -4,6 +4,9 @@ import { migratePre548CutBrepFrames } from "@constructorfleet/sketchforge-engine
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const CLIPBOARD_METADATA_KEYS = [
+  "mirrorX",
+  "mirrorY",
+  "mirrorZ",
   "material",
   "appearance",
   "faceIds",
