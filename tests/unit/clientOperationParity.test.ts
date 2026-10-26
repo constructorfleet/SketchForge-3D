@@ -80,8 +80,50 @@ const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   alignShapes: [PROJECT_ID, [SHAPE_ID, "other-shape"], "x", "max"],
   booleanShapes: [PROJECT_ID, [SHAPE_ID], ["cutter"]],
 };
+const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
+  "projects.listPage": [{ limit: 10, cursor: "next-page" }],
+  "projects.get": [PROJECT_ID],
+  "projects.findByName": ["Parity project"],
+  "shapes.listPage": [PROJECT_ID, { limit: 10, cursor: "next-page" }],
+  "shapes.createMany": [PROJECT_ID, [{ kind: "box", width: 1, depth: 1, height: 1 }]],
+  "treatments.fillet": [PROJECT_ID, SHAPE_ID, 1],
+  "treatments.chamfer": [PROJECT_ID, SHAPE_ID, 1],
+  "shell.hollow": [PROJECT_ID, SHAPE_ID, 1],
+  "shell.tray": [PROJECT_ID, SHAPE_ID, 1],
+  "align.tops": [PROJECT_ID, [SHAPE_ID, "other-shape"]],
+  "align.bottoms": [PROJECT_ID, [SHAPE_ID, "other-shape"]],
+  "align.centers": [PROJECT_ID, [SHAPE_ID, "other-shape"], "x"],
+  "distribute.gaps": [PROJECT_ID, [SHAPE_ID, "other-shape", "third-shape"]],
+  "distribute.pitch": [PROJECT_ID, [SHAPE_ID, "other-shape", "third-shape"]],
+  "patterns.row": [PROJECT_ID, [SHAPE_ID], 2, 1],
+  "patterns.ring": [PROJECT_ID, [SHAPE_ID], 2, { x: 0, z: 0 }],
+};
+const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
+  "projects.get": [PROJECT_ID],
+  "projects.find_by_name": ["Parity project"],
+  "projects.list_page": [10, "next-page"],
+  "shapes.list_page": [PROJECT_ID, 10, "next-page"],
+  "shapes.create_many": [PROJECT_ID, [{ kind: "box", width: 1, depth: 1, height: 1 }]],
+  "edges.filletable_indexes": [PROJECT_ID, SHAPE_ID],
+  "faces.facing": [PROJECT_ID, SHAPE_ID, "top"],
+  "faces.ids_facing": [PROJECT_ID, SHAPE_ID, "top"],
+  "treatments.fillet": [PROJECT_ID, SHAPE_ID, 1],
+  "treatments.chamfer": [PROJECT_ID, SHAPE_ID, 1],
+  "shell.hollow": [PROJECT_ID, SHAPE_ID, 1],
+  "shell.tray": [PROJECT_ID, SHAPE_ID, 1],
+  "align.tops": [PROJECT_ID, [SHAPE_ID, "other-shape"]],
+  "align.bottoms": [PROJECT_ID, [SHAPE_ID, "other-shape"]],
+  "align.centers": [PROJECT_ID, [SHAPE_ID, "other-shape"], "x"],
+  "distribute.gaps": [PROJECT_ID, [SHAPE_ID, "other-shape", "third-shape"]],
+  "distribute.pitch": [PROJECT_ID, [SHAPE_ID, "other-shape", "third-shape"]],
+  "patterns.row": [PROJECT_ID, [SHAPE_ID], 2, 1],
+  "patterns.ring": [PROJECT_ID, [SHAPE_ID], 2, [0, 0]],
+  "imports.file": [PROJECT_ID],
+  "imports.apply": [PROJECT_ID, "mesh.stl", "fixture", "model/stl"],
+  "exports.file": [PROJECT_ID, "stl"],
+};
 
-type CapturedRequest = { method: string; pathname: string };
+type CapturedRequest = { method: string; pathname: string; query?: string };
 
 function operationLookup() {
   return new Map(API_V1_OPERATIONS.map((operation) => [operation.operationId, operation]));
@@ -94,7 +136,7 @@ async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
     token: "test",
     fetch: async (input, init) => {
       const url = new URL(input);
-      requests.push({ method: init?.method ?? "GET", pathname: url.pathname });
+      requests.push({ method: init?.method ?? "GET", pathname: url.pathname, query: url.search });
       return new Response("{}", { status: 200 });
     },
   });
@@ -102,28 +144,35 @@ async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
   for (const [resourceName, operationMap] of Object.entries(CLIENT_RESOURCE_OPERATIONS)) {
     const resource = (client as unknown as Record<string, Record<string, (...args: unknown[]) => unknown>>)[resourceName];
     for (const [operationId, methodNames] of Object.entries(operationMap)) {
-      const methodName = (methodNames as readonly string[])[0];
-      const before = requests.length;
-      try {
-        await resource[methodName](...(CALL_ARGUMENTS[operationId] ?? []));
-      } catch {
-        // Response decoding is incidental here; the real HTTP request is the assertion target.
-      }
       const operation = lookup.get(operationId);
-      expect(requests.slice(before), `TypeScript ${resourceName}.${methodName} should call ${operationId}`).toHaveLength(1);
-      expect(requests[before], `TypeScript ${resourceName}.${methodName} request`).toEqual({
-        method: operation?.method,
-        pathname: operation?.path,
-      });
+      for (const methodName of methodNames as readonly string[]) {
+        const before = requests.length;
+        try {
+          await resource[methodName](...(TS_METHOD_ARGUMENTS[`${resourceName}.${methodName}`] ?? CALL_ARGUMENTS[operationId] ?? []));
+        } catch {
+          // Response decoding is incidental here; the real HTTP request is the assertion target.
+        }
+        expect(requests.slice(before), `TypeScript ${resourceName}.${methodName} should call ${operationId}`).toHaveLength(1);
+        expect({ method: requests[before]?.method, pathname: requests[before]?.pathname }, `TypeScript ${resourceName}.${methodName} request`).toEqual({ method: operation?.method, pathname: operation?.path });
+        if (resourceName === "projects" && methodName === "get") expect(requests[before]?.query).toContain("projectId=parity-project");
+        if (resourceName === "projects" && methodName === "listPage") {
+          expect(requests[before]?.query).toContain("limit=10");
+          expect(requests[before]?.query).toContain("cursor=next-page");
+        }
+        if (resourceName === "shapes" && methodName === "listPage") {
+          expect(requests[before]?.query).toContain("limit=10");
+          expect(requests[before]?.query).toContain("cursor=next-page");
+        }
+      }
     }
   }
   return requests;
 }
 
-function capturePythonRequests(): CapturedRequest[] {
+function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number }[] } {
   const python = process.platform === "win32" ? "python" : "python3";
   const source = [
-    "import json",
+    "import json, tempfile, urllib.parse",
     "from sketchforge3d.client import CLIENT_RESOURCE_OPERATIONS, SketchForgeClient",
     "class Reply:",
     "    def __enter__(self): return self",
@@ -132,25 +181,35 @@ function capturePythonRequests(): CapturedRequest[] {
     "class Opener:",
     "    def __init__(self): self.requests = []",
     "    def open(self, request, timeout=None):",
-    "        self.requests.append({'method': request.get_method(), 'pathname': request.full_url.split('?')[0].replace('http://parity.test', '')})",
+    "        parsed = urllib.parse.urlsplit(request.full_url)",
+    "        self.requests.append({'method': request.get_method(), 'pathname': parsed.path, 'query': parsed.query})",
     "        return Reply()",
     "opener = Opener()",
     "client = SketchForgeClient('http://parity.test', 'test', opener=opener)",
+    "calls = []",
     "arguments = json.loads(__import__('sys').argv[1])",
     "for resource_name, operation_map in CLIENT_RESOURCE_OPERATIONS.items():",
     "    for operation_id, method_names in operation_map.items():",
-    "        call_args = arguments[operation_id]",
-    "        if operation_id == 'importGeometry': call_args = [call_args[0], 'mesh.stl', b'fixture', 'model/stl']",
-    "        try: getattr(getattr(client, resource_name), method_names[0])(*call_args)",
-    "        except Exception: pass",
-    "print(json.dumps(opener.requests))",
+    "        for method_name in method_names:",
+    "            call_args = arguments.get(resource_name + '.' + method_name, arguments.get(operation_id, []))",
+    "            before = len(opener.requests)",
+    "            try:",
+    "                if resource_name == 'imports' and method_name == 'file':",
+    "                    with tempfile.NamedTemporaryFile(suffix='.stl') as fixture: getattr(getattr(client, resource_name), method_name)(call_args[0], fixture.name)",
+    "                elif resource_name == 'imports' and method_name == 'apply': getattr(getattr(client, resource_name), method_name)(call_args[0], call_args[1], b'fixture', call_args[3])",
+    "                elif resource_name == 'exports' and method_name == 'file':",
+    "                    with tempfile.NamedTemporaryFile(suffix='.stl') as fixture: getattr(getattr(client, resource_name), method_name)(call_args[0], call_args[1], fixture.name)",
+    "                else: getattr(getattr(client, resource_name), method_name)(*call_args)",
+    "            except Exception: pass",
+    "            calls.append({'resource': resource_name, 'method': method_name, 'requestCount': len(opener.requests) - before})",
+    "print(json.dumps({'requests': opener.requests, 'calls': calls}))",
   ].join("\n");
-  const output = execFileSync(python, ["-c", source, JSON.stringify(PYTHON_CALL_ARGUMENTS)], {
+  const output = execFileSync(python, ["-c", source, JSON.stringify({ ...PYTHON_CALL_ARGUMENTS, ...PY_METHOD_ARGUMENTS })], {
     cwd: path.join(root, "packages/sketchforge-py"),
     env: { ...process.env, PYTHONPATH: "src" },
     encoding: "utf8",
   });
-  return JSON.parse(output) as CapturedRequest[];
+  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number }[] };
 }
 
 function captureMcpRequest(toolName: string, args: Record<string, unknown>, filesDir: string): CapturedRequest[] {
@@ -196,6 +255,18 @@ describe("REST client operation parity", () => {
 
     expect(Object.keys(CLIENT_RESOURCE_OPERATIONS).sort()).toEqual(tsResources.sort());
     expect(Object.keys(py.operations).sort()).toEqual(py.resources.sort());
+    const expectedSecondaryMethods = {
+      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"] },
+      python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"] },
+    } as const;
+    for (const [resourceName, methods] of Object.entries(expectedSecondaryMethods.typescript)) {
+      const mapped = Object.values(CLIENT_RESOURCE_OPERATIONS[resourceName as keyof typeof CLIENT_RESOURCE_OPERATIONS]).flat();
+      expect(mapped, `TypeScript ${resourceName} secondary route methods`).toEqual(expect.arrayContaining([...methods]));
+    }
+    for (const [resourceName, methods] of Object.entries(expectedSecondaryMethods.python)) {
+      const operationMap = py.operations[resourceName] as Record<string, string[]>;
+      expect(Object.values(operationMap).flat(), `Python ${resourceName} secondary route methods`).toEqual(expect.arrayContaining([...methods]));
+    }
     const restBackedTools = Object.keys(MCP_RESOURCE_OPERATIONS);
     const nonRestTools = Object.keys(MCP_NON_REST_TOOL_REASONS);
     expect([...restBackedTools, ...nonRestTools].sort()).toEqual([...mcpToolNames].sort());
@@ -207,7 +278,7 @@ describe("REST client operation parity", () => {
       const resource = (tsClient as unknown as Record<string, Record<string, unknown>>)[resourceName];
       for (const [operationId, methodNames] of Object.entries(operationMap)) {
         expect(Array.isArray(methodNames), `TypeScript ${resourceName}.${operationId} must name callable methods`).toBe(true);
-        expect(methodNames, `TypeScript ${resourceName}.${operationId} must identify one route method`).toHaveLength(1);
+        expect(methodNames.length, `TypeScript ${resourceName}.${operationId} must identify route methods`).toBeGreaterThan(0);
         for (const methodName of methodNames as string[]) {
           expect(typeof resource[methodName], `TypeScript ${resourceName}.${methodName} for ${operationId}`).toBe("function");
         }
@@ -219,7 +290,7 @@ describe("REST client operation parity", () => {
       expect(operationMap && typeof operationMap === "object", `Python ${resourceName} must map operations to methods`).toBe(true);
       for (const [operationId, methodNames] of Object.entries(operationMap as Record<string, unknown>)) {
         expect(Array.isArray(methodNames), `Python ${resourceName}.${operationId} must name callable methods`).toBe(true);
-        expect(methodNames, `Python ${resourceName}.${operationId} must identify one route method`).toHaveLength(1);
+        expect((methodNames as unknown[]).length, `Python ${resourceName}.${operationId} must identify route methods`).toBeGreaterThan(0);
         for (const methodName of methodNames as string[]) {
           expect(methods.has(methodName), `Python ${resourceName}.${methodName} for ${operationId}`).toBe(true);
         }
@@ -230,16 +301,22 @@ describe("REST client operation parity", () => {
 
     const operationById = operationLookup();
     const pythonExpected = Object.values(py.operations).flatMap((operationMap) =>
-      Object.keys(operationMap as Record<string, unknown>).map((operationId) => {
+      Object.entries(operationMap as Record<string, string[]>).flatMap(([operationId, methods]) => methods.map(() => {
         const operation = operationById.get(operationId)!;
         return { method: operation.method, pathname: operation.path };
-      }),
+      })),
     );
     const typeScriptRequests = await captureTypeScriptRequests();
-    expect(typeScriptRequests).toHaveLength([...registered].filter((operationId) =>
-      Object.values(CLIENT_RESOURCE_OPERATIONS).some((operationMap) => operationId in operationMap),
-    ).length);
-    expect(capturePythonRequests()).toEqual(pythonExpected);
+    const tsExpectedCount = Object.values(CLIENT_RESOURCE_OPERATIONS).flatMap((operationMap) => Object.values(operationMap)).reduce((sum, methods) => sum + methods.length, 0);
+    expect(typeScriptRequests).toHaveLength(tsExpectedCount);
+    const pythonCaptured = capturePythonRequests();
+    for (const call of pythonCaptured.calls) {
+      expect(call.requestCount, `Python ${call.resource}.${call.method} should emit exactly one REST request`).toBe(1);
+    }
+    expect(pythonCaptured.requests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(pythonExpected);
+    expect(pythonCaptured.requests.find(({ query }) => query?.includes("projectId=parity-project"))).toBeDefined();
+    expect(pythonCaptured.requests.find(({ query }) => query?.includes("limit=10"))).toBeDefined();
+    expect(pythonCaptured.requests.find(({ query }) => query?.includes("cursor=next-page"))).toBeDefined();
 
     const filesDir = mkdtempSync(path.join(tmpdir(), "sketchforge-client-parity-"));
     try {
