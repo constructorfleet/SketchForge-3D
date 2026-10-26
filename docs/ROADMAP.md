@@ -114,7 +114,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 ## Client parity
 
-- [#328: Derive the client operation parity matrix](https://github.com/constructorfleet/SketchForge-3D/issues/328) — `tests/unit/clientOperationParity.test.ts` joins the REST operation registry to the TypeScript and Python resource lists and the MCP tool list. REST operation coverage is complete for TypeScript and Python. The MCP server still has no project-delete or retained prism-draft tool; project deletion remains in the dashboard, and retained prism drafting is not exposed through MCP. This is a route-level matrix; it does not prove that every client accepts every REST request option.
+- [#328: Derive the client operation parity matrix](https://github.com/constructorfleet/SketchForge-3D/issues/328) — `tests/unit/clientOperationParity.test.ts` joins the REST registry to TypeScript and Python resource inventories, checks that every listed operation names callable resource methods, and checks every MCP tool that calls `restRequest` appears in the MCP operation inventory. TypeScript and Python cover all registered operations. MCP still has no project-delete or retained prism-draft tool; project deletion remains in the dashboard, and retained prism drafting is not exposed through MCP. **Caveat:** this is route-level coverage; it does not verify that clients accept every REST request option or that method payloads match each route schema.
 - [#364: Python CAD resources and exact face listings](https://github.com/constructorfleet/SketchForge-3D/issues/364) — Python STEP explosion, sampled wall thickness, DXF export, and exact face listing in both clients implemented with regression coverage; awaiting review.
 
 ## CAD geometry correctness
