@@ -32,6 +32,8 @@ Server-backed projects and the shared project library are available to any calle
 
 For a trusted classroom or lab network, limit access to the server to that network. For deployments reachable by untrusted users, put SketchForge behind a reverse proxy or identity gateway that authenticates and authorizes requests to these routes. Keep the application port inaccessible to clients that could bypass the proxy; proxy authentication only protects requests that pass through it. The REST API token alone does not secure server-backed or shared project storage.
 
+The desktop-only `POST /api/local-download` helper is enabled only when `SKETCHFORGE_DESKTOP=1` and `SKETCHFORGE_LOCAL_DOWNLOAD_ROOT` is configured. Its JSON request body is capped at 26 MiB and its multipart request body at 513 MiB before parsing; text content remains limited to 25 MiB and uploaded files to 512 MiB. The packaged desktop server binds to loopback. Do not enable this helper on a network listener.
+
 ## REST API access
 
 Set `SKETCHFORGE_API_TOKEN` together with `SKETCHFORGE_PROJECTS_DIR` to enable authenticated REST API access. Treat the token as a secret: use a high-entropy value, store it in the deployment's secret manager, and keep it out of browser code and logs. See the [REST API deployment instructions](https://github.com/constructorfleet/SketchForge-3D#rest-api).

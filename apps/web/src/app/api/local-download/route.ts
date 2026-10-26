@@ -8,6 +8,33 @@ export const revalidate = false;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const MAX_TEXT_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_BINARY_DOWNLOAD_BYTES = 512 * 1024 * 1024;
+const MAX_JSON_REQUEST_BYTES = MAX_TEXT_DOWNLOAD_BYTES + 1024 * 1024;
+const MAX_MULTIPART_REQUEST_BYTES = MAX_BINARY_DOWNLOAD_BYTES + 1024 * 1024;
+
+class RequestBodyTooLarge extends Error {}
+
+async function readBoundedBody(request: Request, limit: number) {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > limit) {
+    throw new RequestBodyTooLarge();
+  }
+
+  if (!request.body) return Buffer.alloc(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new RequestBodyTooLarge();
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, totalBytes);
+}
 
 function configuredRoot() {
   const configured = process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT?.trim();
@@ -80,11 +107,18 @@ export async function POST(request: Request) {
     }
 
     const contentType = request.headers.get("content-type") ?? "";
+    const isMultipart = contentType.toLowerCase().startsWith("multipart/form-data");
+    const bodyBytes = await readBoundedBody(request, isMultipart ? MAX_MULTIPART_REQUEST_BYTES : MAX_JSON_REQUEST_BYTES);
+    const boundedRequest = new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: bodyBytes,
+    });
     let filename: string;
     let folder: string;
     let content: string | Buffer;
-    if (contentType.toLowerCase().startsWith("multipart/form-data")) {
-      const formData = await request.formData();
+    if (isMultipart) {
+      const formData = await boundedRequest.formData();
       const file = formData.get("file");
       const requestedName = formData.get("filename");
       const requestedFolder = formData.get("folder");
@@ -98,7 +132,7 @@ export async function POST(request: Request) {
       folder = requestedFolder;
       content = Buffer.from(await file.arrayBuffer());
     } else {
-      const body = (await request.json()) as { content?: unknown; filename?: unknown; folder?: unknown };
+      const body = (await boundedRequest.json()) as { content?: unknown; filename?: unknown; folder?: unknown };
       if (typeof body.content !== "string" || typeof body.filename !== "string" || typeof body.folder !== "string") {
         return errorResponse("errors.download.invalidRequest", 400);
       }
@@ -140,6 +174,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ path: targetPath });
   } catch (error) {
+    if (error instanceof RequestBodyTooLarge) {
+      return errorResponse("errors.download.tooLarge", 413);
+    }
     return caughtErrorResponse(error, "errors.download.saveFailed", 500);
   }
 }
