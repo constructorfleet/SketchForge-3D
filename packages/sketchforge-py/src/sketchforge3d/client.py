@@ -910,27 +910,27 @@ class Exports:
 # inventory beside the client resource construction list so parity tests can
 # compare it with the server's operation registry.
 CLIENT_RESOURCE_OPERATIONS = {
-    "projects": {"listProjectsOrGetProject": ("list", "get"), "createProject": ("create",), "deleteProject": ("delete",)},
-    "shapes": {"listShapes": ("list",), "createShapes": ("create", "create_many"), "updateShape": ("update",), "deleteShape": ("delete",)},
+    "projects": {"listProjectsOrGetProject": ("list",), "createProject": ("create",), "deleteProject": ("delete",)},
+    "shapes": {"listShapes": ("list",), "createShapes": ("create",), "updateShape": ("update",), "deleteShape": ("delete",)},
     "edges": {"listEdges": ("list",)},
     "faces": {"listFaces": ("list",)},
     "measurements": {"listMeasurements": ("list",), "measureEntities": ("between",)},
     "properties": {"getShapeProperties": ("get",)},
     "interference": {"analyzeInterference": ("check",)},
-    "treatments": {"treatShape": ("apply", "fillet", "chamfer")},
+    "treatments": {"treatShape": ("apply",)},
     "draft_prisms": {"draftPrism": ("apply",)},
-    "shell": {"shellShape": ("apply", "hollow", "tray")},
+    "shell": {"shellShape": ("apply",)},
     "booleans": {"booleanShapes": ("cut",)},
     "groups": {"groupShapes": ("group",), "ungroupShape": ("ungroup",)},
     "parts": {"splitParts": ("separate",)},
     "explosions": {"explodeAssembly": ("explode",)},
     "thickness": {"estimateThickness": ("estimate",)},
-    "align": {"alignShapes": ("apply", "tops", "bottoms", "centers")},
+    "align": {"alignShapes": ("apply",)},
     "mirrors": {"mirrorShapes": ("bake",)},
-    "distribute": {"distributeShapes": ("apply", "gaps", "pitch")},
-    "patterns": {"patternShapes": ("apply", "row", "ring")},
-    "imports": {"importGeometry": ("apply", "file")},
-    "exports": {"exportProject": ("export", "file")},
+    "distribute": {"distributeShapes": ("apply",)},
+    "patterns": {"patternShapes": ("apply",)},
+    "imports": {"importGeometry": ("apply",)},
+    "exports": {"exportProject": ("export",)},
 }
 
 
