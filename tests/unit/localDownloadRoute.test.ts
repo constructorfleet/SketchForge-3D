@@ -52,6 +52,42 @@ describe("local download route", () => {
     }
   });
 
+  it("rejects an oversized JSON body before parsing it", async () => {
+    process.env.SKETCHFORGE_DESKTOP = "1";
+    process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT = root;
+    const response = await POST(new Request("http://localhost/api/local-download", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(26 * 1024 * 1024 + 1),
+      },
+      body: "{}",
+    }));
+
+    expect(response.status).toBe(413);
+    expect(await fs.readdir(root)).toEqual([]);
+  });
+
+  it("rejects an oversized streamed JSON body when its length is not declared", async () => {
+    process.env.SKETCHFORGE_DESKTOP = "1";
+    process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT = root;
+    const response = await POST(new Request("http://localhost/api/local-download", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(26 * 1024 * 1024 + 1));
+          controller.close();
+        },
+      }),
+      // Node's Request implementation requires duplex when given a stream.
+      duplex: "half",
+    } as RequestInit & { duplex: "half" }),);
+
+    expect(response.status).toBe(413);
+    expect(await fs.readdir(root)).toEqual([]);
+  });
+
   it("rejects a folder whose existing parent symlink escapes the configured root", async () => {
     process.env.SKETCHFORGE_DESKTOP = "1";
     process.env.SKETCHFORGE_LOCAL_DOWNLOAD_ROOT = root;
