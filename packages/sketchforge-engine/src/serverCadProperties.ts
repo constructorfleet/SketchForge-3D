@@ -11,7 +11,9 @@ import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "./serverCadKernel.js";
 import { hasCurrentResultBrep, placedResultBrepSolid, placedSolid, type ShapeGeometryProvenance } from "./serverShapeBooleans.js";
 import { worldMeshForShape } from "./serverShapeGroups.js";
-import { meshMassProperties } from "./meshMassProperties.js";
+import { meshMassProperties, meshDataFromPositions } from "./meshMassProperties.js";
+import { MeshShellsOverlapError } from "./meshShellOverlap.js";
+import { restoreGroupedChildren } from "./serverShapeGroups.js";
 import { asServerCadError, hasExactRevolveSolid } from "./serverCadOperations.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
@@ -35,6 +37,38 @@ export type ServerCadShapeProperties = {
 };
 
 const MESH_PROVENANCE: ShapeGeometryProvenance = { source: "mesh", precision: "tessellated" };
+
+/**
+ * Flatten a record-only group of mesh children into one placed triangle mesh.
+ * A nested group is restored before descending so each child's stored frame
+ * and placement are composed exactly as they are when the group is ungrouped.
+ * Hole members and mixed exact/mesh groups stay on the existing OCCT path.
+ */
+function meshForRecordOnlyGroup(shape: WorkplaneShape) {
+  if (!shape.groupedShapes?.length || shape.importedMesh || shape.hole || shape.hidden) return null;
+  const positions: number[] = [];
+  const visit = (group: WorkplaneShape): boolean => {
+    for (const child of restoreGroupedChildren(group)) {
+      if (child.hidden) continue;
+      if (child.groupedShapes?.length && !child.importedMesh) {
+        if (!visit(child)) return false;
+        continue;
+      }
+      if (!child.importedMesh || child.hole || child.cadBrep) return false;
+      const mesh = worldMeshForShape(child);
+      if (!mesh) return false;
+      for (const face of mesh.faces) {
+        for (const index of face) {
+          const vertex = mesh.vertices[index];
+          if (!vertex) return false;
+          positions.push(vertex[0], vertex[1], vertex[2]);
+        }
+      }
+    }
+    return true;
+  };
+  return visit(shape) && positions.length >= 9 ? meshDataFromPositions(positions) : null;
+}
 
 function measuredSolid(cad: OcctKernel, solid: ShapeHandle, provenance: ShapeGeometryProvenance): ServerCadShapeProperties {
   const query = cad.queryBatch([solid])[0];
@@ -61,7 +95,9 @@ export async function shapeProperties(shape: WorkplaneShape): Promise<ServerCadS
     if (exact) return exact;
   }
   // The same placed triangles placedSolidForShape would sew, measured as they are.
-  const mesh = hasExactRevolveSolid(shape) ? null : worldMeshForShape(shape);
+  const mesh = hasExactRevolveSolid(shape)
+    ? null
+    : worldMeshForShape(shape) ?? meshForRecordOnlyGroup(shape);
   // A mesh that does not close at any weld tolerance has no volume to report:
   // the kernel's sewing gets the last word, and refuses it as it always has.
   // Bodies overlapping without nesting are refused here, as the exact path
@@ -70,7 +106,14 @@ export async function shapeProperties(shape: WorkplaneShape): Promise<ServerCadS
   try {
     fromMesh = mesh ? meshMassProperties(mesh) : null;
   } catch (error) {
-    throw asServerCadError(error);
+    // A record-only group is an assembly that OCCT fuses. When sibling meshes
+    // overlap, let that exact union path handle them instead of adding their
+    // overlapping triangles or returning the single-mesh overlap refusal.
+    if (error instanceof MeshShellsOverlapError && shape.groupedShapes?.length && !shape.importedMesh) {
+      fromMesh = null;
+    } else {
+      throw asServerCadError(error);
+    }
   }
   // Measured from the triangles, so tessellated, whatever else the shape
   // carries: a result whose B-rep did not match its mesh lands here too.
