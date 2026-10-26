@@ -120,8 +120,9 @@ const isResized = (factors: { width: number; depth: number; height: number }) =>
  * treatment or shell -- has its B-rep stored at the size it was drawn. A resize
  * since then lives only in its dimensions, so its exact solid at the size it is
  * shown is its profile scaled by that resize and extruded to its height, the
- * rebuild a face draft already makes (#452). Null when there is no resize to
- * apply, or the solid is something else.
+ * rebuild `applySketchFaceDraft` makes (#452 for width and depth; #546 fixed
+ * the engine handing a height-resized extrusion to it at twice its height).
+ * Null when there is no resize to apply, or the solid is something else.
  *
  * Without this, a fillet, chamfer or shell of a resized extrusion was built
  * from the B-rep as drawn and stored back at the original size (#539).

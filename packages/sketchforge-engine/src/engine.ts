@@ -996,8 +996,6 @@ export function createEngine(store: ProjectStore): Engine {
           ? recordedTreatmentScale
           : undefined;
         const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
-        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height
-          ?? (treatmentSourceScale ? treatmentSource!.height / treatmentSourceScale.height : existing.height);
         const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
         const faceDraftSourceScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
           // Editor-written drafts predate this field. Their output bounds
@@ -1012,6 +1010,12 @@ export function createEngine(store: ProjectStore): Engine {
         const rebuildScale = existing.faceDraft || faceDraftChanged
           ? faceDraftSourceScale
           : treatmentSourceScale ?? { width: 1, depth: 1, height: 1 };
+        // The extrusion is rebuilt at the height it was drawn and then scaled
+        // by `rebuildScale`, as its width is. Rebuilding a height-resized
+        // extrusion at its shown height applied that resize twice (#546).
+        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height
+          ?? (treatmentSourceScale ? treatmentSource!.height / treatmentSourceScale.height
+            : existing.height / rebuildScale.height);
         try {
           const rebuilt = await sketchExtrusionShapeFromRequest({
             id: existing.id,
