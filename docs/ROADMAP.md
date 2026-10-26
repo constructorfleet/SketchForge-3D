@@ -114,6 +114,7 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 ## Client parity
 
+- [#328: Derive the client operation parity matrix](https://github.com/constructorfleet/SketchForge-3D/issues/328) — `tests/unit/clientOperationParity.test.ts` invokes every mapped TypeScript and Python resource method with a stub transport, checks each outgoing method/path against the REST registry, and checks representative project id, page limit, and cursor query options. Composite bulk-delete helpers are inventoried separately and checked against their complete list/delete request sequence. It compares MCP's runtime `tools/list` inventory with explicit REST-backed and local/editor tool inventories, then invokes every REST-backed MCP handler against a fetch spy. TypeScript and Python cover all registered operations. MCP issues headless REST requests for 11 operations; the remaining 17 are explicit gaps, even where a local/editor tool offers similar behavior (for example, object CRUD, grouping and alignment). Project deletion and retained prism drafting have no MCP counterpart. **Caveat:** request option checks are representative; payloads are not validated against each route schema.
 - [#364: Python CAD resources and exact face listings](https://github.com/constructorfleet/SketchForge-3D/issues/364) — Python STEP explosion, sampled wall thickness, DXF export, and exact face listing in both clients implemented with regression coverage; awaiting review.
 
 ## CAD geometry correctness

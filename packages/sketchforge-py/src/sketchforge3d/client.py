@@ -906,6 +906,39 @@ class Exports:
         )
 
 
+# REST operation ids implemented by each public client resource. Keep this
+# inventory beside the client resource construction list so parity tests can
+# compare it with the server's operation registry.
+CLIENT_RESOURCE_OPERATIONS = {
+    "projects": {"listProjectsOrGetProject": ("list", "list_page", "get", "find_by_name"), "createProject": ("create",), "deleteProject": ("delete",)},
+    "shapes": {"listShapes": ("list", "list_page"), "createShapes": ("create", "create_many"), "updateShape": ("update",), "deleteShape": ("delete",)},
+    "edges": {"listEdges": ("list", "filletable_indexes")},
+    "faces": {"listFaces": ("list", "facing", "ids_facing")},
+    "measurements": {"listMeasurements": ("list", "with_radius"), "measureEntities": ("between",)},
+    "properties": {"getShapeProperties": ("get",)},
+    "interference": {"analyzeInterference": ("check",)},
+    "treatments": {"treatShape": ("apply", "fillet", "chamfer")},
+    "draft_prisms": {"draftPrism": ("apply",)},
+    "shell": {"shellShape": ("apply", "hollow", "tray")},
+    "booleans": {"booleanShapes": ("cut",)},
+    "groups": {"groupShapes": ("group",), "ungroupShape": ("ungroup",)},
+    "parts": {"splitParts": ("separate",)},
+    "explosions": {"explodeAssembly": ("explode",)},
+    "thickness": {"estimateThickness": ("estimate",)},
+    "align": {"alignShapes": ("apply", "tops", "bottoms", "centers")},
+    "mirrors": {"mirrorShapes": ("bake",)},
+    "distribute": {"distributeShapes": ("apply", "gaps", "pitch")},
+    "patterns": {"patternShapes": ("apply", "row", "ring")},
+    "imports": {"importGeometry": ("apply", "file")},
+    "exports": {"exportProject": ("export", "file")},
+}
+
+# Convenience helpers that emit a sequence of REST operations rather than one route.
+CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
+    "shapes": {"delete_all": ("listShapes", "updateShape", "deleteShape")},
+}
+
+
 class SketchForgeClient:
     def __init__(
         self,

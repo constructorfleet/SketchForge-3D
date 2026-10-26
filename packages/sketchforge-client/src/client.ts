@@ -68,6 +68,39 @@ import type {
 
 export type SketchForgeClientOptions = TransportOptions;
 
+/** REST operation ids implemented by each public client resource. Keep these
+ * beside the resource list so parity tests can compare clients to the server
+ * registry when a route is added. */
+export const CLIENT_RESOURCE_OPERATIONS = {
+  projects: { listProjectsOrGetProject: ["list", "listPage", "get", "findByName"], createProject: ["create"], deleteProject: ["delete"] },
+  shapes: { listShapes: ["list", "listPage"], createShapes: ["create", "createMany"], updateShape: ["update"], deleteShape: ["delete"] },
+  edges: { listEdges: ["list", "filletableIndexes"] },
+  explosions: { explodeAssembly: ["explode"] },
+  faces: { listFaces: ["list", "facing"] },
+  measurements: { listMeasurements: ["list", "withRadius"], measureEntities: ["between"] },
+  mirrors: { mirrorShapes: ["bake"] },
+  properties: { getShapeProperties: ["get"] },
+  treatments: { treatShape: ["apply", "fillet", "chamfer"] },
+  drawings: { exportProject: ["section", "dxf"] },
+  draftPrism: { draftPrism: ["apply"] },
+  shell: { shellShape: ["apply", "hollow", "tray"] },
+  align: { alignShapes: ["apply", "tops", "bottoms", "centers"] },
+  distribute: { distributeShapes: ["apply", "gaps", "pitch"] },
+  patterns: { patternShapes: ["apply", "row", "ring"] },
+  imports: { importGeometry: ["apply"] },
+  interference: { analyzeInterference: ["check"] },
+  thickness: { estimateThickness: ["estimate"] },
+  exports: { exportProject: ["export"] },
+  booleans: { booleanShapes: ["cut"] },
+  groups: { groupShapes: ["group"], ungroupShape: ["ungroup"] },
+  parts: { splitParts: ["separate"] },
+} as const satisfies Readonly<Record<string, Readonly<Record<string, readonly string[]>> | readonly []>>;
+
+/** Convenience methods that emit a sequence of REST operations rather than one route. */
+export const CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
+  shapes: { deleteAll: ["listShapes", "updateShape", "deleteShape"] },
+} as const;
+
 export class SketchForgeClient {
   readonly projects: Projects;
   readonly shapes: Shapes;
