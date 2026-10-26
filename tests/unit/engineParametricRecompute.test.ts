@@ -12,6 +12,7 @@ import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-en
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { buildGroupFromSelection } from "@constructorfleet/sketchforge-engine/serverShapeBooleans";
+import { recompute } from "@constructorfleet/sketchforge-engine/parametricRecompute";
 import {
   boundsForShapes,
   restoreGroupedChildren,
@@ -112,6 +113,17 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("refuses a cyclic transient feature graph with the node that closes the cycle", async () => {
+    const source = { id: "cycle-source", sketchSourceId: "sketch/cycle", groupedShapes: [] } as unknown as WorkplaneShape;
+    const group = { id: "cycle-group", groupedShapes: [source] } as WorkplaneShape;
+    source.groupedShapes = [group];
+
+    const result = await recompute({ shapes: [group] }, ["sketch/cycle"]);
+
+    expect(result).toMatchObject({ ok: false, reason: "dependency_cycle" });
+    expect(result.ok ? "" : result.message).toContain("cycle-group");
+  });
+
   it("classifies an injected WebAssembly runtime fault as a kernel failure and logs its raw message", async () => {
     const { store } = projectStore();
     const engine = createEngine(store);
@@ -1707,6 +1719,49 @@ describe("dependency-ordered feature recomputation", () => {
     expect(restoredGroup.cadBrep).toBe(persistedGroup.cadBrep);
     expect(restoredGroup.groupedShapes?.find((child) => child.sketchSourceId === source.sketchSourceId)?.sketchProfile).toEqual(editedProfile);
   });
+
+  it("names the failed downstream boolean and rolls back a drafted, treated two-cut chain", async () => {
+    const { store, writeCount, document } = projectStore();
+    const engine = createEngine(store);
+    const source = await sketchExtrusionShapeFromRequest({
+      id: "source-chain", sketchSourceId: "sketch/source-chain", name: "Source chain",
+      profile: extrusionProfile(), height: 3,
+    });
+    const cutters = value(await engine.addShapes("recompute", [
+      { kind: "box", name: "First cut", width: 0.3, depth: 4, height: 4, elevation: -0.5, hole: true },
+      { kind: "box", name: "Downstream cut", width: 0.2, depth: 0.4, height: 4, x: 0.8, elevation: -0.5, hole: true },
+    ]));
+    document.shapes = [source, ...cutters.shapes];
+    const drafted = value(await engine.draftPrism("recompute", source.id, 5)).shape;
+    const treated = await persistAllEdgeFillet(engine, "recompute", drafted.id, 0.1);
+    const firstCut = value(await engine.cut("recompute", {
+      solidIds: [treated.id], holeIds: [cutters.shapes[0]!.id],
+    })).shape;
+    const secondCut = value(await engine.cut("recompute", {
+      solidIds: [firstCut.id], holeIds: [cutters.shapes[1]!.id],
+    })).shape;
+    document.shapes = [
+      ...document.shapes.filter((shape) => shape.id !== secondCut.id),
+      {
+        ...secondCut,
+        groupedShapes: secondCut.groupedShapes?.map((shape) => shape.hole
+          ? { ...shape, x: shape.x + 20 }
+          : shape),
+      },
+    ];
+    const before = structuredClone(value(await engine.project("recompute")).shapes);
+    const writesBefore = writeCount();
+
+    const changed = await engine.changeShape("recompute", source.sketchSourceId!, {
+      sketchProfile: extrusionProfile(1.1),
+    });
+
+    expect(changed.ok).toBe(false);
+    expect(changed.ok ? undefined : changed.failure.reason).toBe("sweep_failed");
+    expect(changed.ok ? "" : JSON.stringify(changed.failure)).toContain(secondCut.id);
+    expect(writeCount()).toBe(writesBefore);
+    expect(value(await engine.project("recompute")).shapes).toEqual(before);
+  }, CAD_TEST_TIMEOUT_MS);
 
   it("rolls back all writes when an invalid upstream sketch is submitted", async () => {
     const { store, writeCount } = projectStore();

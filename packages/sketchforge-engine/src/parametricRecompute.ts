@@ -14,10 +14,17 @@ import { draftFaceForSketchSegment, legacyDraftSegmentForShape } from "./faceDra
 import { retainedDraftSourcePlacement } from "./sketchFaceDraftKernel.js";
 import { edgeIndexesForSketchSourceEdges } from "./sketchEdgeSegmentLineage.js";
 import type { EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectDocument } from "./projectStore.js";
 
 export type RecomputeTreeResult =
   | { ok: true; shapes: WorkplaneShape[]; updated: WorkplaneShape; matchCount: number }
-  | { ok: false; reason: "recompute_failed" | "dependency_missing" | "dependency_ambiguous"; message?: string };
+  | { ok: false; reason: "recompute_failed" | "dependency_missing" | "dependency_ambiguous" | "dependency_cycle"; message?: string };
+
+type RecomputeNode = {
+  shape: WorkplaneShape;
+  dependencies: string[];
+  order: number;
+};
 
 /** Where a treatment was applied, so reverting it later carries any move made since. */
 export function edgeTreatmentAppliedFrame(shape: WorkplaneShape): NonNullable<EdgeTreatmentHistoryEntry["appliedFrame"]> {
@@ -228,94 +235,187 @@ async function replaySelectedEdgeTreatment(
   };
 }
 
-/** Find a retained sketch output anywhere in the feature tree, replace it, then rebuild boolean ancestors bottom-up. */
-export async function recomputeSketchOutput(
+/** Replace a rebuilt sketch output in a project snapshot before scheduling its dependents. */
+export function replaceSketchOutput(
   roots: WorkplaneShape[],
   sourceId: string,
   replacement: WorkplaneShape,
-): Promise<RecomputeTreeResult> {
+): { shapes: WorkplaneShape[]; matchCount: number } {
   let matchCount = 0;
-  let updated: WorkplaneShape | undefined;
-
-  const visit = async (shape: WorkplaneShape): Promise<WorkplaneShape> => {
+  const visit = (shape: WorkplaneShape): WorkplaneShape => {
     if (shape.id === replacement.id && shape.sketchSourceId === sourceId) {
       matchCount += 1;
-      updated = replacement;
       return replacement;
     }
     if (!shape.groupedShapes?.length) return shape;
+    const children = shape.groupedShapes.map(visit);
+    return children.some((child, index) => child !== shape.groupedShapes![index])
+      ? { ...shape, groupedShapes: children }
+      : shape;
+  };
+  return { shapes: roots.map(visit), matchCount };
+}
 
-    const children: WorkplaneShape[] = [];
-    let changed = false;
-    for (const child of shape.groupedShapes) {
-      const next = await visit(child);
-      children.push(next);
-      changed ||= next !== child;
-    }
-    if (!changed) return shape;
+/**
+ * Recompute every dependent node in deterministic dependency order.
+ *
+ * `project` already contains the newly rebuilt outputs named by
+ * `changedSourceIds`; only their retained dependents are evaluated here.
+ */
+export async function recompute(
+  project: Pick<ProjectDocument, "shapes">,
+  changedSourceIds: readonly string[],
+): Promise<RecomputeTreeResult> {
+  const nodes = new Map<string, RecomputeNode>();
+  const outputsBySource = new Map<string, string[]>();
+  const active = new Set<WorkplaneShape>();
+  let order = 0;
 
-    // Plain groups are containers; boolean groups have retained operand hole
-    // modes and exact BREP. Rebuild those in dependency order after their child.
-    if (!shape.cadBrep || !children.some((child) => child.hole)) {
-      return { ...shape, groupedShapes: children };
+  const collect = (shape: WorkplaneShape): RecomputeTreeResult | undefined => {
+    if (active.has(shape)) {
+      return { ok: false, reason: "dependency_cycle", message: `Feature node ${shape.id} creates a dependency cycle.` };
     }
-    const result = await buildGroupFromSelection(children);
-    if ("error" in result || result.cutRemovedNothing) {
-      throw new Error("The edited sketch made a dependent boolean invalid or ineffective.");
+    if (nodes.has(shape.id)) {
+      return { ok: false, reason: "dependency_ambiguous", message: `Feature node ${shape.id} appears more than once in the project tree.` };
     }
-    // `children` are expressed in this group's child frame, so the rebuilt
-    // group comes back placed in that frame at its natural size. Put it through
-    // the retained group's frame -- resize, mirror, turn, then move -- the same
-    // way ungrouping puts each child, and keep the turn, mirror and resize on
-    // the rebuilt group so its geometry is drawn under them too.
-    const rebuilt = result.group;
-    const frame = groupChildFrame(shape);
-    const width = shapeWidth(rebuilt) * frame.scale.x;
-    const depth = shapeDepth(rebuilt) * frame.scale.z;
-    const height = rebuilt.height * frame.scale.y;
-    const center = frame.toParent(rebuilt.x, (rebuilt.elevation ?? 0) + rebuilt.height / 2, rebuilt.z);
-    return {
-      ...rebuilt,
-      id: shape.id,
-      name: shape.name,
-      color: shape.color,
-      locked: shape.locked,
-      x: center.x,
-      z: center.z,
-      elevation: center.y - height / 2,
-      width,
-      depth,
-      height,
-      size: resizedShapeSize(width, depth),
-      rotation: shape.rotation,
-      rotationX: shape.rotationX,
-      rotationZ: shape.rotationZ,
-      mirrorX: shape.mirrorX,
-      mirrorY: shape.mirrorY,
-      mirrorZ: shape.mirrorZ,
-      // The group builder creates fresh child IDs because ordinary grouping
-      // is a new operation. Recompute is different: each retained child is the
-      // same feature with new geometry, so keep its existing feature identity.
-      groupedShapes: result.group.groupedShapes?.map((child, index) => ({
-        ...child,
-        id: children[index]?.id ?? child.id,
-      })),
-    };
+    active.add(shape);
+    const children = shape.groupedShapes ?? [];
+    nodes.set(shape.id, { shape, dependencies: children.map((child) => child.id), order: order++ });
+    if (shape.sketchSourceId) {
+      const outputs = outputsBySource.get(shape.sketchSourceId) ?? [];
+      outputs.push(shape.id);
+      outputsBySource.set(shape.sketchSourceId, outputs);
+    }
+    for (const child of children) {
+      const failure = collect(child);
+      if (failure) return failure;
+    }
+    active.delete(shape);
+    return undefined;
   };
 
-  try {
-    const shapes = [] as WorkplaneShape[];
-    for (const root of roots) shapes.push(await visit(root));
-    if (matchCount === 0) return { ok: false, reason: "dependency_missing" };
-    if (matchCount !== 1) return { ok: false, reason: "dependency_ambiguous" };
-    return { ok: true, shapes, updated: updated!, matchCount };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: "recompute_failed",
-      message: error instanceof Error ? error.message : "A dependent feature could not be recomputed.",
-    };
+  for (const root of project.shapes) {
+    const failure = collect(root);
+    if (failure) return failure;
   }
+
+  const changedNodeIds: string[] = [];
+  for (const sourceId of changedSourceIds) {
+    const outputs = outputsBySource.get(sourceId) ?? [];
+    if (outputs.length === 0) return { ok: false, reason: "dependency_missing", message: `Sketch source ${sourceId} has no output node.` };
+    if (outputs.length !== 1) return { ok: false, reason: "dependency_ambiguous", message: `Sketch source ${sourceId} has multiple output nodes.` };
+    changedNodeIds.push(outputs[0]!);
+  }
+  if (changedNodeIds.length === 0) return { ok: false, reason: "dependency_missing", message: "No changed sketch sources were supplied." };
+
+  const dependents = new Map<string, string[]>();
+  for (const [id, node] of nodes) {
+    for (const dependency of node.dependencies) {
+      if (!nodes.has(dependency)) {
+        return { ok: false, reason: "dependency_missing", message: `Feature node ${id} depends on missing node ${dependency}.` };
+      }
+      const parents = dependents.get(dependency) ?? [];
+      parents.push(id);
+      dependents.set(dependency, parents);
+    }
+  }
+
+  const affected = new Set(changedNodeIds);
+  const pending = [...changedNodeIds];
+  while (pending.length) {
+    const dependency = pending.shift()!;
+    for (const parent of dependents.get(dependency) ?? []) {
+      if (!affected.has(parent)) {
+        affected.add(parent);
+        pending.push(parent);
+      }
+    }
+  }
+
+  const indegree = new Map<string, number>();
+  for (const id of affected) {
+    indegree.set(id, (nodes.get(id)?.dependencies ?? []).filter((dependency) => affected.has(dependency)).length);
+  }
+  const ready = [...affected].filter((id) => indegree.get(id) === 0)
+    .sort((left, right) => nodes.get(left)!.order - nodes.get(right)!.order);
+  const schedule: string[] = [];
+  while (ready.length) {
+    const id = ready.shift()!;
+    schedule.push(id);
+    for (const parent of dependents.get(id) ?? []) {
+      if (!affected.has(parent)) continue;
+      const remaining = indegree.get(parent)! - 1;
+      indegree.set(parent, remaining);
+      if (remaining === 0) {
+        ready.push(parent);
+        ready.sort((left, right) => nodes.get(left)!.order - nodes.get(right)!.order);
+      }
+    }
+  }
+  if (schedule.length !== affected.size) {
+    const nodeId = [...affected].find((id) => !schedule.includes(id))!;
+    return { ok: false, reason: "dependency_cycle", message: `Feature node ${nodeId} is part of a dependency cycle.` };
+  }
+  const rebuilt = new Map<string, WorkplaneShape>();
+  for (const id of schedule) {
+    const node = nodes.get(id)!;
+    const shape = node.shape;
+    if (changedNodeIds.includes(id)) {
+      rebuilt.set(id, shape);
+      continue;
+    }
+
+    const children = node.dependencies.map((dependency) => rebuilt.get(dependency) ?? nodes.get(dependency)!.shape);
+    try {
+      if (shape.cadBrep && children.some((child) => child.hole)) {
+        const result = await buildGroupFromSelection(children);
+        if ("error" in result || result.cutRemovedNothing) {
+          const detail = "error" in result ? result.error : "the cut removed no material";
+          return { ok: false, reason: "recompute_failed", message: `Dependent boolean node ${id} could not be recomputed: ${detail}` };
+        }
+        // The group builder returns a natural-frame result. Restore the retained
+        // group's resize, mirror, rotation and placement around that result.
+        const frame = groupChildFrame(shape);
+        const width = shapeWidth(result.group) * frame.scale.x;
+        const depth = shapeDepth(result.group) * frame.scale.z;
+        const height = result.group.height * frame.scale.y;
+        const center = frame.toParent(result.group.x, (result.group.elevation ?? 0) + result.group.height / 2, result.group.z);
+        rebuilt.set(id, {
+          ...result.group,
+          id: shape.id,
+          name: shape.name,
+          color: shape.color,
+          locked: shape.locked,
+          x: center.x,
+          z: center.z,
+          elevation: center.y - height / 2,
+          width,
+          depth,
+          height,
+          size: resizedShapeSize(width, depth),
+          rotation: shape.rotation,
+          rotationX: shape.rotationX,
+          rotationZ: shape.rotationZ,
+          mirrorX: shape.mirrorX,
+          mirrorY: shape.mirrorY,
+          mirrorZ: shape.mirrorZ,
+          groupedShapes: result.group.groupedShapes?.map((child, index) => ({
+            ...child,
+            id: children[index]?.id ?? child.id,
+          })),
+        });
+      } else {
+        rebuilt.set(id, { ...shape, ...(children.length ? { groupedShapes: children } : {}) });
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "an unexpected recompute error occurred";
+      return { ok: false, reason: "recompute_failed", message: `Dependent boolean node ${id} could not be recomputed: ${detail}` };
+    }
+  }
+
+  const shapes = project.shapes.map((shape) => rebuilt.get(shape.id) ?? shape);
+  const updated = nodes.get(changedNodeIds[0]!)!.shape;
+  return { ok: true, shapes, updated, matchCount: changedNodeIds.length };
 }
 
 export function findSketchOutput(roots: WorkplaneShape[], sourceId: string): WorkplaneShape[] {

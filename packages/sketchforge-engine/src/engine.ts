@@ -93,7 +93,8 @@ import { sketchSourceEdgesForEdgeIndexes } from "./sketchEdgeSegmentLineage.js";
 import {
   edgeTreatmentAppliedFrame,
   findSketchOutput,
-  recomputeSketchOutput,
+  recompute,
+  replaceSketchOutput,
   replaySingleAllEdgeTreatment,
 } from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
@@ -1450,7 +1451,16 @@ export function createEngine(store: ProjectStore): Engine {
       }
 
       if (sourceSketchTarget) {
-        const recomputed = await recomputeSketchOutput(document.shapes, shapeId, updatedShape);
+        const candidate = replaceSketchOutput(document.shapes, shapeId, updatedShape);
+        if (candidate.matchCount !== 1) {
+          return failed({
+            reason: "sweep_failed",
+            message: candidate.matchCount === 0
+              ? `Sketch source ${shapeId} has no output node.`
+              : `Sketch source ${shapeId} has multiple output nodes.`,
+          });
+        }
+        const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId]);
         if (!recomputed.ok) {
           return failed({
             reason: "sweep_failed",

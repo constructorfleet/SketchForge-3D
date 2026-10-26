@@ -7,7 +7,7 @@ owner: Engine
 
 # ADR 0001: Dependency-ordered parametric recomputation
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-26
 - Issue: [#351](https://github.com/constructorfleet/SketchForge-3D/issues/351)
 
@@ -15,32 +15,29 @@ owner: Engine
 
 Parametric edits currently split responsibility across `engine.changeShape`
 and `parametricRecompute.ts`. `changeShape` rebuilds a sketch-backed output and
-replays its supported retained operations. `recomputeSketchOutput` then finds
+replays its supported retained operations. The recompute module then finds
 that output in the nested shape tree and rebuilds retained boolean ancestors.
-This preserves atomic writes, but each new dependency relationship adds
-another special case and ordering is implicit in recursive traversal.
+This preserves atomic writes, but ordering is implicit in recursive traversal.
 
 The `.skf` project already persists sketch-source IDs, feature inputs, and
 nested boolean-group membership. A separate persisted history format would
 duplicate those inputs and require a migration without adding information the
 recompute path needs today.
 
-## Decision proposed
+## Decision
 
 Build a transient directed acyclic graph from the loaded project for each
 recompute request. Do not persist synthetic feature nodes or change the `.skf`
 schema in this work.
 
-- A sketch-source node produces its retained output shape.
-- A retained operation on that shape is represented as an ordered feature step
-  using the inputs already stored on the shape (draft settings, face-draft
-  settings, treatment history, or revolve settings).
+- Each shape ID identifies one recompute node. A sketch-source ID points to
+  its retained output node; the engine rebuilds that output and its supported
+  ordered feature chain before handing the candidate project to the scheduler.
 - A boolean-group node depends on each retained operand and produces the group
-  output. Plain grouping remains a container and does not add a geometry step.
-- Stable source IDs identify sketch inputs; shape IDs identify retained output,
-  operation, and group nodes. Where a node needs a more specific ID, derive it
-  from its owning shape ID and operation position rather than storing another
-  identifier.
+  output. Plain grouping remains a container node, so changed child outputs
+  flow through it without a kernel operation.
+- The node graph is derived from the nested shape tree and its existing source
+  IDs. No generated feature IDs or new persisted records are needed.
 
 Use a deterministic topological sort. Persisted child order breaks ties between
 independent operands. A cycle or missing/ambiguous input is a recompute failure
@@ -55,9 +52,10 @@ inputs.
 
 Expose one engine entry point, `recompute(project, changedSourceIds)`, which
 constructs the graph, schedules affected nodes, and returns either the complete
-replacement project or a node-scoped failure. Keep CAD builders as internal
-feature evaluators behind this interface. The engine transaction remains the
-only place that writes the returned project.
+replacement shape tree or a node-scoped failure. The changed source outputs are
+already rebuilt in the candidate project; the scheduler rebuilds only their
+affected dependents. The engine transaction remains the only place that writes
+the returned tree.
 
 ## Consequences
 
@@ -65,8 +63,8 @@ only place that writes the returned project.
   migration.
 - Ordering and failure behavior become explicit and testable at one seam.
 - A failed feature does not leave a partially recomputed tree.
-- New retained feature types must provide their input dependencies and an
-  evaluator; they do not add a new traversal branch at each caller.
+- New retained group dependencies are derived from the shape tree and do not
+  add another traversal branch at each caller.
 - The graph is rebuilt per request. This favors correctness and locality over
   caching; caching can be considered only after profiling demonstrates a need.
 
@@ -80,10 +78,13 @@ only place that writes the returned project.
 - Verify atomic failure by comparing the complete persisted project before and
   after a deliberately invalid downstream operation.
 
+The scheduler and node-scoped failures are implemented in PR #580. The nested
+draft → fillet → boolean → boolean regression verifies that an ineffective
+downstream cut names its shape ID and leaves the stored project unchanged.
+
 ## Open question
 
-This proposal treats the current shape tree and `.skf` feature inputs as the
-canonical dependency record. If maintainers require arbitrary branching feature
-history, independent feature editing, or persistent failed-node status, that
-would require an explicit feature-node schema and a separate compatibility
-decision before implementation.
+This decision treats the current shape tree and `.skf` feature inputs as the
+canonical dependency record. Arbitrary branching feature history, independent
+feature editing, and persistent failed-node status would require an explicit
+feature-node schema and a separate compatibility decision.
