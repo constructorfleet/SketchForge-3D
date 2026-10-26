@@ -468,6 +468,12 @@ describe("exports", () => {
     expect(server.calls[0]?.body).toEqual({ format: "svg", view: "top" });
   });
 
+  it("sends a mesh feature angle with an SVG projection", async () => {
+    const server = fakeServer({ body: exported("svg") });
+    await client(server).exports.export("p1", { format: "svg", view: "top", featureAngle: 22 });
+    expect(server.calls[0]?.body).toEqual({ format: "svg", view: "top", featureAngle: 22 });
+  });
+
   it.each(["svg", "dxf"] as const)("sends a section plane with %s", async (format) => {
     const server = fakeServer({ body: exported(format) });
     await client(server).exports.export("p1", { format, section: { plane: "xz", offset: -4 } });
@@ -490,6 +496,12 @@ describe("exports", () => {
     expect(server.calls).toHaveLength(0);
   });
 
+  it.each(PROJECT_EXPORT_FORMATS.filter((format) => format !== "svg"))("refuses a feature angle on %s before sending anything", async (format) => {
+    const server = fakeServer({ body: exported(format) });
+    await expect(client(server).exports.export("p1", { format, featureAngle: 22 })).rejects.toThrow(/featureAngle only applies to svg projection drawings/);
+    expect(server.calls).toHaveLength(0);
+  });
+
   it.each(PROJECT_EXPORT_FORMATS.filter((format) => format !== "svg" && format !== "dxf"))("refuses a section on %s before sending anything", async (format) => {
     const server = fakeServer({ body: exported(format) });
     await expect(client(server).exports.export("p1", { format, section: { plane: "xy", offset: 0 } })).rejects.toThrow(/section only applies to svg and dxf/);
@@ -500,6 +512,8 @@ describe("exports", () => {
     const server = fakeServer({ body: exported("svg") });
     await expect(client(server).exports.export("p1", { format: "svg", view: "top", section: { plane: "xy", offset: 0 } }))
       .rejects.toThrow(/section and view cannot be used together/);
+    await expect(client(server).exports.export("p1", { format: "svg", section: { plane: "xy", offset: 0 }, featureAngle: 22 }))
+      .rejects.toThrow(/featureAngle only applies to svg projection drawings/);
     await expect(client(server).exports.export("p1", { format: "gltf" as never })).rejects.toThrow(/format must be one of: stl, obj, 3mf, step, skf, zip, svg, dxf/);
     expect(server.calls).toHaveLength(0);
   });

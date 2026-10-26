@@ -99,7 +99,7 @@ client.mirrors.bake(projectId, ids, axis): Promise<BakedMirrorResult>
 client.explosions.explode(projectId, shapeId): Promise<ShapeWriteResult>
 client.thickness.estimate(projectId, shapeId): Promise<WallThicknessEstimate>
 client.drawings.dxf(projectId, { plane, offset, shapeIds?, name? }): Promise<SectionDxfArtifact>
-client.exports.export(projectId, { format, shapeIds?, name?, view?, section? }): Promise<ProjectExportArtifact>
+client.exports.export(projectId, { format, shapeIds?, name?, view?, featureAngle?, section? }): Promise<ProjectExportArtifact>
 
 client.booleans.cut(projectId, { solidIds, holeIds }): Promise<BooleanCutResult>
 client.groups.group(projectId, ids): Promise<GroupResult>
@@ -182,7 +182,7 @@ const widerProfile = {
 await client.shapes.update(projectId, sweep.id, { sketchProfile: widerProfile });
 ```
 
-`exports.export` covers every format in `PROJECT_EXPORT_FORMATS` -- `stl`, `obj`, `3mf`, `step`, `skf`, `zip`, `svg` and `dxf` -- and returns the file whole as `data: Uint8Array`, with the server's `filename`, `mimeType`, `bytes` and `shapeCount`. A STEP export also reports `exportedCount` and the `skipped` shapes it could not write as exact solids. `view` (one of `EXPORT_VIEWS`) applies only to SVG, `section` (`{ plane, offset }`) only to SVG and DXF, and the two cannot be combined; the client refuses each of those before sending anything, with the server's own message:
+`exports.export` covers every format in `PROJECT_EXPORT_FORMATS` -- `stl`, `obj`, `3mf`, `step`, `skf`, `zip`, `svg` and `dxf` -- and returns the file whole as `data: Uint8Array`, with the server's `filename`, `mimeType`, `bytes` and `shapeCount`. A STEP export also reports `exportedCount` and the `skipped` shapes it could not write as exact solids. `view` (one of `EXPORT_VIEWS`) applies only to SVG, `featureAngle` sets the mesh crease angle from 0 to 180 degrees on SVG projections (default 30; exact solids ignore it), and `section` (`{ plane, offset }`) applies to SVG and DXF. The client refuses unsupported option combinations before sending anything, with the server's own message:
 
 ```ts
 import { writeFile } from "node:fs/promises";
