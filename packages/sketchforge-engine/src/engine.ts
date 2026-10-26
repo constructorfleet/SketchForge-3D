@@ -84,7 +84,7 @@ import {
   REVOLVE_ONLY_FIELDS,
 } from "./revolveRequests.js";
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separateShapeParts } from "./serverShapeGroups.js";
+import { boundsForShapes as boundsForMirroring, restoreGroupedChildren, separateShapeParts, worldMeshForShape } from "./serverShapeGroups.js";
 import { serverManifoldRuntime } from "./serverManifoldRuntime.js";
 import { createLocalId } from "./localIds.js";
 import { invalidSketchSweepProfile, sketchSweepShapeFromRequest } from "./sketchSweepRequest.js";
@@ -1423,6 +1423,24 @@ export function createEngine(store: ProjectStore): Engine {
         !== JSON.stringify((changed.shape as unknown as Record<string, unknown>)[field]),
       );
       let updatedShape = changed.shape;
+      if (existing.kind === "mesh" && existing.importedMesh && !existing.cadBrep
+        && ["rotation", "rotationX", "rotationZ"].some((field) => field in requestedChanges)) {
+        const previousMesh = worldMeshForShape(existing);
+        const mesh = worldMeshForShape(updatedShape);
+        if (previousMesh?.vertices.length && mesh?.vertices.length) {
+          const lowestPointOf = (vertices: Array<[number, number, number]>) =>
+            vertices.reduce((lowest, [, y]) => Math.min(lowest, y), Number.POSITIVE_INFINITY);
+          const previousLowestPoint = lowestPointOf(previousMesh.vertices);
+          const lowestPoint = lowestPointOf(mesh.vertices);
+          const targetElevation = typeof requestedChanges.elevation === "number"
+            ? requestedChanges.elevation
+            : previousLowestPoint;
+          updatedShape = {
+            ...updatedShape,
+            elevation: (updatedShape.elevation ?? 0) + targetElevation - lowestPoint,
+          };
+        }
+      }
       if (!replacingSketchProfile && geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
         try {
           updatedShape = await preserveUnambiguousFaceMetadata(existing, changed.shape);

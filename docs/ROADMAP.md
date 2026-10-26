@@ -129,6 +129,8 @@ Tracked under [epic #329](https://github.com/constructorfleet/SketchForge-3D/iss
 
 ## CAD geometry correctness
 
+- [#561: Keep a rotated imported mesh on its original bed elevation](https://github.com/constructorfleet/SketchForge-3D/issues/561) — changing an imported mesh's rotation now adjusts its elevation to preserve its current lowest point, so STL export does not leave the rotated part below the bed.
+
 - [#354: Preserve face lineage and replay non-45° chamfers](https://github.com/constructorfleet/SketchForge-3D/issues/354) — implementation and regression coverage complete; awaiting review.
 - [#355: Report kernel failures and guard face reselection](https://github.com/constructorfleet/SketchForge-3D/issues/355) — implementation and regression coverage complete; awaiting review.
 - [#356: Draft colored plain revolves](https://github.com/constructorfleet/SketchForge-3D/issues/356) — implementation and regression coverage complete; awaiting review.

@@ -5,6 +5,7 @@ import type { ProjectDocument, ProjectStore } from "@constructorfleet/sketchforg
 import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
+import { worldMeshForShape } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 
 function engineWithShapes(shapes: WorkplaneShape[]) {
   const document: ProjectDocument = {
@@ -49,6 +50,34 @@ function unitCubeTriangles() {
 }
 
 describe("engine shape properties", () => {
+  it("keeps an imported mesh on its elevation when it is rotated", async () => {
+    const mesh = sceneShape({
+      id: "mesh",
+      name: "Imported mesh",
+      kind: "mesh",
+      color: "#123456",
+      width: 49,
+      depth: 150,
+      height: 49,
+    } as never);
+    const imported = {
+      ...mesh,
+      importedMesh: {
+        positions: [0, 0, -75, 49, 0, -75, 0, 49, 75],
+        baseWidth: 49,
+        baseDepth: 150,
+        baseHeight: 49,
+        triangleCount: 1,
+        sourceFormat: "stl",
+      },
+    } as WorkplaneShape;
+    const updated = value(await engineWithShapes([imported]).changeShape("properties", "mesh", { rotationX: -90 }));
+
+    expect(updated.shape.elevation).toBeCloseTo(50.5, 6);
+    const worldMesh = worldMeshForShape(updated.shape)!;
+    expect(Math.min(...worldMesh.vertices.map((vertex) => vertex[1]))).toBeCloseTo(0, 6);
+  });
+
   it("reports exact box mass properties in project coordinates", async () => {
     const box = sceneShape({
       id: "box",
