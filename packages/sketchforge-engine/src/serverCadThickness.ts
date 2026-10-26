@@ -5,6 +5,7 @@
  * this places the stored shape and runs it on the server's kernel.
  */
 
+import { recoverLegacyRevolveShape } from "./serverRevolveRecovery.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { ServerCadError } from "./serverCadOperations.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
@@ -17,7 +18,8 @@ export type { WallThicknessResult } from "./cadAnalysis.js";
  * Return the smallest sampled distance between opposing faces. This is a
  * screening estimate, not a medial-axis or certified minimum-thickness result.
  */
-export function wallThickness(shape: WorkplaneShape): Promise<WallThicknessResult> {
+export async function wallThickness(shape: WorkplaneShape): Promise<WallThicknessResult> {
+  shape = await recoverLegacyRevolveShape(shape);
   return withCadKernel((cad) => {
     try {
       return sampledWallThickness(cad, placedSolidForShape(cad, shape));

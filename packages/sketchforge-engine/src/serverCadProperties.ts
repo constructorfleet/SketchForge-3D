@@ -7,6 +7,7 @@
  * time, and could not improve on a result that is tessellated either way.
  */
 
+import { recoverLegacyRevolveShape } from "./serverRevolveRecovery.js";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { withCadKernel } from "./serverCadKernel.js";
 import { hasCurrentResultBrep, placedResultBrepSolid, placedSolid, type ShapeGeometryProvenance } from "./serverShapeBooleans.js";
@@ -54,7 +55,7 @@ function meshForRecordOnlyGroup(shape: WorkplaneShape) {
         if (!visit(child)) return false;
         continue;
       }
-      if (!child.importedMesh || child.hole || child.cadBrep) return false;
+      if (!child.importedMesh || child.hole || child.cadBrep || hasExactRevolveSolid(child)) return false;
       const mesh = worldMeshForShape(child);
       if (!mesh) return false;
       for (const face of mesh.faces) {
@@ -85,6 +86,7 @@ function measuredSolid(cad: OcctKernel, solid: ShapeHandle, provenance: ShapeGeo
 
 /** Measure one shape using the same project-space solid the engine's CAD tools use. */
 export async function shapeProperties(shape: WorkplaneShape): Promise<ServerCadShapeProperties> {
+  shape = await recoverLegacyRevolveShape(shape);
   // A boolean result is measured on its exact B-rep while that still agrees
   // with its mesh (#541), and falls through to the mesh when it does not.
   if (hasCurrentResultBrep(shape)) {

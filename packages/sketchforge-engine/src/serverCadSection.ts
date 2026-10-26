@@ -11,7 +11,8 @@
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
 import { renderSectionDxf, renderSectionSvg, SECTION_PLANES, type SectionDrawing, type SectionPlane } from "./cadSection.js";
 import { withCadKernel } from "./serverCadKernel.js";
-import { ServerCadError } from "./serverCadOperations.js";
+import { recoverLegacyRevolveShapes } from "./serverRevolveRecovery.js";
+import { hasExactRevolveSolid, ServerCadError } from "./serverCadOperations.js";
 import { placedSolidForShape } from "./serverShapeBooleans.js";
 import { EDITOR_TO_DRAWING_TRANSFORM } from "./cadProjection.js";
 import { sectionTriangleSoup } from "./meshSection.js";
@@ -94,6 +95,7 @@ function sectionCompound(cad: OcctKernel, shapes: readonly WorkplaneShape[]): Sh
 
 /** A mesh shape's triangles where it stands, in the drawing frame, three vertices per triangle. */
 function drawingFramePositions(shape: WorkplaneShape): Float64Array | null {
+  if (hasExactRevolveSolid(shape)) return null;
   const mesh = worldMeshForShape(shape);
   if (!mesh) return null;
   const positions = new Float64Array(mesh.faces.length * 9);
@@ -236,7 +238,7 @@ async function sectionShapesToDrawing(shapes: readonly WorkplaneShape[], options
 
   const meshes: Float64Array[] = [];
   const exact: WorkplaneShape[] = [];
-  for (const shape of visible) {
+  for (const shape of await recoverLegacyRevolveShapes(visible)) {
     const positions = drawingFramePositions(shape);
     if (positions) meshes.push(positions);
     else exact.push(shape);

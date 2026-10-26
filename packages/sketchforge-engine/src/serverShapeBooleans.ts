@@ -17,6 +17,7 @@
 
 import type { Matrix4 } from "three";
 import type { OcctKernel, ShapeHandle } from "occt-wasm";
+import { recoverLegacyRevolveShape, recoverLegacyRevolveShapes } from "./serverRevolveRecovery.js";
 import { withCadKernel } from "./serverCadKernel.js";
 import { exactRevolveAngularDeflection, exactRevolveLocalSolid, hasExactRevolveSolid,localSolidForShape, meshedCadResult, solidFromMeshPositions, ServerCadError, cadResultIsValid } from "./serverCadOperations.js";
 import { mirroredInShapeFrame, UnbuildableShapeError } from "./cadSolids.js";
@@ -305,7 +306,8 @@ export function placedResultBrepSolid(cad: OcctKernel, shape: WorkplaneShape): S
  * other shape: what the STEP exporter writes for a revolve instead of skipping
  * it as a mesh with no B-rep source (#523).
  */
-export function placedExactRevolveBrep(shape: WorkplaneShape): Promise<string | null> {
+export async function placedExactRevolveBrep(shape: WorkplaneShape): Promise<string | null> {
+  shape = await recoverLegacyRevolveShape(shape);
   if (!hasExactRevolveSolid(shape)) return Promise.resolve(null);
   return withCadKernel((cad) => cad.toBREP(placedSolidForShape(cad, shape)));
 }
@@ -406,6 +408,7 @@ function cutSolids(cad: OcctKernel, solids: WorkplaneShape[], holes: WorkplaneSh
  * the operands, so cutting into a group cuts the shapes it holds.
  */
 export async function buildGroupFromSelection(selection: WorkplaneShape[]): Promise<GroupBuildOutcome> {
+  selection = await recoverLegacyRevolveShapes(selection);
   const operands = expandGroupsForBoolean(selection);
   const solids = operands.filter((shape) => !shape.hole);
   const holes = operands.filter((shape) => shape.hole);
