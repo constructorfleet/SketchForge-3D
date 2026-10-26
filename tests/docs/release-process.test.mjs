@@ -17,6 +17,19 @@ test("release-process guide documents the configured release path", async () => 
   ]) assert.match(guide, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
 });
 
+test("Windows release documentation names the workflow artifact and unsigned policy", async () => {
+  const [readme, setup, release] = await Promise.all([
+    read("README.md"),
+    read(".github/SETUP.md"),
+    read("docs/RELEASE_PROCESS.md"),
+  ]);
+  assert.match(readme, /## Windows Desktop Release/);
+  assert.match(readme, /SketchForge-Setup-<version>-x64\.exe/);
+  assert.match(readme, /SmartScreen/);
+  assert.match(setup, /Windows.*unsigned|unsigned.*Windows/is);
+  assert.match(release, /SketchForge-Setup-<version>-x64\.exe/);
+});
+
 test("release metadata versions and release-please package coverage stay aligned", async () => {
   const [root, engine, client, python, manifestText, configText, workflow] = await Promise.all([
     read("package.json").then(JSON.parse),

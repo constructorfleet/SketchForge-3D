@@ -11,6 +11,7 @@ owner: "Contributors"
 
 - Deployment guidance now explains that server-backed and shared project routes have no user authentication, that the REST API token covers only `/api/v1`, and that untrusted deployments need an authenticating reverse proxy ([#340](https://github.com/constructorfleet/SketchForge-3D/issues/340)).
 - The desktop app now shows a notification when a background update check finds a newer release, so updates discovered between manual checks are visible in the app ([#345](https://github.com/constructorfleet/SketchForge-3D/issues/345)).
+- Windows releases now have an install guide for `SketchForge-Setup-<version>-x64.exe`. Until a code-signing certificate is configured, the installer is unsigned and Windows may show a SmartScreen warning; the setup and release guides document this policy ([#343](https://github.com/constructorfleet/SketchForge-3D/issues/343)).
 - The packaged desktop app now closes its web server when the app is force-killed, and a restart recognizes and reuses a SketchForge server left by an older build instead of showing a false busy-port error ([#545](https://github.com/constructorfleet/SketchForge-3D/issues/545)).
 
 - Exact solids stored by the editor now keep analytic faces when the CAD worker moves or rotates them for exact operations. Previously, even a rigid placement converted cylindrical faces to splines, making volume and downstream operations less accurate. Non-uniform scaling and shear still use the general affine transform ([#558](https://github.com/constructorfleet/SketchForge-3D/issues/558)).
