@@ -17,6 +17,7 @@ const SERVER_EXTERNALS_DIR = nodePath.join("apps", "web", ".next", "node_modules
 
 /** The compiled server chunks whose module references are checked. */
 const SERVER_CHUNKS_DIR = nodePath.join("apps", "web", ".next", "server");
+const CAD_KERNEL_PACKAGES = new Set(["occt-wasm", "manifold-3d"]);
 
 /**
  * Packages the server may `require()` without shipping them in the web bundle.
@@ -141,6 +142,42 @@ function unresolvedServerReferences(webRoot, skipDir) {
 }
 
 /**
+ * CAD kernels staged for the web server, grouped by package name and archive path.
+ * The desktop copies this whole tree to Resources/web, so a package left at
+ * both the standalone root and .next/node_modules consumes disk twice.
+ *
+ * @param {string} webRoot
+ * @returns {Map<string, string[]>}
+ */
+function cadKernelPackageCopies(webRoot) {
+  const copies = new Map();
+  if (!fs.existsSync(webRoot)) return copies;
+  const pending = [webRoot];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const entryPath = nodePath.join(directory, entry.name);
+      if (nodePath.basename(directory) === "node_modules") {
+        try {
+          const { name } = JSON.parse(fs.readFileSync(nodePath.join(entryPath, "package.json"), "utf8"));
+          if (CAD_KERNEL_PACKAGES.has(name)) {
+            const paths = copies.get(name) ?? [];
+            paths.push(nodePath.relative(webRoot, entryPath));
+            copies.set(name, paths);
+          }
+        } catch {
+          // Not a package directory (or not one with a readable package.json).
+        }
+      }
+      pending.push(entryPath);
+    }
+  }
+  for (const paths of copies.values()) paths.sort();
+  return copies;
+}
+
+/**
  * Make a standalone build's server externals ship as real package directories
  * inside `.next/node_modules`, so the bundle no longer depends on the root
  * `node_modules` electron-builder drops. Hashed Turbopack specifiers are
@@ -214,6 +251,17 @@ function materializeServerExternals(standaloneDir) {
     fs.cpSync(source, nodePath.join(externalsDir, name), { recursive: true, dereference: true });
     copied.push(name);
   }
+
+  // `extraResources` copies the entire standalone directory, including its
+  // root node_modules. The server imports resolve from .next/node_modules, so
+  // keeping the original traced packages at the root would ship both copies.
+  for (const name of CAD_KERNEL_PACKAGES) {
+    const materializedPackage = nodePath.join(externalsDir, name, "package.json");
+    const rootPackage = nodePath.join(rootModules, name);
+    if (fs.existsSync(materializedPackage) && fs.existsSync(rootPackage)) {
+      fs.rmSync(rootPackage, { recursive: true, force: true });
+    }
+  }
   return copied;
 }
 
@@ -255,6 +303,10 @@ function findDanglingLinks(rootDir) {
 function verifyPackagedWebBundle(webRoot) {
   const problems = findDanglingLinks(webRoot).map((link) => `dangling link: ${link}`);
 
+  for (const copies of cadKernelPackageCopies(webRoot).values()) {
+    if (copies.length > 1) problems.push(`duplicate CAD kernel package: ${copies.join(" and ")}`);
+  }
+
   const externalsDir = nodePath.join(webRoot, SERVER_EXTERNALS_DIR);
   if (fs.existsSync(externalsDir)) {
     for (const name of fs.readdirSync(externalsDir)) {
@@ -294,6 +346,7 @@ module.exports = {
   NODE_PATH_PACKAGES,
   SERVER_EXTERNALS_DIR,
   findDanglingLinks,
+  cadKernelPackageCopies,
   materializeServerExternals,
   packagedResourcesDir,
   serverModuleReferences,

@@ -108,6 +108,8 @@ describe("materializeServerExternals", () => {
     expect(fs.existsSync(path.join(externals, "occt-wasm-1b9e064a4904705b"))).toBe(false);
     expect(fs.readFileSync(path.join(standalone, "apps/web/.next/server/chunks/route.js"), "utf8"))
       .not.toContain("occt-wasm-1b9e064a4904705b");
+    expect(fs.existsSync(path.join(rootModules, "occt-wasm"))).toBe(false);
+    expect(fs.existsSync(path.join(rootModules, "manifold-3d"))).toBe(false);
 
     // electron-builder drops the standalone root node_modules; the copy must
     // stand on its own once that directory is gone.
@@ -251,6 +253,16 @@ describe("verifyPackagedWebBundle", () => {
 
     expect(verifyPackagedWebBundle(standalone)).toEqual([]);
   });
+
+  it("rejects duplicate CAD kernel package copies in the standalone web bundle", () => {
+    const { standalone, rootModules } = standaloneFixture();
+    materializeServerExternals(standalone);
+    writePackage(rootModules, "occt-wasm");
+
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toMatch(/duplicate CAD kernel package/);
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toContain("node_modules/occt-wasm");
+    expect(verifyPackagedWebBundle(standalone).join("\n")).toContain("apps/web/.next/node_modules/occt-wasm");
+  });
 });
 
 describe("desktop afterPack hook", () => {
@@ -297,6 +309,25 @@ describe("desktop afterPack hook", () => {
       electronPlatformName: "linux",
       packager: { appInfo: { productFilename: "SketchForge" } },
     })).rejects.toThrow(/CAD kernels are duplicated in app\.asar/);
+  });
+
+  it("rejects a package when a CAD kernel remains duplicated in Resources/web", async () => {
+    const appOutDir = scratch();
+    const resourcesDir = path.join(appOutDir, "resources");
+    const { standalone, rootModules } = standaloneFixture();
+    materializeServerExternals(standalone);
+    writePackage(rootModules, "occt-wasm");
+    fs.mkdirSync(resourcesDir, { recursive: true });
+    fs.cpSync(standalone, path.join(resourcesDir, "web"), { recursive: true });
+
+    const appDir = scratch();
+    await createPackage(appDir, path.join(resourcesDir, "app.asar"));
+
+    await expect(afterPackModule({
+      appOutDir,
+      electronPlatformName: "linux",
+      packager: { appInfo: { productFilename: "SketchForge" } },
+    })).rejects.toThrow(/duplicate CAD kernel package/);
   });
 
   it("finds Resources inside the macOS app and resources beside the Windows and Linux executable", () => {
