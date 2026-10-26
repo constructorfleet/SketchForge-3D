@@ -158,7 +158,7 @@ def _read_version() -> str:
         return _SOURCE_VERSION
 
 
-_SOURCE_VERSION = "1.27.0"  # x-release-please-version
+_SOURCE_VERSION = "1.28.0"  # x-release-please-version
 __version__ = _read_version()
 
 __all__ = [
