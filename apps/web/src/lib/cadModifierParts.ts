@@ -67,7 +67,9 @@ export function reconstructSolid(cad: OcctKernel, part: CadModifierMeshPart) {
   }
   if (part.brep) {
     let exact = cad.fromBREP(part.brep);
-    if (part.brepTransform?.length === 12) exact = cad.generalTransform(exact, part.brepTransform);
+    // Keep analytic B-rep surfaces when placement is rigid; the general
+    // affine transform turns even an unscaled cylinder into a spline.
+    exact = applyCadTransform(cad, exact, part.brepTransform);
     const restoredSolids = cad.getSubShapes(exact, "solid");
     if (cadShapeIsValid(cad, exact) && (cad.isSolid(exact) || restoredSolids.length > 0)) {
       return restoredSolids.length === 1 ? restoredSolids[0] : exact;
