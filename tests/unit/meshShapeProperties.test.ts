@@ -17,6 +17,7 @@ vi.mock("@constructorfleet/sketchforge-engine/serverCadKernel", async (importOri
 });
 
 const { shapeProperties } = await import("@constructorfleet/sketchforge-engine/serverCadProperties");
+const { groupedShapeFromSelection } = await import("@constructorfleet/sketchforge-engine/serverShapeGroups");
 
 type Vec3 = [number, number, number];
 
@@ -126,6 +127,38 @@ describe("mesh-native shape properties", () => {
     expect(properties.bbox.ymin).toBeCloseTo(3, 6);
     expect(properties.bbox.ymax).toBeCloseTo(3 + 2 * radius, 6);
     expect(properties.isValid).toBe(true);
+    expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+  });
+
+  it("measures a record-only group of separate mesh parts without sewing them (#521)", async () => {
+    const positions = boxTriangles([-2, 0, -2], [2, 4, 2]);
+    const group = groupedShapeFromSelection([
+      meshShape(positions, { id: "left", x: -5 }),
+      meshShape(positions, { id: "right", x: 5 }),
+    ]);
+    expect(group).not.toBeNull();
+
+    const properties = await shapeProperties(group!);
+
+    expect(kernelCalls.count).toBe(0);
+    expect(properties.volume).toBeCloseTo(128, 6);
+    expect(properties.centerOfMass.x).toBeCloseTo(0, 6);
+    expect(properties.centerOfMass.y).toBeCloseTo(2, 6);
+    expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
+  });
+
+  it("uses the exact union path when record-only mesh members overlap", async () => {
+    const positions = boxTriangles([-2, 0, -2], [2, 4, 2]);
+    const group = groupedShapeFromSelection([
+      meshShape(positions, { id: "left", x: 0 }),
+      meshShape(positions, { id: "right", x: 1 }),
+    ]);
+    expect(group).not.toBeNull();
+
+    const properties = await shapeProperties(group!);
+
+    expect(kernelCalls.count).toBe(1);
+    expect(properties.volume).toBeCloseTo(80, 5);
     expect(properties.provenance).toEqual({ source: "mesh", precision: "tessellated" });
   });
 
