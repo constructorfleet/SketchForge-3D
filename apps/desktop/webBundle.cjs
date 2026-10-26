@@ -141,14 +141,11 @@ function unresolvedServerReferences(webRoot, skipDir) {
 }
 
 /**
- * Make a standalone build's server externals ship as real directories inside
- * `.next/node_modules`, so the bundle no longer depends on the root
- * `node_modules` electron-builder drops. Returns the names it copied.
- *
- * Each hashed link is replaced with a copy of the package it points at. Then
- * any package a chunk still imports by its plain name -- the engine's
- * `import(/* webpackIgnore: true *\/ "occt-wasm")`, which no bundler rewrites
- * -- is copied in from the standalone root under that name.
+ * Make a standalone build's server externals ship as real package directories
+ * inside `.next/node_modules`, so the bundle no longer depends on the root
+ * `node_modules` electron-builder drops. Hashed Turbopack specifiers are
+ * rewritten to the package name and share one materialized package with plain
+ * imports (including the engine's webpack-ignored OCCT loader).
  *
  * Scoped hashed externals (`@scope/pkg-<hash>`, a link one level down) are not
  * handled; none exist today, and verifyPackagedWebBundle fails loudly on one.
@@ -175,10 +172,31 @@ function materializeServerExternals(standaloneDir) {
         );
       }
 
+      const packageJsonPath = nodePath.join(target, "package.json");
+      const packageName = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")).name;
+      if (!packageName || packageName.includes("/")) {
+        throw new Error(`[desktop:web:build] ${linkPath} points to a package without a supported unscoped package name.`);
+      }
+
+      // Turbopack hashes server external names. Point those imports at the
+      // package's canonical name so the hashed and plain imports can share the
+      // same files instead of copying a second 21 MB OCCT package.
+      for (const { specifier, files } of serverModuleReferences(standaloneDir)) {
+        if (specifier !== name && !specifier.startsWith(`${name}/`)) continue;
+        const rewritten = `${packageName}${specifier.slice(name.length)}`;
+        for (const file of files) {
+          const source = fs.readFileSync(file, "utf8");
+          fs.writeFileSync(file, source.split(JSON.stringify(specifier)).join(JSON.stringify(rewritten)));
+        }
+      }
+
       // rm does not follow links: this removes the link (or Windows junction), not its target.
       fs.rmSync(linkPath, { recursive: true, force: true });
-      fs.cpSync(target, linkPath, { recursive: true, dereference: true });
-      copied.push(name);
+      const packagePath = nodePath.join(externalsDir, packageName);
+      if (!fs.existsSync(nodePath.join(packagePath, "package.json"))) {
+        fs.cpSync(target, packagePath, { recursive: true, dereference: true });
+        copied.push(packageName);
+      }
     }
   }
 
@@ -186,7 +204,7 @@ function materializeServerExternals(standaloneDir) {
   for (const { specifier, kind, file } of unresolvedServerReferences(standaloneDir, rootModules)) {
     if (kind !== "import") continue;
     const { name } = splitSpecifier(specifier);
-    if (copied.includes(name)) continue;
+    if (copied.includes(name) || fs.existsSync(nodePath.join(externalsDir, name, "package.json"))) continue;
     const source = nodePath.join(rootModules, name);
     if (!fs.existsSync(nodePath.join(source, "package.json"))) {
       throw new Error(

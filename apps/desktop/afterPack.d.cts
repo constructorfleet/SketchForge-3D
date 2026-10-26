@@ -6,4 +6,9 @@ declare function afterPack(context: {
   packager: { appInfo: { productFilename: string } };
 }): Promise<void>;
 
+declare namespace afterPack {
+  /** CAD kernel packages found in app.asar, excluding a leading archive slash. */
+  function packagedKernelDuplicates(appAsarPath: string): Promise<string[]>;
+}
+
 export = afterPack;
