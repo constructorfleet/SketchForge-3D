@@ -484,6 +484,21 @@ describe("local MCP engine mode", () => {
     expect(fs.existsSync(projectsDir)).toBe(false);
   }, 180_000);
 
+  it("creates missing parent directories when exporting a scene (#562)", () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    fs.writeFileSync(path.join(projectsDir, "case.json"), JSON.stringify({ name: "Local case", createdAt: 1, revision: 1 }));
+    const created = callMcp(projectsDir, 2, "sketchforge_create_shape", { projectId: "case", kind: "box", width: 2, depth: 3, height: 4 });
+    expect(created[1].result.isError).toBeUndefined();
+    const outputPath = path.join(projectsDir, "nested", "deeper", "scene.skf");
+
+    const exported = callMcp(projectsDir, 3, "sketchforge_export_scene", { projectId: "case", format: "skf", outputPath });
+
+    expect(exported[1].result.isError).toBeUndefined();
+    expect(fs.statSync(outputPath).size).toBeGreaterThan(0);
+    expect(JSON.parse(exported[1].result.content[0].text).savedTo).toBe(outputPath);
+  }, 60_000);
+
   it("creates and reads a project directly from its directory without a server", () => {
     const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
     temporaryDirectories.push(projectsDir);
