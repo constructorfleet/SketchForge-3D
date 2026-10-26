@@ -997,7 +997,7 @@ export function createEngine(store: ProjectStore): Engine {
           : undefined;
         const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
         const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
-        const faceDraftSourceScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
+        const recordedFaceDraftScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
           // Editor-written drafts predate this field. Their output bounds
           // include the taper, so they cannot be used to infer the source
           // resize ratio; these shapes were only retained before resize support.
@@ -1007,6 +1007,12 @@ export function createEngine(store: ProjectStore): Engine {
           depth: ratio(existing.depth, sourceFrame?.depth ?? existing.importedMesh?.baseDepth),
           height: ratio(existing.height, sourceFrame?.height ?? existing.importedMesh?.baseHeight),
         });
+        // Height is unchanged by face drafting, so a later dimension edit can
+        // be composed with the original scale without trying to infer scale
+        // from the tapered width/depth bounds.
+        const faceDraftSourceScale = existing.faceDraft && sourceFrame
+          ? { ...recordedFaceDraftScale, height: ratio(existing.height, sourceFrame.height) }
+          : recordedFaceDraftScale;
         const rebuildScale = existing.faceDraft || faceDraftChanged
           ? faceDraftSourceScale
           : treatmentSourceScale ?? { width: 1, depth: 1, height: 1 };
@@ -1037,6 +1043,7 @@ export function createEngine(store: ProjectStore): Engine {
             faceColors: _faceColors,
             edgeTreatments: _edgeTreatments,
             edgeTreatmentHistory: _edgeTreatmentHistory,
+            faceDraft: _faceDraft,
             cadDisplayEdges: _cadDisplayEdges,
             cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
             ...sourceMetadata

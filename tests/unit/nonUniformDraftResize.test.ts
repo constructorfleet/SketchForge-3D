@@ -136,6 +136,38 @@ describe("drafts on non-uniformly resized sketch extrusions", () => {
     expect((await shapeProperties({ ...replayed, importedMesh: undefined })).volume)
       .toBeCloseTo((await shapeProperties({ ...expected, importedMesh: undefined })).volume, 6);
   }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a height resize when the face draft angle changes", async () => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const natural = await extrusion("resized-draft-angle", 3);
+    document.shapes = [natural];
+    const face = (await shapeFaces(natural)).find((candidate) => candidate.surfaceType === "plane"
+      && candidate.normal && Math.abs(candidate.normal.x) > 0.99)!;
+    value(await engine.changeShape("resize", natural.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+    }));
+    value(await engine.changeShape("resize", natural.id, { height: 6 }));
+    const resized = value(await engine.changeShape("resize", natural.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 8, pullDirection: "y" },
+    })).shape;
+
+    const expectedSource = await extrusion("expected-resized-draft-angle", 6);
+    const expectedFace = (await shapeFaces(expectedSource)).find((candidate) => candidate.surfaceType === "plane"
+      && candidate.normal && Math.abs(candidate.normal.x) > 0.99)!;
+    const expected = shapeWithCadResult(expectedSource, await applySketchFaceDraft(expectedSource, {
+      sourceFaceId: expectedFace.id, angle: 8, pullDirection: "y",
+    }));
+    const actualProperties = await shapeProperties({ ...resized, importedMesh: undefined });
+    const expectedProperties = await shapeProperties({ ...expected, importedMesh: undefined });
+    expect(resized.height).toBeCloseTo(6, 6);
+    expect(actualProperties.volume).toBeCloseTo(expectedProperties.volume, 6);
+    expect(actualProperties.centerOfMass).toEqual(expect.objectContaining({
+      x: expect.closeTo(expectedProperties.centerOfMass.x, 6),
+      y: expect.closeTo(expectedProperties.centerOfMass.y, 6),
+      z: expect.closeTo(expectedProperties.centerOfMass.z, 6),
+    }));
+  }, CAD_TEST_TIMEOUT_MS);
 });
 
 describe("face drafts on resized revolves", () => {
