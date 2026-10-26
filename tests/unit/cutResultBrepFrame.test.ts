@@ -77,6 +77,33 @@ const pocket = () => shape({
 
 type Centre = { x: number; y: number; z: number };
 
+describe("stored exact B-rep placement", { timeout: CAD_TEST_TIMEOUT_MS }, () => {
+  it("keeps a rotated cylinder analytic and preserves its exact volume and centre", async () => {
+    const cad = await serverCadKernel();
+    const cylinder = cad.makeCylinder(6, 20);
+    const sourceCenter = cad.getCenterOfMass(cylinder);
+    const brep = cad.toBREP(cylinder);
+    // A 90° rotation around Z followed by a translation. OCCT's gp_Trsf path
+    // preserves the cylindrical surface; the gp_GTrsf path converts it to a
+    // spline despite this transform being rigid.
+    const transform = [0, -1, 0, 11, 1, 0, 0, -7, 0, 0, 1, 4];
+    const placed = reconstructSolid(cad, { brep, brepTransform: transform, hole: false });
+    const expectedCenter = {
+      x: -sourceCenter.y + 11,
+      y: sourceCenter.x - 7,
+      z: sourceCenter.z + 4,
+    };
+    const faces = cad.getSubShapes(placed, "face");
+
+    expect(faces.map((face) => cad.surfaceType(face))).toContain("cylinder");
+    expect(cad.getVolume(placed)).toBeCloseTo(cad.getVolume(cylinder), 5);
+    const center = cad.getCenterOfMass(placed);
+    expect(center.x).toBeCloseTo(expectedCenter.x, 5);
+    expect(center.y).toBeCloseTo(expectedCenter.y, 5);
+    expect(center.z).toBeCloseTo(expectedCenter.z, 5);
+  });
+});
+
 /** Where the plate-with-pocket's centre of mass is, by the arithmetic. */
 function cutCentre(offset: Centre = { x: 0, y: 0, z: 0 }): Centre {
   const plateCentre = { x: AT.x, y: AT.y + PLATE.height / 2, z: AT.z };

@@ -32,6 +32,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 ## CAD worker reliability
 
 - [#361: Release exact-cut intermediate handles during an open edge-modifier session](https://github.com/constructorfleet/SketchForge-3D/issues/361) — implementation and real-kernel handle-baseline regression coverage complete; awaiting review. Cuts use an arena checkpoint and release their allocations on success or failure, preserving retained session geometry.
+- [#558: Preserve analytic surfaces when the CAD worker places stored B-reps](https://github.com/constructorfleet/SketchForge-3D/issues/558) — rigid moves and rotations now use OCCT's rigid transform, keeping cylinders exact; non-uniform scale and shear continue through the general transform. Covered by a real-kernel test for surface type, volume and centre of mass; implementation complete and awaiting review.
 
 ## Group evaluation
 
