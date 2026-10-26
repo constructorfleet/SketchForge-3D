@@ -229,9 +229,7 @@ describe("a plain revolve is measured as its exact solid (#523)", () => {
     expect(triangles[2]).toBeGreaterThan(triangles[1]);
   }, CAD_TIMEOUT_MS);
 
-  it("reports a revolve whose profile has a curved edge as tessellated", async () => {
-    // The section is sampled into straight segments before it is turned, so an
-    // exact solid of it would still approximate the drawn curve.
+  it("builds a curved profile revolve from its exact Bezier edge", async () => {
     const runtime = await manifoldModule();
     runtime.setup();
     const point = (id: string, x: number, z: number, extra: Record<string, unknown> = {}) => ({ id, x, z, mode: "corner" as const, ...extra });
@@ -252,7 +250,15 @@ describe("a plain revolve is measured as its exact solid (#523)", () => {
     });
     const settings = normalizeSketchRevolveSettings({ sides: 24 });
     const curved = revolvedShapeFromRequest(runtime, { profile: profile("bezier"), settings }, {});
-    expect((await shapeProperties(curved)).provenance).toEqual({ source: "mesh", precision: "tessellated" });
+    const curvedProperties = await shapeProperties(curved);
+    expect(curvedProperties.provenance).toEqual({ source: "parametric", precision: "exact" });
+    // The cubic radius is 10 + 9t(1-t) and its axial coordinate is
+    // 6t + 6t^2 - 4t^3. Integrating pi*(R^2 - 5^2) dz gives 6126*pi/7.
+    // The centre remains at mid-height and on the revolve axis.
+    expect(curvedProperties.volume / ((6126 / 7) * Math.PI)).toBeCloseTo(1, 6);
+    expect(curvedProperties.centerOfMass.x).toBeCloseTo(0, 6);
+    expect(curvedProperties.centerOfMass.z).toBeCloseTo(0, 6);
+    expect(curvedProperties.centerOfMass.y).toBeCloseTo(4, 6);
     // The same outline with that edge drawn straight is exact.
     const straight = revolvedShapeFromRequest(runtime, { profile: profile("line"), settings }, {});
     const properties = await shapeProperties(straight);
