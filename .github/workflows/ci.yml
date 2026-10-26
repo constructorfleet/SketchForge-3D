@@ -124,9 +124,6 @@ jobs:
       - name: Python client unit tests
         run: npm run client:test:py
 
-      - name: Python client unit tests
-        run: npm run client:test:py
-
   windows-unit:
     # Release 1.20.0 shipped with no desktop installers: the desktop release
     # then ran `npm test` on each platform, one Windows-only unit failure stopped
