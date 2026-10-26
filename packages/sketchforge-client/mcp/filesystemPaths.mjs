@@ -62,5 +62,7 @@ export async function resolveMcpWritePath(value, { overwrite = false } = {}) {
     }
     resolved = await resolveThroughExistingAncestor(requested);
   }
-  return root ? requireWithin(root, resolved) : resolved;
+  const destination = root ? requireWithin(root, resolved) : resolved;
+  await mkdir(path.dirname(destination), { recursive: true });
+  return destination;
 }
