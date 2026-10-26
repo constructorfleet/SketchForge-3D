@@ -31,8 +31,8 @@ recompute request. Do not persist synthetic feature nodes or change the `.skf`
 schema in this work.
 
 - Each shape ID identifies one recompute node. A sketch-source ID points to
-  its retained output node; the engine rebuilds that output and its supported
-  ordered feature chain before handing the candidate project to the scheduler.
+  its retained output node; the recompute seam rebuilds that output and its
+  supported retained treatments before scheduling downstream dependencies.
 - A boolean-group node depends on each retained operand and produces the group
   output. Plain grouping remains a container node, so changed child outputs
   flow through it without a kernel operation.
@@ -51,11 +51,11 @@ project containing downstream geometry built from a mixture of old and new
 inputs.
 
 Expose one engine entry point, `recompute(project, changedSourceIds)`, which
-constructs the graph, schedules affected nodes, and returns either the complete
-replacement shape tree or a node-scoped failure. The changed source outputs are
-already rebuilt in the candidate project; the scheduler rebuilds only their
-affected dependents. The engine transaction remains the only place that writes
-the returned tree.
+constructs the graph, rebuilds changed sketch-source outputs, schedules their
+affected dependents, and returns either the complete replacement shape tree or
+a node-scoped failure. `engine.changeShape` supplies the changed recipe and
+calls this seam; the engine transaction remains the only place that writes the
+returned tree.
 
 ## Consequences
 
@@ -68,7 +68,7 @@ the returned tree.
 - The graph is rebuilt per request. This favors correctness and locality over
   caching; caching can be considered only after profiling demonstrates a need.
 
-## Validation required before acceptance
+## Validation completed
 
 - Preserve every existing recompute test unchanged.
 - Cover an unspecial-cased chain such as extrusion → prism draft → fillet →
@@ -78,9 +78,11 @@ the returned tree.
 - Verify atomic failure by comparing the complete persisted project before and
   after a deliberately invalid downstream operation.
 
-The scheduler and node-scoped failures are implemented in PR #580. The nested
-draft → fillet → boolean → boolean regression verifies that an ineffective
-downstream cut names its shape ID and leaves the stored project unchanged.
+The recompute seam, source recipe replay, scheduler, and node-scoped failures
+are implemented in PR #580. The nested draft → fillet → boolean → boolean
+regression verifies that an ineffective downstream cut names its shape ID and
+leaves the stored project unchanged. Direct tests cover deterministic ordering
+and cycle detection. The focused suite preserves the existing recompute tests.
 
 ## Open question
 

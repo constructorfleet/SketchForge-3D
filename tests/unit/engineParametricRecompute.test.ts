@@ -12,7 +12,8 @@ import { sketchProfileToRevolvePolygons } from "@constructorfleet/sketchforge-en
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { buildGroupFromSelection } from "@constructorfleet/sketchforge-engine/serverShapeBooleans";
-import { recompute } from "@constructorfleet/sketchforge-engine/parametricRecompute";
+import { deterministicRecomputeSchedule, recompute } from "@constructorfleet/sketchforge-engine/parametricRecompute";
+import { preserveUnambiguousFaceMetadata } from "@constructorfleet/sketchforge-engine/faceMetadata";
 import {
   boundsForShapes,
   restoreGroupedChildren,
@@ -92,6 +93,19 @@ function value<T>(result: EngineResult<T>): T {
   return result.value;
 }
 
+function measureWorldShape(shape: WorkplaneShape) {
+  const mesh = worldMeshForShape(shape);
+  if (!mesh) throw new Error(`${shape.name} has no mesh`);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(
+    mesh.faces.flatMap((face) => face.flatMap((index) => mesh.vertices[index]!)),
+    3,
+  ));
+  const measurement = measureMesh(geometry);
+  geometry.dispose();
+  return measurement;
+}
+
 // `engine.treat` writes the replayable treatment record itself (#346), so these
 // go through it exactly as a REST or MCP caller would.
 async function persistAllEdgeFillet(
@@ -113,6 +127,97 @@ async function persistAllEdgeChamfer(
 }
 
 describe("dependency-ordered feature recomputation", () => {
+  it("preserves persisted face IDs and colors for faces with unique counterparts", async () => {
+    const previousBase = await sketchExtrusionShapeFromRequest({
+      id: "metadata-rebuild", sketchSourceId: "sketch/metadata-rebuild", name: "Metadata rebuild",
+      profile: extrusionProfile(), height: 3,
+    });
+    const faces = await shapeFaces(previousBase);
+    const selected = faces.find((face) => face.normal?.x && face.normal.x > 0.99)!;
+    const previous = { ...previousBase, faceColors: { [selected.id]: "#123456" } };
+    const next = await sketchExtrusionShapeFromRequest({
+      id: previous.id, sketchSourceId: previous.sketchSourceId!, name: previous.name,
+      profile: extrusionProfile(1.2), height: 3,
+    });
+
+    const preserved = await preserveUnambiguousFaceMetadata(previous, next);
+
+    expect(preserved.faceIds).toContain(selected.id);
+    expect(preserved.faceColors).toEqual({ [selected.id]: "#123456" });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("orders independent feature branches by persisted tree order regardless of input set order", () => {
+    const nodes = new Map([
+      ["source", { shape: { id: "source" } as WorkplaneShape, dependencies: [], order: 0 }],
+      ["branch-a", { shape: { id: "branch-a" } as WorkplaneShape, dependencies: ["source"], order: 1 }],
+      ["branch-b", { shape: { id: "branch-b" } as WorkplaneShape, dependencies: ["source"], order: 2 }],
+      ["join", { shape: { id: "join" } as WorkplaneShape, dependencies: ["branch-a", "branch-b"], order: 3 }],
+    ]);
+    const dependents = new Map([
+      ["source", ["branch-a", "branch-b"]],
+      ["branch-a", ["join"]],
+      ["branch-b", ["join"]],
+    ]);
+
+    expect(deterministicRecomputeSchedule(nodes, new Set(["join", "branch-b", "source", "branch-a"]), dependents))
+      .toEqual(["source", "branch-a", "branch-b", "join"]);
+    expect(deterministicRecomputeSchedule(nodes, new Set(["branch-a", "join", "branch-b", "source"]), dependents))
+      .toEqual(["source", "branch-a", "branch-b", "join"]);
+  });
+
+  it("rebuilds a changed source recipe and its retained draft and fillet in recompute", async () => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const source = await sketchExtrusionShapeFromRequest({
+      id: "recompute-source-recipe", sketchSourceId: "sketch/recompute-source-recipe", name: "Recipe extrusion",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [source];
+    const drafted = value(await engine.draftPrism("recompute", source.id, 5)).shape;
+    const treated = await persistAllEdgeFillet(engine, "recompute", drafted.id, 0.1);
+    const before = measureWorldShape(treated);
+    const recipe = { ...treated, sketchProfile: extrusionProfile(1.1) };
+
+    const result = await recompute({ shapes: [recipe] }, [source.sketchSourceId!]);
+
+    expect(result.ok).toBe(true);
+    const rebuilt = result.ok ? result.updated : recipe;
+    expect(rebuilt.sketchProfile).toEqual(extrusionProfile(1.1));
+    expect(rebuilt).toMatchObject({
+      draftPrismAngle: 5,
+      edgeTreatments: [{ kind: "fillet", amount: 0.1, allEdges: true }],
+    });
+    const after = measureWorldShape(rebuilt);
+    expect(Math.abs(after.volume - before.volume)).toBeGreaterThan(0.1);
+    expect(Math.hypot(
+      after.centroid[0] - before.centroid[0],
+      after.centroid[1] - before.centroid[1],
+      after.centroid[2] - before.centroid[2],
+    )).toBeGreaterThan(0.001);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a recorded source resize when clearing a retained face draft", async () => {
+    const { store, document } = projectStore();
+    const engine = createEngine(store);
+    const original = await sketchExtrusionShapeFromRequest({
+      id: "resized-draft-clear", sketchSourceId: "sketch/resized-draft-clear", name: "Resized draft clear",
+      profile: extrusionProfile(), height: 3,
+    });
+    document.shapes = [original];
+    const resized = value(await engine.changeShape("recompute", original.id, { width: 4, depth: 5, height: 6 })).shape;
+    const face = (await shapeFaces(resized)).find((candidate) => candidate.surfaceType === "plane" && candidate.normal)!;
+    value(await engine.changeShape("recompute", original.id, {
+      faceDraft: { sourceFaceId: face.id, angle: 5, pullDirection: "y" },
+    }));
+
+    const cleared = await engine.changeShape("recompute", original.sketchSourceId!, { faceDraft: null });
+
+    expect(cleared.ok, JSON.stringify(cleared)).toBe(true);
+    expect(value(cleared).shape).toMatchObject({ width: resized.width, depth: resized.depth, height: resized.height });
+    expect(value(cleared).shape.faceDraft).toBeUndefined();
+    expect(value(cleared).shape.faceDraftSourceScale).toBeUndefined();
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("refuses a cyclic transient feature graph with the node that closes the cycle", async () => {
     const source = { id: "cycle-source", sketchSourceId: "sketch/cycle", groupedShapes: [] } as unknown as WorkplaneShape;
     const group = { id: "cycle-group", groupedShapes: [source] } as WorkplaneShape;
