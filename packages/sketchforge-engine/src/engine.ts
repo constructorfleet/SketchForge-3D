@@ -53,6 +53,7 @@ import {
   type ServerCadMeasurementPair,
 } from "./serverCadMeasure.js";
 import { shapeProperties, type ServerCadShapeProperties } from "./serverCadProperties.js";
+import { preserveUnambiguousFaceMetadata } from "./faceMetadata.js";
 import { checkInterference, type InterferenceReport, type InterferenceRequest, type InterferenceRefusal } from "./serverCadInterference.js";
 import { explodeStepAssembly } from "./serverStepExplode.js";
 import {
@@ -93,7 +94,8 @@ import { sketchSourceEdgesForEdgeIndexes } from "./sketchEdgeSegmentLineage.js";
 import {
   edgeTreatmentAppliedFrame,
   findSketchOutput,
-  recomputeSketchOutput,
+  recompute,
+  replaceSketchOutput,
   replaySingleAllEdgeTreatment,
 } from "./parametricRecompute.js";
 import { boundsForShapes, footprintCenter, shapeBounds } from "./shapeBounds.js";
@@ -116,7 +118,6 @@ import {
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { EdgeTreatmentFeature, ProjectAsset, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
 
-const UNIQUE_CURVED_FACE_SURFACES = new Set(["cone", "sphere", "torus", "cylinder"]);
 const FACE_DRAFT_AXES = new Set(["x", "y", "z", "-x", "-y", "-z"]);
 
 function faceDraftInput(value: unknown): Omit<SketchFaceDraft, "sourceFaceNormal"> | null {
@@ -183,80 +184,6 @@ function unmirroredDraftSource(shape: WorkplaneShape): WorkplaneShape {
 
 function retainDraftSourceMirrors(result: WorkplaneShape, source: WorkplaneShape): WorkplaneShape {
   return { ...result, mirrorX: source.mirrorX, mirrorY: source.mirrorY, mirrorZ: source.mirrorZ };
-}
-
-/**
- * Carry face metadata across a parameter edit only when a face has a unique
- * counterpart. Curved faces may change their sampled normal as their defining
- * dimensions change, so a curved surface type can be a fallback identity only
- * when it occurs exactly once before and after. Repeated faces remain
- * unmatched rather than guessed.
- */
-async function preserveUnambiguousFaceMetadata(
-  previous: WorkplaneShape,
-  next: WorkplaneShape,
-): Promise<WorkplaneShape> {
-  if (!previous.faceIds?.length && !previous.faceColors) return next;
-  const before = await shapeFaces(previous);
-  const after = await shapeFaces(next);
-  const signature = (face: ServerCadFace) => face.normal
-    ? `${face.surfaceType}:${Math.round(face.normal.x * 1000)}:${Math.round(face.normal.y * 1000)}:${Math.round(face.normal.z * 1000)}:${face.facing ?? "interior"}`
-    : undefined;
-  const beforeBySignature = new Map<string, ServerCadFace[]>();
-  const afterBySignature = new Map<string, ServerCadFace[]>();
-  for (const face of before) {
-    const key = signature(face);
-    if (key) beforeBySignature.set(key, [...(beforeBySignature.get(key) ?? []), face]);
-  }
-  for (const face of after) {
-    const key = signature(face);
-    if (key) afterBySignature.set(key, [...(afterBySignature.get(key) ?? []), face]);
-  }
-
-  const beforeBySurface = new Map<string, ServerCadFace[]>();
-  const afterBySurface = new Map<string, ServerCadFace[]>();
-  for (const face of before) beforeBySurface.set(face.surfaceType, [...(beforeBySurface.get(face.surfaceType) ?? []), face]);
-  for (const face of after) afterBySurface.set(face.surfaceType, [...(afterBySurface.get(face.surfaceType) ?? []), face]);
-
-  const beforeForAfter = new Map<number, ServerCadFace>();
-  const matchedBefore = new Set<number>();
-  for (const face of after) {
-    const key = signature(face);
-    const oldMatches = key ? beforeBySignature.get(key) ?? [] : [];
-    const newMatches = key ? afterBySignature.get(key) ?? [] : [];
-    if (oldMatches.length === 1 && newMatches.length === 1) {
-      beforeForAfter.set(face.index, oldMatches[0]!);
-      matchedBefore.add(oldMatches[0]!.index);
-    }
-  }
-  for (const face of after) {
-    if (beforeForAfter.has(face.index) || !UNIQUE_CURVED_FACE_SURFACES.has(face.surfaceType)) continue;
-    const oldMatches = beforeBySurface.get(face.surfaceType) ?? [];
-    const newMatches = afterBySurface.get(face.surfaceType) ?? [];
-    if (oldMatches.length === 1 && newMatches.length === 1 && !matchedBefore.has(oldMatches[0]!.index)) {
-      beforeForAfter.set(face.index, oldMatches[0]!);
-      matchedBefore.add(oldMatches[0]!.index);
-    }
-  }
-
-  const ids = after.map((face) => beforeForAfter.get(face.index)?.id
-    ?? `face_${createLocalId(`${next.id}-${face.index}`)}`);
-  const mappedColors: Record<string, string> = {};
-  for (const [key, color] of Object.entries(previous.faceColors ?? {})) {
-    const oldIndex = /^\d+$/.test(key) ? Number(key) : -1;
-    const oldFace = oldIndex >= 0
-      ? before[oldIndex]
-      : before.find((face) => face.id === key);
-    if (!oldFace) continue;
-    const matched = after.find((face) => beforeForAfter.get(face.index)?.index === oldFace.index);
-    if (!matched) continue;
-    mappedColors[ids[matched.index]!] = color;
-  }
-  return canonicalizeShape({
-    ...next,
-    faceIds: ids,
-    faceColors: Object.keys(mappedColors).length ? mappedColors : undefined,
-  });
 }
 
 /**
@@ -961,6 +888,66 @@ export function createEngine(store: ProjectStore): Engine {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
       }
 
+      if (sourceSketchTarget && rebuildsFromSource) {
+        if (replacingSketchProfile && isSketchSweep) {
+          const invalidProfile = invalidSketchSweepProfile(changes.sketchProfile);
+          if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
+        }
+        let recipeFaceDraft = existing.faceDraft;
+        let recipeFaceDraftSourceFaceIds = existing.faceDraftSourceFaceIds;
+        let recipeFaceDraftSourceSegmentId = existing.faceDraftSourceSegmentId;
+        let recipeFaceDraftSourceFrame = existing.faceDraftSourceFrame;
+        if (faceDraftChanged) {
+          if (!requestedFaceDraft) {
+            recipeFaceDraft = undefined;
+            recipeFaceDraftSourceFaceIds = undefined;
+            recipeFaceDraftSourceSegmentId = undefined;
+            recipeFaceDraftSourceFrame = undefined;
+          } else if (existing.faceDraft && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId) {
+            recipeFaceDraft = { ...existing.faceDraft, ...requestedFaceDraft };
+          } else {
+            try {
+              const resolved = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
+                existing,
+                source: existing,
+                request: requestedFaceDraft,
+                profileChanged: false,
+              }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
+              const retained = retainedFaceDraftFields(existing.faceIds, existing, resolved, requestedFaceDraft);
+              recipeFaceDraft = retained.faceDraft;
+              recipeFaceDraftSourceFaceIds = retained.faceDraftSourceFaceIds;
+              recipeFaceDraftSourceSegmentId = retained.faceDraftSourceSegmentId;
+              recipeFaceDraftSourceFrame = retained.faceDraftSourceFrame;
+            } catch (error) {
+              return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The selected face could not be resolved." });
+            }
+          }
+        }
+        const recipe: WorkplaneShape = {
+          ...existing,
+          ...(replacingSketchProfile ? { sketchProfile: changes.sketchProfile as WorkplaneShape["sketchProfile"] } : {}),
+          ...(draftPrismChanged ? { draftPrismAngle: requestedDraftPrismAngle } : {}),
+          ...(faceDraftChanged ? { faceDraft: recipeFaceDraft } : {}),
+          ...(faceDraftChanged ? {
+            faceDraftSourceFaceIds: recipeFaceDraftSourceFaceIds,
+            faceDraftSourceSegmentId: recipeFaceDraftSourceSegmentId,
+            faceDraftSourceFrame: !recipeFaceDraft && existing.faceDraft
+              ? existing.faceDraftSourceFrame
+              : recipeFaceDraftSourceFrame,
+          } : {}),
+          ...(isRevolveShape(existing) && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined)
+            ? { sketchRevolve: requestedRevolveSettings(existing.sketchRevolve!, changes) }
+            : {}),
+        };
+        const candidate = replaceSketchOutput(document.shapes, shapeId, recipe);
+        if (candidate.matchCount !== 1) {
+          return failed({ reason: "sweep_failed", message: `Sketch source ${shapeId} has no unique output node.` });
+        }
+        const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
+        if (!recomputed.ok) return failed({ reason: "sweep_failed", message: recomputed.message ?? "The sketch source could not be recomputed." });
+        return ok({ shape: recomputed.updated, revision: await writeShapes(projectId, document, recomputed.shapes) });
+      }
+
       const sweptShape = isRevolveShape(existing);
       const misplaced = REVOLVE_ONLY_FIELDS.filter((field) => changes[field] !== undefined);
       if (!sweptShape && misplaced.length > 0) {
@@ -1450,7 +1437,16 @@ export function createEngine(store: ProjectStore): Engine {
       }
 
       if (sourceSketchTarget) {
-        const recomputed = await recomputeSketchOutput(document.shapes, shapeId, updatedShape);
+        const candidate = replaceSketchOutput(document.shapes, shapeId, updatedShape);
+        if (candidate.matchCount !== 1) {
+          return failed({
+            reason: "sweep_failed",
+            message: candidate.matchCount === 0
+              ? `Sketch source ${shapeId} has no output node.`
+              : `Sketch source ${shapeId} has multiple output nodes.`,
+          });
+        }
+        const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
         if (!recomputed.ok) {
           return failed({
             reason: "sweep_failed",
