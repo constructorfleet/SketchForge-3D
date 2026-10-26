@@ -96,6 +96,11 @@ export const CLIENT_RESOURCE_OPERATIONS = {
   parts: { splitParts: ["separate"] },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, readonly string[]>> | readonly []>>;
 
+/** Convenience methods that emit a sequence of REST operations rather than one route. */
+export const CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
+  shapes: { deleteAll: ["listShapes", "deleteShape"] },
+} as const;
+
 export class SketchForgeClient {
   readonly projects: Projects;
   readonly shapes: Shapes;

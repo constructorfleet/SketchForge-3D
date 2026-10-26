@@ -933,6 +933,11 @@ CLIENT_RESOURCE_OPERATIONS = {
     "exports": {"exportProject": ("export", "file")},
 }
 
+# Convenience helpers that emit a sequence of REST operations rather than one route.
+CLIENT_COMPOSITE_RESOURCE_OPERATIONS = {
+    "shapes": {"delete_all": ("listShapes", "deleteShape")},
+}
+
 
 class SketchForgeClient:
     def __init__(

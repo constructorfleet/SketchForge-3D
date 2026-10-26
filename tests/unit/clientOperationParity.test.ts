@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
-import { CLIENT_RESOURCE_OPERATIONS, SketchForgeClient } from "../../packages/sketchforge-client/src/client.js";
+import { CLIENT_COMPOSITE_RESOURCE_OPERATIONS, CLIENT_RESOURCE_OPERATIONS, SketchForgeClient } from "../../packages/sketchforge-client/src/client.js";
 import {
   MCP_NON_REST_TOOL_REASONS,
   MCP_RESOURCE_OPERATIONS,
@@ -17,23 +17,24 @@ const root = process.cwd();
 function pythonResources(): {
   resources: string[];
   operations: Record<string, unknown>;
+  compositeOperations: Record<string, Record<string, string[]>>;
   methods: Record<string, string[]>;
 } {
   const python = process.platform === "win32" ? "python" : "python3";
   const source = [
     "import json",
-    "from sketchforge3d.client import CLIENT_RESOURCE_OPERATIONS, SketchForgeClient",
+    "from sketchforge3d.client import CLIENT_COMPOSITE_RESOURCE_OPERATIONS, CLIENT_RESOURCE_OPERATIONS, SketchForgeClient",
     "client = SketchForgeClient('http://localhost', 'test')",
     "resources = [key for key in vars(client) if not key.startswith('_')]",
     "methods = {key: [name for name in dir(getattr(client, key)) if not name.startswith('_') and callable(getattr(getattr(client, key), name))] for key in resources}",
-    "print(json.dumps({'resources': resources, 'operations': CLIENT_RESOURCE_OPERATIONS, 'methods': methods}))",
+    "print(json.dumps({'resources': resources, 'operations': CLIENT_RESOURCE_OPERATIONS, 'compositeOperations': CLIENT_COMPOSITE_RESOURCE_OPERATIONS, 'methods': methods}))",
   ].join("; ");
   const output = execFileSync(python, ["-c", source], {
     cwd: path.join(root, "packages/sketchforge-py"),
     env: { ...process.env, PYTHONPATH: "src" },
     encoding: "utf8",
   });
-  return JSON.parse(output) as { resources: string[]; operations: Record<string, unknown>; methods: Record<string, string[]> };
+  return JSON.parse(output) as { resources: string[]; operations: Record<string, unknown>; compositeOperations: Record<string, Record<string, string[]>>; methods: Record<string, string[]> };
 }
 
 function declaredOperationIds(resourceOperations: Record<string, unknown>): string[] {
@@ -125,10 +126,28 @@ const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "exports.file": [PROJECT_ID, "stl"],
 };
 
-type CapturedRequest = { method: string; pathname: string; query?: string };
+type CapturedRequest = { method: string; pathname: string; query?: string; body?: string | null };
 
 function operationLookup() {
   return new Map(API_V1_OPERATIONS.map((operation) => [operation.operationId, operation]));
+}
+
+async function captureTypeScriptDeleteAllRequests(): Promise<CapturedRequest[]> {
+  const requests: CapturedRequest[] = [];
+  const client = new SketchForgeClient({
+    baseUrl: "http://parity.test",
+    token: "test",
+    fetch: async (input, init) => {
+      const url = new URL(input);
+      requests.push({ method: init?.method ?? "GET", pathname: url.pathname, query: url.search, body: typeof init?.body === "string" ? init.body : undefined });
+      const body = url.pathname.endsWith("/shapes") && (init?.method ?? "GET") === "GET"
+        ? JSON.stringify({ shapes: [{ id: SHAPE_ID, locked: false }] })
+        : "{}";
+      return new Response(body, { status: 200 });
+    },
+  });
+  await client.shapes.deleteAll(PROJECT_ID);
+  return requests;
 }
 
 async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
@@ -171,20 +190,22 @@ async function captureTypeScriptRequests(): Promise<CapturedRequest[]> {
   return requests;
 }
 
-function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[] } {
+function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[] } {
   const python = process.platform === "win32" ? "python" : "python3";
   const source = [
     "import json, tempfile, urllib.parse",
     "from sketchforge3d.client import CLIENT_RESOURCE_OPERATIONS, SketchForgeClient",
     "class Reply:",
+    "    def __init__(self, body=b'{}'): self.body = body",
     "    def __enter__(self): return self",
     "    def __exit__(self, *args): return False",
-    "    def read(self): return b'{}'",
+    "    def read(self): return self.body",
     "class Opener:",
     "    def __init__(self): self.requests = []",
     "    def open(self, request, timeout=None):",
     "        parsed = urllib.parse.urlsplit(request.full_url)",
-    "        self.requests.append({'method': request.get_method(), 'pathname': parsed.path, 'query': parsed.query})",
+    "        self.requests.append({'method': request.get_method(), 'pathname': parsed.path, 'query': parsed.query, 'body': request.data.decode() if request.data else None})",
+    "        if parsed.path == '/api/v1/shapes' and request.get_method() == 'GET': return Reply(b'{\"shapes\":[{\"id\":\"parity-shape\",\"locked\":false}]}')",
     "        return Reply()",
     "opener = Opener()",
     "client = SketchForgeClient('http://parity.test', 'test', opener=opener)",
@@ -204,14 +225,17 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
     "                else: getattr(getattr(client, resource_name), method_name)(*call_args)",
     "            except Exception: pass",
     "            calls.append({'resource': resource_name, 'method': method_name, 'requestCount': len(opener.requests) - before, 'queries': [request['query'] for request in opener.requests[before:]]})",
-    "print(json.dumps({'requests': opener.requests, 'calls': calls}))",
+    "composite_opener = Opener()",
+    "composite_client = SketchForgeClient('http://parity.test', 'test', opener=composite_opener)",
+    "composite_client.shapes.delete_all('parity-project')",
+    "print(json.dumps({'requests': opener.requests, 'calls': calls, 'compositeRequests': composite_opener.requests}))",
   ].join("\n");
   const output = execFileSync(python, ["-c", source, JSON.stringify({ ...PYTHON_CALL_ARGUMENTS, ...PY_METHOD_ARGUMENTS })], {
     cwd: path.join(root, "packages/sketchforge-py"),
     env: { ...process.env, PYTHONPATH: "src" },
     encoding: "utf8",
   });
-  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[] };
+  return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[] };
 }
 
 function captureMcpRequest(toolName: string, args: Record<string, unknown>, filesDir: string): CapturedRequest[] {
@@ -257,6 +281,10 @@ describe("REST client operation parity", () => {
 
     expect(Object.keys(CLIENT_RESOURCE_OPERATIONS).sort()).toEqual(tsResources.sort());
     expect(Object.keys(py.operations).sort()).toEqual(py.resources.sort());
+    expect(CLIENT_COMPOSITE_RESOURCE_OPERATIONS.shapes.deleteAll).toEqual(["listShapes", "deleteShape"]);
+    expect(typeof tsClient.shapes.deleteAll).toBe("function");
+    expect(py.compositeOperations.shapes.delete_all).toEqual(["listShapes", "deleteShape"]);
+    expect(py.methods.shapes).toContain("delete_all");
     const expectedSecondaryMethods = {
       typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"] },
       python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"] },
@@ -324,6 +352,23 @@ describe("REST client operation parity", () => {
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("projectId=parity-project"))).toBeDefined();
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("limit=10"))).toBeDefined();
     expect(pythonCaptured.requests.find(({ query }) => query?.includes("cursor=next-page"))).toBeDefined();
+
+    const deleteAllOperationIds = CLIENT_COMPOSITE_RESOURCE_OPERATIONS.shapes.deleteAll;
+    const deleteAllExpected = deleteAllOperationIds.map((operationId) => {
+      const operation = operationById.get(operationId)!;
+      return { method: operation.method, pathname: operation.path };
+    });
+    const typeScriptDeleteAll = await captureTypeScriptDeleteAllRequests();
+    expect(typeScriptDeleteAll.map(({ method, pathname }) => ({ method, pathname }))).toEqual(deleteAllExpected);
+    expect(typeScriptDeleteAll[0]?.query).toContain("projectId=parity-project");
+    expect(typeScriptDeleteAll[1]?.query).toContain("projectId=parity-project");
+    expect(typeScriptDeleteAll[1]?.query).toContain("shapeId=parity-shape");
+    expect(typeScriptDeleteAll.every(({ body }) => body === undefined)).toBe(true);
+    expect(pythonCaptured.compositeRequests.map(({ method, pathname }) => ({ method, pathname }))).toEqual(deleteAllExpected);
+    expect(pythonCaptured.compositeRequests[0]?.query).toContain("projectId=parity-project");
+    expect(pythonCaptured.compositeRequests[1]?.query).toContain("projectId=parity-project");
+    expect(pythonCaptured.compositeRequests[1]?.query).toContain("shapeId=parity-shape");
+    expect(pythonCaptured.compositeRequests.every(({ body }) => body == null)).toBe(true);
 
     const filesDir = mkdtempSync(path.join(tmpdir(), "sketchforge-client-parity-"));
     try {
