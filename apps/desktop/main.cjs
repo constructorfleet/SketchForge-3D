@@ -21,6 +21,7 @@ const {
   watchProcess,
 } = require("./webProcess.cjs");
 const { whenWindowReady } = require("./windowReady.cjs");
+const { handleUpdateAvailable } = require("./updateNotifications.cjs");
 
 const devUrl = process.env.SKETCHFORGE_DESKTOP_DEV_URL?.trim() || "";
 
@@ -321,13 +322,19 @@ function setupDesktopUpdater() {
   autoUpdater.allowPrerelease = false;
 
   autoUpdater.on("update-available", (info) => {
-    if (!manualUpdateCheck) return;
-    manualUpdateCheck = false;
-    void dialog.showMessageBox({
-      type: "info",
-      title: t("desktop.updates.availableTitle"),
-      message: t("desktop.updates.available", { version: info.version }),
-      detail: t("desktop.updates.availableDetail"),
+    handleUpdateAvailable(info, {
+      manualUpdateCheck,
+      clearManualCheck: () => {
+        manualUpdateCheck = false;
+      },
+      showNotice: (updateInfo) => {
+        void dialog.showMessageBox({
+          type: "info",
+          title: t("desktop.updates.availableTitle"),
+          message: t("desktop.updates.available", { version: updateInfo.version }),
+          detail: t("desktop.updates.availableDetail"),
+        });
+      },
     });
   });
 

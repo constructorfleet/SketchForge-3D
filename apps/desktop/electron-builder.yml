@@ -21,6 +21,7 @@ files:
   - apps/desktop/port.cjs
   - apps/desktop/preload.cjs
   - apps/desktop/projectFiles.cjs
+  - apps/desktop/updateNotifications.cjs
   - apps/desktop/webProcess.cjs
   - apps/desktop/windowReady.cjs
   - apps/web/src/i18n/locales/*/desktop.json
