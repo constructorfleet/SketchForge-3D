@@ -73,4 +73,8 @@ SketchForge-VERSION-arm64-unsigned.zip
 
 Unsigned packages trigger a Gatekeeper warning. Add the signing and notarization secrets before public distribution.
 
+## Windows signing
+
+Windows packages are currently unsigned. No Windows code-signing certificate is configured in repository secrets or in the Windows build action. The release uses the unsigned NSIS installer `SketchForge-Setup-VERSION-x64.exe` and publishes `latest.yml` for `electron-updater`. Windows may show SmartScreen's unrecognized-app warning. Revisit this policy when a Windows code-signing certificate is available; until then, document the warning for users and publish the unsigned installer.
+
 Do not commit certificates, private keys, or passwords.

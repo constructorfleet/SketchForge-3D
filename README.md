@@ -65,7 +65,7 @@ Choose an installation based on how you want to use SketchForge. The browser app
 | Path | Best for | Difficulty |
 | --- | --- | --- |
 | [Browser app](https://sketchforge3d.com/) | Trying SketchForge without installing anything | Easiest |
-| [Desktop releases](#linux-desktop-release) | Offline use on Linux or macOS | Easy |
+| [Desktop releases](#linux-desktop-release) | Offline use on Windows, Linux, or macOS | Easy |
 | [Docker](#docker--fablab-server-recommended) | Classrooms, shared computers, or local network hosting | Recommended for hosting |
 | [Run from source](#local-development) | Developers who want to change the code | Requires Node.js |
 | [Static export](#static-export) | Hosting the browser app on static web hosting | Advanced |
@@ -140,6 +140,15 @@ Some virtual machines do not provide hardware WebGL. Launch SketchForge with sof
   --use-angle=swiftshader \
   --enable-unsafe-swiftshader
 ```
+
+## Windows Desktop Release
+
+GitHub releases include the 64-bit Windows installer `SketchForge-Setup-<version>-x64.exe`, its update blockmap `SketchForge-Setup-<version>-x64.exe.blockmap`, and the `latest.yml` manifest used by automatic updates. Download the `.exe` installer.
+
+1. Download and run the installer.
+2. If Windows SmartScreen warns that the app is unrecognized, verify that you downloaded it from the SketchForge GitHub release, then choose **More info** and **Run anyway**.
+
+The Windows installer is currently unsigned because the project does not have a Windows code-signing certificate configured. The installer still supports automatic updates. Opening a `.skf` file starts SketchForge or opens it in the running app.
 
 ## macOS Desktop Release
 

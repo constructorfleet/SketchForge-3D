@@ -94,6 +94,12 @@ an `-unsigned` suffix and no update manifest. If any installer is missing, the
 job adds a warning naming the missing platforms to the top of the release notes
 and fails the run. The rest of the notes are left as generated.
 
+The Windows installer is currently unsigned because no Windows signing
+certificate is configured. Releases include `SketchForge-Setup-<version>-x64.exe`
+and `latest.yml`; users may see a SmartScreen warning. The README describes
+how to verify and open the downloaded installer. Revisit the policy when a
+Windows signing certificate is configured.
+
 A failed leg is recovered by running the workflow again for the same version:
 
 <!-- runnable-exempt: Dispatching this publishes release assets for a reader-supplied version; it is a maintainer recovery command, not a repository example. -->

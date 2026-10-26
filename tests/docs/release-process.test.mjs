@@ -17,6 +17,25 @@ test("release-process guide documents the configured release path", async () => 
   ]) assert.match(guide, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
 });
 
+test("Windows release documentation names the workflow artifact and unsigned policy", async () => {
+  const [readme, setup, release, windowsBuild] = await Promise.all([
+    read("README.md"),
+    read(".github/SETUP.md"),
+    read("docs/RELEASE_PROCESS.md"),
+    read(".github/actions/build-win32/action.yml"),
+  ]);
+  assert.match(readme, /## Windows Desktop Release/);
+  assert.match(readme, /SmartScreen/);
+  const verifiedArtifacts = [...windowsBuild.matchAll(/^\s+"([^"]+)"[,]?$/gm)]
+    .map(([, artifact]) => artifact.split("/").at(-1).replace("$env:VERSION", "<version>"));
+  assert.ok(verifiedArtifacts.length > 0, "the Windows build action should declare its required artifacts");
+  for (const artifact of verifiedArtifacts) {
+    assert.ok(readme.includes(`\`${artifact}\``), `README should name the Windows release artifact ${artifact}`);
+  }
+  assert.match(setup, /Windows.*unsigned|unsigned.*Windows/is);
+  assert.match(release, /SketchForge-Setup-<version>-x64\.exe/);
+});
+
 test("release metadata versions and release-please package coverage stay aligned", async () => {
   const [root, engine, client, python, manifestText, configText, workflow] = await Promise.all([
     read("package.json").then(JSON.parse),
