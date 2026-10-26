@@ -292,6 +292,17 @@ describe("desktop afterPack hook", () => {
     ]));
   });
 
+  it("normalizes Windows archive paths when matching CAD kernel packages", () => {
+    expect(afterPackModule.packagedKernelDuplicatesFromEntries([
+      "\\node_modules\\occt-wasm\\package.json",
+      "\\node_modules\\manifold-3d\\package.json",
+      "\\node_modules\\some-other-package\\package.json",
+    ])).toEqual([
+      "node_modules/occt-wasm/package.json",
+      "node_modules/manifold-3d/package.json",
+    ]);
+  });
+
   it("rejects a package when a CAD kernel remains in app.asar", async () => {
     const appOutDir = scratch();
     const resourcesDir = path.join(appOutDir, "resources");

@@ -13,8 +13,18 @@ const KERNEL_PACKAGES = ["occt-wasm", "manifold-3d"];
  */
 async function packagedKernelDuplicates(appAsarPath) {
   const entries = await asar.listPackage(appAsarPath);
+  return packagedKernelDuplicatesFromEntries(entries);
+}
+
+/**
+ * Normalize archive entry separators before matching package paths.
+ *
+ * @param {string[]} entries
+ * @returns {string[]}
+ */
+function packagedKernelDuplicatesFromEntries(entries) {
   return entries
-    .map((entry) => entry.replace(/^\//, ""))
+    .map((entry) => entry.replace(/\\/g, "/").replace(/^\/+/, ""))
     .filter((entry) => KERNEL_PACKAGES.some((name) =>
       entry === `node_modules/${name}` || entry.startsWith(`node_modules/${name}/`)));
 }
@@ -48,3 +58,4 @@ module.exports = async function afterPack(context) {
 };
 
 module.exports.packagedKernelDuplicates = packagedKernelDuplicates;
+module.exports.packagedKernelDuplicatesFromEntries = packagedKernelDuplicatesFromEntries;
