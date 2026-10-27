@@ -279,7 +279,7 @@ class SketchAxisConstraint(TypedDict):
 
 class SketchSegmentPairConstraint(TypedDict):
     id: str
-    kind: Literal["parallel", "perpendicular", "tangent"]
+    kind: Literal["parallel", "perpendicular", "tangent", "equalLength"]
     segmentIds: Tuple[str, str]
 
 

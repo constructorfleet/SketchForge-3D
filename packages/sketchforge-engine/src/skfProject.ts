@@ -1076,9 +1076,20 @@ function validateSketchProfile(value: unknown, label: string) {
         if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }
-      } else if (kind === "perpendicular" || kind === "parallel" || kind === "tangent") {
+      } else if (kind === "perpendicular" || kind === "parallel" || kind === "tangent" || kind === "equalLength") {
         if (!Array.isArray(constraint.segmentIds) || constraint.segmentIds.length !== 2 || constraint.segmentIds[0] === constraint.segmentIds[1] || !constraint.segmentIds.every((segmentId) => typeof segmentId === "string" && segmentIds.has(segmentId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+        }
+        if (kind === "equalLength") {
+          const [first, second] = constraint.segmentIds.map((segmentId) => segmentById.get(String(segmentId))!);
+          const isLine = (segment: typeof first) => !segment.kind || segment.kind === "line";
+          const length = (segment: typeof first) => {
+            const start = pointById.get(String(segment.startId))!, end = pointById.get(String(segment.endId))!;
+            return Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z));
+          };
+          if (!isLine(first) || !isLine(second) || length(first) <= 1e-5 || length(second) <= 1e-5) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+          }
         }
         if (kind === "tangent") {
           const [first, second] = constraint.segmentIds.map((segmentId) => segmentById.get(String(segmentId))!);

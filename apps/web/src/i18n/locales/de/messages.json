@@ -488,8 +488,11 @@
       "constraints": {
         "addTangent": "Tangential",
         "kinds": {
-          "tangent": "Tangential"
-        }
+          "tangent": "Tangential",
+          "equalLength": "Gleiche Länge"
+        },
+        "addEqualLength": "Gleiche Länge hinzufügen",
+        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal oder zwei Segmente für parallel, senkrecht oder gleiche Länge."
       }
     },
     "export": {

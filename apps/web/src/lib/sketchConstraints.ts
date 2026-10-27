@@ -79,6 +79,24 @@ export function isSketchTangentPair(segmentIds: [string, string], profile: Sketc
   return Boolean(tangentInfo(segmentIds, profile, new Map(profile.points.map((point) => [point.id, point]))));
 }
 
+function equalLengthPair(segmentIds: [string, string], profile: SketchProfile) {
+  if (segmentIds[0] === segmentIds[1]) return null;
+  const pair = segmentPair(segmentIds, profile);
+  if (!pair) return null;
+  const isLine = (segment: typeof pair[0]) => !segment.kind || segment.kind === "line";
+  const points = new Map(profile.points.map((point) => [point.id, point]));
+  const isNonDegenerate = (segment: typeof pair[0]) => {
+    const start = points.get(segment.startId), end = points.get(segment.endId);
+    return Boolean(start && end && distance(start, end) > CONSTRAINT_TOLERANCE_MM);
+  };
+  return isLine(pair[0]) && isLine(pair[1]) && isNonDegenerate(pair[0]) && isNonDegenerate(pair[1]) ? pair : null;
+}
+
+/** Whether the selected segments are a supported pair for an equal-length relation. */
+export function isSketchEqualLengthPair(segmentIds: [string, string], profile: SketchProfile) {
+  return Boolean(equalLengthPair(segmentIds, profile));
+}
+
 function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, string] }>, points: Map<string, SketchPoint>) {
   const first = points.get(constraint.pointIds[0]);
   const second = points.get(constraint.pointIds[1]);
@@ -120,6 +138,16 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
     return lineLength <= CONSTRAINT_TOLERANCE_MM || curveLength <= CONSTRAINT_TOLERANCE_MM
       ? Number.POSITIVE_INFINITY
       : Math.abs((lineX * info.curveZ - lineZ * info.curveX) / (lineLength * curveLength));
+  }
+  if (constraint.kind === "equalLength") {
+    const pair = equalLengthPair(constraint.segmentIds, profile);
+    const firstStart = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+    const secondStart = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+    if (!firstStart || !firstEnd || !secondStart || !secondEnd) return Number.POSITIVE_INFINITY;
+    const firstLength = distance(firstStart, firstEnd), secondLength = distance(secondStart, secondEnd);
+    return firstLength <= CONSTRAINT_TOLERANCE_MM || secondLength <= CONSTRAINT_TOLERANCE_MM
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(firstLength - secondLength);
   }
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
@@ -217,6 +245,29 @@ function equationRows(
         { pointId: info.lineStart.id, coordinate: 1, coefficient: -guz },
         { pointId: info.lineEnd.id, coordinate: 0, coefficient: gux },
         { pointId: info.lineEnd.id, coordinate: 1, coefficient: guz },
+      ]);
+      continue;
+    }
+    if (constraint.kind === "equalLength") {
+      const pair = equalLengthPair(constraint.segmentIds, profile);
+      const firstStart = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+      const secondStart = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+      if (!firstStart || !firstEnd || !secondStart || !secondEnd) continue;
+      const firstDx = firstEnd.x - firstStart.x, firstDz = firstEnd.z - firstStart.z;
+      const secondDx = secondEnd.x - secondStart.x, secondDz = secondEnd.z - secondStart.z;
+      const firstLength = Math.hypot(firstDx, firstDz), secondLength = Math.hypot(secondDx, secondDz);
+      if (firstLength <= CONSTRAINT_TOLERANCE_MM || secondLength <= CONSTRAINT_TOLERANCE_MM) continue;
+      const firstX = firstDx / firstLength, firstZ = firstDz / firstLength;
+      const secondX = secondDx / secondLength, secondZ = secondDz / secondLength;
+      add(firstLength - secondLength, [
+        { pointId: firstStart.id, coordinate: 0, coefficient: -firstX },
+        { pointId: firstStart.id, coordinate: 1, coefficient: -firstZ },
+        { pointId: firstEnd.id, coordinate: 0, coefficient: firstX },
+        { pointId: firstEnd.id, coordinate: 1, coefficient: firstZ },
+        { pointId: secondStart.id, coordinate: 0, coefficient: secondX },
+        { pointId: secondStart.id, coordinate: 1, coefficient: secondZ },
+        { pointId: secondEnd.id, coordinate: 0, coefficient: -secondX },
+        { pointId: secondEnd.id, coordinate: 1, coefficient: -secondZ },
       ]);
       continue;
     }
@@ -354,10 +405,16 @@ function breakCollinearDistanceDegeneracy(
     } else if (constraint.kind === "tangent") {
       const info = tangentInfo(constraint.segmentIds, profile, points);
       if (info) connect(info.line.startId, info.line.endId);
+    } else if (constraint.kind === "equalLength") {
+      const pair = equalLengthPair(constraint.segmentIds, profile);
+      if (pair) {
+        connect(pair[0].startId, pair[0].endId);
+        connect(pair[1].startId, pair[1].endId);
+      }
     } else if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (segment) connect(segment.startId, segment.endId);
-    } else if (constraint.kind !== "fixed") {
+    } else if (constraint.kind === "coincident" || constraint.kind === "distance") {
       connect(constraint.pointIds[0], constraint.pointIds[1]);
     }
   }
@@ -413,7 +470,7 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
   const anchors = new Set([...anchoredPointIds, ...fixedPointConstraints.map((constraint) => constraint.pointId)]);
   const constrainedPointIds = new Set(constraints.flatMap((constraint) => {
     if (constraint.kind === "fixed") return [constraint.pointId];
-    if (constraint.kind === "perpendicular" || constraint.kind === "parallel") return constraint.segmentIds.flatMap((id) => {
+    if (constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "equalLength") return constraint.segmentIds.flatMap((id) => {
       const segment = profile.segments.find(({ id: candidate }) => candidate === id);
       return segment ? [segment.startId, segment.endId] : [];
     });
@@ -533,6 +590,7 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
     ? segmentIds.has(constraint.segmentId)
     : constraint.kind === "perpendicular" || constraint.kind === "parallel" ? constraint.segmentIds.every((id) => segmentIds.has(id))
     : constraint.kind === "tangent" ? isSketchTangentPair(constraint.segmentIds, profile)
+    : constraint.kind === "equalLength" ? isSketchEqualLengthPair(constraint.segmentIds, profile)
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
 }
 
@@ -604,6 +662,25 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
       row[start + 1] = (row[start + 1] ?? 0) - guz;
       row[end] = (row[end] ?? 0) + gux;
       row[end + 1] = (row[end + 1] ?? 0) + guz;
+      rows.push(row);
+      continue;
+    }
+    if (constraint.kind === "equalLength") {
+      const pair = equalLengthPair(constraint.segmentIds, profile);
+      if (!pair) continue;
+      const ids = pair.flatMap(({ startId, endId }) => [startId, endId]);
+      const coordinates = ids.map((id) => profile.points.find((point) => point.id === id)!);
+      const [a, b, c, d] = coordinates;
+      const ux = b!.x - a!.x, uz = b!.z - a!.z, vx = d!.x - c!.x, vz = d!.z - c!.z;
+      const lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
+      if (lu <= CONSTRAINT_TOLERANCE_MM || lv <= CONSTRAINT_TOLERANCE_MM) return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-segment" };
+      const coefficients = [-ux / lu, -uz / lu, ux / lu, uz / lu, vx / lv, vz / lv, -vx / lv, -vz / lv];
+      const row = Array(parameterCount).fill(0) as number[];
+      ids.forEach((id, index) => {
+        const base = pointIndex.get(id)!;
+        row[base] = (row[base] ?? 0) + coefficients[index * 2]!;
+        row[base + 1] = (row[base + 1] ?? 0) + coefficients[index * 2 + 1]!;
+      });
       rows.push(row);
       continue;
     }

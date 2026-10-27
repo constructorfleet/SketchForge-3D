@@ -488,8 +488,11 @@
       "constraints": {
         "addTangent": "Styczność",
         "kinds": {
-          "tangent": "Styczność"
-        }
+          "tangent": "Styczność",
+          "equalLength": "Równa długość"
+        },
+        "addEqualLength": "Dodaj równą długość",
+        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości lub równej długości."
       }
     },
     "export": {

@@ -488,8 +488,11 @@
       "constraints": {
         "addTangent": "Tangente",
         "kinds": {
-          "tangent": "Tangente"
-        }
+          "tangent": "Tangente",
+          "equalLength": "Longitud igual"
+        },
+        "addEqualLength": "Añadir longitud igual",
+        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, o dos segmentos para paralelo, perpendicular o igual longitud."
       }
     },
     "export": {

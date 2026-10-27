@@ -150,6 +150,35 @@ describe("solveSketchConstraints", () => {
     expect(unconstrained.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(source).degreesOfFreedom!).toBe(1);
   });
 
+  it("keeps two line segments equal in length while a dragged endpoint stays anchored", () => {
+    const source = profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 8, z: 0 },
+        { id: "c", x: 0, z: 5 }, { id: "d", x: 6, z: 5 },
+      ],
+      segments: [
+        { id: "first", startId: "a", endId: "b" },
+        { id: "second", startId: "c", endId: "d" },
+      ],
+    });
+    const constraint = { id: "equal", kind: "equalLength" as const, segmentIds: ["first", "second"] as [string, string] };
+    const before = sketchConstraintDegreesOfFreedom(source);
+    const constrained = { ...source, constraints: [constraint] };
+    const result = solveSketchConstraints(constrained, ["d"]);
+    const points = new Map(result.profile.points.map((point) => [point.id, point]));
+    const segmentLength = (segmentId: string) => {
+      const segment = result.profile.segments.find(({ id }) => id === segmentId)!;
+      const start = points.get(segment.startId)!;
+      const end = points.get(segment.endId)!;
+      return Math.hypot(end.x - start.x, end.z - start.z);
+    };
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(points.get("d")).toMatchObject({ x: 6, z: 5 });
+    expect(segmentLength("first")).toBeCloseTo(segmentLength("second"), 5);
+    expect(before.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(constrained).degreesOfFreedom!).toBe(1);
+  });
+
   it("counts a perpendicular relation as one independent equation in the local freedom estimate", () => {
     const report = sketchConstraintDegreesOfFreedom(profile({
       points: [
