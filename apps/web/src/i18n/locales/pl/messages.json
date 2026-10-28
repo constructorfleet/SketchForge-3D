@@ -532,10 +532,12 @@
           "perpendicular": "Prostopadle",
           "distance": "Odległość",
           "angle": "Kąt",
-          "symmetry": "Symetria"
+          "symmetry": "Symetria",
+          "radius": "Promień",
+          "diameter": "Średnica"
         },
         "addEqualLength": "Dodaj równą długość",
-        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego, dwa segmenty dla równoległości, prostopadłości, równej długości lub kąta, albo dwa punkty i oś dla symetrii.",
+        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności, odległości, promienia lub średnicy, jeden segment dla poziomego lub pionowego, dwa segmenty dla równoległości, prostopadłości, równej długości lub kąta, albo dwa punkty i oś dla symetrii.",
         "title": "Więzy",
         "dofEstimate": "Szacowana liczba swobodnych parametrów: {count}. To lokalne oszacowanie rzędu nie gwarantuje, że więzy da się spełnić.",
         "dofIndeterminate": "Nie można ustalić liczby swobodnych parametrów, ponieważ ustalona odległość lub odcinek ma zerową długość.",
@@ -553,7 +555,11 @@
         "angleDeg": "Kąt (°)",
         "addSymmetry": "Symetria",
         "symmetryAxis": "Oś symetrii",
-        "segmentOption": "Segment {index}"
+        "segmentOption": "Segment {index}",
+        "addRadius": "Promień",
+        "radiusMm": "Promień (mm)",
+        "addDiameter": "Średnica",
+        "diameterMm": "Średnica (mm)"
       },
       "constraintUnsatisfied": "Nie udało się spełnić więzów szkicu: {ids}",
       "constraintAdded": "Dodano więz szkicu: {kind}",

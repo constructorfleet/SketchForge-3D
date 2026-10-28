@@ -13,7 +13,7 @@ sources:
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
 shows **Parallel**, **Perpendicular**, **Tangent**, **Equal length**,
-**Angle**, and **Symmetry** constraints.
+**Angle**, **Symmetry**, and **Radius / Diameter** constraints.
 
 ## Make two segments parallel
 
@@ -85,6 +85,22 @@ stored in `.skf` projects. A zero-length axis or two identical points are
 refused.
 
 ![Two sketch points mirrored across a selected axis.](../screenshots/sketch-symmetry-constraint.png)
+
+## Set a radius or diameter
+
+1. Select two points that sit at opposite ends of the diameter. For a circle
+   primitive, drag a narrow selection band through the centre so only one pair
+   of opposite rim points is selected.
+2. Enter the **Radius (mm)** or **Diameter (mm)** value.
+3. Choose **Radius** or **Diameter**.
+
+**Radius** keeps the distance between the two points at twice the entered
+value; **Diameter** keeps it at the entered value. The relation removes one
+estimated degree of freedom and is stored in `.skf` projects. The two points
+must be different and the value must be greater than zero. For a circle, use
+**Diameter** on two opposite rim points to set its size directly.
+
+![Two opposite sketch points sized with a diameter constraint.](../screenshots/sketch-radius-diameter-constraint.png)
 
 ## Make a line tangent to a Bezier
 

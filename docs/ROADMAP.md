@@ -13,7 +13,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 | Epic | Status |
 | --- | --- |
-| [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Open; the dependency scheduler for source edits is implemented in PR #580, with broader editable feature history remaining. |
+| [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Complete in the pending constraint PR chain; all 28 sub-issues are implemented, with the editable-history and recompute foundations listed below. |
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Complete in merged PR [#584](https://github.com/constructorfleet/SketchForge-3D/pull/584); TypeScript/Python operation coverage, runtime-backed MCP coverage, and documented MCP gaps are verified below. |
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Complete in PR [#595](https://github.com/constructorfleet/SketchForge-3D/pull/595); all seven non-English catalogs are fully translated, `complete: true`, and no longer reported as todos. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; PR #587 adds the documented production app build check to pull request CI. |
@@ -138,7 +138,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 ## Sketch constraints
 
-- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint shipped in [#593](https://github.com/constructorfleet/SketchForge-3D/pull/593); the angle between two segments is in PR [#596](https://github.com/constructorfleet/SketchForge-3D/pull/596); symmetry is implemented in the stacked pull request; radius/diameter remains an open slice.
+- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint shipped in [#593](https://github.com/constructorfleet/SketchForge-3D/pull/593); the angle between two segments is in PR [#596](https://github.com/constructorfleet/SketchForge-3D/pull/596); symmetry and radius/diameter are implemented in the stacked pull requests. That completes the four remaining slices; awaiting review.
 
 ## Translation completeness
 

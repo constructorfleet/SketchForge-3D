@@ -22,6 +22,23 @@ it("accepts angle constraints in public sketch profiles", () => {
   expect(constraint.valueDeg).toBe(45);
 });
 
+it("accepts radius and diameter constraints in public sketch profiles", () => {
+  const radius = {
+    id: "radius",
+    kind: "radius",
+    pointIds: ["centre", "rim"],
+    valueMm: 5,
+  } satisfies NonNullable<SketchSweepProfile["constraints"]>[number];
+  const diameter = {
+    id: "diameter",
+    kind: "diameter",
+    pointIds: ["left", "right"],
+    valueMm: 10,
+  } satisfies NonNullable<SketchSweepProfile["constraints"]>[number];
+
+  expect([radius.kind, diameter.kind]).toEqual(["radius", "diameter"]);
+});
+
 it("accepts symmetry constraints in public sketch profiles", () => {
   const constraint = {
     id: "symmetry",

@@ -532,10 +532,12 @@
           "perpendicular": "Kolmá",
           "distance": "Vzdálenost",
           "angle": "Úhel",
-          "symmetry": "Souměrnost"
+          "symmetry": "Souměrnost",
+          "radius": "Poloměr",
+          "diameter": "Průměr"
         },
         "addEqualLength": "Přidat stejnou délku",
-        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, dva segmenty pro rovnoběžnost, kolmost, stejnou délku nebo úhel, nebo dva body a osu pro souměrnost.",
+        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu, vzdálenost, poloměr nebo průměr, jeden úsečkový segment pro vodorovnou či svislou polohu, dva segmenty pro rovnoběžnost, kolmost, stejnou délku nebo úhel, nebo dva body a osu pro souměrnost.",
         "title": "Vazby",
         "dofEstimate": "Odhad volných parametrů: {count}. Tento místní odhad nezaručuje, že se vazby podaří vyřešit.",
         "dofIndeterminate": "Volné parametry: nelze určit, protože některá vázaná vzdálenost nebo segment jsou nulové.",
@@ -553,7 +555,11 @@
         "angleDeg": "Úhel (°)",
         "addSymmetry": "Souměrnost",
         "symmetryAxis": "Osa zrcadlení",
-        "segmentOption": "Segment {index}"
+        "segmentOption": "Segment {index}",
+        "addRadius": "Poloměr",
+        "radiusMm": "Poloměr (mm)",
+        "addDiameter": "Průměr",
+        "diameterMm": "Průměr (mm)"
       },
       "constraintUnsatisfied": "Vazby náčrtu se nepodařilo splnit: {ids}",
       "constraintAdded": "Přidána vazba náčrtu: {kind}",

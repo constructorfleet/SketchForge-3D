@@ -532,10 +532,12 @@
           "perpendicular": "Perpendicular",
           "distance": "Distancia",
           "angle": "Ángulo",
-          "symmetry": "Simetría"
+          "symmetry": "Simetría",
+          "radius": "Radio",
+          "diameter": "Diámetro"
         },
         "addEqualLength": "Añadir longitud igual",
-        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, dos segmentos para paralelo, perpendicular, igual longitud o ángulo, o dos puntos y un eje para simetría.",
+        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir, distancia, radio o diámetro, un segmento para horizontal o vertical, dos segmentos para paralelo, perpendicular, igual longitud o ángulo, o dos puntos y un eje para simetría.",
         "title": "Restricciones",
         "dofEstimate": "Parámetros libres estimados: {count}. Esta estimación del rango local no garantiza que las restricciones se puedan resolver.",
         "dofIndeterminate": "Parámetros libres: indeterminados porque una distancia restringida o un segmento es degenerado.",
@@ -553,7 +555,11 @@
         "angleDeg": "Ángulo (°)",
         "addSymmetry": "Simetría",
         "symmetryAxis": "Eje de simetría",
-        "segmentOption": "Segmento {index}"
+        "segmentOption": "Segmento {index}",
+        "addRadius": "Radio",
+        "radiusMm": "Radio (mm)",
+        "addDiameter": "Diámetro",
+        "diameterMm": "Diámetro (mm)"
       },
       "constraintUnsatisfied": "No se pudieron cumplir estas restricciones del boceto: {ids}",
       "constraintAdded": "Se agregó la restricción de boceto: {kind}",

@@ -1126,12 +1126,20 @@ function validateSketchProfile(value: unknown, label: string) {
         if (Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z)) <= 1e-5) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }
-      } else if (kind === "coincident" || kind === "distance") {
+      } else if (kind === "coincident" || kind === "distance" || kind === "radius" || kind === "diameter") {
         if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });
         }
         if (kind === "distance" && finiteNumber(constraint.valueMm, `${constraintLabel}.valueMm`) < 0) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.valueMm` });
+        }
+        if (kind === "radius" || kind === "diameter") {
+          if (constraint.pointIds[0] === constraint.pointIds[1]) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });
+          }
+          if (finiteNumber(constraint.valueMm, `${constraintLabel}.valueMm`) <= 0) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.valueMm` });
+          }
         }
       } else {
         throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.kind` });

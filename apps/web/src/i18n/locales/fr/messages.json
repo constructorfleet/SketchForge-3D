@@ -532,10 +532,12 @@
           "perpendicular": "Perpendiculaire",
           "distance": "Distance",
           "angle": "Angle",
-          "symmetry": "Symétrie"
+          "symmetry": "Symétrie",
+          "radius": "Rayon",
+          "diameter": "Diamètre"
         },
         "addEqualLength": "Ajouter une longueur égale",
-        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence ou distance, un segment pour horizontal ou vertical, deux segments pour parallèle, perpendiculaire, longueur égale ou angle, ou deux points et un axe pour la symétrie.",
+        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence, distance, rayon ou diamètre, un segment pour horizontal ou vertical, deux segments pour parallèle, perpendiculaire, longueur égale ou angle, ou deux points et un axe pour la symétrie.",
         "title": "Contraintes",
         "dofEstimate": "Paramètres libres estimés : {count}. Cette estimation locale du rang ne garantit pas que les contraintes peuvent être satisfaites.",
         "dofIndeterminate": "Paramètres libres : indéterminés, car une distance ou un segment contraint est dégénéré.",
@@ -553,7 +555,11 @@
         "angleDeg": "Angle (°)",
         "addSymmetry": "Symétrie",
         "symmetryAxis": "Axe de symétrie",
-        "segmentOption": "Segment {index}"
+        "segmentOption": "Segment {index}",
+        "addRadius": "Rayon",
+        "radiusMm": "Rayon (mm)",
+        "addDiameter": "Diamètre",
+        "diameterMm": "Diamètre (mm)"
       },
       "constraintUnsatisfied": "Impossible de satisfaire la ou les contraintes d’esquisse : {ids}",
       "constraintAdded": "Contrainte d’esquisse ajoutée : {kind}",

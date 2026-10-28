@@ -28,6 +28,8 @@ const sketch: WorkplaneShape = {
       { id: "equal", kind: "equalLength", segmentIds: ["line", "other"] },
       { id: "angle", kind: "angle", segmentIds: ["line", "other"], valueDeg: 45 },
       { id: "symmetry", kind: "symmetry", pointIds: ["a", "c"], segmentId: "line" },
+      { id: "radius", kind: "radius", pointIds: ["a", "b"], valueMm: 5 },
+      { id: "diameter", kind: "diameter", pointIds: ["a", "b"], valueMm: 10 },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
       { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
     ],
@@ -146,4 +148,16 @@ it("rejects symmetry constraints with missing or coincident points or a degenera
   };
   const bytes = await exportSkfProject({ projectName: "Degenerate symmetry axis", createdAt: 1, modifiedAt: 1, shapes: [degenerate], history: [editorHistoryEntry([degenerate], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
   await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentId/);
+});
+
+it("rejects radius and diameter constraints with non-positive values or identical points", async () => {
+  for (const constraint of [
+    { id: "radius", kind: "radius" as const, pointIds: ["a", "b"] as [string, string], valueMm: 0 },
+    { id: "diameter", kind: "diameter" as const, pointIds: ["a", "b"] as [string, string], valueMm: -1 },
+    { id: "radius", kind: "radius" as const, pointIds: ["a", "a"] as [string, string], valueMm: 5 },
+  ]) {
+    const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, constraints: [constraint] } };
+    const bytes = await exportSkfProject({ projectName: "Invalid radius", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
+    await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.(valueMm|pointIds)/);
+  }
 });

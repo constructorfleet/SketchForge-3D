@@ -304,6 +304,13 @@ class SketchDistanceConstraint(TypedDict):
     valueMm: float
 
 
+class SketchRadiusConstraint(TypedDict):
+    id: str
+    kind: Literal["radius", "diameter"]
+    pointIds: Tuple[str, str]
+    valueMm: float
+
+
 SketchConstraint = Union[
     SketchFixedConstraint,
     SketchCoincidentConstraint,
@@ -312,6 +319,7 @@ SketchConstraint = Union[
     SketchAngleConstraint,
     SketchSymmetryConstraint,
     SketchDistanceConstraint,
+    SketchRadiusConstraint,
 ]
 
 

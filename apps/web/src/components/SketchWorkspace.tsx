@@ -1361,6 +1361,8 @@ function SketchConstraintPanel({
     : never;
   const t = useTranslations();
   const [distanceValue, setDistanceValue] = useState("10");
+  const [radiusValue, setRadiusValue] = useState("10");
+  const [diameterValue, setDiameterValue] = useState("20");
   const [angleValue, setAngleValue] = useState("45");
   const [symmetryAxisId, setSymmetryAxisId] = useState("");
   const pointIds = selected?.kind === "point" ? [selected.id] : selected?.kind === "multiple" ? selected.pointIds : [];
@@ -1380,6 +1382,8 @@ function SketchConstraintPanel({
   });
   const symmetryAxis = symmetryAxisId || symmetryAxes[0]?.id || "";
   const valueMm = Number(distanceValue);
+  const radiusMm = Number(radiusValue);
+  const diameterMm = Number(diameterValue);
   const angleDeg = Number(angleValue);
   const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
   const addConstraint = (constraint: NewConstraint) => onAddConstraint({ ...constraint, id: createLocalId("constraint") } as SketchConstraint);
@@ -1419,13 +1423,23 @@ function SketchConstraintPanel({
           <input type="number" min="0" step="0.1" value={distanceValue} onChange={(event) => setDistanceValue(event.currentTarget.value)} />
         </label>
         <button type="button" disabled={!selectedPair || !Number.isFinite(valueMm) || valueMm < 0} onClick={() => selectedPair && addConstraint({ kind: "distance", pointIds: selectedPair, valueMm })}>{t("editor.sketch.constraints.addDistance")}</button>
+        <label>
+          <span>{t("editor.sketch.constraints.radiusMm")}</span>
+          <input type="number" min="0" step="0.1" value={radiusValue} onChange={(event) => setRadiusValue(event.currentTarget.value)} />
+        </label>
+        <button type="button" disabled={!selectedPair || !Number.isFinite(radiusMm) || radiusMm <= 0} onClick={() => selectedPair && addConstraint({ kind: "radius", pointIds: selectedPair, valueMm: radiusMm })}>{t("editor.sketch.constraints.addRadius")}</button>
+        <label>
+          <span>{t("editor.sketch.constraints.diameterMm")}</span>
+          <input type="number" min="0" step="0.1" value={diameterValue} onChange={(event) => setDiameterValue(event.currentTarget.value)} />
+        </label>
+        <button type="button" disabled={!selectedPair || !Number.isFinite(diameterMm) || diameterMm <= 0} onClick={() => selectedPair && addConstraint({ kind: "diameter", pointIds: selectedPair, valueMm: diameterMm })}>{t("editor.sketch.constraints.addDiameter")}</button>
       </div>
       <div className="sketch-constraint-list">
         {(profile.constraints ?? []).map((constraint) => (
           <div className="sketch-constraint-row" key={constraint.id}>
             <span>{constraint.kind === "fixed"
               ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.pointId} (${constraint.xMm}, ${constraint.zMm}) mm`
-              : constraint.kind === "distance"
+              : constraint.kind === "distance" || constraint.kind === "radius" || constraint.kind === "diameter"
                 ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm ${constraint.pointIds.join("–")}`
                 : constraint.kind === "angle"
                   ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueDeg}° ${t("editor.sketch.constraints.twoSegments")}`
