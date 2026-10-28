@@ -20,7 +20,7 @@ For automated project export from a server-backed project, see [`POST /exports` 
 | Schema | `com.sketchforge.project` |
 | Current writer format | 2 |
 | Minimum reader format | 2 |
-| Created-with version | `1.29.1` | <!-- x-release-please-version -->
+| Created-with version | `1.30.0` | <!-- x-release-please-version -->
 | Media type | `application/vnd.sketchforge.project+zip` |
 
 A packaged file is a ZIP with a root `project.json` and binary or JSON payloads below `assets/`. The archive is validated before restoration. ZIP64 and encrypted entries are not supported.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sketchforge3d"
-version = "1.29.1"
+version = "1.30.0"
 description = "Typed client and macro runner for the SketchForge REST API."
 readme = "README.md"
 license = "AGPL-3.0-only"
