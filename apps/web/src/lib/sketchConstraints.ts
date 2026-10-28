@@ -215,7 +215,9 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
   const pair = pointPair(constraint, points);
   if (!pair) return Number.POSITIVE_INFINITY;
   const [first, second] = pair;
-  return constraint.kind === "coincident" ? distance(first, second) : Math.abs(distance(first, second) - constraint.valueMm);
+  if (constraint.kind === "coincident") return distance(first, second);
+  const target = constraint.kind === "radius" ? constraint.valueMm * 2 : constraint.valueMm;
+  return Math.abs(distance(first, second) - target);
 }
 
 type JacobianTerm = { index: number; coefficient: number };
@@ -417,7 +419,8 @@ function equationRows(
     const length = Math.hypot(dx, dz);
     const unitX = length <= CONSTRAINT_TOLERANCE_MM ? DEGENERATE_DISTANCE_DIRECTION.x : dx / length;
     const unitZ = length <= CONSTRAINT_TOLERANCE_MM ? DEGENERATE_DISTANCE_DIRECTION.z : dz / length;
-    add(length - constraint.valueMm, [
+    const target = constraint.kind === "radius" ? constraint.valueMm * 2 : constraint.valueMm;
+    add(length - target, [
       { pointId: first.id, coordinate: 0, coefficient: -unitX },
       { pointId: first.id, coordinate: 1, coefficient: -unitZ },
       { pointId: second.id, coordinate: 0, coefficient: unitX },
@@ -483,14 +486,19 @@ function applyStep(points: Map<string, SketchPoint>, variableIndex: Map<string, 
   return result;
 }
 
+function isPointDistanceConstraint(constraint: SketchConstraint): constraint is Extract<SketchConstraint, { pointIds: [string, string] }> {
+  return constraint.kind === "distance" || constraint.kind === "radius" || constraint.kind === "diameter";
+}
+
 function breakCollinearDistanceDegeneracy(
   constraints: SketchConstraint[],
   profile: SketchProfile,
   points: Map<string, SketchPoint>,
   variableIndex: Map<string, number>,
 ) {
-  const unsatisfiedDistances = constraints.filter((constraint) => constraint.kind === "distance"
-    && residual(constraint, profile, points) > CONSTRAINT_TOLERANCE_MM);
+  const unsatisfiedDistances = constraints
+    .filter(isPointDistanceConstraint)
+    .filter((constraint) => residual(constraint, profile, points) > CONSTRAINT_TOLERANCE_MM);
   if (!unsatisfiedDistances.length) return null;
 
   const neighbors = new Map<string, Set<string>>();
@@ -530,12 +538,12 @@ function breakCollinearDistanceDegeneracy(
     } else if (constraint.kind === "symmetry") {
       const axis = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (axis) connect(axis.startId, axis.endId);
-    } else if (constraint.kind === "coincident" || constraint.kind === "distance") {
+    } else if (constraint.kind === "coincident" || isPointDistanceConstraint(constraint)) {
       connect(constraint.pointIds[0], constraint.pointIds[1]);
     }
   }
   const componentIds = new Set<string>();
-  const pending = unsatisfiedDistances.flatMap((constraint) => constraint.kind === "distance" ? [...constraint.pointIds] : []);
+  const pending = unsatisfiedDistances.flatMap((constraint) => [...constraint.pointIds]);
   while (pending.length) {
     const pointId = pending.pop()!;
     if (componentIds.has(pointId)) continue;

@@ -378,6 +378,19 @@ describe("solveSketchConstraints", () => {
     expect(result.unsatisfiedConstraintIds).toEqual([]);
   });
 
+  it("keeps a radius between two opposite points while one endpoint is dragged", () => {
+    const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 6, z: 0 }], constraints: [{ id: "radius", kind: "radius", pointIds: ["a", "b"], valueMm: 5 }] }), ["a"]);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(Math.hypot(result.profile.points[1]!.x - result.profile.points[0]!.x, result.profile.points[1]!.z - result.profile.points[0]!.z)).toBeCloseTo(10, 5);
+  });
+
+  it("keeps a diameter between two opposite points while one endpoint is dragged", () => {
+    const result = solveSketchConstraints(profile({ points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 6, z: 0 }], constraints: [{ id: "diameter", kind: "diameter", pointIds: ["a", "b"], valueMm: 8 }] }), ["a"]);
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(Math.hypot(result.profile.points[1]!.x - result.profile.points[0]!.x, result.profile.points[1]!.z - result.profile.points[0]!.z)).toBeCloseTo(8, 5);
+    expect(sketchConstraintDegreesOfFreedom(profile({ constraints: [{ id: "diameter", kind: "diameter", pointIds: ["a", "b"], valueMm: 8 }] }))).toMatchObject({ equationCount: 1, rank: 1 });
+  });
+
   it("reports an unsatisfied distance when both endpoints are anchored apart from the requested length", () => {
     const result = solveSketchConstraints(profile({ constraints: [{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 5 }] }), ["a", "b"]);
     expect(result.unsatisfiedConstraintIds).toEqual(["d"]);

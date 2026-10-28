@@ -50,7 +50,8 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
   de: [
     "common.shape.text", "common.shape.torus", "common.shape.ring", "common.shape.polygon", "dashboard.projects.sortName",
     "editor.panel.import", "editor.panel.export", "editor.panel.format", "editor.sketch.constraints.addParallel",
-    "editor.sketch.constraints.kinds.parallel", "editor.sketch.constraints.segmentOption", "panels.property.text", "panels.property.positionX",
+    "editor.sketch.constraints.kinds.parallel", "editor.sketch.constraints.segmentOption", "editor.sketch.constraints.addRadius",
+    "editor.sketch.constraints.radiusMm", "editor.sketch.constraints.kinds.radius", "panels.property.text", "panels.property.positionX",
     "panels.property.positionY", "panels.property.positionZ", "panels.edgeModifier.radius", "panels.material.name.abs",
     "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
   ],

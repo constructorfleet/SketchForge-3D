@@ -496,7 +496,7 @@
       "constraintRemoved": "Sketch constraint removed",
       "constraints": {
         "title": "Constraints",
-        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident or distance, one segment for horizontal or vertical, two segments for parallel, perpendicular, equal length, or angle, or two points and an axis for symmetry.",
+        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident, distance, radius, or diameter, one segment for horizontal or vertical, two segments for parallel, perpendicular, equal length, or angle, or two points and an axis for symmetry.",
         "dofEstimate": "Estimated free parameters: {count}. This local rank estimate does not guarantee the constraints are solvable.",
         "dofIndeterminate": "Free parameters: indeterminate because a constrained distance or segment is degenerate.",
         "addCoincident": "Coincident",
@@ -520,7 +520,9 @@
           "tangent": "Tangent",
           "equalLength": "Equal length",
           "angle": "Angle",
-          "symmetry": "Symmetry"
+          "symmetry": "Symmetry",
+          "radius": "Radius",
+          "diameter": "Diameter"
         },
         "addTangent": "Tangent",
         "addEqualLength": "Add equal length",
@@ -528,7 +530,11 @@
         "angleDeg": "Angle (°)",
         "addSymmetry": "Symmetry",
         "symmetryAxis": "Mirror axis",
-        "segmentOption": "Segment {index}"
+        "segmentOption": "Segment {index}",
+        "addRadius": "Radius",
+        "radiusMm": "Radius (mm)",
+        "addDiameter": "Diameter",
+        "diameterMm": "Diameter (mm)"
       },
       "primitive": {
         "rectangle": "Rectangle",

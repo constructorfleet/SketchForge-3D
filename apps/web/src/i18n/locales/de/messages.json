@@ -532,10 +532,12 @@
           "perpendicular": "Senkrecht",
           "distance": "Abstand",
           "angle": "Winkel",
-          "symmetry": "Symmetrie"
+          "symmetry": "Symmetrie",
+          "radius": "Radius",
+          "diameter": "Durchmesser"
         },
         "addEqualLength": "Gleiche Länge hinzufügen",
-        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal, zwei Segmente für parallel, senkrecht, gleiche Länge oder Winkel, oder zwei Punkte und eine Achse für Symmetrie.",
+        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich, Abstand, Radius oder Durchmesser, ein Segment für horizontal oder vertikal, zwei Segmente für parallel, senkrecht, gleiche Länge oder Winkel, oder zwei Punkte und eine Achse für Symmetrie.",
         "title": "Bedingungen",
         "dofEstimate": "Geschätzte freie Parameter: {count}. Diese lokale Rangschätzung garantiert nicht, dass die Bedingungen lösbar sind.",
         "dofIndeterminate": "Freie Parameter: nicht bestimmbar, weil ein festgelegter Abstand null ist oder ein Segment keine Länge hat.",
@@ -553,7 +555,11 @@
         "angleDeg": "Winkel (°)",
         "addSymmetry": "Symmetrie",
         "symmetryAxis": "Spiegelachse",
-        "segmentOption": "Segment {index}"
+        "segmentOption": "Segment {index}",
+        "addRadius": "Radius",
+        "radiusMm": "Radius (mm)",
+        "addDiameter": "Durchmesser",
+        "diameterMm": "Durchmesser (mm)"
       },
       "constraintUnsatisfied": "Die Bedingungen der Skizze konnten nicht erfüllt werden: {ids}",
       "constraintAdded": "Bedingung „{kind}“ zur Skizze hinzugefügt",

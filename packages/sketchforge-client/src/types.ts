@@ -241,7 +241,8 @@ export type SketchSweepProfile = {
     | { id: string; kind: "equalLength"; segmentIds: readonly [string, string] }
     | { id: string; kind: "angle"; segmentIds: readonly [string, string]; valueDeg: number }
     | { id: string; kind: "symmetry"; pointIds: readonly [string, string]; segmentId: string }
-    | { id: string; kind: "distance"; pointIds: readonly [string, string]; valueMm: number })[];
+    | { id: string; kind: "distance"; pointIds: readonly [string, string]; valueMm: number }
+    | { id: string; kind: "radius" | "diameter"; pointIds: readonly [string, string]; valueMm: number })[];
   sweepFrames?: {
     section: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; xAxis: { x: number; y: number; z: number }; zAxis: { x: number; y: number; z: number } };
     spine: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; xAxis: { x: number; y: number; z: number }; zAxis: { x: number; y: number; z: number } };
