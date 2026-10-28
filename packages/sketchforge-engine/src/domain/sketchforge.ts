@@ -161,6 +161,7 @@ export type SketchConstraint =
   | { id: string; kind: "tangent"; segmentIds: [string, string] }
   | { id: string; kind: "equalLength"; segmentIds: [string, string] }
   | { id: string; kind: "angle"; segmentIds: [string, string]; valueDeg: number }
+  | { id: string; kind: "symmetry"; pointIds: [string, string]; segmentId: string }
   | { id: string; kind: "distance"; pointIds: [string, string]; valueMm: number };
 
 export type SketchImage = {

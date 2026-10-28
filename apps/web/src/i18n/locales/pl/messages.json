@@ -531,10 +531,11 @@
           "parallel": "Równolegle",
           "perpendicular": "Prostopadle",
           "distance": "Odległość",
-          "angle": "Kąt"
+          "angle": "Kąt",
+          "symmetry": "Symetria"
         },
         "addEqualLength": "Dodaj równą długość",
-        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości, równej długości lub kąta.",
+        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego, dwa segmenty dla równoległości, prostopadłości, równej długości lub kąta, albo dwa punkty i oś dla symetrii.",
         "title": "Więzy",
         "dofEstimate": "Szacowana liczba swobodnych parametrów: {count}. To lokalne oszacowanie rzędu nie gwarantuje, że więzy da się spełnić.",
         "dofIndeterminate": "Nie można ustalić liczby swobodnych parametrów, ponieważ ustalona odległość lub odcinek ma zerową długość.",
@@ -549,7 +550,10 @@
         "twoSegments": "2 odcinki",
         "remove": "Usuń więz: {kind}",
         "addAngle": "Ustaw kąt",
-        "angleDeg": "Kąt (°)"
+        "angleDeg": "Kąt (°)",
+        "addSymmetry": "Symetria",
+        "symmetryAxis": "Oś symetrii",
+        "segmentOption": "Segment {index}"
       },
       "constraintUnsatisfied": "Nie udało się spełnić więzów szkicu: {ids}",
       "constraintAdded": "Dodano więz szkicu: {kind}",

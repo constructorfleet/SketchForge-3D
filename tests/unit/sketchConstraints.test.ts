@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addSketchConstraint, isSketchAnglePair, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
+import { addSketchConstraint, isSketchAnglePair, isSketchSymmetrySetup, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
 import type { SketchProfile } from "@/types/sketchforge";
 
 function profile(overrides: Partial<SketchProfile> = {}): SketchProfile {
@@ -252,6 +252,49 @@ describe("solveSketchConstraints", () => {
     const opposite = solveSketchConstraints(source({ x: -8, z: 3 }, 180), ["a", "b"]);
     expect(opposite.unsatisfiedConstraintIds).toEqual([]);
     expect(measure(opposite)).toBeCloseTo(180, 3);
+  });
+
+  it("mirrors two points about a selected axis while the axis and one point stay put", () => {
+    const source = profile({
+      points: [
+        { id: "axis-a", x: 0, z: 0 }, { id: "axis-b", x: 10, z: 0 },
+        { id: "left", x: 2, z: 3 }, { id: "right", x: 6, z: 4 },
+      ],
+      segments: [{ id: "axis", startId: "axis-a", endId: "axis-b" }],
+    });
+    const constraint = { id: "symmetry", kind: "symmetry" as const, pointIds: ["left", "right"] as [string, string], segmentId: "axis" };
+    const before = sketchConstraintDegreesOfFreedom(source);
+    const constrained = { ...source, constraints: [constraint] };
+    const result = solveSketchConstraints(constrained, ["axis-a", "axis-b", "left"]);
+    const points = new Map(result.profile.points.map((point) => [point.id, point]));
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(points.get("left")).toMatchObject({ x: 2, z: 3 });
+    expect(points.get("right")?.x).toBeCloseTo(2, 5);
+    expect(points.get("right")?.z).toBeCloseTo(-3, 5);
+    expect(before.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(constrained).degreesOfFreedom!).toBe(2);
+    expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
+  });
+
+  it("does not offer symmetry without a non-degenerate axis", () => {
+    const source = profile({
+      points: [{ id: "axis-a", x: 0, z: 0 }, { id: "axis-b", x: 0, z: 0 }, { id: "left", x: 2, z: 3 }, { id: "right", x: 6, z: 4 }],
+      segments: [{ id: "axis", startId: "axis-a", endId: "axis-b" }],
+    });
+    expect(isSketchSymmetrySetup(["left", "right"], "axis", source)).toBe(false);
+  });
+
+  it("reports an unsatisfied symmetry when the points cannot mirror across the fixed axis", () => {
+    const source = profile({
+      points: [
+        { id: "axis-a", x: 0, z: 0 }, { id: "axis-b", x: 10, z: 0 },
+        { id: "left", x: 2, z: 3 }, { id: "right", x: 6, z: 4 },
+      ],
+      segments: [{ id: "axis", startId: "axis-a", endId: "axis-b" }],
+      constraints: [{ id: "symmetry", kind: "symmetry", pointIds: ["left", "right"], segmentId: "axis" }],
+    });
+    const result = solveSketchConstraints(source, ["axis-a", "axis-b", "left", "right"]);
+    expect(result.unsatisfiedConstraintIds).toEqual(["symmetry"]);
   });
 
   it("does not offer an angle for a degenerate segment", () => {

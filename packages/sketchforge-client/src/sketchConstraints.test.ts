@@ -21,3 +21,14 @@ it("accepts angle constraints in public sketch profiles", () => {
 
   expect(constraint.valueDeg).toBe(45);
 });
+
+it("accepts symmetry constraints in public sketch profiles", () => {
+  const constraint = {
+    id: "symmetry",
+    kind: "symmetry",
+    pointIds: ["first", "second"],
+    segmentId: "axis",
+  } satisfies NonNullable<SketchSweepProfile["constraints"]>[number];
+
+  expect(constraint.segmentId).toBe("axis");
+});

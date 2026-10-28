@@ -138,7 +138,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 ## Sketch constraints
 
-- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint shipped in [#593](https://github.com/constructorfleet/SketchForge-3D/pull/593); the angle between two segments is implemented in the pending pull request; radius/diameter and symmetry remain open slices.
+- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint shipped in [#593](https://github.com/constructorfleet/SketchForge-3D/pull/593); the angle between two segments is in PR [#596](https://github.com/constructorfleet/SketchForge-3D/pull/596); symmetry is implemented in the stacked pull request; radius/diameter remains an open slice.
 
 ## Translation completeness
 

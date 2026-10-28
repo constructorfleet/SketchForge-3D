@@ -46,11 +46,11 @@ function messageParts(message: string) {
 const NEUTRAL_WORDS = new Set(["mm", "cm", "m", "in", "ft", "CAD", "B-Rep", "STL", "OBJ", "STEP", "SVG", "SKF", "PNG", "SketchForge"]);
 // Words a language spells like English. Any other text identical to English counts as untranslated.
 const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
-  cs: ["common.shape.text", "editor.panel.import", "editor.panel.export", "panels.property.text"],
+  cs: ["common.shape.text", "editor.panel.import", "editor.panel.export", "editor.sketch.constraints.segmentOption", "panels.property.text"],
   de: [
     "common.shape.text", "common.shape.torus", "common.shape.ring", "common.shape.polygon", "dashboard.projects.sortName",
     "editor.panel.import", "editor.panel.export", "editor.panel.format", "editor.sketch.constraints.addParallel",
-    "editor.sketch.constraints.kinds.parallel", "panels.property.text", "panels.property.positionX",
+    "editor.sketch.constraints.kinds.parallel", "editor.sketch.constraints.segmentOption", "panels.property.text", "panels.property.positionX",
     "panels.property.positionY", "panels.property.positionZ", "panels.edgeModifier.radius", "panels.material.name.abs",
     "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
   ],
@@ -64,14 +64,15 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
   fr: [
     "common.shape.tube", "common.shapeName.cube", "common.shapeName.intersection", "editor.sketch.primitive.rectangle",
     "editor.sketch.primitive.triangle", "editor.sketch.constraints.kinds.distance",
-    "editor.sketch.constraints.kinds.angle", "editor.sketch.constraints.angleDeg", "editor.panel.format",
+    "editor.sketch.constraints.kinds.angle", "editor.sketch.constraints.angleDeg",
+    "editor.sketch.constraints.segmentOption", "editor.panel.format",
     "panels.edgeModifier.distance", "panels.edgeModifier.angle", "panels.edgeModifier.quality.fine",
     "panels.inspector.faces.face", "panels.inspector.faces.title", "panels.loftShape.rectangle",
     "panels.loftShape.triangle", "panels.material.name.abs", "panels.material.name.asa", "panels.material.name.pa12",
     "panels.material.name.pc", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
     "panels.material.volume", "workspace.sketch.sweepSectionLabel",
   ],
-  pl: ["common.shape.torus", "editor.panel.import", "editor.panel.format"],
+  pl: ["common.shape.torus", "editor.panel.import", "editor.panel.format", "editor.sketch.constraints.segmentOption"],
   pt: [
     "common.shape.cone", "editor.sketch.constraints.addHorizontal", "editor.sketch.constraints.addPerpendicular",
     "editor.sketch.constraints.addVertical", "editor.sketch.constraints.kinds.horizontal",

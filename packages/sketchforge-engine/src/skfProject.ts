@@ -1116,6 +1116,16 @@ function validateSketchProfile(value: unknown, label: string) {
             throw new LocalizedError("errors.skf.fieldInvalid", { label: value < 0 || value > 180 ? `${constraintLabel}.valueDeg` : `${constraintLabel}.segmentIds` });
           }
         }
+      } else if (kind === "symmetry") {
+        if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || constraint.pointIds[0] === constraint.pointIds[1] || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });
+        }
+        const axis = segmentById.get(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`));
+        if (!axis) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
+        const start = pointById.get(String(axis.startId))!, end = pointById.get(String(axis.endId))!;
+        if (Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z)) <= 1e-5) {
+          throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
+        }
       } else if (kind === "coincident" || kind === "distance") {
         if (!Array.isArray(constraint.pointIds) || constraint.pointIds.length !== 2 || !constraint.pointIds.every((pointId) => typeof pointId === "string" && pointIds.has(pointId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointIds` });
