@@ -12,7 +12,7 @@ sources:
 # Constrain sketch geometry
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
-shows **Parallel**, **Perpendicular**, and **Tangent** constraints.
+shows **Parallel**, **Perpendicular**, **Tangent**, and **Equal length** constraints.
 
 ## Make two segments parallel
 
@@ -42,6 +42,18 @@ measures the resulting angle before capturing the editor state.
 
 ![Two adjoining sketch segments selected with the Perpendicular constraint applied.](../screenshots/sketch-perpendicular-constraint.png)
 
+## Make two segments equal in length
+
+1. Create a sketch with two non-zero-length line segments.
+2. Select both line segments.
+3. Choose **Equal length** in the sketch constraint toolbar.
+
+The solver adjusts the segments so their lengths match while preserving any
+anchored point. This relation removes one estimated degree of freedom and is
+stored in `.skf` projects. Curves and zero-length lines are not eligible.
+
+![Two selected sketch segments with the Equal length constraint applied.](../screenshots/sketch-equal-length-constraint.png)
+
 ## Make a line tangent to a Bezier
 
 1. Draw a line and a Bezier segment that meet at one endpoint. Give the Bezier
@@ -56,7 +68,7 @@ between unsupported segment types are refused when a `.skf` project is read.
 
 Run the browser acceptance flow with:
 
-<!-- runnable-exempt: This command runs the browser acceptance workflow; its maintained implementation is tests/browser/sketch-parallel-constraint.test.mjs. -->
+<!-- runnable-exempt: This command runs the browser acceptance workflow; its maintained implementation is tests/browser/sketch-equal-length-constraint.test.mjs. -->
 ```sh
 npm run test:browser
 ```

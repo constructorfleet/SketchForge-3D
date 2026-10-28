@@ -6910,7 +6910,7 @@ export function SketchForgeEditor({
 
   const addSketchConstraint = useCallback((constraint: SketchConstraint) => {
     const next = addConstraintToProfile(sketchProfile, constraint);
-    commitSketchProfile(next, notice((t) => t("editor.sketch.constraintAdded", { kind: constraint.kind })), []);
+    commitSketchProfile(next, notice((t) => t("editor.sketch.constraintAdded", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })), []);
   }, [commitSketchProfile, sketchProfile]);
 
   const removeSketchConstraint = useCallback((constraintId: string) => {

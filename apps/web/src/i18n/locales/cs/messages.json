@@ -488,8 +488,11 @@
       "constraints": {
         "addTangent": "Tečna",
         "kinds": {
-          "tangent": "Tečna"
-        }
+          "tangent": "Tečna",
+          "equalLength": "Stejná délka"
+        },
+        "addEqualLength": "Přidat stejnou délku",
+        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, nebo dva segmenty pro rovnoběžnost, kolmost či stejnou délku."
       }
     },
     "export": {

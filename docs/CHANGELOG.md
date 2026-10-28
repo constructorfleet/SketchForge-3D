@@ -9,6 +9,7 @@ owner: "Contributors"
 
 ## Unreleased
 
+- Sketches can constrain two non-degenerate line segments to equal lengths. The bounded solver preserves the relation while editing, the inspector reports its degree-of-freedom effect, and `.skf` projects retain and validate the relation ([#592](https://github.com/constructorfleet/SketchForge-3D/issues/592)).
 - Plain partial revolves saved before their axis was recorded can now be measured, cut, analyzed and exported to STEP exactly when replaying their retained profile reproduces their stored triangles. Recovery preserves placement, mirroring and even radial scale without rewriting a project on reads; changed or unreplayable meshes keep their previous tessellated behavior. Server section and SVG projection drawings now use the exact solid for eligible plain revolves, including recovered legacy ones, instead of drawing their stored facets ([#542](https://github.com/constructorfleet/SketchForge-3D/issues/542)).
 
 - The desktop local-folder download route now caps JSON and multipart request bodies while reading them, before parsing. Text downloads remain limited to 25 MiB and binary downloads to 512 MiB; oversized streamed bodies return 413 without parsing or writing a file.

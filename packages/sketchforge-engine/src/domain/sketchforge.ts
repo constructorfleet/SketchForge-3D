@@ -159,6 +159,7 @@ export type SketchConstraint =
   | { id: string; kind: "parallel"; segmentIds: [string, string] }
   | { id: string; kind: "perpendicular"; segmentIds: [string, string] }
   | { id: string; kind: "tangent"; segmentIds: [string, string] }
+  | { id: string; kind: "equalLength"; segmentIds: [string, string] }
   | { id: string; kind: "distance"; pointIds: [string, string]; valueMm: number };
 
 export type SketchImage = {

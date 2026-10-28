@@ -138,7 +138,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 ## Sketch constraints
 
-- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier constraint implemented as the first constraint slice; remaining constraint types are tracked for separate PRs.
+- [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint is scoped in [#592](https://github.com/constructorfleet/SketchForge-3D/issues/592); radius/diameter, angle, and symmetry remain open slices.
 
 ## Translation completeness
 
