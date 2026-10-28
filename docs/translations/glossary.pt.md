@@ -134,3 +134,16 @@ desktop app only supports plain language codes. General rules and audience:
 | Geometry (editor tab, next to Sketch) | Modelo 3D | not “Geometria”: reads as the school subject; pairs with “Esboço” as 3D vs 2D |
 | key tag / nameplate (challenges) | chaveiro / placa com nome | |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with “MCP: ” |
+| draft (taper on a face or a prism) | ângulo de saída | the term the DRAFT kernel errors already use; prism draft — ângulo de saída do prisma, face draft — ângulo de saída da face. A shape rebuilt by a tool rather than its parameters — geometria fixa |
+| hollow / shell | esvaziar; oco | tool “Esvaziar”; hollowed — esvaziada, hollow wall — parede. The shell errors already said “esvaziar” |
+| loft (primitive) | transição | as SolidWorks pt-BR; the kernel errors keep “loft” |
+| thread (screw) | rosca | threaded rod — haste roscada; tapped hole — orifício roscado; thread sizes — tamanhos de rosca; UNC / UNF — Unificada (UNC) / Unificada fina (UNF) |
+| pattern / repeat | repetir / repetição | toolbar “Repetir”; copies — cópias; linear pattern — em linha, circular pattern — em anel |
+| distribute (objects) | distribuir | equal pitch — passo igual, equal gaps — espaços iguais; the outer two stay put — os dois das pontas ficam parados |
+| interference | interferência | colliding pairs — pares em colisão; touching — em contato |
+| analysis (CAD panel) | análise | reads the scene and never changes it |
+| material (printing material of a shape) | material | panel “Material da forma”, select label “Material”; weight — peso, cost — custo |
+| surface appearance | aparência da superfície | viewport shading only; roughness — rugosidade, metalness — metalicidade, sheen — brilho |
+| constraint (sketch) | restrição | as Fusion pt-BR; coincident — coincidente. Horizontal, vertical and perpendicular are written as “Reta horizontal”, “Reta vertical”, “Retas perpendiculares”, and the buttons as “Tornar horizontal”…, because the bare adjectives are spelled like English |
+| face (label) | face; picker label — Face nº; card title — Faces da forma | the noun is added where the bare “Face” / “Faces” would otherwise be spelled like English |
+| scene list | lista da cena | panel title — Cena |

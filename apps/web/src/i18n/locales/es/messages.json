@@ -30,7 +30,9 @@
       "wedge": "Cuña",
       "polygon": "Polígono",
       "icosahedron": "Icosaedro",
-      "mesh": "Modelo"
+      "mesh": "Modelo",
+      "loft": "Solevado",
+      "thread": "Rosca"
     },
     "shapeName": {
       "cube": "Cubo",
@@ -79,7 +81,8 @@
     "fileSize": {
       "bytes": "{size} B",
       "kilobytes": "{size} KB",
-      "megabytes": "{size} MB"
+      "megabytes": "{size} MB",
+      "gigabytes": "{size} GB"
     },
     "actions": {
       "create": "Crear un proyecto 3D",
@@ -234,6 +237,23 @@
     },
     "loading": {
       "editor": "Cargando el editor"
+    },
+    "backup": {
+      "exportAll": "Exportar todos los proyectos",
+      "preparing": "{count, plural, one {Empaquetando {count} proyecto…} many {Empaquetando {count} de proyectos…} other {Empaquetando {count} proyectos…}}",
+      "exported": "{count, plural, one {Se exportó {count} proyecto a {fileName}.} many {Se exportaron {count} de proyectos a {fileName}.} other {Se exportaron {count} proyectos a {fileName}.}}",
+      "skipped": "No se pudieron incluir: {names}.",
+      "failed": "No se pudieron exportar tus proyectos."
+    },
+    "storageWarning": {
+      "message": "Este navegador ha usado el {percent} del espacio disponible para tus proyectos. Exporta una copia de seguridad antes de que se agote."
+    },
+    "serverStorage": {
+      "migrated": "{count, plural, one {Se movió {count} proyecto al almacenamiento del servidor} many {Se movieron {count} de proyectos al almacenamiento del servidor} other {Se movieron {count} proyectos al almacenamiento del servidor}}",
+      "migrateFailed": "No se pudieron mover los proyectos al almacenamiento del servidor; siguen guardados en este navegador",
+      "badge": "En el servidor",
+      "hint": "Los proyectos se guardan en el servidor, en {name}",
+      "restored": "{count, plural, one {El almacenamiento del servidor está desactivado; se restauró {count} proyecto de este navegador} many {El almacenamiento del servidor está desactivado; se restauraron {count} de proyectos de este navegador} other {El almacenamiento del servidor está desactivado; se restauraron {count} proyectos de este navegador}}"
     }
   },
   "editor": {
@@ -280,7 +300,21 @@
       "newEmptyDesign": "Proyecto nuevo vacío",
       "savedDesign": "{count, plural, one {Se guardó el proyecto con {count} forma} many {Se guardó el proyecto con {count} de formas} other {Se guardó el proyecto con {count} formas}}",
       "nothingToCopy": "Aún no hay nada que copiar",
-      "madeCopy": "Se creó una copia del proyecto"
+      "madeCopy": "Se creó una copia del proyecto",
+      "unlockBeforeCentering": "Desbloquea la selección antes de centrarla",
+      "nothingToCenter": "La selección no tiene geometría medible que centrar",
+      "alreadyCentered": "La selección ya está centrada en el plano de trabajo",
+      "centeredOnWorkplane": "{count, plural, one {Se centró la selección en el plano de trabajo} many {Se centraron {count} de objetos en el plano de trabajo} other {Se centraron {count} objetos en el plano de trabajo}}",
+      "shapeLocked": "Forma bloqueada",
+      "shapeUnlocked": "Forma desbloqueada",
+      "distributeNeedsThree": "Selecciona al menos tres objetos para distribuirlos",
+      "distributeNeedsSpread": "Separa más los objetos antes de distribuirlos",
+      "distributeBlocked": "Desbloquea los objetos que están entre los dos extremos antes de distribuirlos",
+      "distributeAlreadyEven": "Esos objetos ya están espaciados por igual",
+      "distributed": "{count, plural, one {Se distribuyó {count} objeto a lo largo {axis}} many {Se distribuyeron {count} de objetos a lo largo {axis}} other {Se distribuyeron {count} objetos a lo largo {axis}}}",
+      "patternNeedsStep": "Define un espaciado antes de repetir; si no, las copias quedan encima del original",
+      "patternNeedsSweep": "Define un ángulo para repartir las copias alrededor",
+      "patterned": "{count, plural, one {Se repitió la selección en {count} copia} many {Se repitió la selección en {count} de copias} other {Se repitió la selección en {count} copias}}"
     },
     "workplane": {
       "toolActive": "Plano de trabajo: haz clic en una cara o en una zona vacía de la rejilla. Mantén presionada la tecla Shift para invertirlo",
@@ -489,11 +523,36 @@
         "addTangent": "Tangente",
         "kinds": {
           "tangent": "Tangente",
-          "equalLength": "Longitud igual"
+          "equalLength": "Longitud igual",
+          "coincident": "Coincidente",
+          "fixed": "Fija",
+          "horizontal": "Horizontal",
+          "vertical": "Vertical",
+          "parallel": "Paralela",
+          "perpendicular": "Perpendicular",
+          "distance": "Distancia"
         },
         "addEqualLength": "Añadir longitud igual",
-        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, o dos segmentos para paralelo, perpendicular o igual longitud."
-      }
+        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, o dos segmentos para paralelo, perpendicular o igual longitud.",
+        "title": "Restricciones",
+        "dofEstimate": "Parámetros libres estimados: {count}. Esta estimación del rango local no garantiza que las restricciones se puedan resolver.",
+        "dofIndeterminate": "Parámetros libres: indeterminados porque una distancia restringida o un segmento es degenerado.",
+        "addCoincident": "Coincidente",
+        "addFixed": "Fijar el punto seleccionado",
+        "addHorizontal": "Horizontal",
+        "addVertical": "Vertical",
+        "addParallel": "Paralela",
+        "addPerpendicular": "Perpendicular",
+        "addDistance": "Establecer distancia",
+        "distanceMm": "Distancia (mm)",
+        "twoSegments": "2 segmentos",
+        "remove": "Quitar la restricción {kind}"
+      },
+      "constraintUnsatisfied": "No se pudieron cumplir estas restricciones del boceto: {ids}",
+      "constraintAdded": "Se agregó la restricción de boceto: {kind}",
+      "constraintRemoved": "Se quitó la restricción del boceto",
+      "draftReplayFailed": "El boceto no se actualizó: su desmoldeo no se puede reconstruir con este perfil. Devuelve el perfil a como estaba o cancela la edición del boceto.",
+      "shellNotReplayable": "El boceto no se actualizó: esta forma se vació y el vaciado no se puede volver a aplicar al reconstruirla desde su boceto. Deshaz el vaciado primero o cancela la edición del boceto."
     },
     "export": {
       "needSolidSelected": "Selecciona al menos una forma sólida antes de exportar",
@@ -609,7 +668,43 @@
       "sketch": "Boceto",
       "finishSweep": "Finalizar barrido",
       "sweepSketch": "Barrido de boceto",
-      "sweepSketchHint": "Dibuja la sección en el plano seleccionado y después su trayectoria en el plano ortogonal derivado"
+      "sweepSketchHint": "Dibuja la sección en el plano seleccionado y después su trayectoria en el plano ortogonal derivado",
+      "centerOnWorkplane": "Centrar en el plano de trabajo",
+      "distributeGaps": "Separación igual",
+      "distributeCenters": "Paso igual",
+      "distribute": "Distribuir",
+      "distributeGapsHint": "El mismo espacio libre entre objetos",
+      "distributeCentersHint": "La misma distancia de centro a centro",
+      "distributeHelp": "Con objetos del mismo tamaño dan el mismo resultado; dejan de coincidir cuando los tamaños son distintos. Los dos extremos no se mueven.",
+      "threadHint": "Coloca una rosca de tornillo estándar, como varilla sólida o como agujero roscado",
+      "threadCatalog": "Tamaños de rosca",
+      "threadForm": "Sólido o agujero",
+      "threadSolid": "Sólido",
+      "threadHole": "Agujero",
+      "threadSolidHint": "Una varilla roscada con el diámetro propio del tamaño.",
+      "threadHoleHint": "El agujero se corta 0.2 mm más ancho para que quepa un tornillo de ese tamaño. Agrúpalo con un sólido para roscarlo.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Paso de {pitch} mm",
+      "threadSeries": {
+        "metric": "Métrico (ISO, paso grueso)",
+        "metric-fine": "Métrico (ISO, paso fino)",
+        "unified": "Imperial (UNC, paso grueso)",
+        "unified-fine": "Imperial (UNF, paso fino)"
+      },
+      "pattern": "Repetir",
+      "patternHint": "Repite la selección en fila o alrededor de un anillo",
+      "patternLinear": "En fila",
+      "patternLinearHint": "Copias espaciadas a lo largo de X y Z",
+      "patternCircular": "Alrededor de un anillo",
+      "patternCircularHint": "Copias giradas alrededor de un punto central",
+      "patternCount": "Copias",
+      "patternStepX": "Paso X",
+      "patternStepZ": "Paso Z",
+      "patternCenterX": "Centro X",
+      "patternCenterZ": "Centro Z",
+      "patternSweep": "Ángulo total",
+      "patternRotate": "Girar las copias para que sigan el anillo",
+      "patternApply": "Repetir"
     },
     "panel": {
       "import": "Importar",
@@ -652,6 +747,10 @@
         "dxf": {
           "description": "Dibujo en sección",
           "note": "Requiere un plano de sección. La geometría se dibuja con el núcleo CAD."
+        },
+        "3mf": {
+          "description": "Paquete para impresión 3D",
+          "note": "Lo que prefieren los laminadores modernos: unidades en milímetros, un objeto con nombre por forma, cada uno con su propia posición, y los colores de las formas."
         }
       },
       "historyTitle": "Historial de acciones guardado",
@@ -695,6 +794,25 @@
       "separated": "{count, plural, one {MCP: el objeto se separó en {count} parte} many {MCP: el objeto se separó en {count} de partes} other {MCP: el objeto se separó en {count} partes}}",
       "filleted": "{count, plural, one {MCP: se redondeó {count} arista} many {MCP: se redondearon {count} de aristas} other {MCP: se redondearon {count} aristas}}",
       "chamfered": "{count, plural, one {MCP: se achaflanó {count} arista} many {MCP: se achaflanaron {count} de aristas} other {MCP: se achaflanaron {count} aristas}}"
+    },
+    "keyboardShortcuts": {
+      "title": "Atajos de teclado",
+      "helpHint": "Presiona la tecla ? para abrir esta lista. Presiona la tecla Escape para cerrarla.",
+      "lockSelection": "Bloquear o desbloquear la selección",
+      "hideSelection": "Ocultar o mostrar la selección",
+      "showHidden": "Mostrar todas las formas ocultas",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "copy": "Copiar",
+      "paste": "Pegar",
+      "duplicate": "Duplicar",
+      "delete": "Eliminar la selección",
+      "close": "Cerrar los atajos de teclado"
+    },
+    "axis": {
+      "x": "del eje X",
+      "y": "del eje Y",
+      "z": "del eje Z"
     }
   },
   "workspace": {
@@ -721,7 +839,11 @@
     "camera": {
       "home": "Vista inicial",
       "zoomIn": "Acercar",
-      "zoomOut": "Alejar"
+      "zoomOut": "Alejar",
+      "centerOnSelection": "Centrar la vista en la selección",
+      "centerOnSelectionShortcut": "Centrar la vista en la selección (Shift+F)",
+      "orthographicView": "Vista ortográfica",
+      "perspectiveView": "Vista en perspectiva"
     },
     "workplane": {
       "label": "Plano de trabajo",
@@ -826,6 +948,13 @@
       "sweepSpineHelp": "Inicia la trayectoria en el origen de la sección (0,0). El primer segmento se ajusta a la derecha para mantener la sección perpendicular a la tangente inicial. Selecciona un punto y asigna la profundidad 3D (mm) para sacarlo de este plano.",
       "sweepSectionPlane": "Editar sección · plano seleccionado",
       "sweepSpinePlane": "Dibujar trayectoria · plano ortogonal"
+    },
+    "viewTools": {
+      "label": "Herramientas de la vista",
+      "show": "Mostrar herramientas",
+      "showLabel": "Mostrar las herramientas de la vista",
+      "hide": "Ocultar herramientas",
+      "hideLabel": "Ocultar las herramientas de la vista"
     }
   },
   "panels": {
@@ -893,7 +1022,21 @@
       "topLength": "Largo superior",
       "topWidth": "Ancho superior",
       "bottomLength": "Largo inferior",
-      "bottomWidth": "Ancho inferior"
+      "bottomWidth": "Ancho inferior",
+      "topShape": "Forma superior",
+      "bottomShape": "Forma inferior",
+      "topRotation": "Giro superior",
+      "bottomRotation": "Giro inferior",
+      "layers": "Capas",
+      "positionX": "Posición X",
+      "positionY": "Posición Y",
+      "positionZ": "Posición Z",
+      "rotationX": "Inclinación X",
+      "rotationY": "Giro Y",
+      "rotationZ": "Inclinación Z",
+      "pitch": "Paso",
+      "turns": "Vueltas",
+      "core": "Radio del núcleo"
     },
     "inspector": {
       "label": "Panel de la forma «{name}»",
@@ -923,7 +1066,90 @@
         "teeth": "Dientes",
         "helix": "Hélice"
       },
-      "gearType": "Tipo de engranaje"
+      "gearType": "Tipo de engranaje",
+      "placement": "Ubicación",
+      "faces": {
+        "title": "Caras",
+        "enableHint": "Colorea caras individuales o inclina una con un desmoldeo. Esto primero reconstruye la forma como geometría sólida exacta. Su tamaño sigue siendo editable, pero los valores propios de este tipo de forma, como el número de lados, quedan fijos.",
+        "enable": "Activar la edición de caras",
+        "enabling": "Preparando las caras…",
+        "enabled": "Edición de caras activada. Elige una cara para colorearla o inclinarla.",
+        "enableSuperseded": "La forma cambió antes de que sus caras estuvieran listas. Vuelve a activar la edición de caras.",
+        "face": "Cara",
+        "of": "de {count}",
+        "previous": "Cara anterior",
+        "next": "Cara siguiente",
+        "faceId": "ID de cara: {id}",
+        "highlightHint": "Señala una cara en la vista para resaltarla y luego haz clic para elegirla. La cara elegida sigue marcada mientras este panel esté abierto, incluso si tiene un color.",
+        "colorFor": "Color de la cara {face}",
+        "chooseColor": "Elige un color",
+        "clearColor": "Quitar color",
+        "coloredFaces": "Caras con color",
+        "faceNumber": "Cara {face}",
+        "remove": "Quitar el color de la cara {face}",
+        "noColors": "Aún no hay caras con color.",
+        "draftTitle": "Desmoldeo",
+        "draftHint": "Inclina la cara elegida según el ángulo indicado, como si la pieza se sacara de un molde en la dirección elegida. No todas las caras admiten un desmoldeo en todas las direcciones. El desmoldeo reconstruye la lista de caras, borra sus colores y puede cambiar los números de cara; comprueba el ID de cara antes de volver a aplicar un desmoldeo.",
+        "direction": {
+          "label": "Dirección",
+          "x": "En dirección +X",
+          "negX": "En dirección −X",
+          "y": "Hacia arriba (+Y)",
+          "negY": "Hacia abajo (−Y)",
+          "z": "En dirección +Z",
+          "negZ": "En dirección −Z"
+        },
+        "angle": "Ángulo de desmoldeo",
+        "applyDraft": "Aplicar desmoldeo",
+        "drafting": "Aplicando el desmoldeo a la cara…",
+        "drafted": "Desmoldeo aplicado a la cara.",
+        "draftedRetained": "Desmoldeo aplicado a la cara. Se conserva con el boceto, así que al editar el boceto se mantiene.",
+        "draftRetained": "Esta forma ya conserva un desmoldeo de cara. Cámbialo en la tarjeta «Desmoldeo de cara» o deshazlo antes de aplicar un desmoldeo a otra cara.",
+        "prismDraftRetained": "Esta forma conserva un desmoldeo de prisma y no se le puede agregar un desmoldeo de cara. Primero deshaz el desmoldeo del prisma."
+      },
+      "draftPrism": {
+        "title": "Desmoldeo del prisma",
+        "hint": "Inclina una extrusión recta de boceto que se conserva. Esto crea geometría fija.",
+        "angle": "Ángulo de desmoldeo",
+        "apply": "Aplicar desmoldeo",
+        "applying": "Aplicando el desmoldeo…",
+        "applied": "Desmoldeo aplicado. La forma ahora es geometría fija.",
+        "hintRetained": "Inclina una extrusión recta de boceto. El desmoldeo se conserva con el boceto, así que al editar el boceto se mantiene.",
+        "appliedRetained": "Desmoldeo aplicado. Se conserva con el boceto, así que al editar el boceto se mantiene.",
+        "update": "Actualizar desmoldeo",
+        "faceDraftRetained": "Esta forma conserva un desmoldeo de cara y no se le puede agregar un desmoldeo de prisma. Primero deshaz el desmoldeo de cara."
+      },
+      "faceDraft": {
+        "title": "Desmoldeo de cara",
+        "hint": "Se conserva con el boceto: al editar el boceto se vuelve a dibujar el desmoldeo. Cambia aquí su dirección o su ángulo.",
+        "face": "Cara {face} de la extrusión del boceto",
+        "update": "Actualizar desmoldeo",
+        "updating": "Actualizando el desmoldeo…",
+        "updated": "Desmoldeo de cara actualizado."
+      },
+      "shell": {
+        "title": "Vaciado",
+        "hint": "Vacía la forma con una pared de este grosor, medida hacia dentro, para que el exterior conserve su tamaño. Deja caras abiertas para hacer una bandeja o un estuche.",
+        "thickness": "Grosor de pared",
+        "openFaces": "Dejar abiertas",
+        "directionsHint": "Los lados son los del plano de trabajo: la cara superior mira hacia arriba. Un lado solo abre una cara plana.",
+        "direction": {
+          "top": "Superior",
+          "bottom": "Inferior",
+          "left": "Izquierda",
+          "right": "Derecha",
+          "front": "Frontal",
+          "back": "Trasera"
+        },
+        "faceNumbers": "Caras por número",
+        "faceNumbersHint": "Números de la tarjeta «Caras», separados por comas.",
+        "faceNumbersInvalid": "Escribe números de cara del 1 al {count}.",
+        "addPicked": "Agregar la cara {face} seleccionada",
+        "apply": "Vaciar forma",
+        "applying": "Vaciando…",
+        "applied": "Forma vaciada: {percent} menos material.",
+        "hollowed": "Vaciada con una pared de {thickness} {unit}."
+      }
     },
     "edgeModifier": {
       "title": {
@@ -985,7 +1211,8 @@
         "cruiseShapes": "Colocar las formas nuevas sobre las superficies",
         "zoomSpeed": "Velocidad del zoom",
         "zoomSlow": "Lento",
-        "zoomFast": "Rápido"
+        "zoomFast": "Rápido",
+        "classicRotateHandles": "Usar los controladores de giro clásicos"
       },
       "measurement": {
         "title": "Medición",
@@ -1047,6 +1274,24 @@
         "description": "Guarda la configuración actual para este proyecto.",
         "makeDefault": "Usar por defecto",
         "defaultSaved": "Predeterminado guardado"
+      },
+      "storage": {
+        "nav": "Almacenamiento",
+        "title": "Almacenamiento del navegador",
+        "description": "Cómo guarda este navegador los proyectos de este equipo.",
+        "checking": "Comprobando el almacenamiento…",
+        "persistence": "Almacenamiento persistente",
+        "persisted": "Activado. El navegador no borrará tus proyectos para liberar espacio.",
+        "bestEffort": "Desactivado. El navegador podría borrar tus proyectos cuando el equipo se quede sin espacio.",
+        "unsupported": "Este navegador no indica si conserva tus proyectos.",
+        "server": "Tus proyectos se guardan en el servidor, no en este navegador, así que borrar los datos del navegador no los elimina.",
+        "request": "Pedir al navegador que conserve los proyectos",
+        "requestDeclined": "El navegador lo rechazó. Mantén copias de seguridad con «Exportar todos los proyectos».",
+        "usage": "Espacio usado",
+        "usageValue": "{used} de {quota} ({percent})",
+        "usageUnknown": "Este navegador no informa cuánto espacio usa.",
+        "usageMeter": "Parte usada del almacenamiento del navegador",
+        "backupNote": "«Exportar todos los proyectos» en la página de inicio guarda todos los proyectos en un solo ZIP de archivos SKF."
       }
     },
     "tutorial": {
@@ -1158,6 +1403,110 @@
         "body": "Selecciona la base y el objeto «Texto»: mantén presionada la tecla Shift y haz clic en los dos, o arrastra un recuadro a su alrededor. Haz clic en «Agrupar» en la sección «Combinar» de la parte superior para obtener un solo modelo terminado para imprimir. Si «Agrupar» sigue en gris, la base sigue bloqueada: primero desbloquéala con el candado del panel de la forma.",
         "alt": "Placa azul ALEX terminada y agrupada"
       }
+    },
+    "analysis": {
+      "title": "Análisis",
+      "readOnly": "El análisis lee la escena y nunca la modifica.",
+      "checkInterference": "Comprobar interferencias",
+      "wallThickness": "Grosor de pared",
+      "scopeSelection": "{count, plural, one {Comprueba {count} forma seleccionada.} many {Comprueba {count} de formas seleccionadas.} other {Comprueba {count} formas seleccionadas.}}",
+      "scopeScene": "{count, plural, =0 {Agrega dos formas para comprobar si chocan.} one {Agrega otra forma para comprobar si chocan.} many {Comprueba todas las {count} de formas visibles. Selecciona dos o más para limitar la comprobación.} other {Comprueba las {count} formas visibles. Selecciona dos o más para limitar la comprobación.}}",
+      "thicknessHint": "Selecciona un sólido para medir el grosor de sus paredes.",
+      "running": "Analizando…",
+      "noCollisions": "{count, plural, one {No hay colisiones entre {count} forma.} many {No hay colisiones entre {count} de formas.} other {No hay colisiones entre {count} formas.}}",
+      "collisions": "{pairs, plural, one {{pairs} par en colisión} many {{pairs} de pares en colisión} other {{pairs} pares en colisión}} entre {count, plural, one {{count} forma} many {{count} de formas} other {{count} formas}}.",
+      "pairsLabel": "Pares en colisión",
+      "pair": "{a} y {b}",
+      "overlap": "superposición de {volume} mm³",
+      "touching": "en contacto",
+      "tessellated": "a partir de triángulos",
+      "interferenceMethod": "Distancia exacta entre superficies de OCCT y volumen común para cada par cuyas cajas delimitadoras se tocan.",
+      "thicknessResult": "La pared más delgada de «{name}» mide {value} mm",
+      "thicknessNone": "No se encontraron paredes opuestas de «{name}» que se pudieran medir.",
+      "thicknessMethod": "Estimación por muestreo: {samples} puntos por cara en {faces} caras, medidos hasta la superficie opuesta. Una pared más delgada entre dos puntos de muestreo puede pasar desapercibida.",
+      "stale": "La escena cambió desde este resultado. Vuelve a ejecutar el análisis.",
+      "failed": "El núcleo CAD no pudo analizar la escena.",
+      "refusal": {
+        "tooManyShapes": "La comprobación de interferencias admite como máximo {limit} formas a la vez, y se dieron {given}. Selecciona menos formas y vuelve a comprobar.",
+        "tooManyCandidates": "Hay demasiadas formas muy juntas: {given} pares necesitarían una comprobación exacta y el límite es {limit}. Selecciona menos formas y vuelve a comprobar.",
+        "invalidClearance": "La holgura debe ser un número de milímetros igual o mayor que cero.",
+        "tooManyFaces": "La medición de grosor de pared analiza como máximo sólidos de {limit} caras.",
+        "noFaces": "Esa forma no tiene caras que muestrear.",
+        "noGeometry": "«{name}» no tiene geometría que analizar."
+      }
+    },
+    "appearance": {
+      "title": "Apariencia de la superficie",
+      "hint": "Solo cambia el sombreado de la vista; no simula texturas ni materiales físicos.",
+      "custom": "Superficie personalizada",
+      "roughness": "Rugosidad",
+      "metalness": "Metalicidad",
+      "sheen": "Brillo",
+      "presets": {
+        "painted": "Superficie pintada",
+        "wood": "Madera",
+        "fabric": "Tela",
+        "ceramic": "Cerámica",
+        "metal": "Metálico"
+      }
+    },
+    "material": {
+      "title": "Material",
+      "label": "Material de la forma",
+      "none": "Ninguno",
+      "pricePerKg": "Precio por kg",
+      "pricePerKgLabel": "Precio del material por kilogramo",
+      "weight": "Peso",
+      "cost": "Costo",
+      "volume": "Volumen",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "El peso y el costo usan el volumen exacto de la forma.",
+        "tessellated": "El peso y el costo son estimaciones calculadas a partir de una malla de triángulos."
+      },
+      "holeHint": "Un agujero quita material, así que no tiene peso propio.",
+      "name": {
+        "pla": "PLA",
+        "petg": "PETG",
+        "abs": "ABS",
+        "asa": "ASA",
+        "tpu": "TPU",
+        "pa12": "Nailon (PA12)",
+        "pc": "Policarbonato",
+        "resin": "Resina"
+      },
+      "density": "{density} g/cm³"
+    },
+    "loftShape": {
+      "oval": "Óvalo",
+      "rectangle": "Rectángulo",
+      "triangle": "Triángulo",
+      "pentagon": "Pentágono",
+      "hexagon": "Hexágono"
+    },
+    "scene": {
+      "title": "Escena",
+      "open": "Lista de escena",
+      "summary": "{count, plural, =0 {No hay nada en la escena} one {{count} forma} many {{count} de formas} other {{count} formas}}{hidden, plural, =0 {} one { · {hidden} oculta} many { · {hidden} de ocultas} other { · {hidden} ocultas}}",
+      "searchPlaceholder": "Buscar formas",
+      "searchLabel": "Buscar formas por nombre o tipo",
+      "empty": "Agrega una forma y aparecerá aquí.",
+      "noMatches": "Ninguna forma coincide con esa búsqueda.",
+      "hole": "Agujero",
+      "show": "Mostrar «{name}»",
+      "hide": "Ocultar «{name}»",
+      "lock": "Bloquear «{name}»",
+      "unlock": "Desbloquear «{name}»",
+      "delete": "Eliminar «{name}»",
+      "rename": "Cambiar el nombre de «{name}»",
+      "renameInput": "Nuevo nombre de «{name}»",
+      "saveName": "Guardar el nombre de «{name}»",
+      "cancelRename": "Cancelar el cambio de nombre de «{name}»",
+      "expandGroup": "Mostrar lo que agrupa «{name}»",
+      "collapseGroup": "Ocultar lo que agrupa «{name}»",
+      "collapse": "Contraer la lista de escena",
+      "expand": "Expandir la lista de escena"
     }
   },
   "errors": {
@@ -1378,7 +1727,9 @@
       "readFailed": "No se pudo leer el archivo STEP: {detail}",
       "noSolidGeometry": "El archivo STEP no tiene sólidos que se puedan importar",
       "nothingToExport": "No hay cajas, cilindros, esferas ni sólidos importados de STEP para exportar a STEP (B-Rep)",
-      "exportFailed": "No se pudo exportar a STEP: {detail}"
+      "exportFailed": "No se pudo exportar a STEP: {detail}",
+      "meshFailed": "Este archivo STEP es demasiado complejo para que el navegador lo convierta en malla. Para importarlo hace falta un servidor de SketchForge, que hace el trabajo directamente con el núcleo CAD.",
+      "allSkipped": "No se pudo exportar nada como STEP B-Rep: {detail}"
     },
     "stl": {
       "noGeometry": "El archivo STL no tiene ningún modelo legible",
@@ -1495,6 +1846,21 @@
       "localFailed": "No se pudo actualizar SketchForge en este equipo",
       "serviceStatus": "El servicio de actualizaciones respondió con el error {status}",
       "startFailed": "No se pudo iniciar la actualización"
+    },
+    "projects": {
+      "notConfigured": "{name} no está configurado",
+      "disabled": "El almacenamiento de proyectos del servidor está desactivado",
+      "invalidId": "Identificador de proyecto no válido",
+      "notFound": "Ese proyecto no está en el servidor",
+      "sameOrigin": "El almacenamiento de proyectos del servidor solo acepta escrituras desde el mismo origen",
+      "busySaving": "Este proyecto se está guardando en este momento",
+      "missingMetadata": "A la carga del proyecto le faltan sus datos",
+      "invalidMetadata": "No se pudieron leer los datos del proyecto",
+      "tooLarge": "El proyecto supera el límite de tamaño del almacenamiento del servidor",
+      "changedBeforeSave": "Este proyecto se modificó en otro lugar. Recarga antes de volver a guardarlo.",
+      "loadFailed": "No se pudieron cargar los proyectos del servidor",
+      "saveFailed": "No se pudo guardar el proyecto en el servidor",
+      "deleteFailed": "No se pudo eliminar el proyecto del servidor"
     }
   }
 }

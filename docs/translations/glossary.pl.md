@@ -134,3 +134,18 @@ Binding for the Polish catalogs. General rules and audience: [../TRANSLATIONS.md
 | shape defaults | ustawienia nowych kształtów | not „domyślne kształty”: reads as a default set of shapes |
 | Geometry (editor tab, next to Sketch) | Model 3D | not „Geometria”: reads as the school subject; pairs with „Szkic” as 3D vs 2D |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with „MCP: ” |
+| draft | pochylenie; kąt pochylenia — draft angle; face draft — pochylenie ściany; draft prism — pochylenie graniastosłupa | „kąt odformowania” is the moulding term; the UI keeps the plainer „kąt pochylenia” |
+| baked geometry | geometria zapisana na stałe | the shape no longer follows its settings |
+| shell / hollow | wydrążenie / wydrążyć; the process — drążenie | not „skorupa” |
+| wall thickness | grubość ścianki | |
+| loft | bryła przejściowa | Fusion „Przejście”; the shell error already says „bryła przejściowa (loft)” |
+| thread / pitch | gwint / skok; threaded rod — gwintowany pręt; tapped hole — gwintowany otwór; fine thread — drobnozwojny | |
+| pattern (toolbar section) / repeat | szyk / powtórz | Fusion PL „Szyk”; equal pitch — równe odległości środków, equal gaps — równe przerwy |
+| distribute | rozłóż; status „Rozłożono … wzdłuż …” | not „dystrybuuj” |
+| interference | kolizje; the overlapping volume — przenikanie | the panel checks for „kolizje” and reports „przenikanie” |
+| analysis | analiza | panel title |
+| material / surface appearance | materiał / wygląd powierzchni | appearance presets („Ceramika”, „Drewno”) name a look, not a material |
+| constraint | więz; plural więzy | FreeCAD PL; the kinds read „Poziomo”, „Pionowo”, „Równolegle”, „Prostopadle”, „Zbieżność”, „Odległość”, „Ustalenie” |
+| free parameters | swobodne parametry | the count the sketch solver has left, as in the English |
+| placement rows (X, Tilt X, Turn Y) | współrzędna X, pochylenie X, obrót Y | Polish needs a noun, a bare axis letter would be unchanged from English |
+| draft direction options | Oś +X, Oś −X, W górę (+Y), W dół (−Y) | axes keep the minus sign − |

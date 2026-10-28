@@ -30,7 +30,9 @@
       "wedge": "Keil",
       "polygon": "Polygon",
       "icosahedron": "Ikosaeder",
-      "mesh": "Modell"
+      "mesh": "Modell",
+      "loft": "Übergangskörper",
+      "thread": "Gewinde"
     },
     "shapeName": {
       "cube": "Würfel",
@@ -79,7 +81,8 @@
     "fileSize": {
       "bytes": "{size} B",
       "kilobytes": "{size} KB",
-      "megabytes": "{size} MB"
+      "megabytes": "{size} MB",
+      "gigabytes": "{size} GB"
     },
     "actions": {
       "create": "Neues 3D-Projekt erstellen",
@@ -234,6 +237,23 @@
     },
     "loading": {
       "editor": "Editor wird geladen"
+    },
+    "backup": {
+      "exportAll": "Alle Projekte exportieren",
+      "preparing": "{count, plural, one {{count} Projekt wird gepackt…} other {{count} Projekte werden gepackt…}}",
+      "exported": "{count, plural, one {{count} Projekt in {fileName} exportiert.} other {{count} Projekte in {fileName} exportiert.}}",
+      "skipped": "Nicht aufgenommen: {names}.",
+      "failed": "Ihre Projekte konnten nicht exportiert werden."
+    },
+    "storageWarning": {
+      "message": "Dieser Browser hat {percent} des für Ihre Projekte erlaubten Speicherplatzes belegt. Exportieren Sie eine Sicherung, bevor der Platz ausgeht."
+    },
+    "serverStorage": {
+      "migrated": "{count, plural, one {{count} Projekt in den Serverspeicher verschoben} other {{count} Projekte in den Serverspeicher verschoben}}",
+      "migrateFailed": "Projekte konnten nicht in den Serverspeicher verschoben werden; sie sind weiterhin in diesem Browser gespeichert",
+      "badge": "Auf dem Server",
+      "hint": "Projekte werden auf dem Server unter {name} gespeichert",
+      "restored": "Der Serverspeicher ist aus; {count, plural, one {{count} Projekt aus diesem Browser wiederhergestellt} other {{count} Projekte aus diesem Browser wiederhergestellt}}"
     }
   },
   "editor": {
@@ -280,7 +300,21 @@
       "newEmptyDesign": "Neues leeres Projekt",
       "savedDesign": "{count, plural, one {Projekt mit {count} Form gespeichert} other {Projekt mit {count} Formen gespeichert}}",
       "nothingToCopy": "Noch nichts zum Kopieren",
-      "madeCopy": "Kopie des Projekts erstellt"
+      "madeCopy": "Kopie des Projekts erstellt",
+      "unlockBeforeCentering": "Entsperren Sie die Auswahl, bevor Sie sie zentrieren",
+      "nothingToCenter": "Die Auswahl hat keine messbare Geometrie zum Zentrieren",
+      "alreadyCentered": "Die Auswahl ist bereits auf der Arbeitsebene zentriert",
+      "centeredOnWorkplane": "{count, plural, one {Auswahl auf der Arbeitsebene zentriert} other {{count} Objekte auf der Arbeitsebene zentriert}}",
+      "shapeLocked": "Form gesperrt",
+      "shapeUnlocked": "Form entsperrt",
+      "distributeNeedsThree": "Wählen Sie mindestens drei Objekte zum Verteilen aus",
+      "distributeNeedsSpread": "Ziehen Sie die Objekte weiter auseinander, bevor Sie sie verteilen",
+      "distributeBlocked": "Entsperren Sie die Objekte zwischen den beiden äußeren, bevor Sie verteilen",
+      "distributeAlreadyEven": "Diese Objekte haben bereits gleiche Abstände",
+      "distributed": "{count, plural, one {{count} Objekt entlang {axis} verteilt} other {{count} Objekte entlang {axis} verteilt}}",
+      "patternNeedsStep": "Legen Sie einen Abstand fest, bevor Sie das Muster erstellen, sonst liegen die Kopien auf dem Original",
+      "patternNeedsSweep": "Legen Sie einen Winkel fest, damit sich die Kopien im Kreis verteilen",
+      "patterned": "{count, plural, one {Auswahl als Muster mit {count} Kopie erstellt} other {Auswahl als Muster mit {count} Kopien erstellt}}"
     },
     "workplane": {
       "toolActive": "Arbeitsebene: Klicken Sie auf eine Fläche oder auf eine leere Stelle im Raster. Halten Sie Shift gedrückt, um die Ebene umzudrehen",
@@ -489,11 +523,36 @@
         "addTangent": "Tangential",
         "kinds": {
           "tangent": "Tangential",
-          "equalLength": "Gleiche Länge"
+          "equalLength": "Gleiche Länge",
+          "coincident": "Deckungsgleich",
+          "fixed": "Fixiert",
+          "horizontal": "Waagerecht",
+          "vertical": "Vertikal",
+          "parallel": "Parallel",
+          "perpendicular": "Senkrecht",
+          "distance": "Abstand"
         },
         "addEqualLength": "Gleiche Länge hinzufügen",
-        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal oder zwei Segmente für parallel, senkrecht oder gleiche Länge."
-      }
+        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal oder zwei Segmente für parallel, senkrecht oder gleiche Länge.",
+        "title": "Bedingungen",
+        "dofEstimate": "Geschätzte freie Parameter: {count}. Diese lokale Rangschätzung garantiert nicht, dass die Bedingungen lösbar sind.",
+        "dofIndeterminate": "Freie Parameter: nicht bestimmbar, weil ein festgelegter Abstand null ist oder ein Segment keine Länge hat.",
+        "addCoincident": "Deckungsgleich",
+        "addFixed": "Ausgewählten Punkt fixieren",
+        "addHorizontal": "Waagerecht",
+        "addVertical": "Vertikal",
+        "addParallel": "Parallel",
+        "addPerpendicular": "Senkrecht",
+        "addDistance": "Abstand festlegen",
+        "distanceMm": "Abstand (mm)",
+        "twoSegments": "2 Segmente",
+        "remove": "Bedingung „{kind}“ entfernen"
+      },
+      "constraintUnsatisfied": "Die Bedingungen der Skizze konnten nicht erfüllt werden: {ids}",
+      "constraintAdded": "Bedingung „{kind}“ zur Skizze hinzugefügt",
+      "constraintRemoved": "Bedingung aus der Skizze entfernt",
+      "draftReplayFailed": "Die Skizze wurde nicht aktualisiert: Ihre Formschräge lässt sich auf diesem Profil nicht neu aufbauen. Stellen Sie das Profil wieder her oder brechen Sie die Skizzenbearbeitung ab.",
+      "shellNotReplayable": "Die Skizze wurde nicht aktualisiert: Diese Form wurde ausgehöhlt, und beim erneuten Aufbau aus der Skizze lässt sich das Aushöhlen nicht erneut anwenden. Machen Sie zuerst das Aushöhlen rückgängig, oder brechen Sie die Skizzenbearbeitung ab."
     },
     "export": {
       "needSolidSelected": "Wählen Sie vor dem Export mindestens einen Volumenkörper aus",
@@ -609,7 +668,43 @@
       "sketch": "Skizze",
       "finishSweep": "Sweep abschließen",
       "sweepSketch": "Skizze sweepen",
-      "sweepSketchHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und dann den Pfad auf der abgeleiteten orthogonalen Ebene"
+      "sweepSketchHint": "Zeichne den Querschnitt auf der ausgewählten Arbeitsebene und dann den Pfad auf der abgeleiteten orthogonalen Ebene",
+      "centerOnWorkplane": "Auf Arbeitsebene zentrieren",
+      "distributeGaps": "Gleiche Lücken",
+      "distributeCenters": "Gleiche Abstände",
+      "distribute": "Verteilen",
+      "distributeGapsHint": "Gleicher freier Abstand zwischen den Objekten",
+      "distributeCentersHint": "Gleicher Abstand von Mitte zu Mitte",
+      "distributeHelp": "Bei gleich großen Objekten ergeben beide dasselbe; bei unterschiedlich großen unterscheiden sie sich. Die beiden äußeren bleiben an ihrem Platz.",
+      "threadHint": "Fügen Sie ein Standardgewinde als Gewindestange oder als Gewindebohrung hinzu",
+      "threadCatalog": "Gewindegrößen",
+      "threadForm": "Volumenkörper oder Bohrung",
+      "threadSolid": "Volumenkörper",
+      "threadHole": "Bohrung",
+      "threadSolidHint": "Eine Gewindestange im Nenndurchmesser dieser Größe.",
+      "threadHoleHint": "Die Bohrung wird 0.2 mm größer geschnitten, damit eine Schraube dieser Größe hineinpasst. Gruppieren Sie sie mit einem Volumenkörper, um das Gewinde in ihn zu schneiden.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Steigung {pitch} mm",
+      "threadSeries": {
+        "metric": "Metrisch (ISO-Regelgewinde)",
+        "metric-fine": "Metrisch (ISO-Feingewinde)",
+        "unified": "Zöllig (UNC)",
+        "unified-fine": "Zöllig (UNF)"
+      },
+      "pattern": "Muster",
+      "patternHint": "Die Auswahl in einer Reihe oder im Kreis mehrfach anordnen",
+      "patternLinear": "In einer Reihe",
+      "patternLinearHint": "Kopien mit Abstand entlang X und Z",
+      "patternCircular": "Im Kreis",
+      "patternCircularHint": "Kopien um einen Mittelpunkt gedreht",
+      "patternCount": "Kopien",
+      "patternStepX": "Schritt X",
+      "patternStepZ": "Schritt Z",
+      "patternCenterX": "Mittelpunkt X",
+      "patternCenterZ": "Mittelpunkt Z",
+      "patternSweep": "Winkel",
+      "patternRotate": "Kopien entlang des Kreises drehen",
+      "patternApply": "Muster erstellen"
     },
     "panel": {
       "import": "Import",
@@ -652,6 +747,10 @@
         "dxf": {
           "description": "Schnittzeichnung",
           "note": "Erfordert eine Schnittebene. Die Geometrie wird vom CAD-Kern gezeichnet."
+        },
+        "3mf": {
+          "description": "3D-Druckpaket",
+          "note": "Was moderne Slicer bevorzugen: Maßeinheiten in Millimetern, ein benanntes Objekt pro Form mit eigener Platzierung und die Farben der Formen."
         }
       },
       "historyTitle": "Gespeicherter Änderungsverlauf",
@@ -695,6 +794,25 @@
       "separated": "{count, plural, one {MCP: in {count} Teil zerlegt} other {MCP: in {count} Teile zerlegt}}",
       "filleted": "{count, plural, one {MCP: {count} Kante abgerundet} other {MCP: {count} Kanten abgerundet}}",
       "chamfered": "{count, plural, one {MCP: {count} Kante gefast} other {MCP: {count} Kanten gefast}}"
+    },
+    "keyboardShortcuts": {
+      "title": "Tastenkürzel",
+      "helpHint": "Drücken Sie ?, um diese Liste zu öffnen. Drücken Sie Escape, um sie zu schließen.",
+      "lockSelection": "Auswahl sperren oder entsperren",
+      "hideSelection": "Auswahl ausblenden oder einblenden",
+      "showHidden": "Alle ausgeblendeten Formen einblenden",
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "copy": "Kopieren",
+      "paste": "Einfügen",
+      "duplicate": "Duplizieren",
+      "delete": "Auswahl löschen",
+      "close": "Tastenkürzel schließen"
+    },
+    "axis": {
+      "x": "der X-Achse",
+      "y": "der Y-Achse",
+      "z": "der Z-Achse"
     }
   },
   "workspace": {
@@ -721,7 +839,11 @@
     "camera": {
       "home": "Startansicht",
       "zoomIn": "Hineinzoomen",
-      "zoomOut": "Herauszoomen"
+      "zoomOut": "Herauszoomen",
+      "centerOnSelection": "Ansicht auf die Auswahl zentrieren",
+      "centerOnSelectionShortcut": "Ansicht auf die Auswahl zentrieren (Shift+F)",
+      "orthographicView": "Orthogonale Ansicht",
+      "perspectiveView": "Perspektivische Ansicht"
     },
     "workplane": {
       "label": "Arbeitsebene",
@@ -826,6 +948,13 @@
       "sweepSpineHelp": "Der Pfad beginnt im Profilursprung (0,0). Das erste Segment rastet rechts ein, damit der Querschnitt senkrecht zur anfänglichen Tangente bleibt. Wähle einen Pfadpunkt und lege eine 3D-Tiefe (mm) fest, um ihn aus dieser Ebene zu bewegen.",
       "sweepSectionPlane": "Querschnitt bearbeiten · ausgewählte Ebene",
       "sweepSpinePlane": "Pfad zeichnen · orthogonale Ebene"
+    },
+    "viewTools": {
+      "label": "Ansichtswerkzeuge",
+      "show": "Werkzeuge einblenden",
+      "showLabel": "Ansichtswerkzeuge einblenden",
+      "hide": "Werkzeuge ausblenden",
+      "hideLabel": "Ansichtswerkzeuge ausblenden"
     }
   },
   "panels": {
@@ -893,7 +1022,21 @@
       "topLength": "Länge oben",
       "topWidth": "Breite oben",
       "bottomLength": "Länge unten",
-      "bottomWidth": "Breite unten"
+      "bottomWidth": "Breite unten",
+      "topShape": "Form oben",
+      "bottomShape": "Form unten",
+      "topRotation": "Drehung oben",
+      "bottomRotation": "Drehung unten",
+      "layers": "Schichten",
+      "positionX": "X",
+      "positionY": "Y",
+      "positionZ": "Z",
+      "rotationX": "Neigung X",
+      "rotationY": "Drehung Y",
+      "rotationZ": "Neigung Z",
+      "pitch": "Steigung",
+      "turns": "Windungen",
+      "core": "Kernradius"
     },
     "inspector": {
       "label": "Formeinstellungen: {name}",
@@ -923,7 +1066,90 @@
         "teeth": "Zähne",
         "helix": "Schrägung"
       },
-      "gearType": "Zahnradart"
+      "gearType": "Zahnradart",
+      "placement": "Platzierung",
+      "faces": {
+        "title": "Flächen",
+        "enableHint": "Färben Sie einzelne Flächen oder versehen Sie eine mit einer Formschräge. Dazu wird die Form zuerst als exakter Volumenkörper neu aufgebaut. Ihre Größe bleibt änderbar, aber Einstellungen, die zu diesem Formtyp gehören, wie die Anzahl der Seiten, lassen sich dann nicht mehr ändern.",
+        "enable": "Flächenbearbeitung einschalten",
+        "enabling": "Flächen werden vorbereitet…",
+        "enabled": "Flächenbearbeitung eingeschaltet. Wählen Sie eine Fläche zum Färben oder für eine Formschräge.",
+        "enableSuperseded": "Die Form hat sich geändert, bevor ihre Flächen bereit waren. Schalten Sie die Flächenbearbeitung erneut ein.",
+        "face": "Fläche",
+        "of": "von {count}",
+        "previous": "Vorherige Fläche",
+        "next": "Nächste Fläche",
+        "faceId": "Flächen-ID: {id}",
+        "highlightHint": "Zeigen Sie in der Ansicht auf eine Fläche, um sie hervorzuheben, und klicken Sie dann, um sie auszuwählen. Die gewählte Fläche bleibt umrandet, solange diese Karte geöffnet ist, auch wenn sie eine Farbe hat.",
+        "colorFor": "Farbe für Fläche {face}",
+        "chooseColor": "Farbe wählen",
+        "clearColor": "Entfernen",
+        "coloredFaces": "Farbige Flächen",
+        "faceNumber": "Fläche {face}",
+        "remove": "Farbe von Fläche {face} entfernen",
+        "noColors": "Noch keine Flächen gefärbt.",
+        "draftTitle": "Formschräge",
+        "draftHint": "Kippt die gewählte Fläche um den Winkel, als würde das Teil in der gewählten Richtung aus einer Gussform gezogen. Nicht jede Fläche lässt sich in jeder Richtung mit einer Formschräge versehen. Durch die Formschräge wird die Flächenliste neu aufgebaut, ihre Farben werden entfernt und die Flächennummern können sich ändern; prüfen Sie die Flächen-ID, bevor Sie erneut eine Formschräge anwenden.",
+        "direction": {
+          "label": "Richtung",
+          "x": "In +X-Richtung",
+          "negX": "In −X-Richtung",
+          "y": "Nach oben (+Y)",
+          "negY": "Nach unten (−Y)",
+          "z": "In +Z-Richtung",
+          "negZ": "In −Z-Richtung"
+        },
+        "angle": "Entformungswinkel",
+        "applyDraft": "Formschräge anwenden",
+        "drafting": "Formschräge wird angewendet…",
+        "drafted": "Formschräge auf die Fläche angewendet.",
+        "draftedRetained": "Formschräge auf die Fläche angewendet. Sie bleibt mit der Skizze verknüpft, daher bleibt sie beim Bearbeiten der Skizze erhalten.",
+        "draftRetained": "Diese Form behält bereits eine Flächenschräge. Ändern Sie sie in der Karte „Flächenschräge“, oder machen Sie sie rückgängig, bevor Sie eine weitere Fläche mit einer Formschräge versehen.",
+        "prismDraftRetained": "Diese Form behält eine Prismen-Formschräge, und eine Flächenschräge kann nicht zusätzlich hinzugefügt werden. Machen Sie zuerst die Prismen-Formschräge rückgängig."
+      },
+      "draftPrism": {
+        "title": "Prismen-Formschräge",
+        "hint": "Verjüngen Sie eine gerade Extrusion, die mit der Skizze verknüpft ist. Dabei entsteht feste Geometrie.",
+        "angle": "Entformungswinkel",
+        "apply": "Formschräge anwenden",
+        "applying": "Formschräge wird angewendet…",
+        "applied": "Formschräge angewendet. Die Form ist jetzt feste Geometrie.",
+        "hintRetained": "Verjüngen Sie eine gerade Extrusion aus der Skizze. Die Formschräge bleibt mit der Skizze verknüpft, daher bleibt sie beim Bearbeiten der Skizze erhalten.",
+        "appliedRetained": "Formschräge angewendet. Sie bleibt mit der Skizze verknüpft, daher bleibt sie beim Bearbeiten der Skizze erhalten.",
+        "update": "Formschräge aktualisieren",
+        "faceDraftRetained": "Diese Form behält eine Flächenschräge, und eine Prismen-Formschräge kann nicht zusätzlich hinzugefügt werden. Machen Sie zuerst die Flächenschräge rückgängig."
+      },
+      "faceDraft": {
+        "title": "Flächenschräge",
+        "hint": "Bleibt mit der Skizze verknüpft: Beim Bearbeiten der Skizze wird die Formschräge neu erzeugt. Ändern Sie hier ihre Richtung oder ihren Winkel.",
+        "face": "Fläche {face} der Extrusion aus der Skizze",
+        "update": "Formschräge aktualisieren",
+        "updating": "Formschräge wird aktualisiert…",
+        "updated": "Flächenschräge aktualisiert."
+      },
+      "shell": {
+        "title": "Aushöhlen",
+        "hint": "Höhlen Sie die Form bis zu einer Wand dieser Dicke nach innen aus, damit die Außenseite ihre Größe behält. Lassen Sie Flächen offen, um eine Schale oder eine Hülse zu erhalten.",
+        "thickness": "Wandstärke",
+        "openFaces": "Offen lassen",
+        "directionsHint": "Die Seiten richten sich nach der Arbeitsebene: Oben zeigt nach oben. Eine offene Seite öffnet nur eine ebene Fläche.",
+        "direction": {
+          "top": "Oben",
+          "bottom": "Unten",
+          "left": "Links",
+          "right": "Rechts",
+          "front": "Vorne",
+          "back": "Hinten"
+        },
+        "faceNumbers": "Flächen nach Nummer",
+        "faceNumbersHint": "Nummern aus der Karte „Flächen“, durch Kommas getrennt.",
+        "faceNumbersInvalid": "Geben Sie Flächennummern von 1 bis {count} ein.",
+        "addPicked": "Gewählte Fläche {face} hinzufügen",
+        "apply": "Form aushöhlen",
+        "applying": "Form wird ausgehöhlt…",
+        "applied": "Form ausgehöhlt: {percent} % weniger Material.",
+        "hollowed": "Auf eine Wandstärke von {thickness} {unit} ausgehöhlt."
+      }
     },
     "edgeModifier": {
       "title": {
@@ -985,7 +1211,8 @@
         "cruiseShapes": "Neue Formen auf Oberflächen platzieren",
         "zoomSpeed": "Zoomgeschwindigkeit",
         "zoomSlow": "Langsam",
-        "zoomFast": "Schnell"
+        "zoomFast": "Schnell",
+        "classicRotateHandles": "Klassische Drehgriffe verwenden"
       },
       "measurement": {
         "title": "Einheiten",
@@ -1047,6 +1274,24 @@
         "description": "Speichern Sie die aktuellen Einstellungen für dieses Projekt.",
         "makeDefault": "Als Standard setzen",
         "defaultSaved": "Als Standard gespeichert"
+      },
+      "storage": {
+        "nav": "Speicher",
+        "title": "Speicher im Browser",
+        "description": "Wie dieser Browser die auf diesem Gerät gespeicherten Projekte aufbewahrt.",
+        "checking": "Speicher wird geprüft…",
+        "persistence": "Dauerhafter Speicher",
+        "persisted": "Ein. Der Browser löscht Ihre Projekte nicht, um Speicherplatz freizugeben.",
+        "bestEffort": "Aus. Der Browser kann Ihre Projekte löschen, wenn auf dem Gerät der Speicher knapp wird.",
+        "unsupported": "Dieser Browser gibt nicht an, ob er Ihre Projekte behält.",
+        "server": "Ihre Projekte werden auf dem Server gespeichert, nicht in diesem Browser. Wenn Sie die Browserdaten löschen, bleiben sie erhalten.",
+        "request": "Browser bitten, Projekte zu behalten",
+        "requestDeclined": "Der Browser hat abgelehnt. Legen Sie Sicherungen mit „Alle Projekte exportieren“ an.",
+        "usage": "Belegter Speicherplatz",
+        "usageValue": "{used} von {quota} ({percent})",
+        "usageUnknown": "Dieser Browser meldet nicht, wie viel Speicherplatz er belegt.",
+        "usageMeter": "Anteil des belegten Speichers im Browser",
+        "backupNote": "„Alle Projekte exportieren“ auf der Startseite speichert jedes Projekt als ein ZIP aus SKF-Dateien."
       }
     },
     "tutorial": {
@@ -1158,6 +1403,110 @@
         "body": "Wählen Sie die Grundplatte und das Textobjekt aus. Halten Sie dazu Shift gedrückt und klicken Sie auf beide, oder ziehen Sie einen Rahmen um beide. Klicken Sie oben im Bereich „Kombinieren“ auf „Gruppieren“. So entsteht ein fertiges druckbares Modell. Wenn „Gruppieren“ grau bleibt, ist die Grundplatte noch gesperrt: Entsperren Sie sie zuerst mit dem Schloss in den Formeinstellungen.",
         "alt": "Fertig gruppiertes blaues Namensschild ALEX"
       }
+    },
+    "analysis": {
+      "title": "Analyse",
+      "readOnly": "Die Analyse liest die Szene nur und ändert sie nie.",
+      "checkInterference": "Kollisionen prüfen",
+      "wallThickness": "Wandstärke",
+      "scopeSelection": "{count, plural, one {Prüft die {count} ausgewählte Form.} other {Prüft die {count} ausgewählten Formen.}}",
+      "scopeScene": "{count, plural, =0 {Fügen Sie zwei Formen hinzu, um sie auf Kollisionen zu prüfen.} one {Fügen Sie eine weitere Form hinzu, um auf Kollisionen zu prüfen.} other {Prüft alle {count} sichtbaren Formen. Wählen Sie zwei oder mehr aus, um die Prüfung einzuschränken.}}",
+      "thicknessHint": "Wählen Sie einen Volumenkörper aus, um seine Wände abzutasten.",
+      "running": "Analyse läuft…",
+      "noCollisions": "{count, plural, one {Keine Kollisionen bei {count} Form.} other {Keine Kollisionen bei {count} Formen.}}",
+      "collisions": "{pairs, plural, one {{pairs} kollidierendes Paar} other {{pairs} kollidierende Paare}} bei {count, plural, one {{count} Form} other {{count} Formen}}.",
+      "pairsLabel": "Kollidierende Paare",
+      "pair": "{a} und {b}",
+      "overlap": "Überschneidung {volume} mm³",
+      "touching": "berühren sich",
+      "tessellated": "aus Dreiecken",
+      "interferenceMethod": "Exakter Oberflächenabstand und gemeinsames Volumen von OCCT für jedes Paar, dessen Begrenzungsrahmen sich überschneiden.",
+      "thicknessResult": "Dünnste Wand von „{name}“: {value} mm",
+      "thicknessNone": "Bei „{name}“ wurden keine gegenüberliegenden Wände zum Messen gefunden.",
+      "thicknessMethod": "Geschätzte Messung: {samples} Punkte pro Fläche auf {faces} Flächen, gemessen bis zur gegenüberliegenden Oberfläche. Eine Wand, die zwischen den Messpunkten dünner ist, kann übersehen werden.",
+      "stale": "Die Szene hat sich seit diesem Ergebnis geändert. Führen Sie die Analyse erneut aus.",
+      "failed": "Der CAD-Kern konnte die Szene nicht analysieren.",
+      "refusal": {
+        "tooManyShapes": "Die Kollisionsprüfung prüft höchstens {limit} Formen auf einmal, angegeben waren {given}. Wählen Sie weniger Formen aus und prüfen Sie erneut.",
+        "tooManyCandidates": "Zu viele Formen liegen dicht beieinander: {given} Paare müssten exakt geprüft werden, erlaubt sind {limit}. Wählen Sie weniger Formen aus und prüfen Sie erneut.",
+        "invalidClearance": "Der Mindestabstand muss 0 mm oder größer sein.",
+        "tooManyFaces": "Die Wandstärkenanalyse tastet Volumenkörper mit höchstens {limit} Flächen ab.",
+        "noFaces": "Diese Form hat keine Flächen zum Abtasten.",
+        "noGeometry": "„{name}“ hat keine Geometrie zum Analysieren."
+      }
+    },
+    "appearance": {
+      "title": "Oberflächendarstellung",
+      "hint": "Nur die Darstellung in der Ansicht; Texturen und physikalische Materialien werden nicht simuliert.",
+      "custom": "Eigene Oberfläche",
+      "roughness": "Rauheit",
+      "metalness": "Metallanteil",
+      "sheen": "Schimmer",
+      "presets": {
+        "painted": "Lackierte Oberfläche",
+        "wood": "Holz",
+        "fabric": "Stoff",
+        "ceramic": "Keramik",
+        "metal": "Metall"
+      }
+    },
+    "material": {
+      "title": "Werkstoff",
+      "label": "Werkstoff der Form",
+      "none": "Ohne Werkstoff",
+      "pricePerKg": "Preis pro kg",
+      "pricePerKgLabel": "Werkstoffpreis pro Kilogramm",
+      "weight": "Gewicht",
+      "cost": "Kosten",
+      "volume": "Volumen",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "Gewicht und Kosten beruhen auf dem exakten Volumen der Form.",
+        "tessellated": "Gewicht und Kosten sind Schätzwerte aus dem Dreiecksmodell."
+      },
+      "holeHint": "Eine Bohrung entfernt Material und hat daher kein eigenes Gewicht.",
+      "name": {
+        "pla": "PLA",
+        "petg": "PETG",
+        "abs": "ABS",
+        "asa": "ASA",
+        "tpu": "TPU",
+        "pa12": "Polyamid (PA12)",
+        "pc": "Polycarbonat",
+        "resin": "Harz"
+      },
+      "density": "{density} g/cm³"
+    },
+    "loftShape": {
+      "oval": "Ellipse",
+      "rectangle": "Rechteck",
+      "triangle": "Dreieck",
+      "pentagon": "Fünfeck",
+      "hexagon": "Sechseck"
+    },
+    "scene": {
+      "title": "Szene",
+      "open": "Szenenliste",
+      "summary": "{count, plural, =0 {Nichts in der Szene} one {{count} Form} other {{count} Formen}}{hidden, plural, =0 {} one { · {hidden} ausgeblendet} other { · {hidden} ausgeblendet}}",
+      "searchPlaceholder": "Formen suchen",
+      "searchLabel": "Formen nach Name oder Art suchen",
+      "empty": "Fügen Sie eine Form hinzu, dann erscheint sie hier.",
+      "noMatches": "Keine Form passt zu dieser Suche.",
+      "hole": "Bohrung",
+      "show": "„{name}“ einblenden",
+      "hide": "„{name}“ ausblenden",
+      "lock": "„{name}“ sperren",
+      "unlock": "„{name}“ entsperren",
+      "delete": "„{name}“ löschen",
+      "rename": "„{name}“ umbenennen",
+      "renameInput": "Neuer Name für „{name}“",
+      "saveName": "Namen für „{name}“ speichern",
+      "cancelRename": "Umbenennen von „{name}“ abbrechen",
+      "expandGroup": "Inhalt von „{name}“ einblenden",
+      "collapseGroup": "Inhalt von „{name}“ ausblenden",
+      "collapse": "Szenenliste einklappen",
+      "expand": "Szenenliste ausklappen"
     }
   },
   "errors": {
@@ -1378,7 +1727,9 @@
       "readFailed": "STEP konnte nicht gelesen werden: {detail}",
       "noSolidGeometry": "Die STEP-Datei enthält keine Volumenkörper zum Importieren",
       "nothingToExport": "Keine Quader, Zylinder, Kugeln oder aus STEP importierten Volumenkörper für den STEP-Export (B-Rep) vorhanden",
-      "exportFailed": "STEP-Export fehlgeschlagen: {detail}"
+      "exportFailed": "STEP-Export fehlgeschlagen: {detail}",
+      "meshFailed": "Diese STEP-Datei ist zu komplex, um sie im Browser in ein Modell aus Dreiecken umzuwandeln. Für den Import braucht es einen SketchForge-Server, der die Arbeit direkt mit dem CAD-Kern erledigt.",
+      "allSkipped": "Nichts konnte als STEP (B-Rep) exportiert werden – {detail}"
     },
     "stl": {
       "noGeometry": "Die STL-Datei enthält kein lesbares Modell",
@@ -1495,6 +1846,21 @@
       "localFailed": "SketchForge konnte auf diesem Computer nicht aktualisiert werden",
       "serviceStatus": "Der Update-Dienst hat mit dem Fehler {status} geantwortet",
       "startFailed": "Das Update konnte nicht gestartet werden"
+    },
+    "projects": {
+      "notConfigured": "{name} ist nicht eingerichtet",
+      "disabled": "Der Projektspeicher auf dem Server ist ausgeschaltet",
+      "invalidId": "Ungültige Projekt-ID",
+      "notFound": "Dieses Projekt ist nicht auf dem Server vorhanden",
+      "sameOrigin": "Projekte können auf dem Server nur von der SketchForge-Seite aus gespeichert werden",
+      "busySaving": "Dieses Projekt wird gerade gespeichert",
+      "missingMetadata": "Beim Hochladen des Projekts fehlen die Projektdetails",
+      "invalidMetadata": "Die Projektdetails konnten nicht gelesen werden",
+      "tooLarge": "Das Projekt überschreitet die Größenbeschränkung des Serverspeichers",
+      "changedBeforeSave": "Dieses Projekt wurde anderswo geändert. Laden Sie es neu, bevor Sie erneut speichern.",
+      "loadFailed": "Die Projekte konnten nicht vom Server geladen werden",
+      "saveFailed": "Das Projekt konnte nicht auf dem Server gespeichert werden",
+      "deleteFailed": "Das Projekt konnte nicht vom Server gelöscht werden"
     }
   }
 }

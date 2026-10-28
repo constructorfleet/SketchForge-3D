@@ -130,3 +130,18 @@ Binding for the Spanish catalogs. General rules and audience: [../TRANSLATIONS.m
 | shape defaults | valores de las formas nuevas | not «formas predeterminadas»: reads as a default set of shapes |
 | Geometry (editor tab, next to Sketch) | modelo 3D | not «geometría»: reads as the school subject; pairs with «Boceto» as 3D vs 2D |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with «MCP: » |
+| draft (mold angle) | ángulo de desmoldeo; the operation — desmoldeo | as Fusion; not «borrador», which is the erase tool |
+| face draft / draft prism | desmoldeo de cara / desmoldeo del prisma | |
+| shell / hollow | vaciar / vaciado; the result — forma vaciada | not «carcasa»: that is a physical casing |
+| wall thickness | grosor de pared | as the shape's thickness row; not «espesor» |
+| loft | solevado | as SolidWorks and Fusion ES; the toolbar shape is «Solevado» |
+| thread (screw) | rosca | pitch — paso; threaded rod — varilla roscada; tapped hole — agujero roscado |
+| pattern / repeat | patrón; the command — repetir; the copies — copias | in a row / around a ring — en fila / alrededor de un anillo; spacing — paso; angular span — ángulo total |
+| distribute | distribuir; equal pitch — paso igual; equal gaps — separación igual | |
+| interference / colliding pair | interferencia / par en colisión; the shared volume — superposición | |
+| analysis (inspector) | análisis; wall thickness check — grosor de pared | |
+| material | material; the inspector card is «Material» | the polymer acronyms stay as they are: PLA, PETG, ABS, ASA, TPU |
+| surface appearance | apariencia de la superficie | shading only: no textures or physical materials |
+| constraint (sketch) | restricción | as Fusion; kinds take the feminine adjective — horizontal, vertical, paralela, perpendicular, coincidente; fixed — fija |
+| scene list | lista de escena | |
+| keyboard shortcut | atajo de teclado | as Google; Microsoft says «métodos abreviados de teclado» |
