@@ -144,3 +144,23 @@ Binding for the Czech catalogs. General rules and audience: [../TRANSLATIONS.md]
 | theme / light / dark | motiv / světlý / tmavý | Microsoft CZ |
 | click / drag / hold | kliknout (na) / přetáhnout, táhnout / podržet; keys — stisknout | |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with „MCP: “ |
+
+## Další ustálené termíny
+
+| English | Čeština | Poznámka |
+|---|---|---|
+| loft | přechod | Fusion CZ; tvar v nabídce se jmenuje „Přechod“ |
+| thread | závit | velikosti závitů; závitová tyč, závitová díra |
+| thread pitch | stoupání závitu; popisek „Stoupání“ | ČSN; u závitu ne „rozteč“ |
+| draft | úkos; draft angle — úhel úkosu | Fusion, SolidWorks CZ |
+| draft prism / face draft | úkos hranolu / úkos plochy | „plocha“ podle hesla face; starší texty v `errors.cadModifier` místy říkají „stěna“ |
+| shell / hollow | skořepina / dutý; tlačítko „Vytvořit skořepinu“ | Fusion CZ „Skořepina“; shoduje se se stávajícími chybami skořepiny |
+| wall thickness | tloušťka stěny | |
+| pattern / repeat | pole / rozmnožit | SolidWorks CZ „pole“; nástroj „Pole“, potvrzovací tlačítko „Rozmnožit“ |
+| distribute | rozmístit; equal gaps — stejné mezery, equal pitch — stejné rozteče | |
+| interference / collision | kolize; kolizní dvojice | shoduje se s `errors.cadModifier` |
+| analysis | analýza | |
+| sketch constraint | vazba | FreeCAD CZ; druhy — Shodná, Vodorovná, Svislá, Rovnoběžná, Kolmá, Pevná |
+| face (exact solid) | plocha; karta „Plochy“ | podle hesla edge / face / vertex; u sítě zůstává „stěna“ |
+| material / surface appearance | materiál / vzhled povrchu | |
+| orthographic / perspective view | ortogonální / perspektivní pohled | Blender CZ |

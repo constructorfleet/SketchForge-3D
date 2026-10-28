@@ -107,3 +107,16 @@ Binding for the Russian catalogs. General rules and audience: [../TRANSLATIONS.m
 | shape defaults | параметры новых фигур | not «фигуры по умолчанию»: reads as a default set of shapes |
 | Geometry (editor tab, next to Sketch) | 3D-модель | not «Геометрия»: reads as the school subject; pairs with «Эскиз» as 3D vs 2D |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with «MCP: » |
+| draft / draft angle | уклон / угол уклона | as Fusion; face draft — уклон грани, prism draft — уклон призмы |
+| shell / hollow | оболочка / сделать полым; полое тело | the operation is «Оболочка», the command «Сделать полой» |
+| wall thickness | толщина стенки | the shape property and the analysis result alike |
+| loft | переход | shape between a bottom and a top profile; long error texts may say «тело по сечениям» |
+| thread / pitch | резьба / шаг резьбы | threaded rod — стержень с резьбой; thread sizes — размеры резьбы |
+| pattern (repeated copies) | массив; create pattern — создать массив | not «повторить»: that is redo |
+| distribute | распределить; equal pitch / equal gaps — равный шаг / равные промежутки | the outer two objects stay put |
+| interference / collision (analysis) | пересечение / пересечения | проверка пересечений; a pair «пересекается» or «касается» |
+| analysis (panel) | анализ | «Анализ» reads the scene and never changes it |
+| material (3D printing) | материал; PLA-пластик, ABS-пластик | resin — смола, nylon — нейлон |
+| surface appearance | вид поверхности | not «внешний вид»: that is the settings section |
+| sketch constraint | ограничение эскиза | as Fusion; kinds are nouns: «Совпадение», «Горизонтальность», «Фиксация» |
+| scene list | список сцены | the panel is «Сцена», its toggle «Список сцены» |

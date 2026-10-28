@@ -146,3 +146,18 @@ Binding for the French catalogs. General rules and audience: [../TRANSLATIONS.md
 | shape defaults | paramètres des nouvelles formes | not «formes par défaut»: reads as a default set of shapes |
 | Geometry (editor tab, next to Sketch) | Modèle 3D | not «Géométrie»: reads as the school subject; pairs with «Esquisse» as 3D vs 2D |
 | MCP (connection an AI agent uses to drive the editor) | MCP | name kept; notices about the agent's actions start with « MCP : » |
+| draft / draft angle | dépouille / angle de dépouille | Fusion «Dépouille»; a face draft is «dépouille de face», a prism draft «dépouille du prisme» |
+| shell / hollow | évidement / évider; a hollowed shape — évidé(e) | Fusion «Évider»; the tool card is «Évidement»; the remaining material is the «paroi» |
+| wall thickness | épaisseur de paroi | also the analysis that measures it, «Épaisseur de paroi» |
+| loft | lissage | Fusion; the top and bottom profiles are «forme du haut» and «forme du bas» |
+| thread / screw thread | filetage / filetage de vis | ISO; thread pitch — pas; a tapped hole — trou taraudé |
+| pitch / spacing | pas / espacement | «pas» for a thread, a helix or the grid; «espacement» for the distance between pattern copies |
+| pattern / repeat | répétition / répéter; one copy — copie | the toolbar section is «Répétition», the command «Répéter»; linear — «En ligne», circular — «Autour d’un anneau» |
+| distribute | répartir; the result — répartition | modes: «Centres équidistants» (equal pitch) and «Écarts égaux» (equal gaps) |
+| interference (overlap check) | interférence; one overlap — chevauchement | the command is «Vérifier les interférences»; a result pair — «paire en collision» |
+| analysis | analyse | the inspector card, «Analyse»; a sampled value is an «estimation par échantillonnage» |
+| constraint (sketch) | contrainte | Fusion; the card is «Contraintes»; free parameters — paramètres libres |
+| section (of a sweep) / path | section / trajectoire | the sweep workflow: the section is drawn on one plane, the path on the other; the operation is a «balayage» |
+| scene list | liste de la scène | not «scène 3D»; the panel title is «Scène» |
+| material | matériau | not «matière»: «matière» is the physical stuff a shape removes or uses up |
+| surface appearance | aspect de la surface | viewport shading only; «apparence» alone is the app theme, so keep «aspect de la surface» |

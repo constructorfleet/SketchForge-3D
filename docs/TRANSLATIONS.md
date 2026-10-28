@@ -120,18 +120,22 @@ are saved into project files.
 MCP stays English whatever the interface language: command results and errors, and the status line text an agent
 reads (`englishNotice`). API routes keep their English `error` text and add `errorKey` for the interface.
 
-## Pending translations in this fork
+## Translation status
 
-This fork carries features that upstream's localization did not cover, so each language other than English is marked
-`complete: false` in `i18n/locales.ts` and is missing 45 strings — the loft primitive and its property rows, Center on
-workplane and its notices, Center view on selection, Use classic rotate handles, the workplane label, the projection toggle, the STEP skip-reason error, the scene list, and the view-tools rail labels (renamed out of the camera namespace, so the old translations no longer applied). They show in
-English until translated.
+Every shipped locale is complete: `complete: true` in `i18n/locales.ts` and all 1,542 source strings translated.
+A missing or still-English string now fails `tests/unit/i18n.test.ts` rather than being reported as a todo.
 
-`npm test` lists them per language as a todo, for example:
+| Catalog | Language | Status |
+| --- | --- | --- |
+| `en` | English | Source catalog |
+| `cs` | Čeština | Complete |
+| `de` | Deutsch | Complete |
+| `es` | Español | Complete |
+| `fr` | Français | Complete |
+| `pl` | Polski | Complete |
+| `pt` | Português (Brasil) | Complete |
+| `ru` | Русский | Complete |
 
-```
-□ de catalog > translate 45 of 1178 strings, shown in English until then: common.shape.loft, …
-```
-
-Translating a language's remaining strings and setting its `complete` back to `true` makes a later regression a failure
-again rather than a todo.
+The non-English catalogs were translated with AI models against the language guides and the automated placeholder,
+tag and plural checks. The language guides' note applies: native-speaker review is still welcome, and a correction
+belongs in the catalog and the guide together.

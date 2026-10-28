@@ -30,7 +30,9 @@
       "wedge": "Klin",
       "polygon": "Wielokąt",
       "icosahedron": "Dwudziestościan",
-      "mesh": "Model"
+      "mesh": "Model",
+      "loft": "Bryła przejściowa",
+      "thread": "Gwint"
     },
     "shapeName": {
       "cube": "Sześcian",
@@ -79,7 +81,8 @@
     "fileSize": {
       "bytes": "{size} B",
       "kilobytes": "{size} KB",
-      "megabytes": "{size} MB"
+      "megabytes": "{size} MB",
+      "gigabytes": "{size} GB"
     },
     "actions": {
       "create": "Utwórz nowy projekt 3D",
@@ -234,6 +237,23 @@
     },
     "loading": {
       "editor": "Wczytywanie edytora"
+    },
+    "backup": {
+      "exportAll": "Eksportuj wszystkie projekty",
+      "preparing": "{count, plural, one {Pakowanie {count} projektu…} few {Pakowanie {count} projektów…} many {Pakowanie {count} projektów…} other {Pakowanie {count} projektu…}}",
+      "exported": "{count, plural, one {Wyeksportowano {count} projekt do pliku {fileName}.} few {Wyeksportowano {count} projekty do pliku {fileName}.} many {Wyeksportowano {count} projektów do pliku {fileName}.} other {Wyeksportowano {count} projektu do pliku {fileName}.}}",
+      "skipped": "Nie udało się dołączyć: {names}.",
+      "failed": "Nie udało się wyeksportować projektów."
+    },
+    "storageWarning": {
+      "message": "Ta przeglądarka wykorzystała {percent} miejsca dozwolonego na projekty. Wyeksportuj kopię zapasową, zanim miejsce się skończy."
+    },
+    "serverStorage": {
+      "migrated": "Przeniesiono {count, plural, one {{count} projekt} few {{count} projekty} many {{count} projektów} other {{count} projektu}} do magazynu na serwerze",
+      "migrateFailed": "Nie udało się przenieść projektów do magazynu na serwerze; nadal są przechowywane w tej przeglądarce",
+      "badge": "Na serwerze",
+      "hint": "Projekty są przechowywane na serwerze pod adresem {name}",
+      "restored": "Magazyn na serwerze jest wyłączony; przywrócono {count, plural, one {{count} projekt} few {{count} projekty} many {{count} projektów} other {{count} projektu}} z tej przeglądarki"
     }
   },
   "editor": {
@@ -280,7 +300,21 @@
       "newEmptyDesign": "Nowy pusty projekt",
       "savedDesign": "{count, plural, one {Zapisano projekt ({count} kształt)} few {Zapisano projekt ({count} kształty)} many {Zapisano projekt ({count} kształtów)} other {Zapisano projekt ({count} kształtu)}}",
       "nothingToCopy": "Na razie nie ma czego kopiować",
-      "madeCopy": "Utworzono kopię projektu"
+      "madeCopy": "Utworzono kopię projektu",
+      "unlockBeforeCentering": "Przed wyśrodkowaniem odblokuj zaznaczenie",
+      "nothingToCenter": "Zaznaczenie nie ma geometrii, którą można wyśrodkować",
+      "alreadyCentered": "Zaznaczenie jest już wyśrodkowane na płaszczyźnie roboczej",
+      "centeredOnWorkplane": "{count, plural, one {Wyśrodkowano zaznaczenie na płaszczyźnie roboczej} few {Wyśrodkowano {count} obiekty na płaszczyźnie roboczej} many {Wyśrodkowano {count} obiektów na płaszczyźnie roboczej} other {Wyśrodkowano {count} obiektu na płaszczyźnie roboczej}}",
+      "shapeLocked": "Zablokowano kształt",
+      "shapeUnlocked": "Odblokowano kształt",
+      "distributeNeedsThree": "Aby rozłożyć obiekty, zaznacz co najmniej trzy",
+      "distributeNeedsSpread": "Przed rozłożeniem odsuń obiekty od siebie",
+      "distributeBlocked": "Przed rozłożeniem odblokuj obiekty między dwoma skrajnymi",
+      "distributeAlreadyEven": "Te obiekty są już równomiernie rozłożone",
+      "distributed": "Rozłożono {count, plural, one {{count} obiekt} few {{count} obiekty} many {{count} obiektów} other {{count} obiektu}} wzdłuż {axis}",
+      "patternNeedsStep": "Ustaw odstęp przed powtórzeniem, inaczej kopie nałożą się na oryginał",
+      "patternNeedsSweep": "Ustaw kąt, aby rozłożyć kopie wokół",
+      "patterned": "Powtórzono zaznaczenie: {count, plural, one {{count} kopia} few {{count} kopie} many {{count} kopii} other {{count} kopii}}"
     },
     "workplane": {
       "toolActive": "Płaszczyzna robocza: kliknij ścianę lub puste miejsce na siatce. Przytrzymaj Shift, aby ją odwrócić",
@@ -489,11 +523,36 @@
         "addTangent": "Styczność",
         "kinds": {
           "tangent": "Styczność",
-          "equalLength": "Równa długość"
+          "equalLength": "Równa długość",
+          "coincident": "Zbieżność",
+          "fixed": "Ustalenie",
+          "horizontal": "Poziomo",
+          "vertical": "Pionowo",
+          "parallel": "Równolegle",
+          "perpendicular": "Prostopadle",
+          "distance": "Odległość"
         },
         "addEqualLength": "Dodaj równą długość",
-        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości lub równej długości."
-      }
+        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości lub równej długości.",
+        "title": "Więzy",
+        "dofEstimate": "Szacowana liczba swobodnych parametrów: {count}. To lokalne oszacowanie rzędu nie gwarantuje, że więzy da się spełnić.",
+        "dofIndeterminate": "Nie można ustalić liczby swobodnych parametrów, ponieważ ustalona odległość lub odcinek ma zerową długość.",
+        "addCoincident": "Zbieżność",
+        "addFixed": "Ustal zaznaczony punkt",
+        "addHorizontal": "Poziomo",
+        "addVertical": "Pionowo",
+        "addParallel": "Równolegle",
+        "addPerpendicular": "Prostopadle",
+        "addDistance": "Ustaw odległość",
+        "distanceMm": "Odległość (mm)",
+        "twoSegments": "2 odcinki",
+        "remove": "Usuń więz: {kind}"
+      },
+      "constraintUnsatisfied": "Nie udało się spełnić więzów szkicu: {ids}",
+      "constraintAdded": "Dodano więz szkicu: {kind}",
+      "constraintRemoved": "Usunięto więz szkicu",
+      "draftReplayFailed": "Szkic nie został zaktualizowany: nie można odtworzyć jego pochylenia na tym profilu. Przywróć poprzedni profil albo anuluj edycję szkicu.",
+      "shellNotReplayable": "Szkic nie został zaktualizowany: ten kształt został wydrążony, a odtworzenie go ze szkicu nie odtworzy wydrążenia. Najpierw cofnij wydrążenie albo anuluj edycję szkicu."
     },
     "export": {
       "needSolidSelected": "Przed eksportem zaznacz co najmniej jedną bryłę",
@@ -609,7 +668,43 @@
       "sketch": "Szkic",
       "finishSweep": "Zakończ wyciąganie po ścieżce",
       "sweepSketch": "Wyciągnij szkic po ścieżce",
-      "sweepSketchHint": "Narysuj przekrój na wybranej płaszczyźnie, a potem ścieżkę na wyprowadzonej płaszczyźnie ortogonalnej"
+      "sweepSketchHint": "Narysuj przekrój na wybranej płaszczyźnie, a potem ścieżkę na wyprowadzonej płaszczyźnie ortogonalnej",
+      "centerOnWorkplane": "Wyśrodkuj na płaszczyźnie roboczej",
+      "distributeGaps": "Równe przerwy",
+      "distributeCenters": "Równe odległości środków",
+      "distribute": "Rozłóż",
+      "distributeGapsHint": "Ta sama wolna przestrzeń między obiektami",
+      "distributeCentersHint": "Ta sama odległość od środka do środka",
+      "distributeHelp": "Przy obiektach tego samego rozmiaru oba sposoby dają ten sam wynik; różnią się, gdy rozmiary są różne. Dwa skrajne obiekty pozostają na miejscu.",
+      "threadHint": "Dodaj standardowy gwint śruby jako pełny pręt lub otwór gwintowany",
+      "threadCatalog": "Rozmiary gwintów",
+      "threadForm": "Bryła lub otwór",
+      "threadSolid": "Bryła",
+      "threadHole": "Otwór",
+      "threadSolidHint": "Gwintowany pręt o średnicy nominalnej tego rozmiaru.",
+      "threadHoleHint": "Otwór jest o 0.2 mm szerszy, aby pasowała śruba w tym rozmiarze. Zgrupuj go z bryłą, aby wyciąć gwint wewnętrzny.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Skok {pitch} mm",
+      "threadSeries": {
+        "metric": "Metryczny (ISO zwykły)",
+        "metric-fine": "Metryczny (ISO drobnozwojny)",
+        "unified": "Calowy (UNC)",
+        "unified-fine": "Calowy (UNF)"
+      },
+      "pattern": "Szyk",
+      "patternHint": "Powtórz zaznaczenie w rzędzie lub po okręgu",
+      "patternLinear": "W rzędzie",
+      "patternLinearHint": "Kopie rozłożone wzdłuż X i Z",
+      "patternCircular": "Po okręgu",
+      "patternCircularHint": "Kopie obrócone wokół punktu środkowego",
+      "patternCount": "Liczba kopii",
+      "patternStepX": "Krok X",
+      "patternStepZ": "Krok Z",
+      "patternCenterX": "Środek X",
+      "patternCenterZ": "Środek Z",
+      "patternSweep": "Kąt obrotu",
+      "patternRotate": "Obróć kopie zgodnie z okręgiem",
+      "patternApply": "Powtórz"
     },
     "panel": {
       "import": "Import",
@@ -652,6 +747,10 @@
         "dxf": {
           "description": "Rysunek przekroju",
           "note": "Wymaga płaszczyzny przekroju. Geometria jest rysowana przez jądro CAD."
+        },
+        "3mf": {
+          "description": "Pakiet do druku 3D",
+          "note": "Co preferują nowoczesne programy przygotowujące wydruk: jednostki w milimetrach, jeden nazwany obiekt na kształt z własnym położeniem i kolory kształtów."
         }
       },
       "historyTitle": "Zapisywana historia zmian",
@@ -695,6 +794,25 @@
       "separated": "{count, plural, one {MCP: rozdzielono obiekt na {count} część} few {MCP: rozdzielono obiekt na {count} części} many {MCP: rozdzielono obiekt na {count} części} other {MCP: rozdzielono obiekt na {count} części}}",
       "filleted": "{count, plural, one {MCP: zaokrąglono {count} krawędź} few {MCP: zaokrąglono {count} krawędzie} many {MCP: zaokrąglono {count} krawędzi} other {MCP: zaokrąglono {count} krawędzi}}",
       "chamfered": "{count, plural, one {MCP: sfazowano {count} krawędź} few {MCP: sfazowano {count} krawędzie} many {MCP: sfazowano {count} krawędzi} other {MCP: sfazowano {count} krawędzi}}"
+    },
+    "keyboardShortcuts": {
+      "title": "Skróty klawiszowe",
+      "helpHint": "Naciśnij ?, aby otworzyć tę listę. Naciśnij Escape, aby ją zamknąć.",
+      "lockSelection": "Zablokuj lub odblokuj zaznaczone obiekty",
+      "hideSelection": "Ukryj lub pokaż zaznaczone obiekty",
+      "showHidden": "Pokaż wszystkie ukryte kształty",
+      "undo": "Cofnij",
+      "redo": "Ponów",
+      "copy": "Kopiuj",
+      "paste": "Wklej",
+      "duplicate": "Duplikuj",
+      "delete": "Usuń zaznaczone obiekty",
+      "close": "Zamknij skróty klawiszowe"
+    },
+    "axis": {
+      "x": "osi X",
+      "y": "osi Y",
+      "z": "osi Z"
     }
   },
   "workspace": {
@@ -721,7 +839,11 @@
     "camera": {
       "home": "Widok początkowy",
       "zoomIn": "Przybliż",
-      "zoomOut": "Oddal"
+      "zoomOut": "Oddal",
+      "centerOnSelection": "Wyśrodkuj widok na zaznaczeniu",
+      "centerOnSelectionShortcut": "Wyśrodkuj widok na zaznaczeniu (Shift+F)",
+      "orthographicView": "Widok ortogonalny",
+      "perspectiveView": "Widok perspektywiczny"
     },
     "workplane": {
       "label": "Płaszczyzna robocza",
@@ -826,6 +948,13 @@
       "sweepSpineHelp": "Rozpocznij ścieżkę w początku przekroju (0,0). Pierwszy odcinek przyciąga się w prawo, aby przekrój pozostał prostopadły do początkowej stycznej. Wybierz punkt ścieżki i ustaw głębokość 3D (mm), aby przesunąć go poza tę płaszczyznę.",
       "sweepSectionPlane": "Edytuj przekrój · wybrana płaszczyzna",
       "sweepSpinePlane": "Rysuj ścieżkę · płaszczyzna ortogonalna"
+    },
+    "viewTools": {
+      "label": "Narzędzia widoku",
+      "show": "Pokaż narzędzia",
+      "showLabel": "Pokaż narzędzia widoku",
+      "hide": "Ukryj narzędzia",
+      "hideLabel": "Ukryj narzędzia widoku"
     }
   },
   "panels": {
@@ -893,7 +1022,21 @@
       "topLength": "Długość u góry",
       "topWidth": "Szerokość u góry",
       "bottomLength": "Długość u dołu",
-      "bottomWidth": "Szerokość u dołu"
+      "bottomWidth": "Szerokość u dołu",
+      "topShape": "Kształt u góry",
+      "bottomShape": "Kształt u dołu",
+      "topRotation": "Obrót u góry",
+      "bottomRotation": "Obrót u dołu",
+      "layers": "Liczba warstw",
+      "positionX": "Współrzędna X",
+      "positionY": "Współrzędna Y",
+      "positionZ": "Współrzędna Z",
+      "rotationX": "Pochylenie X",
+      "rotationY": "Obrót Y",
+      "rotationZ": "Pochylenie Z",
+      "pitch": "Skok",
+      "turns": "Liczba zwojów",
+      "core": "Promień rdzenia"
     },
     "inspector": {
       "label": "Ustawienia kształtu „{name}”",
@@ -923,7 +1066,90 @@
         "teeth": "Zęby",
         "helix": "Pochylenie zębów"
       },
-      "gearType": "Rodzaj koła zębatego"
+      "gearType": "Rodzaj koła zębatego",
+      "placement": "Położenie",
+      "faces": {
+        "title": "Ściany",
+        "enableHint": "Koloruj pojedyncze ściany albo pochyl jedną z nich. Najpierw odtwarza kształt jako dokładną geometrię bryły. Jego rozmiar nadal można zmieniać, ale ustawienia właściwe dla tego typu kształtu, np. liczba boków, staną się stałe.",
+        "enable": "Włącz edycję ścian",
+        "enabling": "Przygotowywanie ścian…",
+        "enabled": "Włączono edycję ścian. Wybierz ścianę, aby ją pokolorować lub pochylić.",
+        "enableSuperseded": "Kształt zmienił się, zanim jego ściany były gotowe. Włącz edycję ścian ponownie.",
+        "face": "Ściana",
+        "of": "z {count}",
+        "previous": "Poprzednia ściana",
+        "next": "Następna ściana",
+        "faceId": "Identyfikator ściany: {id}",
+        "highlightHint": "Wskaż ścianę w widoku, aby ją podświetlić, a następnie kliknij, aby ją wybrać. Wybrana ściana pozostaje obrysowana, dopóki ten panel jest otwarty, także gdy ma kolor.",
+        "colorFor": "Kolor ściany {face}",
+        "chooseColor": "Wybierz kolor",
+        "clearColor": "Wyczyść",
+        "coloredFaces": "Kolorowe ściany",
+        "faceNumber": "Ściana {face}",
+        "remove": "Usuń kolor ze ściany {face}",
+        "noColors": "Żadna ściana nie jest jeszcze pokolorowana.",
+        "draftTitle": "Pochylenie",
+        "draftHint": "Pochyla wybraną ścianę o podany kąt, tak jakby część była wyciągana z formy w wybranym kierunku. Nie każdą ścianę można pochylić w każdym kierunku. Pochylenie odtwarza listę ścian, usuwa ich kolory i może zmienić numery ścian; przed kolejnym pochyleniem sprawdź identyfikator ściany.",
+        "direction": {
+          "label": "Kierunek",
+          "x": "Oś +X",
+          "negX": "Oś −X",
+          "y": "W górę (+Y)",
+          "negY": "W dół (−Y)",
+          "z": "Oś +Z",
+          "negZ": "Oś −Z"
+        },
+        "angle": "Kąt pochylenia",
+        "applyDraft": "Zastosuj pochylenie",
+        "drafting": "Pochylanie ściany…",
+        "drafted": "Pochylono ścianę.",
+        "draftedRetained": "Pochylono ścianę. Pochylenie pozostaje przy szkicu, więc edycja szkicu je zachowa.",
+        "draftRetained": "Ten kształt zachowuje już pochylenie ściany. Zmień je w karcie „Pochylenie ściany” albo cofnij je przed pochyleniem kolejnej ściany.",
+        "prismDraftRetained": "Ten kształt zachowuje pochylenie graniastosłupa i nie można dodać do niego pochylenia ściany. Najpierw cofnij pochylenie graniastosłupa."
+      },
+      "draftPrism": {
+        "title": "Pochylenie graniastosłupa",
+        "hint": "Zwęź proste wyciągnięcie szkicu. Powstanie z tego geometria zapisana na stałe.",
+        "angle": "Kąt pochylenia",
+        "apply": "Zastosuj pochylenie",
+        "applying": "Stosowanie pochylenia…",
+        "applied": "Zastosowano pochylenie. Kształt ma teraz geometrię zapisaną na stałe.",
+        "hintRetained": "Zwęź proste wyciągnięcie szkicu. Pochylenie pozostaje przy szkicu, więc edycja szkicu je zachowa.",
+        "appliedRetained": "Zastosowano pochylenie. Pozostaje przy szkicu, więc edycja szkicu je zachowa.",
+        "update": "Zaktualizuj pochylenie",
+        "faceDraftRetained": "Ten kształt zachowuje pochylenie ściany i nie można dodać do niego pochylenia graniastosłupa. Najpierw cofnij pochylenie ściany."
+      },
+      "faceDraft": {
+        "title": "Pochylenie ściany",
+        "hint": "Zachowane przy szkicu: edycja szkicu odtwarza pochylenie. Tutaj zmień jego kierunek lub kąt.",
+        "face": "Ściana {face} wyciągnięcia szkicu",
+        "update": "Zaktualizuj pochylenie",
+        "updating": "Aktualizowanie pochylenia…",
+        "updated": "Zaktualizowano pochylenie ściany."
+      },
+      "shell": {
+        "title": "Wydrążenie",
+        "hint": "Wydrąż kształt, zostawiając ściankę o tej grubości, mierzoną do wewnątrz, aby zewnętrzne wymiary się nie zmieniły. Pozostaw ściany otwarte, aby powstała tacka lub osłonka.",
+        "thickness": "Grubość ścianki",
+        "openFaces": "Pozostaw otwarte",
+        "directionsHint": "Kierunki wyznacza płaszczyzna robocza: góra jest skierowana w górę. Bok otwiera tylko płaską ścianę.",
+        "direction": {
+          "top": "Góra",
+          "bottom": "Dół",
+          "left": "Lewo",
+          "right": "Prawo",
+          "front": "Przód",
+          "back": "Tył"
+        },
+        "faceNumbers": "Ściany według numerów",
+        "faceNumbersHint": "Numery z karty „Ściany”, oddzielone przecinkami.",
+        "faceNumbersInvalid": "Wpisz numery ścian od 1 do {count}.",
+        "addPicked": "Dodaj wskazaną ścianę {face}",
+        "apply": "Wydrąż kształt",
+        "applying": "Drążenie…",
+        "applied": "Wydrążono kształt: o {percent}% mniej materiału.",
+        "hollowed": "Wydrążono, zostawiając ściankę o grubości {thickness} {unit}."
+      }
     },
     "edgeModifier": {
       "title": {
@@ -985,7 +1211,8 @@
         "cruiseShapes": "Umieszczaj nowe kształty na powierzchniach innych kształtów",
         "zoomSpeed": "Szybkość przybliżania",
         "zoomSlow": "Wolno",
-        "zoomFast": "Szybko"
+        "zoomFast": "Szybko",
+        "classicRotateHandles": "Używaj klasycznych uchwytów obrotu"
       },
       "measurement": {
         "title": "Pomiary",
@@ -1047,6 +1274,24 @@
         "description": "Zapisz bieżące ustawienia dla tego projektu.",
         "makeDefault": "Ustaw jako domyślne",
         "defaultSaved": "Zapisano jako domyślne"
+      },
+      "storage": {
+        "nav": "Magazyn",
+        "title": "Magazyn przeglądarki",
+        "description": "Sposób, w jaki ta przeglądarka przechowuje projekty zapisane na tym urządzeniu.",
+        "checking": "Sprawdzanie magazynu…",
+        "persistence": "Magazyn trwały",
+        "persisted": "Włączone. Przeglądarka nie usunie projektów, aby zwolnić miejsce.",
+        "bestEffort": "Wyłączone. Przeglądarka może usunąć projekty, gdy na urządzeniu zabraknie miejsca.",
+        "unsupported": "Ta przeglądarka nie informuje, czy zachowuje projekty.",
+        "server": "Projekty są zapisywane na serwerze, a nie w tej przeglądarce, więc czyszczenie przeglądarki ich nie usunie.",
+        "request": "Poproś przeglądarkę o zachowanie projektów",
+        "requestDeclined": "Przeglądarka odmówiła. Rób kopie zapasowe poleceniem „Eksportuj wszystkie projekty”.",
+        "usage": "Zajęte miejsce",
+        "usageValue": "{used} z {quota} ({percent})",
+        "usageUnknown": "Ta przeglądarka nie podaje, ile miejsca zajmuje.",
+        "usageMeter": "Udział zajętego magazynu przeglądarki",
+        "backupNote": "Polecenie „Eksportuj wszystkie projekty” na stronie głównej zapisuje wszystkie projekty jako jeden plik ZIP z plikami SKF."
       }
     },
     "tutorial": {
@@ -1158,6 +1403,110 @@
         "body": "Zaznacz podstawę i obiekt „Tekst”: przytrzymaj Shift i kliknij oba albo przeciągnij wokół nich ramkę. Kliknij „Grupuj” w sekcji „Łączenie” u góry, aby powstał jeden gotowy model do druku. Jeśli przycisk „Grupuj” jest szary, podstawa jest nadal zablokowana: najpierw odblokuj ją kłódką w panelu kształtu.",
         "alt": "Gotowa zgrupowana niebieska tabliczka ALEX"
       }
+    },
+    "analysis": {
+      "title": "Analiza",
+      "readOnly": "Analiza tylko odczytuje scenę i nigdy jej nie zmienia.",
+      "checkInterference": "Sprawdź kolizje",
+      "wallThickness": "Grubość ścianki",
+      "scopeSelection": "{count, plural, one {Sprawdza {count} zaznaczony kształt.} few {Sprawdza {count} zaznaczone kształty.} many {Sprawdza {count} zaznaczonych kształtów.} other {Sprawdza {count} zaznaczonego kształtu.}}",
+      "scopeScene": "{count, plural, =0 {Dodaj dwa kształty, aby sprawdzić je pod kątem kolizji.} one {Dodaj jeszcze jeden kształt, aby sprawdzić kolizje.} few {Sprawdza wszystkie {count} widoczne kształty. Zaznacz dwa lub więcej, aby zawęzić zakres.} many {Sprawdza wszystkie {count} widocznych kształtów. Zaznacz dwa lub więcej, aby zawęzić zakres.} other {Sprawdza wszystkie widoczne kształty: {count}. Zaznacz dwa lub więcej, aby zawęzić zakres.}}",
+      "thicknessHint": "Zaznacz jedną bryłę, aby zmierzyć grubość jej ścianek.",
+      "running": "Analizowanie…",
+      "noCollisions": "{count, plural, one {Brak kolizji wśród {count} kształtu.} few {Brak kolizji wśród {count} kształtów.} many {Brak kolizji wśród {count} kształtów.} other {Brak kolizji wśród {count} kształtu.}}",
+      "collisions": "{pairs, plural, one {{pairs} kolidująca para} few {{pairs} kolidujące pary} many {{pairs} kolidujących par} other {{pairs} kolidującej pary}} wśród {count, plural, one {{count} kształtu} few {{count} kształtów} many {{count} kształtów} other {{count} kształtu}}.",
+      "pairsLabel": "Kolidujące pary",
+      "pair": "{a} i {b}",
+      "overlap": "przenikanie {volume} mm³",
+      "touching": "stykają się",
+      "tessellated": "z trójkątów",
+      "interferenceMethod": "Dokładna odległość powierzchni i objętość części wspólnej w OCCT dla każdej pary, której prostopadłościany otaczające zachodzą na siebie.",
+      "thicknessResult": "Najcieńsza ścianka kształtu „{name}”: {value} mm",
+      "thicknessNone": "Nie znaleziono przeciwległych ścianek kształtu „{name}”, których grubość można zmierzyć.",
+      "thicknessMethod": "Oszacowanie z próbek: {samples} punktów na każdą z {faces} ścian, mierzone do przeciwległej powierzchni. Ścianka cieńsza między punktami próbek może zostać pominięta.",
+      "stale": "Scena zmieniła się od czasu tego wyniku. Uruchom analizę ponownie.",
+      "failed": "Jądro CAD nie mogło przeanalizować sceny.",
+      "refusal": {
+        "tooManyShapes": "Sprawdzanie kolizji obejmuje naraz najwyżej {limit} kształtów, a podano {given}. Zaznacz mniej kształtów i sprawdź ponownie.",
+        "tooManyCandidates": "Zbyt wiele kształtów leży blisko siebie: {given} par wymagałoby dokładnego sprawdzenia, a limit wynosi {limit}. Zaznacz mniej kształtów i sprawdź ponownie.",
+        "invalidClearance": "Luz musi wynosić zero lub więcej milimetrów.",
+        "tooManyFaces": "Pomiar grubości ścianki obsługuje bryły o najwyżej {limit} ścianach.",
+        "noFaces": "Ten kształt nie ma ścian, na których można pobrać próbki.",
+        "noGeometry": "Kształt „{name}” nie ma geometrii do analizy."
+      }
+    },
+    "appearance": {
+      "title": "Wygląd powierzchni",
+      "hint": "Tylko cieniowanie w widoku; bez tekstur i symulacji fizycznych właściwości materiału.",
+      "custom": "Własna powierzchnia",
+      "roughness": "Chropowatość",
+      "metalness": "Metaliczność",
+      "sheen": "Połysk",
+      "presets": {
+        "painted": "Powierzchnia malowana",
+        "wood": "Drewno",
+        "fabric": "Tkanina",
+        "ceramic": "Ceramika",
+        "metal": "Powierzchnia metalowa"
+      }
+    },
+    "material": {
+      "title": "Materiał",
+      "label": "Materiał kształtu",
+      "none": "Brak",
+      "pricePerKg": "Cena za kg",
+      "pricePerKgLabel": "Cena materiału za kilogram",
+      "weight": "Waga",
+      "cost": "Koszt",
+      "volume": "Objętość",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "Waga i koszt są obliczane z dokładnej objętości kształtu.",
+        "tessellated": "Waga i koszt to szacunki na podstawie siatki trójkątów kształtu."
+      },
+      "holeHint": "Otwór usuwa materiał, więc sam nie ma wagi.",
+      "name": {
+        "pla": "Tworzywo PLA",
+        "petg": "Tworzywo PETG",
+        "abs": "Tworzywo ABS",
+        "asa": "Tworzywo ASA",
+        "tpu": "Tworzywo TPU",
+        "pa12": "Nylon PA12",
+        "pc": "Poliwęglan",
+        "resin": "Żywica"
+      },
+      "density": "{density} g/cm³"
+    },
+    "loftShape": {
+      "oval": "Owal",
+      "rectangle": "Prostokąt",
+      "triangle": "Trójkąt",
+      "pentagon": "Pięciokąt",
+      "hexagon": "Sześciokąt"
+    },
+    "scene": {
+      "title": "Scena",
+      "open": "Lista sceny",
+      "summary": "{count, plural, =0 {Scena jest pusta} one {{count} kształt} few {{count} kształty} many {{count} kształtów} other {{count} kształtu}}{hidden, plural, =0 {} one { · {hidden} ukryty} few { · {hidden} ukryte} many { · {hidden} ukrytych} other { · {hidden} ukrytego}}",
+      "searchPlaceholder": "Szukaj kształtów",
+      "searchLabel": "Szukaj kształtów po nazwie lub rodzaju",
+      "empty": "Dodaj kształt, a pojawi się tutaj.",
+      "noMatches": "Żaden kształt nie pasuje do tego wyszukiwania.",
+      "hole": "Otwór",
+      "show": "Pokaż „{name}”",
+      "hide": "Ukryj „{name}”",
+      "lock": "Zablokuj „{name}”",
+      "unlock": "Odblokuj „{name}”",
+      "delete": "Usuń „{name}”",
+      "rename": "Zmień nazwę „{name}”",
+      "renameInput": "Nowa nazwa dla „{name}”",
+      "saveName": "Zapisz nazwę „{name}”",
+      "cancelRename": "Anuluj zmianę nazwy „{name}”",
+      "expandGroup": "Pokaż zawartość grupy „{name}”",
+      "collapseGroup": "Ukryj zawartość grupy „{name}”",
+      "collapse": "Zwiń listę sceny",
+      "expand": "Rozwiń listę sceny"
     }
   },
   "errors": {
@@ -1378,7 +1727,9 @@
       "readFailed": "Nie udało się odczytać pliku STEP: {detail}",
       "noSolidGeometry": "Plik STEP nie zawiera brył do zaimportowania",
       "nothingToExport": "Brak prostopadłościanów, walców, kul ani brył zaimportowanych z plików STEP do eksportu w formacie STEP (B-Rep)",
-      "exportFailed": "Eksport do STEP nie powiódł się: {detail}"
+      "exportFailed": "Eksport do STEP nie powiódł się: {detail}",
+      "meshFailed": "Ten plik STEP jest zbyt złożony, aby przeglądarka mogła utworzyć z niego siatkę trójkątów. Aby go zaimportować, potrzebny jest serwer SketchForge, który wykonuje tę pracę bezpośrednio w jądrze CAD.",
+      "allSkipped": "Nie udało się wyeksportować niczego jako STEP (B-Rep) – {detail}"
     },
     "stl": {
       "noGeometry": "Plik STL nie zawiera modelu, który można odczytać",
@@ -1495,6 +1846,21 @@
       "localFailed": "Nie udało się zaktualizować SketchForge na tym komputerze",
       "serviceStatus": "Usługa aktualizacji zwróciła błąd {status}",
       "startFailed": "Nie udało się uruchomić aktualizacji"
+    },
+    "projects": {
+      "notConfigured": "Nie ustawiono {name}",
+      "disabled": "Magazyn projektów na serwerze jest wyłączony",
+      "invalidId": "Nieprawidłowy identyfikator projektu",
+      "notFound": "Tego projektu nie ma na serwerze",
+      "sameOrigin": "Magazyn projektów na serwerze przyjmuje zapisy tylko ze strony SketchForge",
+      "busySaving": "Ten projekt jest teraz zapisywany",
+      "missingMetadata": "W przesyłanym projekcie brakuje szczegółów",
+      "invalidMetadata": "Nie udało się odczytać szczegółów projektu",
+      "tooLarge": "Projekt przekracza limit rozmiaru magazynu na serwerze",
+      "changedBeforeSave": "Ten projekt został zmieniony gdzie indziej. Odśwież go przed ponownym zapisaniem.",
+      "loadFailed": "Nie udało się wczytać projektów z serwera",
+      "saveFailed": "Nie udało się zapisać projektu na serwerze",
+      "deleteFailed": "Nie udało się usunąć projektu z serwera"
     }
   }
 }

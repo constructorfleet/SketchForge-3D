@@ -30,7 +30,9 @@
       "wedge": "Coin",
       "polygon": "Polygone",
       "icosahedron": "Icosaèdre",
-      "mesh": "Modèle"
+      "mesh": "Modèle",
+      "loft": "Lissage",
+      "thread": "Filetage"
     },
     "shapeName": {
       "cube": "Cube",
@@ -79,7 +81,8 @@
     "fileSize": {
       "bytes": "{size} o",
       "kilobytes": "{size} Ko",
-      "megabytes": "{size} Mo"
+      "megabytes": "{size} Mo",
+      "gigabytes": "{size} Go"
     },
     "actions": {
       "create": "Créer un projet 3D",
@@ -234,6 +237,23 @@
     },
     "loading": {
       "editor": "Chargement de l’éditeur"
+    },
+    "backup": {
+      "exportAll": "Exporter tous les projets",
+      "preparing": "{count, plural, one {Préparation de {count} projet…} many {Préparation de {count} de projets…} other {Préparation de {count} projets…}}",
+      "exported": "{count, plural, one {{count} projet exporté vers {fileName}} many {{count} de projets exportés vers {fileName}} other {{count} projets exportés vers {fileName}}}",
+      "skipped": "Impossible d’inclure : {names}",
+      "failed": "Impossible d’exporter vos projets"
+    },
+    "storageWarning": {
+      "message": "Ce navigateur utilise {percent} de l’espace qu’il autorise pour vos projets. Exportez une sauvegarde avant qu’il ne soit plein."
+    },
+    "serverStorage": {
+      "migrated": "{count, plural, one {{count} projet déplacé vers le stockage du serveur} many {{count} de projets déplacés vers le stockage du serveur} other {{count} projets déplacés vers le stockage du serveur}}",
+      "migrateFailed": "Impossible de déplacer les projets vers le stockage du serveur ; ils restent enregistrés dans ce navigateur",
+      "badge": "Sur le serveur",
+      "hint": "Les projets sont enregistrés sur le serveur {name}",
+      "restored": "Le stockage sur le serveur est désactivé ; {count, plural, one {{count} projet restauré depuis ce navigateur} many {{count} de projets restaurés depuis ce navigateur} other {{count} projets restaurés depuis ce navigateur}}"
     }
   },
   "editor": {
@@ -280,7 +300,21 @@
       "newEmptyDesign": "Nouveau projet vide",
       "savedDesign": "{count, plural, one {Projet enregistré : {count} forme} many {Projet enregistré : {count} de formes} other {Projet enregistré : {count} formes}}",
       "nothingToCopy": "Rien à copier pour l’instant",
-      "madeCopy": "Copie du projet créée"
+      "madeCopy": "Copie du projet créée",
+      "unlockBeforeCentering": "Déverrouillez la sélection avant de la centrer",
+      "nothingToCenter": "La sélection n’a aucune géométrie mesurable à centrer",
+      "alreadyCentered": "La sélection est déjà centrée sur le plan de travail",
+      "centeredOnWorkplane": "{count, plural, one {Sélection centrée sur le plan de travail} many {{count} d’objets centrés sur le plan de travail} other {{count} objets centrés sur le plan de travail}}",
+      "shapeLocked": "Forme verrouillée",
+      "shapeUnlocked": "Forme déverrouillée",
+      "distributeNeedsThree": "Sélectionnez au moins trois objets à répartir",
+      "distributeNeedsSpread": "Écartez les objets avant de les répartir",
+      "distributeBlocked": "Déverrouillez les objets situés entre les deux objets extérieurs avant de répartir",
+      "distributeAlreadyEven": "Ces objets sont déjà régulièrement espacés",
+      "distributed": "{count, plural, one {{count} objet réparti le long de {axis}} many {{count} d’objets répartis le long de {axis}} other {{count} objets répartis le long de {axis}}}",
+      "patternNeedsStep": "Réglez un espacement avant de répéter, sinon les copies se superposent à l’original",
+      "patternNeedsSweep": "Réglez un angle pour répartir les copies autour du centre",
+      "patterned": "{count, plural, one {Sélection répétée en {count} copie} many {Sélection répétée en {count} de copies} other {Sélection répétée en {count} copies}}"
     },
     "workplane": {
       "toolActive": "Plan de travail : cliquez sur une face ou sur la grille vide. Maintenez Shift pour l’inverser",
@@ -489,11 +523,36 @@
         "addTangent": "Tangente",
         "kinds": {
           "tangent": "Tangente",
-          "equalLength": "Longueur égale"
+          "equalLength": "Longueur égale",
+          "coincident": "Coïncidence",
+          "fixed": "Fixe",
+          "horizontal": "Horizontale",
+          "vertical": "Verticale",
+          "parallel": "Parallèle",
+          "perpendicular": "Perpendiculaire",
+          "distance": "Distance"
         },
         "addEqualLength": "Ajouter une longueur égale",
-        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence ou distance, un segment pour horizontal ou vertical, ou deux segments pour parallèle, perpendiculaire ou longueur égale."
-      }
+        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence ou distance, un segment pour horizontal ou vertical, ou deux segments pour parallèle, perpendiculaire ou longueur égale.",
+        "title": "Contraintes",
+        "dofEstimate": "Paramètres libres estimés : {count}. Cette estimation locale du rang ne garantit pas que les contraintes peuvent être satisfaites.",
+        "dofIndeterminate": "Paramètres libres : indéterminés, car une distance ou un segment contraint est dégénéré.",
+        "addCoincident": "Coïncidence",
+        "addFixed": "Fixer le point sélectionné",
+        "addHorizontal": "Horizontale",
+        "addVertical": "Verticale",
+        "addParallel": "Parallèle",
+        "addPerpendicular": "Perpendiculaire",
+        "addDistance": "Définir la distance",
+        "distanceMm": "Distance en mm",
+        "twoSegments": "deux segments",
+        "remove": "Supprimer la contrainte « {kind} »"
+      },
+      "constraintUnsatisfied": "Impossible de satisfaire la ou les contraintes d’esquisse : {ids}",
+      "constraintAdded": "Contrainte d’esquisse ajoutée : {kind}",
+      "constraintRemoved": "Contrainte d’esquisse supprimée",
+      "draftReplayFailed": "L’esquisse n’a pas été mise à jour : sa dépouille ne peut pas être reconstruite sur ce profil. Revenez au profil précédent ou annulez la modification de l’esquisse.",
+      "shellNotReplayable": "L’esquisse n’a pas été mise à jour : cette forme a été évidée, et sa reconstruction à partir de l’esquisse ne peut pas reproduire l’évidement. Annulez d’abord l’évidement, ou annulez la modification de l’esquisse."
     },
     "export": {
       "needSolidSelected": "Sélectionnez au moins une forme solide avant d’exporter",
@@ -609,7 +668,43 @@
       "sketch": "Esquisse",
       "finishSweep": "Terminer le balayage",
       "sweepSketch": "Balayer une esquisse",
-      "sweepSketchHint": "Dessinez la section sur le plan sélectionné, puis le chemin sur le plan orthogonal qui en dérive"
+      "sweepSketchHint": "Dessinez la section sur le plan sélectionné, puis le chemin sur le plan orthogonal qui en dérive",
+      "centerOnWorkplane": "Centrer sur le plan de travail",
+      "distributeGaps": "Écarts égaux",
+      "distributeCenters": "Centres équidistants",
+      "distribute": "Répartir",
+      "distributeGapsHint": "Même espace libre entre les objets",
+      "distributeCentersHint": "Même distance d’un centre à l’autre",
+      "distributeHelp": "Les deux méthodes donnent le même résultat pour des objets de même taille ; le résultat change dès que les tailles changent. Les deux objets extérieurs ne bougent pas.",
+      "threadHint": "Poser un filetage de vis standard, sous forme de tige pleine ou de trou taraudé",
+      "threadCatalog": "Tailles de filetage",
+      "threadForm": "Solide ou perçage",
+      "threadSolid": "Solide",
+      "threadHole": "Perçage",
+      "threadSolidHint": "Une tige filetée au diamètre nominal de la taille choisie",
+      "threadHoleHint": "Ce perçage est 0,2 mm plus large pour qu’une vis de cette taille entre. Groupez-le avec un solide pour tarauder le trou.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Pas : {pitch} mm",
+      "threadSeries": {
+        "metric": "Métrique (ISO à pas gros)",
+        "metric-fine": "Métrique (ISO à pas fin)",
+        "unified": "Impérial (UNC)",
+        "unified-fine": "Impérial (UNF)"
+      },
+      "pattern": "Répétition",
+      "patternHint": "Répéter la sélection en ligne ou autour d’un anneau",
+      "patternLinear": "En ligne",
+      "patternLinearHint": "Copies espacées le long de X et de Z",
+      "patternCircular": "Autour d’un anneau",
+      "patternCircularHint": "Copies tournées autour d’un point central",
+      "patternCount": "Nombre de copies",
+      "patternStepX": "Espacement X",
+      "patternStepZ": "Espacement Z",
+      "patternCenterX": "Centre en X",
+      "patternCenterZ": "Centre en Z",
+      "patternSweep": "Angle de répétition",
+      "patternRotate": "Faire tourner les copies pour suivre l’anneau",
+      "patternApply": "Répéter"
     },
     "panel": {
       "import": "Importer",
@@ -652,6 +747,10 @@
         "dxf": {
           "description": "Dessin en coupe",
           "note": "Nécessite un plan de coupe. La géométrie est dessinée par le noyau CAO."
+        },
+        "3mf": {
+          "description": "Ensemble pour l’impression 3D",
+          "note": "Ce que préfèrent les logiciels de tranchage récents : des unités en millimètres, un objet nommé par forme avec sa propre position, et les couleurs des formes."
         }
       },
       "historyTitle": "Historique enregistré",
@@ -695,6 +794,25 @@
       "separated": "{count, plural, one {MCP : objet séparé en {count} partie} many {MCP : objet séparé en {count} de parties} other {MCP : objet séparé en {count} parties}}",
       "filleted": "{count, plural, one {MCP : {count} arête arrondie} many {MCP : {count} d’arêtes arrondies} other {MCP : {count} arêtes arrondies}}",
       "chamfered": "{count, plural, one {MCP : {count} arête chanfreinée} many {MCP : {count} d’arêtes chanfreinées} other {MCP : {count} arêtes chanfreinées}}"
+    },
+    "keyboardShortcuts": {
+      "title": "Raccourcis clavier",
+      "helpHint": "Appuyez sur ? pour ouvrir cette liste. Appuyez sur Esc pour la fermer.",
+      "lockSelection": "Verrouiller ou déverrouiller la sélection",
+      "hideSelection": "Masquer ou afficher la sélection",
+      "showHidden": "Afficher toutes les formes masquées",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "copy": "Copier",
+      "paste": "Coller",
+      "duplicate": "Dupliquer",
+      "delete": "Supprimer la sélection",
+      "close": "Fermer les raccourcis clavier"
+    },
+    "axis": {
+      "x": "l’axe X",
+      "y": "l’axe Y",
+      "z": "l’axe Z"
     }
   },
   "workspace": {
@@ -721,7 +839,11 @@
     "camera": {
       "home": "Vue initiale",
       "zoomIn": "Zoom avant",
-      "zoomOut": "Zoom arrière"
+      "zoomOut": "Zoom arrière",
+      "centerOnSelection": "Centrer la vue sur la sélection",
+      "centerOnSelectionShortcut": "Centrer la vue sur la sélection (Shift+F)",
+      "orthographicView": "Vue orthographique",
+      "perspectiveView": "Vue en perspective"
     },
     "workplane": {
       "label": "Plan de travail",
@@ -826,6 +948,13 @@
       "sweepSpineHelp": "Commencez le chemin à l’origine de la section (0,0). Le premier segment s’aligne à droite pour garder la section perpendiculaire à la tangente initiale. Sélectionnez un point du chemin et réglez sa profondeur 3D (mm) pour le déplacer hors de ce plan.",
       "sweepSectionPlane": "Modifier la section · plan sélectionné",
       "sweepSpinePlane": "Dessiner le chemin · plan orthogonal"
+    },
+    "viewTools": {
+      "label": "Outils de la vue",
+      "show": "Afficher les outils",
+      "showLabel": "Afficher les outils de la vue",
+      "hide": "Masquer les outils",
+      "hideLabel": "Masquer les outils de la vue"
     }
   },
   "panels": {
@@ -893,7 +1022,21 @@
       "topLength": "Longueur en haut",
       "topWidth": "Largeur en haut",
       "bottomLength": "Longueur en bas",
-      "bottomWidth": "Largeur en bas"
+      "bottomWidth": "Largeur en bas",
+      "topShape": "Forme du haut",
+      "bottomShape": "Forme du bas",
+      "topRotation": "Rotation du haut",
+      "bottomRotation": "Rotation du bas",
+      "layers": "Couches",
+      "positionX": "Position en X",
+      "positionY": "Position en Y",
+      "positionZ": "Position en Z",
+      "rotationX": "Inclinaison X",
+      "rotationY": "Rotation Y",
+      "rotationZ": "Inclinaison Z",
+      "pitch": "Pas",
+      "turns": "Tours",
+      "core": "Rayon du noyau"
     },
     "inspector": {
       "label": "Panneau de la forme « {name} »",
@@ -923,7 +1066,90 @@
         "teeth": "Dents",
         "helix": "Inclinaison des dents"
       },
-      "gearType": "Type de roue dentée"
+      "gearType": "Type de roue dentée",
+      "placement": "Position et orientation",
+      "faces": {
+        "title": "Faces",
+        "enableHint": "Colorer des faces individuellement, ou en incliner une avec une dépouille. La forme est d’abord reconstruite en géométrie solide exacte. Sa taille reste modifiable, mais les réglages propres à ce type de forme, comme le nombre de côtés, deviennent fixes.",
+        "enable": "Activer la modification des faces",
+        "enabling": "Préparation des faces…",
+        "enabled": "Modification des faces activée. Choisissez une face à colorer ou à dépouiller.",
+        "enableSuperseded": "La forme a changé avant que ses faces soient prêtes. Activez de nouveau la modification des faces.",
+        "face": "Face",
+        "of": "sur {count}",
+        "previous": "Face précédente",
+        "next": "Face suivante",
+        "faceId": "ID de face : {id}",
+        "highlightHint": "Pointez une face dans la vue pour la surligner, puis cliquez pour la choisir. La face choisie reste entourée tant que ce panneau est ouvert, même si elle a une couleur.",
+        "colorFor": "Couleur de la face {face}",
+        "chooseColor": "Choisir une couleur",
+        "clearColor": "Effacer",
+        "coloredFaces": "Faces colorées",
+        "faceNumber": "Face n° {face}",
+        "remove": "Retirer la couleur de la face {face}",
+        "noColors": "Aucune face colorée pour l’instant.",
+        "draftTitle": "Dépouille",
+        "draftHint": "Incline la face choisie de l’angle indiqué, comme si la pièce était démoulée dans la direction choisie. Toutes les faces ne peuvent pas être dépouillées dans toutes les directions. La dépouille reconstruit la liste des faces, efface leurs couleurs et peut modifier les numéros de face ; vérifiez l’ID de face avant de dépouiller de nouveau.",
+        "direction": {
+          "label": "Sens",
+          "x": "Vers +X",
+          "negX": "Vers −X",
+          "y": "Vers le haut (+Y)",
+          "negY": "Vers le bas (−Y)",
+          "z": "Vers +Z",
+          "negZ": "Vers −Z"
+        },
+        "angle": "Angle de dépouille",
+        "applyDraft": "Appliquer la dépouille",
+        "drafting": "Dépouille de la face…",
+        "drafted": "Face dépouillée.",
+        "draftedRetained": "Face dépouillée. La dépouille reste avec l’esquisse : modifier l’esquisse la conserve.",
+        "draftRetained": "Cette forme conserve déjà une dépouille de face. Modifiez-la dans la carte « Dépouille de face », ou annulez-la avant de dépouiller une autre face.",
+        "prismDraftRetained": "Cette forme conserve une dépouille de prisme, et une dépouille de face ne peut pas y être ajoutée. Annulez d’abord la dépouille du prisme."
+      },
+      "draftPrism": {
+        "title": "Dépouille du prisme",
+        "hint": "Donner une dépouille à une extrusion droite d’esquisse conservée. Cela crée une géométrie figée.",
+        "angle": "Angle de dépouille",
+        "apply": "Appliquer la dépouille",
+        "applying": "Application de la dépouille…",
+        "applied": "Dépouille appliquée. La forme est maintenant une géométrie figée.",
+        "hintRetained": "Donner une dépouille à une extrusion droite d’esquisse. La dépouille reste avec l’esquisse : modifier l’esquisse la conserve.",
+        "appliedRetained": "Dépouille appliquée. Elle reste avec l’esquisse : modifier l’esquisse la conserve.",
+        "update": "Mettre à jour la dépouille",
+        "faceDraftRetained": "Cette forme conserve une dépouille de face, et une dépouille de prisme ne peut pas y être ajoutée. Annulez d’abord la dépouille de face."
+      },
+      "faceDraft": {
+        "title": "Dépouille de face",
+        "hint": "Conservée avec l’esquisse : modifier l’esquisse redessine la dépouille. Changez ici sa direction ou son angle.",
+        "face": "Face {face} de l’extrusion d’esquisse",
+        "update": "Mettre à jour la dépouille",
+        "updating": "Mise à jour de la dépouille…",
+        "updated": "Dépouille de face mise à jour."
+      },
+      "shell": {
+        "title": "Évidement",
+        "hint": "Évidez la forme avec une paroi de cette épaisseur, mesurée vers l’intérieur, pour que l’extérieur garde sa taille. Laissez des faces ouvertes pour obtenir un bac ou un manchon.",
+        "thickness": "Épaisseur de paroi",
+        "openFaces": "Laisser ouvertes",
+        "directionsHint": "Les côtés sont ceux du plan de travail : « Haut » désigne le dessus. Un côté n’ouvre qu’une face plane.",
+        "direction": {
+          "top": "Haut",
+          "bottom": "Bas",
+          "left": "Gauche",
+          "right": "Droite",
+          "front": "Avant",
+          "back": "Arrière"
+        },
+        "faceNumbers": "Faces par numéro",
+        "faceNumbersHint": "Numéros indiqués dans la carte des faces, séparés par des virgules.",
+        "faceNumbersInvalid": "Saisissez des numéros de face de 1 à {count}.",
+        "addPicked": "Ajouter la face choisie n° {face}",
+        "apply": "Évider la forme",
+        "applying": "Évidement…",
+        "applied": "Forme évidée : {percent} % de matière en moins.",
+        "hollowed": "Évidée avec une paroi de {thickness} {unit}."
+      }
     },
     "edgeModifier": {
       "title": {
@@ -985,7 +1211,8 @@
         "cruiseShapes": "Poser les nouvelles formes sur les surfaces",
         "zoomSpeed": "Vitesse du zoom",
         "zoomSlow": "Lente",
-        "zoomFast": "Rapide"
+        "zoomFast": "Rapide",
+        "classicRotateHandles": "Utiliser les poignées de rotation classiques"
       },
       "measurement": {
         "title": "Mesures",
@@ -1047,6 +1274,24 @@
         "description": "Enregistrez les paramètres actuels pour ce projet.",
         "makeDefault": "Définir par défaut",
         "defaultSaved": "Enregistré"
+      },
+      "storage": {
+        "nav": "Stockage",
+        "title": "Stockage du navigateur",
+        "description": "Comment ce navigateur conserve les projets enregistrés sur cet appareil.",
+        "checking": "Vérification du stockage…",
+        "persistence": "Stockage persistant",
+        "persisted": "Activé. Le navigateur ne supprimera pas vos projets pour libérer de l’espace.",
+        "bestEffort": "Désactivé. Le navigateur peut supprimer vos projets lorsque l’appareil manque d’espace.",
+        "unsupported": "Ce navigateur ne précise pas s’il conserve vos projets.",
+        "server": "Vos projets sont enregistrés sur le serveur, et non dans ce navigateur : effacer les données du navigateur ne les supprime donc pas.",
+        "request": "Demander au navigateur de conserver les projets",
+        "requestDeclined": "Le navigateur a refusé. Conservez des sauvegardes avec « Exporter tous les projets ».",
+        "usage": "Espace utilisé",
+        "usageValue": "{used} sur {quota} ({percent})",
+        "usageUnknown": "Ce navigateur n’indique pas l’espace qu’il utilise.",
+        "usageMeter": "Part du stockage du navigateur utilisée",
+        "backupNote": "L’option « Exporter tous les projets » de l’accueil enregistre tous les projets dans une seule archive ZIP de fichiers SKF."
       }
     },
     "tutorial": {
@@ -1158,6 +1403,110 @@
         "body": "Sélectionnez la base et l’objet « Texte » : maintenez Shift et cliquez sur les deux, ou tracez un cadre autour. Cliquez sur « Grouper » dans la section « Combiner » en haut pour obtenir un seul modèle imprimable terminé. Si « Grouper » reste grisé, la base est encore verrouillée : déverrouillez-la d’abord avec le cadenas du panneau de la forme.",
         "alt": "Plaque nominative bleue ALEX terminée et groupée"
       }
+    },
+    "analysis": {
+      "title": "Analyse",
+      "readOnly": "L’analyse lit la scène et ne la modifie jamais.",
+      "checkInterference": "Vérifier les interférences",
+      "wallThickness": "Épaisseur de paroi",
+      "scopeSelection": "{count, plural, one {Vérifie la forme sélectionnée.} many {Vérifie les {count} de formes sélectionnées.} other {Vérifie les {count} formes sélectionnées.}}",
+      "scopeScene": "{count, plural, =0 {Ajoutez deux formes pour vérifier leurs collisions.} one {Ajoutez une autre forme pour vérifier les collisions.} many {Vérifie les {count} de formes visibles. Sélectionnez-en au moins deux pour restreindre.} other {Vérifie les {count} formes visibles. Sélectionnez-en au moins deux pour restreindre.}}",
+      "thicknessHint": "Sélectionnez un seul solide pour échantillonner ses parois.",
+      "running": "Analyse en cours…",
+      "noCollisions": "{count, plural, one {Aucune collision parmi {count} forme.} many {Aucune collision parmi {count} de formes.} other {Aucune collision parmi {count} formes.}}",
+      "collisions": "{pairs, plural, one {{pairs} paire en collision} many {{pairs} de paires en collision} other {{pairs} paires en collision}} parmi {count, plural, one {{count} forme} many {{count} de formes} other {{count} formes}}.",
+      "pairsLabel": "Paires en collision",
+      "pair": "{a} et {b}",
+      "overlap": "chevauchement de {volume} mm³",
+      "touching": "en contact",
+      "tessellated": "d’après les triangles",
+      "interferenceMethod": "Distance exacte entre les surfaces OCCT et volume commun pour chaque paire dont les boîtes englobantes se touchent.",
+      "thicknessResult": "Paroi la plus fine de {name} : {value} mm",
+      "thicknessNone": "Aucune paroi opposée de {name} n’a pu être mesurée.",
+      "thicknessMethod": "Estimation par échantillonnage : {samples} points par face sur {faces} faces, mesurés jusqu’à la surface opposée. Une paroi plus fine entre deux points d’échantillonnage peut ne pas être détectée.",
+      "stale": "La scène a changé depuis ce résultat. Relancez l’analyse.",
+      "failed": "Le noyau CAO n’a pas pu analyser la scène.",
+      "refusal": {
+        "tooManyShapes": "La vérification des interférences porte sur {limit} formes au maximum à la fois, et {given} formes ont été fournies. Sélectionnez moins de formes et relancez la vérification.",
+        "tooManyCandidates": "Trop de formes sont proches les unes des autres : {given} paires exigeraient une vérification exacte, alors que la limite est de {limit}. Sélectionnez moins de formes et relancez la vérification.",
+        "invalidClearance": "Le jeu doit être supérieur ou égal à zéro.",
+        "tooManyFaces": "La mesure de l’épaisseur de paroi échantillonne des solides d’au plus {limit} faces.",
+        "noFaces": "Cette forme n’a aucune face à échantillonner.",
+        "noGeometry": "{name} n’a aucune géométrie à analyser."
+      }
+    },
+    "appearance": {
+      "title": "Aspect de la surface",
+      "hint": "Uniquement l’aspect dans la vue ; ni texture ni simulation physique du matériau.",
+      "custom": "Surface personnalisée",
+      "roughness": "Rugosité",
+      "metalness": "Métallique",
+      "sheen": "Brillance",
+      "presets": {
+        "painted": "Surface peinte",
+        "wood": "Bois",
+        "fabric": "Tissu",
+        "ceramic": "Céramique",
+        "metal": "Métal"
+      }
+    },
+    "material": {
+      "title": "Matériau",
+      "label": "Matériau de la forme",
+      "none": "Aucun",
+      "pricePerKg": "Prix au kg",
+      "pricePerKgLabel": "Prix du matériau au kilogramme",
+      "weight": "Poids",
+      "cost": "Coût",
+      "volume": "Volume",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "Le poids et le coût utilisent le volume exact de la forme.",
+        "tessellated": "Le poids et le coût sont estimés d’après un maillage de triangles."
+      },
+      "holeHint": "Un perçage retire de la matière : il n’a donc pas de poids propre.",
+      "name": {
+        "pla": "PLA",
+        "petg": "PETG",
+        "abs": "ABS",
+        "asa": "ASA",
+        "tpu": "TPU",
+        "pa12": "Nylon (PA12)",
+        "pc": "Polycarbonate",
+        "resin": "Résine"
+      },
+      "density": "{density} g/cm³"
+    },
+    "loftShape": {
+      "oval": "Ovale",
+      "rectangle": "Rectangle",
+      "triangle": "Triangle",
+      "pentagon": "Pentagone",
+      "hexagon": "Hexagone"
+    },
+    "scene": {
+      "title": "Scène",
+      "open": "Liste de la scène",
+      "summary": "{count, plural, =0 {Scène vide} one {{count} forme} many {{count} de formes} other {{count} formes}}{hidden, plural, =0 {} one { · {hidden} masquée} many { · {hidden} de masquées} other { · {hidden} masquées}}",
+      "searchPlaceholder": "Rechercher des formes",
+      "searchLabel": "Rechercher des formes par nom ou par type",
+      "empty": "Ajoutez une forme : elle apparaîtra ici.",
+      "noMatches": "Aucune forme ne correspond à cette recherche.",
+      "hole": "Perçage",
+      "show": "Afficher « {name} »",
+      "hide": "Masquer « {name} »",
+      "lock": "Verrouiller « {name} »",
+      "unlock": "Déverrouiller « {name} »",
+      "delete": "Supprimer « {name} »",
+      "rename": "Renommer « {name} »",
+      "renameInput": "Nouveau nom de « {name} »",
+      "saveName": "Enregistrer le nom de « {name} »",
+      "cancelRename": "Annuler le changement de nom de « {name} »",
+      "expandGroup": "Afficher le contenu de « {name} »",
+      "collapseGroup": "Masquer le contenu de « {name} »",
+      "collapse": "Réduire la liste de la scène",
+      "expand": "Développer la liste de la scène"
     }
   },
   "errors": {
@@ -1378,7 +1727,9 @@
       "readFailed": "Impossible de lire le fichier STEP : {detail}",
       "noSolidGeometry": "Le fichier STEP ne contient aucun solide à importer",
       "nothingToExport": "Aucune boîte, aucun cylindre, aucune sphère ni aucun solide STEP importé à exporter en STEP (B-Rep)",
-      "exportFailed": "Échec de l’exportation STEP : {detail}"
+      "exportFailed": "Échec de l’exportation STEP : {detail}",
+      "meshFailed": "Ce fichier STEP est trop complexe pour que le navigateur en calcule le maillage. Son importation nécessite un serveur SketchForge, qui effectue le travail directement avec le noyau CAO.",
+      "allSkipped": "Aucune forme n’a pu être exportée en STEP B-Rep — {detail}"
     },
     "stl": {
       "noGeometry": "Le fichier STL ne contient aucun modèle lisible",
@@ -1495,6 +1846,21 @@
       "localFailed": "Impossible de mettre à jour SketchForge sur cet ordinateur",
       "serviceStatus": "Le service de mise à jour a répondu par l’erreur {status}",
       "startFailed": "Impossible de lancer la mise à jour"
+    },
+    "projects": {
+      "notConfigured": "{name} n’est pas configuré",
+      "disabled": "Le stockage des projets sur le serveur est désactivé",
+      "invalidId": "Identifiant de projet non valide",
+      "notFound": "Ce projet n’est pas sur le serveur",
+      "sameOrigin": "Le stockage des projets sur le serveur n’accepte que les enregistrements depuis la page SketchForge",
+      "busySaving": "Ce projet est en cours d’enregistrement",
+      "missingMetadata": "L’envoi du projet ne contient pas ses détails",
+      "invalidMetadata": "Impossible de lire les détails du projet",
+      "tooLarge": "Le projet dépasse la taille maximale du stockage du serveur",
+      "changedBeforeSave": "Ce projet a été modifié ailleurs. Rechargez-le avant de l’enregistrer de nouveau.",
+      "loadFailed": "Impossible de charger les projets depuis le serveur",
+      "saveFailed": "Impossible d’enregistrer le projet sur le serveur",
+      "deleteFailed": "Impossible de supprimer le projet du serveur"
     }
   }
 }

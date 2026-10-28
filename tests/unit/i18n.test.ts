@@ -49,16 +49,38 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
   cs: ["common.shape.text", "editor.panel.import", "editor.panel.export", "panels.property.text"],
   de: [
     "common.shape.text", "common.shape.torus", "common.shape.ring", "common.shape.polygon", "dashboard.projects.sortName",
-    "editor.panel.import", "editor.panel.export", "editor.panel.format", "panels.property.text", "panels.edgeModifier.radius",
+    "editor.panel.import", "editor.panel.export", "editor.panel.format", "editor.sketch.constraints.addParallel",
+    "editor.sketch.constraints.kinds.parallel", "panels.property.text", "panels.property.positionX",
+    "panels.property.positionY", "panels.property.positionZ", "panels.edgeModifier.radius", "panels.material.name.abs",
+    "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
   ],
-  es: ["panels.inspector.color.title"],
+  es: [
+    "editor.sketch.constraints.addHorizontal", "editor.sketch.constraints.addPerpendicular",
+    "editor.sketch.constraints.addVertical", "editor.sketch.constraints.kinds.horizontal",
+    "editor.sketch.constraints.kinds.perpendicular", "editor.sketch.constraints.kinds.vertical",
+    "panels.inspector.color.title", "panels.material.title", "panels.material.name.abs", "panels.material.name.asa",
+    "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+  ],
   fr: [
     "common.shape.tube", "common.shapeName.cube", "common.shapeName.intersection", "editor.sketch.primitive.rectangle",
-    "editor.sketch.primitive.triangle", "editor.panel.format", "panels.edgeModifier.distance", "panels.edgeModifier.angle",
-    "panels.edgeModifier.quality.fine",
+    "editor.sketch.primitive.triangle", "editor.sketch.constraints.kinds.distance", "editor.panel.format",
+    "panels.edgeModifier.distance", "panels.edgeModifier.angle", "panels.edgeModifier.quality.fine",
+    "panels.inspector.faces.face", "panels.inspector.faces.title", "panels.loftShape.rectangle",
+    "panels.loftShape.triangle", "panels.material.name.abs", "panels.material.name.asa", "panels.material.name.pa12",
+    "panels.material.name.pc", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+    "panels.material.volume", "workspace.sketch.sweepSectionLabel",
   ],
   pl: ["common.shape.torus", "editor.panel.import", "editor.panel.format"],
-  pt: ["common.shape.cone"],
+  pt: [
+    "common.shape.cone", "editor.sketch.constraints.addHorizontal", "editor.sketch.constraints.addPerpendicular",
+    "editor.sketch.constraints.addVertical", "editor.sketch.constraints.kinds.horizontal",
+    "editor.sketch.constraints.kinds.perpendicular", "editor.sketch.constraints.kinds.vertical",
+    "panels.inspector.faces.direction.negX", "panels.inspector.faces.direction.negZ",
+    "panels.inspector.faces.direction.x", "panels.inspector.faces.direction.z", "panels.inspector.faces.face",
+    "panels.inspector.faces.faceNumber", "panels.inspector.faces.title", "panels.appearance.presets.metal",
+    "panels.loftShape.oval", "panels.material.title", "panels.material.volume", "panels.material.name.abs",
+    "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+  ],
 };
 
 const isLanguageNeutral = (message: string) =>

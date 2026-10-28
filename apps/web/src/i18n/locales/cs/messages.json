@@ -30,7 +30,9 @@
       "wedge": "Klín",
       "polygon": "Mnohoúhelník",
       "icosahedron": "Dvacetistěn",
-      "mesh": "Model"
+      "mesh": "Model",
+      "loft": "Přechod",
+      "thread": "Závit"
     },
     "shapeName": {
       "cube": "Krychle",
@@ -79,7 +81,8 @@
     "fileSize": {
       "bytes": "{size} B",
       "kilobytes": "{size} kB",
-      "megabytes": "{size} MB"
+      "megabytes": "{size} MB",
+      "gigabytes": "{size} GB"
     },
     "actions": {
       "create": "Vytvořit nový 3D projekt",
@@ -234,6 +237,23 @@
     },
     "loading": {
       "editor": "Načítání editoru"
+    },
+    "backup": {
+      "exportAll": "Exportovat všechny projekty",
+      "preparing": "{count, plural, one {Balení {count} projektu…} few {Balení {count} projektů…} many {Balení {count} projektu…} other {Balení {count} projektů…}}",
+      "exported": "{count, plural, one {Exportován {count} projekt do souboru {fileName}.} few {Exportovány {count} projekty do souboru {fileName}.} many {Exportováno {count} projektu do souboru {fileName}.} other {Exportováno {count} projektů do souboru {fileName}.}}",
+      "skipped": "Nepodařilo se zahrnout: {names}.",
+      "failed": "Projekty se nepodařilo exportovat."
+    },
+    "storageWarning": {
+      "message": "Tento prohlížeč už využil {percent} místa, které pro vaše projekty povoluje. Než se zaplní, exportujte zálohu."
+    },
+    "serverStorage": {
+      "migrated": "{count, plural, one {Přesunut {count} projekt do úložiště na serveru} few {Přesunuty {count} projekty do úložiště na serveru} many {Přesunuto {count} projektu do úložiště na serveru} other {Přesunuto {count} projektů do úložiště na serveru}}",
+      "migrateFailed": "Projekty se nepodařilo přesunout do úložiště na serveru; zůstávají uložené v tomto prohlížeči",
+      "badge": "Na serveru",
+      "hint": "Projekty jsou uložené na serveru {name}",
+      "restored": "Úložiště na serveru je vypnuté; obnoven {count, plural, one {{count} projekt z tohoto prohlížeče} few {{count} projekty z tohoto prohlížeče} many {{count} projektu z tohoto prohlížeče} other {{count} projektů z tohoto prohlížeče}}}"
     }
   },
   "editor": {
@@ -280,7 +300,21 @@
       "newEmptyDesign": "Nový prázdný projekt",
       "savedDesign": "{count, plural, one {Projekt uložen: {count} tvar} few {Projekt uložen: {count} tvary} many {Projekt uložen: {count} tvaru} other {Projekt uložen: {count} tvarů}}",
       "nothingToCopy": "Zatím není co kopírovat",
-      "madeCopy": "Vytvořena kopie projektu"
+      "madeCopy": "Vytvořena kopie projektu",
+      "unlockBeforeCentering": "Před vycentrováním výběr odemkněte",
+      "nothingToCenter": "Výběr nemá žádnou měřitelnou geometrii, kterou by šlo vycentrovat",
+      "alreadyCentered": "Výběr už je vycentrovaný na pracovní rovině",
+      "centeredOnWorkplane": "{count, plural, one {Výběr vycentrován na pracovní rovině} few {Vycentrovány {count} objekty na pracovní rovině} many {Vycentrováno {count} objektu na pracovní rovině} other {Vycentrováno {count} objektů na pracovní rovině}}",
+      "shapeLocked": "Tvar zamčen",
+      "shapeUnlocked": "Tvar odemčen",
+      "distributeNeedsThree": "Pro rozmístění vyberte alespoň tři objekty",
+      "distributeNeedsSpread": "Před rozmístěním objekty od sebe odsuňte",
+      "distributeBlocked": "Před rozmístěním odemkněte objekty mezi oběma krajními",
+      "distributeAlreadyEven": "Tyto objekty už jsou rozmístěny rovnoměrně",
+      "distributed": "{count, plural, one {Rozmístěn {count} objekt {axis}} few {Rozmístěny {count} objekty {axis}} many {Rozmístěno {count} objektu {axis}} other {Rozmístěno {count} objektů {axis}}}",
+      "patternNeedsStep": "Před rozmnožením nastavte rozteč, jinak kopie skončí na původním tvaru",
+      "patternNeedsSweep": "Nastavte úhel, podle kterého se kopie rozloží po obvodu",
+      "patterned": "{count, plural, one {Vytvořena {count} kopie} few {Vytvořeny {count} kopie} many {Vytvořeno {count} kopie} other {Vytvořeno {count} kopií}}"
     },
     "workplane": {
       "toolActive": "Pracovní rovina: klikněte na plochu nebo na prázdné místo mřížky. Podržením Shift rovinu obrátíte",
@@ -489,11 +523,36 @@
         "addTangent": "Tečna",
         "kinds": {
           "tangent": "Tečna",
-          "equalLength": "Stejná délka"
+          "equalLength": "Stejná délka",
+          "coincident": "Shodná",
+          "fixed": "Pevná",
+          "horizontal": "Vodorovná",
+          "vertical": "Svislá",
+          "parallel": "Rovnoběžná",
+          "perpendicular": "Kolmá",
+          "distance": "Vzdálenost"
         },
         "addEqualLength": "Přidat stejnou délku",
-        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, nebo dva segmenty pro rovnoběžnost, kolmost či stejnou délku."
-      }
+        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, nebo dva segmenty pro rovnoběžnost, kolmost či stejnou délku.",
+        "title": "Vazby",
+        "dofEstimate": "Odhad volných parametrů: {count}. Tento místní odhad nezaručuje, že se vazby podaří vyřešit.",
+        "dofIndeterminate": "Volné parametry: nelze určit, protože některá vázaná vzdálenost nebo segment jsou nulové.",
+        "addCoincident": "Shodná",
+        "addFixed": "Zafixovat vybraný bod",
+        "addHorizontal": "Vodorovná",
+        "addVertical": "Svislá",
+        "addParallel": "Rovnoběžná",
+        "addPerpendicular": "Kolmá",
+        "addDistance": "Nastavit vzdálenost",
+        "distanceMm": "Vzdálenost (mm)",
+        "twoSegments": "2 segmenty",
+        "remove": "Odebrat vazbu: {kind}"
+      },
+      "constraintUnsatisfied": "Vazby náčrtu se nepodařilo splnit: {ids}",
+      "constraintAdded": "Přidána vazba náčrtu: {kind}",
+      "constraintRemoved": "Vazba náčrtu odebrána",
+      "draftReplayFailed": "Náčrt nebyl aktualizován: úkos jeho profilu už nejde znovu vytvořit. Vraťte profil zpět, nebo úpravu náčrtu zrušte.",
+      "shellNotReplayable": "Náčrt nebyl aktualizován: tento tvar má skořepinu a při obnovení z náčrtu ji už nelze znovu vytvořit. Nejprve skořepinu vraťte zpět, nebo úpravu náčrtu zrušte."
     },
     "export": {
       "needSolidSelected": "Před exportem vyberte alespoň jedno těleso",
@@ -609,7 +668,43 @@
       "sketch": "Náčrt",
       "finishSweep": "Dokončit tažení",
       "sweepSketch": "Tažení náčrtu",
-      "sweepSketchHint": "Nakreslete profil na vybrané pracovní rovině a potom dráhu na odvozené kolmé rovině"
+      "sweepSketchHint": "Nakreslete profil na vybrané pracovní rovině a potom dráhu na odvozené kolmé rovině",
+      "centerOnWorkplane": "Vycentrovat na pracovní rovinu",
+      "distributeGaps": "Stejné mezery",
+      "distributeCenters": "Stejné rozteče",
+      "distribute": "Rozmístit",
+      "distributeGapsHint": "Stejná volná mezera mezi objekty",
+      "distributeCentersHint": "Stejná vzdálenost mezi středy",
+      "distributeHelp": "U objektů stejné velikosti vyjdou obě možnosti stejně; jakmile se velikosti liší, výsledky se rozejdou. Krajní dva objekty zůstanou na místě.",
+      "threadHint": "Vloží standardní závit podle normy, jako šroub nebo závitovou díru.",
+      "threadCatalog": "Velikosti závitů",
+      "threadForm": "Těleso nebo díra",
+      "threadSolid": "Těleso",
+      "threadHole": "Díra",
+      "threadSolidHint": "Závitová tyč o průměru dané velikosti.",
+      "threadHoleHint": "Díra se vyřízne o 0.2 mm větší, aby se do ní šroub této velikosti vešel. Seskupením s tělesem v ní vznikne závit.",
+      "threadPitch": "{pitch} mm",
+      "threadSizeHint": "Stoupání {pitch} mm",
+      "threadSeries": {
+        "metric": "Metrický (hrubé stoupání)",
+        "metric-fine": "Metrický (jemné stoupání)",
+        "unified": "Palcový (UNC)",
+        "unified-fine": "Palcový (UNF)"
+      },
+      "pattern": "Pole",
+      "patternHint": "Rozmnoží výběr v řadě nebo po kruhu",
+      "patternLinear": "V řadě",
+      "patternLinearHint": "Kopie s roztečí podél os X a Z",
+      "patternCircular": "Po kruhu",
+      "patternCircularHint": "Kopie otočené kolem středu",
+      "patternCount": "Počet kopií",
+      "patternStepX": "Rozteč X",
+      "patternStepZ": "Rozteč Z",
+      "patternCenterX": "Střed X",
+      "patternCenterZ": "Střed Z",
+      "patternSweep": "Celkový úhel",
+      "patternRotate": "Otáčet kopie po obvodu",
+      "patternApply": "Rozmnožit"
     },
     "panel": {
       "import": "Import",
@@ -652,6 +747,10 @@
         "dxf": {
           "description": "Výkres řezu",
           "note": "Vyžaduje rovinu řezu. Geometrie je vykreslena geometrickým jádrem CAD."
+        },
+        "3mf": {
+          "description": "Balíček pro 3D tisk",
+          "note": "Co moderní slicery upřednostňují: milimetry, jeden pojmenovaný objekt pro každý tvar s vlastním umístěním a barvy tvarů."
         }
       },
       "historyTitle": "Uložená historie akcí",
@@ -695,6 +794,25 @@
       "separated": "{count, plural, one {MCP: objekt rozdělen na {count} část} few {MCP: objekt rozdělen na {count} části} many {MCP: objekt rozdělen na {count} části} other {MCP: objekt rozdělen na {count} částí}}",
       "filleted": "{count, plural, one {MCP: zaoblena {count} hrana} few {MCP: zaobleny {count} hrany} many {MCP: zaobleno {count} hrany} other {MCP: zaobleno {count} hran}}",
       "chamfered": "{count, plural, one {MCP: zkosena {count} hrana} few {MCP: zkoseny {count} hrany} many {MCP: zkoseno {count} hrany} other {MCP: zkoseno {count} hran}}"
+    },
+    "keyboardShortcuts": {
+      "title": "Klávesové zkratky",
+      "helpHint": "Seznam otevřete klávesou ? a zavřete klávesou Escape.",
+      "lockSelection": "Zamknout nebo odemknout výběr",
+      "hideSelection": "Skrýt nebo zobrazit výběr",
+      "showHidden": "Zobrazit všechny skryté tvary",
+      "undo": "Zpět",
+      "redo": "Znovu",
+      "copy": "Kopírovat",
+      "paste": "Vložit",
+      "duplicate": "Duplikovat",
+      "delete": "Odstranit výběr",
+      "close": "Zavřít klávesové zkratky"
+    },
+    "axis": {
+      "x": "v ose X",
+      "y": "v ose Y",
+      "z": "v ose Z"
     }
   },
   "workspace": {
@@ -721,7 +839,11 @@
     "camera": {
       "home": "Výchozí pohled",
       "zoomIn": "Přiblížit",
-      "zoomOut": "Oddálit"
+      "zoomOut": "Oddálit",
+      "centerOnSelection": "Vycentrovat pohled na výběr",
+      "centerOnSelectionShortcut": "Vycentrovat pohled na výběr (Shift+F)",
+      "orthographicView": "Ortogonální pohled",
+      "perspectiveView": "Perspektivní pohled"
     },
     "workplane": {
       "label": "Pracovní rovina",
@@ -826,6 +948,13 @@
       "sweepSpineHelp": "Dráha začíná v počátku profilu (0,0). První úsek se přichytí doprava, aby profil zůstal kolmý k počáteční tečně. Vyberte bod dráhy a nastavte 3D hloubku (mm), chcete-li jej posunout mimo tuto rovinu.",
       "sweepSectionPlane": "Upravit profil · vybraná rovina",
       "sweepSpinePlane": "Kreslit dráhu · kolmá rovina"
+    },
+    "viewTools": {
+      "label": "Nástroje pohledu",
+      "show": "Zobrazit nástroje",
+      "showLabel": "Zobrazit nástroje pohledu",
+      "hide": "Skrýt nástroje",
+      "hideLabel": "Skrýt nástroje pohledu"
     }
   },
   "panels": {
@@ -893,7 +1022,21 @@
       "topLength": "Délka nahoře",
       "topWidth": "Šířka nahoře",
       "bottomLength": "Délka dole",
-      "bottomWidth": "Šířka dole"
+      "bottomWidth": "Šířka dole",
+      "topShape": "Tvar nahoře",
+      "bottomShape": "Tvar dole",
+      "topRotation": "Otočení nahoře",
+      "bottomRotation": "Otočení dole",
+      "layers": "Vrstvy",
+      "positionX": "Poloha X",
+      "positionY": "Poloha Y",
+      "positionZ": "Poloha Z",
+      "rotationX": "Náklon X",
+      "rotationY": "Otočení Y",
+      "rotationZ": "Náklon Z",
+      "pitch": "Stoupání",
+      "turns": "Počet závitů",
+      "core": "Poloměr jádra"
     },
     "inspector": {
       "label": "Nastavení tvaru „{name}“",
@@ -923,7 +1066,90 @@
         "teeth": "Zuby",
         "helix": "Sklon zubů"
       },
-      "gearType": "Typ ozubeného kola"
+      "gearType": "Typ ozubeného kola",
+      "placement": "Umístění",
+      "faces": {
+        "title": "Plochy",
+        "enableHint": "Můžete obarvit jednotlivé plochy nebo jednu z nich naklonit úkosem. Nejdřív se z tvaru znovu vytvoří přesné těleso. Jeho velikost zůstane upravitelná, ale nastavení, která patří k tomuto typu tvaru, třeba počet stran, už nepůjdou měnit.",
+        "enable": "Zapnout úpravy ploch",
+        "enabling": "Příprava ploch…",
+        "enabled": "Úpravy ploch zapnuty. Zvolte plochu, kterou chcete obarvit nebo naklonit úkosem.",
+        "enableSuperseded": "Tvar se změnil dřív, než byly jeho plochy připravené. Zapněte úpravy ploch znovu.",
+        "face": "Plocha",
+        "of": "z {count}",
+        "previous": "Předchozí plocha",
+        "next": "Další plocha",
+        "faceId": "ID plochy: {id}",
+        "highlightHint": "Přejeďte v pohledu na plochu, zvýrazní se; kliknutím ji zvolte. Zvolená plocha zůstane po celou dobu otevřeného panelu orámovaná, i když má barvu.",
+        "colorFor": "Barva plochy {face}",
+        "chooseColor": "Zvolit barvu",
+        "clearColor": "Odebrat barvu",
+        "coloredFaces": "Obarvené plochy",
+        "faceNumber": "Plocha {face}",
+        "remove": "Odebrat barvu z plochy {face}",
+        "noColors": "Zatím žádné obarvené plochy.",
+        "draftTitle": "Úkos",
+        "draftHint": "Nakloní zvolenou plochu o zadaný úhel, jako kdyby se díl vytahoval z formy ve zvoleném směru. Ne každou plochu lze v každém směru naklonit. Úkos znovu sestaví seznam ploch, odstraní jejich barvy a může změnit čísla ploch; před dalším úkosem zkontrolujte ID plochy.",
+        "direction": {
+          "label": "Směr",
+          "x": "Doprava (+X)",
+          "negX": "Doleva (−X)",
+          "y": "Nahoru (+Y)",
+          "negY": "Dolů (−Y)",
+          "z": "Dopředu (+Z)",
+          "negZ": "Dozadu (−Z)"
+        },
+        "angle": "Úhel úkosu",
+        "applyDraft": "Použít úkos",
+        "drafting": "Vytváření úkosu plochy…",
+        "drafted": "Úkos plochy vytvořen.",
+        "draftedRetained": "Úkos plochy vytvořen. Zůstane s náčrtem, takže při úpravě náčrtu se zachová.",
+        "draftRetained": "Tento tvar už má uložený úkos plochy. Změňte ho na kartě „Úkos plochy“, nebo ho vraťte zpět, než vytvoříte úkos další plochy.",
+        "prismDraftRetained": "Tento tvar má uložený úkos hranolu, a proto k němu nelze přidat úkos plochy. Nejprve úkos hranolu vraťte zpět."
+      },
+      "draftPrism": {
+        "title": "Úkos hranolu",
+        "hint": "Zúží rovné vysunutí náčrtu, které si tvar uchovává. Vznikne pevná geometrie.",
+        "angle": "Úhel úkosu",
+        "apply": "Použít úkos",
+        "applying": "Použití úkosu…",
+        "applied": "Úkos použit. Tvar je teď pevná geometrie.",
+        "hintRetained": "Zúží rovné vysunutí náčrtu. Úkos zůstane s náčrtem, takže při úpravě náčrtu se zachová.",
+        "appliedRetained": "Úkos použit. Zůstane s náčrtem, takže při úpravě náčrtu se zachová.",
+        "update": "Aktualizovat úkos",
+        "faceDraftRetained": "Tento tvar má uložený úkos plochy, a proto k němu nelze přidat úkos hranolu. Nejprve úkos plochy vraťte zpět."
+      },
+      "faceDraft": {
+        "title": "Úkos plochy",
+        "hint": "Úkos je uložený s náčrtem: při úpravě náčrtu se vytvoří znovu. Zde změňte jeho směr nebo úhel.",
+        "face": "Plocha {face} vysunutí náčrtu",
+        "update": "Aktualizovat úkos",
+        "updating": "Aktualizace úkosu…",
+        "updated": "Úkos plochy aktualizován."
+      },
+      "shell": {
+        "title": "Skořepina",
+        "hint": "Vytvořte ze tvaru skořepinu se stěnou této tloušťky, měřenou dovnitř, takže vnější rozměry zůstanou stejné. Nechte plochy otevřené a vznikne miska nebo pouzdro.",
+        "thickness": "Tloušťka stěny",
+        "openFaces": "Nechat otevřené",
+        "directionsHint": "Strany jsou podle pracovní roviny: horní strana míří nahoru. Otevřít lze jen rovinnou plochu.",
+        "direction": {
+          "top": "Horní",
+          "bottom": "Dolní",
+          "left": "Levá",
+          "right": "Pravá",
+          "front": "Přední",
+          "back": "Zadní"
+        },
+        "faceNumbers": "Plochy podle čísel",
+        "faceNumbersHint": "Čísla z karty „Plochy“, oddělená čárkami.",
+        "faceNumbersInvalid": "Zadejte čísla ploch od 1 do {count}.",
+        "addPicked": "Přidat vybranou plochu {face}",
+        "apply": "Vytvořit skořepinu",
+        "applying": "Vytváření skořepiny…",
+        "applied": "Skořepina vytvořena: o {percent} % méně materiálu.",
+        "hollowed": "Skořepina se stěnou {thickness} {unit}."
+      }
     },
     "edgeModifier": {
       "title": {
@@ -985,7 +1211,8 @@
         "cruiseShapes": "Pokládat nové tvary na povrch jiných tvarů",
         "zoomSpeed": "Rychlost přibližování",
         "zoomSlow": "Pomalu",
-        "zoomFast": "Rychle"
+        "zoomFast": "Rychle",
+        "classicRotateHandles": "Používat klasické úchyty otáčení"
       },
       "measurement": {
         "title": "Měření",
@@ -1047,6 +1274,24 @@
         "description": "Uložte aktuální nastavení pro tento projekt.",
         "makeDefault": "Nastavit jako výchozí",
         "defaultSaved": "Výchozí nastavení uloženo"
+      },
+      "storage": {
+        "nav": "Úložiště",
+        "title": "Úložiště v prohlížeči",
+        "description": "Jak tento prohlížeč uchovává projekty uložené v tomto zařízení.",
+        "checking": "Kontrola úložiště…",
+        "persistence": "Trvalé úložiště",
+        "persisted": "Zapnuto. Prohlížeč nebude kvůli místu odstraňovat vaše projekty.",
+        "bestEffort": "Vypnuto. Když v zařízení dojde místo, prohlížeč může vaše projekty odstranit.",
+        "unsupported": "Tento prohlížeč neuvádí, zda vaše projekty uchová.",
+        "server": "Vaše projekty jsou uložené na serveru, ne v tomto prohlížeči, takže je vymazání prohlížeče neodstraní.",
+        "request": "Požádat prohlížeč o uchování projektů",
+        "requestDeclined": "Prohlížeč žádost odmítl. Zálohy si udržujte pomocí „Exportovat všechny projekty“.",
+        "usage": "Využité místo",
+        "usageValue": "{used} z {quota} ({percent})",
+        "usageUnknown": "Tento prohlížeč neuvádí, kolik místa využívá.",
+        "usageMeter": "Podíl využitého úložiště prohlížeče",
+        "backupNote": "Příkaz „Exportovat všechny projekty“ na úvodní stránce uloží všechny projekty do jednoho archivu ZIP se soubory SKF."
       }
     },
     "tutorial": {
@@ -1158,6 +1403,110 @@
         "body": "Vyberte základnu a text: podržte Shift a klikněte na oba, nebo je ohraničte tažením rámečku. Nahoře v části „Kombinace“ klikněte na „Seskupit“. Vznikne jeden hotový model pro tisk. Pokud tlačítko „Seskupit“ zůstává šedé, je základna ještě zamčená: nejprve ji odemkněte zámkem na panelu tvaru.",
         "alt": "Hotová seskupená modrá jmenovka ALEX"
       }
+    },
+    "analysis": {
+      "title": "Analýza",
+      "readOnly": "Analýza scénu jen čte, nikdy ji nemění.",
+      "checkInterference": "Zkontrolovat kolize",
+      "wallThickness": "Tloušťka stěny",
+      "scopeSelection": "{count, plural, one {Zkontroluje {count} vybraný tvar.} few {Zkontroluje {count} vybrané tvary.} many {Zkontroluje {count} vybraného tvaru.} other {Zkontroluje {count} vybraných tvarů.}}",
+      "scopeScene": "{count, plural, =0 {Přidejte dva tvary, které chcete zkontrolovat na kolize.} one {Přidejte ještě jeden tvar, který chcete zkontrolovat na kolize.} few {Zkontrolují se všechny {count} viditelné tvary. Výběrem dvou nebo více je omezíte.} many {Zkontroluje se všech {count} viditelných tvarů. Výběrem dvou nebo více je omezíte.} other {Zkontroluje se všech {count} viditelných tvarů. Výběrem dvou nebo více je omezíte.}}",
+      "thicknessHint": "Vyberte jedno těleso, jehož stěny se mají proměřit.",
+      "running": "Probíhá analýza…",
+      "noCollisions": "{count, plural, one {Žádné kolize mezi {count} tvarem.} few {Žádné kolize mezi {count} tvary.} many {Žádné kolize mezi {count} tvarem.} other {Žádné kolize mezi {count} tvary.}}",
+      "collisions": "{pairs, plural, one {{pairs} kolizní dvojice} few {{pairs} kolizní dvojice} many {{pairs} kolizní dvojice} other {{pairs} kolizních dvojic}} mezi {count, plural, one {{count} tvarem} few {{count} tvary} many {{count} tvarem} other {{count} tvary}}.",
+      "pairsLabel": "Kolizní dvojice",
+      "pair": "{a} a {b}",
+      "overlap": "přesah {volume} mm³",
+      "touching": "dotýkají se",
+      "tessellated": "z trojúhelníků",
+      "interferenceMethod": "Přesná vzdálenost povrchů a společný objem v OCCT pro každou dvojici, jejíž ohraničující kvádry se protínají.",
+      "thicknessResult": "Nejtenčí stěna tvaru „{name}“: {value} mm",
+      "thicknessNone": "U tvaru „{name}“ se nenašly protilehlé stěny, které by šlo proměřit.",
+      "thicknessMethod": "Odhad ze vzorků: {samples} bodů na každé z {faces} ploch, měřeno k protilehlému povrchu. Stěna tenčí mezi vzorky může zůstat nepovšimnuta.",
+      "stale": "Scéna se od tohoto výsledku změnila. Spusťte analýzu znovu.",
+      "failed": "Scénu se v modulu CAD nepodařilo analyzovat.",
+      "refusal": {
+        "tooManyShapes": "Kontrola kolizí zvládne najednou nejvýše {limit} tvarů, ale počet vybraných tvarů je {given}. Vyberte méně tvarů a zkontrolujte to znovu.",
+        "tooManyCandidates": "Příliš mnoho tvarů je blízko sebe: počet dvojic pro přesnou kontrolu je {given}, ale limit je {limit}. Vyberte méně tvarů a zkontrolujte to znovu.",
+        "invalidClearance": "Odstup musí být nula nebo více milimetrů.",
+        "tooManyFaces": "Tloušťka stěny proměřuje tělesa s nejvýše {limit} plochami.",
+        "noFaces": "Tento tvar nemá žádné plochy k proměření.",
+        "noGeometry": "Tvar „{name}“ nemá žádnou geometrii k analýze."
+      }
+    },
+    "appearance": {
+      "title": "Vzhled povrchu",
+      "hint": "Jen stínování v pohledu; nejde o simulaci textur ani fyzikálního materiálu.",
+      "custom": "Vlastní povrch",
+      "roughness": "Drsnost",
+      "metalness": "Kovovost",
+      "sheen": "Lesk",
+      "presets": {
+        "painted": "Nabarvený povrch",
+        "wood": "Dřevo",
+        "fabric": "Textil",
+        "ceramic": "Keramika",
+        "metal": "Kov"
+      }
+    },
+    "material": {
+      "title": "Materiál",
+      "label": "Materiál tvaru",
+      "none": "Žádný",
+      "pricePerKg": "Cena za kg",
+      "pricePerKgLabel": "Cena materiálu za kilogram",
+      "weight": "Hmotnost",
+      "cost": "Cena",
+      "volume": "Objem",
+      "grams": "{grams} g",
+      "cubicCentimeters": "{volume} cm³",
+      "precision": {
+        "exact": "Hmotnost a cena vycházejí z přesného objemu tvaru.",
+        "tessellated": "Hmotnost a cena jsou odhadem z modelu složeného z trojúhelníků."
+      },
+      "holeHint": "Díra materiál odebírá, proto nemá vlastní hmotnost.",
+      "name": {
+        "pla": "Plast PLA",
+        "petg": "Plast PETG",
+        "abs": "Plast ABS",
+        "asa": "Plast ASA",
+        "tpu": "Plast TPU",
+        "pa12": "Polyamid (PA12)",
+        "pc": "Polykarbonát",
+        "resin": "Pryskyřice"
+      },
+      "density": "{density} g/cm³"
+    },
+    "loftShape": {
+      "oval": "Elipsa",
+      "rectangle": "Obdélník",
+      "triangle": "Trojúhelník",
+      "pentagon": "Pětiúhelník",
+      "hexagon": "Šestiúhelník"
+    },
+    "scene": {
+      "title": "Scéna",
+      "open": "Seznam scény",
+      "summary": "{count, plural, =0 {Ve scéně nic není} one {{count} tvar} few {{count} tvary} many {{count} tvaru} other {{count} tvarů}}{hidden, plural, =0 {} one { · {hidden} skrytý} few { · {hidden} skryté} many { · {hidden} skrytého} other { · {hidden} skrytých}}",
+      "searchPlaceholder": "Hledat tvary",
+      "searchLabel": "Hledat tvary podle názvu nebo druhu",
+      "empty": "Přidejte tvar a objeví se tady.",
+      "noMatches": "Hledání neodpovídá žádný tvar.",
+      "hole": "Díra",
+      "show": "Zobrazit „{name}“",
+      "hide": "Skrýt „{name}“",
+      "lock": "Zamknout „{name}“",
+      "unlock": "Odemknout „{name}“",
+      "delete": "Odstranit „{name}“",
+      "rename": "Přejmenovat „{name}“",
+      "renameInput": "Nový název pro „{name}“",
+      "saveName": "Uložit název pro „{name}“",
+      "cancelRename": "Zrušit přejmenování „{name}“",
+      "expandGroup": "Zobrazit obsah skupiny „{name}“",
+      "collapseGroup": "Skrýt obsah skupiny „{name}“",
+      "collapse": "Sbalit seznam scény",
+      "expand": "Rozbalit seznam scény"
     }
   },
   "errors": {
@@ -1378,7 +1727,9 @@
       "readFailed": "Soubor STEP se nepodařilo přečíst: {detail}",
       "noSolidGeometry": "Soubor STEP neobsahuje žádná tělesa k importu",
       "nothingToExport": "Pro export do STEP (B-Rep) nejsou žádné kvádry, válce, koule ani tělesa importovaná ze STEP",
-      "exportFailed": "Export do STEP se nezdařil: {detail}"
+      "exportFailed": "Export do STEP se nezdařil: {detail}",
+      "meshFailed": "Tento soubor STEP je pro převod na trojúhelníkovou síť v prohlížeči příliš složitý. K importu je potřeba server SketchForge, který práci provede přímo v modulu CAD.",
+      "allSkipped": "Jako B-Rep STEP nešlo exportovat nic – {detail}"
     },
     "stl": {
       "noGeometry": "Soubor STL neobsahuje model, který lze přečíst",
@@ -1495,6 +1846,21 @@
       "localFailed": "SketchForge v tomto počítači se nepodařilo aktualizovat",
       "serviceStatus": "Služba aktualizací vrátila chybu {status}",
       "startFailed": "Nepodařilo se spustit aktualizaci"
+    },
+    "projects": {
+      "notConfigured": "Parametr {name} není nastavený",
+      "disabled": "Úložiště projektů na serveru je vypnuté",
+      "invalidId": "Neplatné ID projektu",
+      "notFound": "Tento projekt na serveru není",
+      "sameOrigin": "Projekty na server lze ukládat jen ze stránky SketchForge",
+      "busySaving": "Tento projekt se právě ukládá",
+      "missingMetadata": "U nahrávaného projektu chybějí údaje",
+      "invalidMetadata": "Údaje o projektu se nepodařilo přečíst",
+      "tooLarge": "Projekt je větší, než úložiště na serveru povoluje",
+      "changedBeforeSave": "Tento projekt se mezitím změnil jinde. Před dalším uložením ho znovu načtěte.",
+      "loadFailed": "Projekty se nepodařilo načíst ze serveru",
+      "saveFailed": "Projekt se nepodařilo uložit na server",
+      "deleteFailed": "Projekt se nepodařilo odstranit ze serveru"
     }
   }
 }
