@@ -26,6 +26,7 @@ const sketch: WorkplaneShape = {
       { id: "p", kind: "perpendicular", segmentIds: ["line", "other"] },
       { id: "t", kind: "tangent", segmentIds: ["line", "curve"] },
       { id: "equal", kind: "equalLength", segmentIds: ["line", "other"] },
+      { id: "angle", kind: "angle", segmentIds: ["line", "other"], valueDeg: 45 },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
       { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
     ],
@@ -99,4 +100,25 @@ it("rejects equal-length constraints on a degenerate line", async () => {
   const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, points: sketch.sketchProfile!.points.map((point) => point.id === "b" ? { ...point, x: 0, z: 0 } : point), constraints: [{ id: "equal", kind: "equalLength" as const, segmentIds: ["line", "other"] as [string, string] }] } };
   const bytes = await exportSkfProject({ projectName: "Invalid degenerate equal length", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
   await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentIds/);
+});
+
+it("rejects angle constraints outside 0 to 180 degrees", async () => {
+  for (const valueDeg of [-1, 181, Number.NaN]) {
+    const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, constraints: [{ id: "angle", kind: "angle" as const, segmentIds: ["line", "other"] as [string, string], valueDeg }] } };
+    const bytes = await exportSkfProject({ projectName: "Invalid angle", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
+    await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.valueDeg/);
+  }
+});
+
+it("rejects angle constraints that reference a missing or degenerate segment", async () => {
+  for (const constraints of [
+    [{ id: "angle", kind: "angle" as const, segmentIds: ["line", "missing"] as [string, string], valueDeg: 45 }],
+    [{ id: "angle", kind: "angle" as const, segmentIds: ["line", "flat"] as [string, string], valueDeg: 45 }],
+  ]) {
+    const points = sketch.sketchProfile!.points.map((point) => point.id === "b" ? { ...point, x: 0, z: 0 } : point);
+    const segments = [...sketch.sketchProfile!.segments, { id: "flat", startId: "a", endId: "b" }];
+    const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, points, segments, constraints } };
+    const bytes = await exportSkfProject({ projectName: "Invalid angle segment", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
+    await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentIds/);
+  }
 });

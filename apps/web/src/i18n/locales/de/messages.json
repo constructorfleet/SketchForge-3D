@@ -530,10 +530,11 @@
           "vertical": "Vertikal",
           "parallel": "Parallel",
           "perpendicular": "Senkrecht",
-          "distance": "Abstand"
+          "distance": "Abstand",
+          "angle": "Winkel"
         },
         "addEqualLength": "Gleiche Länge hinzufügen",
-        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal oder zwei Segmente für parallel, senkrecht oder gleiche Länge.",
+        "hint": "Wähle einen Punkt zum Fixieren, zwei Punkte für deckungsgleich oder Abstand, ein Segment für horizontal oder vertikal oder zwei Segmente für parallel, senkrecht, gleiche Länge oder Winkel.",
         "title": "Bedingungen",
         "dofEstimate": "Geschätzte freie Parameter: {count}. Diese lokale Rangschätzung garantiert nicht, dass die Bedingungen lösbar sind.",
         "dofIndeterminate": "Freie Parameter: nicht bestimmbar, weil ein festgelegter Abstand null ist oder ein Segment keine Länge hat.",
@@ -546,7 +547,9 @@
         "addDistance": "Abstand festlegen",
         "distanceMm": "Abstand (mm)",
         "twoSegments": "2 Segmente",
-        "remove": "Bedingung „{kind}“ entfernen"
+        "remove": "Bedingung „{kind}“ entfernen",
+        "addAngle": "Winkel festlegen",
+        "angleDeg": "Winkel (°)"
       },
       "constraintUnsatisfied": "Die Bedingungen der Skizze konnten nicht erfüllt werden: {ids}",
       "constraintAdded": "Bedingung „{kind}“ zur Skizze hinzugefügt",

@@ -530,10 +530,11 @@
           "vertical": "Vertical",
           "parallel": "Paralela",
           "perpendicular": "Perpendicular",
-          "distance": "Distância"
+          "distance": "Distância",
+          "angle": "Ângulo"
         },
         "addEqualLength": "Adicionar comprimento igual",
-        "hint": "Selecione um ponto para fixá-lo, dois pontos para coincidência ou distância, um segmento para horizontal ou vertical, ou dois segmentos para paralelo, perpendicular ou comprimento igual.",
+        "hint": "Selecione um ponto para fixá-lo, dois pontos para coincidência ou distância, um segmento para horizontal ou vertical, ou dois segmentos para paralelo, perpendicular, comprimento igual ou ângulo.",
         "title": "Restrições",
         "dofEstimate": "Parâmetros livres estimados: {count}. Esta estimativa local não garante que as restrições tenham solução.",
         "dofIndeterminate": "Parâmetros livres: indeterminado porque uma distância ou um segmento com restrição está degenerado.",
@@ -546,7 +547,9 @@
         "addDistance": "Definir distância",
         "distanceMm": "Distância (mm)",
         "twoSegments": "2 segmentos",
-        "remove": "Remover a restrição {kind}"
+        "remove": "Remover a restrição {kind}",
+        "addAngle": "Definir ângulo",
+        "angleDeg": "Ângulo (°)"
       },
       "constraintUnsatisfied": "Não foi possível satisfazer as restrições do esboço: {ids}",
       "constraintAdded": "Restrição adicionada ao esboço: {kind}",

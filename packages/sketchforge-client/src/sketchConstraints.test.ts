@@ -10,3 +10,14 @@ it("accepts equal-length constraints in public sketch profiles", () => {
 
   expect(constraint.kind).toBe("equalLength");
 });
+
+it("accepts angle constraints in public sketch profiles", () => {
+  const constraint = {
+    id: "angle",
+    kind: "angle",
+    segmentIds: ["first", "second"],
+    valueDeg: 45,
+  } satisfies NonNullable<SketchSweepProfile["constraints"]>[number];
+
+  expect(constraint.valueDeg).toBe(45);
+});

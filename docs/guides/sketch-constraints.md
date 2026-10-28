@@ -12,7 +12,8 @@ sources:
 # Constrain sketch geometry
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
-shows **Parallel**, **Perpendicular**, **Tangent**, and **Equal length** constraints.
+shows **Parallel**, **Perpendicular**, **Tangent**, **Equal length**, and
+**Angle** constraints.
 
 ## Make two segments parallel
 
@@ -53,6 +54,21 @@ anchored point. This relation removes one estimated degree of freedom and is
 stored in `.skf` projects. Curves and zero-length lines are not eligible.
 
 ![Two selected sketch segments with the Equal length constraint applied.](../screenshots/sketch-equal-length-constraint.png)
+
+## Set the angle between two segments
+
+1. Create a sketch with two non-zero-length segments.
+2. Select both segments.
+3. Enter the angle in degrees and choose **Set angle**.
+
+The solver turns the second segment around the anchored geometry until the
+unsigned angle between the two segments matches the value. The angle is measured
+from 0° to 180°, so 90° is the same relation as **Perpendicular**; use whichever
+name fits the design. The relation removes one estimated degree of freedom and
+is stored in `.skf` projects. A zero-length segment is refused, and the angle
+must stay between 0° and 180°.
+
+![Two selected sketch segments with a 45 degree angle constraint applied.](../screenshots/sketch-angle-constraint.png)
 
 ## Make a line tangent to a Bezier
 

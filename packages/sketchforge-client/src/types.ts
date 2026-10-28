@@ -239,6 +239,7 @@ export type SketchSweepProfile = {
     | { id: string; kind: "perpendicular"; segmentIds: readonly [string, string] }
     | { id: string; kind: "tangent"; segmentIds: readonly [string, string] }
     | { id: string; kind: "equalLength"; segmentIds: readonly [string, string] }
+    | { id: string; kind: "angle"; segmentIds: readonly [string, string]; valueDeg: number }
     | { id: string; kind: "distance"; pointIds: readonly [string, string]; valueMm: number })[];
   sweepFrames?: {
     section: { origin: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; xAxis: { x: number; y: number; z: number }; zAxis: { x: number; y: number; z: number } };

@@ -63,7 +63,8 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
   ],
   fr: [
     "common.shape.tube", "common.shapeName.cube", "common.shapeName.intersection", "editor.sketch.primitive.rectangle",
-    "editor.sketch.primitive.triangle", "editor.sketch.constraints.kinds.distance", "editor.panel.format",
+    "editor.sketch.primitive.triangle", "editor.sketch.constraints.kinds.distance",
+    "editor.sketch.constraints.kinds.angle", "editor.sketch.constraints.angleDeg", "editor.panel.format",
     "panels.edgeModifier.distance", "panels.edgeModifier.angle", "panels.edgeModifier.quality.fine",
     "panels.inspector.faces.face", "panels.inspector.faces.title", "panels.loftShape.rectangle",
     "panels.loftShape.triangle", "panels.material.name.abs", "panels.material.name.asa", "panels.material.name.pa12",
