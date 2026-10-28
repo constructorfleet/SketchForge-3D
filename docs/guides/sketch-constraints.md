@@ -12,8 +12,8 @@ sources:
 # Constrain sketch geometry
 
 Sketch constraints relate selected entities while you edit a sketch. This guide
-shows **Parallel**, **Perpendicular**, **Tangent**, **Equal length**, and
-**Angle** constraints.
+shows **Parallel**, **Perpendicular**, **Tangent**, **Equal length**,
+**Angle**, and **Symmetry** constraints.
 
 ## Make two segments parallel
 
@@ -69,6 +69,22 @@ is stored in `.skf` projects. A zero-length segment is refused, and the angle
 must stay between 0° and 180°.
 
 ![Two selected sketch segments with a 45 degree angle constraint applied.](../screenshots/sketch-angle-constraint.png)
+
+## Make two points symmetric about a line
+
+1. Draw the line you want to use as the mirror axis, then draw or place the two
+   points that should mirror across it.
+2. Select the two points. Choose the axis in the **Mirror axis** list — the
+   first non-zero-length segment is selected by default.
+3. Choose **Symmetry**.
+
+The solver puts the points' midpoint on the axis and turns the line between them
+perpendicular to the axis, so the two points end up the same distance from it on
+opposite sides. The relation removes two estimated degrees of freedom and is
+stored in `.skf` projects. A zero-length axis or two identical points are
+refused.
+
+![Two sketch points mirrored across a selected axis.](../screenshots/sketch-symmetry-constraint.png)
 
 ## Make a line tangent to a Bezier
 

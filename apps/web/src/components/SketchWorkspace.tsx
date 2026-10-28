@@ -8,7 +8,7 @@ import { notice, unitLabel, useTranslations, type Notice } from "@/i18n";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
-import { isSketchAnglePair, isSketchEqualLengthPair, isSketchTangentPair, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
+import { isSketchAnglePair, isSketchEqualLengthPair, isSketchSymmetrySetup, isSketchTangentPair, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
 import { projectSweepSectionPoint, sketchSweepGuideRoles, snapInitialSweepSpineEndpoint, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
@@ -1362,6 +1362,7 @@ function SketchConstraintPanel({
   const t = useTranslations();
   const [distanceValue, setDistanceValue] = useState("10");
   const [angleValue, setAngleValue] = useState("45");
+  const [symmetryAxisId, setSymmetryAxisId] = useState("");
   const pointIds = selected?.kind === "point" ? [selected.id] : selected?.kind === "multiple" ? selected.pointIds : [];
   const selectedPoint = pointIds.length === 1 ? profile.points.find(({ id }) => id === pointIds[0]) : null;
   const selectedPair = pointIds.length === 2 && pointIds[0] !== pointIds[1] ? pointIds as [string, string] : null;
@@ -1371,6 +1372,13 @@ function SketchConstraintPanel({
   const selectedTangentPair = selectedSegmentPair && isSketchTangentPair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
   const selectedEqualLengthPair = selectedSegmentPair && isSketchEqualLengthPair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
   const selectedAnglePair = selectedSegmentPair && isSketchAnglePair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
+  const selectedSymmetryPair = pointIds.length === 2 && pointIds[0] !== pointIds[1] ? pointIds as [string, string] : null;
+  const symmetryAxes = profile.segments.filter((segment) => {
+    const start = profile.points.find(({ id }) => id === segment.startId);
+    const end = profile.points.find(({ id }) => id === segment.endId);
+    return Boolean(start && end && Math.hypot(end.x - start.x, end.z - start.z) > 1e-5);
+  });
+  const symmetryAxis = symmetryAxisId || symmetryAxes[0]?.id || "";
   const valueMm = Number(distanceValue);
   const angleDeg = Number(angleValue);
   const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
@@ -1399,6 +1407,13 @@ function SketchConstraintPanel({
           <input type="number" min="0" max="180" step="1" value={angleValue} onChange={(event) => setAngleValue(event.currentTarget.value)} />
         </label>
         <button type="button" disabled={!selectedAnglePair || !Number.isFinite(angleDeg) || angleDeg < 0 || angleDeg > 180} onClick={() => selectedAnglePair && addConstraint({ kind: "angle", segmentIds: selectedAnglePair, valueDeg: angleDeg })}>{t("editor.sketch.constraints.addAngle")}</button>
+        <label>
+          <span>{t("editor.sketch.constraints.symmetryAxis")}</span>
+          <select aria-label={t("editor.sketch.constraints.symmetryAxis")} value={symmetryAxis} onChange={(event) => setSymmetryAxisId(event.currentTarget.value)}>
+            {symmetryAxes.map((segment, index) => <option key={segment.id} value={segment.id}>{t("editor.sketch.constraints.segmentOption", { index: index + 1 })}</option>)}
+          </select>
+        </label>
+        <button type="button" disabled={!selectedSymmetryPair || !symmetryAxis || !isSketchSymmetrySetup(selectedSymmetryPair, symmetryAxis, profile)} onClick={() => selectedSymmetryPair && addConstraint({ kind: "symmetry", pointIds: selectedSymmetryPair, segmentId: symmetryAxis })}>{t("editor.sketch.constraints.addSymmetry")}</button>
         <label>
           <span>{t("editor.sketch.constraints.distanceMm")}</span>
           <input type="number" min="0" step="0.1" value={distanceValue} onChange={(event) => setDistanceValue(event.currentTarget.value)} />

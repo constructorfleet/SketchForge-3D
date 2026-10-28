@@ -114,6 +114,25 @@ export function isSketchAnglePair(segmentIds: [string, string], profile: SketchP
   return Boolean(anglePair(segmentIds, profile));
 }
 
+function symmetryInfo(pointIds: [string, string], segmentId: string, profile: SketchProfile, points = new Map(profile.points.map((point) => [point.id, point]))) {
+  if (pointIds[0] === pointIds[1]) return null;
+  const first = points.get(pointIds[0]);
+  const second = points.get(pointIds[1]);
+  const axis = profile.segments.find(({ id }) => id === segmentId);
+  if (!first || !second || !axis) return null;
+  const start = points.get(axis.startId);
+  const end = points.get(axis.endId);
+  if (!start || !end) return null;
+  const length = distance(start, end);
+  if (length <= CONSTRAINT_TOLERANCE_MM) return null;
+  return { first, second, start, end, length, ux: (end.x - start.x) / length, uz: (end.z - start.z) / length };
+}
+
+/** Whether two distinct points and a non-degenerate segment can form a symmetry relation. */
+export function isSketchSymmetrySetup(pointIds: [string, string], segmentId: string, profile: SketchProfile) {
+  return Boolean(symmetryInfo(pointIds, segmentId, profile));
+}
+
 function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, string] }>, points: Map<string, SketchPoint>) {
   const first = points.get(constraint.pointIds[0]);
   const second = points.get(constraint.pointIds[1]);
@@ -177,6 +196,15 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
     if (lengths <= CONSTRAINT_TOLERANCE_MM ** 2) return Number.POSITIVE_INFINITY;
     const cosine = Math.max(-1, Math.min(1, (ux * vx + uz * vz) / lengths));
     return Math.abs(Math.acos(cosine) - constraint.valueDeg * Math.PI / 180);
+  }
+  if (constraint.kind === "symmetry") {
+    const info = symmetryInfo(constraint.pointIds, constraint.segmentId, profile, points);
+    if (!info) return Number.POSITIVE_INFINITY;
+    const middleX = (info.first.x + info.second.x) / 2;
+    const middleZ = (info.first.z + info.second.z) / 2;
+    const onAxis = (middleX - info.start.x) * info.uz - (middleZ - info.start.z) * info.ux;
+    const acrossAxis = (info.second.x - info.first.x) * info.ux + (info.second.z - info.first.z) * info.uz;
+    return Math.max(Math.abs(onAxis), Math.abs(acrossAxis));
   }
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
@@ -324,6 +352,38 @@ function equationRows(
       ]);
       continue;
     }
+    if (constraint.kind === "symmetry") {
+      const info = symmetryInfo(constraint.pointIds, constraint.segmentId, profile, points);
+      if (!info) continue;
+      const { first, second, start, end, length, ux, uz } = info;
+      const middleX = (first.x + second.x) / 2 - start.x;
+      const middleZ = (first.z + second.z) / 2 - start.z;
+      const acrossX = second.x - first.x;
+      const acrossZ = second.z - first.z;
+      const onAxis = middleX * uz - middleZ * ux;
+      const acrossAxis = acrossX * ux + acrossZ * uz;
+      const firstOnAxisX = -uz + (middleX * ux * uz + middleZ * (1 - ux * ux)) / length;
+      const firstOnAxisZ = ux - (middleX * (1 - uz * uz) + middleZ * ux * uz) / length;
+      const secondOnAxisX = -(middleX * ux * uz + middleZ * (1 - ux * ux)) / length;
+      const secondOnAxisZ = (middleX * (1 - uz * uz) + middleZ * ux * uz) / length;
+      const firstAcrossAxisX = (-acrossX * (1 - ux * ux) + acrossZ * ux * uz) / length;
+      const firstAcrossAxisZ = (acrossX * ux * uz - acrossZ * (1 - uz * uz)) / length;
+      const secondAcrossAxisX = (acrossX * (1 - ux * ux) - acrossZ * ux * uz) / length;
+      const secondAcrossAxisZ = (-acrossX * ux * uz + acrossZ * (1 - uz * uz)) / length;
+      add(onAxis, [
+        { pointId: first.id, coordinate: 0, coefficient: 0.5 * uz }, { pointId: first.id, coordinate: 1, coefficient: -0.5 * ux },
+        { pointId: second.id, coordinate: 0, coefficient: 0.5 * uz }, { pointId: second.id, coordinate: 1, coefficient: -0.5 * ux },
+        { pointId: start.id, coordinate: 0, coefficient: firstOnAxisX }, { pointId: start.id, coordinate: 1, coefficient: firstOnAxisZ },
+        { pointId: end.id, coordinate: 0, coefficient: secondOnAxisX }, { pointId: end.id, coordinate: 1, coefficient: secondOnAxisZ },
+      ]);
+      add(acrossAxis, [
+        { pointId: first.id, coordinate: 0, coefficient: -ux }, { pointId: first.id, coordinate: 1, coefficient: -uz },
+        { pointId: second.id, coordinate: 0, coefficient: ux }, { pointId: second.id, coordinate: 1, coefficient: uz },
+        { pointId: start.id, coordinate: 0, coefficient: firstAcrossAxisX }, { pointId: start.id, coordinate: 1, coefficient: firstAcrossAxisZ },
+        { pointId: end.id, coordinate: 0, coefficient: secondAcrossAxisX }, { pointId: end.id, coordinate: 1, coefficient: secondAcrossAxisZ },
+      ]);
+      continue;
+    }
     if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       const first = segment && points.get(segment.startId);
@@ -467,6 +527,9 @@ function breakCollinearDistanceDegeneracy(
     } else if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       if (segment) connect(segment.startId, segment.endId);
+    } else if (constraint.kind === "symmetry") {
+      const axis = profile.segments.find(({ id }) => id === constraint.segmentId);
+      if (axis) connect(axis.startId, axis.endId);
     } else if (constraint.kind === "coincident" || constraint.kind === "distance") {
       connect(constraint.pointIds[0], constraint.pointIds[1]);
     }
@@ -534,6 +597,10 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
     if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
       const segment = profile.segments.find(({ id }) => id === constraint.segmentId);
       return segment ? [segment.startId, segment.endId] : [];
+    }
+    if (constraint.kind === "symmetry") {
+      const axis = profile.segments.find(({ id }) => id === constraint.segmentId);
+      return [...constraint.pointIds, ...(axis ? [axis.startId, axis.endId] : [])];
     }
     return constraint.pointIds;
   }));
@@ -645,6 +712,7 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
     : constraint.kind === "tangent" ? isSketchTangentPair(constraint.segmentIds, profile)
     : constraint.kind === "equalLength" ? isSketchEqualLengthPair(constraint.segmentIds, profile)
     : constraint.kind === "angle" ? isSketchAnglePair(constraint.segmentIds, profile)
+    : constraint.kind === "symmetry" ? isSketchSymmetrySetup(constraint.pointIds, constraint.segmentId, profile)
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
 }
 
@@ -660,7 +728,8 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
   const pointIndex = new Map(profile.points.map((point, index) => [point.id, index * 2]));
   const parameterCount = profile.points.reduce((count, point) => count + 2
     + (point.handleIn ? 2 : 0) + (point.handleOut ? 2 : 0) + (point.sweepDepth !== undefined ? 1 : 0), 0);
-  const equationCount = constraints.reduce((count, constraint) => count + (constraint.kind === "fixed" || constraint.kind === "coincident" ? 2 : 1), 0);
+  const equationCount = constraints.reduce((count, constraint) => count
+    + (constraint.kind === "fixed" || constraint.kind === "coincident" || constraint.kind === "symmetry" ? 2 : 1), 0);
   const rows: number[][] = [];
 
   for (const constraint of constraints) {
@@ -738,6 +807,36 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
         row[base + 1] = (row[base + 1] ?? 0) + coefficients[index * 2 + 1]!;
       });
       rows.push(row);
+      continue;
+    }
+    if (constraint.kind === "symmetry") {
+      const info = symmetryInfo(constraint.pointIds, constraint.segmentId, profile);
+      if (!info) continue;
+      const { first, second, start, end, length, ux, uz } = info;
+      const middleX = (first.x + second.x) / 2 - start.x;
+      const middleZ = (first.z + second.z) / 2 - start.z;
+      const acrossX = second.x - first.x;
+      const acrossZ = second.z - first.z;
+      const firstOnAxisX = -uz + (middleX * ux * uz + middleZ * (1 - ux * ux)) / length;
+      const firstOnAxisZ = ux - (middleX * (1 - uz * uz) + middleZ * ux * uz) / length;
+      const secondOnAxisX = -(middleX * ux * uz + middleZ * (1 - ux * ux)) / length;
+      const secondOnAxisZ = (middleX * (1 - uz * uz) + middleZ * ux * uz) / length;
+      const firstAcrossAxisX = (-acrossX * (1 - ux * ux) + acrossZ * ux * uz) / length;
+      const firstAcrossAxisZ = (acrossX * ux * uz - acrossZ * (1 - uz * uz)) / length;
+      const secondAcrossAxisX = (acrossX * (1 - ux * ux) - acrossZ * ux * uz) / length;
+      const secondAcrossAxisZ = (-acrossX * ux * uz + acrossZ * (1 - uz * uz)) / length;
+      const onAxisRow = Array(parameterCount).fill(0) as number[];
+      const acrossAxisRow = Array(parameterCount).fill(0) as number[];
+      const bases = [first.id, second.id, start.id, end.id].map((id) => pointIndex.get(id)!);
+      const onAxisCoefficients = [0.5 * uz, -0.5 * ux, 0.5 * uz, -0.5 * ux, firstOnAxisX, firstOnAxisZ, secondOnAxisX, secondOnAxisZ];
+      const acrossAxisCoefficients = [-ux, -uz, ux, uz, firstAcrossAxisX, firstAcrossAxisZ, secondAcrossAxisX, secondAcrossAxisZ];
+      bases.forEach((base, index) => {
+        onAxisRow[base] = (onAxisRow[base] ?? 0) + onAxisCoefficients[index * 2]!;
+        onAxisRow[base + 1] = (onAxisRow[base + 1] ?? 0) + onAxisCoefficients[index * 2 + 1]!;
+        acrossAxisRow[base] = (acrossAxisRow[base] ?? 0) + acrossAxisCoefficients[index * 2]!;
+        acrossAxisRow[base + 1] = (acrossAxisRow[base + 1] ?? 0) + acrossAxisCoefficients[index * 2 + 1]!;
+      });
+      rows.push(onAxisRow, acrossAxisRow);
       continue;
     }
     if (constraint.kind === "horizontal" || constraint.kind === "vertical") {

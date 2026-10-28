@@ -496,7 +496,7 @@
       "constraintRemoved": "Sketch constraint removed",
       "constraints": {
         "title": "Constraints",
-        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident or distance, one segment for horizontal or vertical, or two segments for parallel, perpendicular, equal length, or angle.",
+        "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident or distance, one segment for horizontal or vertical, two segments for parallel, perpendicular, equal length, or angle, or two points and an axis for symmetry.",
         "dofEstimate": "Estimated free parameters: {count}. This local rank estimate does not guarantee the constraints are solvable.",
         "dofIndeterminate": "Free parameters: indeterminate because a constrained distance or segment is degenerate.",
         "addCoincident": "Coincident",
@@ -519,12 +519,16 @@
           "distance": "Distance",
           "tangent": "Tangent",
           "equalLength": "Equal length",
-          "angle": "Angle"
+          "angle": "Angle",
+          "symmetry": "Symmetry"
         },
         "addTangent": "Tangent",
         "addEqualLength": "Add equal length",
         "addAngle": "Set angle",
-        "angleDeg": "Angle (°)"
+        "angleDeg": "Angle (°)",
+        "addSymmetry": "Symmetry",
+        "symmetryAxis": "Mirror axis",
+        "segmentOption": "Segment {index}"
       },
       "primitive": {
         "rectangle": "Rectangle",

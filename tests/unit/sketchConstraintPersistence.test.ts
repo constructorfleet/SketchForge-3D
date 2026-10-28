@@ -27,6 +27,7 @@ const sketch: WorkplaneShape = {
       { id: "t", kind: "tangent", segmentIds: ["line", "curve"] },
       { id: "equal", kind: "equalLength", segmentIds: ["line", "other"] },
       { id: "angle", kind: "angle", segmentIds: ["line", "other"], valueDeg: 45 },
+      { id: "symmetry", kind: "symmetry", pointIds: ["a", "c"], segmentId: "line" },
       { id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10 },
       { id: "fixed-a", kind: "fixed", pointId: "a", xMm: 0, zMm: 0 },
     ],
@@ -121,4 +122,28 @@ it("rejects angle constraints that reference a missing or degenerate segment", a
     const bytes = await exportSkfProject({ projectName: "Invalid angle segment", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
     await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentIds/);
   }
+});
+
+it("rejects symmetry constraints with missing or coincident points or a degenerate axis", async () => {
+  const invalidConstraints = [
+    { id: "symmetry", kind: "symmetry" as const, pointIds: ["a", "missing"] as [string, string], segmentId: "line" },
+    { id: "symmetry", kind: "symmetry" as const, pointIds: ["a", "a"] as [string, string], segmentId: "line" },
+    { id: "symmetry", kind: "symmetry" as const, pointIds: ["a", "c"] as [string, string], segmentId: "missing" },
+  ];
+  for (const constraint of invalidConstraints) {
+    const invalid = { ...sketch, sketchProfile: { ...sketch.sketchProfile!, constraints: [constraint] } };
+    const bytes = await exportSkfProject({ projectName: "Invalid symmetry", createdAt: 1, modifiedAt: 1, shapes: [invalid], history: [editorHistoryEntry([invalid], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
+    await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.(pointIds|segmentId)/);
+  }
+
+  const degenerate = {
+    ...sketch,
+    sketchProfile: {
+      ...sketch.sketchProfile!,
+      points: sketch.sketchProfile!.points.map((point) => point.id === "b" ? { ...point, x: 0, z: 0 } : point),
+      constraints: [{ id: "symmetry", kind: "symmetry" as const, pointIds: ["a", "c"] as [string, string], segmentId: "line" }],
+    },
+  };
+  const bytes = await exportSkfProject({ projectName: "Degenerate symmetry axis", createdAt: 1, modifiedAt: 1, shapes: [degenerate], history: [editorHistoryEntry([degenerate], [])], historyIndex: 0, assets: [], workspace: DEFAULT_WORKPLANE_WORKSPACE, snapGrid: DEFAULT_SNAP_GRID, placementElevation: 0 });
+  await expect(importSkfProject(bytes)).rejects.toThrow(/constraints\[0\]\.segmentId/);
 });
