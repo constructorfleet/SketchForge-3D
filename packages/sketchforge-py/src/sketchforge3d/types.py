@@ -283,6 +283,13 @@ class SketchSegmentPairConstraint(TypedDict):
     segmentIds: Tuple[str, str]
 
 
+class SketchAngleConstraint(TypedDict):
+    id: str
+    kind: Literal["angle"]
+    segmentIds: Tuple[str, str]
+    valueDeg: float
+
+
 class SketchDistanceConstraint(TypedDict):
     id: str
     kind: Literal["distance"]
@@ -295,6 +302,7 @@ SketchConstraint = Union[
     SketchCoincidentConstraint,
     SketchAxisConstraint,
     SketchSegmentPairConstraint,
+    SketchAngleConstraint,
     SketchDistanceConstraint,
 ]
 

@@ -97,6 +97,23 @@ export function isSketchEqualLengthPair(segmentIds: [string, string], profile: S
   return Boolean(equalLengthPair(segmentIds, profile));
 }
 
+function anglePair(segmentIds: [string, string], profile: SketchProfile) {
+  if (segmentIds[0] === segmentIds[1]) return null;
+  const pair = segmentPair(segmentIds, profile);
+  if (!pair) return null;
+  const points = new Map(profile.points.map((point) => [point.id, point]));
+  const isNonDegenerate = (segment: typeof pair[0]) => {
+    const start = points.get(segment.startId), end = points.get(segment.endId);
+    return Boolean(start && end && distance(start, end) > CONSTRAINT_TOLERANCE_MM);
+  };
+  return isNonDegenerate(pair[0]) && isNonDegenerate(pair[1]) ? pair : null;
+}
+
+/** Whether the selected segments are a supported pair for an angle relation. */
+export function isSketchAnglePair(segmentIds: [string, string], profile: SketchProfile) {
+  return Boolean(anglePair(segmentIds, profile));
+}
+
 function pointPair(constraint: Extract<SketchConstraint, { pointIds: [string, string] }>, points: Map<string, SketchPoint>) {
   const first = points.get(constraint.pointIds[0]);
   const second = points.get(constraint.pointIds[1]);
@@ -148,6 +165,18 @@ function residual(constraint: SketchConstraint, profile: SketchProfile, points: 
     return firstLength <= CONSTRAINT_TOLERANCE_MM || secondLength <= CONSTRAINT_TOLERANCE_MM
       ? Number.POSITIVE_INFINITY
       : Math.abs(firstLength - secondLength);
+  }
+  if (constraint.kind === "angle") {
+    const pair = anglePair(constraint.segmentIds, profile);
+    const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+    const second = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+    if (!first || !firstEnd || !second || !secondEnd) return Number.POSITIVE_INFINITY;
+    const ux = firstEnd.x - first.x, uz = firstEnd.z - first.z;
+    const vx = secondEnd.x - second.x, vz = secondEnd.z - second.z;
+    const lengths = Math.hypot(ux, uz) * Math.hypot(vx, vz);
+    if (lengths <= CONSTRAINT_TOLERANCE_MM ** 2) return Number.POSITIVE_INFINITY;
+    const cosine = Math.max(-1, Math.min(1, (ux * vx + uz * vz) / lengths));
+    return Math.abs(Math.acos(cosine) - constraint.valueDeg * Math.PI / 180);
   }
   if (constraint.kind === "horizontal" || constraint.kind === "vertical") {
     const segment = profile.segments.find((candidate) => candidate.id === constraint.segmentId);
@@ -268,6 +297,30 @@ function equationRows(
         { pointId: secondStart.id, coordinate: 1, coefficient: secondZ },
         { pointId: secondEnd.id, coordinate: 0, coefficient: -secondX },
         { pointId: secondEnd.id, coordinate: 1, coefficient: -secondZ },
+      ]);
+      continue;
+    }
+    if (constraint.kind === "angle") {
+      const pair = anglePair(constraint.segmentIds, profile);
+      const first = pair && points.get(pair[0].startId), firstEnd = pair && points.get(pair[0].endId);
+      const second = pair && points.get(pair[1].startId), secondEnd = pair && points.get(pair[1].endId);
+      if (!first || !firstEnd || !second || !secondEnd) continue;
+      const ux = firstEnd.x - first.x, uz = firstEnd.z - first.z;
+      const vx = secondEnd.x - second.x, vz = secondEnd.z - second.z;
+      const firstLength = Math.hypot(ux, uz), secondLength = Math.hypot(vx, vz);
+      if (firstLength <= CONSTRAINT_TOLERANCE_MM || secondLength <= CONSTRAINT_TOLERANCE_MM) continue;
+      const cosine = (ux * vx + uz * vz) / (firstLength * secondLength);
+      const sine = Math.sqrt(Math.max(0, 1 - cosine * cosine));
+      const scale = -1 / Math.max(sine, 1e-6);
+      const gux = (vx / (firstLength * secondLength) - cosine * ux / (firstLength * firstLength)) * scale;
+      const guz = (vz / (firstLength * secondLength) - cosine * uz / (firstLength * firstLength)) * scale;
+      const gvx = (ux / (firstLength * secondLength) - cosine * vx / (secondLength * secondLength)) * scale;
+      const gvz = (uz / (firstLength * secondLength) - cosine * vz / (secondLength * secondLength)) * scale;
+      add(Math.acos(Math.max(-1, Math.min(1, cosine))) - constraint.valueDeg * Math.PI / 180, [
+        { pointId: first.id, coordinate: 0, coefficient: -gux }, { pointId: first.id, coordinate: 1, coefficient: -guz },
+        { pointId: firstEnd.id, coordinate: 0, coefficient: gux }, { pointId: firstEnd.id, coordinate: 1, coefficient: guz },
+        { pointId: second.id, coordinate: 0, coefficient: -gvx }, { pointId: second.id, coordinate: 1, coefficient: -gvz },
+        { pointId: secondEnd.id, coordinate: 0, coefficient: gvx }, { pointId: secondEnd.id, coordinate: 1, coefficient: gvz },
       ]);
       continue;
     }
@@ -405,8 +458,8 @@ function breakCollinearDistanceDegeneracy(
     } else if (constraint.kind === "tangent") {
       const info = tangentInfo(constraint.segmentIds, profile, points);
       if (info) connect(info.line.startId, info.line.endId);
-    } else if (constraint.kind === "equalLength") {
-      const pair = equalLengthPair(constraint.segmentIds, profile);
+    } else if (constraint.kind === "equalLength" || constraint.kind === "angle") {
+      const pair = constraint.kind === "equalLength" ? equalLengthPair(constraint.segmentIds, profile) : anglePair(constraint.segmentIds, profile);
       if (pair) {
         connect(pair[0].startId, pair[0].endId);
         connect(pair[1].startId, pair[1].endId);
@@ -470,7 +523,7 @@ export function solveSketchConstraints(profile: SketchProfile, anchoredPointIds:
   const anchors = new Set([...anchoredPointIds, ...fixedPointConstraints.map((constraint) => constraint.pointId)]);
   const constrainedPointIds = new Set(constraints.flatMap((constraint) => {
     if (constraint.kind === "fixed") return [constraint.pointId];
-    if (constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "equalLength") return constraint.segmentIds.flatMap((id) => {
+    if (constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "equalLength" || constraint.kind === "angle") return constraint.segmentIds.flatMap((id) => {
       const segment = profile.segments.find(({ id: candidate }) => candidate === id);
       return segment ? [segment.startId, segment.endId] : [];
     });
@@ -591,6 +644,7 @@ export function sketchConstraintsForProfile(profile: SketchProfile) {
     : constraint.kind === "perpendicular" || constraint.kind === "parallel" ? constraint.segmentIds.every((id) => segmentIds.has(id))
     : constraint.kind === "tangent" ? isSketchTangentPair(constraint.segmentIds, profile)
     : constraint.kind === "equalLength" ? isSketchEqualLengthPair(constraint.segmentIds, profile)
+    : constraint.kind === "angle" ? isSketchAnglePair(constraint.segmentIds, profile)
     : pointIds.has(constraint.pointIds[0]) && pointIds.has(constraint.pointIds[1]));
 }
 
@@ -619,7 +673,7 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
       rows.push(xRow, zRow);
       continue;
     }
-    if (constraint.kind === "perpendicular" || constraint.kind === "parallel") {
+    if (constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "angle") {
       const firstSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[0])!;
       const secondSegment = profile.segments.find(({ id }) => id === constraint.segmentIds[1])!;
       const ids = [firstSegment.startId, firstSegment.endId, secondSegment.startId, secondSegment.endId];
@@ -628,13 +682,15 @@ export function sketchConstraintDegreesOfFreedom(profile: SketchProfile): Sketch
       const ux = b!.x - a!.x, uz = b!.z - a!.z, vx = d!.x - c!.x, vz = d!.z - c!.z;
       const lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
       if (lu <= CONSTRAINT_TOLERANCE_MM || lv <= CONSTRAINT_TOLERANCE_MM) return { parameterCount, equationCount, rank: null, degreesOfFreedom: null, status: "indeterminate", reason: "degenerate-segment" };
-      const relation = constraint.kind === "perpendicular" ? (ux * vx + uz * vz) / (lu * lv) : (ux * vz - uz * vx) / (lu * lv);
-      const gux = (constraint.kind === "perpendicular" ? vx : vz) / (lu * lv) - relation * ux / (lu * lu);
-      const guz = (constraint.kind === "perpendicular" ? vz : -vx) / (lu * lv) - relation * uz / (lu * lu);
-      const gvx = (constraint.kind === "perpendicular" ? ux : -uz) / (lu * lv) - relation * vx / (lv * lv);
-      const gvz = (constraint.kind === "perpendicular" ? uz : ux) / (lu * lv) - relation * vz / (lv * lv);
+      const usesSine = constraint.kind === "parallel";
+      const relation = usesSine ? (ux * vz - uz * vx) / (lu * lv) : (ux * vx + uz * vz) / (lu * lv);
+      const gux = (usesSine ? vz : vx) / (lu * lv) - relation * ux / (lu * lu);
+      const guz = (usesSine ? -vx : vz) / (lu * lv) - relation * uz / (lu * lu);
+      const gvx = (usesSine ? -uz : ux) / (lu * lv) - relation * vx / (lv * lv);
+      const gvz = (usesSine ? ux : uz) / (lu * lv) - relation * vz / (lv * lv);
+      const scale = constraint.kind === "angle" ? -1 / Math.max(Math.sqrt(Math.max(0, 1 - relation * relation)), 1e-6) : 1;
       const row = Array(parameterCount).fill(0) as number[];
-      const coefficients = [-gux, -guz, gux, guz, -gvx, -gvz, gvx, gvz];
+      const coefficients = [-gux * scale, -guz * scale, gux * scale, guz * scale, -gvx * scale, -gvz * scale, gvx * scale, gvz * scale];
       ids.forEach((id, index) => {
         const base = pointIndex.get(id)!;
         row[base] = (row[base] ?? 0) + coefficients[index * 2]!;

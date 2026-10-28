@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addSketchConstraint, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
+import { addSketchConstraint, isSketchAnglePair, removeSketchConstraint, solveSketchConstraints, sketchConstraintDegreesOfFreedom, sketchConstraintsForProfile } from "@/lib/sketchConstraints";
 import type { SketchProfile } from "@/types/sketchforge";
 
 function profile(overrides: Partial<SketchProfile> = {}): SketchProfile {
@@ -177,6 +177,105 @@ describe("solveSketchConstraints", () => {
     expect(points.get("d")).toMatchObject({ x: 6, z: 5 });
     expect(segmentLength("first")).toBeCloseTo(segmentLength("second"), 5);
     expect(before.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(constrained).degreesOfFreedom!).toBe(1);
+  });
+
+  it("sets the angle between two selected segments while anchoring the first", () => {
+    const source = profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 5, z: 5 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+    });
+    const constraint = { id: "angle", kind: "angle" as const, segmentIds: ["base", "other"] as [string, string], valueDeg: 30 };
+    const before = sketchConstraintDegreesOfFreedom(source);
+    const constrained = { ...source, constraints: [constraint] };
+    const result = solveSketchConstraints(constrained, ["a", "b"]);
+    const points = new Map(result.profile.points.map((point) => [point.id, point]));
+    const [a, b, c, d] = [points.get("a")!, points.get("b")!, points.get("c")!, points.get("d")!];
+    const cosine = ((b.x - a.x) * (d.x - c.x) + (b.z - a.z) * (d.z - c.z))
+      / (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(d.x - c.x, d.z - c.z));
+    const angle = Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI;
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(angle).toBeCloseTo(30, 4);
+    expect(before.degreesOfFreedom! - sketchConstraintDegreesOfFreedom(constrained).degreesOfFreedom!).toBe(1);
+    expect(sketchConstraintsForProfile(result.profile)).toHaveLength(1);
+  });
+
+  it("measures an angle between 90 and 180 degrees as the larger angle", () => {
+    const source = profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 5, z: 5 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "angle", kind: "angle", segmentIds: ["base", "other"], valueDeg: 150 }],
+    });
+    const result = solveSketchConstraints(source, ["a", "b"]);
+    const points = new Map(result.profile.points.map((point) => [point.id, point]));
+    const [a, b, c, d] = [points.get("a")!, points.get("b")!, points.get("c")!, points.get("d")!];
+    const cosine = ((b.x - a.x) * (d.x - c.x) + (b.z - a.z) * (d.z - c.z))
+      / (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(d.x - c.x, d.z - c.z));
+    const angle = Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI;
+
+    expect(result.unsatisfiedConstraintIds).toEqual([]);
+    expect(angle).toBeCloseTo(150, 4);
+  });
+
+  it("solves a zero-degree angle as parallel and a 180-degree angle as opposite", () => {
+    const source = (start: { x: number; z: number }, target: number) => profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", ...start },
+      ],
+      segments: [{ id: "base", startId: "a", endId: "b" }, { id: "other", startId: "c", endId: "d" }],
+      constraints: [{ id: "angle", kind: "angle", segmentIds: ["base", "other"], valueDeg: target }],
+    });
+    const measure = (result: ReturnType<typeof solveSketchConstraints>) => {
+      const points = new Map(result.profile.points.map((point) => [point.id, point]));
+      const [a, b, c, d] = [points.get("a")!, points.get("b")!, points.get("c")!, points.get("d")!];
+      const cosine = ((b.x - a.x) * (d.x - c.x) + (b.z - a.z) * (d.z - c.z))
+        / (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(d.x - c.x, d.z - c.z));
+      return Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI;
+    };
+
+    const parallel = solveSketchConstraints(source({ x: 8, z: 3 }, 0), ["a", "b"]);
+    expect(parallel.unsatisfiedConstraintIds).toEqual([]);
+    expect(measure(parallel)).toBeCloseTo(0, 3);
+    const opposite = solveSketchConstraints(source({ x: -8, z: 3 }, 180), ["a", "b"]);
+    expect(opposite.unsatisfiedConstraintIds).toEqual([]);
+    expect(measure(opposite)).toBeCloseTo(180, 3);
+  });
+
+  it("does not offer an angle for a degenerate segment", () => {
+    const source = profile({
+      points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 0, z: 0 }, { id: "c", x: 0, z: 0 }, { id: "d", x: 5, z: 5 }],
+      segments: [{ id: "base", startId: "a", endId: "b" }, { id: "other", startId: "c", endId: "d" }],
+    });
+    expect(isSketchAnglePair(["base", "other"], source)).toBe(false);
+  });
+
+  it("counts an angle relation as one independent equation in the local freedom estimate", () => {
+    const report = sketchConstraintDegreesOfFreedom(profile({
+      points: [
+        { id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 },
+        { id: "c", x: 0, z: 0 }, { id: "d", x: 4, z: 3 },
+      ],
+      segments: [
+        { id: "base", startId: "a", endId: "b" },
+        { id: "other", startId: "c", endId: "d" },
+      ],
+      constraints: [{ id: "angle", kind: "angle", segmentIds: ["base", "other"], valueDeg: 45 }],
+    }));
+
+    expect(report).toMatchObject({ status: "estimated", equationCount: 1, rank: 1, degreesOfFreedom: 7 });
   });
 
   it("counts a perpendicular relation as one independent equation in the local freedom estimate", () => {

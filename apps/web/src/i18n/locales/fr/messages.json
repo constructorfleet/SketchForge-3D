@@ -530,10 +530,11 @@
           "vertical": "Verticale",
           "parallel": "Parallèle",
           "perpendicular": "Perpendiculaire",
-          "distance": "Distance"
+          "distance": "Distance",
+          "angle": "Angle"
         },
         "addEqualLength": "Ajouter une longueur égale",
-        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence ou distance, un segment pour horizontal ou vertical, ou deux segments pour parallèle, perpendiculaire ou longueur égale.",
+        "hint": "Sélectionnez un point pour le fixer, deux points pour coïncidence ou distance, un segment pour horizontal ou vertical, ou deux segments pour parallèle, perpendiculaire, longueur égale ou angle.",
         "title": "Contraintes",
         "dofEstimate": "Paramètres libres estimés : {count}. Cette estimation locale du rang ne garantit pas que les contraintes peuvent être satisfaites.",
         "dofIndeterminate": "Paramètres libres : indéterminés, car une distance ou un segment contraint est dégénéré.",
@@ -546,7 +547,9 @@
         "addDistance": "Définir la distance",
         "distanceMm": "Distance en mm",
         "twoSegments": "deux segments",
-        "remove": "Supprimer la contrainte « {kind} »"
+        "remove": "Supprimer la contrainte « {kind} »",
+        "addAngle": "Définir l’angle",
+        "angleDeg": "Angle (°)"
       },
       "constraintUnsatisfied": "Impossible de satisfaire la ou les contraintes d’esquisse : {ids}",
       "constraintAdded": "Contrainte d’esquisse ajoutée : {kind}",

@@ -530,10 +530,11 @@
           "vertical": "Svislá",
           "parallel": "Rovnoběžná",
           "perpendicular": "Kolmá",
-          "distance": "Vzdálenost"
+          "distance": "Vzdálenost",
+          "angle": "Úhel"
         },
         "addEqualLength": "Přidat stejnou délku",
-        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, nebo dva segmenty pro rovnoběžnost, kolmost či stejnou délku.",
+        "hint": "Vyberte jeden bod k pevnému umístění, dva body pro shodu nebo vzdálenost, jeden úsečkový segment pro vodorovnou či svislou polohu, nebo dva segmenty pro rovnoběžnost, kolmost, stejnou délku nebo úhel.",
         "title": "Vazby",
         "dofEstimate": "Odhad volných parametrů: {count}. Tento místní odhad nezaručuje, že se vazby podaří vyřešit.",
         "dofIndeterminate": "Volné parametry: nelze určit, protože některá vázaná vzdálenost nebo segment jsou nulové.",
@@ -546,7 +547,9 @@
         "addDistance": "Nastavit vzdálenost",
         "distanceMm": "Vzdálenost (mm)",
         "twoSegments": "2 segmenty",
-        "remove": "Odebrat vazbu: {kind}"
+        "remove": "Odebrat vazbu: {kind}",
+        "addAngle": "Nastavit úhel",
+        "angleDeg": "Úhel (°)"
       },
       "constraintUnsatisfied": "Vazby náčrtu se nepodařilo splnit: {ids}",
       "constraintAdded": "Přidána vazba náčrtu: {kind}",

@@ -8,7 +8,7 @@ import { notice, unitLabel, useTranslations, type Notice } from "@/i18n";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
-import { isSketchEqualLengthPair, isSketchTangentPair, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
+import { isSketchAnglePair, isSketchEqualLengthPair, isSketchTangentPair, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
 import { projectSweepSectionPoint, sketchSweepGuideRoles, snapInitialSweepSpineEndpoint, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
@@ -1361,6 +1361,7 @@ function SketchConstraintPanel({
     : never;
   const t = useTranslations();
   const [distanceValue, setDistanceValue] = useState("10");
+  const [angleValue, setAngleValue] = useState("45");
   const pointIds = selected?.kind === "point" ? [selected.id] : selected?.kind === "multiple" ? selected.pointIds : [];
   const selectedPoint = pointIds.length === 1 ? profile.points.find(({ id }) => id === pointIds[0]) : null;
   const selectedPair = pointIds.length === 2 && pointIds[0] !== pointIds[1] ? pointIds as [string, string] : null;
@@ -1369,7 +1370,9 @@ function SketchConstraintPanel({
     ? selected.segmentIds as [string, string] : null;
   const selectedTangentPair = selectedSegmentPair && isSketchTangentPair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
   const selectedEqualLengthPair = selectedSegmentPair && isSketchEqualLengthPair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
+  const selectedAnglePair = selectedSegmentPair && isSketchAnglePair(selectedSegmentPair, profile) ? selectedSegmentPair : null;
   const valueMm = Number(distanceValue);
+  const angleDeg = Number(angleValue);
   const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
   const addConstraint = (constraint: NewConstraint) => onAddConstraint({ ...constraint, id: createLocalId("constraint") } as SketchConstraint);
 
@@ -1392,6 +1395,11 @@ function SketchConstraintPanel({
         <button type="button" disabled={!selectedTangentPair} onClick={() => selectedTangentPair && addConstraint({ kind: "tangent", segmentIds: selectedTangentPair })}>{t("editor.sketch.constraints.addTangent")}</button>
         <button type="button" disabled={!selectedEqualLengthPair} onClick={() => selectedEqualLengthPair && addConstraint({ kind: "equalLength", segmentIds: selectedEqualLengthPair })}>{t("editor.sketch.constraints.addEqualLength")}</button>
         <label>
+          <span>{t("editor.sketch.constraints.angleDeg")}</span>
+          <input type="number" min="0" max="180" step="1" value={angleValue} onChange={(event) => setAngleValue(event.currentTarget.value)} />
+        </label>
+        <button type="button" disabled={!selectedAnglePair || !Number.isFinite(angleDeg) || angleDeg < 0 || angleDeg > 180} onClick={() => selectedAnglePair && addConstraint({ kind: "angle", segmentIds: selectedAnglePair, valueDeg: angleDeg })}>{t("editor.sketch.constraints.addAngle")}</button>
+        <label>
           <span>{t("editor.sketch.constraints.distanceMm")}</span>
           <input type="number" min="0" step="0.1" value={distanceValue} onChange={(event) => setDistanceValue(event.currentTarget.value)} />
         </label>
@@ -1404,7 +1412,9 @@ function SketchConstraintPanel({
               ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.pointId} (${constraint.xMm}, ${constraint.zMm}) mm`
               : constraint.kind === "distance"
                 ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm ${constraint.pointIds.join("–")}`
-                : `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "tangent" || constraint.kind === "equalLength" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}`}</span>
+                : constraint.kind === "angle"
+                  ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueDeg}° ${t("editor.sketch.constraints.twoSegments")}`
+                  : `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "tangent" || constraint.kind === "equalLength" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}`}</span>
             <button type="button" aria-label={t("editor.sketch.constraints.remove", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })} onClick={() => onRemoveConstraint(constraint.id)}>×</button>
           </div>
         ))}

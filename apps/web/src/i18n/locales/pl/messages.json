@@ -530,10 +530,11 @@
           "vertical": "Pionowo",
           "parallel": "Równolegle",
           "perpendicular": "Prostopadle",
-          "distance": "Odległość"
+          "distance": "Odległość",
+          "angle": "Kąt"
         },
         "addEqualLength": "Dodaj równą długość",
-        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości lub równej długości.",
+        "hint": "Wybierz jeden punkt, aby go ustalić, dwa punkty dla zbieżności lub odległości, jeden segment dla poziomego lub pionowego albo dwa segmenty dla równoległości, prostopadłości, równej długości lub kąta.",
         "title": "Więzy",
         "dofEstimate": "Szacowana liczba swobodnych parametrów: {count}. To lokalne oszacowanie rzędu nie gwarantuje, że więzy da się spełnić.",
         "dofIndeterminate": "Nie można ustalić liczby swobodnych parametrów, ponieważ ustalona odległość lub odcinek ma zerową długość.",
@@ -546,7 +547,9 @@
         "addDistance": "Ustaw odległość",
         "distanceMm": "Odległość (mm)",
         "twoSegments": "2 odcinki",
-        "remove": "Usuń więz: {kind}"
+        "remove": "Usuń więz: {kind}",
+        "addAngle": "Ustaw kąt",
+        "angleDeg": "Kąt (°)"
       },
       "constraintUnsatisfied": "Nie udało się spełnić więzów szkicu: {ids}",
       "constraintAdded": "Dodano więz szkicu: {kind}",

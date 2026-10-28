@@ -530,10 +530,11 @@
           "vertical": "Vertical",
           "parallel": "Paralela",
           "perpendicular": "Perpendicular",
-          "distance": "Distancia"
+          "distance": "Distancia",
+          "angle": "Ángulo"
         },
         "addEqualLength": "Añadir longitud igual",
-        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, o dos segmentos para paralelo, perpendicular o igual longitud.",
+        "hint": "Selecciona un punto para fijarlo, dos puntos para coincidir o establecer una distancia, un segmento para horizontal o vertical, o dos segmentos para paralelo, perpendicular, igual longitud o ángulo.",
         "title": "Restricciones",
         "dofEstimate": "Parámetros libres estimados: {count}. Esta estimación del rango local no garantiza que las restricciones se puedan resolver.",
         "dofIndeterminate": "Parámetros libres: indeterminados porque una distancia restringida o un segmento es degenerado.",
@@ -546,7 +547,9 @@
         "addDistance": "Establecer distancia",
         "distanceMm": "Distancia (mm)",
         "twoSegments": "2 segmentos",
-        "remove": "Quitar la restricción {kind}"
+        "remove": "Quitar la restricción {kind}",
+        "addAngle": "Establecer ángulo",
+        "angleDeg": "Ángulo (°)"
       },
       "constraintUnsatisfied": "No se pudieron cumplir estas restricciones del boceto: {ids}",
       "constraintAdded": "Se agregó la restricción de boceto: {kind}",

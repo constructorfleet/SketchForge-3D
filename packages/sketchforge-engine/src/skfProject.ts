@@ -1076,7 +1076,7 @@ function validateSketchProfile(value: unknown, label: string) {
         if (!segmentIds.has(stringValue(constraint.segmentId, `${constraintLabel}.segmentId`))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentId` });
         }
-      } else if (kind === "perpendicular" || kind === "parallel" || kind === "tangent" || kind === "equalLength") {
+      } else if (kind === "perpendicular" || kind === "parallel" || kind === "tangent" || kind === "equalLength" || kind === "angle") {
         if (!Array.isArray(constraint.segmentIds) || constraint.segmentIds.length !== 2 || constraint.segmentIds[0] === constraint.segmentIds[1] || !constraint.segmentIds.every((segmentId) => typeof segmentId === "string" && segmentIds.has(segmentId))) {
           throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
         }
@@ -1103,6 +1103,17 @@ function validateSketchProfile(value: unknown, label: string) {
           const curve = isBezier(first) ? first : second;
           if (!sharedPoint || (curve.startId === shared[0] ? !sharedPoint.handleOut : !sharedPoint.handleIn)) {
             throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.segmentIds` });
+          }
+        }
+        if (kind === "angle") {
+          const value = finiteNumber(constraint.valueDeg, `${constraintLabel}.valueDeg`);
+          const [first, second] = constraint.segmentIds.map((segmentId) => segmentById.get(String(segmentId))!);
+          const length = (segment: typeof first) => {
+            const start = pointById.get(String(segment.startId))!, end = pointById.get(String(segment.endId))!;
+            return Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z));
+          };
+          if (value < 0 || value > 180 || length(first) <= 1e-5 || length(second) <= 1e-5) {
+            throw new LocalizedError("errors.skf.fieldInvalid", { label: value < 0 || value > 180 ? `${constraintLabel}.valueDeg` : `${constraintLabel}.segmentIds` });
           }
         }
       } else if (kind === "coincident" || kind === "distance") {
