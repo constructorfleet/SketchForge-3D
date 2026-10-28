@@ -1405,7 +1405,7 @@ function SketchConstraintPanel({
               : constraint.kind === "distance"
                 ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm ${constraint.pointIds.join("–")}`
                 : `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.kind === "horizontal" || constraint.kind === "vertical" ? constraint.segmentId : constraint.kind === "perpendicular" || constraint.kind === "parallel" || constraint.kind === "tangent" || constraint.kind === "equalLength" ? t("editor.sketch.constraints.twoSegments") : constraint.pointIds.join("–")}`}</span>
-            <button type="button" aria-label={t("editor.sketch.constraints.remove", { kind: constraint.kind })} onClick={() => onRemoveConstraint(constraint.id)}>×</button>
+            <button type="button" aria-label={t("editor.sketch.constraints.remove", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })} onClick={() => onRemoveConstraint(constraint.id)}>×</button>
           </div>
         ))}
       </div>
