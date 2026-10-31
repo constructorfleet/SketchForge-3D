@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSweepAxis, projectSweepSectionPoint, sketchSweepGuideRoles, sketchSweepStage, sketchToolForSweepStage, snapInitialSweepSpineEndpoint, sweepFramesForSectionWorkplane, tagSweepProfile } from "@/lib/sketchSweepGuides";
+import { centerSweepSection, formatSweepAxis, projectSweepSectionPoint, sketchSweepGuideRoles, sketchSweepStage, sketchToolForSweepStage, snapInitialSweepSpineEndpoint, sweepFramesForSectionWorkplane, sweepProfileStatus, sweepSectionOffset, sweepSpineStartPointId, tagSweepProfile, withSweepSpineStart } from "@/lib/sketchSweepGuides";
 
 describe("sweep construction guide roles", () => {
   it("returns to selection mode when editing the section and drawing mode for the spine", () => {
@@ -109,6 +109,132 @@ describe("sweep construction guide roles", () => {
 
     expect(roles.segmentRoles.size).toBe(0);
     expect(roles.pointRoles.size).toBe(0);
+  });
+
+  it("reports section and spine progress and only calls a completed sweep ready", () => {
+    const section = {
+      closed: true,
+      points: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      steps: [{ segment: { id: "ab" } }, { segment: { id: "bc" } }, { segment: { id: "ca" } }],
+    };
+    const spine = {
+      closed: false,
+      points: [{ id: "start" }, { id: "end" }],
+      steps: [{ segment: { id: "spine" } }],
+    };
+    const secondSpine = {
+      closed: false,
+      points: [{ id: "start-2" }, { id: "end-2" }],
+      steps: [{ segment: { id: "spine-2" } }],
+    };
+
+    expect(sweepProfileStatus([])).toEqual({
+      hasSection: false, hasSpine: false, sectionCount: 0, spineCount: 0, ready: false,
+    });
+    expect(sweepProfileStatus([section])).toEqual({
+      hasSection: true, hasSpine: false, sectionCount: 1, spineCount: 0, ready: false,
+    });
+    expect(sweepProfileStatus([section, spine])).toEqual({
+      hasSection: true, hasSpine: true, sectionCount: 1, spineCount: 1, ready: true,
+    });
+    expect(sweepProfileStatus([section, spine, secondSpine])).toMatchObject({ spineCount: 2, ready: false });
+    // A start point on its own is not a spine yet.
+    expect(sweepProfileStatus([section, { closed: false, points: [{ id: "start" }], steps: [] }])).toMatchObject({
+      hasSpine: false, ready: false,
+    });
+  });
+
+  it("finds the sweep start at the section origin even when the path is ordered from the other end", () => {
+    const profile = {
+      points: [
+        { id: "section-a", x: -1, z: -1, sweepRole: "section" as const },
+        { id: "section-b", x: 1, z: -1, sweepRole: "section" as const },
+        { id: "section-c", x: 1, z: 1, sweepRole: "section" as const },
+        { id: "spine-start", x: 0, z: 0, sweepRole: "spine" as const },
+        { id: "spine-end", x: 10, z: 0, sweepRole: "spine" as const },
+      ],
+      segments: [
+        { id: "section-ab", startId: "section-a", endId: "section-b" },
+        { id: "section-bc", startId: "section-b", endId: "section-c" },
+        { id: "section-ca", startId: "section-c", endId: "section-a" },
+        // Stored back to front: the ordered path begins at spine-end.
+        { id: "spine", startId: "spine-end", endId: "spine-start" },
+      ],
+    };
+
+    expect(sweepSpineStartPointId(profile)).toBe("spine-start");
+    expect(sweepSpineStartPointId({ ...profile, points: profile.points.filter((point) => point.sweepRole === "section") })).toBeNull();
+    expect(sweepSpineStartPointId({
+      points: [
+        { id: "legacy-start", x: 5, z: 0, sweepRole: "spine" as const },
+        { id: "legacy-end", x: 15, z: 0, sweepRole: "spine" as const },
+      ],
+      segments: [{ id: "legacy", startId: "legacy-start", endId: "legacy-end" }],
+    })).toBe("legacy-start");
+  });
+
+  it("adds a start point at the section origin only when a sweep has no spine yet", () => {
+    const sectionProfile = {
+      points: [
+        { id: "section-a", x: -1, z: -1, sweepRole: "section" as const },
+        { id: "section-b", x: 1, z: -1, sweepRole: "section" as const },
+        { id: "section-c", x: 1, z: 1, sweepRole: "section" as const },
+        { id: "section-d", x: -1, z: 1, sweepRole: "section" as const },
+      ],
+      segments: [
+        { id: "ab", startId: "section-a", endId: "section-b" },
+        { id: "bc", startId: "section-b", endId: "section-c" },
+        { id: "cd", startId: "section-c", endId: "section-d" },
+        { id: "da", startId: "section-d", endId: "section-a" },
+      ],
+    };
+
+    const ensured = withSweepSpineStart(sectionProfile, "start-id");
+    expect(ensured.created).toBe(true);
+    expect(ensured.pointId).toBe("start-id");
+    expect(ensured.profile.points.at(-1)).toEqual({
+      id: "start-id", x: 0, z: 0, sweepRole: "spine", mode: "corner",
+    });
+
+    const again = withSweepSpineStart(ensured.profile, "other-id");
+    expect(again.created).toBe(false);
+    expect(again.pointId).toBe("start-id");
+    expect(again.profile).toBe(ensured.profile);
+
+    const legacy = {
+      points: [{ id: "legacy", x: 5, z: 0, sweepRole: "spine" as const }],
+      segments: [],
+    };
+    const kept = withSweepSpineStart(legacy, "start-id");
+    expect(kept.created).toBe(false);
+    expect(kept.pointId).toBe("legacy");
+    expect(kept.profile).toBe(legacy);
+  });
+
+  it("centres an off-origin section on the sweep origin and leaves the spine untouched", () => {
+    const profile = {
+      points: [
+        { id: "a", x: 9, z: -1, sweepRole: "section" as const, handleOut: { x: 10, z: -1 } },
+        { id: "b", x: 11, z: 1, sweepRole: "section" as const },
+        { id: "start", x: 0, z: 0, sweepRole: "spine" as const },
+        { id: "end", x: 10, z: 0, sweepRole: "spine" as const, sweepDepth: 3 },
+      ],
+      segments: [],
+      constraints: [{ id: "fix", kind: "fixed" as const, pointId: "a", xMm: 9, zMm: -1 }],
+    };
+
+    expect(sweepSectionOffset(profile)).toEqual({ x: 10, z: 0 });
+    const centred = centerSweepSection(profile);
+    expect(centred.points).toEqual([
+      { id: "a", x: -1, z: -1, sweepRole: "section", handleOut: { x: 0, z: -1 } },
+      { id: "b", x: 1, z: 1, sweepRole: "section" },
+      { id: "start", x: 0, z: 0, sweepRole: "spine" },
+      { id: "end", x: 10, z: 0, sweepRole: "spine", sweepDepth: 3 },
+    ]);
+    expect(centred.constraints).toEqual([{ id: "fix", kind: "fixed", pointId: "a", xMm: -1, zMm: -1 }]);
+    expect(centerSweepSection(centred)).toBe(centred);
+
+    expect(sweepSectionOffset({ points: [{ id: "start", x: 0, z: 0, sweepRole: "spine" as const }], segments: [] })).toBeNull();
   });
 
   it("does not change ordinary extrusion sketch roles", () => {

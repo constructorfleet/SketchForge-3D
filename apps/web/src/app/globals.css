@@ -3910,6 +3910,138 @@ html[data-theme="dark"] .editor-autosave-alert {
   pointer-events: auto;
 }
 
+.sketch-sweep-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sketch-sweep-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 9px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #c9dde6;
+  border-radius: 8px;
+}
+
+.sketch-sweep-step.current {
+  border-color: #159fd0;
+  box-shadow: 0 0 0 2px rgba(21, 159, 208, 0.16);
+}
+
+.sketch-sweep-step.done .sketch-sweep-step-number {
+  color: #ffffff;
+  background: #2f9e62;
+  border-color: #2f9e62;
+}
+
+.sketch-sweep-step-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: #173b5a;
+  background: #eef8fc;
+  border: 1px solid #9fc2d2;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.sketch-sweep-step-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sketch-sweep-step-copy strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.sketch-sweep-step-copy small {
+  color: #567184;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sketch-sweep-next {
+  margin: 0;
+  color: #173b5a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sketch-sweep-axes {
+  color: #567184;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sketch-sweep-offset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 8px;
+  color: #7a4a00;
+  background: #fff6e5;
+  border: 1px solid #f0c27a;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.sketch-sweep-offset button {
+  padding: 3px 8px;
+  color: #5b3700;
+  background: #ffffff;
+  border: 1px solid #d19a3d;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.sketch-sweep-offset button:hover {
+  background: #ffe9bf;
+}
+
+.sketch-sweep-start circle {
+  fill: none;
+  stroke: #b12582;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.sketch-sweep-start line {
+  stroke: #b12582;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.sketch-sweep-start text {
+  fill: #7e164f;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.sketch-plate.operation-sweep .sketch-points circle.sweep-start-point {
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
 .sketch-plate.operation-sweep.stage-section .sketch-plate-background {
   fill: #f8fbfc;
 }
@@ -4008,7 +4140,7 @@ html[data-theme="dark"] .editor-autosave-alert {
   font-weight: 700;
 }
 
-.sketch-revolve-preview {
+.sketch-mesh-preview {
   position: absolute;
   top: 18px;
   right: 22px;
@@ -4023,7 +4155,7 @@ html[data-theme="dark"] .editor-autosave-alert {
   pointer-events: none;
 }
 
-.sketch-revolve-preview-title {
+.sketch-mesh-preview-title {
   position: absolute;
   top: 10px;
   left: 12px;
@@ -4035,14 +4167,14 @@ html[data-theme="dark"] .editor-autosave-alert {
   text-transform: uppercase;
 }
 
-.sketch-revolve-preview canvas {
+.sketch-mesh-preview canvas {
   display: block;
   width: 100%;
   height: 100%;
   background: radial-gradient(circle at 50% 48%, rgba(221, 248, 255, 0.98), rgba(176, 224, 238, 0.96));
 }
 
-.sketch-revolve-preview-empty {
+.sketch-mesh-preview-empty {
   display: grid;
   height: 100%;
   place-items: center;
@@ -8939,22 +9071,66 @@ html[data-theme="dark"] .sketch-workspace-stage {
   background: #101820;
 }
 
-html[data-theme="dark"] .sketch-revolve-preview {
+html[data-theme="dark"] .sketch-mesh-preview {
   background: rgba(17, 33, 43, 0.97);
   border-color: rgba(73, 126, 149, 0.8);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
 }
 
-html[data-theme="dark"] .sketch-revolve-preview-title {
+html[data-theme="dark"] .sketch-mesh-preview-title {
   color: #b9d7e5;
 }
 
-html[data-theme="dark"] .sketch-revolve-preview canvas {
+html[data-theme="dark"] .sketch-mesh-preview canvas {
   background: radial-gradient(circle at 50% 48%, rgba(31, 58, 70, 0.98), rgba(12, 24, 32, 0.98));
 }
 
-html[data-theme="dark"] .sketch-revolve-preview-empty {
+html[data-theme="dark"] .sketch-mesh-preview-empty {
   color: #9db9c7;
+}
+
+html[data-theme="dark"] .sketch-sweep-guide {
+  color: #d6e5ef;
+  background: rgba(20, 31, 40, 0.97);
+  border-color: #3a4d5b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+}
+
+html[data-theme="dark"] .sketch-sweep-step {
+  background: #1b2a35;
+  border-color: #3a4f5e;
+}
+
+html[data-theme="dark"] .sketch-sweep-step-number {
+  color: #cfe3ee;
+  background: #16242c;
+  border-color: #4c6979;
+}
+
+html[data-theme="dark"] .sketch-sweep-step-copy small,
+html[data-theme="dark"] .sketch-sweep-axes {
+  color: #9eb2bf;
+}
+
+html[data-theme="dark"] .sketch-sweep-next {
+  color: #e0edf5;
+}
+
+html[data-theme="dark"] .sketch-sweep-offset {
+  color: #ffd9a1;
+  background: #3a2a12;
+  border-color: #7a5520;
+}
+
+html[data-theme="dark"] .sketch-sweep-offset button {
+  color: #ffd9a1;
+  background: #22180a;
+  border-color: #7a5520;
+}
+
+html[data-theme="dark"] .sketch-sweep-start text {
+  fill: #f3b6d9;
+  stroke: #0d141a;
 }
 
 html[data-theme="dark"] .sketch-plate-background {

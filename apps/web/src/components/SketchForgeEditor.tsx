@@ -221,7 +221,7 @@ import type { RetainedFaceDraftResolution } from "@/lib/engine/sketchFaceDraftKe
 import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketchCadTypes";
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
-import { formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, tagSweepProfile, type SketchSweepStage } from "@/lib/sketchSweepGuides";
+import { centerSweepSection, formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, sweepProfileStatus, sweepSpineStartPointId, tagSweepProfile, withSweepSpineStart, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import type { AlignAxis, AlignHandleStatus, AlignTarget, EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, EdgeTreatmentSourceEdge, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
@@ -773,6 +773,22 @@ async function cadShapeFromSketchSweepProfile(profile: SketchProfile, existing?:
     sketchOperation: "sweep" as const,
     sketchSourceId,
   };
+}
+
+/** Builds only the triangles for the 3D inset, without creating a shape. */
+async function previewSketchSweepProfile(profile: SketchProfile) {
+  const worker = ensureSketchCadWorker();
+  const requestId = ++sketchCadRequestId;
+  const response = await new Promise<SketchCadBuildResponse>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      sketchCadPending.delete(requestId);
+      reject(new LocalizedError("errors.editor.sketchTimedOut"));
+    }, 8_000);
+    sketchCadPending.set(requestId, { resolve, reject, timer });
+    worker.postMessage({ type: "sweep", requestId, profile: cloneSketchProfile(profile) } satisfies SketchCadWorkerRequest);
+  });
+  if (response.type === "error") throw errorFromPayload(response);
+  return { positions: Array.from(response.positions), indices: Array.from(response.indices) };
 }
 
 async function shapeFromRevolvedSketchProfile(
@@ -5551,6 +5567,8 @@ export function SketchForgeEditor({
   const [sketchRevolveSettings, setSketchRevolveSettings] = useState<SketchRevolveSettings>(() => ({ ...DEFAULT_SKETCH_REVOLVE_SETTINGS }));
   const [sketchRevolvePreview, setSketchRevolvePreview] = useState<SketchRevolveMesh | null>(null);
   const sketchRevolvePreviewRequestRef = useRef(0);
+  const [sketchSweepPreview, setSketchSweepPreview] = useState<{ positions: number[]; indices: number[] } | null>(null);
+  const sketchSweepPreviewRequestRef = useRef(0);
   const sketchRevolveUpdateRequestRef = useRef(new Map<string, number>());
   const sketchRevolveUpdateTimerRef = useRef(new Map<string, number>());
   const [sketchTool, setSketchTool] = useState<SketchTool>("line");
@@ -5889,6 +5907,26 @@ export function SketchForgeEditor({
     }, 90);
     return () => window.clearTimeout(timer);
   }, [sketchActive, sketchOperation, sketchProfile, sketchRevolveSettings]);
+
+  useEffect(() => {
+    const requestId = sketchSweepPreviewRequestRef.current + 1;
+    sketchSweepPreviewRequestRef.current = requestId;
+    const status = sweepProfileStatus(orderedSketchPaths(sketchProfile));
+    if (!sketchActive || sketchOperation !== "sweep" || !status.hasSection || !status.hasSpine) {
+      setSketchSweepPreview(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void previewSketchSweepProfile(sketchProfile)
+        .then((positions) => {
+          if (sketchSweepPreviewRequestRef.current === requestId) setSketchSweepPreview(positions);
+        })
+        .catch(() => {
+          if (sketchSweepPreviewRequestRef.current === requestId) setSketchSweepPreview(null);
+        });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [sketchActive, sketchOperation, sketchProfile]);
 
   useEffect(() => {
     const nextWorkspace = normalizeWorkspaceSettings(initialWorkspace);
@@ -6449,10 +6487,16 @@ export function SketchForgeEditor({
     workplaneOverride?: PlacementWorkplane,
   ) => {
     const nextWorkplane = normalizePlacementWorkplane(workplaneOverride ?? placementWorkplaneRef.current);
-    const initial = operation === "sweep"
+    let initial = operation === "sweep"
       ? tagSweepProfile(profile ?? emptySketchProfile(), sweepFramesForSectionWorkplane(nextWorkplane))
       : cloneSketchProfile(profile ?? emptySketchProfile());
     const initialSweepStage = getSketchSweepStage(orderedSketchPaths(initial), operation) ?? "section";
+    let initialSweepStartPointId: string | null = null;
+    if (operation === "sweep" && initialSweepStage === "spine") {
+      const ensured = withSweepSpineStart(initial, createLocalId("sketch-point"));
+      initial = ensured.profile;
+      initialSweepStartPointId = ensured.pointId;
+    }
     setWorkplaneMode(false);
     setActiveSketchWorkplane(nextWorkplane);
     setToolbarMode("sketch");
@@ -6468,8 +6512,8 @@ export function SketchForgeEditor({
     sketchHistoryIndexRef.current = 0;
     setSketchHistory(initialHistory);
     setSketchHistoryIndex(0);
-    setSketchActivePointId(null);
-    setSketchSelection(null);
+    setSketchActivePointId(initialSweepStartPointId);
+    setSketchSelection(initialSweepStartPointId ? { kind: "point", id: initialSweepStartPointId } : null);
     setSketchMeasureStart(null);
     setSketchMeasurement(null);
     setEditingSketchShapeId(editingId);
@@ -6615,12 +6659,19 @@ export function SketchForgeEditor({
           };
       const smoothed = sketchTool === "smooth" ? withSmoothSketchHandles(next) : next;
       const closed = orderedSketchPaths(smoothed).some((path) => path.closed && path.steps.some((step) => step.segment.startId === sketchActivePointId || step.segment.endId === sketchActivePointId));
-      if (!duplicate) commitSketchProfile(smoothed, notice((t) => t(closed ? "editor.sketch.profileClosed" : "editor.sketch.segmentAdded")));
+      let committed = smoothed;
+      let nextActivePointId = closed ? null : pointId;
+      let nextSelectionId = pointId;
       if (closed && sketchOperation === "sweep") {
+        const ensured = withSweepSpineStart(smoothed, createLocalId("sketch-point"));
+        committed = ensured.profile;
+        nextActivePointId = ensured.pointId;
+        nextSelectionId = ensured.pointId ?? pointId;
         setSweepStage("spine");
       }
-      setSketchActivePointId(closed ? null : pointId);
-      setSketchSelection({ kind: "point", id: pointId });
+      if (!duplicate) commitSketchProfile(committed, notice((t) => t(closed ? "editor.sketch.profileClosed" : "editor.sketch.segmentAdded")));
+      setSketchActivePointId(nextActivePointId);
+      setSketchSelection({ kind: "point", id: nextSelectionId });
       if (closed) setSketchTool(sketchOperation === "sweep" ? "line" : "select");
       return smoothed;
     },
@@ -6732,17 +6783,24 @@ export function SketchForgeEditor({
         }));
       }
 
-      const next: SketchProfile = {
+      let next: SketchProfile = {
         ...sketchProfile,
         points: [...sketchProfile.points, ...points],
         segments: [...sketchProfile.segments, ...segments],
       };
+      let startPointId: string | null = null;
+      if (sketchOperation === "sweep") {
+        const ensured = withSweepSpineStart(next, createLocalId("sketch-point"));
+        next = ensured.profile;
+        startPointId = ensured.pointId;
+        setSweepStage("spine");
+      }
       commitSketchProfile(next, notice((t) => t("editor.sketch.primitiveAdded", { shape: t(`editor.sketch.primitive.${primitive}`) })));
-      setSketchActivePointId(null);
-      setSketchSelection(null);
-      setSketchTool("select");
+      setSketchActivePointId(startPointId);
+      setSketchSelection(startPointId ? { kind: "point", id: startPointId } : null);
+      setSketchTool(sketchOperation === "sweep" ? "line" : "select");
     },
-    [commitSketchProfile, sketchProfile, t],
+    [commitSketchProfile, sketchOperation, sketchProfile, t],
   );
 
   const pressSketchPoint = useCallback(
@@ -6766,6 +6824,10 @@ export function SketchForgeEditor({
 
   const deleteSketchPoint = useCallback(
     (id: string) => {
+      if (sketchOperation === "sweep" && id === sweepSpineStartPointId(sketchProfile)) {
+        setNotice(notice((t) => t("editor.sketch.sweepStartPinned")));
+        return;
+      }
       const connected = sketchProfile.segments.filter((segment) => segment.startId === id || segment.endId === id);
       const neighboringIds = connected.map((segment) => segment.startId === id ? segment.endId : segment.startId);
       const remainingSegments = sketchProfile.segments.filter((segment) => segment.startId !== id && segment.endId !== id);
@@ -6793,7 +6855,7 @@ export function SketchForgeEditor({
       if (sketchActivePointId === id) setSketchActivePointId(null);
       setSketchSelection(null);
     },
-    [commitSketchProfile, sketchActivePointId, sketchProfile, t],
+    [commitSketchProfile, sketchActivePointId, sketchOperation, sketchProfile, t],
   );
 
   const deleteSketchSegment = useCallback(
@@ -6920,6 +6982,10 @@ export function SketchForgeEditor({
   const moveSketchPoint = useCallback((id: string, position: { x: number; z: number }) => {
     const current = sketchProfile.points.find((point) => point.id === id);
     if (!current) return;
+    if (sketchOperation === "sweep" && id === sweepSpineStartPointId(sketchProfile)) {
+      setNotice(notice((t) => t("editor.sketch.sweepStartPinned")));
+      return;
+    }
     const deltaX = position.x - current.x;
     const deltaZ = position.z - current.z;
     const next = {
@@ -6932,16 +6998,22 @@ export function SketchForgeEditor({
       } : point),
     };
     commitSketchProfile(next, notice((t) => t("editor.sketch.pointMoved")), [id]);
-  }, [commitSketchProfile, sketchProfile, t]);
+  }, [commitSketchProfile, sketchOperation, sketchProfile, t]);
 
   const transformSketchPoints = useCallback((points: SketchPoint[], message?: Notice) => {
     if (!points.length) return;
-    const byId = new Map(points.map((point) => [point.id, point]));
+    const startId = sketchOperation === "sweep" ? sweepSpineStartPointId(sketchProfile) : null;
+    const movable = startId ? points.filter((point) => point.id !== startId) : points;
+    if (movable.length === 0) {
+      setNotice(notice((t) => t("editor.sketch.sweepStartPinned")));
+      return;
+    }
+    const byId = new Map(movable.map((point) => [point.id, point]));
     commitSketchProfile({
       ...sketchProfile,
       points: sketchProfile.points.map((point) => byId.get(point.id) ?? point),
-    }, message ?? notice((t) => t("editor.sketch.geometryTransformed")), points.map((point) => point.id));
-  }, [commitSketchProfile, sketchProfile, t]);
+    }, message ?? notice((t) => t("editor.sketch.geometryTransformed")), movable.map((point) => point.id));
+  }, [commitSketchProfile, sketchOperation, sketchProfile, t]);
 
   const rotateSelectedClosedSketch45 = useCallback(() => {
     if (sketchSelection?.kind !== "multiple") {
@@ -6986,6 +7058,12 @@ export function SketchForgeEditor({
       if (updated) updated.mode = mode;
     }
     commitSketchProfile(next, notice((t) => t(mode === "corner" ? "editor.sketch.madeCorner" : mode === "smooth" ? "editor.sketch.madeSmooth" : "editor.sketch.handlesSplit")));
+  }, [commitSketchProfile, sketchProfile, t]);
+
+  const centreSketchSweepSection = useCallback(() => {
+    const centred = centerSweepSection(sketchProfile);
+    if (centred === sketchProfile) return;
+    commitSketchProfile(centred, notice((t) => t("editor.sketch.sweepSectionCentred")));
   }, [commitSketchProfile, sketchProfile, t]);
 
   const setSketchSweepDepth = useCallback((id: string, depth: number) => {
@@ -10377,6 +10455,7 @@ export function SketchForgeEditor({
         sketchTool={sketchTool}
         sketchCanUndo={sketchHistoryIndex > 0}
         sketchCanRedo={sketchHistoryIndex < sketchHistory.length - 1}
+        sketchFinishDisabled={sketchOperation === "sweep" && !sweepProfileStatus(orderedSketchPaths(sketchProfile)).ready}
         canEditSketch={selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile)}
         onStartSketch={(operation) => beginSketch(operation)}
         onEditSketch={beginSketchEdit}
@@ -10444,12 +10523,22 @@ export function SketchForgeEditor({
             onSweepStageChange={(stage) => {
               setSweepStage(stage);
               setSketchTool(sketchToolForSweepStage(stage));
-              setSketchActivePointId(null);
-              setSketchSelection(null);
               setSketchMeasureStart(null);
               setSketchMeasurement(null);
+              if (stage === "spine") {
+                const ensured = withSweepSpineStart(sketchProfile, createLocalId("sketch-point"));
+                if (ensured.created) commitSketchProfile(ensured.profile);
+                setSketchActivePointId(ensured.pointId);
+                setSketchSelection(ensured.pointId ? { kind: "point", id: ensured.pointId } : null);
+              } else {
+                setSketchActivePointId(null);
+                setSketchSelection(null);
+              }
             }}
+            onCentreSection={centreSketchSweepSection}
             revolvePreviewPositions={sketchRevolvePreview?.positions ?? null}
+            sweepPreviewPositions={sketchSweepPreview?.positions ?? null}
+            sweepPreviewIndices={sketchSweepPreview?.indices ?? null}
             referenceShapes={sketchReferenceShapes.filter((shape) => shape.id !== editingSketchShapeId)}
             tool={sketchTool}
             activePointId={sketchActivePointId}
@@ -10757,6 +10846,7 @@ function SecondaryToolbar({
   sketchTool,
   sketchCanUndo,
   sketchCanRedo,
+  sketchFinishDisabled,
   canEditSketch,
   onStartSketch,
   onEditSketch,
@@ -10822,6 +10912,7 @@ function SecondaryToolbar({
   sketchTool: SketchTool;
   sketchCanUndo: boolean;
   sketchCanRedo: boolean;
+  sketchFinishDisabled: boolean;
   canEditSketch: boolean;
   onStartSketch: (operation: SketchOperation) => void;
   onEditSketch: () => void;
@@ -11738,7 +11829,13 @@ function SecondaryToolbar({
                 <div className="toolbar-section sketch-finish-section">
                   <div className="toolbar-section-label">{t("editor.toolbar.finish")}</div>
                   <div className="toolbar-section-tools">
-                    <button className="sketch-command-button primary" type="button" onClick={onSketchFinish}>
+                    <button
+                      className="sketch-command-button primary"
+                      type="button"
+                      onClick={onSketchFinish}
+                      disabled={sketchFinishDisabled}
+                      title={sketchFinishDisabled ? t("editor.toolbar.finishSweepBlocked") : undefined}
+                    >
                       <Check />
                       <span>{t(sketchOperation === "revolve" ? "editor.toolbar.finishRevolve" : sketchOperation === "sweep" ? "editor.toolbar.finishSweep" : "editor.toolbar.finishSketch")}</span>
                     </button>

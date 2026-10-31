@@ -574,6 +574,8 @@
       "revolveSettingsFailed": "The revolve settings could not be applied",
       "sweepStarted": "Sweep sketch started: draw the closed section on the selected workplane, then switch to an orthogonal plane derived from it and draw one open spine",
       "editingSweep": "Editing sweep sketch profile",
+      "sweepSectionCentred": "Section centred on the sweep origin",
+      "sweepStartPinned": "The sweep starts at the section origin, so that point stays put",
       "buildingSweep": "Building planar sweep",
       "cannotSweep": "Could not create the planar sweep",
       "sweepCreated": "Planar sweep created",
@@ -730,6 +732,7 @@
       "patternRotate": "Turn copies to follow the ring",
       "patternApply": "Repeat",
       "finishSweep": "Finish sweep",
+      "finishSweepBlocked": "Draw a closed section and one spine before finishing",
       "sweepSketch": "Sweep sketch",
       "sweepSketchHint": "Draw the section on the selected workplane, then its spine on the derived orthogonal plane"
     },
@@ -962,12 +965,26 @@
       "sweepSpineLabel": "Spine",
       "sweepPlaneHint": "Draw the section on the selected workplane, then switch to the orthogonal plane derived from it for the spine. The finished section is oriented perpendicular to the spine’s initial direction.",
       "sweepSectionStage": "Step 1 of 2 · Section on selected plane",
+      "sweepSectionStep": "Draw closed loops",
       "sweepSectionHelp": "Draw and close one or more section loops centered at the selected plane origin (0,0). Each closure switches to the orthogonal spine plane. Return to the section plane to add more loops, then switch to the spine plane when done.",
       "sweepSpineStage": "Step 2 of 2 · Spine on orthogonal plane",
+      "sweepSpineStep": "Draw one open path",
       "sweepSpineAxes": "On this plane, screen-right follows {right} and screen-up follows {up}.",
       "sweepSpineHelp": "Start the spine at the section origin (0,0). Its first segment snaps to screen-right so the section stays perpendicular to the initial tangent. Select a spine point and set 3D depth (mm) to move it out of this plane.",
       "sweepSectionPlane": "Edit section · selected plane",
-      "sweepSpinePlane": "Draw spine · orthogonal plane"
+      "sweepSpinePlane": "Draw spine · orthogonal plane",
+      "sweepNextSection": "Draw and close a section loop.",
+      "sweepNextSpine": "Switch to the spine plane and draw from the start marker.",
+      "sweepNextFinish": "Ready to finish the sweep.",
+      "sweepNextOneSpine": "A sweep needs exactly one spine.",
+      "sweepSectionOffset": "Section is {distance} mm off the origin.",
+      "sweepCentreSection": "Centre section",
+      "sweepStartHere": "Start",
+      "sweepPreview": {
+        "label": "Sweep 3D preview",
+        "title": "3D preview",
+        "empty": "Draw a closed section, then a spine"
+      }
     }
   },
   "panels": {
