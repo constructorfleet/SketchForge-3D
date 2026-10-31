@@ -15,7 +15,7 @@ import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation,
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const SKF_FORMAT_VERSION = 2;
 export const SKF_MINIMUM_READER_VERSION = 2;
-export const SKF_CREATED_WITH_VERSION = "1.30.0"; // x-release-please-version
+export const SKF_CREATED_WITH_VERSION = "1.31.0"; // x-release-please-version
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
 export const SKF_LIMITS = {
