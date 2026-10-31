@@ -2,10 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useTranslations } from "@/i18n";
 
-export function SketchRevolvePreview({ positions }: { positions: number[] | null }) {
-  const t = useTranslations();
+/**
+ * A small 3D inset for a sketch operation, drawn from the mesh the kernel
+ * builds. Revolve and sweep both use it so the solid is visible while the
+ * profile is still being drawn.
+ */
+export function SketchMeshPreview({ positions, indices = null, title, empty, label }: {
+  positions: number[] | null;
+  indices?: number[] | null;
+  title: string;
+  empty: string;
+  label: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -20,6 +29,7 @@ export function SketchRevolvePreview({ positions }: { positions: number[] | null
     const camera = new THREE.PerspectiveCamera(34, 1, 0.01, 5000);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    if (indices?.length) geometry.setIndex(indices);
     geometry.computeVertexNormals();
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
@@ -39,11 +49,15 @@ export function SketchRevolvePreview({ positions }: { positions: number[] | null
 
     const bounds = geometry.boundingBox ?? new THREE.Box3().setFromObject(mesh);
     const center = bounds.getCenter(new THREE.Vector3());
-    const radius = Math.max(1, geometry.boundingSphere?.radius ?? 1);
-    camera.position.set(center.x + radius * 1.8, center.y + radius * 1.2, center.z + radius * 2.1);
+    const size = bounds.getSize(new THREE.Vector3());
+    const longest = Math.max(size.x, size.y, size.z, 1);
+    // Frame the whole solid, not just its bounding sphere: a long sweep would
+    // otherwise fill the inset and hide where it starts and ends.
+    const distance = (longest / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.5;
+    camera.position.copy(center).addScaledVector(new THREE.Vector3(1, 0.75, 1.2).normalize(), distance);
     camera.lookAt(center);
-    camera.near = Math.max(0.01, radius / 100);
-    camera.far = radius * 20;
+    camera.near = Math.max(0.01, distance / 1000);
+    camera.far = distance * 10;
     camera.updateProjectionMatrix();
 
     const render = () => {
@@ -63,12 +77,12 @@ export function SketchRevolvePreview({ positions }: { positions: number[] | null
       material.dispose();
       renderer.dispose();
     };
-  }, [positions]);
+  }, [indices, positions]);
 
   return (
-    <aside className="sketch-revolve-preview" aria-label={t("workspace.sketch.revolvePreview.label")}>
-      <div className="sketch-revolve-preview-title">{t("workspace.sketch.revolvePreview.title")}</div>
-      {positions?.length ? <canvas ref={canvasRef} /> : <div className="sketch-revolve-preview-empty">{t("workspace.sketch.revolvePreview.empty")}</div>}
+    <aside className="sketch-mesh-preview" aria-label={label}>
+      <div className="sketch-mesh-preview-title">{title}</div>
+      {positions?.length ? <canvas ref={canvasRef} /> : <div className="sketch-mesh-preview-empty">{empty}</div>}
     </aside>
   );
 }

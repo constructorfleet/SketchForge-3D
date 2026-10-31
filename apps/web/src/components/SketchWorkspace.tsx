@@ -3,13 +3,13 @@
 import { ChevronUp, CornerDownRight, Home, Link, Link2Off, LockKeyhole, LockKeyholeOpen, Minus, Plus, Split, Trash2, Waves } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { SnapGridControl } from "@/components/workplane/ShapeInspector";
-import { SketchRevolvePreview } from "@/components/SketchRevolvePreview";
+import { SketchMeshPreview } from "@/components/SketchMeshPreview";
 import { notice, unitLabel, useTranslations, type Notice } from "@/i18n";
 import { parseMeasurementInput } from "@/lib/measurementUnits";
 import { WORKPLANE_MAJOR_GRID_INTERVAL } from "@/lib/workplaneGrid";
 import { closestPointOnSketchSegment, type SketchSegmentPlacement } from "@/lib/sketchPointRefinement";
 import { isSketchAnglePair, isSketchEqualLengthPair, isSketchSymmetrySetup, isSketchTangentPair, sketchConstraintDegreesOfFreedom } from "@/lib/sketchConstraints";
-import { projectSweepSectionPoint, sketchSweepGuideRoles, snapInitialSweepSpineEndpoint, type SketchSweepStage } from "@/lib/sketchSweepGuides";
+import { projectSweepSectionPoint, sketchSweepGuideRoles, snapInitialSweepSpineEndpoint, sweepProfileStatus, sweepSectionOffset, sweepSpineStartPointId, type SketchSweepStage } from "@/lib/sketchSweepGuides";
 import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { mirrorSign, resizedImportedMeshPositions } from "@/lib/engine/workplaneShapes";
@@ -37,7 +37,10 @@ type SketchWorkspaceProps = {
   sweepScreenRight?: string;
   sweepScreenUp?: string;
   onSweepStageChange?: (stage: SketchSweepStage) => void;
+  onCentreSection?: () => void;
   revolvePreviewPositions?: number[] | null;
+  sweepPreviewPositions?: number[] | null;
+  sweepPreviewIndices?: number[] | null;
   referenceShapes: WorkplaneShape[];
   tool: SketchTool;
   activePointId: string | null;
@@ -488,7 +491,10 @@ export function SketchWorkspace({
   sweepScreenRight = "(0.00, 1.00, 0.00)",
   sweepScreenUp = "(1.00, 0.00, 0.00)",
   onSweepStageChange,
+  onCentreSection,
   revolvePreviewPositions = null,
+  sweepPreviewPositions = null,
+  sweepPreviewIndices = null,
   referenceShapes,
   tool,
   activePointId,
@@ -600,6 +606,16 @@ export function SketchWorkspace({
   const pointById = useMemo(() => new Map(displayProfile.points.map((point) => [point.id, point])), [displayProfile.points]);
   const paths = useMemo(() => orderedPaths(displayProfile), [displayProfile]);
   const sweepRoles = useMemo(() => sketchSweepGuideRoles(paths, operation), [operation, paths]);
+  const sweepStatus = useMemo(() => sweepProfileStatus(paths), [paths]);
+  const sweepStartPointId = useMemo(
+    () => operation === "sweep" ? sweepSpineStartPointId(profile) : null,
+    [operation, profile],
+  );
+  const sweepOffset = useMemo(
+    () => operation === "sweep" ? sweepSectionOffset(profile) : null,
+    [operation, profile],
+  );
+  const sweepOffsetDistance = sweepOffset ? Math.hypot(sweepOffset.x, sweepOffset.z) : 0;
   const spineStage = operation === "sweep" && sweepStage === "spine";
   const sweepSectionGhostPaths = useMemo(() => spineStage
     ? paths.filter((path) => path.closed).map((path) => ({
@@ -831,21 +847,66 @@ export function SketchWorkspace({
     <main className="sketch-workspace-stage">
       <div className="sketch-mode-badge">{operation === "revolve" ? t("workspace.sketch.badge.revolve") : operation === "sweep" ? t("workspace.sketch.badge.sweep") : t("workspace.sketch.badge.extrude")}</div>
       {operation === "sweep" ? (
-        <div role="note" className="sketch-mode-badge sketch-sweep-guide">
-          <strong>{t(sweepStage === "section" ? "workspace.sketch.sweepSectionStage" : "workspace.sketch.sweepSpineStage")}</strong>
-          <span>{t(sweepStage === "section" ? "workspace.sketch.sweepSectionHelp" : "workspace.sketch.sweepSpineHelp")}</span>
-          {sweepStage === "spine" ? <span>{t("workspace.sketch.sweepSpineAxes", { right: sweepScreenRight, up: sweepScreenUp })}</span> : null}
-          <div className="sketch-sweep-legend">
-            <span><i className="section" />{t("workspace.sketch.sweepSectionLabel")}</span>
-            <span><i className="spine" />{t("workspace.sketch.sweepSpineLabel")}</span>
+        <div
+          role="note"
+          className="sketch-mode-badge sketch-sweep-guide"
+          data-sweep-status={sweepStatus.ready ? "ready" : sweepStatus.hasSection ? "spine" : "section"}
+        >
+          <div className="sketch-sweep-steps">
+            <div className={`sketch-sweep-step ${sweepStatus.hasSection ? "done" : ""} ${sweepStage === "section" ? "current" : ""}`}>
+              <span className="sketch-sweep-step-number" aria-hidden="true">{sweepStatus.hasSection ? "✓" : "1"}</span>
+              <span className="sketch-sweep-step-copy">
+                <strong>{t("workspace.sketch.sweepSectionLabel")}</strong>
+                <small>{t("workspace.sketch.sweepSectionStep")}</small>
+              </span>
+            </div>
+            <div className={`sketch-sweep-step ${sweepStatus.hasSpine ? "done" : ""} ${sweepStage === "spine" ? "current" : ""}`}>
+              <span className="sketch-sweep-step-number" aria-hidden="true">{sweepStatus.hasSpine ? "✓" : "2"}</span>
+              <span className="sketch-sweep-step-copy">
+                <strong>{t("workspace.sketch.sweepSpineLabel")}</strong>
+                <small>{t("workspace.sketch.sweepSpineStep")}</small>
+              </span>
+            </div>
           </div>
+          <p className="sketch-sweep-next" aria-live="polite">
+            {!sweepStatus.hasSection
+              ? t("workspace.sketch.sweepNextSection")
+              : !sweepStatus.hasSpine
+                ? t("workspace.sketch.sweepNextSpine")
+                : sweepStatus.ready
+                  ? t("workspace.sketch.sweepNextFinish")
+                  : t("workspace.sketch.sweepNextOneSpine")}
+          </p>
+          {sweepOffsetDistance > 0.05 ? (
+            <div className="sketch-sweep-offset">
+              <span>{t("workspace.sketch.sweepSectionOffset", { distance: sweepOffsetDistance.toFixed(1) })}</span>
+              <button type="button" onClick={onCentreSection}>{t("workspace.sketch.sweepCentreSection")}</button>
+            </div>
+          ) : null}
+          {sweepStage === "spine" ? <span className="sketch-sweep-axes">{t("workspace.sketch.sweepSpineAxes", { right: sweepScreenRight, up: sweepScreenUp })}</span> : null}
           <div className="sketch-sweep-stage-controls">
             <button type="button" aria-pressed={sweepStage === "section"} onClick={() => onSweepStageChange?.("section")}>{t("workspace.sketch.sweepSectionPlane")}</button>
-            <button type="button" aria-pressed={sweepStage === "spine"} disabled={!paths.some((path) => path.closed)} onClick={() => onSweepStageChange?.("spine")}>{t("workspace.sketch.sweepSpinePlane")}</button>
+            <button type="button" aria-pressed={sweepStage === "spine"} disabled={!sweepStatus.hasSection} onClick={() => onSweepStageChange?.("spine")}>{t("workspace.sketch.sweepSpinePlane")}</button>
           </div>
         </div>
       ) : null}
-      {operation === "revolve" ? <SketchRevolvePreview positions={revolvePreviewPositions} /> : null}
+      {operation === "sweep" ? (
+        <SketchMeshPreview
+          positions={sweepPreviewPositions}
+          indices={sweepPreviewIndices}
+          title={t("workspace.sketch.sweepPreview.title")}
+          empty={t("workspace.sketch.sweepPreview.empty")}
+          label={t("workspace.sketch.sweepPreview.label")}
+        />
+      ) : null}
+      {operation === "revolve" ? (
+        <SketchMeshPreview
+          positions={revolvePreviewPositions}
+          title={t("workspace.sketch.revolvePreview.title")}
+          empty={t("workspace.sketch.revolvePreview.empty")}
+          label={t("workspace.sketch.revolvePreview.label")}
+        />
+      ) : null}
       <div className="view-tools sketch-view-tools" aria-label={t("workspace.sketch.viewControls")}>
         <button aria-label={t("workspace.sketch.resetView")} onClick={() => { setZoom(1); setPan({ x: 0, z: 0 }); }}><Home size={28} /></button>
         <button aria-label={t("workspace.camera.zoomIn")} onClick={() => setZoom((value) => clamp(value * 1.25, 0.75, 6))}><Plus size={33} /></button>
@@ -971,6 +1032,16 @@ export function SketchWorkspace({
           {spineStage ? (
             <g className="sketch-sweep-section-ghost" data-sweep-section-projection="edge-on" pointerEvents="none">
               {sweepSectionGhostPaths.map((path) => <path key={path.id} d={pathData(path)} />)}
+            </g>
+          ) : null}
+          {spineStage ? (
+            <g className="sketch-sweep-start" data-sweep-start="origin" pointerEvents="none">
+              <circle cx={0} cy={0} r={pointRadius * 2.8} />
+              <line x1={-pointRadius * 4} y1={0} x2={pointRadius * 4} y2={0} />
+              <line x1={0} y1={-pointRadius * 4} x2={0} y2={pointRadius * 4} />
+              <text x={pointRadius * 4.4} y={-pointRadius * 2.4} fontSize={11 * screenUnit}>
+                {t("workspace.sketch.sweepStartHere")}
+              </text>
             </g>
           ) : null}
           <g className="sketch-segments">
@@ -1153,38 +1224,43 @@ export function SketchWorkspace({
             </g>
           ) : null}
           <g className="sketch-points">
-            {visiblePoints.map((point) => (
-              <g key={point.id}>
-                {point.sweepRole === "spine" && Math.abs(point.sweepDepth ?? 0) > 1e-9 ? (
-                  <text className="sketch-sweep-depth-label" x={point.x + pointRadius * 1.5} y={point.z - pointRadius * 1.5} fontSize={10 * screenUnit} pointerEvents="none">
-                    {`${point.sweepDepth! > 0 ? "+" : ""}${point.sweepDepth!.toFixed(1)} mm`}
-                  </text>
-                ) : null}
-                <circle
-                  data-sketch-entity="point"
-                  data-sweep-role={sweepRoles.pointRoles.get(point.id)}
-                  className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""} ${sweepRoles.pointRoles.has(point.id) ? `sweep-${sweepRoles.pointRoles.get(point.id)}` : ""}`}
-                  data-sweep-depth={point.sweepDepth ?? undefined}
-                  cx={point.x}
-                  cy={point.z}
-                  r={pointRadius}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (event.button === 1) {
-                      beginPan(event);
-                    } else if (tool === "erase" || tool === "refine") {
-                      onDeletePoint(point.id);
-                    } else if (event.button === 0 && tool === "select") {
-                      onPointPress(point.id);
-                      beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, current: { x: point.x, z: point.z } });
-                    } else if (event.button === 0) {
-                      onPointPress(point.id);
-                    }
-                  }}
-                />
-              </g>
-            ))}
+            {visiblePoints.map((point) => {
+              const role = sweepRoles.pointRoles.get(point.id) ?? (point.id === sweepStartPointId ? "spine" : undefined);
+              const isStart = point.id === sweepStartPointId;
+              return (
+                <g key={point.id}>
+                  {point.sweepRole === "spine" && Math.abs(point.sweepDepth ?? 0) > 1e-9 ? (
+                    <text className="sketch-sweep-depth-label" x={point.x + pointRadius * 1.5} y={point.z - pointRadius * 1.5} fontSize={10 * screenUnit} pointerEvents="none">
+                      {`${point.sweepDepth! > 0 ? "+" : ""}${point.sweepDepth!.toFixed(1)} mm`}
+                    </text>
+                  ) : null}
+                  <circle
+                    data-sketch-entity="point"
+                    data-sweep-role={role}
+                    data-sweep-start={isStart ? "true" : undefined}
+                    className={`${isPointSelected(point.id) ? "selected" : ""} ${activePointId === point.id ? "active" : ""} ${role ? `sweep-${role}` : ""} ${isStart ? "sweep-start-point" : ""}`}
+                    data-sweep-depth={point.sweepDepth ?? undefined}
+                    cx={point.x}
+                    cy={point.z}
+                    r={pointRadius}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (event.button === 1) {
+                        beginPan(event);
+                      } else if (tool === "erase" || tool === "refine") {
+                        onDeletePoint(point.id);
+                      } else if (event.button === 0 && tool === "select") {
+                        onPointPress(point.id);
+                        beginEntityDrag(event, { kind: "move-point", pointerId: event.pointerId, pointId: point.id, current: { x: point.x, z: point.z } });
+                      } else if (event.button === 0) {
+                        onPointPress(point.id);
+                      }
+                    }}
+                  />
+                </g>
+              );
+            })}
           </g>
           {selectedImage && selectedImageBounds && tool === "select" ? (
             <g className="sketch-image-selection">

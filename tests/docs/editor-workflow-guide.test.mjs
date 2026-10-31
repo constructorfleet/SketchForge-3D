@@ -12,6 +12,8 @@ const faceDraftBrowserTest = new URL("../browser/face-drafting.test.mjs", import
 const sketchConstraintsGuide = new URL("../../docs/guides/sketch-constraints.md", import.meta.url);
 const sketchConstraintsBrowserTest = new URL("../browser/sketch-parallel-constraint.test.mjs", import.meta.url);
 const stepAssemblyGuide = new URL("../../docs/guides/step-assemblies.md", import.meta.url);
+const sketchSweepGuide = new URL("../../docs/guides/sketch-sweeps.md", import.meta.url);
+const sketchSweepBrowserTest = new URL("../browser/sketch-sweep-ux.test.mjs", import.meta.url);
 
 test("editor workflow guide covers create, edit, save, and export with supporting references", async () => {
   const [guideText, homeText, quickstartText, browserTestText, siteConfigText] = await Promise.all([
@@ -92,6 +94,21 @@ test("the perpendicular constraint workflow has browser acceptance and screensho
   assert.match(guideText, /sketch-perpendicular-constraint\.png/);
   assert.match(browserTestText, /a user can constrain two selected sketch segments to be perpendicular/i);
   assert.match(browserTestText, /sketch-perpendicular-constraint\.png/);
+});
+
+test("the sketch sweep workflow has a guide, browser acceptance, and screenshot evidence", async () => {
+  const [guideText, browserTestText] = await Promise.all([
+    readFile(sketchSweepGuide, "utf8"),
+    readFile(sketchSweepBrowserTest, "utf8"),
+  ]);
+
+  assert.match(guideText, /\*\*Start\*\*/);
+  assert.match(guideText, /\*\*3D preview\*\*/);
+  assert.match(guideText, /\*\*Centre section\*\*/);
+  assert.match(guideText, /sketch-sweep-ux\.png/);
+  assert.match(browserTestText, /data-sweep-status/);
+  assert.match(browserTestText, /Sweep 3D preview/);
+  assert.match(browserTestText, /sketch-sweep-ux\.png/);
 });
 
 test("STEP assembly guide links the editor-to-local-MCP workflow to browser acceptance and screenshot evidence", async () => {
