@@ -66,6 +66,8 @@ export function renderReference(tools) {
     "",
     `The server currently exposes ${tools.length} tools. Input schemas below are the exact JSON Schema values advertised over MCP.`,
     "",
+    "A SketchForge server's `/mcp` endpoint lists the stored-project subset of these tools, without the editor targeting fields; see the [MCP endpoint guide](../guides/deployment.md#mcp-endpoint).",
+    "",
     ...sections,
     "",
   ].join("\n");

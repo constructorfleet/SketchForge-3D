@@ -14,6 +14,8 @@ Regenerate with `node scripts/generate-mcp-reference.mjs`; `--check` verifies th
 
 The server currently exposes 40 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
 
+A SketchForge server's `/mcp` endpoint lists the stored-project subset of these tools, without the editor targeting fields; see the [MCP endpoint guide](../guides/deployment.md#mcp-endpoint).
+
 ## sketchforge_list_projects
 
 ### Description
