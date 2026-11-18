@@ -88,6 +88,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 - [#424: Keep server treatments in place on tilted shapes](https://github.com/constructorfleet/SketchForge-3D/issues/424) — P2, open.
 
 ## Editor CAD tools
+- Build plate no longer limits dragging, the camera or the position sliders — implemented on `fix/remove-workspace-drag-limits`; awaiting review. Covered by `tests/browser/workspace-limits.test.mjs` and `tests/unit/placementProperties.test.ts`. Unchanged: shape size limits, camera zoom distance limits, and the Y position row still refuses a typed value below the plate.
 - [#506: Feature-edge (crease angle) drawing for mesh shapes](https://github.com/constructorfleet/SketchForge-3D/issues/506) — SVG projections and local `capture_image` draw meshes by feature edges, silhouettes and boundaries with an optional `featureAngle`; meshes and exact solids still occlude each other, and a mesh inside a group with no hole draws the same way. Implemented with regression coverage; the TypeScript `exports` helper now accepts `featureAngle`. Deferred: a group that cuts a hole in a mesh is still sewn and drawn by kernel hidden-line removal; the Python `exports` helper still needs typed `featureAngle` support.
 
 ## Sketch sweep workflow
