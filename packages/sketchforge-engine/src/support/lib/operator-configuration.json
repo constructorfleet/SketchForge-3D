@@ -81,11 +81,11 @@
       "subsystem": "MCP host file access",
       "source": "../packages/sketchforge-client/mcp/filesystemPaths.mjs",
       "ownerPage": "guides/client-configuration.md#mcp-host-file-access",
-      "additionalSources": ["../packages/sketchforge-client/mcp/server.mjs", "../packages/sketchforge-client/mcp/localEngine.mjs"]
+      "additionalSources": ["../packages/sketchforge-client/mcp/toolCatalog.mjs", "../packages/sketchforge-client/mcp/localEngine.mjs"]
     },
     {
       "name": "SKETCHFORGE_API_TOKEN",
-      "default": "Unset; REST API authorization is disabled.",
+      "default": "Unset; the REST API and the `/mcp` endpoint are disabled.",
       "required": false,
       "validation": "Non-empty bearer token. Configure a high-entropy secret; never expose it to browsers or logs. Used with SKETCHFORGE_PROJECTS_DIR.",
       "sensitive": true,
@@ -93,7 +93,7 @@
       "source": "../apps/web/src/lib/apiTokens.ts",
       "ownerPage": "guides/deployment.md#rest-api-access",
       "additionalOwnerPages": ["guides/client-configuration.md#typescript-and-python-api-clients"],
-      "additionalSources": ["../packages/sketchforge-client/src/environment.ts", "../packages/sketchforge-py/src/sketchforge3d/environment.py", "../packages/sketchforge-client/mcp/server.mjs"]
+      "additionalSources": ["../packages/sketchforge-client/src/environment.ts", "../packages/sketchforge-py/src/sketchforge3d/environment.py", "../packages/sketchforge-client/mcp/tools.mjs"]
     },
     {
       "name": "SKETCHFORGE_SHARED_PROJECTS_DIR",

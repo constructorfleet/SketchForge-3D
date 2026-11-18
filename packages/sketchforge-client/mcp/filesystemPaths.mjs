@@ -3,7 +3,7 @@ import { mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 
 function configuredRoot() {
-  return process.env.SKETCHFORGE_MCP_FILES_DIR || process.env.SKETCHFORGE_PROJECTS_DIR;
+  return process.env.SKETCHFORGE_MCP_FILES_DIR?.trim() || process.env.SKETCHFORGE_PROJECTS_DIR?.trim();
 }
 
 function isWithin(root, target) {
@@ -42,7 +42,14 @@ function requireWithin(root, target) {
 export async function resolveMcpReadPath(value) {
   const requested = path.resolve(String(value ?? ""));
   const root = await getRoot();
-  const resolved = await realpath(requested);
+  let resolved;
+  try {
+    resolved = await realpath(requested);
+  } catch (error) {
+    // Hides whether a path outside the root exists.
+    if (root && ["ENOENT", "ENOTDIR"].includes(error?.code)) requireWithin(root, await resolveThroughExistingAncestor(requested));
+    throw error;
+  }
   return root ? requireWithin(root, resolved) : resolved;
 }
 

@@ -25,11 +25,11 @@ Set `SKETCHFORGE_PROJECTS_DIR` in the MCP process to use the local engine agains
 
 ## MCP host file access
 
-Set `SKETCHFORGE_MCP_FILES_DIR` to confine MCP imports and exports to one directory. When it is unset, `SKETCHFORGE_PROJECTS_DIR` is used as the file root. Reads resolve symlinks before checking containment; writes also resolve the destination's parent and reject paths outside the root. Existing output files are preserved unless the tool call explicitly sets `overwrite: true`. If neither directory variable is set, file paths remain unrestricted for compatibility.
+Set `SKETCHFORGE_MCP_FILES_DIR` to confine MCP imports and exports to one directory. When it is unset, `SKETCHFORGE_PROJECTS_DIR` is used as the file root. Reads resolve symlinks before checking containment; writes also resolve the destination's parent and reject paths outside the root. Existing output files are preserved unless the tool call explicitly sets `overwrite: true`. If neither directory variable is set, file paths remain unrestricted for compatibility. A server's [`/mcp` endpoint](./deployment.md#mcp-endpoint) is stricter: paths there are on the server, and it refuses them unless `SKETCHFORGE_MCP_FILES_DIR` names a directory separate from `SKETCHFORGE_PROJECTS_DIR`. With a file root configured, a missing file outside it is reported the same way as an existing one.
 
 ## MCP macro execution
 
-Macro discovery and execution are disabled until `SKETCHFORGE_MACRO_DIR` points to a directory containing reviewed `.mjs`, `.js`, or `.py` files. MCP tools list files from that directory and accept a listed filename, not arbitrary code.
+Macro discovery and execution are disabled until `SKETCHFORGE_MACRO_DIR` points to a directory containing reviewed `.mjs`, `.js`, or `.py` files. MCP tools list files from that directory and accept a listed filename, not arbitrary code. Macro tools are offered by the `sketchforge-mcp` process only; a server's `/mcp` endpoint does not list or run them.
 
 `SKETCHFORGE_MACRO_TIMEOUT_MS` sets the default process timeout in milliseconds (120000 by default). A tool call's `timeoutMs` can override it. `SKETCHFORGE_MACRO_PYTHON` selects the Python executable used to inspect and run Python macros; it defaults to `python3`. `SKETCHFORGE_MACRO_RUNNER_JS` optionally selects an installed JavaScript macro runner; when unset, the MCP package uses its bundled `sketchforge-macro` runner.
 

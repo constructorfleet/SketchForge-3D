@@ -28,7 +28,7 @@ Server-backed projects and the shared project library are available to any calle
 - `GET /api/projects` is unauthenticated: it lists every server-backed project, and `GET /api/projects?projectId=…` reads that project's `.skf` file. When `SKETCHFORGE_PROJECTS_DIR` is configured, `POST` creates or overwrites a project and `DELETE` removes it.
 - `GET /api/shared-projects` is unauthenticated: it lists or downloads shared projects and thumbnails. When `SKETCHFORGE_SHARED_PROJECTS_DIR` is configured, `POST` publishes or replaces a shared project and `DELETE` removes one.
 - The write and delete handlers reject browser requests whose `Origin` does not match the server origin. They accept requests with no `Origin` header, which includes common command-line and scripted clients. A non-browser caller can also set request headers itself, so this same-origin check is a cross-site request defense, not authentication or an authorization boundary.
-- `SKETCHFORGE_API_TOKEN` protects the separate scripting API under `/api/v1`. It does not protect `/api/projects` or `/api/shared-projects`.
+- `SKETCHFORGE_API_TOKEN` protects the separate scripting API under `/api/v1` and the [MCP endpoint](#mcp-endpoint) at `/mcp`. It does not protect `/api/projects` or `/api/shared-projects`.
 
 For a trusted classroom or lab network, limit access to the server to that network. For deployments reachable by untrusted users, put SketchForge behind a reverse proxy or identity gateway that authenticates and authorizes requests to these routes. Keep the application port inaccessible to clients that could bypass the proxy; proxy authentication only protects requests that pass through it. The REST API token alone does not secure server-backed or shared project storage.
 
@@ -37,6 +37,41 @@ The desktop-only `POST /api/local-download` helper is enabled only when `SKETCHF
 ## REST API access
 
 Set `SKETCHFORGE_API_TOKEN` together with `SKETCHFORGE_PROJECTS_DIR` to enable authenticated REST API access. Treat the token as a secret: use a high-entropy value, store it in the deployment's secret manager, and keep it out of browser code and logs. See the [REST API deployment instructions](https://github.com/constructorfleet/SketchForge-3D#rest-api).
+
+## MCP endpoint
+
+The same two settings turn on `POST /mcp`, a [Model Context Protocol](https://modelcontextprotocol.io) endpoint that speaks the Streamable HTTP transport. An MCP client connects to the server's URL instead of starting the `sketchforge-mcp` process, and works on the projects in `SKETCHFORGE_PROJECTS_DIR` with the same engine as the REST API. It is available in server and Docker deployments, including production builds; a static export has no server and therefore no endpoint.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP client
+    participant Server as SketchForge server
+    participant Store as SKETCHFORGE_PROJECTS_DIR
+    Client->>Server: POST /mcp initialize (Authorization: Bearer token)
+    Server-->>Client: 200 JSON, negotiated protocol version
+    Client->>Server: POST /mcp notifications/initialized
+    Server-->>Client: 202
+    Client->>Server: POST /mcp tools/call
+    Server->>Store: read or write the project
+    Server-->>Client: 200 JSON tool result
+```
+
+Send the token as `Authorization: Bearer <token>` on every request. For example, with Claude Code:
+
+<!-- runnable-exempt: This registers a reader-supplied server URL and token with an external MCP client; endpoint behavior is covered by tests/unit/mcpStreamableHttp.test.ts. -->
+```bash
+claude mcp add --transport http sketchforge https://sketchforge.example/mcp \
+  --header "Authorization: Bearer $SKETCHFORGE_API_TOKEN"
+```
+
+Behavior to plan for:
+
+- **Access.** Without `SKETCHFORGE_API_TOKEN` the endpoint answers 404; with a missing or wrong token, 401; without `SKETCHFORGE_PROJECTS_DIR`, 503. There is no OAuth flow, so the client must be able to send a fixed header.
+- **Transport.** Each `POST` is answered with one JSON body. The server opens no event stream and issues no session id, so `GET` and `DELETE` answer 405, and any server instance can answer any request. Protocol versions `2025-11-25`, `2025-06-18`, `2025-03-26` and `2024-11-05` are accepted. Request bodies are capped at 16 MiB.
+- **Browser requests.** A request whose `Origin` header names another host is refused with 403. Requests without an `Origin` header, which is what command-line and desktop clients send, are not affected.
+- **Tools.** The endpoint lists the tools of the [MCP tool reference](../mcp/TOOLS_REFERENCE.md) that work on stored projects. It leaves out `sketchforge_list_editors` and `sketchforge_inspect_errors`, which need an editor tab; `sketchforge_select_objects`, because one server answers every client and a shared selection would leak between them, so pass object ids on each call; and the macro tools, which start processes on the host. Tool calls do not take `url`, `editorNumber`, `editorId` or `timeoutMs`.
+- **Projects.** A `projectId` must be an id as the REST API accepts it: letters, digits, hyphens and underscores. Anything else is refused, so a tool call cannot name a file outside `SKETCHFORGE_PROJECTS_DIR`.
+- **File paths.** `filePath` and `outputPath` arguments name files on the server, not on the client's machine. They are refused unless `SKETCHFORGE_MCP_FILES_DIR` is set to a directory that neither contains nor lies inside `SKETCHFORGE_PROJECTS_DIR`, and are then confined to it; this keeps a tool call from replacing a stored project or leaving a lock file that blocks one. An export without `outputPath` returns the file in the tool result and needs no files directory. See [MCP host file access](./client-configuration.md#mcp-host-file-access).
 
 ## Shared projects
 

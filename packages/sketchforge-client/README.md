@@ -38,6 +38,11 @@ and only files already sitting in `SKETCHFORGE_MACRO_DIR`. There is deliberately
 no tool that accepts code to run. A Python macro needs `sketchforge3d` installed
 from PyPI, since only a checkout carries the Python source.
 
+A SketchForge server also answers MCP itself, at `/mcp`, for clients that connect
+to a URL rather than start a process. That endpoint is part of the server, not of
+this package; see the
+[MCP endpoint guide](https://github.com/constructorfleet/SketchForge-3D/blob/main/docs/guides/deployment.md#mcp-endpoint).
+
 ## Connecting
 
 ```ts

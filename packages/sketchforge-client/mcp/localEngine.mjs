@@ -6,19 +6,20 @@ import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
 
 // SKETCHFORGE_MCP_FILES_DIR is resolved by the shared MCP filesystem path policy.
 
-const projectsDir = process.env.SKETCHFORGE_PROJECTS_DIR;
 let backend;
 let enginePackagePromise;
 let selectedObjectIds = [];
 
 async function getBackend() {
+  // Read per call: a long-lived host process may configure storage after import.
+  const projectsDir = process.env.SKETCHFORGE_PROJECTS_DIR?.trim();
   if (!projectsDir) throw new Error("Set SKETCHFORGE_PROJECTS_DIR to a directory containing SketchForge project files.");
-  if (!backend) {
+  if (backend?.projectsDir !== projectsDir) {
     enginePackagePromise ??= import("@constructorfleet/sketchforge-engine");
     await mkdir(projectsDir, { recursive: true });
     const { createEngine, directoryProjectStore } = await enginePackagePromise;
     const store = directoryProjectStore(projectsDir);
-    backend = { store, engine: createEngine(store), package: await enginePackagePromise };
+    backend = { projectsDir, store, engine: createEngine(store), package: await enginePackagePromise };
   }
   return backend;
 }
@@ -310,7 +311,7 @@ async function callLocalEngineToolRaw(name, args = {}) {
   if (["sketchforge_list_editors", "sketchforge_inspect_errors"].includes(name)) {
     throw new Error(`${name} needs an open SketchForge editor and is unavailable in local mode.`);
   }
-  const { engine, package: enginePackage } = await getBackend();
+  const { engine, package: enginePackage, projectsDir } = await getBackend();
   if (name === "sketchforge_list_projects") {
     const projects = await Promise.all((await backend.store.list()).map(async (record) => {
       const project = await unwrap(await engine.project(record.projectId));

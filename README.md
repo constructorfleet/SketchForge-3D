@@ -519,7 +519,7 @@ The application exposes a **Source** link in the dashboard. Operators distributi
 
 SketchForge includes a local MCP server for AI clients that support MCP tools. It lets an agent inspect and control a live local editor tab: list open editors, read the scene, create/update/select objects, group/cut/separate parts, list CAD edge ids, apply chamfer or fillet, inspect errors, and capture viewport images.
 
-This is for local development only. Run SketchForge with `npm run dev`; the MCP route is disabled in production builds and Docker/static hosting.
+Driving an editor tab is for local development only. Run SketchForge with `npm run dev`; the editor bridge route is disabled in production builds and Docker/static hosting. To work on stored projects on a deployed server instead, see [MCP over HTTP](#mcp-over-http).
 
 The same server can also run **macros** -- parameterised scripts that build a part through the headless [REST API](docs/REST_API.md) rather than through an editor tab. Set `SKETCHFORGE_MACRO_DIR` to a folder of macro files and `sketchforge_list_macros` and `sketchforge_run_macro` become available; with that variable unset they do nothing. Only files already in that folder can be run, and there is no tool that executes code sent to it, so what an agent can run is exactly what the operator installed. Writing a macro is covered in [`packages/sketchforge-client`](packages/sketchforge-client/README.md) and [`packages/sketchforge-py`](packages/sketchforge-py/README.md).
 
@@ -553,6 +553,17 @@ From a checkout, the same bridge runs without the download:
 ```bash
 npm run mcp:sketchforge
 ```
+
+### MCP over HTTP
+
+A SketchForge server with the [REST API](#rest-api) enabled is also an MCP server. Set `SKETCHFORGE_API_TOKEN` and `SKETCHFORGE_PROJECTS_DIR`, and point an MCP client that supports the Streamable HTTP transport at `/mcp`:
+
+```bash
+claude mcp add --transport http sketchforge http://127.0.0.1:3000/mcp \
+  --header "Authorization: Bearer $SKETCHFORGE_API_TOKEN"
+```
+
+No local process and no clone: the client talks to the server, which works on its own stored projects in production and Docker builds too. It offers the tools that work without an editor tab; file paths in tool calls are paths on the server. The [MCP endpoint guide](docs/guides/deployment.md#mcp-endpoint) lists what is and is not available.
 
 ### Codex
 

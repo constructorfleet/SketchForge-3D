@@ -31,7 +31,9 @@ test('public configuration registry agrees with server, container, client, MCP, 
     await source('packages/sketchforge-client/mcp/localEngine.mjs'),
     await source('packages/sketchforge-client/mcp/localMacroRunner.mjs'),
     await source('packages/sketchforge-client/mcp/macroTools.mjs'),
-    await source('packages/sketchforge-client/mcp/server.mjs'),
+    await source('packages/sketchforge-client/mcp/toolCatalog.mjs'),
+    await source('packages/sketchforge-client/mcp/tools.mjs'),
+    await source('packages/sketchforge-client/mcp/hosted.mjs'),
     await source('apps/desktop/main.cjs'),
   ].join('\n');
   const names = registry.settings.map((setting) => setting.name);
@@ -72,7 +74,9 @@ test('public client and MCP runtime settings have an owner and appear in the inv
     'packages/sketchforge-client/mcp/localEngine.mjs',
     'packages/sketchforge-client/mcp/localMacroRunner.mjs',
     'packages/sketchforge-client/mcp/macroTools.mjs',
-    'packages/sketchforge-client/mcp/server.mjs',
+    'packages/sketchforge-client/mcp/toolCatalog.mjs',
+    'packages/sketchforge-client/mcp/tools.mjs',
+    'packages/sketchforge-client/mcp/hosted.mjs',
   ];
   const readerText = (await Promise.all(runtimeReaders.map(source))).join('\n');
   const discovered = [...new Set(readerText.match(/SKETCHFORGE_[A-Z0-9_]+/g) ?? [])].sort();
@@ -148,7 +152,9 @@ test('the tracked server, container, client, MCP, and desktop reader set has no 
     'packages/sketchforge-client/mcp/localEngine.mjs',
     'packages/sketchforge-client/mcp/localMacroRunner.mjs',
     'packages/sketchforge-client/mcp/macroTools.mjs',
-    'packages/sketchforge-client/mcp/server.mjs',
+    'packages/sketchforge-client/mcp/toolCatalog.mjs',
+    'packages/sketchforge-client/mcp/tools.mjs',
+    'packages/sketchforge-client/mcp/hosted.mjs',
     'apps/desktop/main.cjs',
   ];
   const contents = (await Promise.all(readerPaths.map(source))).join('\n');
