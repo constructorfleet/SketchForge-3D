@@ -138,6 +138,9 @@ export const LENGTH_UNIT_PROPERTIES: readonly ShapePropertyId[] = ["length", "wi
 /** Typed values may exceed the slider maximum (the slider still clamps). */
 export const ABOVE_SLIDER_MAX_PROPERTIES: readonly ShapePropertyId[] = ["length", "width", "height", "topLength", "topWidth", "bottomLength", "bottomWidth", "toothWidth", "positionX", "positionY", "positionZ", "pitch", "turns", "core"];
 
+/** Typed values may go below the slider minimum; position has no lower bound. */
+export const BELOW_SLIDER_MIN_PROPERTIES: readonly ShapePropertyId[] = ["positionX", "positionZ"];
+
 export function propertyUsesLengthUnit(id: ShapePropertyId) {
   return LENGTH_UNIT_PROPERTIES.includes(id);
 }
@@ -477,9 +480,18 @@ export type PlacementBounds = {
   halfWidth: number;
   /** Half-extent on Z. */
   halfDepth: number;
-  /** Highest elevation the sliders reach. */
+  /** Elevation the slider reaches while the shape is below it. */
   maxElevation: number;
 };
+
+/** Doubles `base` until `value` lies strictly inside it, so a slider thumb never pins at its end. */
+export function sliderReach(base: number, value: number) {
+  let reach = Math.max(1, base);
+  const distance = Math.abs(value);
+  if (!Number.isFinite(distance)) return reach;
+  while (reach <= distance) reach *= 2;
+  return reach;
+}
 
 /**
  * Position and rotation rows for the object panel.
@@ -496,10 +508,16 @@ export function placementProperties(
   bounds: PlacementBounds,
 ): ShapePropertyConfig[] {
   const spin = (patch: Partial<WorkplaneShape>) => onUpdate(patch);
+  const elevation = shape.elevation ?? 0;
+  // The build plate is a starting range, not a limit on where a shape may sit.
+  const reachX = sliderReach(bounds.halfWidth, shape.x);
+  const reachY = sliderReach(bounds.maxElevation, elevation);
+  const reachZ = sliderReach(bounds.halfDepth, shape.z);
   return [
-    { id: "positionX", value: shape.x, min: -bounds.halfWidth, max: bounds.halfWidth, step: 0.1, onChange: (x) => spin({ x }) },
-    { id: "positionY", value: shape.elevation ?? 0, min: 0, max: bounds.maxElevation, step: 0.1, onChange: (elevation) => spin({ elevation }) },
-    { id: "positionZ", value: shape.z, min: -bounds.halfDepth, max: bounds.halfDepth, step: 0.1, onChange: (z) => spin({ z }) },
+    { id: "positionX", value: shape.x, min: -reachX, max: reachX, step: 0.1, onChange: (x) => spin({ x }) },
+    // Typing places a shape on or above the plate; a drag may leave it below.
+    { id: "positionY", value: elevation, min: elevation < 0 ? -reachY : 0, max: reachY, step: 0.1, onChange: (next) => spin({ elevation: next }) },
+    { id: "positionZ", value: shape.z, min: -reachZ, max: reachZ, step: 0.1, onChange: (z) => spin({ z }) },
     { id: "rotationX", value: signedDegrees(shape.rotationX ?? 0), min: -180, max: 180, step: 1, onChange: (rotationX) => spin({ rotationX }) },
     { id: "rotationY", value: signedDegrees(shape.rotation), min: -180, max: 180, step: 1, onChange: (rotation) => spin({ rotation }) },
     { id: "rotationZ", value: signedDegrees(shape.rotationZ ?? 0), min: -180, max: 180, step: 1, onChange: (rotationZ) => spin({ rotationZ }) },

@@ -29,6 +29,7 @@ import { retainedFaceDraftEditable, retainedPrismDraftAvailable } from "@/lib/re
 import { displayStepFromMillimeters, displayToMillimeters, formatMeasurementNumber, lengthDisplayUnit, millimetersToDisplay, parseMeasurementInput, snapGridLabel } from "@/lib/measurementUnits";
 import {
   ABOVE_SLIDER_MAX_PROPERTIES,
+  BELOW_SLIDER_MIN_PROPERTIES,
   GEAR_TYPE_OPTIONS,
   clamp,
   getShapePropertiesWithAppLimits,
@@ -177,7 +178,7 @@ export function ShapeInspector({
     : [];
   const taperDimensionMax = workspace.shapeCustomizations[shape.kind]?.maxDimension ?? 480;
   const taperProperties = getShapeTaperProperties(shape, onUpdate, taperDimensionMax);
-  // The sliders span the build plate; typed values may still go beyond it.
+  // The sliders start at the build plate and widen once a shape leaves it.
   const placementRows = placementProperties(shape, onUpdate, {
     halfWidth: workspace.width / 2,
     halfDepth: workspace.depth / 2,
@@ -710,12 +711,18 @@ function RangeProperty({
 }: RangePropertyConfig & { label: string; workspace: WorkplaneWorkspaceSettings; disabled?: boolean; onInteractionActiveChange?: (active: boolean) => void }) {
   const t = useTranslations();
   const allowsAboveSliderMax = ABOVE_SLIDER_MAX_PROPERTIES.includes(id);
+  const allowsBelowSliderMin = BELOW_SLIDER_MIN_PROPERTIES.includes(id);
   const isLength = propertyUsesLengthUnit(id);
   const accuracy = workspace.accuracy;
-  const actualValue = Math.max(min, Number.isFinite(value) ? value : min);
+  // A range that widens with the value must hold still under a held thumb.
+  const [heldRange, setHeldRange] = useState<{ min: number; max: number } | null>(null);
+  const sliderMin = heldRange?.min ?? min;
+  const sliderMax = heldRange?.max ?? max;
+  const safeValue = Number.isFinite(value) ? value : min;
+  const actualValue = allowsBelowSliderMin ? safeValue : Math.max(min, safeValue);
   const controlValue = isLength ? millimetersToDisplay(actualValue, workspace) : actualValue;
-  const controlMin = isLength ? millimetersToDisplay(min, workspace) : min;
-  const controlMax = isLength ? millimetersToDisplay(max, workspace) : max;
+  const controlMin = isLength ? millimetersToDisplay(sliderMin, workspace) : sliderMin;
+  const controlMax = isLength ? millimetersToDisplay(sliderMax, workspace) : sliderMax;
   const controlStep = isLength ? displayStepFromMillimeters(step, workspace) : step;
   const sliderValue = clamp(controlValue, controlMin, controlMax);
   const position = ((sliderValue - controlMin) / Math.max(Number.EPSILON, controlMax - controlMin)) * 100;
@@ -727,13 +734,14 @@ function RangeProperty({
     const next = parseMeasurementInput(draft);
     const finiteNext = Number.isFinite(next) ? next : controlValue;
     const nextModelValue = toModelValue(finiteNext);
-    onChange(allowsAboveSliderMax ? Math.max(min, nextModelValue) : clamp(nextModelValue, min, max));
+    const lowerBound = allowsBelowSliderMin ? Number.NEGATIVE_INFINITY : min;
+    onChange(allowsAboveSliderMax ? Math.max(lowerBound, nextModelValue) : clamp(nextModelValue, lowerBound, max));
     setEditing(false);
     onInteractionActiveChange?.(false);
   };
   const handleSliderChange = (nextValue: number) => {
     const next = clamp(Number.isFinite(nextValue) ? nextValue : controlMin, controlMin, controlMax);
-    onChange(clamp(toModelValue(next), min, max));
+    onChange(clamp(toModelValue(next), sliderMin, sliderMax));
     setDraft(formatPropertyNumber(next, accuracy, controlStep));
   };
   return (
@@ -774,10 +782,24 @@ function RangeProperty({
           value={sliderValue}
           disabled={disabled}
           onFocus={() => onInteractionActiveChange?.(true)}
-          onBlur={() => onInteractionActiveChange?.(false)}
-          onPointerDown={() => onInteractionActiveChange?.(true)}
-          onPointerUp={() => onInteractionActiveChange?.(false)}
-          onPointerCancel={() => onInteractionActiveChange?.(false)}
+          onBlur={() => {
+            setHeldRange(null);
+            onInteractionActiveChange?.(false);
+          }}
+          onPointerDown={(event) => {
+            // Captured so a release outside the track still ends the hold.
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setHeldRange({ min, max });
+            onInteractionActiveChange?.(true);
+          }}
+          onPointerUp={() => {
+            setHeldRange(null);
+            onInteractionActiveChange?.(false);
+          }}
+          onPointerCancel={() => {
+            setHeldRange(null);
+            onInteractionActiveChange?.(false);
+          }}
           onChange={(event) => handleSliderChange(Number(event.currentTarget.value))}
         />
       </div>

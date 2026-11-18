@@ -117,10 +117,6 @@ const MAX_CAMERA_DISTANCE = 4200;
 const CAMERA_HOME = new THREE.Vector3(118, 96, 118);
 const CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
 const MIN_SHAPE_SIZE = 0.01;
-const MIN_ELEVATION = -180;
-const MAX_ELEVATION = 220;
-const CAMERA_MIN_TARGET_Y = -70;
-const CAMERA_MAX_TARGET_Y = 120;
 const ROTATION_PROTRACTOR_OUTER_RADIUS = 94;
 const RENDER_LAYER_WORKPLANE = 0;
 const RENDER_LAYER_SHAPES = 1;
@@ -586,8 +582,8 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function snapPositionValue(value: number, step: number, min: number, max: number) {
-  return clamp(step > 0 ? snapValue(value, step) : value, min, max);
+function snapPositionValue(value: number, step: number) {
+  return step > 0 ? snapValue(value, step) : value;
 }
 
 function screenAngle(clientX: number, clientY: number, center: { x: number; y: number }) {
@@ -2034,7 +2030,7 @@ function patchWithPreservedWorldYEdge(shape: WorkplaneShape, patch: Partial<Work
   const delta = edge === "bottom" ? startBounds.min - draftBounds.min : startBounds.max - draftBounds.max;
   return {
     ...patch,
-    elevation: cleanNearZero(clamp((draftShape.elevation ?? 0) + delta, MIN_ELEVATION, MAX_ELEVATION), 0.0005),
+    elevation: cleanNearZero((draftShape.elevation ?? 0) + delta, 0.0005),
   };
 }
 
@@ -2052,6 +2048,10 @@ function patchWithResizeAnchor(
   axis: ShapeInspectorUpdateOptions["resizeAxis"] | DimensionMark["axis"],
   anchor: ResizeAnchorMemory | null,
 ) {
+  // An explicit elevation is the request; holding the bottom still would undo it.
+  if (axis === undefined && patch.elevation !== undefined) {
+    return patch;
+  }
   if (axis === "height") {
     return patchWithPreservedWorldYEdge(shape, patch, anchor?.shapeId === shape.id && anchor.pressedY === "bottom" ? "top" : "bottom");
   }
@@ -2820,8 +2820,6 @@ export function WorkplaneViewport({
         restoreCameraView(threeRef.current.camera, threeRef.current.controls.target, nextWorkspace.cameraView);
         threeRef.current.controls.update();
         lastPersistedCameraViewRef.current = captureCameraView(threeRef.current.camera, threeRef.current.controls.target);
-      } else {
-        constrainCamera(threeRef.current, nextWorkspace);
       }
       threeRef.current.needsRender = true;
     }
@@ -3205,9 +3203,6 @@ export function WorkplaneViewport({
       if (!controlsChanged && !state.needsRender && !cameraSettled && !state.rotationRingsAnimating) {
         return;
       }
-      if (!cubeDragActiveRef.current) {
-        constrainCamera(state, workspaceRef.current);
-      }
       // Future edits: keep this before any view cube or transform-overlay projection.
       // OrbitControls changes camera position/quaternion, but manual Vector3.project()
       // can read the previous matrix unless we force the matrix world current here.
@@ -3400,11 +3395,7 @@ export function WorkplaneViewport({
     }
 
     const step = snapStep(snapRef.current);
-    const bounds = workspaceRef.current;
-    return {
-      x: clamp(snapValue(hit.x, step), -bounds.width / 2 + 6, bounds.width / 2 - 6),
-      z: clamp(snapValue(hit.z, step), -bounds.depth / 2 + 6, bounds.depth / 2 - 6),
-    };
+    return { x: snapValue(hit.x, step), z: snapValue(hit.z, step) };
   }, [toRawPlanePoint]);
   const toPlanePoint = useCallback((clientX: number, clientY: number) => toPlanePointAtY(clientX, clientY, 0), [toPlanePointAtY]);
 
@@ -3415,12 +3406,7 @@ export function WorkplaneViewport({
     if (!raw) return null;
     const local = placementWorkplaneCoordinates(workplane, raw);
     const step = snapStep(snapRef.current);
-    const bounds = workspaceRef.current;
-    return placementWorkplanePoint(
-      workplane,
-      clamp(snapValue(local.x, step), -bounds.width / 2 + 6, bounds.width / 2 - 6),
-      clamp(snapValue(local.z, step), -bounds.depth / 2 + 6, bounds.depth / 2 - 6),
-    );
+    return placementWorkplanePoint(workplane, snapValue(local.x, step), snapValue(local.z, step));
   }, [toRawPlanePoint]);
 
   const storeRulerModel = useCallback((next: RulerModel) => {
@@ -3558,12 +3544,7 @@ export function WorkplaneViewport({
       const raw = toRawPlanePoint(clientX, clientY, state.dragPlane);
       if (!raw) return null;
       const step = snapStep(snapRef.current);
-      const bounds = workspaceRef.current;
-      const snapped = {
-        x: clamp(snapValue(raw.x, step), -bounds.width / 2, bounds.width / 2),
-        y: 0,
-        z: clamp(snapValue(raw.z, step), -bounds.depth / 2, bounds.depth / 2),
-      };
+      const snapped = { x: snapValue(raw.x, step), y: 0, z: snapValue(raw.z, step) };
       const existing = model.points.find((point) => Math.hypot(point.x - snapped.x, point.y, point.z - snapped.z) < 0.001 && !point.attachment);
       return { ...snapped, pointId: existing?.id };
     },
@@ -4006,10 +3987,7 @@ export function WorkplaneViewport({
           onUpdateShape(item.id, {
             x: cleanNearZero(nextCenter.x, 0.0005),
             z: cleanNearZero(nextCenter.z, 0.0005),
-            elevation: cleanNearZero(
-              clamp(nextCenter.y - item.startShape.height / 2, MIN_ELEVATION, MAX_ELEVATION),
-              0.0005,
-            ),
+            elevation: cleanNearZero(nextCenter.y - item.startShape.height / 2, 0.0005),
           });
         });
         if (state) {
@@ -4124,9 +4102,9 @@ export function WorkplaneViewport({
         const patch: Partial<WorkplaneShape> = rotationPatchFromQuaternion(nextQuaternion);
         if (transform.items.length > 1) {
           const nextCenter = pivot.clone().add(item.startCenter.clone().sub(pivot).applyQuaternion(rotationDelta));
-          patch.x = snapPositionValue(nextCenter.x, step, -workspaceRef.current.width / 2 + 6, workspaceRef.current.width / 2 - 6);
-          patch.z = snapPositionValue(nextCenter.z, step, -workspaceRef.current.depth / 2 + 6, workspaceRef.current.depth / 2 - 6);
-          patch.elevation = snapPositionValue(nextCenter.y - item.startShape.height / 2, step, MIN_ELEVATION, MAX_ELEVATION);
+          patch.x = snapPositionValue(nextCenter.x, step);
+          patch.z = snapPositionValue(nextCenter.z, step);
+          patch.elevation = snapPositionValue(nextCenter.y - item.startShape.height / 2, step);
         }
         onUpdateShape(item.id, patch);
       });
@@ -4232,7 +4210,7 @@ export function WorkplaneViewport({
         const currentElevation = frame
           ? workplaneFootprintY(frame, activeWorkplane) - workplaneYForFrame(frame, activeWorkplane)
           : shape.elevation ?? 0;
-        const targetElevation = cleanNearZero(clamp(value, MIN_ELEVATION, MAX_ELEVATION), 0.0005);
+        const targetElevation = cleanNearZero(value, 0.0005);
         const delta = targetElevation - currentElevation;
         const axis = frame?.yAxis.clone().normalize() ?? new THREE.Vector3(0, 1, 0);
         selectedIdsRef.current.forEach((selectedId) => {
@@ -4242,7 +4220,7 @@ export function WorkplaneViewport({
             onUpdateShape(selectedId, {
               x: cleanNearZero(nextCenter.x, 0.0005),
               z: cleanNearZero(nextCenter.z, 0.0005),
-              elevation: cleanNearZero(clamp(nextCenter.y - selectedShape.height / 2, MIN_ELEVATION, MAX_ELEVATION), 0.0005),
+              elevation: cleanNearZero(nextCenter.y - selectedShape.height / 2, 0.0005),
             });
           }
         });
@@ -5166,9 +5144,6 @@ export function WorkplaneViewport({
       state.camera.position.copy(center).add(direction.multiplyScalar(distance));
     }
 
-    // constrainCamera keeps the orbit target inside the workspace on every frame,
-    // so an object parked beyond the plate edge is framed as closely as the
-    // existing camera limits allow rather than pulling the view off the grid.
     state.controls.target.copy(center);
     state.camera.lookAt(center);
     state.camera.updateProjectionMatrix();
@@ -6185,20 +6160,6 @@ function setCameraToViewFace(state: ThreeState, face: ViewCubeFace) {
   state.camera.updateProjectionMatrix();
   state.controls.update();
   state.needsRender = true;
-}
-
-function constrainCamera(state: ThreeState, workspace: WorkspaceSettings) {
-  const target = state.controls.target;
-  const previousTarget = target.clone();
-  target.x = clamp(target.x, -workspace.width / 2, workspace.width / 2);
-  target.y = clamp(target.y, CAMERA_MIN_TARGET_Y, CAMERA_MAX_TARGET_Y);
-  target.z = clamp(target.z, -workspace.depth / 2, workspace.depth / 2);
-
-  const targetShift = target.clone().sub(previousTarget);
-  if (targetShift.lengthSq() > 0) {
-    state.camera.position.add(targetShift);
-    state.camera.updateProjectionMatrix();
-  }
 }
 
 // Straight down and straight up leave no horizontal offset to read a yaw from, and

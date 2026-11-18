@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placementProperties, signedDegrees, type RangePropertyConfig, type ShapeInspectorUpdate } from "@/lib/shapeProperties";
+import { BELOW_SLIDER_MIN_PROPERTIES, placementProperties, signedDegrees, sliderReach, type RangePropertyConfig, type ShapeInspectorUpdate } from "@/lib/shapeProperties";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 const BOUNDS = { halfWidth: 150, halfDepth: 150, maxElevation: 300 };
@@ -111,5 +111,48 @@ describe("placement rows", () => {
     written.find((r) => r.id === "positionX")!.onChange(-12.75);
     written.find((r) => r.id === "rotationY")!.onChange(-90);
     expect(patches).toEqual([{ x: -12.75 }, { rotation: -90 }]);
+  });
+
+  it("spans the build plate while the shape is on it", () => {
+    for (const x of [0, 149.9, -149.9]) {
+      expect(row(shape({ x }), "positionX").max).toBe(150);
+      expect(row(shape({ x }), "positionX").min).toBe(-150);
+    }
+    expect(row(shape({ elevation: 299 }), "positionY").max).toBe(300);
+  });
+
+  it("widens to keep a shape beyond the plate inside the slider", () => {
+    for (const [x, reach] of [[150, 300], [-150, 300], [400, 600], [-650, 1200], [5000, 9600]]) {
+      const position = row(shape({ x }), "positionX");
+      expect([position.min, position.max], `x ${x}`).toEqual([-reach, reach]);
+      expect(position.value).toBe(x);
+    }
+    expect(row(shape({ z: -400 }), "positionZ").min).toBe(-600);
+    expect(row(shape({ elevation: 900 }), "positionY").max).toBe(1200);
+  });
+
+  it("shows a shape dragged below the plate at its real height", () => {
+    const lowered = row(shape({ elevation: -40 }), "positionY");
+    expect(lowered.value).toBe(-40);
+    expect(lowered.min).toBe(-300);
+  });
+
+  it("lets a typed X or Z go past the slider minimum", () => {
+    expect([...BELOW_SLIDER_MIN_PROPERTIES].sort()).toEqual(["positionX", "positionZ"]);
+  });
+});
+
+describe("sliderReach", () => {
+  it("doubles the base until the value is strictly inside it", () => {
+    expect(sliderReach(100, 0)).toBe(100);
+    expect(sliderReach(100, 99.9)).toBe(100);
+    expect(sliderReach(100, 100)).toBe(200);
+    expect(sliderReach(100, -250)).toBe(400);
+  });
+
+  it("falls back to the base for values it cannot span", () => {
+    expect(sliderReach(100, Number.NaN)).toBe(100);
+    expect(sliderReach(100, Number.POSITIVE_INFINITY)).toBe(100);
+    expect(sliderReach(0, 5)).toBe(8);
   });
 });
