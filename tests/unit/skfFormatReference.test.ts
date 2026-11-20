@@ -13,7 +13,7 @@ describe("published .skf format reference", () => {
     const reference = readFileSync(path.join(root, "docs", "SKF_FORMAT_REFERENCE.md"), "utf8");
     expect(reference).toMatch(/Newest format read and written\s*\|\s*3/);
     expect(reference).toMatch(/Format written when the project has parameters\s*\|\s*3/);
-    expect(reference).toMatch(/Minimum reader format of other projects\s*\|\s*2/);
+    expect(reference).toMatch(/Format written for other projects\s*\|\s*2/);
     expect(reference).toContain("### `SkfParameterV3`");
     expect(reference).toContain("`parameters?` | `SkfParameterV3[]`");
     expect(reference).toContain("`sceneStateId`");

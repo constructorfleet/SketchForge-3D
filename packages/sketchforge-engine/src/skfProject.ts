@@ -10,12 +10,14 @@ import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
-import { resolveProjectParameters, type ProjectParameterError, type ProjectParameterInput } from "./projectParameters.js";
+import { PROJECT_PARAMETER_DIMENSIONS, resolveProjectParameters, type ProjectParameterInput } from "./projectParameters.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
 export const SKF_FORMAT_VERSION = 3;
 export const SKF_MINIMUM_READER_VERSION = 2;
+/** Written, with the same minimum reader version, when the parameter table is empty. */
+export const SKF_BASE_FORMAT_VERSION = 2;
 // Written only when the parameter table is not empty, so other projects stay readable by V2 readers.
 export const SKF_PARAMETERS_FORMAT_VERSION = 3;
 export const SKF_CREATED_WITH_VERSION = "1.32.0"; // x-release-please-version
@@ -104,12 +106,13 @@ export type SkfFeatureV1 = {
   parameters?: Record<string, unknown>;
 };
 
-// V3 only; the document omits `parameters` when the table is empty. Readers recompute `value`.
+// V3 writes it; readers accept it in any version. Readers recompute `value`, which is
+// the last known value of an entry that no longer resolves and absent when there is none.
 export type SkfParameterV3 = {
   name: string;
   expression: string;
   dimension: ProjectParameterDimension;
-  value: number;
+  value?: number;
 };
 
 // The packaged graph layout is shared by V1 and V2. V2 moves display edges
@@ -873,29 +876,35 @@ function unzipAsync(bytes: Uint8Array) {
   });
 }
 
-function parameterErrorLabel(entries: readonly ProjectParameterInput[], error: ProjectParameterError) {
-  const index = entries.findIndex((entry) => entry.name === error.parameter);
-  if (index < 0 || error.code === "tooManyParameters") return "parameters";
-  const field = error.code === "invalidName" || error.code === "duplicateName" ? "name" : error.code === "invalidDimension" ? "dimension" : "expression";
-  return `parameters[${index}].${field}`;
-}
-
-// Re-resolves so a stored value always matches its expression.
+// Fails only on malformed structure. Entries that no longer resolve keep their stored text and last value.
 function resolvedSkfParameters(entries: readonly ProjectParameterInput[]): ProjectParameter[] {
   const resolved = resolveProjectParameters(entries);
-  if (!resolved.ok) throw new LocalizedError("errors.skf.fieldInvalid", { label: parameterErrorLabel(entries, resolved.error) });
+  if (!resolved.ok) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
   return resolved.parameters;
 }
 
 function readSkfParameters(raw: unknown): ProjectParameter[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw) || raw.length > SKF_LIMITS.parameters) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
-  return resolvedSkfParameters(raw.map((entry, index) => objectRecord(entry, `parameters[${index}]`) as ProjectParameterInput));
+  raw.forEach((entry, index) => {
+    const record = objectRecord(entry, `parameters[${index}]`);
+    if (typeof record.name !== "string") throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].name` });
+    if (typeof record.expression !== "string") throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].expression` });
+    if (!PROJECT_PARAMETER_DIMENSIONS.includes(record.dimension as ProjectParameterDimension)) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].dimension` });
+    }
+    if (record.value !== undefined) finiteNumber(record.value, `parameters[${index}].value`);
+  });
+  return resolvedSkfParameters(raw as ProjectParameterInput[]);
+}
+
+function skfParameter({ name, expression, dimension, value }: ProjectParameter): SkfParameterV3 {
+  return Number.isFinite(value) ? { name, expression, dimension, value } : { name, expression, dimension };
 }
 
 export async function exportSkfProject(input: SkfProjectExportInput) {
   const parameters = resolvedSkfParameters(input.parameters ?? []);
-  const formatVersion = parameters.length ? SKF_PARAMETERS_FORMAT_VERSION : 2;
+  const formatVersion = parameters.length ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
   const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex);
   if (hydrated.entries.length > SKF_LIMITS.states) throw new LocalizedError("errors.skf.tooManyStates");
   const exportEntries = hydrated.entries.map((entry) => {
@@ -932,7 +941,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
   const document: SkfProjectDocumentV1 = {
     schema: SKF_SCHEMA_ID,
     formatVersion,
-    minimumReaderVersion: Math.max(SKF_MINIMUM_READER_VERSION, formatVersion),
+    minimumReaderVersion: formatVersion,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -961,7 +970,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
       placementWorkplane,
       sketchPlacementWorkplane,
     },
-    ...(parameters.length ? { parameters } : {}),
+    ...(parameters.length ? { parameters: parameters.map(skfParameter) } : {}),
   };
   const projectJson = strToU8(JSON.stringify(document));
   if (projectJson.byteLength > SKF_LIMITS.projectJsonBytes) {

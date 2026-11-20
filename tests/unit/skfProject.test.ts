@@ -1177,23 +1177,58 @@ describe("SketchForge .skf project parameters", () => {
     expect(document.parameters).toEqual(parameters);
   });
 
-  it("rejects a table that does not resolve, on load and on save", async () => {
+  it("opens a project whose table no longer resolves, and saves the table back unchanged", async () => {
+    const exported = await exportSkfProject(input([shape("box"), shape("box", "box-2")], { parameters }));
+    const unresolved: Array<[string, (document: SkfProjectDocumentV1) => void, string]> = [
+      ["cycle", (document) => { document.parameters![0]!.expression = "depth"; }, "invalidExpression"],
+      ["unknown reference", (document) => { document.parameters![3]!.expression = "missing + 1"; }, "invalidExpression"],
+      ["reserved name", (document) => { document.parameters![1]!.name = "mm"; }, "invalidName"],
+      ["duplicate", (document) => { document.parameters![1]!.name = "wall"; }, "duplicateName"],
+    ];
+    for (const [label, mutate, code] of unresolved) {
+      const bytes = mutateProject(exported, mutate);
+      const stored = packageDocument(bytes).document.parameters!;
+
+      const restored = await importSkfProject(bytes);
+
+      expect(restored.shapes, label).toHaveLength(2);
+      expect(restored.parameters.map(({ name, expression, dimension }) => ({ name, expression, dimension })), label)
+        .toEqual(stored.map(({ name, expression, dimension }) => ({ name, expression, dimension })));
+      const failing = restored.parameters.filter((parameter) => parameter.error);
+      expect(failing.length, label).toBeGreaterThan(0);
+      expect(failing.map((parameter) => parameter.error!.code), label).toContain(code);
+      for (const parameter of failing) {
+        expect(parameter.value, label).toBe(stored.find((entry) => entry.name === parameter.name && entry.expression === parameter.expression)!.value);
+      }
+
+      const saved = packageDocument(await exportSkfProject(input(restored.shapes, { parameters: restored.parameters })));
+      expect(saved.document.parameters, label).toEqual(stored);
+    }
+  });
+
+  it("saves an unresolved entry with no known value without a value", async () => {
+    const cyclic = [{ name: "a", expression: "b", dimension: "length" as const }, { name: "b", expression: "a", dimension: "length" as const }];
+
+    const { document } = packageDocument(await exportSkfProject(input([shape("box")], { parameters: cyclic as ProjectParameter[] })));
+
+    expect(document.parameters).toEqual(cyclic);
+    expect((await importSkfProject(await exportSkfProject(input([shape("box")], { parameters: cyclic as ProjectParameter[] })))).parameters.map((parameter) => parameter.error?.code))
+      .toEqual(["invalidExpression", "invalidExpression"]);
+  });
+
+  it("rejects a structurally malformed table", async () => {
     const exported = await exportSkfProject(input([shape("box")], { parameters }));
-    const broken: Array<[string, (document: SkfProjectDocumentV1) => void]> = [
-      ["cycle", (document) => { document.parameters![0]!.expression = "depth"; }],
-      ["unknown reference", (document) => { document.parameters![3]!.expression = "missing + 1"; }],
+    const malformed: Array<[string, (document: SkfProjectDocumentV1) => void]> = [
       ["dimension", (document) => { (document.parameters![1] as { dimension: string }).dimension = "area"; }],
-      ["duplicate", (document) => { document.parameters![1]!.name = "wall"; }],
-      ["invalid name", (document) => { document.parameters![1]!.name = "mm"; }],
       ["not a list", (document) => { (document as { parameters: unknown }).parameters = { wall: "3" }; }],
       ["not an object", (document) => { (document as { parameters: unknown[] }).parameters[0] = "wall"; }],
+      ["name type", (document) => { (document.parameters![0] as { name: unknown }).name = 3; }],
+      ["expression type", (document) => { (document.parameters![0] as { expression: unknown }).expression = 3; }],
+      ["value type", (document) => { (document.parameters![0] as { value: unknown }).value = "3"; }],
     ];
-    for (const [label, mutate] of broken) {
+    for (const [label, mutate] of malformed) {
       await expect(importSkfProject(mutateProject(exported, mutate)), label).rejects.toThrow(/parameters/);
     }
-
-    const cyclic = [{ name: "a", expression: "b", dimension: "length" as const, value: 0 }, { name: "b", expression: "a", dimension: "length" as const, value: 0 }];
-    await expect(exportSkfProject(input([shape("box")], { parameters: cyclic }))).rejects.toThrow(/parameters\[0\]/);
   });
 
   it("caps the number of stored parameters", async () => {

@@ -20,7 +20,7 @@ For automated project export from a server-backed project, see [`POST /exports` 
 | Schema | `com.sketchforge.project` |
 | Newest format read and written | 3 |
 | Format written when the project has parameters | 3 |
-| Minimum reader format of other projects | 2 |
+| Format written for other projects | 2 |
 | Created-with version | `1.32.0` | <!-- x-release-please-version -->
 | Media type | `application/vnd.sketchforge.project+zip` |
 
@@ -95,14 +95,14 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `name` | `string` |
 | `expression` | `string` |
 | `dimension` | `ProjectParameterDimension` |
-| `value` | `number` |
+| `value?` | `number` |
 
-`value` is in mm for `length`, degrees for `angle`, and plain for `unitless`. Readers re-evaluate every expression and ignore the stored value. A table that does not resolve (invalid or duplicate name, unknown dimension, unknown reference, dimension mismatch, or reference cycle) rejects the whole package.
+`value` is in mm for `length`, degrees for `angle`, and plain for `unitless`. Readers re-evaluate every expression and use the stored value only for an entry that no longer resolves; it is absent when no value is known. An entry that no longer resolves (an invalid or duplicate name, for example a name a later release reserves, an unknown reference, a dimension mismatch, or a reference cycle) does not stop the project opening: the reader keeps its name, expression, dimension and stored value as its last known value, reports a per-entry error, and the next save writes it back unchanged. Only a malformed table rejects the package: `parameters` that is not a list, an entry that is not an object, a `name` or `expression` that is not a string, a `dimension` other than `length`, `angle` or `unitless`, a `value` that is present and not a finite number, or more entries than the limit.
 
 ## Reader compatibility
 
 - V3 is written only when the project parameter table is not empty, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
-- V2 is written for every other project and requires a reader at least version 2. It has no `parameters` field and loads with an empty table.
+- V2 is written for every other project and requires a reader at least version 2. Writers never put a `parameters` field in it. Readers accept `parameters` in any version, and a file without one loads with an empty table.
 - V1 packaged projects are accepted and migrate inline display edges into shared assets on import; the next save writes V2.
 - V0 legacy JSON projects are accepted by the explicit migration path, which preserves valid object IDs and history.
 - Unsupported future versions are rejected before restoration. The original input bytes are not modified.

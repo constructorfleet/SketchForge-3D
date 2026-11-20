@@ -140,10 +140,74 @@ describe("project parameter table", () => {
   it("reports the root failure rather than an earlier dependent of it", () => {
     const resolved = resolveProjectParameters([
       { name: "depth", expression: "wall * 2", dimension: "length" },
-      { name: "wall", expression: "wal", dimension: "length" },
+      { name: "wall", expression: "3", dimension: "length" },
     ]);
+    if (!resolved.ok) throw new Error(resolved.error.message);
 
-    expect(resolved).toMatchObject({ ok: false, error: { code: "invalidExpression", parameter: "wall", expressionError: { code: "unknownName" } } });
+    const error = failed(updateParameter({ parameters: resolved.parameters }, "wall", { expression: "wal" }));
+
+    expect(error).toMatchObject({ code: "invalidExpression", parameter: "wall", expressionError: { code: "unknownName" } });
+  });
+
+  it("keeps entries that do not resolve, with their last value and an error", () => {
+    const resolved = resolveProjectParameters([
+      { name: "wall", expression: "3", dimension: "length", value: 3 },
+      { name: "pi", expression: "wall + missing", dimension: "length", value: 7 },
+      { name: "outer", expression: "pi * 2", dimension: "length", value: 14 },
+      { name: "mm", expression: "1", dimension: "length", value: 1 },
+      { name: "wall", expression: "4", dimension: "length", value: 4 },
+      { name: "fresh", expression: "fresh", dimension: "length" },
+    ] as ProjectParameter[]);
+    if (!resolved.ok) throw new Error(resolved.error.message);
+
+    expect(resolved.parameters.map(({ name, expression, dimension, value }) => ({ name, expression, dimension, value }))).toEqual([
+      { name: "wall", expression: "3", dimension: "length", value: 3 },
+      { name: "pi", expression: "wall + missing", dimension: "length", value: 7 },
+      { name: "outer", expression: "pi * 2", dimension: "length", value: 14 },
+      { name: "mm", expression: "1", dimension: "length", value: 1 },
+      { name: "wall", expression: "4", dimension: "length", value: 4 },
+      { name: "fresh", expression: "fresh", dimension: "length", value: Number.NaN },
+    ]);
+    expect(resolved.parameters.map((parameter) => parameter.error?.code ?? null)).toEqual([
+      "duplicateName", "invalidExpression", "invalidExpression", "invalidName", "duplicateName", "invalidExpression",
+    ]);
+    expect(resolved.parameters[1]!.error?.expressionError?.code).toBe("dependencyFailed");
+    expect(resolved.parameters[5]!.error?.expressionError?.code).toBe("cycle");
+  });
+
+  it("allows changes that break nothing new in a table with broken entries", () => {
+    const loaded = resolveProjectParameters([
+      { name: "wall", expression: "3", dimension: "length", value: 3 },
+      { name: "lip", expression: "missing", dimension: "length", value: 5 },
+    ] as ProjectParameter[]);
+    if (!loaded.ok) throw new Error(loaded.error.message);
+    const current = { parameters: loaded.parameters };
+
+    const added = ok(addParameter(current, { name: "depth", expression: "wall * 2", dimension: "length" }));
+    expect(added.parameters.map((parameter) => [parameter.name, parameter.value, parameter.error?.code ?? null])).toEqual([
+      ["wall", 3, null], ["lip", 5, "invalidExpression"], ["depth", 6, null],
+    ]);
+    expect(ok(deleteParameter(current, "lip")).parameters.map((parameter) => parameter.name)).toEqual(["wall"]);
+
+    const fixed = ok(updateParameter(current, "lip", { expression: "wall + 1" }));
+    expect(fixed.parameters[1]).toEqual({ name: "lip", expression: "wall + 1", dimension: "length", value: 4 });
+
+    expect(failed(updateParameter(current, "lip", { dimension: "angle" })).parameter).toBe("lip");
+    expect(failed(updateParameter(current, "wall", { expression: "lip" })).parameter).toBe("wall");
+  });
+
+  it("returns structured errors for malformed input instead of throwing", () => {
+    expect(ok(addParameter({} as Project, { name: "wall", expression: "3", dimension: "length" })).parameters).toHaveLength(1);
+    expect(failed(addParameter(project(), null as never)).code).toBe("invalidParameter");
+    expect(failed(addParameter({ parameters: [null] } as never, { name: "wall", expression: "3", dimension: "length" })).code).toBe("invalidParameter");
+    expect(failed(addParameter(project(), { name: 3, expression: "1", dimension: "length" } as never)).code).toBe("invalidName");
+    expect(resolveProjectParameters([null] as never)).toMatchObject({ ok: false, error: { code: "invalidParameter" } });
+    expect(resolveProjectParameters(null as never)).toMatchObject({ ok: false, error: { code: "invalidParameter" } });
+    const current = table(["wall", "3", "length"]);
+    expect(ok(updateParameter(current, "wall", null as never))).toEqual(current);
+    expect(failed(renameParameter(current, 5 as never, "other")).code).toBe("unknownParameter");
+    expect(failed(renameParameter(current, "wall", 5 as never)).code).toBe("invalidName");
+    expect(failed(deleteParameter({} as Project, "wall")).code).toBe("unknownParameter");
   });
 
   it("reports an unknown parameter", () => {
