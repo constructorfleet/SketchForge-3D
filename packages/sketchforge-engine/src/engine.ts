@@ -123,6 +123,7 @@ import {
   boundFieldValue,
   resolveShapeBinding,
   withoutBindings,
+  withoutShapeBindings,
   type ShapeBindingError,
 } from "./expressionBindings.js";
 import { expressionDependencies } from "./parameterExpressions.js";
@@ -704,9 +705,10 @@ export function createEngine(store: ProjectStore): Engine {
       const locked = lockedIds(resolved.value);
       if (locked) return failed({ reason: "shape_locked", ids: locked });
 
-      const operands = holes
+      // Grouping rewrites operand placement into the group frame, a literal change.
+      const operands = (holes
         ? resolved.value.map((shape) => withHoleMode(shape, holes.has(shape.id)))
-        : resolved.value;
+        : resolved.value).map(withoutShapeBindings);
       const outcome = await buildGroupFromSelection(operands);
       if ("error" in outcome) {
         return failed({ reason: "geometry_failed", message: outcome.error, status: outcome.status });
@@ -767,7 +769,9 @@ export function createEngine(store: ProjectStore): Engine {
 
       let changed: WorkplaneShape;
       try {
-        changed = await run(found.value);
+        changed = withoutBindings(await run(found.value), operation === "prism-draft"
+          ? ["draftPrismAngle"]
+          : ["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
       } catch (error) {
         return failed(cadFailure(error));
       }
@@ -810,7 +814,7 @@ export function createEngine(store: ProjectStore): Engine {
       const deltaById = new Map(shifts.map((shift) => [shift.id, shift.delta]));
       const shapes = document.shapes.map((shape) => {
         const delta = deltaById.get(shape.id);
-        return delta === undefined ? shape : shapeMovedAlong(shape, axis, delta);
+        return delta === undefined ? shape : withoutBindings(shapeMovedAlong(shape, axis, delta), [axis === "y" ? "elevation" : axis]);
       });
       const selected = new Set(ids);
       return ok({
@@ -1612,13 +1616,15 @@ export function createEngine(store: ProjectStore): Engine {
       const values: Record<string, number> = {};
       for (const [field, expression] of Object.entries(shape.expressions ?? {})) {
         if (invalid || !expressionDependencies(expression).some((name) => changed.has(name))) continue;
-        if (bindableField(shape, field)?.target === "shape" && !topLevel) {
-          invalid = { code: "fieldNotBindable", shapeId: shape.id, field, message: `${field} binds on top-level shapes only.` };
-          continue;
-        }
+        // A misplaced shape binding stays stale, as on load.
+        if (bindableField(shape, field)?.target === "shape" && !topLevel) continue;
         const resolved = resolveShapeBinding(shape, field, expression, next);
-        if (!resolved.ok) invalid = resolved.error;
-        else if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
+        if (resolved.ok) {
+          if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
+        } else if (resolveShapeBinding(shape, field, expression, previous).ok) {
+          // Refuses only a binding this change breaks; one already stale stays stale.
+          invalid = resolved.error;
+        }
       }
       if (Object.keys(values).length) pending.push({ id: shape.id, values });
     };
@@ -1760,7 +1766,7 @@ export function createEngine(store: ProjectStore): Engine {
         // The copy turns about the ring's centre, so its own rotation gains the
         // same angle the placement did.
         return canonicalizeShape({
-          ...clone,
+          ...withoutBindings(clone, ["x", "z", ...(placement.rotation === 0 ? [] : ["rotation"])]),
           x: storedCoordinate(clone.x + placement.dx),
           z: storedCoordinate(clone.z + placement.dz),
           rotation: placement.rotation === 0 ? clone.rotation : cleanRotationDegrees(clone.rotation + placement.rotation),

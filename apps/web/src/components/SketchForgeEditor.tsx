@@ -7610,7 +7610,7 @@ export function SketchForgeEditor({
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes);
+    syncProjectShapes(nextShapes, true); // Forced: a table-only step leaves the shapes fingerprint unchanged.
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.undone")}` : t("editor.notice.undone")));
   }, [invalidateCadModifierSession, syncProjectShapes, t]);
 
@@ -7637,7 +7637,7 @@ export function SketchForgeEditor({
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes);
+    syncProjectShapes(nextShapes, true);
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.redone")}` : t("editor.notice.redone")));
   }, [invalidateCadModifierSession, syncProjectShapes, t]);
 

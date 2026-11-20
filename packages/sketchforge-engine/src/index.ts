@@ -215,6 +215,7 @@ export {
   resolveShapeBinding,
   shapeBindingIssues,
   withoutBindings,
+  withoutShapeBindings,
   type BindableFieldRequirement,
   type BindableFieldSpec,
   type ShapeBindingDependent,

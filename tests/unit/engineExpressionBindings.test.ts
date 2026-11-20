@@ -207,6 +207,69 @@ describe("expression-bound fields and parameter recompute", () => {
     expect(after.shapes.find((shape) => shape.id === staleShape!.id)).toMatchObject({ width: 10, expressions: { width: "gone" } });
   });
 
+  it("lets a stale binding on the changed parameter stay stale, but refuses a change that breaks a live one", async () => {
+    await project("stale-dependent");
+    const [box] = value(await engine.addShapes("stale-dependent", [{ kind: "box", width: 10, depth: 10, height: 10 }])).shapes;
+    value(await engine.addParameter("stale-dependent", { name: "wall", expression: "2", dimension: "length" }));
+    const current = await document("stale-dependent");
+    await store.write("stale-dependent", current, [{ ...current.shapes[0]!, expressions: { sides: "wall", height: "wall * 3" } }]);
+
+    value(await engine.updateParameter("stale-dependent", "wall", { expression: "3" }));
+    expect((await document("stale-dependent")).shapes[0]).toMatchObject({ height: 9, expressions: { sides: "wall", height: "wall * 3" } });
+
+    const broken = await engine.updateParameter("stale-dependent", "wall", { expression: "30 deg", dimension: "angle" });
+    expect(broken).toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { shapeId: box!.id, field: "height" } } });
+  });
+
+  it("writes nothing when a later bound shape refuses the change", async () => {
+    await project("partial");
+    const [first, second] = value(await engine.addShapes("partial", [
+      { kind: "box", width: 10, depth: 10, height: 10 },
+      { kind: "box", width: 10, depth: 10, height: 10 },
+    ])).shapes;
+    value(await engine.addParameter("partial", { name: "wall", expression: "2", dimension: "length" }));
+    value(await engine.bindShapeField("partial", first!.id, "width", "wall * 2"));
+    value(await engine.bindShapeField("partial", second!.id, "width", "wall * 3"));
+    value(await engine.changeShape("partial", second!.id, { locked: true }));
+    const before = await document("partial");
+
+    const refused = await engine.updateParameter("partial", "wall", { expression: "5" });
+
+    expect(refused).toMatchObject({ ok: false, failure: { reason: "binding_failed", shapeId: second!.id, failure: { reason: "shape_locked" } } });
+    const after = await document("partial");
+    expect(after.metadata.revision).toBe(before.metadata.revision);
+    expect(after.shapes).toEqual(before.shapes);
+    expect(after.parameters).toEqual(before.parameters);
+  });
+
+  it("drops placement bindings that a group, align or pattern replaces with literals, and keeps size bindings", async () => {
+    await project("literal-ops");
+    const [a, b, c] = value(await engine.addShapes("literal-ops", [
+      { kind: "box", width: 4, depth: 4, height: 4, x: 0 },
+      { kind: "box", width: 4, depth: 4, height: 4, x: 20 },
+      { kind: "box", width: 4, depth: 4, height: 4, x: 40 },
+    ])).shapes;
+    value(await engine.addParameter("literal-ops", { name: "wall", expression: "2", dimension: "length" }));
+    for (const shape of [a!, b!, c!]) {
+      value(await engine.bindShapeField("literal-ops", shape.id, "z", shape === c ? "wall * 4" : "wall"));
+      value(await engine.bindShapeField("literal-ops", shape.id, "height", "wall * 3"));
+    }
+
+    value(await engine.align("literal-ops", { ids: [a!.id, c!.id], axis: "z", target: "min", anchorId: a!.id }));
+    const copies = value(await engine.pattern("literal-ops", { ids: [c!.id], kind: "linear", count: 2, stepZ: 10 })).shapes;
+    const group = value(await engine.group("literal-ops", [a!.id, b!.id])).shape;
+    value(await engine.updateParameter("literal-ops", "wall", { expression: "5" }));
+
+    const after = await document("literal-ops");
+    const copy = after.shapes.find((shape) => shape.id === copies[0]!.id)!;
+    expect(copy.expressions).toEqual({ height: "wall * 3" });
+    expect(copy).toMatchObject({ z: 12, height: 15 });
+    // Align moved c from z 8 to a's 2, so its z binding went and it stays put.
+    expect(after.shapes.find((shape) => shape.id === c!.id)).toMatchObject({ z: 2, height: 15, expressions: { height: "wall * 3" } });
+    const children = after.shapes.find((shape) => shape.id === group.id)!.groupedShapes!;
+    expect(children.every((child) => child.expressions === undefined)).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("replays a retained all-edge fillet when its bound amount changes", async () => {
     await project("fillet");
     await project("fillet-reference");
@@ -226,6 +289,7 @@ describe("expression-bound fields and parameter recompute", () => {
     const updated = (await document("fillet")).shapes[0]!;
     expect(updated.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: 0.4, allEdges: true })]);
     expect(updated.edgeTreatmentHistory?.[0]?.feature.amount).toBe(0.4);
+    expect(updated.expressions).toEqual({ "edgeTreatments.0.amount": "fillet" });
     const rebuilt = value(await engine.properties("fillet", bound.id));
     const reference = value(await engine.properties("fillet-reference", (await document("fillet-reference")).shapes[0]!.id));
     expect(rebuilt.volume).toBeLessThan(smaller.volume - 1e-3);

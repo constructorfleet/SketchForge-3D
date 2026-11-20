@@ -138,6 +138,12 @@ export function boundFieldsNamedBy(changes: Record<string, unknown>): string[] {
   return [...fields];
 }
 
+/** Drops shape-target bindings, whose placement and size stop meaning the same thing inside a group. */
+export function withoutShapeBindings(shape: WorkplaneShape): WorkplaneShape {
+  const fields = Object.keys(shape.expressions ?? {}).filter((field) => SPEC_BY_FIELD.get(field)?.target === "shape");
+  return withoutBindings(shape, fields);
+}
+
 /** Returns `shape` without the named bindings, or `shape` itself when none were bound. */
 export function withoutBindings(shape: WorkplaneShape, fields: readonly string[]): WorkplaneShape {
   if (!shape.expressions || !fields.some((field) => Object.hasOwn(shape.expressions!, field))) return shape;
