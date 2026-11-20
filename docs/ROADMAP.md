@@ -16,7 +16,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Complete in the pending constraint PR chain; all 28 sub-issues are implemented, with the editable-history and recompute foundations listed below. |
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Complete in merged PR [#584](https://github.com/constructorfleet/SketchForge-3D/pull/584); TypeScript/Python operation coverage, runtime-backed MCP coverage, and documented MCP gaps are verified below. |
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Complete in PR [#595](https://github.com/constructorfleet/SketchForge-3D/pull/595); all seven non-English catalogs are fully translated, `complete: true`, and no longer reported as todos. |
-| [#608: Named parameters and expressions](https://github.com/constructorfleet/SketchForge-3D/issues/608) | In progress; the engine expression evaluator ([#610](https://github.com/constructorfleet/SketchForge-3D/issues/610)) is awaiting review. The parameter table, shape binding, sketch constraint values and editor field entry follow in #609, #611, #612 and #617. |
+| [#608: Named parameters and expressions](https://github.com/constructorfleet/SketchForge-3D/issues/608) | In progress; the engine expression evaluator ([#610](https://github.com/constructorfleet/SketchForge-3D/issues/610)) is merged, and the project parameter table ([#609](https://github.com/constructorfleet/SketchForge-3D/issues/609)) is awaiting review. Shape binding, sketch constraint values and editor field entry follow in #611, #612 and #617. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; PR #587 adds the documented production app build check to pull request CI. |
 
 ## Desktop release installers
@@ -149,7 +149,8 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 ## Named parameters
 
-- [#610: Unit-aware expression evaluator with cycle detection](https://github.com/constructorfleet/SketchForge-3D/issues/610) — the engine evaluates `+ - * /`, parentheses, unit literals (`mm`, `cm`, `m`, `in`, `ft`, `deg`, `rad`), parameter references and ten functions with dimensional analysis, lists and renames references, and resolves a parameter table in dependency order with cycle paths. Awaiting review. Not yet stored in projects or bound to shapes.
+- [#610: Unit-aware expression evaluator with cycle detection](https://github.com/constructorfleet/SketchForge-3D/issues/610) — the engine evaluates `+ - * /`, parentheses, unit literals (`mm`, `cm`, `m`, `in`, `ft`, `deg`, `rad`), parameter references and ten functions with dimensional analysis, lists and renames references, and resolves a parameter table in dependency order with cycle paths. Merged in PR [#619](https://github.com/constructorfleet/SketchForge-3D/pull/619).
+- [#609: Project parameter table with `.skf` persistence](https://github.com/constructorfleet/SketchForge-3D/issues/609) — the engine adds, updates, renames and deletes project parameters with structured errors; a rename rewrites every referencing expression, and a delete is refused while other parameters reference it. `.skf` stores the table as format 3 only when it is not empty; the server store, server exports and browser autosave carry it. Awaiting review. Not yet bound to shapes.
 
 ## Translation completeness
 

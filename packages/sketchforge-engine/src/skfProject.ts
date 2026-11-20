@@ -10,11 +10,16 @@ import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
-import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import { PROJECT_PARAMETER_DIMENSIONS, resolveProjectParameters, type ProjectParameterInput } from "./projectParameters.js";
+import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
-export const SKF_FORMAT_VERSION = 2;
+export const SKF_FORMAT_VERSION = 3;
 export const SKF_MINIMUM_READER_VERSION = 2;
+/** Written, with the same minimum reader version, when the parameter table is empty. */
+export const SKF_BASE_FORMAT_VERSION = 2;
+// Written only when the parameter table is not empty, so other projects stay readable by V2 readers.
+export const SKF_PARAMETERS_FORMAT_VERSION = 3;
 export const SKF_CREATED_WITH_VERSION = "1.32.0"; // x-release-please-version
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
@@ -28,6 +33,7 @@ export const SKF_LIMITS = {
   objectsPerState: 100_000,
   features: 300_000,
   meshNumbers: 30_000_000,
+  parameters: 2_000,
 } as const;
 
 const SHAPE_KINDS = new Set([
@@ -100,11 +106,20 @@ export type SkfFeatureV1 = {
   parameters?: Record<string, unknown>;
 };
 
+// V3 writes it; readers accept it in any version. Readers recompute `value`, which is
+// the last known value of an entry that no longer resolves and absent when there is none.
+export type SkfParameterV3 = {
+  name: string;
+  expression: string;
+  dimension: ProjectParameterDimension;
+  value?: number;
+};
+
 // The packaged graph layout is shared by V1 and V2. V2 moves display edges
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID;
-  formatVersion: 1 | 2;
+  formatVersion: 1 | 2 | 3;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -134,6 +149,7 @@ export type SkfProjectDocumentV1 = {
     placementWorkplane?: PlacementWorkplane;
     sketchPlacementWorkplane?: PlacementWorkplane;
   };
+  parameters?: SkfParameterV3[];
 };
 
 export type SkfProjectExportInput = {
@@ -150,6 +166,7 @@ export type SkfProjectExportInput = {
   placementElevation: number;
   placementWorkplane?: PlacementWorkplane;
   sketchPlacementWorkplane?: PlacementWorkplane;
+  parameters?: readonly ProjectParameterInput[];
   compressionLevel?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 };
 
@@ -167,6 +184,7 @@ export type SkfRestoredProject = {
   placementElevation: number;
   placementWorkplane: PlacementWorkplane;
   sketchPlacementWorkplane: PlacementWorkplane;
+  parameters: ProjectParameter[];
   migratedFromVersion?: number;
 };
 
@@ -858,7 +876,35 @@ function unzipAsync(bytes: Uint8Array) {
   });
 }
 
+// Fails only on malformed structure. Entries that no longer resolve keep their stored text and last value.
+function resolvedSkfParameters(entries: readonly ProjectParameterInput[]): ProjectParameter[] {
+  const resolved = resolveProjectParameters(entries);
+  if (!resolved.ok) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
+  return resolved.parameters;
+}
+
+function readSkfParameters(raw: unknown): ProjectParameter[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.length > SKF_LIMITS.parameters) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
+  raw.forEach((entry, index) => {
+    const record = objectRecord(entry, `parameters[${index}]`);
+    if (typeof record.name !== "string") throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].name` });
+    if (typeof record.expression !== "string") throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].expression` });
+    if (!PROJECT_PARAMETER_DIMENSIONS.includes(record.dimension as ProjectParameterDimension)) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `parameters[${index}].dimension` });
+    }
+    if (record.value !== undefined) finiteNumber(record.value, `parameters[${index}].value`);
+  });
+  return resolvedSkfParameters(raw as ProjectParameterInput[]);
+}
+
+function skfParameter({ name, expression, dimension, value }: ProjectParameter): SkfParameterV3 {
+  return Number.isFinite(value) ? { name, expression, dimension, value } : { name, expression, dimension };
+}
+
 export async function exportSkfProject(input: SkfProjectExportInput) {
+  const parameters = resolvedSkfParameters(input.parameters ?? []);
+  const formatVersion = parameters.length ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
   const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex);
   if (hydrated.entries.length > SKF_LIMITS.states) throw new LocalizedError("errors.skf.tooManyStates");
   const exportEntries = hydrated.entries.map((entry) => {
@@ -894,8 +940,8 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
   const selectedWorkplaneId = placementWorkplaneIsBase(placementWorkplane) ? "workplane-base" : "workplane-active";
   const document: SkfProjectDocumentV1 = {
     schema: SKF_SCHEMA_ID,
-    formatVersion: SKF_FORMAT_VERSION,
-    minimumReaderVersion: SKF_MINIMUM_READER_VERSION,
+    formatVersion,
+    minimumReaderVersion: formatVersion,
     createdWithVersion: SKF_CREATED_WITH_VERSION,
     metadata: {
       ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -924,6 +970,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
       placementWorkplane,
       sketchPlacementWorkplane,
     },
+    ...(parameters.length ? { parameters: parameters.map(skfParameter) } : {}),
   };
   const projectJson = strToU8(JSON.stringify(document));
   if (projectJson.byteLength > SKF_LIMITS.projectJsonBytes) {
@@ -1653,7 +1700,8 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       finiteNumber(coordinates.z, `editor.${fieldName}.${field}.z`);
     }
   }
-  return { document, assetById, stateById };
+  const parameters = readSkfParameters(document.parameters);
+  return { document, assetById, stateById, parameters };
 }
 
 export async function importSkfSourceAsset(asset: ProjectAsset) {
@@ -1811,7 +1859,14 @@ async function restoreShapeFromNode(
   });
 }
 
-async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, SkfAssetRecordV1>, stateById: Map<string, SkfStateV1>, files: ArchiveFiles, options: ImportSkfOptions) {
+async function restoreV1(
+  document: SkfProjectDocumentV1,
+  assetById: Map<string, SkfAssetRecordV1>,
+  stateById: Map<string, SkfStateV1>,
+  parameters: ProjectParameter[],
+  files: ArchiveFiles,
+  options: ImportSkfOptions,
+) {
   const runtimeAssetByArchiveId = new Map<string, ProjectAsset>();
   for (const record of document.assets.filter((asset) => asset.kind === "source")) {
     const bytes = new Uint8Array(files[record.path]);
@@ -1870,6 +1925,7 @@ async function restoreV1(document: SkfProjectDocumentV1, assetById: Map<string, 
     placementElevation: document.editor.placementElevation,
     placementWorkplane: normalizePlacementWorkplane(document.editor.placementWorkplane, document.editor.placementElevation),
     sketchPlacementWorkplane: normalizePlacementWorkplane(document.editor.sketchPlacementWorkplane),
+    parameters,
   } satisfies SkfRestoredProject;
 }
 
@@ -1899,6 +1955,7 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
       typeof raw.placementElevation === "number" && Number.isFinite(raw.placementElevation) ? raw.placementElevation : 0,
     ),
     sketchPlacementWorkplane: normalizePlacementWorkplane(raw.sketchPlacementWorkplane),
+    parameters: [],
     migratedFromVersion: 0,
   };
 }
@@ -1995,5 +2052,5 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
   }
 
   const { files, validated } = await readPackagedSkf(bytes);
-  return restoreV1(validated.document, validated.assetById, validated.stateById, files, options);
+  return restoreV1(validated.document, validated.assetById, validated.stateById, validated.parameters, files, options);
 }

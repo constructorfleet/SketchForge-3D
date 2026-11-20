@@ -18,8 +18,9 @@ For automated project export from a server-backed project, see [`POST /exports` 
 | Property | Value |
 | --- | --- |
 | Schema | `com.sketchforge.project` |
-| Current writer format | 2 |
-| Minimum reader format | 2 |
+| Newest format read and written | 3 |
+| Format written when the project has parameters | 3 |
+| Format written for other projects | 2 |
 | Created-with version | `1.32.0` | <!-- x-release-please-version -->
 | Media type | `application/vnd.sketchforge.project+zip` |
 
@@ -32,7 +33,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | Field | Serialized type |
 | --- | --- |
 | `schema` | `typeof SKF_SCHEMA_ID` |
-| `formatVersion` | `1 | 2` |
+| `formatVersion` | `1 | 2 | 3` |
 | `minimumReaderVersion` | `number` |
 | `createdWithVersion` | `string` |
 | `metadata` | `{ projectId?: string; projectName: string; units: string; createdAt: string; modifiedAt: string; }` |
@@ -46,6 +47,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `workplanes` | `Array<{ id: string; kind: "base" | "offset"; elevation: number }>` |
 | `exactCad` | `Array<{ nodeId: string; objectId: string; brepAssetId?: string; importedStepAssetId?: string }>` |
 | `editor` | `{ workspace: WorkplaneWorkspaceSettings; snapGrid: GridSize; selectedWorkplaneId: string; placementElevation: number; placementWorkplane?: PlacementWorkplane; sketchPlacementWorkplane?: PlacementWorkplane; }` |
+| `parameters?` | `SkfParameterV3[]` |
 
 ### `SkfAssetRecordV1`
 
@@ -86,9 +88,21 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `dependsOnFeatureIds` | `string[]` |
 | `parameters?` | `Record<string, unknown>` |
 
+### `SkfParameterV3`
+
+| Field | Serialized type |
+| --- | --- |
+| `name` | `string` |
+| `expression` | `string` |
+| `dimension` | `ProjectParameterDimension` |
+| `value?` | `number` |
+
+`value` is in mm for `length`, degrees for `angle`, and plain for `unitless`. Readers re-evaluate every expression and use the stored value only for an entry that no longer resolves; it is absent when no value is known. An entry that no longer resolves (an invalid or duplicate name, for example a name a later release reserves, an unknown reference, a dimension mismatch, or a reference cycle) does not stop the project opening: the reader keeps its name, expression, dimension and stored value as its last known value, reports a per-entry error, and the next save writes it back unchanged. Only a malformed table rejects the package: `parameters` that is not a list, an entry that is not an object, a `name` or `expression` that is not a string, a `dimension` other than `length`, `angle` or `unitless`, a `value` that is present and not a finite number, or more entries than the limit.
+
 ## Reader compatibility
 
-- V2 is the current writer format and requires a reader at least version 2.
+- V3 is written only when the project parameter table is not empty, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
+- V2 is written for every other project and requires a reader at least version 2. Writers never put a `parameters` field in it. Readers accept `parameters` in any version, and a file without one loads with an empty table.
 - V1 packaged projects are accepted and migrate inline display edges into shared assets on import; the next save writes V2.
 - V0 legacy JSON projects are accepted by the explicit migration path, which preserves valid object IDs and history.
 - Unsupported future versions are rejected before restoration. The original input bytes are not modified.
@@ -106,5 +120,6 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `objectsPerState` | `100_000` |
 | `features` | `300_000` |
 | `meshNumbers` | `30_000_000` |
+| `parameters` | `2_000` |
 
 These are engine validation limits, not suggested project sizes. The expanded archive limit applies across entries; `assetBytes` limits one asset, and `projectJsonBytes` limits `project.json`.

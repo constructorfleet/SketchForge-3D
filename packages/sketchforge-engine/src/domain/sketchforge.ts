@@ -1,4 +1,5 @@
 import type { CameraProjection } from "./cameraProjection.js";
+import type { ProjectParameterError } from "../projectParameters.js";
 
 export type ShapeKind =
   | "box"
@@ -41,6 +42,20 @@ export type ProjectAsset = {
   bytes: Uint8Array;
   byteLength: number;
   sha256: string;
+};
+
+/** Declared so a bare number resolves: `3` is 3 mm, 3 degrees, or plain 3. */
+export type ProjectParameterDimension = "length" | "angle" | "unitless";
+
+/** Names a project-wide value that expressions can reference. */
+export type ProjectParameter = {
+  name: string;
+  expression: string;
+  dimension: ProjectParameterDimension;
+  /** Caches the resolved value in mm, degrees, or plain units. Recomputed on load and on every change. */
+  value: number;
+  /** Set when the entry does not resolve; `value` is then its last known value, or NaN. Never stored. */
+  error?: ProjectParameterError;
 };
 
 export type GridSize = "Off" | "0.1 mm" | "0.25 mm" | "0.5 mm" | "1.0 mm" | "2.0 mm" | "5.0 mm" | "Brick";

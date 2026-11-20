@@ -20,7 +20,7 @@ import { importedShapeFromStepOnKernel } from "./stepImportKernel.js";
 import { exportSkfProject, importSkfProject, importSkfSourceAsset } from "./skfProject.js";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "./workplaneSettings.js";
 import { horizontalPlacementWorkplane } from "./placementWorkplane.js";
-import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import type { GridSize, ProjectAsset, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 import type { PlacementWorkplane } from "./placementWorkplane.js";
 
 export type ProjectDocument = {
@@ -41,6 +41,8 @@ export type ProjectDocument = {
   placementElevation: number;
   placementWorkplane: PlacementWorkplane;
   sketchPlacementWorkplane: PlacementWorkplane;
+  // Optional so existing ProjectStore implementations still type-check. Absent reads as empty.
+  parameters?: ProjectParameter[];
 };
 
 function metadataNumber(metadata: ProjectMetadata, key: string, fallback: number) {
@@ -80,6 +82,7 @@ export async function readProjectDocument(root: string, projectId: string): Prom
       placementElevation: 0,
       placementWorkplane: horizontalPlacementWorkplane(),
       sketchPlacementWorkplane: horizontalPlacementWorkplane(),
+      parameters: [],
     };
   }
   const restored = await importSkfProject(packageBytes, {
@@ -102,6 +105,7 @@ export async function readProjectDocument(root: string, projectId: string): Prom
     placementElevation: restored.placementElevation,
     placementWorkplane: restored.placementWorkplane,
     sketchPlacementWorkplane: restored.sketchPlacementWorkplane,
+    parameters: restored.parameters,
   };
 }
 
@@ -135,6 +139,7 @@ export async function writeProjectDocument(root: string, projectId: string, docu
     placementElevation: document.placementElevation,
     placementWorkplane: document.placementWorkplane,
     sketchPlacementWorkplane: document.sketchPlacementWorkplane,
+    parameters: document.parameters,
     compressionLevel: 1,
   });
   await writeProjectPackage(root, projectId, packageBytes);

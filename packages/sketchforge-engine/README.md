@@ -92,7 +92,32 @@ console.log(evaluateExpression("wall * wall", table.scope, "length").ok); // fal
 - **Cycles:** every parameter in one group of mutually referencing parameters gets the same `cycle` path, which starts and ends at the group's first entry. Its span marks that parameter's reference to the next one on the path.
 - **Names:** `isValidParameterName` accepts ASCII identifiers up to 64 characters that are not unit or function names. A non-ASCII letter is an invalid character, so `wäll` reads as `w` and `ll`. `expressionDependencies` lists referenced names; `renameExpressionReference` renames whole references only, so `wall2`, unit suffixes and function calls stay unchanged. It does not check whether the new name is already in use; the caller must.
 
-Projects do not store parameters yet.
+### The project parameter table
+
+A project holds one parameter table for the whole project. Each `ProjectParameter` has a `name`, an `expression`, a declared `dimension` (`"length"`, `"angle"` or `"unitless"`), and a cached `value` in mm, degrees or plain units. The dimension is required so a bare number resolves: `3` is 3 mm in a length parameter and 3 degrees in an angle parameter.
+
+```js
+import { addParameter, deleteParameter, renameParameter, updateParameter } from "@constructorfleet/sketchforge-engine";
+
+let project = { parameters: [] };
+for (const input of [
+  { name: "wall", expression: "2", dimension: "length" },
+  { name: "outer", expression: "20 + 2 * wall", dimension: "length" },
+]) {
+  const result = addParameter(project, input);
+  if (!result.ok) throw new Error(result.error.message);
+  project = result.project;
+}
+project = updateParameter(project, "wall", { expression: "3 mm" }).project; // outer is now 26
+project = renameParameter(project, "wall", "shell").project; // outer reads "20 + 2 * shell"
+console.log(deleteParameter(project, "shell").error); // { code: "parameterInUse", dependents: ["outer"], ... }
+```
+
+- **Operations:** `addParameter`, `updateParameter` (expression, dimension or both), `renameParameter` and `deleteParameter` take any object with a `parameters` array (missing reads as empty) and return `{ ok: true, project }` with a new object, or `{ ok: false, error }`. They never throw and never change their input. Each re-evaluates the whole table, so dependents get new values. A change is refused when the parameter it changes does not resolve, or when it breaks a parameter that resolved before.
+- **Errors:** `{ code, message, parameter }`, where `parameter` names the entry that failed, which can be a dependent of the one changed. Codes are `invalidParameter` (an entry or table that is not an object or list), `invalidName`, `duplicateName`, `invalidDimension`, `invalidExpression` (with the evaluator's `expressionError`, including `cycle` and its path), `unknownParameter`, `parameterInUse` (with the `dependents` that reference it directly) and `tooManyParameters`. A table holds up to `PROJECT_PARAMETER_LIMIT` (2,000) entries.
+- **Rename** checks the new name, refuses one already in use, and rewrites every expression that references the old name. **Delete** refuses while another parameter references the parameter; `parameterDependents` lists those parameters.
+- **Values:** `resolveProjectParameters` evaluates a table and ignores any cached `value`. `.skf` export and import both call it, so a stored value is never trusted over its expression. It fails only on malformed structure. An entry that does not resolve stays in the table with an `error` and keeps its stored `value` as its last known value (`NaN` when there is none), so a project whose table a later release can no longer resolve still opens and saves the table back unchanged. Other entries can still be added, changed and deleted around it. `error` is never written to `.skf`.
+- **Storage:** `.skf` packages and `ProjectDocument.parameters` carry the table. See the [project format](https://constructorfleet.github.io/SketchForge-3D/docs/SKF_PROJECT_FORMAT) for the format version rules. Shape fields cannot reference parameters yet.
 
 ## Editing a sketch-backed feature
 

@@ -19,7 +19,7 @@ SketchForge uses a packaged container (format option B). A `.skf` file is a ZIP 
 
 This was selected over pure JSON because imported STL/STEP data and exact B-Rep can be large, Base64 would add size and parsing overhead, and an archive lets SketchForge validate and hash each asset independently. The editable model is still JSON and can be inspected by opening `project.json` from the package.
 
-## Version 2 layout
+## Version 2 and 3 layout
 
 ```text
 project.skf
@@ -45,6 +45,7 @@ project.skf
 - `workplanes`: base and selected offset workplanes
 - `exactCad`: objects with exact B-Rep or imported STEP sources
 - `editor`: workspace dimensions, units, snap grid, camera projection and saved camera view, and selected workplane elevation
+- `parameters` (written only in version 3; readers accept it in any version): the project parameter table, in table order. Each entry has a `name`, an `expression`, a declared `dimension` (`length`, `angle`, or `unitless`), and the resolved `value` in mm, degrees, or plain units. A bare number takes the declared dimension, so `3` in a `length` parameter is 3 mm.
 
 Object nodes keep stable SketchForge object IDs. A sketch extrusion, revolve, or sweep has a separate, non-rendered source-sketch node and a stable `sketchSourceId`; its feature lists that sketch as an input. The sketch index links the source node to its output and records the profile, operation, and applicable operation settings used to rebuild it. The output node also retains the profile and settings so current editor and history restore paths can rebuild without an extra rendered object. A prism-drafted sketch extrusion also retains its draft angle and pre-draft height/frame for the engine's bounded source-ID recompute path; this does not create a separate draft node. Editing the profile keeps source and output identities while replacing the generated geometry. Older packages derive a source identity from the output object when saved again. Groups refer to child node IDs instead of array positions. Fillet/chamfer history refers to explicit “before” nodes. Feature dependencies are explicit and checked for cycles; general downstream dependency-ordered recomputation is not yet implemented.
 
@@ -61,6 +62,7 @@ Nodes reference display edges through `cadDisplayEdgesAssetId`; the edge version
 - Undo and redo states according to the export choice: Unlimited, 100, 50, or 30 recent actions. Unlimited means every state still retained by the editor, including available redo states.
 - Workspace units, grid/snap settings, dimensions, active offset workplane, and camera projection
 - The last settled camera position, target, and zoom. Older projects without a saved camera view open at the standard home view.
+- The project parameter table: names, expressions, and declared dimensions. The stored values are a cache; every load and every save evaluates the expressions again. An entry that no longer resolves keeps its stored text and value and is saved back unchanged (see [Compatibility and migrations](#compatibility-and-migrations)).
 
 Native primitives are regenerated from definitions and do not receive mesh assets. Source-backed STL, SVG, and STEP objects are regenerated from their original asset. Derived mesh assets are written only when the current editor has genuinely baked geometry (for example a boolean or edge treatment), or when an older local project no longer has its original imported source.
 
@@ -70,11 +72,13 @@ SketchForge inspects ZIP metadata before expansion and validates the entire proj
 
 Opening a valid `.skf` creates a new local project. It does not overwrite the project that is currently open. The imported project is then saved through the existing dashboard, thumbnail, IndexedDB, history, and editor lifecycle.
 
-Current safety limits are 512 MB compressed, 1 GB expanded, 256 MB per asset, 64 MB for `project.json`, 4,096 archive entries, 100,000 object nodes per state, and 5,001 distinct states. The live editor retains at most 5,000 history entries and 64 MB of serialized history, so Unlimited means all history currently available inside those safety limits.
+Current safety limits are 512 MB compressed, 1 GB expanded, 256 MB per asset, 64 MB for `project.json`, 4,096 archive entries, 100,000 object nodes per state, 5,001 distinct states, and 2,000 parameters. The live editor retains at most 5,000 history entries and 64 MB of serialized history, so Unlimited means all history currently available inside those safety limits.
 
 ## Compatibility and migrations
 
-New saves use format version 2 and minimum reader version 2. Older applications reject these files rather than dropping shared display edges. The current reader accepts version 1 packages with inline display edges, interns those resources on import, and writes version 2 on the next save. The importer also contains an explicit migration for the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+A project with at least one parameter is saved as format version 3 with minimum reader version 3. Releases from before the parameter table reject such a file rather than open it and drop the parameter table on the next save. Every other project is still saved as format version 2 with minimum reader version 2, so it stays readable by those releases. Writers never put a `parameters` field in a version 2 or older file, and a file without one opens with an empty table. An entry that no longer resolves (an invalid or duplicate name, for example a name a later release reserves, an unknown reference, a dimension mismatch, or a reference cycle) does not stop the project opening: the reader keeps its name, expression, dimension and stored value as its last known value, reports a per-entry error, and the next save writes it back unchanged. Only a malformed table rejects the package: `parameters` that is not a list, an entry that is not an object, a `name` or `expression` that is not a string, a `dimension` other than `length`, `angle` or `unitless`, a `value` that is present and not a finite number, or more entries than the limit.
+
+Format version 2 has minimum reader version 2. Older applications reject these files rather than dropping shared display edges. The current reader accepts version 1 packages with inline display edges, interns those resources on import, and writes version 2 on the next save. The importer also contains an explicit migration for the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
 
 Future schema changes should add a version-to-version migration, run validation after every migration, and never mutate the user's original file.
 

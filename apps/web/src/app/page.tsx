@@ -28,7 +28,7 @@ import {
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
-import { editorHistoryForAutosave, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
+import type { EditorHistoryEntry } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createAutosaveNoticeController, type AutosaveNotice } from "@/lib/autosaveNotice";
 import { createLocalId } from "@/lib/engine/localIds";
@@ -42,6 +42,13 @@ import {
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
 import {
+  projectShapeCacheEntry,
+  projectShapeCacheEntryFromEditor,
+  projectSkfPackage,
+  type ProjectShapeCacheEntry,
+  type ProjectShapeSaveContext,
+} from "@/lib/projectShapeCache";
+import {
   deleteServerProject,
   fetchServerProjectPackage,
   openableProjectIds,
@@ -50,14 +57,14 @@ import {
   saveServerProjectPackage,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
-import { exportSkfProject, importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
+import { importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
 import { openDesktopProjectFile } from "@/lib/desktopProjectFile";
 import { downloadBlob } from "@/lib/downloadFile";
 import { PROJECTS_BACKUP_MEDIA_TYPE, newerBackupSource, projectsBackupFileName, storedBackupRevision, writeProjectsBackup, type ProjectBackupEntry } from "@/lib/projectBackup";
 import { browserStorageManager, readStorageStatus, requestPersistentStorageOnce, storageNearQuota, storageUsageFraction, type StorageStatus } from "@/lib/storageHealth";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
-import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { GridSize, ProjectAsset, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 type AppView = "dashboard" | "editor";
 type ViewMode = "grid" | "list";
@@ -96,14 +103,6 @@ type StoredDashboardProject = Partial<DashboardProject> & {
   designShapes?: unknown;
 };
 
-type ProjectShapeCacheEntry = {
-  revision: number;
-  shapes: WorkplaneShape[];
-  history: EditorHistoryEntry[];
-  historyIndex: number;
-  assets: ProjectAsset[];
-};
-
 /** One queued autosave. `shapeCount` and `revision` are what the list shows once it lands. */
 type ProjectSaveJob = {
   entry: ProjectShapeCacheEntry;
@@ -120,19 +119,10 @@ type ProjectShapeRecord = {
   history?: EditorHistoryEntry[];
   historyIndex?: number;
   assets?: ProjectAsset[];
+  parameters?: ProjectParameter[];
   meshResourceIds?: string[];
   assetResourceIds?: string[];
   updatedAt: number;
-};
-
-type ProjectShapeSaveContext = {
-  projectName: string;
-  createdAt: number;
-  workspace: WorkplaneWorkspaceSettings;
-  snapGrid: GridSize;
-  placementElevation: number;
-  placementWorkplane: PlacementWorkplane;
-  sketchPlacementWorkplane: PlacementWorkplane;
 };
 
 type ProjectShapeResourceRecord =
@@ -187,42 +177,6 @@ function formatFileSize(t: Translator, locale: Locale, bytes: number) {
   if (bytes < 1024) return t("dashboard.fileSize.bytes", { size: format(bytes, 0) });
   if (bytes < 1024 * 1024) return t("dashboard.fileSize.kilobytes", { size: format(bytes / 1024, bytes < 10 * 1024 ? 1 : 0) });
   return t("dashboard.fileSize.megabytes", { size: format(bytes / (1024 * 1024), bytes < 10 * 1024 * 1024 ? 1 : 0) });
-}
-
-function projectShapeCacheEntry(
-  revision: number,
-  shapes: WorkplaneShape[],
-  history?: EditorHistoryEntry[],
-  historyIndex?: number,
-  assets: ProjectAsset[] = [],
-): ProjectShapeCacheEntry {
-  const hydrated = hydrateEditorHistoryState(shapes, history, historyIndex);
-  return {
-    revision,
-    shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,
-    history: hydrated.entries,
-    historyIndex: hydrated.index,
-    assets: dedupeProjectAssets(assets),
-  };
-}
-
-function projectShapeCacheEntryFromEditor(
-  revision: number,
-  shapes: WorkplaneShape[],
-  history: EditorHistoryEntry[],
-  historyIndex: number,
-  assets: ProjectAsset[],
-): ProjectShapeCacheEntry {
-  if (history.length === 0) {
-    return projectShapeCacheEntry(revision, shapes, history, historyIndex, assets);
-  }
-  return {
-    revision,
-    shapes,
-    history,
-    historyIndex: Math.min(Math.max(0, historyIndex), history.length - 1),
-    assets: dedupeProjectAssets(assets),
-  };
 }
 
 function projectShapeSaveContext(project: Pick<DashboardProject, "name" | "createdAt" | "workspace" | "snapGrid" | "placementElevation" | "placementWorkplane" | "sketchPlacementWorkplane">): ProjectShapeSaveContext {
@@ -300,6 +254,7 @@ async function loadProjectShapes(projectId: string) {
       history: restored.history,
       historyIndex: restored.historyIndex,
       assets: restored.assets,
+      parameters: restored.parameters,
     };
   }
   const database = await openProjectShapesDb();
@@ -323,6 +278,7 @@ async function loadProjectShapes(projectId: string) {
       history: restored.history,
       historyIndex: restored.historyIndex,
       assets: restored.assets,
+      parameters: restored.parameters,
     };
   }
 
@@ -378,27 +334,6 @@ async function loadProjectShapes(projectId: string) {
     history: hydrated.history,
     assets,
   };
-}
-
-/** The `.skf` package autosave stores for a project; "Export all projects" packs the same bytes. */
-function projectSkfPackage(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
-  const autosaveHistory = editorHistoryForAutosave(entry.history, entry.historyIndex);
-  return exportSkfProject({
-    projectId,
-    projectName: context.projectName,
-    createdAt: context.createdAt,
-    modifiedAt: entry.revision,
-    shapes: entry.shapes,
-    history: autosaveHistory.entries,
-    historyIndex: autosaveHistory.index,
-    assets: entry.assets,
-    workspace: context.workspace,
-    snapGrid: context.snapGrid,
-    placementElevation: context.placementElevation,
-    placementWorkplane: context.placementWorkplane,
-    sketchPlacementWorkplane: context.sketchPlacementWorkplane,
-    compressionLevel: 1,
-  });
 }
 
 async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
@@ -988,7 +923,7 @@ export default function Home() {
         if (canceled) return;
         const loadedRevision = record?.revision ?? 0;
         const revision = Math.max(activeProject.revision ?? 0, loadedRevision, 1);
-        const loadedEntry = projectShapeCacheEntry(Math.max(loadedRevision, 1), record?.shapes ?? [], record?.history, record?.historyIndex, record?.assets);
+        const loadedEntry = projectShapeCacheEntry(Math.max(loadedRevision, 1), record?.shapes ?? [], record?.history, record?.historyIndex, record?.assets, record?.parameters);
         const entry = loadedEntry.revision === revision ? loadedEntry : { ...loadedEntry, revision };
         setProjectShapesById((current) => {
           // IndexedDB reads are asynchronous. A local edit/import can update the live
@@ -1173,6 +1108,7 @@ export default function Home() {
     history: EditorHistoryEntry[];
     historyIndex: number;
     assets: ProjectAsset[];
+    parameters: ProjectParameter[];
     projectName: string;
     projectCreatedAt: number;
     workspace: WorkplaneWorkspaceSettings;
@@ -1183,7 +1119,7 @@ export default function Home() {
   }) => {
     const revision = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
     nextProjectRevisionRef.current = revision;
-    const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets);
+    const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets, snapshot.parameters);
     setProjectShapesById((current) => {
       const existing = current[snapshot.projectId];
       if (existing && existing.revision > revision) {
@@ -1304,7 +1240,7 @@ export default function Home() {
         sketchPlacementWorkplane: restored.sketchPlacementWorkplane,
         sharedProject: sharedProject ? { fileName: sharedProject.fileName, revision: sharedProject.revision } : undefined,
       };
-      const entry = projectShapeCacheEntry(now, restored.shapes, restored.history, restored.historyIndex, restored.assets);
+      const entry = projectShapeCacheEntry(now, restored.shapes, restored.history, restored.historyIndex, restored.assets, restored.parameters);
       await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
       setProjectShapesById((current) => ({ ...current, [project.id]: entry }));
       setProjects((current) => [project, ...current]);
@@ -1550,7 +1486,7 @@ export default function Home() {
           try {
             const record = await loadProjectShapes(project.id);
             stored = record
-              ? projectShapeCacheEntry(storedBackupRevision(record), record.shapes ?? [], record.history, record.historyIndex, record.assets)
+              ? projectShapeCacheEntry(storedBackupRevision(record), record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters)
               : null;
           } catch (error) {
             if (!inSession) throw error;
@@ -1742,6 +1678,7 @@ export default function Home() {
         <div className={view === "editor" ? "editor-stage active" : "editor-stage"} aria-hidden={view !== "editor"}>
           <SketchForgeEditor
             initialAssets={activeProjectShapeEntry?.assets ?? []}
+            initialParameters={activeProjectShapeEntry?.parameters ?? []}
             initialShapes={activeProjectShapeEntry?.shapes ?? []}
             initialHistory={activeProjectShapeEntry?.history}
             initialHistoryIndex={activeProjectShapeEntry?.historyIndex}
