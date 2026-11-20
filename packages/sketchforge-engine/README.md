@@ -67,6 +67,31 @@ The main entry point also exports these API areas:
 
 See the [generated TypeScript API reference](https://constructorfleet.github.io/SketchForge-3D/docs/reference/typescript-engine) for every symbol and declaration. The reference links back to this usage guide. Related documentation: [REST API](https://constructorfleet.github.io/SketchForge-3D/docs/REST_API), [project format](https://constructorfleet.github.io/SketchForge-3D/docs/SKF_PROJECT_FORMAT), and [TypeScript client](https://constructorfleet.github.io/SketchForge-3D/docs/packages/typescript-client).
 
+## Parameter expressions
+
+`evaluateExpression(expression, scope, expectedDimension)` evaluates a unit-aware expression and never throws. It returns `{ ok: true, value, dimension }` with the value in base units (millimetres for length, degrees for angle, mm² for area), or `{ ok: false, error: { code, message, span } }`.
+
+```js
+import { evaluateExpression, resolveParameterTable } from "@constructorfleet/sketchforge-engine";
+
+const table = resolveParameterTable([
+  { name: "wall", expression: "0.1in" },
+  { name: "outer", expression: "inner + 2 * wall", dimension: "length" },
+  { name: "inner", expression: "20", dimension: "length" },
+]);
+console.log(table.scope.get("outer")?.value); // 25.08
+console.log(evaluateExpression("wall * wall", table.scope, "length").ok); // false: an area
+```
+
+- **Syntax:** `+ - * /`, unary minus, parentheses, parameter names, and numbers with an optional unit: `mm`, `cm`, `m`, `in`, `ft`, `deg`, `rad` (`10mm`, `10 mm`).
+- **Functions:** `min`, `max`, `abs`, `sqrt`, `round`, `floor`, `ceil`, `sin`, `cos`, `tan`. Trig takes an angle. Rounding works on the base-unit value, so `floor(1in)` is 25 mm.
+- **Dimensions:** length, angle and their products. `wall * 2` is a length, `wall * wall` is an area, `wall / wall` is unitless, and length plus angle is an error.
+- **Bare numbers:** a number without a unit has no dimension until context gives one. Under `+`, `-`, `min` and `max` it takes the other operand's dimension (`wall + 3` is wall + 3 mm). Under `*` and `/` it is a unitless factor. As a trig argument it is degrees. If the whole result is still bare, it takes the field dimension: `3` and `2 * 3` in a length field are 3 mm and 6 mm. With no field dimension it is unitless. A unitless parameter is never bare, so `wall + count` is an error.
+- **Errors:** `parseError`, `unknownName`, `unknownFunction`, `argumentCount`, `dimensionMismatch`, `divisionByZero`, `nonFinite`; the table adds `cycle` (with the `cycle` path), `dependencyFailed`, `invalidName` and `duplicateName`.
+- **Names:** `isValidParameterName` accepts identifiers up to 64 characters that are not unit or function names. `expressionDependencies` lists referenced names; `renameExpressionReference` renames whole references only, so `wall2` and unit suffixes stay unchanged.
+
+Projects do not store parameters yet.
+
 ## Editing a sketch-backed feature
 
 Sketch extrusions, revolves, and sweeps expose a stable `sketchSourceId` on the generated shape. Pass that ID to `engine.changeShape(projectId, sketchSourceId, { sketchProfile })` to rebuild the feature. For a persisted sketch revolve, the same source ID also accepts operation-setting updates such as `{ sides: 64 }`. A draft prism retains its `draftPrismAngle`; source edits accept `{ draftPrismAngle: 12 }` and reapply the draft when the extrusion profile changes. Retained sketch extrusions, sweeps, and eligible revolves can store one face draft with `{ faceDraft: { sourceFaceId, angle, pullDirection } }`; use the ID from `engine.faces`, and use `null` to clear it. Profile edits resolve the selected planar face by its stored normal and require exactly one match; they never carry the old face index forward. `.skf` round trips preserve the face draft and source frame. A single-loop sketch extrusion can combine one face draft followed by one all-edge fillet. A single-section, no-hole sketch sweep can combine one face draft followed by one all-edge fillet or one symmetric 45° all-edge chamfer. Sweep treatments replay the source, draft, then treatment on profile edits, including after archive import; tests cover the round trip, replay, unsupported angles, and atomic refusal. Sweep face drafts do not support multiple sections, section holes, selected-edge treatments, or additional treatments. A plain single-region full-turn sketch revolve can combine one face draft followed by either one symmetric 45° all-edge chamfer or one all-edge fillet; profile and setting edits replay the source, draft, then treatment, including after archive import. Other face-draft treatment combinations, prism drafts, and shelling remain unsupported. When the output is nested inside a baked boolean group, the engine updates the sketch output and recomputes its boolean ancestors from their retained operands before writing the project. Each rebuilt ancestor is placed through its group's frame the way ungrouping places the group's children, so a group that was moved, turned, mirrored or resized after creation keeps that placement, mirror and scale across the edit. The edit is atomic: invalid profiles, missing or ambiguous face matches, or a failed dependent rebuild leave the stored project unchanged.
