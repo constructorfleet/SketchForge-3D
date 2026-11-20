@@ -7221,6 +7221,8 @@ export function SketchForgeEditor({
     if (projectInteractionActiveRef.current) {
       return;
     }
+    // The host owns the table, so a newer entry for the same project replaces it.
+    projectParametersRef.current = initialParameters;
     const projectChanged = lastProjectIdRef.current !== projectId;
     if (projectChanged) {
       lastProjectIdRef.current = projectId;
@@ -7229,7 +7231,6 @@ export function SketchForgeEditor({
       const nextAssets = dedupeProjectAssets(initialAssets);
       projectAssetsRef.current = nextAssets;
       setProjectAssets(nextAssets);
-      projectParametersRef.current = initialParameters;
       const nextPlacementElevation = Number.isFinite(initialPlacementElevation) ? initialPlacementElevation : 0;
       setPlacementElevation(nextPlacementElevation);
       setPlacementWorkplane(normalizePlacementWorkplane(initialPlacementWorkplane, nextPlacementElevation));
