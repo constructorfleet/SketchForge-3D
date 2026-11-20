@@ -161,3 +161,26 @@ export { wallThickness, type WallThicknessResult } from "./serverCadThickness.js
 export { explodeStepAssembly, MAX_EXPLODE_SOLIDS, MAX_EXPLODE_SOURCE_BYTES } from "./serverStepExplode.js";
 export { analyzeMeshTopology, type TriangleFace } from "./meshValidation.js";
 export { mirrorShapes } from "./serverShapeGroups.js";
+
+// --- parameters ---------------------------------------------------------------
+export {
+  DIMENSIONS,
+  EXPRESSION_FUNCTIONS,
+  EXPRESSION_UNITS,
+  evaluateExpression,
+  expressionDependencies,
+  formatDimension,
+  isValidParameterName,
+  renameExpressionReference,
+  resolveParameterTable,
+  type Dimension,
+  type DimensionName,
+  type ExpressionError,
+  type ExpressionErrorCode,
+  type ExpressionQuantity,
+  type ExpressionResult,
+  type ExpressionScope,
+  type ExpressionSpan,
+  type ParameterTableEntry,
+  type ParameterTableResult,
+} from "./parameterExpressions.js";

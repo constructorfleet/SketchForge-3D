@@ -16,6 +16,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 | [#327: Parametric recompute and editable feature history](https://github.com/constructorfleet/SketchForge-3D/issues/327) | Complete in the pending constraint PR chain; all 28 sub-issues are implemented, with the editable-history and recompute foundations listed below. |
 | [#328: Client parity](https://github.com/constructorfleet/SketchForge-3D/issues/328) | Complete in merged PR [#584](https://github.com/constructorfleet/SketchForge-3D/pull/584); TypeScript/Python operation coverage, runtime-backed MCP coverage, and documented MCP gaps are verified below. |
 | [#330: Translation completeness](https://github.com/constructorfleet/SketchForge-3D/issues/330) | Complete in PR [#595](https://github.com/constructorfleet/SketchForge-3D/pull/595); all seven non-English catalogs are fully translated, `complete: true`, and no longer reported as todos. |
+| [#608: Named parameters and expressions](https://github.com/constructorfleet/SketchForge-3D/issues/608) | In progress; the engine expression evaluator ([#610](https://github.com/constructorfleet/SketchForge-3D/issues/610)) is awaiting review. The parameter table, shape binding, sketch constraint values and editor field entry follow in #609, #611, #612 and #617. |
 | [#331: CI, dependency, and planning hygiene](https://github.com/constructorfleet/SketchForge-3D/issues/331) | Open; PR #587 adds the documented production app build check to pull request CI. |
 
 ## Desktop release installers
@@ -145,6 +146,10 @@ This page summarizes active tracked work. Issue status remains authoritative.
 ## Sketch constraints
 
 - [#352: Add bounded-solver sketch constraints](https://github.com/constructorfleet/SketchForge-3D/issues/352) — tangent-to-Bezier shipped in #490; equal-length line constraint shipped in [#593](https://github.com/constructorfleet/SketchForge-3D/pull/593); the angle between two segments is in PR [#596](https://github.com/constructorfleet/SketchForge-3D/pull/596); symmetry and radius/diameter are implemented in the stacked pull requests. That completes the four remaining slices; awaiting review.
+
+## Named parameters
+
+- [#610: Unit-aware expression evaluator with cycle detection](https://github.com/constructorfleet/SketchForge-3D/issues/610) — the engine evaluates `+ - * /`, parentheses, unit literals (`mm`, `cm`, `m`, `in`, `ft`, `deg`, `rad`), parameter references and ten functions with dimensional analysis, lists and renames references, and resolves a parameter table in dependency order with cycle paths. Awaiting review. Not yet stored in projects or bound to shapes.
 
 ## Translation completeness
 

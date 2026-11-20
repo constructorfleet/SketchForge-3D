@@ -14,6 +14,7 @@ const ENGINE_API_GROUPS = [
   { title: "Projects and engine operations", test: /^(createEngine|directoryProjectStore|Engine|EngineFailure|EngineResult|Project|ShapeWritten|ShapesWritten|ShapeRemoved|ShapesArranged|AlignOutcome|DistributeOutcome|CutRequest|AlignRequest|DistributeRequest|PatternRequest|MeshImportRequest|Interference|ServerCad|Measurement)/ },
   { title: "Shape construction and placement", test: /(Shape|Request|Kind|Hole|Workplane|Revolve|Loft|Gear|Align|Distribute|Pattern|Bounds|Mirror|Placement|Footprint|Canonical)/ },
   { title: "Project files and geometry exchange", test: /(Import|Export|Step|Skf|Mesh|Scene|Projection|Section|Dxf|Svg)/ },
+  { title: "Parameters and expressions", test: /expression|parameter|dimension/i },
   { title: "Geometry and CAD", test: /.*/ },
 ];
 
