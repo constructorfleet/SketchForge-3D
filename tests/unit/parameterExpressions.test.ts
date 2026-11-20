@@ -91,7 +91,7 @@ describe("evaluateExpression dimensions", () => {
     const error = errorOf(evaluateExpression("wall * wall", scope, "length"));
     expect(error.code).toBe("dimensionMismatch");
     expect(error.span).toEqual({ start: 0, end: 11 });
-    expect(error.message).toMatch(/length.*area/);
+    expect(error.message).toBe("Expected length, got area.");
   });
 
   it("divides a length by a length to a unitless ratio", () => {
@@ -193,6 +193,21 @@ describe("evaluateExpression functions", () => {
     expect(value(evaluateExpression(source, scope, dimension))).toBeCloseTo(expected, 12);
   });
 
+  it("passes a bare argument through abs, rounding, min, max and sqrt", () => {
+    expect(value(evaluateExpression("wall + abs(-3)", scope, "length"))).toBe(5);
+    expect(value(evaluateExpression("wall + round(2.6)", scope, "length"))).toBe(5);
+    expect(value(evaluateExpression("wall + max(1, 3)", scope, "length"))).toBe(5);
+    expect(value(evaluateExpression("wall * abs(-2)", scope, "length"))).toBe(4);
+    expect(value(evaluateExpression("wall + sqrt(9)", scope, "length"))).toBe(5);
+    const root = evaluateExpression("sqrt(16)", {}, "length");
+    expect(value(root)).toBe(4);
+    expect(root.ok && root.dimension).toEqual(DIMENSIONS.length);
+  });
+
+  it("gives trig results a fixed unitless dimension", () => {
+    expect(errorOf(evaluateExpression("wall + cos(0)", scope, "length")).code).toBe("dimensionMismatch");
+  });
+
   it("rejects trig of a length", () => {
     const error = errorOf(evaluateExpression("sin(wall)", scope, "unitless"));
     expect(error.code).toBe("dimensionMismatch");
@@ -284,16 +299,70 @@ describe("evaluateExpression errors", () => {
     for (const input of inputs) {
       expect(() => evaluateExpression(input, scope, "unitless")).not.toThrow();
     }
-    const deep = errorOf(evaluateExpression("(".repeat(5000) + "1" + ")".repeat(5000)));
-    expect(deep).toMatchObject({ code: "parseError", span: { start: 128, end: 129 } });
+  });
+
+  it("limits nesting depth", () => {
+    const deep = errorOf(evaluateExpression("(".repeat(200) + "1" + ")".repeat(200)));
+    expect(deep).toMatchObject({ code: "limitExceeded", span: { start: 128, end: 129 } });
     expect(deep.message).toMatch(/nests too deeply/);
     expect(value(evaluateExpression("(".repeat(100) + "1" + ")".repeat(100)))).toBe(1);
+    expect(errorOf(evaluateExpression("abs(".repeat(200) + "1" + ")".repeat(200))).code).toBe("limitExceeded");
+  });
+
+  it("limits expression length to 10,000 characters", () => {
+    const sum = Array.from({ length: 200_000 }, () => "1").join("+");
+    expect(errorOf(evaluateExpression(sum))).toMatchObject({ code: "limitExceeded", span: { start: 10_000, end: sum.length } });
+    const signs = "-".repeat(1_000_000) + "1";
+    expect(errorOf(evaluateExpression(signs)).code).toBe("limitExceeded");
+  });
+
+  it("evaluates long flat input at the length limit without deep recursion", () => {
+    expect(value(evaluateExpression("1+".repeat(4999) + "1"))).toBe(5000);
+    expect(value(evaluateExpression("1*".repeat(4999) + "1"))).toBe(1);
+    expect(value(evaluateExpression("-".repeat(9999) + "1"))).toBe(-1);
+    expect(value(evaluateExpression("-".repeat(9998) + "1"))).toBe(1);
+  });
+
+  it("rejects non-string expressions and non-object scopes", () => {
+    expect(errorOf(evaluateExpression(42 as unknown as string))).toMatchObject({ code: "invalidArgument", span: { start: 0, end: 0 } });
+    expect(errorOf(evaluateExpression(null as unknown as string)).code).toBe("invalidArgument");
+    expect(errorOf(evaluateExpression("1", null as unknown as ExpressionScope)).code).toBe("invalidArgument");
+    expect(errorOf(evaluateExpression("1", "wall" as unknown as ExpressionScope)).code).toBe("invalidArgument");
+  });
+
+  it("rejects unknown or malformed field dimensions", () => {
+    for (const bad of ["Length", "lenght", "", { length: 1 }, { length: "1", angle: 0 }, { length: 0.5, angle: 0 }, { length: Number.NaN, angle: 0 }, null, 3]) {
+      const error = errorOf(evaluateExpression("wall * wall", scope, bad as unknown as Dimension));
+      expect(error).toMatchObject({ code: "invalidDimension", span: { start: 0, end: 0 } });
+    }
+  });
+
+  it("rejects malformed scope entries at the reference", () => {
+    const bad = {
+      typo: { value: 1, dimension: "lenght" },
+      record: { value: 1, dimension: { length: 1 } },
+      text: { value: "1", dimension: "length" },
+      missing: null,
+    } as unknown as ExpressionScope;
+    expect(errorOf(evaluateExpression("1 + typo", bad, "length"))).toMatchObject({ code: "invalidDimension", span: { start: 4, end: 8 } });
+    expect(errorOf(evaluateExpression("record", bad, "length")).code).toBe("invalidDimension");
+    expect(errorOf(evaluateExpression("text", bad, "length")).code).toBe("invalidArgument");
+    expect(errorOf(evaluateExpression("missing", bad, "length")).code).toBe("invalidArgument");
+  });
+
+  it("returns positive zero", () => {
+    expect(Object.is(value(evaluateExpression("-0")), 0)).toBe(true);
+    expect(Object.is(value(evaluateExpression("0 * -1mm", {}, "length")), 0)).toBe(true);
   });
 });
 
 describe("expressionDependencies", () => {
   it("lists referenced names once, in first-use order", () => {
     expect(expressionDependencies("wall + depth * wall - min(depth, 3mm) + sin(tilt)")).toEqual(["wall", "depth", "tilt"]);
+  });
+
+  it("splits a word at a non-ASCII letter", () => {
+    expect(expressionDependencies("wäll + 1")).toEqual(["w", "ll"]);
   });
 
   it("excludes units and functions", () => {
@@ -322,6 +391,10 @@ describe("renameExpressionReference", () => {
   it("rewrites a malformed expression around the bad text", () => {
     expect(renameExpressionReference("wall # wall", "wall", "w")).toBe("w # w");
     expect(renameExpressionReference("wall(1) + wall", "wall", "w")).toBe("wall(1) + w");
+  });
+
+  it("does not check whether the new name is already used", () => {
+    expect(renameExpressionReference("a + b", "a", "b")).toBe("b + b");
   });
 
   it("refuses an invalid new name", () => {
@@ -379,7 +452,7 @@ describe("resolveParameterTable", () => {
     expect(table.scope.has("a")).toBe(false);
   });
 
-  it("reports each cycle member with the cycle path from itself", () => {
+  it("reports every member of a cycle with the same path from the first member", () => {
     const table = resolveParameterTable([
       { name: "a", expression: "b + 1mm" },
       { name: "b", expression: "2 * c" },
@@ -388,8 +461,8 @@ describe("resolveParameterTable", () => {
     ]);
     const [a, b, c, x] = table.results;
     expect(errorOf(a!)).toMatchObject({ code: "cycle", cycle: ["a", "b", "c", "a"], span: { start: 0, end: 1 } });
-    expect(errorOf(b!)).toMatchObject({ code: "cycle", cycle: ["b", "c", "a", "b"], span: { start: 4, end: 5 } });
-    expect(errorOf(c!)).toMatchObject({ code: "cycle", cycle: ["c", "a", "b", "c"], span: { start: 4, end: 5 } });
+    expect(errorOf(b!)).toMatchObject({ code: "cycle", cycle: ["a", "b", "c", "a"], span: { start: 4, end: 5 } });
+    expect(errorOf(c!)).toMatchObject({ code: "cycle", cycle: ["a", "b", "c", "a"], span: { start: 4, end: 5 } });
     expect(errorOf(a!).message).toContain("a → b → c → a");
     expect(value(x!)).toBe(1);
     expect(table.order).toEqual(["x"]);
@@ -432,6 +505,53 @@ describe("resolveParameterTable", () => {
     expect(errorOf(table.results[2]!).code).toBe("duplicateName");
     expect(errorOf(table.results[3]!).code).toBe("dependencyFailed");
     expect(table.scope.size).toBe(0);
+  });
+
+  it("resolves a 10,000-entry chain without recursion", () => {
+    const count = 10_000;
+    const entries = Array.from({ length: count }, (_, index) => ({
+      name: `p${index}`,
+      expression: index === count - 1 ? "1mm" : `p${index + 1} + 1`,
+    }));
+    const table = resolveParameterTable(entries);
+    expect(table.results.every((result) => result.ok)).toBe(true);
+    expect(table.scope.get("p0")?.value).toBe(count);
+    expect(table.order[0]).toBe(`p${count - 1}`);
+  });
+
+  it("reports a 10,000-entry cycle without recursion and shares one path", () => {
+    const count = 10_000;
+    const entries = Array.from({ length: count }, (_, index) => ({ name: `p${index}`, expression: `p${(index + 1) % count} + 1` }));
+    const table = resolveParameterTable(entries);
+    const first = errorOf(table.results[0]!);
+    expect(first.code).toBe("cycle");
+    expect(first.cycle).toHaveLength(count + 1);
+    expect(first.cycle?.[1]).toBe("p1");
+    expect(first.message.length).toBeLessThan(200);
+    const last = errorOf(table.results[count - 1]!);
+    expect(last).toMatchObject({ code: "cycle", span: { start: 0, end: 2 } });
+    expect(last.cycle).toBe(first.cycle);
+  });
+
+  it("refuses a table over 10,000 entries", () => {
+    const entries = Array.from({ length: 10_001 }, (_, index) => ({ name: `p${index}`, expression: "1" }));
+    const table = resolveParameterTable(entries);
+    expect(table.results).toHaveLength(10_001);
+    expect(errorOf(table.results[0]!).code).toBe("limitExceeded");
+    expect(table.scope.size).toBe(0);
+  });
+
+  it("rejects malformed entries and dimensions", () => {
+    const table = resolveParameterTable([
+      { name: "a", expression: "1", dimension: "Length" },
+      { name: "b", expression: 5 },
+      null,
+      { name: "c", expression: "a + 1" },
+    ] as unknown as Parameters<typeof resolveParameterTable>[0]);
+    expect(errorOf(table.results[0]!).code).toBe("invalidDimension");
+    expect(errorOf(table.results[1]!).code).toBe("invalidArgument");
+    expect(errorOf(table.results[2]!).code).toBe("invalidArgument");
+    expect(errorOf(table.results[3]!).code).toBe("dependencyFailed");
   });
 
   it("feeds its scope back into evaluateExpression", () => {
