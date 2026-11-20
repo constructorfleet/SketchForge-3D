@@ -5490,6 +5490,7 @@ export function SketchForgeEditor({
       initialHistory,
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
+      initialParameters,
     );
   }
   const [shapes, setShapes] = useState<WorkplaneShape[]>(() => initialSceneRef.current as WorkplaneShape[]);
@@ -6219,7 +6220,7 @@ export function SketchForgeEditor({
 
   const appendHistorySnapshot = useCallback(
     (nextShapes: WorkplaneShape[], nextSelection: string[]) =>
-      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection)),
+      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, projectParametersRef.current)),
     [appendHistoryEntry],
   );
 
@@ -6232,7 +6233,7 @@ export function SketchForgeEditor({
       return;
     }
 
-    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current);
+    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, projectParametersRef.current);
     if (!startFingerprint || startFingerprint === entry.fingerprint) {
       return;
     }
@@ -6263,7 +6264,7 @@ export function SketchForgeEditor({
           finalizeInteractionHistory();
         }
         if (!projectInteractionActiveRef.current) {
-          interactionHistoryStartRef.current = projectShapesFingerprint(shapesRef.current);
+          interactionHistoryStartRef.current = editorHistoryEntry(shapesRef.current, [], projectParametersRef.current).fingerprint;
           interactionHistoryChangedRef.current = false;
         }
         projectInteractionActiveRef.current = true;
@@ -7255,6 +7256,7 @@ export function SketchForgeEditor({
       initialHistory,
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
+      projectParametersRef.current,
     );
     projectHydratingRef.current = true;
     shapesRef.current = incoming;
@@ -7604,6 +7606,7 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
+    projectParametersRef.current = entry?.parameters ?? [];
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
@@ -7630,6 +7633,7 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
+    projectParametersRef.current = entry?.parameters ?? [];
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);

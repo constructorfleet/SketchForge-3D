@@ -11,6 +11,7 @@ import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import { PROJECT_PARAMETER_DIMENSIONS, resolveProjectParameters, type ProjectParameterInput } from "./projectParameters.js";
+import { EXPRESSION_BINDABLE_FIELDS, shapeBindingIssues, type ShapeBindingIssue } from "./expressionBindings.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -91,10 +92,12 @@ export type SkfShapeNodeV1 = {
   cadDisplayEdgesAssetId?: string;
 };
 
+// `parameters`: V3 only, an undo state's table when not empty. The scene state uses top-level `parameters`.
 export type SkfStateV1 = {
   id: string;
   rootNodeIds: string[];
   nodes: SkfShapeNodeV1[];
+  parameters?: SkfParameterV3[];
 };
 
 export type SkfFeatureV1 = {
@@ -185,6 +188,8 @@ export type SkfRestoredProject = {
   placementWorkplane: PlacementWorkplane;
   sketchPlacementWorkplane: PlacementWorkplane;
   parameters: ProjectParameter[];
+  /** Scene bindings that do not resolve. Kept with their stored numbers; see `shapeBindingIssues`. */
+  bindingIssues: ShapeBindingIssue[];
   migratedFromVersion?: number;
 };
 
@@ -904,13 +909,13 @@ function skfParameter({ name, expression, dimension, value }: ProjectParameter):
 
 export async function exportSkfProject(input: SkfProjectExportInput) {
   const parameters = resolvedSkfParameters(input.parameters ?? []);
-  const formatVersion = parameters.length ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
-  const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex);
+  const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex, "unlimited", parameters);
   if (hydrated.entries.length > SKF_LIMITS.states) throw new LocalizedError("errors.skf.tooManyStates");
   const exportEntries = hydrated.entries.map((entry) => {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
-    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds);
+    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, entry.parameters);
   });
+  const sceneFingerprint = exportEntries[hydrated.index]?.fingerprint;
   const builder = new SkfArchiveBuilder();
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
@@ -923,12 +928,16 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     let stateId = stateIdByFingerprint.get(entry.fingerprint);
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
-      states.push(await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId));
+      const state = await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId);
+      const stateParameters = entry.fingerprint === sceneFingerprint ? [] : resolvedSkfParameters(entry.parameters ?? []);
+      states.push(stateParameters.length ? { ...state, parameters: stateParameters.map(skfParameter) } : state);
       stateIdByFingerprint.set(entry.fingerprint, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
   }
 
+  // V3 whenever any table is written, including one kept only for undo.
+  const formatVersion = parameters.length || states.some((state) => state.parameters) ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
   const sceneStateId = historyEntries[hydrated.index]?.stateId;
   const activeState = states.find((state) => state.id === sceneStateId);
   if (!activeState) throw new LocalizedError("errors.skf.activeStateUnknown");
@@ -1263,6 +1272,18 @@ function validateShapeDefinition(
     throw new LocalizedError("errors.skf.inlinePackageFields", { label });
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
+  // Structure only. A binding that no longer resolves is kept and reported as a binding issue.
+  if (definition.expressions !== undefined) {
+    const expressions = objectRecord(definition.expressions, `${label}.expressions`);
+    if (Object.keys(expressions).length > EXPRESSION_BINDABLE_FIELDS.length) {
+      throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.expressions` });
+    }
+    for (const [field, expression] of Object.entries(expressions)) {
+      if (!field.trim() || typeof expression !== "string" || !expression.trim()) {
+        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${label}.expressions.${field}` });
+      }
+    }
+  }
   // Selected-edge lineage (#350): the replay trusts these names, so a
   // malformed one is refused here rather than at the next sketch edit.
   const treatmentFeatures = [
@@ -1907,9 +1928,17 @@ async function restoreV1(
   // and the format stays readable by releases from before the fix.
   const migrationMemo = new Map<WorkplaneShape, WorkplaneShape>();
   for (const [stateId, shapes] of restoredStates) restoredStates.set(stateId, migratePre548CutBrepFrames(shapes, migrationMemo));
-  const history = document.history.entries.map((entry) => editorHistoryEntry(restoredStates.get(entry.stateId) ?? [], entry.selectedObjectIds));
+  const stateParameters = new Map(document.states.map((state) => [
+    state.id,
+    state.id === document.sceneStateId ? parameters : readSkfParameters(state.parameters),
+  ]));
+  const history = document.history.entries.map((entry) => editorHistoryEntry(
+    restoredStates.get(entry.stateId) ?? [],
+    entry.selectedObjectIds,
+    stateParameters.get(entry.stateId) ?? [],
+  ));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
-  const hydrated = liveEditorHistoryState(shapes, history, document.history.index);
+  const hydrated = liveEditorHistoryState(shapes, history, document.history.index, "unlimited", parameters);
   if (hydrated.entries.length !== history.length || hydrated.index !== document.history.index) throw new LocalizedError("errors.skf.historyRestoreLoss");
   return {
     sourceProjectId: document.metadata.projectId,
@@ -1926,6 +1955,7 @@ async function restoreV1(
     placementWorkplane: normalizePlacementWorkplane(document.editor.placementWorkplane, document.editor.placementElevation),
     sketchPlacementWorkplane: normalizePlacementWorkplane(document.editor.sketchPlacementWorkplane),
     parameters,
+    bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, parameters),
   } satisfies SkfRestoredProject;
 }
 
@@ -1956,6 +1986,7 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
     ),
     sketchPlacementWorkplane: normalizePlacementWorkplane(raw.sketchPlacementWorkplane),
     parameters: [],
+    bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, []),
     migratedFromVersion: 0,
   };
 }

@@ -299,3 +299,43 @@ describe("editor history snapshots", () => {
     expect(lastThirty.entries[30].shapes[0].x).toBe(120);
   });
 });
+
+describe("parameter tables in history snapshots", () => {
+  const wall = (value: number) => [{ name: "wall", expression: String(value), dimension: "length" as const, value }];
+
+  it("keeps the table on the entry and leaves table-free fingerprints unchanged", () => {
+    const shapes = [box()];
+    expect(editorHistoryEntry(shapes, [], []).fingerprint).toBe(editorHistoryEntry(shapes, []).fingerprint);
+    const entry = editorHistoryEntry(shapes, [], wall(2));
+    expect(entry.parameters).toEqual(wall(2));
+    expect(entry.fingerprint).not.toBe(editorHistoryEntry(shapes, []).fingerprint);
+    expect(entry.fingerprint).not.toBe(editorHistoryEntry(shapes, [], wall(3)).fingerprint);
+  });
+
+  it("records a parameter change with its recompute as one undo step", () => {
+    const before = editorHistoryEntry([box({ width: 4, expressions: { width: "wall * 2" } })], [], wall(2));
+    const after = editorHistoryEntry([box({ width: 6, expressions: { width: "wall * 2" } })], [], wall(3));
+    const appended = appendEditorHistorySnapshot([before], 0, after);
+
+    expect(appended).toMatchObject({ changed: true, index: 1 });
+    expect(appended.entries).toHaveLength(2);
+    expect(appended.entries[0]).toMatchObject({ parameters: wall(2), shapes: [{ width: 4 }] });
+  });
+
+  it("records a table-only change as its own step", () => {
+    const shapes = [box()];
+    const appended = appendEditorHistorySnapshot([editorHistoryEntry(shapes, [], wall(2))], 0, editorHistoryEntry(shapes, [], wall(5)));
+    expect(appended.changed).toBe(true);
+  });
+
+  it("hydrates and keeps live history only when the active table matches", () => {
+    const shapes = [box()];
+    const entries = [editorHistoryEntry([], []), editorHistoryEntry(shapes, [], wall(2))];
+
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(2)).entries).toHaveLength(2);
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(2)).entries[1]!.parameters).toEqual(wall(2));
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(9)).entries).toHaveLength(1);
+    expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(2)).entries).toHaveLength(2);
+    expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(9)).entries).toHaveLength(1);
+  });
+});

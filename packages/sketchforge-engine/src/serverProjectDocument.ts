@@ -123,7 +123,7 @@ export async function writeProjectDocument(root: string, projectId: string, docu
   const history = appendEditorHistorySnapshot(
     document.history,
     document.historyIndex,
-    editorHistoryEntry(shapes, []),
+    editorHistoryEntry(shapes, [], document.parameters ?? []),
   );
   const packageBytes = await exportSkfProject({
     projectId,

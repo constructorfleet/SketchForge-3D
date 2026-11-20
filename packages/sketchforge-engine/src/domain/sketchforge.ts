@@ -441,6 +441,11 @@ export type WorkplaneShape = {
    * source sketch is refused rather than returning the solid body.
    */
   shell?: { thickness: number; openFaces?: Array<number | string> };
+  /**
+   * Binds catalog fields (`EXPRESSION_BINDABLE_FIELDS`) to parameter expressions.
+   * The bound fields keep their resolved numbers, so readers never evaluate these.
+   */
+  expressions?: Record<string, string>;
   cadDisplayEdges?: CadDisplayEdge[];
   cadDisplayEdgesVersion?: 2;
   edgeResizeMode?: "scale" | "preserve";

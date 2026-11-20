@@ -54,6 +54,7 @@ The package root is the supported import surface. Its main engine facade is `Eng
 | Import and combine | `importMesh`, `cut`, `group`, `ungroup`, `separate`, `explode` | Import model files, subtract/group solids, split groups/bodies, or explode a retained STEP assembly. |
 | Inspect and measure | `edges`, `faces`, `measurements`, `properties`, `measureBetween`, `interference` | Query exact geometry topology, shape properties, distances/angles, and gaps/overlaps. |
 | Modify exact geometry | `treat`, `draftPrism`, `shell`, `changeShape` | Apply edge treatments, draft an extruded prism, retain bounded sketch face drafts, or hollow a shape. |
+| Parameters and bindings | `addParameter`, `updateParameter`, `renameParameter`, `deleteParameter`, `bindShapeField` | Change the project parameter table and bind shape or feature fields to expressions; bound geometry is recomputed in the same write. |
 
 These operations address an **existing project ID** in a `ProjectStore`; this package does not create projects, project records, or initialize a project directory. `addShapes` is the first write operation for a project that already exists. All writes persist to the configured store.
 
@@ -117,7 +118,26 @@ console.log(deleteParameter(project, "shell").error); // { code: "parameterInUse
 - **Errors:** `{ code, message, parameter }`, where `parameter` names the entry that failed, which can be a dependent of the one changed. Codes are `invalidParameter` (an entry or table that is not an object or list), `invalidName`, `duplicateName`, `invalidDimension`, `invalidExpression` (with the evaluator's `expressionError`, including `cycle` and its path), `unknownParameter`, `parameterInUse` (with the `dependents` that reference it directly) and `tooManyParameters`. A table holds up to `PROJECT_PARAMETER_LIMIT` (2,000) entries.
 - **Rename** checks the new name, refuses one already in use, and rewrites every expression that references the old name. **Delete** refuses while another parameter references the parameter; `parameterDependents` lists those parameters.
 - **Values:** `resolveProjectParameters` evaluates a table and ignores any cached `value`. `.skf` export and import both call it, so a stored value is never trusted over its expression. It fails only on malformed structure. An entry that does not resolve stays in the table with an `error` and keeps its stored `value` as its last known value (`NaN` when there is none), so a project whose table a later release can no longer resolve still opens and saves the table back unchanged. Other entries can still be added, changed and deleted around it. `error` is never written to `.skf`.
-- **Storage:** `.skf` packages and `ProjectDocument.parameters` carry the table. See the [project format](https://constructorfleet.github.io/SketchForge-3D/docs/SKF_PROJECT_FORMAT) for the format version rules. Shape fields cannot reference parameters yet.
+- **Storage:** `.skf` packages and `ProjectDocument.parameters` carry the table. See the [project format](https://constructorfleet.github.io/SketchForge-3D/docs/SKF_PROJECT_FORMAT) for the format version rules.
+
+### Binding shape and feature fields
+
+A shape keeps the resolved number in its normal field (`width`, `x`, `sweepAngle` and so on) and records the expression in `shape.expressions`, keyed by field. Kernels, exports and older readers read only the number.
+
+```ts
+await engine.addParameter(projectId, { name: "wall", expression: "2 mm", dimension: "length" });
+await engine.bindShapeField(projectId, boxId, "width", "wall * 5"); // width is now 10
+await engine.updateParameter(projectId, "wall", { expression: "3" }); // width is now 15, in the same write
+await engine.changeShape(projectId, boxId, { width: 12 }); // a literal removes the width binding
+```
+
+- **Catalog:** `EXPRESSION_BINDABLE_FIELDS` lists every bindable field once, with its `dimension` (`length`, `angle` or `unitless`), `integer` for counts, the `kinds` that carry it and any retained feature it `requires`. `bindableFieldsFor(shape)` and `bindableField(shape, field)` answer for one shape. A bare number takes the field's unit, so `3` in `width` is 3 mm and in `rotation` is 3°.
+- **Fields:** placement and size (`x`, `z`, `elevation`, `width`, `depth`, `height`, `rotation`, `rotationX`, `rotationZ`), the numeric kind parameters (`sides`, `bevel`, `teeth`, `loftTopWidth` and the rest), and the retained-feature settings `revolve.startAngle`, `revolve.sweepAngle`, `revolve.sides`, `revolve.quality`, `revolve.pitch`, `revolve.turns`, `revolve.coreRadius`, `draftPrismAngle`, `faceDraft.angle`, `edgeTreatments.0.amount` and `edgeTreatments.0.chamferAngle`. Shape fields (`target: "shape"`) bind on top-level shapes only; feature fields also bind on a sketch output inside a group.
+- **Recompute:** `updateParameter` re-resolves the table, then every binding whose expression references a parameter whose value or dimension changed, children before their groups. Each value is applied through the path a manual edit takes: treatment settings rebuild the sketch recipe through `recompute`, feature settings go through `changeShape` by `sketchSourceId`, and shape fields through `changeShape` by ID. Retained fillets, chamfers, drafts and boolean ancestors replay as they do for a manual edit, and a shell refuses a rebuild as it does for a manual edit. Treatment settings bind only on sketch-backed shapes, because no manual edit replays a treatment on a plain solid.
+- **Errors:** nothing is written unless every step succeeds. A table error is `parameter_invalid` with the table error. A binding that does not resolve is `binding_invalid` with `{ code, shapeId, field, message, expressionError? }`, where `code` is `fieldNotBindable`, `invalidExpression` (wrong dimension, unknown name, cycle) or `notAnInteger`. A value the geometry refuses, or a locked shape, is `binding_failed` with the shape, the fields and the underlying failure.
+- **Undo:** each operation is one write and so one history entry. History entries carry the parameter table (`EditorHistoryEntry.parameters`) with the shapes, so one undo restores the old table and the old geometry together. An empty table keeps the previous shapes-only fingerprint.
+- **Rename and delete:** `renameParameter` rewrites shape bindings too, including treatment `before` snapshots. `deleteParameter` refuses while a shape binds the parameter and reports `shapeDependents: [{ shapeId, fields }]`; `projectParameterDependents(project, name)` lists both kinds of dependent.
+- **Stale bindings:** a binding that no longer resolves, or names a field the shape lacks, is kept with its stored number. `.skf` import reports it in `bindingIssues`, and `shapeBindingIssues(shapes, parameters)` lists them on demand. A later parameter change re-resolves only the bindings that depend on it, so a stale binding elsewhere does not block it.
 
 ## Editing a sketch-backed feature
 
