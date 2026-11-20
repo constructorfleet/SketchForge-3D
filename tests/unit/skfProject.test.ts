@@ -16,7 +16,7 @@ import {
   type SkfProjectExportInput,
 } from "@constructorfleet/sketchforge-engine/skfProject";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
-import type { ShapeKind, WorkplaneShape } from "@/types/sketchforge";
+import type { ProjectParameter, ShapeKind, WorkplaneShape } from "@/types/sketchforge";
 
 function shape(kind: ShapeKind, id = `${kind}-1`, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return {
@@ -542,7 +542,7 @@ describe("SketchForge .skf project packages", () => {
       projectName: "Round trip",
       createdAt: 1_700_000_000_000,
       modifiedAt: 1_700_000_100_000,
-      formatVersion: SKF_FORMAT_VERSION,
+      formatVersion: 2,
     });
     expect(document.assets.filter((entry) => entry.kind === "derived-mesh")).toHaveLength(0);
   });
@@ -1111,5 +1111,97 @@ describe("SketchForge .skf project packages", () => {
     const asset = document.assets.find((entry) => entry.kind === "derived-mesh")!;
     files[asset.path][20] ^= 0xff;
     await expect(importSkfProject(zipSync(files))).rejects.toThrow("integrity check");
+  });
+});
+
+describe("SketchForge .skf project parameters", () => {
+  const parameters: ProjectParameter[] = [
+    { name: "wall", expression: "3", dimension: "length", value: 3 },
+    { name: "tilt", expression: "0.5 rad", dimension: "angle", value: (0.5 * 180) / Math.PI },
+    { name: "count", expression: "4", dimension: "unitless", value: 4 },
+    { name: "depth", expression: "wall * count + 1in", dimension: "length", value: 37.4 },
+  ];
+
+  it("round-trips the parameter table, expressions included, as format 3", async () => {
+    const exported = await exportSkfProject(input([shape("box")], { parameters }));
+    const { document } = packageDocument(exported);
+
+    expect(document.formatVersion).toBe(3);
+    expect(document.minimumReaderVersion).toBe(3);
+    expect(document.parameters).toEqual(parameters);
+    await expect(inspectSkfProjectPackage(exported)).resolves.toMatchObject({ formatVersion: 3 });
+    expect((await importSkfProject(exported)).parameters).toEqual(parameters);
+  });
+
+  it("keeps writing format 2 while the table is empty, so older releases still open it", async () => {
+    const { document } = packageDocument(await exportSkfProject(input([shape("box")], { parameters: [] })));
+
+    expect(document.formatVersion).toBe(2);
+    expect(document.minimumReaderVersion).toBe(2);
+    expect("parameters" in document).toBe(false);
+  });
+
+  it("loads projects written before parameters with an empty table", async () => {
+    const v2 = await exportSkfProject(input([shape("box")]));
+    const v1 = mutateProject(v2, (document) => {
+      document.formatVersion = 1;
+      document.minimumReaderVersion = 1;
+    });
+    const v0 = strToU8(JSON.stringify({
+      schema: SKF_SCHEMA_ID,
+      formatVersion: 0,
+      project: { id: "legacy", name: "Legacy", createdAt: 100, modifiedAt: 200 },
+      shapes: [shape("box")],
+    }));
+
+    for (const bytes of [v2, v1, v0]) expect((await importSkfProject(bytes)).parameters).toEqual([]);
+  });
+
+  it("recomputes cached values on load instead of trusting the file", async () => {
+    const exported = await exportSkfProject(input([shape("box")], { parameters }));
+    const tampered = mutateProject(exported, (document) => {
+      document.parameters![0]!.value = 999;
+      document.parameters![3]!.value = -1;
+    });
+
+    const restored = await importSkfProject(tampered);
+
+    expect(restored.parameters.map((parameter) => parameter.value)).toEqual(parameters.map((parameter) => parameter.value));
+  });
+
+  it("recomputes cached values on save", async () => {
+    const stale = parameters.map((parameter) => ({ ...parameter, value: 0 }));
+
+    const { document } = packageDocument(await exportSkfProject(input([shape("box")], { parameters: stale })));
+
+    expect(document.parameters).toEqual(parameters);
+  });
+
+  it("rejects a table that does not resolve, on load and on save", async () => {
+    const exported = await exportSkfProject(input([shape("box")], { parameters }));
+    const broken: Array<[string, (document: SkfProjectDocumentV1) => void]> = [
+      ["cycle", (document) => { document.parameters![0]!.expression = "depth"; }],
+      ["unknown reference", (document) => { document.parameters![3]!.expression = "missing + 1"; }],
+      ["dimension", (document) => { (document.parameters![1] as { dimension: string }).dimension = "area"; }],
+      ["duplicate", (document) => { document.parameters![1]!.name = "wall"; }],
+      ["invalid name", (document) => { document.parameters![1]!.name = "mm"; }],
+      ["not a list", (document) => { (document as { parameters: unknown }).parameters = { wall: "3" }; }],
+      ["not an object", (document) => { (document as { parameters: unknown[] }).parameters[0] = "wall"; }],
+    ];
+    for (const [label, mutate] of broken) {
+      await expect(importSkfProject(mutateProject(exported, mutate)), label).rejects.toThrow(/parameters/);
+    }
+
+    const cyclic = [{ name: "a", expression: "b", dimension: "length" as const, value: 0 }, { name: "b", expression: "a", dimension: "length" as const, value: 0 }];
+    await expect(exportSkfProject(input([shape("box")], { parameters: cyclic }))).rejects.toThrow(/parameters\[0\]/);
+  });
+
+  it("caps the number of stored parameters", async () => {
+    const exported = await exportSkfProject(input([shape("box")], { parameters }));
+    const oversized = mutateProject(exported, (document) => {
+      document.parameters = Array.from({ length: SKF_LIMITS.parameters + 1 }, (_, index) => ({ name: `p${index}`, expression: "1", dimension: "length" as const, value: 1 }));
+    });
+
+    await expect(importSkfProject(oversized)).rejects.toThrow(/parameters/);
   });
 });

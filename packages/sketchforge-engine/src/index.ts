@@ -184,3 +184,20 @@ export {
   type ParameterTableEntry,
   type ParameterTableResult,
 } from "./parameterExpressions.js";
+export {
+  addParameter,
+  deleteParameter,
+  parameterDependents,
+  PROJECT_PARAMETER_DIMENSIONS,
+  PROJECT_PARAMETER_LIMIT,
+  renameParameter,
+  resolveProjectParameters,
+  updateParameter,
+  type ProjectParameterError,
+  type ProjectParameterErrorCode,
+  type ProjectParameterHolder,
+  type ProjectParameterInput,
+  type ProjectParameterResult,
+  type ResolvedProjectParameters,
+} from "./projectParameters.js";
+export type { ProjectParameter, ProjectParameterDimension } from "./domain/sketchforge.js";

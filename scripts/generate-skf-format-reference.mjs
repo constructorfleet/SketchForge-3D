@@ -74,8 +74,9 @@ For automated project export from a server-backed project, see [\`POST /exports\
 | Property | Value |
 | --- | --- |
 | Schema | \`${constant("SKF_SCHEMA_ID").replaceAll('"', "")}\` |
-| Current writer format | ${constant("SKF_FORMAT_VERSION")} |
-| Minimum reader format | ${constant("SKF_MINIMUM_READER_VERSION")} |
+| Newest format read and written | ${constant("SKF_FORMAT_VERSION")} |
+| Format written when the project has parameters | ${constant("SKF_PARAMETERS_FORMAT_VERSION")} |
+| Minimum reader format of other projects | ${constant("SKF_MINIMUM_READER_VERSION")} |
 | Created-with version | \`${constant("SKF_CREATED_WITH_VERSION").replaceAll('"', "")}\` | <!-- x-release-please-version -->
 | Media type | \`${constant("SKF_MEDIA_TYPE").replaceAll('"', "")}\` |
 
@@ -107,9 +108,18 @@ ${fields("SkfShapeNodeV1")}
 | --- | --- |
 ${fields("SkfFeatureV1")}
 
+### \`SkfParameterV3\`
+
+| Field | Serialized type |
+| --- | --- |
+${fields("SkfParameterV3")}
+
+\`value\` is in mm for \`length\`, degrees for \`angle\`, and plain for \`unitless\`. Readers re-evaluate every expression and ignore the stored value. A table that does not resolve (invalid or duplicate name, unknown dimension, unknown reference, dimension mismatch, or reference cycle) rejects the whole package.
+
 ## Reader compatibility
 
-- V2 is the current writer format and requires a reader at least version 2.
+- V3 is written only when the project parameter table is not empty, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
+- V2 is written for every other project and requires a reader at least version 2. It has no \`parameters\` field and loads with an empty table.
 - V1 packaged projects are accepted and migrate inline display edges into shared assets on import; the next save writes V2.
 - V0 legacy JSON projects are accepted by the explicit migration path, which preserves valid object IDs and history.
 - Unsupported future versions are rejected before restoration. The original input bytes are not modified.

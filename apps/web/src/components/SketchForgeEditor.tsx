@@ -222,7 +222,7 @@ import type { SketchCadBuildResponse, SketchCadWorkerRequest } from "@/lib/sketc
 import { cadSketchSweepPaths } from "@/lib/sketchCadProfile";
 import { shouldIgnoreGlobalShortcut } from "@/lib/globalShortcutGuard";
 import { centerSweepSection, formatSweepAxis, sketchSweepStage as getSketchSweepStage, sketchToolForSweepStage, sweepFramesForSectionWorkplane, sweepProfileStatus, sweepSpineStartPointId, tagSweepProfile, withSweepSpineStart, type SketchSweepStage } from "@/lib/sketchSweepGuides";
-import type { AlignAxis, AlignHandleStatus, AlignTarget, EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, EdgeTreatmentSourceEdge, GridSize, ProjectAsset, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { AlignAxis, AlignHandleStatus, AlignTarget, EdgeTreatmentFeature, EdgeTreatmentHistoryEntry, EdgeTreatmentSourceEdge, GridSize, ProjectAsset, ProjectParameter, ShapeAsset, SketchConstraint, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchRevolveSettings, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
@@ -5390,6 +5390,7 @@ function readMcpEditorIdentity() {
 
 export function SketchForgeEditor({
   initialAssets = [],
+  initialParameters = [],
   initialShapes = [],
   initialHistory,
   initialHistoryIndex,
@@ -5422,6 +5423,7 @@ export function SketchForgeEditor({
   hostNotice,
 }: {
   initialAssets?: ProjectAsset[];
+  initialParameters?: ProjectParameter[];
   initialShapes?: WorkplaneShape[];
   initialHistory?: EditorHistoryEntry[];
   initialHistoryIndex?: number;
@@ -5438,6 +5440,7 @@ export function SketchForgeEditor({
     history: EditorHistoryEntry[];
     historyIndex: number;
     assets: ProjectAsset[];
+    parameters: ProjectParameter[];
     projectName: string;
     projectCreatedAt: number;
     workspace: WorkplaneWorkspaceSettings;
@@ -5543,6 +5546,8 @@ export function SketchForgeEditor({
   const lastProjectSnapshotRef = useRef<ProjectThumbnailSceneKey | null>(null);
   const shapesRef = useRef(shapes);
   const projectAssetsRef = useRef(projectAssets);
+  // No editor UI changes the table yet; held so saves keep it.
+  const projectParametersRef = useRef(initialParameters);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
   const snapGridRef = useRef(snapGrid);
@@ -6163,6 +6168,7 @@ export function SketchForgeEditor({
           history: historyRef.current,
           historyIndex: historyIndexRef.current,
           assets: projectAssetsRef.current,
+          parameters: projectParametersRef.current,
           projectName: projectInfoRef.current.projectName,
           projectCreatedAt: projectInfoRef.current.projectCreatedAt,
           workspace: workspaceSettingsRef.current,
@@ -7223,6 +7229,7 @@ export function SketchForgeEditor({
       const nextAssets = dedupeProjectAssets(initialAssets);
       projectAssetsRef.current = nextAssets;
       setProjectAssets(nextAssets);
+      projectParametersRef.current = initialParameters;
       const nextPlacementElevation = Number.isFinite(initialPlacementElevation) ? initialPlacementElevation : 0;
       setPlacementElevation(nextPlacementElevation);
       setPlacementWorkplane(normalizePlacementWorkplane(initialPlacementWorkplane, nextPlacementElevation));
@@ -7258,7 +7265,7 @@ export function SketchForgeEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice(null);
-  }, [initialAssets, initialHistory, initialHistoryIndex, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+  }, [initialAssets, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
 
   useEffect(() => {
     if (!projectId || !onProjectShapesChange) {
@@ -9002,6 +9009,7 @@ export function SketchForgeEditor({
             history: exportedHistory.entries,
             historyIndex: exportedHistory.index,
             assets: projectAssetsRef.current,
+            parameters: projectParametersRef.current,
             workspace: workspaceSettingsRef.current,
             snapGrid,
             placementElevation,
@@ -9960,6 +9968,7 @@ export function SketchForgeEditor({
         history: exportedHistory.entries,
         historyIndex: exportedHistory.index,
         assets: projectAssetsRef.current,
+        parameters: projectParametersRef.current,
         workspace: workspaceSettingsRef.current,
         snapGrid,
         placementElevation,

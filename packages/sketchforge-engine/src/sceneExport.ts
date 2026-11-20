@@ -99,6 +99,7 @@ function skfBytes(document: ProjectDocument, shapes: WorkplaneShape[]) {
     placementElevation: document.placementElevation,
     placementWorkplane: document.placementWorkplane,
     sketchPlacementWorkplane: document.sketchPlacementWorkplane,
+    parameters: document.parameters,
   });
 }
 
