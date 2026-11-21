@@ -78,9 +78,16 @@ flowchart LR
   D --> H[One history entry]
 ```
 
-The static web build has no server. There the panel edits the table, but a
-change that would move a bound shape is refused with a message, and the model
-is unchanged.
+Only the shapes whose bindings use a changed value are sent. If the server
+cannot take the request, the message says why: the request is too large, it was
+refused, or the server failed. The status line also shows the message, so a
+refusal is not lost if you closed the panel while shapes were updating.
+
+The static web build has no server. There the panel edits the table, and bound
+placement and size fields on plain primitive shapes, such as a box's width or
+position, update in the browser. A change that would rebuild a sketch, a
+treatment, a group or an imported shape is refused with a message, and the
+model is unchanged.
 
 ## Delete a parameter that is in use
 

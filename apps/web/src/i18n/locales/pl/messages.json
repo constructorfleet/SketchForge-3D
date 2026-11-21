@@ -895,6 +895,9 @@
         "recomputeFailed": "Nie można przebudować {shape} dla {field}.",
         "recomputeFailedGeneric": "Nie można przebudować powiązanych kształtów. Model się nie zmienił.",
         "serverUnavailable": "Powiązane kształty wymagają serwera SketchForge do aktualizacji. Model się nie zmienił.",
+        "requestTooLarge": "Projekt jest za duży, aby wysłać go do przeliczenia. Model się nie zmienił.",
+        "requestRejected": "Serwer odrzucił żądanie przeliczenia. Model się nie zmienił.",
+        "serverError": "Serwer zawiódł podczas aktualizacji powiązanych kształtów. Model się nie zmienił.",
         "busy": "Najpierw zakończ bieżącą edycję.",
         "projectChanged": "Projekt zmienił się podczas aktualizacji kształtów. Spróbuj ponownie."
       }

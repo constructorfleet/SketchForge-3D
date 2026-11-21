@@ -895,6 +895,9 @@
         "recomputeFailed": "Não foi possível reconstruir {shape} para {field}.",
         "recomputeFailedGeneric": "Não foi possível reconstruir as formas vinculadas. O modelo não mudou.",
         "serverUnavailable": "As formas vinculadas precisam do servidor SketchForge para serem atualizadas. O modelo não mudou.",
+        "requestTooLarge": "O projeto é grande demais para ser enviado para recálculo. O modelo não mudou.",
+        "requestRejected": "O servidor recusou o pedido de recálculo. O modelo não mudou.",
+        "serverError": "O servidor falhou ao atualizar as formas vinculadas. O modelo não mudou.",
         "busy": "Conclua primeiro a edição atual.",
         "projectChanged": "O projeto mudou enquanto as formas eram atualizadas. Tente novamente."
       }

@@ -7,6 +7,7 @@ import { useTranslations } from "@/i18n";
 import {
   parameterDeleteWarning,
   parameterRows,
+  parameterTableKey,
   type ParameterDeleteWarning,
   type ParameterEdit,
   type ParameterMessage,
@@ -47,6 +48,18 @@ export function ProjectParametersPanel({
   // Escape reverts a draft; the blur that follows must not commit it.
   const skipBlurCommitRef = useRef(false);
   const rows = parameterRows(parameters);
+  // Undo, redo or a commit replaces the table; drafts and errors about the old one are stale.
+  const tableKey = parameterTableKey(parameters);
+  const tableKeyRef = useRef(tableKey);
+  tableKeyRef.current = tableKey;
+  // Reset during render, so a stale error is never committed and announced.
+  const [seenTableKey, setSeenTableKey] = useState(tableKey);
+  if (seenTableKey !== tableKey) {
+    setSeenTableKey(tableKey);
+    setDrafts({});
+    setErrors({});
+    setPendingDelete(null);
+  }
   const text = (message: ParameterMessage) => t(message.key, message.values);
 
   const clearRow = (name: string) => {
@@ -55,7 +68,10 @@ export function ProjectParametersPanel({
   };
 
   const submit = async (rowName: string, field: Field, edit: ParameterEdit) => {
+    const startKey = tableKeyRef.current;
     const refusal = await onEdit(edit);
+    // A refusal about a table that has since been replaced, for example by undo, no longer applies.
+    if (refusal && tableKeyRef.current !== startKey) return;
     if (refusal) {
       setErrors((current) => ({ ...current, [rowName]: { field, message: refusal } }));
       return;
@@ -138,6 +154,7 @@ export function ProjectParametersPanel({
               </tr>
             </thead>
             <tbody>
+              {/* Keyed by position, not name, so a rename keeps the row and its focus. */}
               {rows.map((row, index) => {
                 const draft = drafts[row.name] ?? {};
                 const editError = errors[row.name];
@@ -146,7 +163,7 @@ export function ProjectParametersPanel({
                 const describedBy = message ? errorId(index) : undefined;
                 const warning = pendingDelete?.name === row.name ? pendingDelete.warning : null;
                 return [
-                  <tr key={`${row.name}-row`} className="parameters-row">
+                  <tr key={`row-${index}`} className="parameters-row">
                     <td>
                       <input
                         className="parameters-input parameters-name-input"
@@ -210,14 +227,14 @@ export function ProjectParametersPanel({
                     </td>
                   </tr>,
                   message ? (
-                    <tr key={`${row.name}-error`} className="parameters-row-note">
+                    <tr key={`error-${index}`} className="parameters-row-note">
                       <td colSpan={5}>
-                        <p id={errorId(index)} className="parameters-error" role="alert">{text(message)}</p>
+                        <p id={errorId(index)} className="parameters-error" role={editError ? "alert" : undefined}>{text(message)}</p>
                       </td>
                     </tr>
                   ) : null,
                   warning ? (
-                    <tr key={`${row.name}-warning`} className="parameters-row-note">
+                    <tr key={`warning-${index}`} className="parameters-row-note">
                       <td colSpan={5}>
                         <DeleteWarning
                           name={row.name}

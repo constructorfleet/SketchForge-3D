@@ -895,6 +895,9 @@
         "recomputeFailed": "{shape} konnte für {field} nicht neu aufgebaut werden.",
         "recomputeFailedGeneric": "Gebundene Formen konnten nicht neu aufgebaut werden. Das Modell ist unverändert.",
         "serverUnavailable": "Gebundene Formen brauchen den SketchForge-Server zum Aktualisieren. Das Modell ist unverändert.",
+        "requestTooLarge": "Das Projekt ist zu groß, um es zur Neuberechnung zu senden. Das Modell ist unverändert.",
+        "requestRejected": "Der Server hat die Anfrage zur Neuberechnung abgelehnt. Das Modell ist unverändert.",
+        "serverError": "Beim Aktualisieren gebundener Formen ist auf dem Server ein Fehler aufgetreten. Das Modell ist unverändert.",
         "busy": "Schließen Sie zuerst die aktuelle Bearbeitung ab.",
         "projectChanged": "Das Projekt hat sich während der Aktualisierung geändert. Versuchen Sie es erneut."
       }

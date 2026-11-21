@@ -895,6 +895,9 @@
         "recomputeFailed": "{shape} nelze znovu sestavit pro {field}.",
         "recomputeFailedGeneric": "Navázané tvary nelze znovu sestavit. Model zůstal beze změny.",
         "serverUnavailable": "Navázané tvary potřebují k aktualizaci server SketchForge. Model zůstal beze změny.",
+        "requestTooLarge": "Projekt je příliš velký na odeslání k přepočtu. Model zůstal beze změny.",
+        "requestRejected": "Server žádost o přepočet odmítl. Model zůstal beze změny.",
+        "serverError": "Server při aktualizaci navázaných tvarů selhal. Model zůstal beze změny.",
         "busy": "Nejprve dokončete aktuální úpravu.",
         "projectChanged": "Projekt se během aktualizace tvarů změnil. Zkuste to znovu."
       }

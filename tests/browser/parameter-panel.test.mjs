@@ -15,6 +15,7 @@ import { exportSkfProject, shapeFromRequest } from "@constructorfleet/sketchforg
 const parameters = [
   { name: "w", expression: "10", dimension: "length", value: 10 },
   { name: "half", expression: "w / 2", dimension: "length", value: 5 },
+  { name: "stale", expression: "missing * 2", dimension: "length", value: 7 },
 ];
 
 async function unusedPort() {
@@ -68,7 +69,7 @@ test("the parameter panel edits, refuses inline, recomputes, undoes in one step,
     projectName: "bound",
     createdAt: Date.now(),
     modifiedAt: Date.now(),
-    shapes: [bound],
+    shapes: [bound, { ...box, id: `${box.id}-free`, name: "Free box", x: -30 }],
     history: [],
     historyIndex: 0,
     assets: [],
@@ -109,14 +110,32 @@ test("the parameter panel edits, refuses inline, recomputes, undoes in one step,
     const valueOf = (name) => panel.locator(`output[aria-label^="${name} = "]`);
     assert.equal(await valueOf("half").getAttribute("aria-label"), "half = 5 mm");
 
+    // A stale entry's error is described, not announced as a new alert.
+    const staleExpression = expressionOf("stale");
+    assert.equal(await staleExpression.getAttribute("aria-invalid"), "true");
+    const staleDescription = await staleExpression.getAttribute("aria-describedby");
+    assert.match(await panel.locator(`[id="${staleDescription}"]`).textContent(), /not a parameter/);
+    assert.equal(await panel.getByRole("alert").count(), 0, "opening the panel raises no alert");
+
+    // A rename keeps focus in the row, so Tab moves on to its expression.
+    await panel.getByRole("textbox", { name: "Name of half" }).fill("mid");
+    await panel.getByRole("textbox", { name: "Name of half" }).press("Tab");
+    await panel.getByRole("textbox", { name: "Name of mid" }).waitFor();
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Expression of mid", "focus survives the rename");
+
     // An invalid expression and a cycle are refused inline; the model is unchanged.
     await expressionOf("w").fill("2 +");
     await expressionOf("w").press("Enter");
     await panel.getByRole("alert").filter({ hasText: "incomplete or has a typo" }).waitFor();
     assert.equal(await expressionOf("w").getAttribute("aria-invalid"), "true");
-    await expressionOf("w").fill("half * 2");
+    await expressionOf("w").fill("mid * 2");
     await expressionOf("w").press("Enter");
-    await panel.getByRole("alert").filter({ hasText: "w → half → w" }).waitFor();
+    await panel.getByRole("alert").filter({ hasText: "w → mid → w" }).waitFor();
+    // An undo underneath clears the row's error and draft.
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await panel.getByRole("textbox", { name: "Name of half" }).waitFor();
+    assert.equal(await panel.getByRole("alert").count(), 0, "undo clears the edit error");
+    assert.equal(await expressionOf("w").inputValue(), "10", "undo clears the draft");
     assert.equal((await shape()).width, 10, "a refused edit leaves geometry alone");
     assert.equal(await valueOf("half").getAttribute("aria-label"), "half = 5 mm");
 
@@ -141,6 +160,26 @@ test("the parameter panel edits, refuses inline, recomputes, undoes in one step,
     await shapeWhen((current) => current.width === 24 && current.x === 12, "redo reapplies the edit");
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await shapeWhen((current) => current.width === 10, "undo again");
+
+    // A refused recompute reaches the status line even after the panel closes.
+    let releaseRecompute;
+    const recomputeHeld = new Promise((resolve) => { releaseRecompute = resolve; });
+    let postedShapes = -1;
+    await page.route("**/api/editor/parameters", async (route) => {
+      postedShapes = JSON.parse(route.request().postData() ?? "{}").shapes?.length ?? -1;
+      await recomputeHeld;
+      await route.fulfill({ status: 413, contentType: "application/json", body: JSON.stringify({ code: "limit_exceeded" }) });
+    });
+    panel = await openPanel();
+    await expressionOf("w").fill("40");
+    await expressionOf("w").press("Enter");
+    await panel.getByRole("status").filter({ hasText: "Updating bound shapes" }).waitFor();
+    await panel.getByRole("button", { name: "Close Parameters" }).click();
+    releaseRecompute();
+    await page.locator(".editor-toast", { hasText: "The project is too large to send for a recompute." }).waitFor();
+    assert.equal(postedShapes, 1, "only the bound tree is sent");
+    assert.equal((await shape()).width, 10, "a refused recompute leaves geometry alone");
+    await page.unroute("**/api/editor/parameters");
 
     // Adding is one undo step too.
     panel = await openPanel();

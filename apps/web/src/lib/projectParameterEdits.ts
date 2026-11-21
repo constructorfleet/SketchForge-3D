@@ -15,7 +15,8 @@ import {
   type ProjectParameterError,
   type ProjectParameterResult,
 } from "@constructorfleet/sketchforge-engine/projectParameters";
-import { parameterShapeDependents, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { bindableField, boundFieldValue, parameterShapeDependents, resolveShapeBindings, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { REQUESTABLE_SHAPE_KINDS, shapeWithRequestedChanges } from "@constructorfleet/sketchforge-engine/shapeRequests";
 import { expressionDependencies, type ExpressionErrorCode } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { MessageKey } from "@/i18n/locales";
 import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
@@ -245,4 +246,146 @@ export function parameterEditFailureMessage(failure: ParameterEditFailure | null
     return { key: "editor.parameters.error.recomputeFailed", values: { shape, field: (failure.fields ?? []).join(", ") } };
   }
   return { key: "editor.parameters.error.recomputeFailedGeneric", values: {} };
+}
+
+function dependsOn(shape: WorkplaneShape, names: ReadonlySet<string>) {
+  return Object.values(shape.expressions ?? {}).some((expression) => expressionDependencies(expression).some((name) => names.has(name)));
+}
+
+function treeDependsOn(shape: WorkplaneShape, names: ReadonlySet<string>): boolean {
+  return dependsOn(shape, names)
+    || Boolean(shape.groupedShapes?.some((child) => treeDependsOn(child, names)))
+    || Boolean(shape.edgeTreatmentHistory?.some((entry) => treeDependsOn(entry.before, names)));
+}
+
+function sketchSources(shape: WorkplaneShape, into = new Set<string>()) {
+  if (shape.sketchSourceId) into.add(shape.sketchSourceId);
+  shape.groupedShapes?.forEach((child) => sketchSources(child, into));
+  return into;
+}
+
+/**
+ * Picks the top-level trees a recompute must send: those with a binding that reads a changed
+ * value, and trees sharing their sketch sources, which the engine rebuilds with them.
+ */
+export function recomputeScope(
+  shapes: readonly WorkplaneShape[],
+  previous: readonly ProjectParameter[],
+  next: readonly ProjectParameter[],
+): WorkplaneShape[] {
+  const changed = new Set(changedNames(previous, next));
+  const bound = shapes.filter((shape) => treeDependsOn(shape, changed));
+  const sources = new Set(bound.flatMap((shape) => [...sketchSources(shape)]));
+  return shapes.filter((shape) => bound.includes(shape) || [...sketchSources(shape)].some((source) => sources.has(source)));
+}
+
+/** Replaces the posted trees with the recomputed ones by id. Null when the response does not match. */
+export function mergeRecomputedShapes(
+  shapes: readonly WorkplaneShape[],
+  posted: readonly WorkplaneShape[],
+  returned: readonly WorkplaneShape[],
+): WorkplaneShape[] | null {
+  const byId = new Map(returned.map((shape) => [shape.id, shape]));
+  if (returned.length !== posted.length || !posted.every((shape) => byId.has(shape.id))) return null;
+  return shapes.map((shape) => byId.get(shape.id) ?? shape);
+}
+
+/** Maps a recompute response that is not a success to a message. */
+export function parameterRecomputeResponseMessage(status: number, body: unknown, shapes: readonly WorkplaneShape[]): ParameterMessage {
+  const failure = body && typeof body === "object" ? (body as { failure?: ParameterEditFailure }).failure : undefined;
+  if (failure) return parameterEditFailureMessage(failure, shapes);
+  if (status === 413) return { key: "editor.parameters.error.requestTooLarge", values: {} };
+  if (status === 400) return { key: "editor.parameters.error.requestRejected", values: {} };
+  if (status === 422 && body && typeof body === "object") return { key: "editor.parameters.error.recomputeFailedGeneric", values: {} };
+  return { key: "editor.parameters.error.serverError", values: {} };
+}
+
+// Any of these means the shape's geometry comes from more than its own fields.
+const KERNEL_FIELDS = [
+  "importedMesh", "imagePlate", "sketchProfile", "sketchSourceId", "sketchRevolve", "draftPrismAngle", "faceDraft",
+  "edgeTreatments", "edgeTreatmentHistory", "shell", "cadBrep", "cadDisplayEdges", "groupedShapes", "stepAssembly", "stepComponent",
+] as const;
+
+function plainPrimitive(shape: WorkplaneShape) {
+  return (REQUESTABLE_SHAPE_KINDS as readonly string[]).includes(shape.kind)
+    && KERNEL_FIELDS.every((field) => shape[field] === undefined);
+}
+
+export type LocalBindingResult =
+  | { ok: true; shapes: WorkplaneShape[] }
+  | { ok: false; failure: ParameterEditFailure };
+
+/**
+ * Applies a table change to bound plain primitives without the kernel, with the engine's
+ * range, lock and stale rules. Null when any dependent needs the engine's CAD paths.
+ */
+export function applyBindingsLocally(
+  shapes: readonly WorkplaneShape[],
+  previous: readonly ProjectParameter[],
+  next: readonly ProjectParameter[],
+): LocalBindingResult | null {
+  const changed = new Set(changedNames(previous, next));
+  const result: WorkplaneShape[] = [];
+  for (const shape of shapes) {
+    if (!treeDependsOn(shape, changed)) {
+      result.push(shape);
+      continue;
+    }
+    if (!plainPrimitive(shape)) return null;
+    const fields = Object.entries(shape.expressions ?? {})
+      .filter(([, expression]) => expressionDependencies(expression).some((name) => changed.has(name)))
+      .map(([field]) => field);
+    if (fields.some((field) => bindableField(shape, field)?.target === "feature")) return null;
+    const resolved = resolveShapeBindings(shape, next);
+    const earlier = resolveShapeBindings(shape, previous);
+    const values: Record<string, number> = {};
+    for (const field of fields) {
+      const outcome = resolved.get(field);
+      if (!outcome) continue;
+      if (!outcome.ok) {
+        // Refuses only a binding this change breaks; one already stale stays stale.
+        if (earlier.get(field)?.ok) return { ok: false, failure: { reason: "binding_invalid", error: outcome.error } };
+        continue;
+      }
+      if (boundFieldValue(shape, field) !== outcome.value) values[field] = outcome.value;
+    }
+    if (!Object.keys(values).length) {
+      result.push(shape);
+      continue;
+    }
+    if (shape.locked) {
+      return { ok: false, failure: { reason: "binding_failed", shapeId: shape.id, fields: Object.keys(values), failure: { reason: "shape_locked", ids: [shape.id] } } };
+    }
+    const changedShape = shapeWithRequestedChanges(shape, values);
+    if (!changedShape.ok) return null;
+    result.push(changedShape.shape);
+  }
+  return { ok: true, shapes: result };
+}
+
+export type HostProjectSync = { adoptTable: boolean; action: "echo" | "unchanged" | "hydrate" };
+
+/**
+ * Decides how the editor takes a host prop update. A table it neither received nor sent is
+ * a remote change: adopted with history rehydrated, so a later local undo cannot revert it.
+ */
+export function hostProjectSync({
+  projectChanged,
+  hostTableKey,
+  knownTableKey,
+  incomingShapesKey,
+  echoShapesKey,
+  currentShapesKey,
+}: {
+  projectChanged: boolean;
+  hostTableKey: string;
+  knownTableKey: string;
+  incomingShapesKey: string;
+  echoShapesKey: string | null;
+  currentShapesKey: string;
+}): HostProjectSync {
+  const adoptTable = projectChanged || hostTableKey !== knownTableKey;
+  if (adoptTable) return { adoptTable, action: "hydrate" };
+  if (echoShapesKey !== null && incomingShapesKey === echoShapesKey) return { adoptTable, action: "echo" };
+  return { adoptTable, action: incomingShapesKey === currentShapesKey ? "unchanged" : "hydrate" };
 }

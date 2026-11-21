@@ -175,7 +175,7 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { parameterEditFailureMessage, parameterErrorMessage, parameterTableKey, planParameterEdit, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterTableKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
@@ -7243,13 +7243,6 @@ export function SketchForgeEditor({
     // Configurations come from the host; the table follows `hostProjectSync` below.
     projectConfigurationRef.current = initialConfiguration;
     const projectChanged = lastProjectIdRef.current !== projectId;
-    // A table the host had not passed or been sent is a remote change, such as REST or MCP.
-    const hostParametersKey = parameterTableKey(initialParameters);
-    const tableChanged = hostParametersKey !== hostParametersKeyRef.current;
-    if (projectChanged || tableChanged) {
-      hostParametersKeyRef.current = hostParametersKey;
-      adoptProjectParameters(initialParameters);
-    }
     if (projectChanged) {
       lastProjectIdRef.current = projectId;
       lastProjectShapesSyncRef.current = "";
@@ -7263,8 +7256,21 @@ export function SketchForgeEditor({
     }
     const incoming = initialShapes.map(canonicalizeShape);
     const incomingSerialized = projectShapesFingerprint(incoming);
+    const hostParametersKey = parameterTableKey(initialParameters);
+    const sync = hostProjectSync({
+      projectChanged,
+      hostTableKey: hostParametersKey,
+      knownTableKey: hostParametersKeyRef.current,
+      incomingShapesKey: incomingSerialized,
+      echoShapesKey: lastProjectShapesEchoRef.current,
+      currentShapesKey: projectShapesFingerprint(shapes),
+    });
+    if (sync.adoptTable) {
+      hostParametersKeyRef.current = hostParametersKey;
+      adoptProjectParameters(initialParameters);
+    }
     // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
-    if (!projectChanged && !tableChanged && lastProjectShapesEchoRef.current !== null && incomingSerialized === lastProjectShapesEchoRef.current) {
+    if (sync.action === "echo") {
       lastProjectShapesSyncRef.current = incomingSerialized;
       return;
     }
@@ -7273,10 +7279,7 @@ export function SketchForgeEditor({
       window.clearTimeout(projectSyncTimerRef.current);
       projectSyncTimerRef.current = null;
     }
-    // A remote table change rehydrates history too, so a later local undo does not revert it.
-    if (!projectChanged && !tableChanged && incomingSerialized === projectShapesFingerprint(shapes)) {
-      return;
-    }
+    if (sync.action === "unchanged") return;
     const hydratedHistory = hydrateEditorHistoryState(
       incoming,
       initialHistory,
@@ -7678,27 +7681,37 @@ export function SketchForgeEditor({
     const planned = planParameterEdit({ parameters: startParameters, shapes: startShapes }, edit);
     if (!planned.ok) return parameterErrorMessage(planned.error);
     let next = planned.project;
-    if (planned.recompute) {
-      // Bound geometry moves through the engine's CAD paths, which only the server runs.
-      if (STATIC_EXPORT_BUILD) return parameterEditFailureMessage(null, startShapes);
+    // Also shown in the status line: the panel may have closed while a recompute ran.
+    const refuse = (message: ParameterMessage) => {
+      setNotice(notice((t) => t(message.key, message.values)));
+      return message;
+    };
+    if (planned.recompute && STATIC_EXPORT_BUILD) {
+      // No server: only plain primitive fields can follow, which needs no kernel.
+      const local = applyBindingsLocally(planned.project.shapes, startParameters, planned.project.parameters);
+      if (!local) return refuse(parameterEditFailureMessage(null, startShapes));
+      if (!local.ok) return refuse(parameterEditFailureMessage(local.failure, startShapes));
+      next = { ...planned.project, shapes: local.shapes };
+    } else if (planned.recompute) {
+      // Bound geometry moves through the engine's CAD paths on the server. Only affected trees are sent.
+      const scope = recomputeScope(startShapes, startParameters, planned.project.parameters);
       parameterEditPendingRef.current = true;
       setParameterEditPending(true);
       try {
-        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", startShapes, startParameters, edit);
+        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", scope, startParameters, edit);
         const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
         const body = await response.json().catch(() => null) as { shapes?: WorkplaneShape[]; parameters?: ProjectParameter[]; failure?: ParameterEditFailure } | null;
-        if (!response.ok || !body?.shapes || !body.parameters) {
-          return parameterEditFailureMessage(body?.failure ?? (response.status === 422 ? { reason: "cad_failed" } : null), startShapes);
-        }
-        next = { shapes: body.shapes, parameters: body.parameters };
+        const merged = response.ok && body?.shapes && body.parameters ? mergeRecomputedShapes(planned.project.shapes, scope, body.shapes) : null;
+        if (!merged || !body?.parameters) return refuse(parameterRecomputeResponseMessage(response.ok ? 200 : response.status, body, startShapes));
+        next = { shapes: merged, parameters: body.parameters };
       } catch {
-        return parameterEditFailureMessage(null, startShapes);
+        return refuse(parameterEditFailureMessage(null, startShapes));
       } finally {
         parameterEditPendingRef.current = false;
         setParameterEditPending(false);
       }
       if (shapesRef.current !== startShapes || projectParametersRef.current !== startParameters) {
-        return { key: "editor.parameters.error.projectChanged", values: {} };
+        return refuse({ key: "editor.parameters.error.projectChanged", values: {} });
       }
     }
     invalidateCadModifierSession();

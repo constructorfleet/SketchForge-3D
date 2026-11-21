@@ -895,6 +895,9 @@
         "recomputeFailed": "{shape} could not be rebuilt for {field}.",
         "recomputeFailedGeneric": "Bound shapes could not be rebuilt. The model is unchanged.",
         "serverUnavailable": "Bound shapes need the SketchForge server to update. The model is unchanged.",
+        "requestTooLarge": "The project is too large to send for a recompute. The model is unchanged.",
+        "requestRejected": "The server refused the recompute request. The model is unchanged.",
+        "serverError": "The server failed while updating bound shapes. The model is unchanged.",
         "busy": "Finish the current edit first.",
         "projectChanged": "The project changed while shapes were updating. Try again."
       }
