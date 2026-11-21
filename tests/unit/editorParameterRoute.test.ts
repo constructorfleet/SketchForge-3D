@@ -187,6 +187,33 @@ describe("editor parameter route", () => {
     expect(missing.body.failure).toMatchObject({ reason: "shapes_not_found" });
   });
 
+  it("activates a configuration and sets an override through the engine, recomputing bound geometry", async () => {
+    const parameters = table([{ name: "w", expression: "10", dimension: "length" }]);
+    const send = async (shapes: WorkplaneShape[], table: typeof parameters, configuration: { configurations: ProjectConfiguration[]; activeConfiguration: string | null }, edit: ParameterEdit) => {
+      const request = editorParameterRequest("project-1", shapes, table, edit, configuration);
+      const response = await POST(new Request(`http://localhost${request.url}`, { method: "POST", body: JSON.stringify(request.body) }));
+      return { status: response.status, body: await response.json() };
+    };
+    const activated = await send([boundBox()], parameters, { configurations: [{ name: "Large", overrides: { w: "30" } }], activeConfiguration: null },
+      { kind: "activateConfiguration", configuration: "Large" });
+    expect(activated.status).toBe(200);
+    expect(activated.body.activeConfiguration).toBe("Large");
+    expect(activated.body.shapes[0]).toMatchObject({ width: 30, x: 15 });
+    // Volume triples with the width, and the centre follows x = w / 2.
+    const before = await stlMeasure([boundBox()]);
+    const after = await stlMeasure(activated.body.shapes);
+    expect(after.volume).toBeCloseTo(before.volume * 3, 3);
+    expect(after.centroid[0] - before.centroid[0]).toBeCloseTo(10, 3);
+
+    const overridden = await send(activated.body.shapes, activated.body.parameters, { configurations: activated.body.configurations, activeConfiguration: "Large" },
+      { kind: "setOverride", configuration: "Large", name: "w", expression: "-4" });
+    expect(overridden.status).toBe(422);
+    expect(overridden.body.failure).toMatchObject({ reason: "binding_invalid", error: { code: "outOfRange", field: "width" } });
+
+    const malformed = await send([], parameters, { configurations: [], activeConfiguration: null }, { kind: "activateConfiguration", configuration: 3 } as never);
+    expect(malformed.status).toBe(400);
+  });
+
   it("rejects malformed requests", async () => {
     const bind = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body: JSON.stringify({ projectId: "p", shapes: [], parameters: [], edit: { kind: "bindShape", shapeId: "a", field: 3, expression: "w" } }) }));
     expect(bind.status).toBe(400);

@@ -909,6 +909,40 @@
         "serverError": "The server failed while updating bound shapes. The model is unchanged.",
         "busy": "Finish the current edit first.",
         "projectChanged": "The project changed while shapes were updating. Try again."
+      },
+      "configurations": {
+        "heading": "Configuration",
+        "base": "Base table",
+        "hint": "Choose a configuration to edit its overrides; Activate applies it to the model. Leave an override empty to use the base expression.",
+        "newName": "New configuration name",
+        "create": "Add configuration",
+        "renameLabel": "Name of configuration {name}",
+        "delete": "Delete configuration {name}",
+        "override": "Override in {name}",
+        "overrideOf": "Override of {parameter} in {name}",
+        "overridePlaceholder": "Base",
+        "inConfiguration": "In {configuration}: {message}",
+        "notice": {
+          "activated": "Activated configuration {name}",
+          "activatedBase": "Switched to the base table",
+          "added": "Added configuration {name}",
+          "renamed": "Renamed configuration to {name}",
+          "deleted": "Deleted configuration {name}",
+          "overrideSet": "Set {parameter} in {name}",
+          "overrideCleared": "Cleared the {parameter} override in {name}"
+        },
+        "editing": "Edit configuration",
+        "activeStatus": "Active: {name}",
+        "activeBase": "Active: base table",
+        "activate": "Activate",
+        "activateLabel": "Activate {name}",
+        "useBase": "Use base table",
+        "activeOption": "{name} (active)",
+        "issues": "{name} has overrides that do not resolve:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "The override uses {identifier}, which is not a parameter.",
+        "clearIssue": "Clear the {parameter} override",
+        "valueIn": "Value in {name}"
       }
     },
     "expressionField": {

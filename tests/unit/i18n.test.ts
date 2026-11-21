@@ -55,6 +55,7 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "panels.property.positionY", "panels.property.positionZ", "panels.edgeModifier.radius", "panels.material.name.abs",
     "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
     "editor.parameters.name", "editor.parameters.dimension",
+    "editor.parameters.configurations.inConfiguration",
   ],
   es: [
     "editor.sketch.constraints.addHorizontal", "editor.sketch.constraints.addPerpendicular",
@@ -62,6 +63,7 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "editor.sketch.constraints.kinds.perpendicular", "editor.sketch.constraints.kinds.vertical",
     "panels.inspector.color.title", "panels.material.title", "panels.material.name.abs", "panels.material.name.asa",
     "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+    "editor.parameters.configurations.overridePlaceholder",
   ],
   fr: [
     "common.shape.tube", "common.shapeName.cube", "common.shapeName.intersection", "editor.sketch.primitive.rectangle",
@@ -74,6 +76,7 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "panels.material.name.pc", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
     "panels.material.volume", "workspace.sketch.sweepSectionLabel", "editor.parameters.expression",
     "editor.parameters.dimension", "editor.parameters.dimensions.angle",
+    "editor.parameters.configurations.heading", "editor.parameters.configurations.overridePlaceholder", "editor.parameters.configurations.activeOption",
   ],
   pl: ["common.shape.torus", "editor.panel.import", "editor.panel.format", "editor.sketch.constraints.segmentOption"],
   pt: [
@@ -85,6 +88,7 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "panels.inspector.faces.faceNumber", "panels.inspector.faces.title", "panels.appearance.presets.metal",
     "panels.loftShape.oval", "panels.material.title", "panels.material.volume", "panels.material.name.abs",
     "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+    "editor.parameters.configurations.overridePlaceholder",
   ],
 };
 

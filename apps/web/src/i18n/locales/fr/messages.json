@@ -909,6 +909,40 @@
         "serverError": "Le serveur a échoué lors de la mise à jour des formes liées. Le modèle n'a pas changé.",
         "busy": "Terminez d'abord la modification en cours.",
         "projectChanged": "Le projet a changé pendant la mise à jour des formes. Réessayez."
+      },
+      "configurations": {
+        "heading": "Configuration",
+        "base": "Table de base",
+        "hint": "Choisissez une configuration pour modifier ses substitutions ; Activer l'applique au modèle. Laissez une substitution vide pour utiliser l'expression de base.",
+        "newName": "Nom de la nouvelle configuration",
+        "create": "Ajouter une configuration",
+        "renameLabel": "Nom de la configuration {name}",
+        "delete": "Supprimer la configuration {name}",
+        "override": "Substitution dans {name}",
+        "overrideOf": "Substitution de {parameter} dans {name}",
+        "overridePlaceholder": "Base",
+        "inConfiguration": "Dans {configuration} : {message}",
+        "notice": {
+          "activated": "Configuration {name} activée",
+          "activatedBase": "Retour à la table de base",
+          "added": "Configuration {name} ajoutée",
+          "renamed": "Configuration renommée en {name}",
+          "deleted": "Configuration {name} supprimée",
+          "overrideSet": "{parameter} défini dans {name}",
+          "overrideCleared": "Substitution de {parameter} retirée dans {name}"
+        },
+        "editing": "Modifier la configuration",
+        "activeStatus": "Active : {name}",
+        "activeBase": "Active : table de base",
+        "activate": "Activer",
+        "activateLabel": "Activer {name}",
+        "useBase": "Utiliser la table de base",
+        "activeOption": "{name} (active)",
+        "issues": "{name} a des substitutions qui ne se résolvent pas :",
+        "issueItem": "{parameter} : {message}",
+        "issueUnknownName": "La substitution utilise {identifier}, qui n'est pas un paramètre.",
+        "clearIssue": "Retirer la substitution de {parameter}",
+        "valueIn": "Valeur dans {name}"
       }
     },
     "expressionField": {

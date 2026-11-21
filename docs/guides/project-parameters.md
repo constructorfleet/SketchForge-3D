@@ -26,11 +26,6 @@ row shows the name, the expression, the resolved value with its unit, and the
 dimension: **Length** (mm), **Angle** (degrees) or **Unitless**. A bare number
 takes the dimension's unit, so `3` in a length parameter is 3 mm.
 
-When the project has an active configuration, the panel edits each parameter's
-base expression, and the value column shows the value under the active
-configuration. A configuration that overrides a parameter keeps its override. A
-rename or delete also updates the configurations.
-
 ![The Parameters panel with four parameters. Changing plate_width also changed post_d and moved the bound shapes.](../screenshots/parameter-panel.png)
 
 ## Add, edit, rename and delete
@@ -92,6 +87,55 @@ placement and size fields on plain primitive shapes, such as a box's width or
 position, update in the browser. A change that would rebuild a sketch, a
 treatment, a group or an imported shape is refused with a message, and the
 model is unchanged.
+
+## Configurations
+
+A configuration is a named set of overrides, such as `Large` with
+`plate_width = 70 mm`. A parameter without an override in the active
+configuration keeps its base expression. The line under **Configuration** says
+which configuration is active.
+
+![Large active and selected for editing: the override column shows 70 mm and 8 mm, and post_d follows the new plate width.](../screenshots/parameter-configurations.png)
+
+- **Edit**: choose a configuration under **Edit configuration**. This only
+  selects it: the table gains an **Override in** column for it, and the model
+  does not change. You can edit any configuration, active or not, including one
+  whose activation was refused or one that does not resolve since it was opened.
+- **Activate**: select **Activate** to apply the selected configuration to the
+  model, or **Use base table** to go back. Bound shapes update. Each switch is
+  one undo step.
+- **Override**: type an expression in the **Override in** column, or clear the
+  field to use the base expression. The **Expression** column still edits the
+  base expression. An override on a configuration that is not active changes
+  nothing until it is activated.
+- **Add**: type a name under **New configuration name** and select
+  **Add configuration**. It starts with no overrides.
+- **Rename** or **delete** the selected configuration with its **Name** field
+  and the bin button. Deleting the active configuration switches to the base
+  table.
+
+A configuration with overrides that do not resolve lists them when you select
+it, naming the identifier that does not resolve, so you can fix them. An
+override of a parameter that no longer exists has no row in the table; clear it
+with its **Clear** button in that list.
+
+A switch or override that does not resolve, or that a bound field cannot take,
+is refused inline, adds no undo step, and leaves the model unchanged. An
+expression error found in a configuration names that configuration; a bound
+field's refusal names the shape and the field instead. Every edit is checked
+against every configuration, so a change that breaks a configuration that is
+not active is refused too.
+
+While you edit a configuration that is not active, the value column is headed
+**Value in** and the active configuration's name, because values always follow
+the active configuration.
+
+![An override with the wrong unit is refused under its row.](../screenshots/parameter-configurations-error.png)
+
+![The configuration section in the dark theme.](../screenshots/parameter-configurations-dark.png)
+
+A rename or delete of a parameter also updates the configurations. Exports use
+the active configuration.
 
 ## Delete a parameter that is in use
 
@@ -202,6 +246,10 @@ the remote change.
 
 ## Verified workflow
 
+`tests/browser/parameter-configurations.test.mjs` edits configurations apart
+from activating them, fixes and then activates one whose activation was
+refused, renames and deletes a stale one, and undoes and redoes with the panel
+open.
 `tests/browser/parameter-panel.test.mjs` opens a project with a bound box and
 checks the inline errors, the recompute, undo and redo, adding, and the delete
 warning. `tests/unit/projectParameterEdits.test.ts` and

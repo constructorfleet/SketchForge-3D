@@ -909,6 +909,40 @@
         "serverError": "O servidor falhou ao atualizar as formas vinculadas. O modelo não mudou.",
         "busy": "Conclua primeiro a edição atual.",
         "projectChanged": "O projeto mudou enquanto as formas eram atualizadas. Tente novamente."
+      },
+      "configurations": {
+        "heading": "Configuração",
+        "base": "Tabela base",
+        "hint": "Escolha uma configuração para editar suas substituições; Ativar a aplica ao modelo. Deixe uma substituição vazia para usar a expressão base.",
+        "newName": "Nome da nova configuração",
+        "create": "Adicionar configuração",
+        "renameLabel": "Nome da configuração {name}",
+        "delete": "Excluir a configuração {name}",
+        "override": "Substituição em {name}",
+        "overrideOf": "Substituição de {parameter} em {name}",
+        "overridePlaceholder": "Base",
+        "inConfiguration": "Em {configuration}: {message}",
+        "notice": {
+          "activated": "Configuração {name} ativada",
+          "activatedBase": "Mudou para a tabela base",
+          "added": "Configuração {name} adicionada",
+          "renamed": "Configuração renomeada para {name}",
+          "deleted": "Configuração {name} excluída",
+          "overrideSet": "{parameter} definido em {name}",
+          "overrideCleared": "Substituição de {parameter} removida em {name}"
+        },
+        "editing": "Editar configuração",
+        "activeStatus": "Ativa: {name}",
+        "activeBase": "Ativa: tabela base",
+        "activate": "Ativar",
+        "activateLabel": "Ativar {name}",
+        "useBase": "Usar a tabela base",
+        "activeOption": "{name} (ativa)",
+        "issues": "{name} tem substituições que não se resolvem:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "A substituição usa {identifier}, que não é um parâmetro.",
+        "clearIssue": "Remover a substituição de {parameter}",
+        "valueIn": "Valor em {name}"
       }
     },
     "expressionField": {

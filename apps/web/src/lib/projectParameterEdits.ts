@@ -7,8 +7,15 @@
  */
 
 import {
+  activateConfiguration,
+  addConfiguration,
   addParameter,
+  clearConfigurationOverride,
+  configurationIssues,
+  deleteConfiguration,
   deleteParameter,
+  renameConfiguration,
+  setConfigurationOverride,
   projectParameterDependents,
   renameParameter,
   updateParameter,
@@ -36,13 +43,22 @@ export type ParameterEdit =
   | { kind: "update"; name: string; expression?: string; dimension?: ProjectParameterDimension }
   | { kind: "rename"; name: string; newName: string }
   /** `releaseShapes` unbinds dependent shape fields first; each keeps its current number. */
-  | { kind: "delete"; name: string; releaseShapes?: boolean };
+  | { kind: "delete"; name: string; releaseShapes?: boolean }
+  // Configurations (#618): named rows of expression overrides; one is active at a time.
+  | { kind: "addConfiguration"; configuration: string; overrides?: Record<string, string> }
+  | { kind: "renameConfiguration"; configuration: string; newName: string }
+  | { kind: "deleteConfiguration"; configuration: string }
+  /** `null` activates the base table. */
+  | { kind: "activateConfiguration"; configuration: string | null }
+  | { kind: "setOverride"; configuration: string; name: string; expression: string }
+  | { kind: "clearOverride"; configuration: string; name: string };
 
 export type PlannedParameterEdit =
   | { ok: true; project: ParameterProject; recompute: boolean }
   | { ok: false; error: ProjectParameterError };
 
-export type ParameterMessage = { key: MessageKey; values: Record<string, string> };
+/** `configuration` names the configuration a table error happened in; shown as a prefix. */
+export type ParameterMessage = { key: MessageKey; values: Record<string, string>; configuration?: string };
 
 /** Mirrors the engine's change test: `Object.is`, so an unresolved entry's NaN is not a change. */
 function changedNames(previous: readonly ProjectParameter[], next: readonly ProjectParameter[]) {
@@ -103,6 +119,58 @@ function runEdit(project: ParameterProject, edit: ParameterEdit): ProjectParamet
       }
       return deleteParameter({ ...project, shapes: releaseShapeBindings(project.shapes, edit.name) }, edit.name);
     }
+    case "addConfiguration":
+      return addConfiguration(project, { name: edit.configuration, overrides: edit.overrides ?? {} });
+    case "renameConfiguration":
+      return renameConfiguration(project, edit.configuration, edit.newName);
+    case "deleteConfiguration":
+      return deleteConfiguration(project, edit.configuration);
+    case "activateConfiguration":
+      return activateConfiguration(project, edit.configuration);
+    case "setOverride":
+      return setConfigurationOverride(project, edit.configuration, edit.name, edit.expression);
+    case "clearOverride":
+      return clearConfigurationOverride(project, edit.configuration, edit.name);
+  }
+}
+
+/** Lists a configuration's entries that fail although their base entries resolve, for example after a load. */
+export function configurationIssueMessages(
+  project: ParameterProject,
+  configuration: string | null,
+): Array<{ parameter: string; message: ParameterMessage }> {
+  if (!configuration) return [];
+  const overrides = project.configurations?.find((entry) => entry.name === configuration)?.overrides ?? {};
+  return configurationIssues(project)
+    .filter((issue) => issue.configuration === configuration)
+    .map((issue) => {
+      const { expressionError } = issue.error;
+      const expression = overrides[issue.parameter];
+      // Names the identifier that does not resolve, read from the override by its span.
+      if (expressionError?.code === "unknownName" && typeof expression === "string") {
+        const identifier = expression.slice(expressionError.span.start, expressionError.span.end);
+        if (identifier) return { parameter: issue.parameter, message: { key: "editor.parameters.configurations.issueUnknownName" as const, values: { identifier } } };
+      }
+      return { parameter: issue.parameter, message: baseErrorMessage(issue.error) };
+    });
+}
+
+/** Names a committed edit for the status line. */
+export function parameterEditNotice(edit: ParameterEdit): ParameterMessage {
+  switch (edit.kind) {
+    case "add": return { key: "editor.parameters.notice.added", values: { name: edit.name } };
+    case "update": return { key: "editor.parameters.notice.updated", values: { name: edit.name } };
+    case "rename": return { key: "editor.parameters.notice.renamed", values: { name: edit.newName } };
+    case "delete": return { key: "editor.parameters.notice.deleted", values: { name: edit.name } };
+    case "addConfiguration": return { key: "editor.parameters.configurations.notice.added", values: { name: edit.configuration } };
+    case "renameConfiguration": return { key: "editor.parameters.configurations.notice.renamed", values: { name: edit.newName } };
+    case "deleteConfiguration": return { key: "editor.parameters.configurations.notice.deleted", values: { name: edit.configuration } };
+    case "activateConfiguration":
+      return edit.configuration === null
+        ? { key: "editor.parameters.configurations.notice.activatedBase", values: {} }
+        : { key: "editor.parameters.configurations.notice.activated", values: { name: edit.configuration } };
+    case "setOverride": return { key: "editor.parameters.configurations.notice.overrideSet", values: { name: edit.configuration, parameter: edit.name } };
+    case "clearOverride": return { key: "editor.parameters.configurations.notice.overrideCleared", values: { name: edit.configuration, parameter: edit.name } };
   }
 }
 
@@ -172,12 +240,21 @@ export type ParameterRow = {
   /** Resolved value in mm, degrees, or plain units, formatted. */
   value: string;
   unit: string;
+  /** The active configuration's override expression, when it has one. */
+  override?: string;
   error?: ParameterMessage;
 };
 
-export function parameterRows(parameters: readonly ProjectParameter[]): ParameterRow[] {
+/** Rows for the panel. `overridesOf` names the configuration whose overrides are shown, active or not. */
+export function parameterRows(
+  parameters: readonly ProjectParameter[],
+  configurations: readonly ProjectConfiguration[] = [],
+  overridesOf: string | null = null,
+): ParameterRow[] {
+  const overrides = overridesOf ? configurations.find((entry) => entry.name === overridesOf)?.overrides ?? {} : {};
   return parameters.map((parameter) => ({
     name: parameter.name,
+    ...(Object.hasOwn(overrides, parameter.name) ? { override: overrides[parameter.name] } : {}),
     expression: parameter.expression,
     dimension: parameter.dimension,
     value: formatParameterValue(parameter.value),
@@ -251,7 +328,14 @@ const EXPRESSION_ERROR_KEYS: Record<ExpressionErrorCode, MessageKey> = {
 };
 
 export function parameterErrorMessage(error: ProjectParameterError): ParameterMessage {
-  const values = { name: error.parameter };
+  const message = baseErrorMessage(error);
+  // A table error inside a configuration says which one; a naming error already does.
+  const named = error.code === "duplicateConfigurationName" || error.code === "unknownConfiguration" || error.code === "invalidConfigurationName";
+  return error.configuration && !named ? { ...message, configuration: error.configuration } : message;
+}
+
+function baseErrorMessage(error: ProjectParameterError): ParameterMessage {
+  const values = { name: error.code === "duplicateConfigurationName" || error.code === "unknownConfiguration" ? error.configuration ?? error.parameter : error.parameter };
   if (error.code !== "invalidExpression") return { key: TABLE_ERROR_KEYS[error.code] ?? "editor.parameters.error.invalidParameter", values };
   const expressionError = error.expressionError;
   if (!expressionError) return { key: "editor.parameters.error.parseError", values };

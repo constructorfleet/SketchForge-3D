@@ -909,6 +909,40 @@
         "serverError": "Serwer zawiódł podczas aktualizacji powiązanych kształtów. Model się nie zmienił.",
         "busy": "Najpierw zakończ bieżącą edycję.",
         "projectChanged": "Projekt zmienił się podczas aktualizacji kształtów. Spróbuj ponownie."
+      },
+      "configurations": {
+        "heading": "Konfiguracja",
+        "base": "Tabela bazowa",
+        "hint": "Wybierz konfigurację, aby edytować jej nadpisania; Aktywuj stosuje ją do modelu. Zostaw nadpisanie puste, aby użyć wyrażenia bazowego.",
+        "newName": "Nazwa nowej konfiguracji",
+        "create": "Dodaj konfigurację",
+        "renameLabel": "Nazwa konfiguracji {name}",
+        "delete": "Usuń konfigurację {name}",
+        "override": "Nadpisanie w {name}",
+        "overrideOf": "Nadpisanie {parameter} w {name}",
+        "overridePlaceholder": "Baza",
+        "inConfiguration": "W {configuration}: {message}",
+        "notice": {
+          "activated": "Aktywowano konfigurację {name}",
+          "activatedBase": "Przełączono na tabelę bazową",
+          "added": "Dodano konfigurację {name}",
+          "renamed": "Zmieniono nazwę konfiguracji na {name}",
+          "deleted": "Usunięto konfigurację {name}",
+          "overrideSet": "Ustawiono {parameter} w {name}",
+          "overrideCleared": "Usunięto nadpisanie {parameter} w {name}"
+        },
+        "editing": "Edytuj konfigurację",
+        "activeStatus": "Aktywna: {name}",
+        "activeBase": "Aktywna: tabela bazowa",
+        "activate": "Aktywuj",
+        "activateLabel": "Aktywuj {name}",
+        "useBase": "Użyj tabeli bazowej",
+        "activeOption": "{name} (aktywna)",
+        "issues": "{name} ma nadpisania, których nie da się rozwiązać:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Nadpisanie używa {identifier}, który nie jest parametrem.",
+        "clearIssue": "Usuń nadpisanie {parameter}",
+        "valueIn": "Wartość w {name}"
       }
     },
     "expressionField": {

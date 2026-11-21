@@ -77,4 +77,32 @@ describe("static-build binding fallback parity with the engine", () => {
     const outcomes = await Promise.all(cases.map(([, shapes, edit]) => engineOutcome(shapes, edit)));
     expect(outcomes.map((outcome) => outcome.ok)).toEqual([false, true, true, false, false, false, true]);
   });
+
+  it.each([
+    ["activating a configuration", false, { kind: "activateConfiguration", configuration: "Large" } as ParameterEdit],
+    ["activating one the bound field refuses", false, { kind: "activateConfiguration", configuration: "Broken" } as ParameterEdit],
+    ["deleting the active configuration", true, { kind: "deleteConfiguration", configuration: "Large" } as ParameterEdit],
+    ["setting an override on the active configuration", true, { kind: "setOverride", configuration: "Large", name: "w", expression: "50" } as ParameterEdit],
+    ["setting an override the bound field refuses", true, { kind: "setOverride", configuration: "Large", name: "w", expression: "-1" } as ParameterEdit],
+    ["clearing an override on the active configuration", true, { kind: "clearOverride", configuration: "Large", name: "w" } as ParameterEdit],
+  ])("%s (#618)", async (_name, startActive, edit) => {
+    const rows = [{ name: "Large", overrides: { w: "30" } }, { name: "Broken", overrides: { w: "-5" } }];
+    const base = { parameters, shapes: [shape({ kind: "box", width: 40, depth: 10, height: 10 }, { expressions: { width: "w" } })], configurations: rows, activeConfiguration: null as string | null };
+    // An active start resolves its values, and the bound width, under Large.
+    const activated = startActive ? planParameterEdit(base, { kind: "activateConfiguration", configuration: "Large" }) : null;
+    if (activated && !activated.ok) throw new Error(activated.error.message);
+    const start = activated
+      ? { ...activated.project, shapes: activated.project.shapes.map((entry) => ({ ...entry, width: 30 })) }
+      : base;
+    const configuration = { configurations: start.configurations ?? [], activeConfiguration: start.activeConfiguration ?? null };
+    const request = editorParameterRequest("parity", start.shapes, start.parameters, edit, configuration);
+    const response = await POST(new Request(`http://localhost${request.url}`, { method: "POST", body: JSON.stringify(request.body) }));
+    const body = await response.json();
+    const engine = response.ok ? { ok: true, shapes: body.shapes } : { ok: false, failure: body.failure };
+    const planned = planParameterEdit(start, edit);
+    if (!planned.ok) throw new Error(planned.error.message);
+    expect(planned.recompute).toBe(true);
+    const local = applyBindingsLocally(planned.project.shapes, start.parameters, planned.project.parameters);
+    expect(local && (local.ok ? { ok: true, shapes: JSON.parse(JSON.stringify(local.shapes)) } : { ok: false, failure: local.failure })).toEqual(engine);
+  });
 });

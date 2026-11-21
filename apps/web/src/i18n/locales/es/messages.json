@@ -909,6 +909,40 @@
         "serverError": "El servidor falló al actualizar las formas vinculadas. El modelo no ha cambiado.",
         "busy": "Termina primero la edición actual.",
         "projectChanged": "El proyecto cambió mientras se actualizaban las formas. Inténtalo de nuevo."
+      },
+      "configurations": {
+        "heading": "Configuración",
+        "base": "Tabla base",
+        "hint": "Elige una configuración para editar sus sustituciones; Activar la aplica al modelo. Deja una sustitución vacía para usar la expresión base.",
+        "newName": "Nombre de la nueva configuración",
+        "create": "Añadir configuración",
+        "renameLabel": "Nombre de la configuración {name}",
+        "delete": "Eliminar la configuración {name}",
+        "override": "Sustitución en {name}",
+        "overrideOf": "Sustitución de {parameter} en {name}",
+        "overridePlaceholder": "Base",
+        "inConfiguration": "En {configuration}: {message}",
+        "notice": {
+          "activated": "Configuración {name} activada",
+          "activatedBase": "Se cambió a la tabla base",
+          "added": "Configuración {name} añadida",
+          "renamed": "Configuración renombrada a {name}",
+          "deleted": "Configuración {name} eliminada",
+          "overrideSet": "{parameter} establecido en {name}",
+          "overrideCleared": "Sustitución de {parameter} quitada en {name}"
+        },
+        "editing": "Editar configuración",
+        "activeStatus": "Activa: {name}",
+        "activeBase": "Activa: tabla base",
+        "activate": "Activar",
+        "activateLabel": "Activar {name}",
+        "useBase": "Usar la tabla base",
+        "activeOption": "{name} (activa)",
+        "issues": "{name} tiene sustituciones que no se resuelven:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "La sustitución usa {identifier}, que no es un parámetro.",
+        "clearIssue": "Quitar la sustitución de {parameter}",
+        "valueIn": "Valor en {name}"
       }
     },
     "expressionField": {

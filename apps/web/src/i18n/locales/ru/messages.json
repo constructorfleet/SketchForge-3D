@@ -909,6 +909,40 @@
         "serverError": "Сервер дал сбой при обновлении связанных фигур. Модель не изменилась.",
         "busy": "Сначала завершите текущее изменение.",
         "projectChanged": "Проект изменился во время обновления фигур. Попробуйте ещё раз."
+      },
+      "configurations": {
+        "heading": "Конфигурация",
+        "base": "Базовая таблица",
+        "hint": "Выберите конфигурацию, чтобы изменить её переопределения; «Активировать» применяет её к модели. Оставьте переопределение пустым, чтобы использовать базовое выражение.",
+        "newName": "Имя новой конфигурации",
+        "create": "Добавить конфигурацию",
+        "renameLabel": "Имя конфигурации {name}",
+        "delete": "Удалить конфигурацию {name}",
+        "override": "Переопределение в {name}",
+        "overrideOf": "Переопределение {parameter} в {name}",
+        "overridePlaceholder": "База",
+        "inConfiguration": "В {configuration}: {message}",
+        "notice": {
+          "activated": "Конфигурация {name} активирована",
+          "activatedBase": "Включена базовая таблица",
+          "added": "Конфигурация {name} добавлена",
+          "renamed": "Конфигурация переименована в {name}",
+          "deleted": "Конфигурация {name} удалена",
+          "overrideSet": "{parameter} задан в {name}",
+          "overrideCleared": "Переопределение {parameter} в {name} удалено"
+        },
+        "editing": "Изменить конфигурацию",
+        "activeStatus": "Активна: {name}",
+        "activeBase": "Активна: базовая таблица",
+        "activate": "Активировать",
+        "activateLabel": "Активировать {name}",
+        "useBase": "Использовать базовую таблицу",
+        "activeOption": "{name} (активна)",
+        "issues": "У {name} есть переопределения, которые не вычисляются:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Переопределение использует {identifier}, которое не является параметром.",
+        "clearIssue": "Удалить переопределение {parameter}",
+        "valueIn": "Значение в {name}"
       }
     },
     "expressionField": {

@@ -11126,3 +11126,134 @@ html[data-theme="dark"] .expression-input-error {
 .range-property-header:has(.expression-input.is-invalid) {
   align-items: flex-start;
 }
+
+/* Issue #618: configuration picker and override column in the parameter panel. */
+.parameters-configurations {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e5ebf0;
+  border-radius: 8px;
+}
+
+.parameters-configurations > strong {
+  color: #20384d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.parameters-configuration-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.parameters-configuration-row .parameters-input {
+  flex: 1 1 140px;
+  width: auto;
+}
+
+.parameters-override-input::placeholder {
+  color: #6b7f91;
+  font-style: italic;
+}
+
+html[data-theme="dark"] .parameters-configurations {
+  background: #182630;
+  border-color: #344854;
+}
+
+html[data-theme="dark"] .parameters-configurations > strong {
+  color: #dceaf3;
+}
+
+html[data-theme="dark"] .parameters-override-input::placeholder {
+  color: #a9bbc9;
+}
+
+.top-action-panel.parameters-action-panel {
+  width: min(760px, calc(100vw - 28px));
+}
+
+.parameters-configuration-status {
+  margin: 0;
+  color: #20384d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.parameters-configuration-field {
+  display: grid;
+  flex: 1 1 160px;
+  gap: 3px;
+  color: #40586c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.parameters-configuration-field .parameters-input {
+  width: 100%;
+}
+
+.parameters-configuration-row:has(.parameters-configuration-field) {
+  align-items: end;
+}
+
+.parameters-activate-button {
+  min-height: 28px;
+  padding: 0 12px;
+  color: #087f9f;
+  background: #eefafd;
+  border: 1px solid #a9dce9;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parameters-activate-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.parameters-configuration-issues {
+  padding: 7px 9px;
+  color: #6a3a00;
+  background: #fff6e5;
+  border: 1px solid #f0c27a;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.parameters-configuration-issues p,
+.parameters-configuration-issues ul {
+  margin: 0;
+}
+
+.parameters-configuration-issues ul {
+  padding-left: 18px;
+}
+
+html[data-theme="dark"] .parameters-configuration-status {
+  color: #dceaf3;
+}
+
+html[data-theme="dark"] .parameters-configuration-field {
+  color: #a9bbc9;
+}
+
+html[data-theme="dark"] .parameters-activate-button {
+  color: #9fe3f5;
+  background: #12303a;
+  border-color: #2f6575;
+}
+
+html[data-theme="dark"] .parameters-configuration-issues {
+  color: #ffd9a1;
+  background: #3a2a12;
+  border-color: #7a5520;
+}
