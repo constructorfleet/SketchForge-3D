@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForAutosave, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistory, editorHistoryEntry, editorHistoryForAutosave, editorHistoryForExport, hydrateEditorHistoryState, immutableResourceFingerprint, liveEditorHistoryState, projectShapesFingerprint, type ProjectConfigurationState } from "@constructorfleet/sketchforge-engine/editorHistory";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 function box(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -348,5 +348,63 @@ describe("parameter tables in history snapshots", () => {
     expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries).toHaveLength(2);
     expect(liveEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries).toHaveLength(2);
     expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries[0]!.parameters).toBeUndefined();
+  });
+});
+
+describe("parameter configurations in history snapshots", () => {
+  const wall = (value: number) => [{ name: "wall", expression: "2", dimension: "length" as const, value }];
+  const rows = (active: string | null, large = "4"): ProjectConfigurationState => ({
+    configurations: [{ name: "Small", overrides: {} }, { name: "Large", overrides: { wall: large } }],
+    activeConfiguration: active,
+  });
+
+  it("keeps configurations and the active name on the entry, and leaves configuration-free fingerprints unchanged", () => {
+    const shapes = [box()];
+    const none = { configurations: [], activeConfiguration: null };
+    expect(editorHistoryEntry(shapes, [], wall(2), none).fingerprint).toBe(editorHistoryEntry(shapes, [], wall(2)).fingerprint);
+    expect(editorHistoryEntry(shapes, [], wall(2), none)).toMatchObject({ configurations: [], activeConfiguration: null });
+
+    const entry = editorHistoryEntry(shapes, [], wall(2), rows(null));
+    expect(entry).toMatchObject(rows(null));
+    expect(entry.fingerprint).not.toBe(editorHistoryEntry(shapes, [], wall(2)).fingerprint);
+    expect(entry.fingerprint).not.toBe(editorHistoryEntry(shapes, [], wall(2), rows(null, "5")).fingerprint);
+  });
+
+  it("records an activation, which changes values and the active name, as its own step", () => {
+    const before = editorHistoryEntry([box({ width: 4, expressions: { width: "wall * 2" } })], [], wall(2), rows(null));
+    const after = editorHistoryEntry([box({ width: 8, expressions: { width: "wall * 2" } })], [], wall(4), rows("Large"));
+    const appended = appendEditorHistorySnapshot([before], 0, after);
+
+    expect(appended).toMatchObject({ changed: true, index: 1 });
+    expect(appended.entries[0]).toMatchObject({ activeConfiguration: null, shapes: [{ width: 4 }] });
+    expect(appended.entries[1]).toMatchObject({ activeConfiguration: "Large", shapes: [{ width: 8 }] });
+  });
+
+  it("records a change to a configuration that is not active as its own step", () => {
+    const shapes = [box()];
+    const appended = appendEditorHistorySnapshot([editorHistoryEntry(shapes, [], wall(2), rows(null))], 0, editorHistoryEntry(shapes, [], wall(2), rows(null, "6")));
+    expect(appended.changed).toBe(true);
+  });
+
+  it("hydrates and keeps live history only when the active configurations match", () => {
+    const shapes = [box()];
+    const entries = [editorHistoryEntry([], []), editorHistoryEntry(shapes, [], wall(2), rows(null))];
+
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(2), rows(null)).entries).toHaveLength(2);
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(2), rows(null)).entries[1]).toMatchObject(rows(null));
+    expect(hydrateEditorHistoryState(shapes, entries, 1, "unlimited", wall(2), rows(null, "9")).entries).toHaveLength(1);
+    expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(2), rows(null)).entries).toHaveLength(2);
+    expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(2), rows(null, "9")).entries).toHaveLength(1);
+  });
+
+  it("keeps entries written without configurations, which mean they are unknown", () => {
+    const shapes = [box()];
+    const legacy = [editorHistoryEntry([], [], []), editorHistoryEntry(shapes, [], wall(2))];
+    expect(legacy[1]!.configurations).toBeUndefined();
+    expect(legacy[1]!.activeConfiguration).toBeUndefined();
+
+    expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2), rows(null)).entries).toHaveLength(2);
+    expect(liveEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2), rows(null)).entries).toHaveLength(2);
+    expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2), rows(null)).entries[1]!.configurations).toBeUndefined();
   });
 });

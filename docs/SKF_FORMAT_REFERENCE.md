@@ -18,7 +18,8 @@ For automated project export from a server-backed project, see [`POST /exports` 
 | Property | Value |
 | --- | --- |
 | Schema | `com.sketchforge.project` |
-| Newest format read and written | 3 |
+| Newest format read and written | 4 |
+| Format written when the project has configurations | 4 |
 | Format written when the project has parameters | 3 |
 | Format written for other projects | 2 |
 | Created-with version | `1.32.0` | <!-- x-release-please-version -->
@@ -33,7 +34,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | Field | Serialized type |
 | --- | --- |
 | `schema` | `typeof SKF_SCHEMA_ID` |
-| `formatVersion` | `1 | 2 | 3` |
+| `formatVersion` | `1 | 2 | 3 | 4` |
 | `minimumReaderVersion` | `number` |
 | `createdWithVersion` | `string` |
 | `metadata` | `{ projectId?: string; projectName: string; units: string; createdAt: string; modifiedAt: string; }` |
@@ -48,6 +49,8 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `exactCad` | `Array<{ nodeId: string; objectId: string; brepAssetId?: string; importedStepAssetId?: string }>` |
 | `editor` | `{ workspace: WorkplaneWorkspaceSettings; snapGrid: GridSize; selectedWorkplaneId: string; placementElevation: number; placementWorkplane?: PlacementWorkplane; sketchPlacementWorkplane?: PlacementWorkplane; }` |
 | `parameters?` | `SkfParameterV3[]` |
+| `configurations?` | `SkfConfigurationV4[]` |
+| `activeConfiguration?` | `string` |
 
 ### `SkfAssetRecordV1`
 
@@ -85,8 +88,12 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `rootNodeIds` | `string[]` |
 | `nodes` | `SkfShapeNodeV1[]` |
 | `parameters?` | `SkfParameterV3[]` |
+| `configurations?` | `SkfConfigurationV4[]` |
+| `activeConfiguration?` | `string` |
 
-A state's `parameters` (V3 only) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level `parameters`.
+A state's `parameters` (V3 and V4) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level `parameters`.
+
+A state's `configurations` and `activeConfiguration` (V4 only) follow the same rule. A state without `configurations` has unknown configurations, and undoing to it keeps the current ones. The scene state uses the top-level fields.
 
 A shape definition may carry `expressions`, a record from a bindable field name to a parameter expression. The field itself keeps the resolved number, so a reader that ignores `expressions` still gets the right geometry. Readers refuse a record that is not an object of non-empty strings, and keep a binding that no longer resolves together with its stored number.
 
@@ -114,10 +121,22 @@ A `distance`, `radius`, `diameter` or `angle` constraint in a definition's `sket
 
 `value` is in mm for `length`, degrees for `angle`, and plain for `unitless`. Readers re-evaluate every expression and use the stored value only for an entry that no longer resolves; it is absent when no value is known. An entry that no longer resolves (an invalid or duplicate name, for example a name a later release reserves, an unknown reference, a dimension mismatch, or a reference cycle) does not stop the project opening: the reader keeps its name, expression, dimension and stored value as its last known value, reports a per-entry error, and the next save writes it back unchanged. Only a malformed table rejects the package: `parameters` that is not a list, an entry that is not an object, a `name` or `expression` that is not a string, a `dimension` other than `length`, `angle` or `unitless`, a `value` that is present and not a finite number, or more entries than the limit.
 
+The top-level `parameters` stores each entry's base `expression` and its `value` under the active configuration.
+
+### `SkfConfigurationV4`
+
+| Field | Serialized type |
+| --- | --- |
+| `name` | `string` |
+| `overrides` | `Record<string, string>` |
+
+A configuration is a named row of parameter expression overrides. A parameter it does not list takes its base expression. The top-level `activeConfiguration` names the active row and is absent when the base table is active. Readers resolve the table under the active configuration. An override that no longer resolves, or that names no parameter, does not stop the project opening: the reader keeps it as stored and reports it. Only malformed configurations reject the package: `configurations` that is not a list, an entry that is not an object, a name that is empty, longer than 100 characters, has surrounding whitespace or control characters, or repeats another, `overrides` that is not an object of strings, more configurations than the limit, or an `activeConfiguration` that names no configuration.
+
 ## Reader compatibility
 
+- V4 is written only when the project has configurations, or an undo state keeps some, with minimum reader version 4. Readers before V4 reject such a file rather than drop its configurations.
 - V3 is written only when the project parameter table is not empty, or an undo state keeps a table, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
-- V2 is written for every other project and requires a reader at least version 2. Writers never put a `parameters` field in it. Readers accept `parameters` in any version, and a file without one loads with an empty table.
+- V2 is written for every other project and requires a reader at least version 2. Writers never put a `parameters` field in V2, nor a `configurations` field in V2 or V3. Readers accept `parameters` in any version, and a file without one loads with an empty table.
 - V1 packaged projects are accepted and migrate inline display edges into shared assets on import; the next save writes V2.
 - V0 legacy JSON projects are accepted by the explicit migration path, which preserves valid object IDs and history.
 - Unsupported future versions are rejected before restoration. The original input bytes are not modified.
@@ -136,5 +155,6 @@ A `distance`, `radius`, `diameter` or `angle` constraint in a definition's `sket
 | `features` | `300_000` |
 | `meshNumbers` | `30_000_000` |
 | `parameters` | `2_000` |
+| `configurations` | `200` |
 
 These are engine validation limits, not suggested project sizes. The expanded archive limit applies across entries; `assetBytes` limits one asset, and `projectJsonBytes` limits `project.json`.

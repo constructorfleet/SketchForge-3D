@@ -116,7 +116,7 @@ import {
   withHoleMode,
 } from "./workplaneShapes.js";
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
-import type { EdgeTreatmentFeature, ProjectAsset, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
+import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import {
   boundSketchConstraints,
   literalSketchProfile,
@@ -143,6 +143,12 @@ import {
 import { expressionDependencies } from "./parameterExpressions.js";
 import { echoedBindings, parseRequestExpressions, requestedBindingValue, type RequestExpressions } from "./shapeRequestExpressions.js";
 import {
+  activateConfiguration as activateTableConfiguration,
+  addConfiguration as addTableConfiguration,
+  clearConfigurationOverride as clearTableConfigurationOverride,
+  deleteConfiguration as deleteTableConfiguration,
+  renameConfiguration as renameTableConfiguration,
+  setConfigurationOverride as setTableConfigurationOverride,
   addParameter as addTableParameter,
   deleteParameter as deleteTableParameter,
   renameParameter as renameTableParameter,
@@ -306,8 +312,15 @@ export type ShapeWritten = { shape: WorkplaneShape; revision: number };
 /** Several shapes written, with the revision the write landed on. */
 export type ShapesWritten = { shapes: WorkplaneShape[]; revision: number };
 
-/** The table after a parameter operation, the top-level shapes it changed, and the revision. */
-export type ParametersWritten = { parameters: ProjectParameter[]; shapes: WorkplaneShape[]; revision: number };
+/** The table and configurations after a parameter operation, the top-level shapes it changed, and the revision. */
+export type ParametersWritten = {
+  /** Base expressions, with values under the active configuration. */
+  parameters: ProjectParameter[];
+  configurations: ProjectConfiguration[];
+  activeConfiguration: string | null;
+  shapes: WorkplaneShape[];
+  revision: number;
+};
 
 type ShapeChanged = { shape: WorkplaneShape; shapes: WorkplaneShape[] };
 
@@ -476,6 +489,18 @@ export type Engine = {
   renameParameter(projectId: string, oldName: string, newName: string): Promise<EngineResult<ParametersWritten>>;
   /** Deletes a parameter that nothing references. */
   deleteParameter(projectId: string, name: string): Promise<EngineResult<ParametersWritten>>;
+  /** Appends a named row of parameter expression overrides. Every override must resolve. */
+  addConfiguration(projectId: string, name: string, overrides?: Record<string, string>): Promise<EngineResult<ParametersWritten>>;
+  /** Renames a configuration. The active name follows. */
+  renameConfiguration(projectId: string, oldName: string, newName: string): Promise<EngineResult<ParametersWritten>>;
+  /** Deletes a configuration. Deleting the active one switches to the base table and recomputes. */
+  deleteConfiguration(projectId: string, name: string): Promise<EngineResult<ParametersWritten>>;
+  /** Sets one override. Recomputes bound geometry when the configuration is active. */
+  setConfigurationOverride(projectId: string, configuration: string, parameter: string, expression: string): Promise<EngineResult<ParametersWritten>>;
+  /** Removes one override, so the parameter takes its base expression in that configuration. */
+  clearConfigurationOverride(projectId: string, configuration: string, parameter: string): Promise<EngineResult<ParametersWritten>>;
+  /** Switches the active configuration, or to the base table for null, and recomputes like a parameter change. */
+  activateConfiguration(projectId: string, name: string | null): Promise<EngineResult<ParametersWritten>>;
   /**
    * Binds `field` on a shape anywhere in the tree to `expression` and applies its value,
    * or removes the binding when `expression` is null. See `EXPRESSION_BINDABLE_FIELDS`.
@@ -1867,24 +1892,38 @@ export function createEngine(store: ProjectStore): Engine {
     return ok(current);
   }
 
-  type ParameterProject = { parameters: ProjectParameter[]; shapes: WorkplaneShape[] };
+  type ParameterProject = {
+    parameters: ProjectParameter[];
+    configurations: ProjectConfiguration[];
+    activeConfiguration: string | null;
+    shapes: WorkplaneShape[];
+  };
 
-  /** Runs a pure table operation, recomputes bound geometry, and writes both once. */
+  /** Runs a pure table or configuration operation, recomputes bound geometry, and writes both once. */
   function parameterOperation(
     projectId: string,
     operation: (project: ParameterProject) => ProjectParameterResult<ParameterProject>,
   ): Promise<EngineResult<ParametersWritten>> {
     return mutating(projectId, async (document) => {
       const previous = document.parameters ?? [];
-      const result = operation({ parameters: previous, shapes: document.shapes });
+      const project: ParameterProject = {
+        parameters: previous,
+        configurations: document.configurations ?? [],
+        activeConfiguration: document.activeConfiguration ?? null,
+        shapes: document.shapes,
+      };
+      const result = operation(project);
       if (!result.ok) return failed({ reason: "parameter_invalid", error: result.error });
-      const { parameters } = result.project;
+      const { parameters, configurations, activeConfiguration } = result.project;
+      if (result.project === project) {
+        return ok({ parameters, configurations, activeConfiguration, shapes: [], revision: documentRevision(document) });
+      }
       const applied = await applyTable(document, result.project.shapes, previous, parameters);
       if (!applied.ok) return applied;
       const shapes = applied.value;
-      const revision = await writeShapes(projectId, { ...document, parameters }, shapes);
+      const revision = await writeShapes(projectId, { ...document, parameters, configurations, activeConfiguration }, shapes);
       const before = new Set(document.shapes);
-      return ok({ parameters, shapes: shapes.filter((shape) => !before.has(shape)), revision });
+      return ok({ parameters, configurations, activeConfiguration, shapes: shapes.filter((shape) => !before.has(shape)), revision });
     });
   }
 
@@ -2326,6 +2365,18 @@ export function createEngine(store: ProjectStore): Engine {
     updateParameter: (projectId, name, changes) => parameterOperation(projectId, (project) => updateTableParameter(project, name, changes)),
     renameParameter: (projectId, oldName, newName) => parameterOperation(projectId, (project) => renameTableParameter(project, oldName, newName)),
     deleteParameter: (projectId, name) => parameterOperation(projectId, (project) => deleteTableParameter(project, name)),
+    addConfiguration: (projectId, name, overrides) => parameterOperation(projectId, (project) => addTableConfiguration(project, { name, overrides })),
+    renameConfiguration: (projectId, oldName, newName) => parameterOperation(projectId, (project) => renameTableConfiguration(project, oldName, newName)),
+    deleteConfiguration: (projectId, name) => parameterOperation(projectId, (project) => deleteTableConfiguration(project, name)),
+    setConfigurationOverride: (projectId, configuration, parameter, expression) => parameterOperation(
+      projectId,
+      (project) => setTableConfigurationOverride(project, configuration, parameter, expression),
+    ),
+    clearConfigurationOverride: (projectId, configuration, parameter) => parameterOperation(
+      projectId,
+      (project) => clearTableConfigurationOverride(project, configuration, parameter),
+    ),
+    activateConfiguration: (projectId, name) => parameterOperation(projectId, (project) => activateTableConfiguration(project, name)),
 
     bindShapeField: (projectId, shapeId, field, expression) => mutating(projectId, async (document) => {
       const bound = await bindFieldsIn(document, shapeId, { [field]: expression });

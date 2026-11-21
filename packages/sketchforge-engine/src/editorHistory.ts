@@ -1,4 +1,4 @@
-import type { ProjectParameter, WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectConfiguration, ProjectParameter, WorkplaneShape } from "./domain/sketchforge.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
 
 export const MAX_EDITOR_HISTORY_ENTRIES = 5000;
@@ -12,8 +12,18 @@ export type EditorHistoryEntry = {
    * tables in history, matches by shapes alone, and restoring it keeps the current table.
    */
   parameters?: ProjectParameter[];
+  /** Restores configurations with the shapes on undo. Absent means unknown, as for `parameters`. */
+  configurations?: ProjectConfiguration[];
+  /** Set exactly when `configurations` is. Null means the base table. */
+  activeConfiguration?: string | null;
   fingerprint: string;
   estimatedBytes: number;
+};
+
+/** Configurations and the active name, as a project and a history entry carry them. */
+export type ProjectConfigurationState = {
+  configurations: readonly ProjectConfiguration[];
+  activeConfiguration: string | null;
 };
 
 export type EditorHistoryState = {
@@ -267,39 +277,76 @@ function parameterTableSignature(parameters: readonly ProjectParameter[]) {
   return signatureFromSerialized(JSON.stringify(parameters.map(({ name, expression, dimension, value }) => [name, expression, dimension, value])));
 }
 
+function configurationSignature({ configurations, activeConfiguration }: ProjectConfigurationState) {
+  return signatureFromSerialized(JSON.stringify([
+    configurations.map(({ name, overrides }) => [name, Object.entries(overrides)]),
+    activeConfiguration,
+  ]));
+}
+
+function copiedConfigurations(state: ProjectConfigurationState) {
+  return {
+    configurations: state.configurations.map((configuration) => ({ name: configuration.name, overrides: { ...configuration.overrides } })),
+    activeConfiguration: state.activeConfiguration,
+  };
+}
+
 /**
- * Fingerprints shapes and table together. An empty or unknown table keeps the shapes-only fingerprint.
- * Omitting `parameters` records an unknown table.
+ * Fingerprints shapes, table and configurations together. Empty or unknown ones keep the shapes-only fingerprint.
+ * Omitting `parameters` or `configuration` records it as unknown.
  */
 export function editorHistoryEntry(
   shapes: WorkplaneShape[],
   selectedIds: string[],
   parameters?: readonly ProjectParameter[],
+  configuration?: ProjectConfigurationState,
 ): EditorHistoryEntry {
   const canonicalShapes = shapes.map(canonicalizeShape);
   const validSelection = selectedIds.filter((id, index) => selectedIds.indexOf(id) === index && canonicalShapes.some((shape) => shape.id === id));
-  const scene = serializedSceneSignature(canonicalShapes);
-  if (!parameters) return { shapes: canonicalShapes, selectedIds: validSelection, ...scene };
-  if (!parameters.length) return { shapes: canonicalShapes, selectedIds: validSelection, parameters: [], ...scene };
-  const table = parameterTableSignature(parameters);
-  return {
-    shapes: canonicalShapes,
-    selectedIds: validSelection,
-    parameters: parameters.map((parameter) => ({ ...parameter })),
-    fingerprint: `${scene.fingerprint}|p${table.fingerprint}`,
-    estimatedBytes: scene.estimatedBytes + table.estimatedBytes,
-  };
+  let { fingerprint, estimatedBytes } = serializedSceneSignature(canonicalShapes);
+  const entry: Omit<EditorHistoryEntry, "fingerprint" | "estimatedBytes"> = { shapes: canonicalShapes, selectedIds: validSelection };
+  if (parameters) {
+    entry.parameters = parameters.map((parameter) => ({ ...parameter }));
+    if (parameters.length) {
+      const table = parameterTableSignature(parameters);
+      fingerprint = `${fingerprint}|p${table.fingerprint}`;
+      estimatedBytes += table.estimatedBytes;
+    }
+  }
+  if (configuration) {
+    Object.assign(entry, copiedConfigurations(configuration));
+    if (configuration.configurations.length || configuration.activeConfiguration !== null) {
+      const rows = configurationSignature(configuration);
+      fingerprint = `${fingerprint}|c${rows.fingerprint}`;
+      estimatedBytes += rows.estimatedBytes;
+    }
+  }
+  return { ...entry, fingerprint, estimatedBytes };
 }
 
 function entryParameters(entry: EditorHistoryEntry | undefined) {
   return Array.isArray(entry?.parameters) ? entry.parameters : undefined;
 }
 
-/** Compares an entry with the current scene, by shapes alone when its table is unknown. */
-function entryMatches(entry: EditorHistoryEntry, shapes: WorkplaneShape[], parameters: readonly ProjectParameter[]) {
-  const table = entryParameters(entry);
-  if (!table) return entry.fingerprint === projectShapesFingerprint(shapes);
-  return entry.fingerprint === editorHistoryEntry(shapes, [], parameters).fingerprint;
+/** Reads an entry's configurations, or undefined when the entry predates them. */
+export function entryConfiguration(entry: EditorHistoryEntry | undefined): ProjectConfigurationState | undefined {
+  return Array.isArray(entry?.configurations)
+    ? { configurations: entry.configurations, activeConfiguration: typeof entry.activeConfiguration === "string" ? entry.activeConfiguration : null }
+    : undefined;
+}
+
+export const NO_CONFIGURATIONS: ProjectConfigurationState = Object.freeze({ configurations: Object.freeze([]) as readonly ProjectConfiguration[], activeConfiguration: null });
+
+/** Compares an entry with the current scene, leaving out what the entry does not know. */
+function entryMatches(
+  entry: EditorHistoryEntry,
+  shapes: WorkplaneShape[],
+  parameters: readonly ProjectParameter[],
+  configuration: ProjectConfigurationState,
+) {
+  const table = entryParameters(entry) ? parameters : undefined;
+  const rows = entryConfiguration(entry) ? configuration : undefined;
+  return entry.fingerprint === editorHistoryEntry(shapes, [], table, rows).fingerprint;
 }
 
 export function boundedEditorHistory(entries: EditorHistoryEntry[], limit: EditorHistoryExportLimit = "unlimited") {
@@ -350,6 +397,11 @@ function sameParameters(left: readonly ProjectParameter[], right: readonly Proje
   return left === right || parameterTableSignature(left).fingerprint === parameterTableSignature(right).fingerprint;
 }
 
+function sameConfigurations(left: ProjectConfigurationState, right: ProjectConfigurationState) {
+  return left.configurations === right.configurations && left.activeConfiguration === right.activeConfiguration
+    || configurationSignature(left).fingerprint === configurationSignature(right).fingerprint;
+}
+
 // `hydrateEditorHistoryState` re-derives every stored entry, which is right for
 // entries parsed out of a file and pure waste for the live editor state an
 // autosave is writing out: those entries were built by `editorHistoryEntry`
@@ -364,9 +416,10 @@ export function liveEditorHistoryState(
   requestedIndex: number | undefined,
   limit: EditorHistoryExportLimit = "unlimited",
   currentParameters: readonly ProjectParameter[] = [],
+  currentConfiguration: ProjectConfigurationState = NO_CONFIGURATIONS,
 ): EditorHistoryState {
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
-    return { entries: [editorHistoryEntry(currentShapes, [], currentParameters)], index: 0 };
+    return { entries: [editorHistoryEntry(currentShapes, [], currentParameters, currentConfiguration)], index: 0 };
   }
   const index = Number.isInteger(requestedIndex)
     ? Math.min(Math.max(0, requestedIndex as number), storedEntries.length - 1)
@@ -375,11 +428,13 @@ export function liveEditorHistoryState(
   // The reference check is the cheap path and the fingerprint the correct one:
   // a caller that hands over the active entry's own shapes array pays nothing,
   // and anything else is compared by content, exactly as hydration would.
-  const current = () => editorHistoryEntry(currentShapes, [], currentParameters);
+  const current = () => editorHistoryEntry(currentShapes, [], currentParameters, currentConfiguration);
   const activeTable = entryParameters(active);
+  const activeRows = entryConfiguration(active);
   const agrees = Array.isArray(active?.shapes)
     && (active.shapes === currentShapes && (!activeTable || sameParameters(activeTable, currentParameters))
-      || entryMatches(active, currentShapes, currentParameters));
+      && (!activeRows || sameConfigurations(activeRows, currentConfiguration))
+      || entryMatches(active, currentShapes, currentParameters, currentConfiguration));
   if (!agrees) {
     return { entries: [current()], index: 0 };
   }
@@ -392,8 +447,9 @@ export function hydrateEditorHistoryState(
   requestedIndex: number | undefined,
   limit: EditorHistoryExportLimit = "unlimited",
   currentParameters: readonly ProjectParameter[] = [],
+  currentConfiguration: ProjectConfigurationState = NO_CONFIGURATIONS,
 ): EditorHistoryState {
-  const fallback = editorHistoryEntry(currentShapes, [], currentParameters);
+  const fallback = editorHistoryEntry(currentShapes, [], currentParameters, currentConfiguration);
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
     return { entries: [fallback], index: 0 };
   }
@@ -404,12 +460,13 @@ export function hydrateEditorHistoryState(
         Array.isArray(entry?.shapes) ? entry.shapes : [],
         Array.isArray(entry?.selectedIds) ? entry.selectedIds.filter((id): id is string => typeof id === "string") : [],
         entryParameters(entry),
+        entryConfiguration(entry),
       ),
     );
     const index = Number.isInteger(requestedIndex)
       ? Math.min(Math.max(0, requestedIndex as number), normalized.length - 1)
       : normalized.length - 1;
-    if (!normalized[index] || !entryMatches(normalized[index], currentShapes, currentParameters)) {
+    if (!normalized[index] || !entryMatches(normalized[index], currentShapes, currentParameters, currentConfiguration)) {
       return { entries: [fallback], index: 0 };
     }
 

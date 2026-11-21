@@ -124,7 +124,7 @@ import {
 } from "@/lib/cadModifierRuntime";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
 import { edgeTreatmentFeatureWithLineage, edgeTreatmentLineageTarget, selectedEdgeTreatmentReplay } from "@/lib/edgeTreatmentLineage";
-import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, hydrateEditorHistoryState, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState } from "@/lib/engine/editorHistory";
+import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, entryConfiguration, hydrateEditorHistoryState, NO_CONFIGURATIONS, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
 import { geometryRotationDegreesForShortcut, geometryRotationDelta, rotatedGeometryShapePatch } from "@/lib/geometryRotation";
 import { createKeyboardMovementInteraction, isMovementKey, moveShapesByKeyboard } from "@/lib/keyboardMovement";
@@ -5391,6 +5391,7 @@ function readMcpEditorIdentity() {
 export function SketchForgeEditor({
   initialAssets = [],
   initialParameters = [],
+  initialConfiguration = NO_CONFIGURATIONS,
   initialShapes = [],
   initialHistory,
   initialHistoryIndex,
@@ -5424,6 +5425,7 @@ export function SketchForgeEditor({
 }: {
   initialAssets?: ProjectAsset[];
   initialParameters?: ProjectParameter[];
+  initialConfiguration?: ProjectConfigurationState;
   initialShapes?: WorkplaneShape[];
   initialHistory?: EditorHistoryEntry[];
   initialHistoryIndex?: number;
@@ -5441,6 +5443,7 @@ export function SketchForgeEditor({
     historyIndex: number;
     assets: ProjectAsset[];
     parameters: ProjectParameter[];
+    configuration: ProjectConfigurationState;
     projectName: string;
     projectCreatedAt: number;
     workspace: WorkplaneWorkspaceSettings;
@@ -5491,6 +5494,7 @@ export function SketchForgeEditor({
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
       initialParameters,
+      initialConfiguration,
     );
   }
   const [shapes, setShapes] = useState<WorkplaneShape[]>(() => initialSceneRef.current as WorkplaneShape[]);
@@ -5549,6 +5553,7 @@ export function SketchForgeEditor({
   const projectAssetsRef = useRef(projectAssets);
   // No editor UI changes the table yet; held so saves keep it.
   const projectParametersRef = useRef(initialParameters);
+  const projectConfigurationRef = useRef(initialConfiguration);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
   const snapGridRef = useRef(snapGrid);
@@ -6170,6 +6175,7 @@ export function SketchForgeEditor({
           historyIndex: historyIndexRef.current,
           assets: projectAssetsRef.current,
           parameters: projectParametersRef.current,
+          configuration: projectConfigurationRef.current,
           projectName: projectInfoRef.current.projectName,
           projectCreatedAt: projectInfoRef.current.projectCreatedAt,
           workspace: workspaceSettingsRef.current,
@@ -6220,7 +6226,7 @@ export function SketchForgeEditor({
 
   const appendHistorySnapshot = useCallback(
     (nextShapes: WorkplaneShape[], nextSelection: string[]) =>
-      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, projectParametersRef.current)),
+      appendHistoryEntry(editorHistoryEntry(nextShapes, nextSelection, projectParametersRef.current, projectConfigurationRef.current)),
     [appendHistoryEntry],
   );
 
@@ -6233,7 +6239,7 @@ export function SketchForgeEditor({
       return;
     }
 
-    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, projectParametersRef.current);
+    const entry = editorHistoryEntry(shapesRef.current, selectedIdsRef.current, projectParametersRef.current, projectConfigurationRef.current);
     if (!startFingerprint || startFingerprint === entry.fingerprint) {
       return;
     }
@@ -6264,7 +6270,7 @@ export function SketchForgeEditor({
           finalizeInteractionHistory();
         }
         if (!projectInteractionActiveRef.current) {
-          interactionHistoryStartRef.current = editorHistoryEntry(shapesRef.current, [], projectParametersRef.current).fingerprint;
+          interactionHistoryStartRef.current = editorHistoryEntry(shapesRef.current, [], projectParametersRef.current, projectConfigurationRef.current).fingerprint;
           interactionHistoryChangedRef.current = false;
         }
         projectInteractionActiveRef.current = true;
@@ -7224,6 +7230,7 @@ export function SketchForgeEditor({
     }
     // The host owns the table, so a newer entry for the same project replaces it.
     projectParametersRef.current = initialParameters;
+    projectConfigurationRef.current = initialConfiguration;
     const projectChanged = lastProjectIdRef.current !== projectId;
     if (projectChanged) {
       lastProjectIdRef.current = projectId;
@@ -7257,6 +7264,7 @@ export function SketchForgeEditor({
       initialHistoryIndex,
       normalizeWorkspaceSettings(initialWorkspace).historyLimit,
       projectParametersRef.current,
+      projectConfigurationRef.current,
     );
     projectHydratingRef.current = true;
     shapesRef.current = incoming;
@@ -7268,7 +7276,7 @@ export function SketchForgeEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice(null);
-  }, [initialAssets, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+  }, [initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
 
   useEffect(() => {
     if (!projectId || !onProjectShapesChange) {
@@ -7607,6 +7615,7 @@ export function SketchForgeEditor({
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
     projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
+    projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
@@ -7634,6 +7643,7 @@ export function SketchForgeEditor({
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
     projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
+    projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
@@ -9015,6 +9025,7 @@ export function SketchForgeEditor({
             historyIndex: exportedHistory.index,
             assets: projectAssetsRef.current,
             parameters: projectParametersRef.current,
+            ...projectConfigurationRef.current,
             workspace: workspaceSettingsRef.current,
             snapGrid,
             placementElevation,
@@ -9974,6 +9985,7 @@ export function SketchForgeEditor({
         historyIndex: exportedHistory.index,
         assets: projectAssetsRef.current,
         parameters: projectParametersRef.current,
+        ...projectConfigurationRef.current,
         workspace: workspaceSettingsRef.current,
         snapGrid,
         placementElevation,

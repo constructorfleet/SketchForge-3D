@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, unzip, zip, type AsyncZippable } from "fflate";
 import { LocalizedError } from "./support/i18n/LocalizedError.js";
-import { editorHistoryEntry, hydrateEditorHistoryState, liveEditorHistoryState, type EditorHistoryEntry } from "./editorHistory.js";
+import { editorHistoryEntry, entryConfiguration, hydrateEditorHistoryState, liveEditorHistoryState, NO_CONFIGURATIONS, type EditorHistoryEntry, type ProjectConfigurationState } from "./editorHistory.js";
 import { normalizePlacementWorkplane, placementWorkplaneIsBase, type PlacementWorkplane } from "./placementWorkplane.js";
 import { importedShapeFromObj } from "./objImport.js";
 import { normalizeProjectAsset, sha256Hex } from "./projectAssets.js";
@@ -10,22 +10,31 @@ import { importedShapeFromStl } from "./stlImport.js";
 import { importedShapeFromSvgOnHost } from "./svgImport.js";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettings.js";
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
-import { PROJECT_PARAMETER_DIMENSIONS, resolveProjectParameters, type ProjectParameterInput } from "./projectParameters.js";
+import {
+  configurationIssues,
+  PROJECT_PARAMETER_DIMENSIONS,
+  projectConfigurationError,
+  resolveConfiguredParameters,
+  type ProjectConfigurationIssue,
+  type ProjectParameterInput,
+} from "./projectParameters.js";
 import { EXPRESSION_BINDABLE_FIELDS, shapeBindingIssues, type ShapeBindingIssue } from "./expressionBindings.js";
 import {
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
   sketchConstraintBindingIssues,
   type SketchConstraintBindingIssue,
 } from "./sketchConstraintBindings.js";
-import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectConfiguration, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
-export const SKF_FORMAT_VERSION = 3;
+export const SKF_FORMAT_VERSION = 4;
 export const SKF_MINIMUM_READER_VERSION = 2;
 /** Written, with the same minimum reader version, when the parameter table is empty. */
 export const SKF_BASE_FORMAT_VERSION = 2;
 // Written only when the parameter table is not empty, so other projects stay readable by V2 readers.
 export const SKF_PARAMETERS_FORMAT_VERSION = 3;
+// Written only when the project has configurations, so V3 readers refuse it instead of dropping them.
+export const SKF_CONFIGURATIONS_FORMAT_VERSION = 4;
 export const SKF_CREATED_WITH_VERSION = "1.32.0"; // x-release-please-version
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
@@ -40,6 +49,7 @@ export const SKF_LIMITS = {
   features: 300_000,
   meshNumbers: 30_000_000,
   parameters: 2_000,
+  configurations: 200,
 } as const;
 
 const SHAPE_KINDS = new Set([
@@ -97,12 +107,15 @@ export type SkfShapeNodeV1 = {
   cadDisplayEdgesAssetId?: string;
 };
 
-// `parameters`: V3 only, an undo state's table when not empty. The scene state uses top-level `parameters`.
+// `parameters`: V3 and V4, an undo state's known table. The scene state uses top-level `parameters`.
+// `configurations`, `activeConfiguration`: V4 only, the same rule. Absent `configurations` means unknown.
 export type SkfStateV1 = {
   id: string;
   rootNodeIds: string[];
   nodes: SkfShapeNodeV1[];
   parameters?: SkfParameterV3[];
+  configurations?: SkfConfigurationV4[];
+  activeConfiguration?: string;
 };
 
 export type SkfFeatureV1 = {
@@ -114,7 +127,7 @@ export type SkfFeatureV1 = {
   parameters?: Record<string, unknown>;
 };
 
-// V3 writes it; readers accept it in any version. Readers recompute `value`, which is
+// V3 and V4 write it; readers accept it in any version. Readers recompute `value`, which is
 // the last known value of an entry that no longer resolves and absent when there is none.
 export type SkfParameterV3 = {
   name: string;
@@ -123,11 +136,18 @@ export type SkfParameterV3 = {
   value?: number;
 };
 
+// V4 writes it. `overrides` maps a parameter name to the expression that replaces its base expression.
+export type SkfConfigurationV4 = {
+  name: string;
+  overrides: Record<string, string>;
+};
+
+// Top-level `parameters[].value` resolves under `activeConfiguration`; absent means the base table.
 // The packaged graph layout is shared by V1 and V2. V2 moves display edges
 // from inline definitions to assets; keep the exported type name for callers.
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID;
-  formatVersion: 1 | 2 | 3;
+  formatVersion: 1 | 2 | 3 | 4;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -158,6 +178,8 @@ export type SkfProjectDocumentV1 = {
     sketchPlacementWorkplane?: PlacementWorkplane;
   };
   parameters?: SkfParameterV3[];
+  configurations?: SkfConfigurationV4[];
+  activeConfiguration?: string;
 };
 
 export type SkfProjectExportInput = {
@@ -175,6 +197,8 @@ export type SkfProjectExportInput = {
   placementWorkplane?: PlacementWorkplane;
   sketchPlacementWorkplane?: PlacementWorkplane;
   parameters?: readonly ProjectParameterInput[];
+  configurations?: readonly ProjectConfiguration[];
+  activeConfiguration?: string | null;
   compressionLevel?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 };
 
@@ -193,10 +217,14 @@ export type SkfRestoredProject = {
   placementWorkplane: PlacementWorkplane;
   sketchPlacementWorkplane: PlacementWorkplane;
   parameters: ProjectParameter[];
+  configurations: ProjectConfiguration[];
+  activeConfiguration: string | null;
   /** Scene bindings that do not resolve. Kept with their stored numbers; see `shapeBindingIssues`. */
   bindingIssues: ShapeBindingIssue[];
   /** Scene constraint bindings that do not resolve. Kept with their stored values. */
   constraintBindingIssues: SketchConstraintBindingIssue[];
+  /** Configuration overrides that do not resolve or name no parameter. Kept as stored; see `configurationIssues`. */
+  configurationIssues: ProjectConfigurationIssue[];
   migratedFromVersion?: number;
 };
 
@@ -888,14 +916,42 @@ function unzipAsync(bytes: Uint8Array) {
   });
 }
 
+function activeConfigurationOf(state: ProjectConfigurationState | undefined) {
+  return state?.configurations.find((configuration) => configuration.name === state.activeConfiguration);
+}
+
 // Fails only on malformed structure. Entries that no longer resolve keep their stored text and last value.
-function resolvedSkfParameters(entries: readonly ProjectParameterInput[]): ProjectParameter[] {
-  const resolved = resolveProjectParameters(entries);
+function resolvedSkfParameters(entries: readonly ProjectParameterInput[], configuration?: ProjectConfigurationState): ProjectParameter[] {
+  const resolved = resolveConfiguredParameters(entries, activeConfigurationOf(configuration));
   if (!resolved.ok) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
   return resolved.parameters;
 }
 
-function readSkfParameters(raw: unknown): ProjectParameter[] {
+/** Validates structure only. Overrides that do not resolve or name no parameter are kept. */
+function skfConfigurationState(configurations: unknown, activeConfiguration: unknown): ProjectConfigurationState {
+  const error = projectConfigurationError(configurations, activeConfiguration);
+  if (error) {
+    const label = error.code === "unknownConfiguration" || typeof activeConfiguration !== "string" && activeConfiguration != null ? "activeConfiguration" : "configurations";
+    throw new LocalizedError("errors.skf.fieldInvalid", { label });
+  }
+  return {
+    configurations: ((configurations ?? []) as ProjectConfiguration[]).map(({ name, overrides }) => ({ name, overrides: Object.fromEntries(Object.entries(overrides)) })),
+    activeConfiguration: (activeConfiguration ?? null) as string | null,
+  };
+}
+
+function skfConfigurationFields({ configurations, activeConfiguration }: ProjectConfigurationState) {
+  return {
+    configurations: configurations.map(({ name, overrides }): SkfConfigurationV4 => ({ name, overrides: { ...overrides } })),
+    ...(activeConfiguration !== null ? { activeConfiguration } : {}),
+  };
+}
+
+function hasConfigurations(state: ProjectConfigurationState | undefined) {
+  return Boolean(state && (state.configurations.length || state.activeConfiguration !== null));
+}
+
+function readSkfParameters(raw: unknown, configuration?: ProjectConfigurationState): ProjectParameter[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw) || raw.length > SKF_LIMITS.parameters) throw new LocalizedError("errors.skf.fieldInvalid", { label: "parameters" });
   raw.forEach((entry, index) => {
@@ -907,7 +963,7 @@ function readSkfParameters(raw: unknown): ProjectParameter[] {
     }
     if (record.value !== undefined) finiteNumber(record.value, `parameters[${index}].value`);
   });
-  return resolvedSkfParameters(raw as ProjectParameterInput[]);
+  return resolvedSkfParameters(raw as ProjectParameterInput[], configuration);
 }
 
 function skfParameter({ name, expression, dimension, value }: ProjectParameter): SkfParameterV3 {
@@ -915,38 +971,52 @@ function skfParameter({ name, expression, dimension, value }: ProjectParameter):
 }
 
 export async function exportSkfProject(input: SkfProjectExportInput) {
-  const parameters = resolvedSkfParameters(input.parameters ?? []);
-  const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex, "unlimited", parameters);
+  const configuration = skfConfigurationState(input.configurations, input.activeConfiguration);
+  const parameters = resolvedSkfParameters(input.parameters ?? [], configuration);
+  const hydrated = liveEditorHistoryState(input.shapes, input.history, input.historyIndex, "unlimited", parameters, configuration);
   if (hydrated.entries.length > SKF_LIMITS.states) throw new LocalizedError("errors.skf.tooManyStates");
   const exportEntries = hydrated.entries.map((entry) => {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
-    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, entry.parameters);
+    return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, entry.parameters, entryConfiguration(entry));
   });
-  const sceneFingerprint = exportEntries[hydrated.index]?.fingerprint;
   // V3 whenever any table is written, including one kept only for undo.
   const anyTable = parameters.length > 0 || exportEntries.some((entry) => entry.parameters?.length);
+  // V4 whenever any configurations are written, the same way.
+  const anyConfigurations = hasConfigurations(configuration) || exportEntries.some((entry) => hasConfigurations(entryConfiguration(entry)));
+  const knownTable = (entry: EditorHistoryEntry) => (anyTable || anyConfigurations) && Array.isArray(entry.parameters);
+  const knownRows = (entry: EditorHistoryEntry) => anyConfigurations && entryConfiguration(entry) !== undefined;
+  // An empty table or configuration list leaves the fingerprint unchanged, so what an entry knows is part of the key.
+  const stateKey = (entry: EditorHistoryEntry) => `${entry.fingerprint}|${knownTable(entry) ? "p" : "-"}${knownRows(entry) ? "c" : "-"}`;
+  const sceneEntry = exportEntries[hydrated.index];
+  const sceneKey = sceneEntry && stateKey(sceneEntry);
   const builder = new SkfArchiveBuilder();
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
   const sourceAssetsByArchiveId = new Map(builder.assets.filter((asset) => asset.kind === "source").map((asset) => [asset.id, asset]));
   const states: SkfStateV1[] = [];
-  const stateIdByFingerprint = new Map<string, string>();
+  const stateIdByKey = new Map<string, string>();
   const historyEntries: SkfProjectDocumentV1["history"]["entries"] = [];
 
   for (const entry of exportEntries) {
-    let stateId = stateIdByFingerprint.get(entry.fingerprint);
+    const key = stateKey(entry);
+    let stateId = stateIdByKey.get(key);
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
       const state = await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId);
       // A state without `parameters` reads back as an unknown table; an empty list is a known empty one.
-      const known = anyTable && entry.fingerprint !== sceneFingerprint && Array.isArray(entry.parameters);
-      states.push(known ? { ...state, parameters: resolvedSkfParameters(entry.parameters!).map(skfParameter) } : state);
-      stateIdByFingerprint.set(entry.fingerprint, stateId);
+      const undoState = key !== sceneKey;
+      const rows = entryConfiguration(entry);
+      states.push({
+        ...state,
+        ...(undoState && knownTable(entry) ? { parameters: resolvedSkfParameters(entry.parameters!, rows).map(skfParameter) } : {}),
+        ...(undoState && knownRows(entry) ? skfConfigurationFields(rows!) : {}),
+      });
+      stateIdByKey.set(key, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
   }
 
-  const formatVersion = anyTable ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
+  const formatVersion = anyConfigurations ? SKF_CONFIGURATIONS_FORMAT_VERSION : anyTable ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
   const sceneStateId = historyEntries[hydrated.index]?.stateId;
   const activeState = states.find((state) => state.id === sceneStateId);
   if (!activeState) throw new LocalizedError("errors.skf.activeStateUnknown");
@@ -989,6 +1059,7 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
       sketchPlacementWorkplane,
     },
     ...(parameters.length ? { parameters: parameters.map(skfParameter) } : {}),
+    ...(hasConfigurations(configuration) ? skfConfigurationFields(configuration) : {}),
   };
   const projectJson = strToU8(JSON.stringify(document));
   if (projectJson.byteLength > SKF_LIMITS.projectJsonBytes) {
@@ -1735,8 +1806,12 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
       finiteNumber(coordinates.z, `editor.${fieldName}.${field}.z`);
     }
   }
-  const parameters = readSkfParameters(document.parameters);
-  return { document, assetById, stateById, parameters };
+  const configuration = skfConfigurationState(document.configurations, document.activeConfiguration);
+  for (const state of document.states) {
+    if (state.configurations !== undefined || state.activeConfiguration !== undefined) skfConfigurationState(state.configurations, state.activeConfiguration);
+  }
+  const parameters = readSkfParameters(document.parameters, configuration);
+  return { document, assetById, stateById, parameters, configuration };
 }
 
 export async function importSkfSourceAsset(asset: ProjectAsset) {
@@ -1899,6 +1974,7 @@ async function restoreV1(
   assetById: Map<string, SkfAssetRecordV1>,
   stateById: Map<string, SkfStateV1>,
   parameters: ProjectParameter[],
+  configuration: ProjectConfigurationState,
   files: ArchiveFiles,
   options: ImportSkfOptions,
 ) {
@@ -1942,17 +2018,29 @@ async function restoreV1(
   // and the format stays readable by releases from before the fix.
   const migrationMemo = new Map<WorkplaneShape, WorkplaneShape>();
   for (const [stateId, shapes] of restoredStates) restoredStates.set(stateId, migratePre548CutBrepFrames(shapes, migrationMemo));
+  // A V4 writer omits `configurations` only for an unknown state; before V4 a project had none.
+  const stateConfigurations = new Map(document.states.map((state) => [
+    state.id,
+    state.id === document.sceneStateId
+      ? configuration
+      : state.configurations !== undefined
+        ? skfConfigurationState(state.configurations, state.activeConfiguration)
+        : document.formatVersion >= SKF_CONFIGURATIONS_FORMAT_VERSION ? undefined : NO_CONFIGURATIONS,
+  ]));
   const stateParameters = new Map(document.states.map((state) => [
     state.id,
-    state.id === document.sceneStateId ? parameters : state.parameters === undefined ? undefined : readSkfParameters(state.parameters),
+    state.id === document.sceneStateId
+      ? parameters
+      : state.parameters === undefined ? undefined : readSkfParameters(state.parameters, stateConfigurations.get(state.id)),
   ]));
   const history = document.history.entries.map((entry) => editorHistoryEntry(
     restoredStates.get(entry.stateId) ?? [],
     entry.selectedObjectIds,
     stateParameters.get(entry.stateId),
+    stateConfigurations.get(entry.stateId),
   ));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
-  const hydrated = liveEditorHistoryState(shapes, history, document.history.index, "unlimited", parameters);
+  const hydrated = liveEditorHistoryState(shapes, history, document.history.index, "unlimited", parameters, configuration);
   if (hydrated.entries.length !== history.length || hydrated.index !== document.history.index) throw new LocalizedError("errors.skf.historyRestoreLoss");
   return {
     sourceProjectId: document.metadata.projectId,
@@ -1969,8 +2057,11 @@ async function restoreV1(
     placementWorkplane: normalizePlacementWorkplane(document.editor.placementWorkplane, document.editor.placementElevation),
     sketchPlacementWorkplane: normalizePlacementWorkplane(document.editor.sketchPlacementWorkplane),
     parameters,
+    configurations: [...configuration.configurations],
+    activeConfiguration: configuration.activeConfiguration,
     bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, parameters),
     constraintBindingIssues: sketchConstraintBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, parameters),
+    configurationIssues: configurationIssues({ parameters, ...configuration }),
   } satisfies SkfRestoredProject;
 }
 
@@ -2001,8 +2092,11 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
     ),
     sketchPlacementWorkplane: normalizePlacementWorkplane(raw.sketchPlacementWorkplane),
     parameters: [],
+    configurations: [],
+    activeConfiguration: null,
     bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, []),
     constraintBindingIssues: sketchConstraintBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, []),
+    configurationIssues: [],
     migratedFromVersion: 0,
   };
 }
@@ -2099,5 +2193,5 @@ export async function importSkfProject(input: ArrayBuffer | Uint8Array, options:
   }
 
   const { files, validated } = await readPackagedSkf(bytes);
-  return restoreV1(validated.document, validated.assetById, validated.stateById, validated.parameters, files, options);
+  return restoreV1(validated.document, validated.assetById, validated.stateById, validated.parameters, validated.configuration, files, options);
 }

@@ -11,11 +11,15 @@ describe("published .skf format reference", () => {
     execFileSync(process.execPath, ["scripts/generate-skf-format-reference.mjs", "--check"], { cwd: root });
 
     const reference = readFileSync(path.join(root, "docs", "SKF_FORMAT_REFERENCE.md"), "utf8");
-    expect(reference).toMatch(/Newest format read and written\s*\|\s*3/);
+    expect(reference).toMatch(/Newest format read and written\s*\|\s*4/);
+    expect(reference).toMatch(/Format written when the project has configurations\s*\|\s*4/);
     expect(reference).toMatch(/Format written when the project has parameters\s*\|\s*3/);
     expect(reference).toMatch(/Format written for other projects\s*\|\s*2/);
     expect(reference).toContain("### `SkfParameterV3`");
     expect(reference).toContain("`parameters?` | `SkfParameterV3[]`");
+    expect(reference).toContain("### `SkfConfigurationV4`");
+    expect(reference).toContain("`configurations?` | `SkfConfigurationV4[]`");
+    expect(reference).toContain("`activeConfiguration?` | `string`");
     expect(reference).toContain("`sceneStateId`");
     expect(reference).toContain("projectName: string");
     expect(reference).toContain("`cadDisplayEdgesAssetId?`");

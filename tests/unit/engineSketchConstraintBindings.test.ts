@@ -375,6 +375,41 @@ describe("expression-bound sketch constraints", () => {
     expect(JSON.stringify(await document("pinned"))).toBe(before);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("refuses activating a configuration the bound sketch cannot solve, and writes nothing", async () => {
+    const diagonal: SketchConstraint = { id: "diagonal", kind: "distance", pointIds: ["a", "c"], valueMm: Math.hypot(2, 2) };
+    const output = await sketchProject("pinned-configuration", rectangle([diagonal]));
+    value(await engine.addParameter("pinned-configuration", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("pinned-configuration", output.id, "width", "w"));
+    value(await engine.addConfiguration("pinned-configuration", "Wide", { w: "4" }));
+    const before = JSON.stringify(await document("pinned-configuration"));
+
+    const refused = await engine.activateConfiguration("pinned-configuration", "Wide");
+
+    expect(refused).toMatchObject({
+      ok: false,
+      failure: { reason: "sketch_unsolvable", shapeId: output.id, constraintIds: expect.arrayContaining(["diagonal"]) },
+    });
+    expect(JSON.stringify(await document("pinned-configuration"))).toBe(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("re-solves a bound sketch when a configuration is activated", async () => {
+    const output = await sketchProject("configured-sketch");
+    value(await engine.addParameter("configured-sketch", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("configured-sketch", output.id, "width", "w"));
+    value(await engine.addConfiguration("configured-sketch", "Wide", { w: "4" }));
+    const narrow = value(await engine.properties("configured-sketch", output.id));
+
+    value(await engine.activateConfiguration("configured-sketch", "Wide"));
+
+    const wide = value(await engine.properties("configured-sketch", output.id));
+    // The 2 x 2 section becomes 4 x 2 from the fixed corner at (-1, -1), so x moves by 1.
+    expect(wide.volume / narrow.volume).toBeCloseTo(2, 4);
+    expect(wide.centerOfMass.x - narrow.centerOfMass.x).toBeCloseTo(1, 4);
+    expect(wide.centerOfMass.y).toBeCloseTo(narrow.centerOfMass.y, 4);
+    expect(wide.centerOfMass.z).toBeCloseTo(narrow.centerOfMass.z, 4);
+    expect(constraintOf((await document("configured-sketch")).shapes[0]!, "width")).toMatchObject({ valueMm: 4, expression: "w" });
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("binds to a new value by solving and rebuilding in one write", async () => {
     const output = await sketchProject("direct");
     const before = await document("direct");

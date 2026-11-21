@@ -573,6 +573,8 @@ const parameterErrorSchema = {
     expressionError: expressionErrorSchema,
     dependents: { type: "array", description: "Parameters that reference the one being deleted.", items: str },
     shapeDependents: { type: "array", items: { type: "object", required: ["shapeId", "fields"], properties: { shapeId: str, fields: { type: "array", items: str } }, additionalProperties: false } },
+    configuration: { type: "string", description: "The parameter configuration whose table failed. Absent for the base table." },
+    configurationDependents: { type: "array", description: "Configurations whose overrides reference the parameter being deleted.", items: str },
     shapeId: str,
     field: str,
     fields: { type: "array", items: str },

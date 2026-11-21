@@ -28,7 +28,7 @@ import {
 import { applyAppTheme, readStoredAppTheme, resolveAppTheme, storeAppTheme, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
-import type { EditorHistoryEntry } from "@/lib/engine/editorHistory";
+import { NO_CONFIGURATIONS, type EditorHistoryEntry, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createAutosaveNoticeController, type AutosaveNotice } from "@/lib/autosaveNotice";
 import { createLocalId } from "@/lib/engine/localIds";
@@ -120,6 +120,7 @@ type ProjectShapeRecord = {
   historyIndex?: number;
   assets?: ProjectAsset[];
   parameters?: ProjectParameter[];
+  configuration?: ProjectConfigurationState;
   meshResourceIds?: string[];
   assetResourceIds?: string[];
   updatedAt: number;
@@ -255,6 +256,7 @@ async function loadProjectShapes(projectId: string) {
       historyIndex: restored.historyIndex,
       assets: restored.assets,
       parameters: restored.parameters,
+      configuration: { configurations: restored.configurations, activeConfiguration: restored.activeConfiguration },
     };
   }
   const database = await openProjectShapesDb();
@@ -279,6 +281,7 @@ async function loadProjectShapes(projectId: string) {
       historyIndex: restored.historyIndex,
       assets: restored.assets,
       parameters: restored.parameters,
+      configuration: { configurations: restored.configurations, activeConfiguration: restored.activeConfiguration },
     };
   }
 
@@ -923,7 +926,7 @@ export default function Home() {
         if (canceled) return;
         const loadedRevision = record?.revision ?? 0;
         const revision = Math.max(activeProject.revision ?? 0, loadedRevision, 1);
-        const loadedEntry = projectShapeCacheEntry(Math.max(loadedRevision, 1), record?.shapes ?? [], record?.history, record?.historyIndex, record?.assets, record?.parameters);
+        const loadedEntry = projectShapeCacheEntry(Math.max(loadedRevision, 1), record?.shapes ?? [], record?.history, record?.historyIndex, record?.assets, record?.parameters, record?.configuration);
         const entry = loadedEntry.revision === revision ? loadedEntry : { ...loadedEntry, revision };
         setProjectShapesById((current) => {
           // IndexedDB reads are asynchronous. A local edit/import can update the live
@@ -1109,6 +1112,7 @@ export default function Home() {
     historyIndex: number;
     assets: ProjectAsset[];
     parameters: ProjectParameter[];
+    configuration: ProjectConfigurationState;
     projectName: string;
     projectCreatedAt: number;
     workspace: WorkplaneWorkspaceSettings;
@@ -1119,7 +1123,7 @@ export default function Home() {
   }) => {
     const revision = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
     nextProjectRevisionRef.current = revision;
-    const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets, snapshot.parameters);
+    const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets, snapshot.parameters, snapshot.configuration);
     setProjectShapesById((current) => {
       const existing = current[snapshot.projectId];
       if (existing && existing.revision > revision) {
@@ -1240,7 +1244,7 @@ export default function Home() {
         sketchPlacementWorkplane: restored.sketchPlacementWorkplane,
         sharedProject: sharedProject ? { fileName: sharedProject.fileName, revision: sharedProject.revision } : undefined,
       };
-      const entry = projectShapeCacheEntry(now, restored.shapes, restored.history, restored.historyIndex, restored.assets, restored.parameters);
+      const entry = projectShapeCacheEntry(now, restored.shapes, restored.history, restored.historyIndex, restored.assets, restored.parameters, { configurations: restored.configurations, activeConfiguration: restored.activeConfiguration });
       await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
       setProjectShapesById((current) => ({ ...current, [project.id]: entry }));
       setProjects((current) => [project, ...current]);
@@ -1486,7 +1490,7 @@ export default function Home() {
           try {
             const record = await loadProjectShapes(project.id);
             stored = record
-              ? projectShapeCacheEntry(storedBackupRevision(record), record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters)
+              ? projectShapeCacheEntry(storedBackupRevision(record), record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration)
               : null;
           } catch (error) {
             if (!inSession) throw error;
@@ -1679,6 +1683,7 @@ export default function Home() {
           <SketchForgeEditor
             initialAssets={activeProjectShapeEntry?.assets ?? []}
             initialParameters={activeProjectShapeEntry?.parameters ?? []}
+            initialConfiguration={activeProjectShapeEntry?.configuration ?? NO_CONFIGURATIONS}
             initialShapes={activeProjectShapeEntry?.shapes ?? []}
             initialHistory={activeProjectShapeEntry?.history}
             initialHistoryIndex={activeProjectShapeEntry?.historyIndex}

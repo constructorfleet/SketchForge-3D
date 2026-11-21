@@ -7,7 +7,7 @@
  * dashboard its copy is behind.
  */
 
-import { appendEditorHistorySnapshot, editorHistoryEntry, type EditorHistoryEntry } from "./editorHistory.js";
+import { appendEditorHistorySnapshot, editorHistoryEntry, type EditorHistoryEntry, type ProjectConfigurationState } from "./editorHistory.js";
 import {
   projectRecord,
   readProjectMetadata,
@@ -20,7 +20,7 @@ import { importedShapeFromStepOnKernel } from "./stepImportKernel.js";
 import { exportSkfProject, importSkfProject, importSkfSourceAsset } from "./skfProject.js";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "./workplaneSettings.js";
 import { horizontalPlacementWorkplane } from "./placementWorkplane.js";
-import type { GridSize, ProjectAsset, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
+import type { GridSize, ProjectAsset, ProjectConfiguration, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 import type { PlacementWorkplane } from "./placementWorkplane.js";
 
 export type ProjectDocument = {
@@ -43,7 +43,15 @@ export type ProjectDocument = {
   sketchPlacementWorkplane: PlacementWorkplane;
   // Optional so existing ProjectStore implementations still type-check. Absent reads as empty.
   parameters?: ProjectParameter[];
+  // Optional for the same reason. Absent reads as none, with the base table active.
+  configurations?: ProjectConfiguration[];
+  activeConfiguration?: string | null;
 };
+
+/** Reads a document's configurations; a store that predates them leaves both unset. */
+export function projectConfigurationState(document: Pick<ProjectDocument, "configurations" | "activeConfiguration">): ProjectConfigurationState {
+  return { configurations: document.configurations ?? [], activeConfiguration: document.activeConfiguration ?? null };
+}
 
 function metadataNumber(metadata: ProjectMetadata, key: string, fallback: number) {
   const value = metadata[key];
@@ -83,6 +91,8 @@ export async function readProjectDocument(root: string, projectId: string): Prom
       placementWorkplane: horizontalPlacementWorkplane(),
       sketchPlacementWorkplane: horizontalPlacementWorkplane(),
       parameters: [],
+      configurations: [],
+      activeConfiguration: null,
     };
   }
   const restored = await importSkfProject(packageBytes, {
@@ -106,6 +116,8 @@ export async function readProjectDocument(root: string, projectId: string): Prom
     placementWorkplane: restored.placementWorkplane,
     sketchPlacementWorkplane: restored.sketchPlacementWorkplane,
     parameters: restored.parameters,
+    configurations: restored.configurations,
+    activeConfiguration: restored.activeConfiguration,
   };
 }
 
@@ -123,7 +135,7 @@ export async function writeProjectDocument(root: string, projectId: string, docu
   const history = appendEditorHistorySnapshot(
     document.history,
     document.historyIndex,
-    editorHistoryEntry(shapes, [], document.parameters ?? []),
+    editorHistoryEntry(shapes, [], document.parameters ?? [], projectConfigurationState(document)),
   );
   const packageBytes = await exportSkfProject({
     projectId,
@@ -140,6 +152,8 @@ export async function writeProjectDocument(root: string, projectId: string, docu
     placementWorkplane: document.placementWorkplane,
     sketchPlacementWorkplane: document.sketchPlacementWorkplane,
     parameters: document.parameters,
+    configurations: document.configurations,
+    activeConfiguration: document.activeConfiguration,
     compressionLevel: 1,
   });
   await writeProjectPackage(root, projectId, packageBytes);
