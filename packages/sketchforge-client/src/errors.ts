@@ -221,6 +221,16 @@ export class SketchForgeApiError extends Error {
     return strings(this.detailBody.fields);
   }
 
+  /** The sketch constraint a constraint-binding refusal is about. */
+  get constraintId(): string | undefined {
+    return this.text("constraintId");
+  }
+
+  /** Sketch constraints that conflict with a refused binding, or that an unsolvable sketch could not satisfy. */
+  get constraintIds(): string[] {
+    return strings(this.detailBody.constraintIds);
+  }
+
   /** Position in a batch `POST /shapes`, whose new shape has no id yet. */
   get index(): number | undefined {
     const index = this.detailBody.index;

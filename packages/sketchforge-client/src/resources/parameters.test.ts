@@ -240,6 +240,16 @@ describe("parameter errors", () => {
     expect(locked.fields).toEqual(["width"]);
   });
 
+  it("names the sketch constraints a binding conflicts with", async () => {
+    const conflict = await refusal(client(fakeServer({ status: 422, body: { error: "Bound twice.", code: "unapplicable_fields", shapeId: "s1", field: "width", reason: "conflictingBinding", fields: ["width"], constraintIds: ["c1"] } })).shapes.update("p1", "s1", { expressions: { width: "wall" } }));
+    expect(conflict.constraintIds).toEqual(["c1"]);
+    expect(conflict.constraintId).toBeUndefined();
+
+    const constraint = await refusal(client(fakeServer({ status: 422, body: { error: "Not bindable.", code: "unapplicable_fields", shapeId: "s1", constraintId: "c2", reason: "constraintNotBindable" } })).shapes.update("p1", "s1", {}));
+    expect(constraint.constraintId).toBe("c2");
+    expect(constraint.constraintIds).toEqual([]);
+  });
+
   it("answers empty details when the body carries none", async () => {
     const error = await refusal(client(fakeServer({ status: 404, body: { error: "Gone.", code: "shape_not_found" } })).shapes.delete("p1", "s1"));
     expect(error.parameter).toBeUndefined();

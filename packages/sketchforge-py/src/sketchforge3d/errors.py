@@ -227,6 +227,16 @@ class SketchForgeApiError(SketchForgeError):
         return _strings(self._detail.get("fields"))
 
     @property
+    def constraint_id(self) -> Optional[str]:
+        """The sketch constraint a constraint-binding refusal is about."""
+        return self._text("constraintId")
+
+    @property
+    def constraint_ids(self) -> List[str]:
+        """Sketch constraints that conflict with a refused binding, or that an unsolvable sketch could not satisfy."""
+        return _strings(self._detail.get("constraintIds"))
+
+    @property
     def index(self) -> Optional[int]:
         """Position in a batch ``POST /shapes``, whose new shape has no id yet."""
         index = self._detail.get("index")

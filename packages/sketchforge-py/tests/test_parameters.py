@@ -292,6 +292,21 @@ class ParameterErrorTests(unittest.TestCase):
         self.assertTrue(locked.is_shape_locked)
         self.assertEqual(locked.fields, ["width"])
 
+    def test_names_the_sketch_constraints_a_binding_conflicts_with(self) -> None:
+        conflict = self.refusal(
+            FakeOpener((422, {"error": "Bound twice.", "code": "unapplicable_fields", "shapeId": "s1", "field": "width", "reason": "conflictingBinding", "fields": ["width"], "constraintIds": ["c1"]})),
+            lambda api: api.shapes.update("p1", "s1", {"expressions": {"width": "wall"}}),
+        )
+        self.assertEqual(conflict.constraint_ids, ["c1"])
+        self.assertIsNone(conflict.constraint_id)
+
+        constraint = self.refusal(
+            FakeOpener((422, {"error": "Not bindable.", "code": "unapplicable_fields", "shapeId": "s1", "constraintId": "c2", "reason": "constraintNotBindable"})),
+            lambda api: api.shapes.update("p1", "s1", {}),
+        )
+        self.assertEqual(constraint.constraint_id, "c2")
+        self.assertEqual(constraint.constraint_ids, [])
+
     def test_answers_empty_details_when_the_body_carries_none(self) -> None:
         error = self.refusal(
             FakeOpener((404, {"error": "Gone.", "code": "shape_not_found"})),
