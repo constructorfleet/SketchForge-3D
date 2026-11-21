@@ -35,6 +35,9 @@ from .types import (
     MeasurementSummary,
     InterferenceReport,
     ListPage,
+    ConfigurationDeleteResult,
+    ConfigurationList,
+    ConfigurationWriteResult,
     ParameterDeleteResult,
     ParameterDimension,
     ParameterList,
@@ -281,6 +284,59 @@ class SketchConstraints:
 
     def unbind(self, project_id: str, shape_id: str, constraint_id: str) -> SketchConstraintBindResult:
         return self.bind(project_id, shape_id, constraint_id, None)
+
+
+_CONFIGURATIONS = "/parameter-configurations"
+
+
+class Configurations:
+    """Owns named rows of parameter overrides. A write that changes the active table rebuilds bound shapes."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def list(self, project_id: str) -> ConfigurationList:
+        payload = self._transport.send("GET", _CONFIGURATIONS, {"projectId": project_id}) or {}
+        return ConfigurationList.from_payload(payload)
+
+    def create(
+        self, project_id: str, name: str, overrides: Optional[Mapping[str, str]] = None
+    ) -> ConfigurationWriteResult:
+        """Creates a configuration without activating it."""
+        body: Dict[str, Any] = {"name": name, **({"overrides": dict(overrides)} if overrides is not None else {})}
+        payload = self._transport.send("POST", _CONFIGURATIONS, {"projectId": project_id}, body, retryable=True) or {}
+        return ConfigurationWriteResult.from_payload(payload)
+
+    def rename(self, project_id: str, name: str, new_name: str) -> ConfigurationWriteResult:
+        """The active configuration keeps its place under the new name."""
+        return self._change(project_id, name, {"name": new_name})
+
+    def set_override(self, project_id: str, name: str, parameter: str, expression: str) -> ConfigurationWriteResult:
+        return self._change(project_id, name, {"parameter": parameter, "expression": expression})
+
+    def clear_override(self, project_id: str, name: str, parameter: str) -> ConfigurationWriteResult:
+        """The parameter takes its base expression in that configuration again."""
+        return self._change(project_id, name, {"parameter": parameter, "expression": None})
+
+    def delete(self, project_id: str, name: str) -> ConfigurationDeleteResult:
+        """Deleting the active configuration switches to the base table."""
+        payload = self._transport.send(
+            "DELETE", _CONFIGURATIONS, {"projectId": project_id, "name": name}, retryable=True
+        ) or {}
+        return ConfigurationDeleteResult.from_payload(payload)
+
+    def activate(self, project_id: str, name: Optional[str]) -> ConfigurationWriteResult:
+        """``None`` switches to the base table."""
+        payload = self._transport.send(
+            "POST", f"{_CONFIGURATIONS}/activate", {"projectId": project_id}, {"name": name}, retryable=True
+        ) or {}
+        return ConfigurationWriteResult.from_payload(payload)
+
+    def _change(self, project_id: str, name: str, body: Dict[str, Any]) -> ConfigurationWriteResult:
+        payload = self._transport.send(
+            "PATCH", _CONFIGURATIONS, {"projectId": project_id, "name": name}, body, retryable=True
+        ) or {}
+        return ConfigurationWriteResult.from_payload(payload)
 
 
 def _check_dimension(dimension: str) -> None:
@@ -1032,6 +1088,13 @@ CLIENT_RESOURCE_OPERATIONS = {
         "updateParameter": ("update", "rename"),
         "deleteParameter": ("delete",),
     },
+    "configurations": {
+        "listParameterConfigurations": ("list",),
+        "createParameterConfiguration": ("create",),
+        "updateParameterConfiguration": ("rename", "set_override", "clear_override"),
+        "deleteParameterConfiguration": ("delete",),
+        "activateParameterConfiguration": ("activate",),
+    },
     "sketch_constraints": {"bindSketchConstraint": ("bind", "unbind")},
 }
 
@@ -1083,6 +1146,7 @@ class SketchForgeClient:
         self.imports = Imports(self._transport)
         self.exports = Exports(self._transport)
         self.parameters = Parameters(self._transport)
+        self.configurations = Configurations(self._transport)
         self.sketch_constraints = SketchConstraints(self._transport)
 
     @property
@@ -1172,6 +1236,28 @@ class ProjectHandle:
 
     def delete_parameter(self, name: str) -> ParameterDeleteResult:
         return self._client.parameters.delete(self.id, name)
+
+    def configurations(self) -> ConfigurationList:
+        return self._client.configurations.list(self.id)
+
+    def add_configuration(self, name: str, overrides: Optional[Mapping[str, str]] = None) -> ConfigurationWriteResult:
+        return self._client.configurations.create(self.id, name, overrides)
+
+    def rename_configuration(self, name: str, new_name: str) -> ConfigurationWriteResult:
+        return self._client.configurations.rename(self.id, name, new_name)
+
+    def set_configuration_override(self, name: str, parameter: str, expression: str) -> ConfigurationWriteResult:
+        return self._client.configurations.set_override(self.id, name, parameter, expression)
+
+    def clear_configuration_override(self, name: str, parameter: str) -> ConfigurationWriteResult:
+        return self._client.configurations.clear_override(self.id, name, parameter)
+
+    def delete_configuration(self, name: str) -> ConfigurationDeleteResult:
+        return self._client.configurations.delete(self.id, name)
+
+    def activate_configuration(self, name: Optional[str]) -> ConfigurationWriteResult:
+        """``None`` switches to the base table."""
+        return self._client.configurations.activate(self.id, name)
 
     def bind_sketch_constraint(
         self, shape_id: str, constraint_id: str, expression: Optional[str]

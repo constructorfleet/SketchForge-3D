@@ -10,6 +10,7 @@ import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import { Transport, type TransportOptions } from "./http.js";
 import { Align, Distribute, Patterns } from "./resources/arrange.js";
 import { Booleans } from "./resources/booleans.js";
+import { Configurations } from "./resources/configurations.js";
 import { Drawings } from "./resources/drawings.js";
 import { DraftPrism } from "./resources/draft-prism.js";
 import { Edges } from "./resources/edges.js";
@@ -35,6 +36,10 @@ import type {
   BakedMirrorResult,
   BooleanCutRequest,
   BooleanCutResult,
+  ConfigurationDeleteResult,
+  ConfigurationList,
+  ConfigurationRequest,
+  ConfigurationWriteResult,
   GroupResult,
   MirrorAxis,
   ParameterChange,
@@ -106,6 +111,13 @@ export const CLIENT_RESOURCE_OPERATIONS = {
   parts: { splitParts: ["separate"] },
   parameters: { listParameters: ["list"], createParameter: ["create"], updateParameter: ["update", "rename"], deleteParameter: ["delete"] },
   sketchConstraints: { bindSketchConstraint: ["bind", "unbind"] },
+  configurations: {
+    listParameterConfigurations: ["list"],
+    createParameterConfiguration: ["create"],
+    updateParameterConfiguration: ["rename", "setOverride", "clearOverride"],
+    deleteParameterConfiguration: ["delete"],
+    activateParameterConfiguration: ["activate"],
+  },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, readonly string[]>> | readonly []>>;
 
 /** Convenience methods that emit a sequence of REST operations rather than one route. */
@@ -138,6 +150,7 @@ export class SketchForgeClient {
   readonly parts: Parts;
   readonly parameters: Parameters;
   readonly sketchConstraints: SketchConstraints;
+  readonly configurations: Configurations;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -166,6 +179,7 @@ export class SketchForgeClient {
     this.parts = new Parts(this.transport);
     this.parameters = new Parameters(this.transport);
     this.sketchConstraints = new SketchConstraints(this.transport);
+    this.configurations = new Configurations(this.transport);
   }
 
   get apiRoot() {
@@ -260,6 +274,35 @@ export class ProjectHandle {
   /** Binds a sketch dimensional constraint; `null` clears the binding and keeps the value. */
   bindSketchConstraint(shapeId: string, constraintId: string, expression: string | null): Promise<SketchConstraintBindResult> {
     return this.client.sketchConstraints.bind(this.id, shapeId, constraintId, expression);
+  }
+
+  configurations(): Promise<ConfigurationList> {
+    return this.client.configurations.list(this.id);
+  }
+
+  addConfiguration(configuration: ConfigurationRequest): Promise<ConfigurationWriteResult> {
+    return this.client.configurations.create(this.id, configuration);
+  }
+
+  renameConfiguration(name: string, newName: string): Promise<ConfigurationWriteResult> {
+    return this.client.configurations.rename(this.id, name, newName);
+  }
+
+  setConfigurationOverride(name: string, parameter: string, expression: string): Promise<ConfigurationWriteResult> {
+    return this.client.configurations.setOverride(this.id, name, parameter, expression);
+  }
+
+  clearConfigurationOverride(name: string, parameter: string): Promise<ConfigurationWriteResult> {
+    return this.client.configurations.clearOverride(this.id, name, parameter);
+  }
+
+  deleteConfiguration(name: string): Promise<ConfigurationDeleteResult> {
+    return this.client.configurations.delete(this.id, name);
+  }
+
+  /** `null` switches to the base table. */
+  activateConfiguration(name: string | null): Promise<ConfigurationWriteResult> {
+    return this.client.configurations.activate(this.id, name);
   }
 
   remove(shapeId: string) {

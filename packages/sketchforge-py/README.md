@@ -103,6 +103,13 @@ client.parameters.delete(project_id, name) -> ParameterDeleteResult
 
 client.sketch_constraints.bind(project_id, shape_id, constraint_id, expression) -> SketchConstraintBindResult
 client.sketch_constraints.unbind(project_id, shape_id, constraint_id) -> SketchConstraintBindResult
+client.configurations.list(project_id) -> ConfigurationList
+client.configurations.create(project_id, name, overrides=None) -> ConfigurationWriteResult
+client.configurations.rename(project_id, name, new_name) -> ConfigurationWriteResult
+client.configurations.set_override(project_id, name, parameter, expression) -> ConfigurationWriteResult
+client.configurations.clear_override(project_id, name, parameter) -> ConfigurationWriteResult
+client.configurations.delete(project_id, name) -> ConfigurationDeleteResult
+client.configurations.activate(project_id, name) -> ConfigurationWriteResult
 ```
 
 ### Parameters and expressions
@@ -117,9 +124,11 @@ changed.shapes  # the rebuilt box, now 15 mm wide
 project.bind_expressions(box.id, {"width": None})  # unbinds; the width stays 15
 ```
 
-Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve, and `constraint_binding_issues`, the sketch constraint bindings that no longer resolve or that conflict with a bound size field. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter`, `bind_expressions` and `bind_sketch_constraint`.
+Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve, and `constraint_binding_issues`, the sketch constraint bindings that no longer resolve or that conflict with a bound size field. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter`, `bind_expressions` and `bind_sketch_constraint`. `ParameterList.active_configuration` names the active configuration.
 
 `sketch_constraints.bind` binds a sketch output's `distance`, `radius`, `diameter` or `angle` constraint to an expression, re-solves the sketch and rebuilds the solid. `shape_id` is the output or its `sketchSourceId`, and `None` removes the binding and keeps the value. `ShapeSummary.sketch_constraints` lists each dimensional constraint as a `SketchConstraintSummary` (`id`, `kind`, `value`, `expression`). It is read-only; change constraints in `sketchProfile` or through `bind`.
+
+A parameter configuration is a named row of overrides, such as `Large` with `{"wall": "4"}`. A parameter the row does not list keeps its base expression. `configurations.activate` switches the active row, or the base table for `None`, and rebuilds every bound shape. A configuration write returns the configurations, `active_configuration`, the table with values under it, and `issues`, the overrides that no longer resolve. `shapes` is empty unless the write changed the active table. The handle has `configurations()`, `add_configuration`, `rename_configuration`, `set_configuration_override`, `clear_configuration_override`, `delete_configuration` and `activate_configuration`. See [Parameter configurations](../../docs/REST_API.md#parameter-configurations).
 
 `as_patch` keeps `expressions`, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `None` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expected_revision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
 
@@ -249,7 +258,7 @@ client.shapes.update(project_id, shape.sketch_source_id, {
 
 Face drafts cannot yet be combined with prism drafts or edge treatments. Missing or ambiguous face matches and ineffective dependent booleans leave the project unchanged.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. Parameter failures add `is_invalid_expression`, `is_parameter_missing`, `is_parameter_duplicate` and `is_parameter_in_use`, with the details `parameter`, `reason`, `configuration`, `expression_error` (`code`, `message`, `span`, `cycle`), `dependents`, `shape_dependents`, `sketch_constraint_dependents`, `configuration_dependents`, and, for a refused binding, `shape_id` or a batch `index`, `field`, `fields`, `constraint_id` and `constraint_ids`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. Parameter failures add `is_invalid_expression`, `is_parameter_missing`, `is_parameter_duplicate`, `is_parameter_in_use`, `is_configuration_missing` and `is_configuration_duplicate`, with the details `parameter`, `reason`, `configuration`, `expression_error` (`code`, `message`, `span`, `cycle`), `dependents`, `shape_dependents`, `sketch_constraint_dependents`, `configuration_dependents`, and, for a refused binding, `shape_id` or a batch `index`, `field`, `fields`, `constraint_id` and `constraint_ids`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 `sketchforge3d.layout` has the arithmetic a parameterised part repeats: `row`, `grid`, `ring`, `centered_offsets`, `angle_of`, `mm`.
 

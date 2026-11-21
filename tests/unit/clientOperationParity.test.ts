@@ -16,15 +16,6 @@ import {
 
 const root = process.cwd();
 
-/** REST operations the TypeScript and Python clients do not wrap yet. Each names its tracking issue. */
-const CLIENT_PENDING_OPERATIONS: Record<string, string> = {
-  listParameterConfigurations: "#618",
-  createParameterConfiguration: "#618",
-  updateParameterConfiguration: "#618",
-  deleteParameterConfiguration: "#618",
-  activateParameterConfiguration: "#618",
-};
-
 function pythonResources(): {
   resources: string[];
   operations: Record<string, unknown>;
@@ -90,6 +81,11 @@ const CALL_ARGUMENTS: Record<string, unknown[]> = {
   updateParameter: [PROJECT_ID, "wall", { expression: "3 mm" }],
   deleteParameter: [PROJECT_ID, "wall"],
   bindSketchConstraint: [PROJECT_ID, SHAPE_ID, "width", "wall * 2"],
+  listParameterConfigurations: [PROJECT_ID],
+  createParameterConfiguration: [PROJECT_ID, { name: "Large", overrides: { wall: "4" } }],
+  updateParameterConfiguration: [PROJECT_ID, "Large", "Big"],
+  deleteParameterConfiguration: [PROJECT_ID, "Large"],
+  activateParameterConfiguration: [PROJECT_ID, "Large"],
 };
 const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   ...CALL_ARGUMENTS,
@@ -98,6 +94,7 @@ const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   booleanShapes: [PROJECT_ID, [SHAPE_ID], ["cutter"]],
   createParameter: [PROJECT_ID, "wall", "2 mm", "length"],
   updateParameter: [PROJECT_ID, "wall", "3 mm"],
+  createParameterConfiguration: [PROJECT_ID, "Large", { wall: "4" }],
 };
 const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "drawings.section": [PROJECT_ID, { plane: "xy", offset: 0 }],
@@ -120,6 +117,8 @@ const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "patterns.ring": [PROJECT_ID, [SHAPE_ID], 2, { x: 0, z: 0 }],
   "parameters.rename": [PROJECT_ID, "wall", "shell"],
   "sketchConstraints.unbind": [PROJECT_ID, SHAPE_ID, "width"],
+  "configurations.setOverride": [PROJECT_ID, "Large", "wall", "3"],
+  "configurations.clearOverride": [PROJECT_ID, "Large", "wall"],
 };
 const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "projects.get": [PROJECT_ID],
@@ -146,6 +145,8 @@ const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "exports.file": [PROJECT_ID, "stl"],
   "parameters.rename": [PROJECT_ID, "wall", "shell"],
   "sketch_constraints.unbind": [PROJECT_ID, SHAPE_ID, "width"],
+  "configurations.set_override": [PROJECT_ID, "Large", "wall", "3"],
+  "configurations.clear_override": [PROJECT_ID, "Large", "wall"],
 };
 
 type CapturedRequest = { method: string; pathname: string; query?: string; body?: string | null };
@@ -342,8 +343,8 @@ describe("REST client operation parity", () => {
     expect(py.compositeOperations.shapes.delete_all).toEqual(["listShapes", "updateShape", "deleteShape"]);
     expect(py.methods.shapes).toContain("delete_all");
     const expectedSecondaryMethods = {
-      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"], parameters: ["rename"] },
-      python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"], parameters: ["rename"] },
+      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"], parameters: ["rename"], configurations: ["setOverride", "clearOverride"] },
+      python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"], parameters: ["rename"], configurations: ["set_override", "clear_override"] },
     } as const;
     for (const [resourceName, methods] of Object.entries(expectedSecondaryMethods.typescript)) {
       const mapped = Object.values(CLIENT_RESOURCE_OPERATIONS[resourceName as keyof typeof CLIENT_RESOURCE_OPERATIONS]).flat();
@@ -497,9 +498,7 @@ describe("REST client operation parity", () => {
       const implemented = new Set(matrices[client]);
       expect([...implemented].filter((operationId) => !registered.has(operationId)), `${client} declares unknown REST operations`).toEqual([]);
       const missing = [...registered].filter((operationId) => !implemented.has(operationId)).sort();
-      const documentedGaps = (client === "mcp"
-        ? Object.keys(MCP_UNSUPPORTED_OPERATIONS)
-        : Object.keys(CLIENT_PENDING_OPERATIONS)).sort();
+      const documentedGaps = client === "mcp" ? Object.keys(MCP_UNSUPPORTED_OPERATIONS).sort() : [];
       expect(missing, `${client} operations missing from its resources`).toEqual(documentedGaps);
     }
   });

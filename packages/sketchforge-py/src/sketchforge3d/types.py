@@ -1405,12 +1405,19 @@ def _shapes(payload: Mapping[str, Any]) -> List[ShapeSummary]:
     return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes") or [] if isinstance(entry, Mapping)]
 
 
+def _optional_text(payload: Mapping[str, Any], key: str) -> Optional[str]:
+    value = payload.get(key)
+    return value if isinstance(value, str) else None
+
+
 @dataclass(frozen=True)
 class ParameterList:
     parameters: List[ProjectParameter]
     binding_issues: List[BindingIssue]
     revision: int
     constraint_binding_issues: List[ConstraintBindingIssue] = field(default_factory=list)
+    #: ``None`` for the base table, and against a server older than configurations.
+    active_configuration: Optional[str] = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterList":
@@ -1423,6 +1430,7 @@ class ParameterList:
                 for entry in payload.get("constraintBindingIssues") or []
                 if isinstance(entry, Mapping)
             ],
+            active_configuration=_optional_text(payload, "activeConfiguration"),
         )
 
 
@@ -1461,6 +1469,119 @@ class ParameterDeleteResult:
             deleted=bool(payload.get("deleted")),
             name=_text(payload, "name"),
             parameters=_parameters(payload),
+            shapes=_shapes(payload),
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ParameterConfiguration:
+    """A named row of parameter overrides. A parameter it does not list keeps its base expression."""
+
+    name: str
+    overrides: Dict[str, str]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterConfiguration":
+        return cls(name=_text(payload, "name"), overrides=_string_map(payload.get("overrides")))
+
+
+@dataclass(frozen=True)
+class ConfigurationIssue:
+    """An override that no longer resolves, or names a parameter that is gone."""
+
+    configuration: str
+    parameter: str
+    code: str
+    message: str
+    expression_error: Optional[ExpressionError] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ConfigurationIssue":
+        return cls(
+            configuration=_text(payload, "configuration"),
+            parameter=_text(payload, "parameter"),
+            code=_text(payload, "code"),
+            message=_text(payload, "message"),
+            expression_error=_expression_error(payload.get("expressionError")),
+        )
+
+
+def _configurations(payload: Mapping[str, Any]) -> List[ParameterConfiguration]:
+    return [ParameterConfiguration.from_payload(entry) for entry in payload.get("configurations") or [] if isinstance(entry, Mapping)]
+
+
+def _configuration_issues(payload: Mapping[str, Any]) -> List[ConfigurationIssue]:
+    return [ConfigurationIssue.from_payload(entry) for entry in payload.get("issues") or [] if isinstance(entry, Mapping)]
+
+
+@dataclass(frozen=True)
+class ConfigurationList:
+    configurations: List[ParameterConfiguration]
+    #: ``None`` for the base table.
+    active_configuration: Optional[str]
+    #: Base expressions, with values under the active configuration.
+    parameters: List[ProjectParameter]
+    issues: List[ConfigurationIssue]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ConfigurationList":
+        return cls(
+            configurations=_configurations(payload),
+            active_configuration=_optional_text(payload, "activeConfiguration"),
+            parameters=_parameters(payload),
+            issues=_configuration_issues(payload),
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ConfigurationWriteResult:
+    """``shapes`` is empty unless the active table changed. ``configuration`` is ``None`` after an activation."""
+
+    configuration: Optional[ParameterConfiguration]
+    configurations: List[ParameterConfiguration]
+    active_configuration: Optional[str]
+    parameters: List[ProjectParameter]
+    issues: List[ConfigurationIssue]
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ConfigurationWriteResult":
+        configuration = payload.get("configuration")
+        return cls(
+            configuration=ParameterConfiguration.from_payload(configuration) if isinstance(configuration, Mapping) else None,
+            configurations=_configurations(payload),
+            active_configuration=_optional_text(payload, "activeConfiguration"),
+            parameters=_parameters(payload),
+            issues=_configuration_issues(payload),
+            shapes=_shapes(payload),
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ConfigurationDeleteResult:
+    deleted: bool
+    name: str
+    configurations: List[ParameterConfiguration]
+    active_configuration: Optional[str]
+    parameters: List[ProjectParameter]
+    issues: List[ConfigurationIssue]
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ConfigurationDeleteResult":
+        return cls(
+            deleted=bool(payload.get("deleted")),
+            name=_text(payload, "name"),
+            configurations=_configurations(payload),
+            active_configuration=_optional_text(payload, "activeConfiguration"),
+            parameters=_parameters(payload),
+            issues=_configuration_issues(payload),
             shapes=_shapes(payload),
             revision=int(_number(payload, "revision")),
         )

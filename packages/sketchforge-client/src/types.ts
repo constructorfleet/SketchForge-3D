@@ -875,6 +875,8 @@ export type ParameterList = {
   parameters: ProjectParameter[];
   bindingIssues: BindingIssue[];
   constraintBindingIssues: ConstraintBindingIssue[];
+  /** Null for the base table; absent from a server older than configurations. */
+  activeConfiguration?: string | null;
   revision: number;
 };
 
@@ -886,6 +888,30 @@ export type ParameterChange = { expression?: string; dimension?: ParameterDimens
 export type ParameterWriteResult = { parameter?: ProjectParameter; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
 
 export type ParameterDeleteResult = { deleted: true; name: string; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
+
+/** A named row of parameter overrides. A parameter it does not list keeps its base expression. */
+export type ParameterConfiguration = { name: string; overrides: Record<string, string> };
+
+/** An override that no longer resolves, or names a parameter that is gone. */
+export type ConfigurationIssue = { configuration: string; parameter: string } & ParameterIssue;
+
+export type ConfigurationState = {
+  configurations: ParameterConfiguration[];
+  /** Null for the base table. */
+  activeConfiguration: string | null;
+  /** Base expressions, with values under the active configuration. */
+  parameters: ProjectParameter[];
+  issues: ConfigurationIssue[];
+};
+
+export type ConfigurationList = ConfigurationState & { revision: number };
+
+export type ConfigurationRequest = { name: string; overrides?: Record<string, string> };
+
+/** `shapes` is empty unless the active table changed. `configuration` is absent after an activation. */
+export type ConfigurationWriteResult = ConfigurationState & { configuration?: ParameterConfiguration; shapes: ShapeSummary[]; revision: number };
+
+export type ConfigurationDeleteResult = ConfigurationState & { deleted: true; name: string; shapes: ShapeSummary[]; revision: number };
 
 /** A shape that a refused parameter delete still binds, and which fields. */
 export type ShapeDependent = { shapeId: string; fields: string[] };

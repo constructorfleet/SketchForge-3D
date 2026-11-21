@@ -25,6 +25,8 @@ export const API_ERROR_CODES = [
   "parameter_not_found",
   "parameter_exists",
   "parameter_in_use",
+  "configuration_not_found",
+  "configuration_exists",
   "invalid_expression",
   "unsupported_kind",
   "unsupported_format",
@@ -159,6 +161,16 @@ export class SketchForgeApiError extends Error {
   /** A delete was refused; `dependents` and `shapeDependents` name what still uses it. */
   get isParameterInUse() {
     return this.code === "parameter_in_use";
+  }
+
+  /** No parameter configuration has that name. */
+  get isConfigurationMissing() {
+    return this.code === "configuration_not_found";
+  }
+
+  /** A parameter configuration with that name already exists. */
+  get isConfigurationDuplicate() {
+    return this.code === "configuration_exists";
   }
 
   /** The parameter that failed, which can be a dependent of the one changed. */

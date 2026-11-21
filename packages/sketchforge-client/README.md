@@ -145,6 +145,13 @@ client.parameters.delete(projectId, name): Promise<ParameterDeleteResult>
 
 client.sketchConstraints.bind(projectId, shapeId, constraintId, expression | null): Promise<SketchConstraintBindResult>
 client.sketchConstraints.unbind(projectId, shapeId, constraintId): Promise<SketchConstraintBindResult>
+client.configurations.list(projectId): Promise<ConfigurationList>
+client.configurations.create(projectId, { name, overrides? }): Promise<ConfigurationWriteResult>
+client.configurations.rename(projectId, name, newName): Promise<ConfigurationWriteResult>
+client.configurations.setOverride(projectId, name, parameter, expression): Promise<ConfigurationWriteResult>
+client.configurations.clearOverride(projectId, name, parameter): Promise<ConfigurationWriteResult>
+client.configurations.delete(projectId, name): Promise<ConfigurationDeleteResult>
+client.configurations.activate(projectId, name | null): Promise<ConfigurationWriteResult>
 ```
 
 `sketchConstraints.bind` binds a sketch output's `distance`, `radius`, `diameter` or `angle` constraint to an expression, re-solves the sketch and rebuilds the solid. `shapeId` is the output or its `sketchSourceId`, and `null` removes the binding and keeps the value. The result's `constraint` is `{ id, kind, value, expression? }`. Every summary of a sketch output lists the same entries in the read-only `sketchConstraints`. `parameters.list` reports constraint bindings that no longer resolve, or that conflict with a bound size field, in `constraintBindingIssues`.
@@ -180,6 +187,9 @@ project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x
 project.importMesh({ fileName, bytes })
 project.parameters() | addParameter({ name, expression, dimension }) | updateParameter(name, change)
 project.renameParameter(name, newName) | deleteParameter(name) | bindExpressions(id, expressions)
+project.configurations() | addConfiguration({ name, overrides? }) | activateConfiguration(name | null)
+project.renameConfiguration(name, newName) | setConfigurationOverride(name, parameter, expression)
+project.clearConfigurationOverride(name, parameter) | deleteConfiguration(name)
 ```
 
 Shapes are described as parameters, with a union per kind so a field that belongs to another kind is a compile error:
@@ -235,13 +245,15 @@ changed.shapes; // the rebuilt box, now 15 mm wide
 await project.bindExpressions(box.id, { width: null }); // unbinds; the width stays 15
 ```
 
-Every parameter write returns the whole table, the written `parameter` when the reply has one, and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` is refused before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `bindingIssues`, the bindings that no longer resolve.
+Every parameter write returns the whole table, the written `parameter` when the reply has one, and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` is refused before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `bindingIssues`, the bindings that no longer resolve, and `activeConfiguration`.
+
+A parameter configuration is a named row of overrides, such as `Large` with `{ wall: "4" }`. A parameter the row does not list keeps its base expression. `configurations.activate` switches the active row, or the base table for `null`, and rebuilds every bound shape. A configuration write returns the configurations, `activeConfiguration`, the table with values under it, and `issues`, the overrides that no longer resolve. `shapes` is empty unless the write changed the active table. See [Parameter configurations](../../docs/REST_API.md#parameter-configurations).
 
 `shapePatchFromSummary` copies `expressions` with the rest of the summary, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `null` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expectedRevision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
 
 `ShapePatch` also accepts `faceDraft` to retain one face draft on a sketch extrusion. The source face is named by its stable ID from `GET /faces`; the draft stores the signed local pull axis and angle. Profile edits replay it only when one planar face matches its original normal. Send `faceDraft: null` to clear the operation. `.skf` preserves the operation and source frame; prism drafts and edge treatments cannot be combined with it yet.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`, and `isLimitExceeded`) or `SketchForgeTransportError`. Parameter failures add `isInvalidExpression`, `isParameterMissing`, `isParameterDuplicate` and `isParameterInUse`, with the details `parameter`, `reason`, `configuration`, `expressionError` (`code`, `message`, `span`, `cycle?`), `dependents`, `shapeDependents`, `sketchConstraintDependents`, `configurationDependents`, and, for a refused binding, `shapeId` or a batch `index`, `field`, `fields`, `constraintId` and `constraintIds`. `isLimitExceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`, and `isLimitExceeded`) or `SketchForgeTransportError`. Parameter failures add `isInvalidExpression`, `isParameterMissing`, `isParameterDuplicate`, `isParameterInUse`, `isConfigurationMissing` and `isConfigurationDuplicate`, with the details `parameter`, `reason`, `configuration`, `expressionError` (`code`, `message`, `span`, `cycle?`), `dependents`, `shapeDependents`, `sketchConstraintDependents`, `configurationDependents`, and, for a refused binding, `shapeId` or a batch `index`, `field`, `fields`, `constraintId` and `constraintIds`. `isLimitExceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 ## Macros
 

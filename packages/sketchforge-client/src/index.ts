@@ -18,6 +18,7 @@ export { Measurements } from "./resources/measurements.js";
 export { Mirrors } from "./resources/mirrors.js";
 export { Parameters } from "./resources/parameters.js";
 export { SketchConstraints } from "./resources/sketch-constraints.js";
+export { Configurations } from "./resources/configurations.js";
 export { Properties } from "./resources/properties.js";
 export { Drawings } from "./resources/drawings.js";
 export { Shell } from "./resources/shell.js";
