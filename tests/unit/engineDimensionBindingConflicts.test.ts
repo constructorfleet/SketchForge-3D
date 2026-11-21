@@ -48,6 +48,8 @@ function sweepProfile(widthExpression?: string): SketchProfile {
   };
 }
 
+const constraintOf = (shape: WorkplaneShape, id: string) => shape.sketchProfile!.constraints!.find((constraint) => constraint.id === id)!;
+
 describe("a shape field binding and a sketch constraint binding on one dimension", () => {
   let root: string;
   let store: ProjectStore;
@@ -118,21 +120,24 @@ describe("a shape field binding and a sketch constraint binding on one dimension
     value(await engine.bindSketchConstraint("height", output.id, "width", "w + 1"));
     value(await engine.bindShapeField("height", output.id, "height", "h"));
 
-    value(await engine.updateParameter("height", "w", { expression: "3" }));
+    value(await engine.updateParameter("height", "w", { expression: "5" }));
     value(await engine.updateParameter("height", "h", { expression: "6" }));
 
     const shape = (await document("height")).shapes[0]!;
     expect(shape.expressions).toEqual({ height: "h" });
+    expect(constraintOf(shape, "width")).toMatchObject({ valueMm: 6, expression: "w + 1" });
     const solved = value(await engine.properties("height", output.id));
-    // 4 x 2 x 6, with corner `a` held: the centre moves +1 in x and up by 1.5.
-    expect(solved.volume).toBeCloseTo(48, 3);
-    expect(solved.centerOfMass.x - original.centerOfMass.x).toBeCloseTo(1, 4);
+    // 6 x 2 x 6, grown from 2 x 2 x 3 with corner `a` held: the centre moves +2 in x and up by 1.5.
+    expect(original.volume).toBeCloseTo(12, 3);
+    expect(solved.volume).toBeCloseTo(72, 3);
+    expect(solved.centerOfMass.x - original.centerOfMass.x).toBeCloseTo(2, 4);
     expect(solved.centerOfMass.y - original.centerOfMass.y).toBeCloseTo(1.5, 4);
     expect(solved.centerOfMass.z).toBeCloseTo(original.centerOfMass.z, 4);
   }, CAD_TEST_TIMEOUT_MS);
 
-  it("keeps a stored conflict usable: an unrelated binding and a parameter change still apply", async () => {
-    const output = await sketchProject("stored", rectangle("w"));
+  it("keeps a stored conflict usable: the constraint is solved, then the bound size applies last", async () => {
+    // The #629 reproduction, as a file written before the check would hold it.
+    const output = await sketchProject("stored", rectangle("w * 2"));
     const current = await document("stored");
     await store.write("stored", current, [{ ...current.shapes[0]!, expressions: { width: "w" } }]);
 
@@ -140,8 +145,83 @@ describe("a shape field binding and a sketch constraint binding on one dimension
     value(await engine.updateParameter("stored", "w", { expression: "4" }));
 
     const shape = (await document("stored")).shapes[0]!;
-    expect(shape.x).toBe(4);
+    expect(constraintOf(shape, "width")).toMatchObject({ valueMm: 8, expression: "w * 2" });
+    expect(shape).toMatchObject({ x: 4, expressions: { width: "w", x: "w" } });
     expect(shape.width).toBeCloseTo(4, 6);
+    const solid = value(await engine.properties("stored", output.id));
+    expect(solid.volume).toBeCloseTo(4 * 2 * 3, 3);
+    expect(solid.centerOfMass.x).toBeCloseTo(4, 4);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses a constraint binding on a revolve whose height is bound", async () => {
+    await writeProjectMetadata(root, "revolve", { id: "revolve", name: "revolve", createdAt: 1, revision: 1 });
+    value(await engine.addParameter("revolve", { name: "w", expression: "12", dimension: "length" }));
+    const created = value(await engine.addShapes("revolve", [{ kind: "revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]], sides: 32 }])).shapes[0]!;
+    const [first, second] = created.sketchProfile!.points;
+    const current = await document("revolve");
+    await store.write("revolve", current, [{
+      ...current.shapes[0]!,
+      sketchProfile: { ...created.sketchProfile!, constraints: [{ id: "edge", kind: "distance", pointIds: [first!.id, second!.id], valueMm: 1 }] },
+    }]);
+    value(await engine.bindShapeField("revolve", created.id, "height", "w"));
+    const before = JSON.stringify(await document("revolve"));
+
+    expect(await engine.bindSketchConstraint("revolve", created.id, "edge", "w / 12")).toMatchObject({
+      ok: false,
+      failure: { reason: "constraint_binding_invalid", error: { code: "conflictingBinding", constraintId: "edge", fields: ["height"] } },
+    });
+    expect(JSON.stringify(await document("revolve"))).toBe(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("drops constraint bindings when a literal size resizes the sketch, and keeps them on an echo", async () => {
+    const output = await sketchProject("resize");
+    value(await engine.bindSketchConstraint("resize", output.id, "width", "w"));
+    const bound = (await document("resize")).shapes[0]!;
+
+    value(await engine.changeShape("resize", output.id, { width: bound.width, name: "Echo" }));
+    expect(constraintOf((await document("resize")).shapes[0]!, "width")).toMatchObject({ valueMm: 3, expression: "w" });
+
+    const resized = value(await engine.changeShape("resize", output.id, { width: 6 }));
+    expect(constraintOf(resized.shape, "width")).toEqual({ id: "width", kind: "distance", pointIds: ["a", "b"], valueMm: 3 });
+    expect(value(await engine.properties("resize", output.id)).volume).toBeCloseTo(6 * 2 * 3, 3);
+
+    // Nothing is bound any more, so a parameter change leaves the solid alone.
+    value(await engine.updateParameter("resize", "w", { expression: "5" }));
+    expect(value(await engine.properties("resize", output.id)).volume).toBeCloseTo(6 * 2 * 3, 3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("reapplies a bound placement after every sketch re-solve, so it is neither stale nor dropped", async () => {
+    const output = await sketchProject("placed");
+    value(await engine.addParameter("placed", { name: "p", expression: "5", dimension: "length" }));
+    value(await engine.bindShapeField("placed", output.id, "x", "p"));
+    const placedAt = async () => {
+      const shape = (await document("placed")).shapes[0]!;
+      expect(shape.expressions).toMatchObject({ x: "p" });
+      expect(shape.x).toBe(5);
+      return value(await engine.properties("placed", output.id));
+    };
+    expect((await placedAt()).centerOfMass.x).toBeCloseTo(5, 4);
+
+    value(await engine.bindSketchConstraint("placed", output.id, "width", "w"));
+    let solid = await placedAt();
+    expect(solid.volume).toBeCloseTo(3 * 2 * 3, 3);
+    expect(solid.centerOfMass.x).toBeCloseTo(5, 4);
+
+    value(await engine.updateParameter("placed", "w", { expression: "4" }));
+    solid = await placedAt();
+    expect(solid.volume).toBeCloseTo(4 * 2 * 3, 3);
+    expect(solid.centerOfMass.x).toBeCloseTo(5, 4);
+
+    // A profile edit by hand moves the sketch's centre too; the bound x still holds.
+    const stored = (await document("placed")).shapes[0]!;
+    const wider: SketchProfile = {
+      ...stored.sketchProfile!,
+      points: stored.sketchProfile!.points.map((point) => (point.id === "b" || point.id === "c" ? { ...point, x: point.x + 2 } : point)),
+    };
+    value(await engine.changeShape("placed", output.id, { sketchProfile: wider }));
+    solid = await placedAt();
+    expect(solid.volume).toBeCloseTo(6 * 2 * 3, 3);
+    expect(solid.centerOfMass.x).toBeCloseTo(5, 4);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("refuses a sweep created with both bindings and writes nothing", async () => {

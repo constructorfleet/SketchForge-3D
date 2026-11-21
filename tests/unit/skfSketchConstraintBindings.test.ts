@@ -72,6 +72,20 @@ describe(".skf sketch constraint bindings", () => {
     ]);
   });
 
+  it("loads a constraint binding beside a bound size field and reports the conflict", async () => {
+    const conflicting = {
+      ...sketch([{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 20, expression: "w * 2" }]),
+      expressions: { width: "w" },
+    };
+    const restored = await importSkfProject(await packaged(conflicting));
+
+    expect(restored.shapes[0]).toMatchObject({ width: 10, expressions: { width: "w" } });
+    expect(restored.shapes[0]?.sketchProfile?.constraints?.[0]).toMatchObject({ valueMm: 20, expression: "w * 2" });
+    expect(restored.constraintBindingIssues).toEqual([
+      expect.objectContaining({ code: "conflictingBinding", shapeId: "profile", constraintId: "d", fields: ["width"] }),
+    ]);
+  });
+
   it("refuses a malformed constraint expression", async () => {
     const bytes = await packaged(sketch([{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10, expression: "w" }]));
     for (const broken of [42, "", "   "]) {
