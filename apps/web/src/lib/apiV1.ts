@@ -11,47 +11,12 @@ import { NextResponse } from "next/server";
 import { authorizeApiRequest, API_TOKEN_ENV } from "@/lib/apiTokens";
 import { ensureProjectsDirectory } from "@/lib/engine/serverProjectFiles";
 import { SERVER_PROJECTS_ENV, safeServerProjectId } from "@/lib/serverProjectStore";
+import { API_ERROR_MESSAGES, type ApiErrorCode } from "@constructorfleet/sketchforge-engine/apiErrors";
 
 export const API_V1_PREFIX = "/api/v1";
 
-/**
- * The machine-readable half of an error, alongside the sentence.
- *
- * A status code is too coarse to act on here. `404` covers a missing project, a
- * missing shape and an API that is switched off entirely; `409` covers both "the
- * project is busy, retry" and "that shape is locked, do not retry". Without a
- * code a client has to match on the prose, which makes every wording change a
- * breaking one -- and both client libraries were doing exactly that.
- */
-export const API_ERROR_CODES = [
-  "api_disabled",
-  "unauthorized",
-  "storage_unconfigured",
-  "invalid_project_id",
-  "invalid_shape_id",
-  "invalid_body",
-  "invalid_request",
-  "project_not_found",
-  "project_exists",
-  "project_busy",
-  "revision_mismatch",
-  "shape_not_found",
-  "shape_locked",
-  "parameter_not_found",
-  "parameter_exists",
-  "parameter_in_use",
-  "invalid_expression",
-  "unsupported_kind",
-  "unsupported_format",
-  "unapplicable_fields",
-  "too_many_shapes",
-  "limit_exceeded",
-  "geometry_failed",
-  "cad_failed",
-  "internal_error",
-] as const;
-
-export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+// Codes and sentences live in the engine so MCP local mode answers with the same ones.
+export { API_ERROR_CODES, type ApiErrorCode } from "@constructorfleet/sketchforge-engine/apiErrors";
 
 export function apiError(message: string, status: number, code: ApiErrorCode, extra?: Record<string, unknown>) {
   return NextResponse.json({ error: message, code, ...extra }, { status, headers: { "Cache-Control": "no-store" } });
@@ -64,15 +29,15 @@ export function apiError(message: string, status: number, code: ApiErrorCode, ex
  * returned, so that a code and its sentence cannot drift apart between routes.
  */
 export const apiErrors = {
-  invalidProjectId: () => apiError("Invalid project id.", 400, "invalid_project_id"),
-  shapeIdRequired: () => apiError("A shapeId is required.", 400, "invalid_shape_id"),
-  jsonBodyRequired: () => apiError("Expected a JSON object body.", 400, "invalid_body"),
-  projectNotFound: (extra?: Record<string, unknown>) => apiError("That project is not on the server.", 404, "project_not_found", extra),
-  projectBusy: (extra?: Record<string, unknown>) => apiError("That project is being changed; try again.", 409, "project_busy", extra),
-  revisionMismatch: (revision: number) => apiError("The project changed since the supplied revision.", 409, "revision_mismatch", { revision }),
-  shapeNotFound: (extra?: Record<string, unknown>) => apiError("That shape is not in the project.", 404, "shape_not_found", extra),
-  shapesNotFound: (ids: readonly string[], extra?: Record<string, unknown>) => apiError(`Not in the project: ${ids.join(", ")}.`, 404, "shape_not_found", extra),
-  shapeLocked: (message = "That shape is locked.", extra?: Record<string, unknown>) => apiError(message, 409, "shape_locked", extra),
+  invalidProjectId: () => apiError(API_ERROR_MESSAGES.invalidProjectId, 400, "invalid_project_id"),
+  shapeIdRequired: () => apiError(API_ERROR_MESSAGES.shapeIdRequired, 400, "invalid_shape_id"),
+  jsonBodyRequired: () => apiError(API_ERROR_MESSAGES.jsonBodyRequired, 400, "invalid_body"),
+  projectNotFound: (extra?: Record<string, unknown>) => apiError(API_ERROR_MESSAGES.projectNotFound, 404, "project_not_found", extra),
+  projectBusy: (extra?: Record<string, unknown>) => apiError(API_ERROR_MESSAGES.projectBusy, 409, "project_busy", extra),
+  revisionMismatch: (revision: number) => apiError(API_ERROR_MESSAGES.revisionMismatch, 409, "revision_mismatch", { revision }),
+  shapeNotFound: (extra?: Record<string, unknown>) => apiError(API_ERROR_MESSAGES.shapeNotFound, 404, "shape_not_found", extra),
+  shapesNotFound: (ids: readonly string[], extra?: Record<string, unknown>) => apiError(API_ERROR_MESSAGES.shapesNotFound(ids), 404, "shape_not_found", extra),
+  shapeLocked: (message: string = API_ERROR_MESSAGES.shapeLocked, extra?: Record<string, unknown>) => apiError(message, 409, "shape_locked", extra),
   limitExceeded: (message: string, limit?: number, given?: number, extra?: Record<string, unknown>) => apiError(message, 413, "limit_exceeded", {
     ...extra,
     ...(limit === undefined ? {} : { limit }),

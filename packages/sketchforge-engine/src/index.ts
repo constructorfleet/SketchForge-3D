@@ -268,3 +268,30 @@ export {
   type SketchConstraintBindingSpec,
   type SketchConstraintDependent,
 } from "./sketchConstraintBindings.js";
+export {
+  API_ERROR_CODES,
+  API_ERROR_MESSAGES,
+  API_PROJECT_ID_MAX_LENGTH,
+  API_PROJECT_ID_PATTERN,
+  apiProjectId,
+  engineFailureToApiError,
+  SHAPE_CHANGE_WORDING,
+  wireExpressionError,
+  type ApiErrorCode,
+  type ApiErrorReply,
+  type ApiFailureWording,
+} from "./apiErrors.js";
+export {
+  API_PARAMETER_DIMENSIONS,
+  API_PARAMETER_EXPRESSION_MAX_LENGTH,
+  API_PARAMETER_MESSAGES,
+  API_PARAMETER_NAME_MAX_LENGTH,
+  apiParameter,
+  apiParameterList,
+  apiParameterName,
+  apiParametersWritten,
+  isApiParameterChangeRequest,
+  isApiParameterCreateRequest,
+  type ApiParameterChange,
+} from "./apiParameters.js";
+export { apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";

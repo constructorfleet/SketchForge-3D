@@ -4,14 +4,12 @@ import { apiShapeSummary } from "@/lib/apiShapes";
 import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { paginateApiV1 } from "@/lib/apiV1Pagination";
 import { parseRequestExpressions } from "@constructorfleet/sketchforge-engine/shapeRequestExpressions";
+import { SHAPE_CHANGE_WORDING } from "@constructorfleet/sketchforge-engine/apiErrors";
 
 export const runtime = "nodejs";
 export const revalidate = false;
 
 const MAX_SHAPES_PER_REQUEST = 200;
-
-/** A change refusing a locked shape says how to unlock it in the same call. */
-const LOCKED_FOR_CHANGE = "That shape is locked. Send locked: false to change it.";
 
 async function getHandler(request: Request) {
   const context = await apiContext(request);
@@ -104,7 +102,7 @@ async function patchHandler(request: Request) {
 
   const changed = await apiEngine(context.root, request).changeShape(projectId, shapeId, parsed.body);
   if (!changed.ok) {
-    return apiEngineError(changed.failure, { oneShape: true, locked: () => LOCKED_FOR_CHANGE });
+    return apiEngineError(changed.failure, SHAPE_CHANGE_WORDING);
   }
   return apiJson({ shape: apiShapeSummary(changed.value.shape), revision: changed.value.revision });
 }
