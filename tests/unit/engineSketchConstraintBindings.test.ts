@@ -308,9 +308,9 @@ describe("expression-bound sketch constraints", () => {
     const horizontal = sweepProfile();
     horizontal.constraints = horizontal.constraints!.map((constraint) => (constraint.id === "h-ab" ? { ...constraint, expression: "w" } as SketchConstraint : constraint));
     expect(await engine.addShapes("sweep", [{ kind: "sketchSweep", profile: horizontal }]))
-      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "constraintNotBindable", constraintId: "h-ab" } } });
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", index: 0, error: { code: "constraintNotBindable", constraintId: "h-ab" } } });
     expect(await engine.addShapes("sweep", [{ kind: "sketchSweep", profile: sweepProfile("unknown") }]))
-      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "invalidExpression", constraintId: "width" } } });
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", index: 0, error: { code: "invalidExpression", constraintId: "width" } } });
     expect(JSON.stringify(await document("sweep"))).toBe(before);
   }, CAD_TEST_TIMEOUT_MS);
 
