@@ -21,6 +21,7 @@ import { Imports } from "./resources/imports.js";
 import { Interference } from "./resources/interference.js";
 import { Measurements } from "./resources/measurements.js";
 import { Mirrors } from "./resources/mirrors.js";
+import { Parameters } from "./resources/parameters.js";
 import { Parts } from "./resources/parts.js";
 import { Projects } from "./resources/projects.js";
 import { Properties } from "./resources/properties.js";
@@ -35,6 +36,13 @@ import type {
   BooleanCutResult,
   GroupResult,
   MirrorAxis,
+  ParameterChange,
+  ParameterDeleteResult,
+  ParameterList,
+  ParameterRequest,
+  ParameterWriteResult,
+  ShapeExpressionChanges,
+  ShapePatchResult,
   AlignResult,
   DistributeRequest,
   DistributeResult,
@@ -94,6 +102,7 @@ export const CLIENT_RESOURCE_OPERATIONS = {
   booleans: { booleanShapes: ["cut"] },
   groups: { groupShapes: ["group"], ungroupShape: ["ungroup"] },
   parts: { splitParts: ["separate"] },
+  parameters: { listParameters: ["list"], createParameter: ["create"], updateParameter: ["update", "rename"], deleteParameter: ["delete"] },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, readonly string[]>> | readonly []>>;
 
 /** Convenience methods that emit a sequence of REST operations rather than one route. */
@@ -124,6 +133,7 @@ export class SketchForgeClient {
   readonly booleans: Booleans;
   readonly groups: Groups;
   readonly parts: Parts;
+  readonly parameters: Parameters;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -150,6 +160,7 @@ export class SketchForgeClient {
     this.booleans = new Booleans(this.transport);
     this.groups = new Groups(this.transport);
     this.parts = new Parts(this.transport);
+    this.parameters = new Parameters(this.transport);
   }
 
   get apiRoot() {
@@ -214,6 +225,31 @@ export class ProjectHandle {
 
   update(shapeId: string, changes: ShapePatch) {
     return this.client.shapes.update(this.id, shapeId, changes);
+  }
+
+  /** Binds fields to expressions; `null` clears a binding and keeps the number. */
+  bindExpressions(shapeId: string, expressions: ShapeExpressionChanges): Promise<ShapePatchResult> {
+    return this.client.shapes.update(this.id, shapeId, { expressions });
+  }
+
+  parameters(): Promise<ParameterList> {
+    return this.client.parameters.list(this.id);
+  }
+
+  addParameter(parameter: ParameterRequest): Promise<ParameterWriteResult> {
+    return this.client.parameters.create(this.id, parameter);
+  }
+
+  updateParameter(name: string, change: ParameterChange): Promise<ParameterWriteResult> {
+    return this.client.parameters.update(this.id, name, change);
+  }
+
+  renameParameter(name: string, newName: string): Promise<ParameterWriteResult> {
+    return this.client.parameters.rename(this.id, name, newName);
+  }
+
+  deleteParameter(name: string): Promise<ParameterDeleteResult> {
+    return this.client.parameters.delete(this.id, name);
   }
 
   remove(shapeId: string) {

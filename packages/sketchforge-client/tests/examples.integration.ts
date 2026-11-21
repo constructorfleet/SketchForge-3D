@@ -20,6 +20,8 @@ import boltPlate from "../examples/bolt-plate.macro.mjs";
 import boltCircle from "../examples/bolt-circle.macro.mjs";
 import filletedBox from "../examples/filleted-box.macro.mjs";
 import tapDrillPlate from "../examples/tap-drill-plate.macro.mjs";
+import parametricBox from "../examples/parametric-box.macro.mjs";
+import { SketchForgeApiError } from "../src/errors.js";
 
 let client: SketchForgeClient;
 const createdProjects: string[] = [];
@@ -179,5 +181,54 @@ describe("filleted box", () => {
     );
     expect(report).toBeInstanceOf(Error);
     expect((report as Error).message).toMatch(/422/);
+  });
+});
+
+describe("parametric box", () => {
+  it("rebuilds the bound solid when its parameter changes", async () => {
+    const report = await run(parametricBox, { wall: "2", resized: "3" });
+    const result = report.result as {
+      expressions: Record<string, string>;
+      before: { width: number; x: number; volume: number; centerX: number };
+      after: { width: number; x: number; volume: number; centerX: number };
+      rebuilt: number;
+    };
+
+    expect(result.expressions).toEqual({ width: "wall * 5", x: "wall * 10" });
+    expect(result.rebuilt).toBe(1);
+    expect(result.before).toMatchObject({ width: 10, x: 20 });
+    expect(result.after).toMatchObject({ width: 15, x: 30 });
+    // 10 x 10 x (wall * 5), centred on wall * 10.
+    expect(result.before.volume).toBeCloseTo(1000, 3);
+    expect(result.before.centerX).toBeCloseTo(20, 3);
+    expect(result.after.volume).toBeCloseTo(1500, 3);
+    expect(result.after.centerX).toBeCloseTo(30, 3);
+  });
+
+  it("refuses to delete a bound parameter, renames through its bindings, and clears them", async () => {
+    const report = await run(parametricBox);
+    const project = client.project(report.projectId);
+    const { shapeId } = report.result as { shapeId: string };
+
+    const refused = await project.deleteParameter("wall").catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(SketchForgeApiError);
+    expect((refused as SketchForgeApiError).isParameterInUse).toBe(true);
+    expect((refused as SketchForgeApiError).shapeDependents.map(({ shapeId: id, fields }) => ({ id, fields: [...fields].sort() })))
+      .toEqual([{ id: shapeId, fields: ["width", "x"] }]);
+
+    const renamed = await project.renameParameter("wall", "shell");
+    expect(renamed.shapes.find((shape) => shape.id === shapeId)?.expressions).toEqual({ width: "shell * 5", x: "shell * 10" });
+
+    const invalid = await project.updateParameter("shell", { expression: "shell + 1" }).catch((error: unknown) => error);
+    expect((invalid as SketchForgeApiError).isInvalidExpression).toBe(true);
+    expect((invalid as SketchForgeApiError).expressionError?.code).toBeTruthy();
+
+    const cleared = await project.bindExpressions(shapeId, { width: null, x: null });
+    expect(cleared.shape.expressions).toBeUndefined();
+    expect(cleared.shape.width).toBe(15);
+    expect((await project.propertiesOf(shapeId)).volume).toBeCloseTo(1500, 3);
+
+    await expect(project.deleteParameter("shell")).resolves.toMatchObject({ deleted: true, name: "shell" });
+    await expect(project.parameters()).resolves.toMatchObject({ parameters: [], bindingIssues: [] });
   });
 });

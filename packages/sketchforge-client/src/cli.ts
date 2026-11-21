@@ -15,7 +15,16 @@ import { clientFromEnvironment, targetProjectFromEnvironment, MissingConfigurati
 import type { Environment } from "./environment.js";
 import { SketchForgeApiError, SketchForgeTransportError } from "./errors.js";
 import type { SketchForgeClient } from "./client.js";
-import { IMPORTABLE_MESH_FORMATS, PROJECT_EXPORT_FORMATS, type ProjectExportFormat } from "./types.js";
+import {
+  IMPORTABLE_MESH_FORMATS,
+  PARAMETER_DIMENSIONS,
+  PROJECT_EXPORT_FORMATS,
+  type ParameterDimension,
+  type ParameterList,
+  type ParameterWriteResult,
+  type ProjectExportFormat,
+  type ProjectParameter,
+} from "./types.js";
 import { macroFromModule, runMacro, type MacroRunReport } from "./macro.js";
 
 const USAGE = `sketchforge-macro <macro-file> [--param=value ...] [--project=<id>] [--json]
@@ -24,6 +33,11 @@ sketchforge-macro projects create <name>
 sketchforge-macro projects delete <project-id>
 sketchforge-macro export --format <fmt> --out <file> [--project <id>]
 sketchforge-macro import <file> [--project <id>]
+sketchforge-macro parameters list [--project <id>]
+sketchforge-macro parameters create <name> <expression> [--dimension <length|angle|unitless>] [--project <id>]
+sketchforge-macro parameters update <name> [--expression <expression>] [--dimension <dimension>] [--project <id>]
+sketchforge-macro parameters rename <name> <new-name> [--project <id>]
+sketchforge-macro parameters delete <name> [--project <id>]
 
 Environment:
   SKETCHFORGE_API_TOKEN   required; the server's API token
@@ -106,7 +120,81 @@ function selectedProject(options: Map<string, string>, environment: Environment)
   return projectId;
 }
 
-/** Execute one direct project, import, or export command using the public client resources. */
+function dimensionOption(options: Map<string, string>): ParameterDimension | undefined {
+  const dimension = options.get("dimension");
+  if (dimension !== undefined && !(PARAMETER_DIMENSIONS as readonly string[]).includes(dimension)) {
+    throw new Error(`--dimension must be one of: ${PARAMETER_DIMENSIONS.join(", ")}.`);
+  }
+  return dimension as ParameterDimension | undefined;
+}
+
+function describeParameter(parameter: ProjectParameter) {
+  const value = parameter.value === null ? "-" : String(parameter.value);
+  const error = parameter.error ? `\t(${parameter.error.message})` : "";
+  return `${parameter.name}\t${parameter.expression}\t${parameter.dimension}\t${value}${error}`;
+}
+
+function describeParameterList(listed: ParameterList) {
+  const lines = listed.parameters.length ? listed.parameters.map(describeParameter) : ["No parameters."];
+  if (listed.bindingIssues.length) {
+    lines.push("Unresolved bindings:", ...listed.bindingIssues.map((issue) => `  ${issue.shapeId} ${issue.field}: ${issue.message}`));
+  }
+  return lines.join("\n");
+}
+
+function shapeCount(written: ParameterWriteResult, verb: string) {
+  return `${written.shapes.length} shape${written.shapes.length === 1 ? "" : "s"} ${verb}`;
+}
+
+/** Splits leading positional arguments from the `--name value` options after them. */
+function positionalsThenOptions(arguments_: readonly string[], count: number, usage: string) {
+  const positionals = arguments_.slice(0, count);
+  if (positionals.length < count || positionals.some((argument) => argument.startsWith("--"))) throw new Error(`Use ${usage}.`);
+  return { positionals, options: optionValues(arguments_.slice(count)) };
+}
+
+async function executeParameterCommand(rest: readonly string[], client: SketchForgeClient, environment: Environment): Promise<string> {
+  const [action, ...arguments_] = rest;
+  if (action === "list") {
+    const { options } = positionalsThenOptions(arguments_, 0, "parameters list [--project <id>]");
+    rejectUnknownOptions(options, ["project"]);
+    return describeParameterList(await client.parameters.list(selectedProject(options, environment)));
+  }
+  if (action === "create") {
+    const { positionals: [name, expression], options } = positionalsThenOptions(arguments_, 2, "parameters create <name> <expression>");
+    rejectUnknownOptions(options, ["dimension", "project"]);
+    const dimension = dimensionOption(options) ?? "length";
+    const written = await client.parameters.create(selectedProject(options, environment), { name: name!, expression: expression!, dimension });
+    return `Created parameter ${written.parameter.name} = ${written.parameter.value} (${shapeCount(written, "rebuilt")}).`;
+  }
+  if (action === "update") {
+    const { positionals: [name], options } = positionalsThenOptions(arguments_, 1, "parameters update <name> --expression <expression>");
+    rejectUnknownOptions(options, ["expression", "dimension", "project"]);
+    const expression = options.get("expression");
+    const dimension = dimensionOption(options);
+    if (expression === undefined && dimension === undefined) throw new Error("Give --expression or --dimension to change.");
+    const written = await client.parameters.update(selectedProject(options, environment), name!, {
+      ...(expression === undefined ? {} : { expression }),
+      ...(dimension === undefined ? {} : { dimension }),
+    });
+    return `Changed parameter ${written.parameter.name} = ${written.parameter.value} (${shapeCount(written, "rebuilt")}).`;
+  }
+  if (action === "rename") {
+    const { positionals: [name, newName], options } = positionalsThenOptions(arguments_, 2, "parameters rename <name> <new-name>");
+    rejectUnknownOptions(options, ["project"]);
+    const written = await client.parameters.rename(selectedProject(options, environment), name!, newName!);
+    return `Renamed parameter ${name} to ${written.parameter.name} (${shapeCount(written, "rewritten")}).`;
+  }
+  if (action === "delete") {
+    const { positionals: [name], options } = positionalsThenOptions(arguments_, 1, "parameters delete <name>");
+    rejectUnknownOptions(options, ["project"]);
+    await client.parameters.delete(selectedProject(options, environment), name!);
+    return `Deleted parameter ${name}.`;
+  }
+  throw new Error("Use parameters list, create, update, rename, or delete.");
+}
+
+/** Executes one direct project, parameter, import, or export command through the public client resources. */
 export async function executeDirectCommand(argv: readonly string[], client: SketchForgeClient, environment: Environment = process.env): Promise<string> {
   const [command, ...rest] = argv;
   if (command === "projects") {
@@ -128,6 +216,8 @@ export async function executeDirectCommand(argv: readonly string[], client: Sket
     }
     throw new Error("Use projects list, projects create <name>, or projects delete <project-id>.");
   }
+
+  if (command === "parameters") return executeParameterCommand(rest, client, environment);
 
   if (command === "export") {
     const options = optionValues(rest);
@@ -169,7 +259,7 @@ export async function executeDirectCommand(argv: readonly string[], client: Sket
 }
 
 export async function main(argv: readonly string[], environment: Environment = process.env, fetch?: typeof globalThis.fetch) {
-  if (["projects", "export", "import"].includes(argv[0] ?? "")) {
+  if (["projects", "parameters", "export", "import"].includes(argv[0] ?? "")) {
     if (argv.includes("--help") || argv.includes("-h")) {
       process.stdout.write(`${USAGE}\n`);
       return 0;
@@ -209,6 +299,10 @@ function explain(error: unknown) {
   if (error instanceof SketchForgeApiError) {
     if (error.looksDisabled) return "The server has no SKETCHFORGE_API_TOKEN set, so its REST API is switched off.";
     if (error.needsStorage) return "The server has no SKETCHFORGE_PROJECTS_DIR set, so it has nowhere to store projects.";
+    if (error.isParameterInUse) {
+      const users = [...error.dependents, ...error.shapeDependents.map(({ shapeId, fields }) => `${shapeId} (${fields.join(", ")})`)];
+      return `${error.detail ?? error.message}\nStill used by: ${users.join(", ")}.`;
+    }
     return error.message;
   }
   return error instanceof Error ? (error.stack ?? error.message) : String(error);

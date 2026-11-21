@@ -120,6 +120,52 @@ class ExampleMacroTests(unittest.TestCase):
             self.run_example("filleted_box.py", width="30", depth="30", height="2", radius="9")
         self.assertEqual(caught.exception.status, 422)
 
+    def test_parametric_box_rebuilds_the_bound_solid_when_its_parameter_changes(self) -> None:
+        report = self.run_example("parametric_box.py", wall="2", resized="3")
+        result: Dict[str, Any] = report.result
+
+        self.assertEqual(result["expressions"], {"width": "wall * 5", "x": "wall * 10"})
+        self.assertEqual(result["rebuilt"], 1)
+        self.assertEqual((result["before"]["width"], result["before"]["x"]), (10, 20))
+        self.assertEqual((result["after"]["width"], result["after"]["x"]), (15, 30))
+        # 10 x 10 x (wall * 5), centred on wall * 10.
+        self.assertAlmostEqual(result["before"]["volume"], 1000, places=3)
+        self.assertAlmostEqual(result["before"]["centerX"], 20, places=3)
+        self.assertAlmostEqual(result["after"]["volume"], 1500, places=3)
+        self.assertAlmostEqual(result["after"]["centerX"], 30, places=3)
+
+    def test_parametric_box_parameter_lifecycle(self) -> None:
+        report = self.run_example("parametric_box.py")
+        project = self.client.project(report.project_id)
+        shape_id = report.result["shapeId"]
+
+        with self.assertRaises(SketchForgeApiError) as refused:
+            project.delete_parameter("wall")
+        self.assertTrue(refused.exception.is_parameter_in_use)
+        self.assertEqual(
+            [(entry.shape_id, sorted(entry.fields)) for entry in refused.exception.shape_dependents],
+            [(shape_id, ["width", "x"])],
+        )
+
+        renamed = project.rename_parameter("wall", "shell")
+        bound = next(shape for shape in renamed.shapes if shape.id == shape_id)
+        self.assertEqual(bound.expressions, {"width": "shell * 5", "x": "shell * 10"})
+
+        with self.assertRaises(SketchForgeApiError) as invalid:
+            project.update_parameter("shell", expression="shell + 1")
+        self.assertTrue(invalid.exception.is_invalid_expression)
+        self.assertIsNotNone(invalid.exception.expression_error)
+
+        cleared = project.bind_expressions(shape_id, {"width": None, "x": None})
+        self.assertEqual(cleared.expressions, {})
+        self.assertEqual(cleared.width, 15)
+        self.assertAlmostEqual(project.properties_of(shape_id).volume, 1500, places=3)
+
+        deleted = project.delete_parameter("shell")
+        self.assertTrue(deleted.deleted)
+        listed = project.parameters()
+        self.assertEqual((listed.parameters, listed.binding_issues), ([], []))
+
 
 if __name__ == "__main__":
     unittest.main()

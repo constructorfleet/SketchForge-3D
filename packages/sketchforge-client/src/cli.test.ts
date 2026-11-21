@@ -64,4 +64,41 @@ describe("direct CLI commands", () => {
     expect(server.calls[1]?.url).toBe("http://localhost:3100/api/v1/imports?projectId=p1");
     expect(server.calls[1]?.body).toMatchObject({ fileName: "bracket.stl", data: "AQID" });
   });
+
+  it("lists, creates, changes, renames, and deletes parameters in the selected project", async () => {
+    const wall = { name: "wall", expression: "2 mm", dimension: "length", value: 2 };
+    const written = { parameter: wall, parameters: [wall], shapes: [{ id: "s1" }], revision: 2 };
+    const server = fakeServer(
+      { body: { parameters: [wall], bindingIssues: [{ shapeId: "s1", field: "width", code: "unknownName", message: "Unknown name gap." }], revision: 1 } },
+      { status: 201, body: written },
+      { body: { ...written, parameter: { ...wall, expression: "3 mm", value: 3 } } },
+      { body: { ...written, parameter: { ...wall, name: "shell" } } },
+      { body: { deleted: true, name: "shell", parameters: [], shapes: [], revision: 5 } },
+    );
+    const api = client(server);
+    const environment = { SKETCHFORGE_PROJECT_ID: "p1" };
+
+    const listed = await executeDirectCommand(["parameters", "list"], api, environment);
+    expect(listed).toContain("wall\t2 mm\tlength\t2");
+    expect(listed).toContain("s1 width: Unknown name gap.");
+    await expect(executeDirectCommand(["parameters", "create", "wall", "2 mm"], api, environment)).resolves.toContain("Created parameter wall = 2 (1 shape rebuilt).");
+    await expect(executeDirectCommand(["parameters", "update", "wall", "--expression", "3 mm", "--project", "p2"], api, environment)).resolves.toContain("wall = 3");
+    await expect(executeDirectCommand(["parameters", "rename", "wall", "shell"], api, environment)).resolves.toContain("Renamed parameter wall to shell");
+    await expect(executeDirectCommand(["parameters", "delete", "shell"], api, environment)).resolves.toContain("Deleted parameter shell.");
+
+    expect(server.calls.map(({ method, url, body }) => [method, new URL(url).search, body])).toEqual([
+      ["GET", "?projectId=p1", undefined],
+      ["POST", "?projectId=p1", { name: "wall", expression: "2 mm", dimension: "length" }],
+      ["PATCH", "?projectId=p2&name=wall", { expression: "3 mm" }],
+      ["PATCH", "?projectId=p1&name=wall", { name: "shell" }],
+      ["DELETE", "?projectId=p1&name=shell", undefined],
+    ]);
+  });
+
+  it("refuses a parameter dimension the server does not know, before sending anything", async () => {
+    const server = fakeServer({ body: {} });
+    await expect(executeDirectCommand(["parameters", "create", "wall", "2", "--dimension", "volume"], client(server), { SKETCHFORGE_PROJECT_ID: "p1" })).rejects.toThrow(/length, angle, unitless/);
+    await expect(executeDirectCommand(["parameters", "update", "wall"], client(server), { SKETCHFORGE_PROJECT_ID: "p1" })).rejects.toThrow(/--expression or --dimension/);
+    expect(server.calls).toHaveLength(0);
+  });
 });

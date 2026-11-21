@@ -33,9 +33,9 @@ Environment:
   SKETCHFORGE_PROJECT_ID  the project for a macro declaring project: "target"
 ```
 
-### Direct project and file commands
+### Direct project, parameter, and file commands
 
-The same executable can list, create, and delete projects, export a selected project, and import an STL, OBJ, or SVG file:
+The same executable can list, create, and delete projects, export a selected project, import an STL, OBJ, or SVG file, and manage a project's parameter table:
 
 ```text
 sketchforge-macro projects list
@@ -43,9 +43,14 @@ sketchforge-macro projects create <name>
 sketchforge-macro projects delete <project-id>
 sketchforge-macro export --format <fmt> --out <file> [--project <id>]
 sketchforge-macro import <file> [--project <id>]
+sketchforge-macro parameters list [--project <id>]
+sketchforge-macro parameters create <name> <expression> [--dimension <length|angle|unitless>] [--project <id>]
+sketchforge-macro parameters update <name> [--expression <expression>] [--dimension <dimension>] [--project <id>]
+sketchforge-macro parameters rename <name> <new-name> [--project <id>]
+sketchforge-macro parameters delete <name> [--project <id>]
 ```
 
-Export uses `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file.
+Export and the parameter commands use `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file. `parameters create` defaults `--dimension` to `length`; `parameters list` also prints the shape bindings that no longer resolve. See [Parameters and expressions](./REST_API.md#parameters-and-expressions) for what each write rebuilds.
 
 ### `sketchforge-mcp`
 

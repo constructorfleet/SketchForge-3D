@@ -68,6 +68,8 @@ class _ShapePlacement(TypedDict, total=False):
     taperTopDepth: float
     taperBottomWidth: float
     taperBottomDepth: float
+    #: Binds fields to parameter expressions; feature settings use dotted keys.
+    expressions: Mapping[str, str]
 
 
 class BoxShapeRequest(_ShapePlacement):
@@ -451,6 +453,16 @@ def _text(payload: Mapping[str, Any], key: str, default: str = "") -> str:
     return value if isinstance(value, str) else default
 
 
+def _string_map(value: Any) -> Dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): entry for key, entry in value.items() if isinstance(entry, str)}
+
+
+def _strings(value: Any) -> List[str]:
+    return [entry for entry in value if isinstance(entry, str)] if isinstance(value, list) else []
+
+
 def _optional_number(payload: Mapping[str, Any], key: str) -> Optional[float]:
     """
     A number the server reports as ``null`` when it does not apply.
@@ -599,6 +611,8 @@ class ShapeSummary:
     face_colors: Dict[str, str] = field(default_factory=dict)
     step_assembly: List[StepAssemblyNode] = field(default_factory=list)
     step_component: Optional[StepComponent] = None
+    #: Bound fields' expressions. Each bound field still carries its resolved number.
+    expressions: Dict[str, str] = field(default_factory=dict)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
@@ -629,6 +643,7 @@ class ShapeSummary:
         "faceColors",
         "stepAssembly",
         "stepComponent",
+        "expressions",
     ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
@@ -668,6 +683,7 @@ class ShapeSummary:
             step_component=StepComponent.from_payload(payload["stepComponent"]) if isinstance(payload.get("stepComponent"), Mapping) else None,
             revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
             profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
+            expressions=_string_map(payload.get("expressions")),
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},
         )
 
@@ -735,6 +751,8 @@ class ShapeSummary:
             patch["sketchProfile"] = self.sketch_profile
         if self.face_draft is not None:
             patch["faceDraft"] = dict(self.face_draft)
+        if self.expressions:
+            patch["expressions"] = dict(self.expressions)
         patch.update(changes)
         return patch
 
@@ -1204,3 +1222,175 @@ class PatternResult:
 
 #: An import answers with the same three fields a treatment does.
 MeshImportResult = TreatmentResult
+
+
+ParameterDimension = Literal["length", "angle", "unitless"]
+#: Values are in millimetres, degrees, or plain units respectively.
+PARAMETER_DIMENSIONS: Tuple[ParameterDimension, ...] = get_args(ParameterDimension)
+
+
+@dataclass(frozen=True)
+class ExpressionSpan:
+    """Half-open character range in an expression."""
+
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class ExpressionError:
+    """The evaluator's reason an expression does not resolve."""
+
+    code: str
+    message: str
+    span: ExpressionSpan
+    #: Set for a cycle: the parameters around it, back to the first.
+    cycle: Optional[List[str]] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ExpressionError":
+        span = payload.get("span")
+        span = span if isinstance(span, Mapping) else {}
+        cycle = payload.get("cycle")
+        return cls(
+            code=_text(payload, "code"),
+            message=_text(payload, "message"),
+            span=ExpressionSpan(start=int(_number(span, "start")), end=int(_number(span, "end"))),
+            cycle=_strings(cycle) if isinstance(cycle, list) else None,
+        )
+
+
+def _expression_error(value: Any) -> Optional[ExpressionError]:
+    return ExpressionError.from_payload(value) if isinstance(value, Mapping) else None
+
+
+@dataclass(frozen=True)
+class ParameterIssue:
+    """Why a stored parameter no longer resolves."""
+
+    code: str
+    message: str
+    expression_error: Optional[ExpressionError] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterIssue":
+        return cls(
+            code=_text(payload, "code"),
+            message=_text(payload, "message"),
+            expression_error=_expression_error(payload.get("expressionError")),
+        )
+
+
+@dataclass(frozen=True)
+class ProjectParameter:
+    """One entry of a project's parameter table."""
+
+    name: str
+    expression: str
+    dimension: str
+    #: A stale entry keeps its last value, or ``None`` when it never had one.
+    value: Optional[float]
+    #: Set when the stored entry no longer resolves.
+    error: Optional[ParameterIssue] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ProjectParameter":
+        error = payload.get("error")
+        return cls(
+            name=_text(payload, "name"),
+            expression=_text(payload, "expression"),
+            dimension=_text(payload, "dimension"),
+            value=_optional_number(payload, "value"),
+            error=ParameterIssue.from_payload(error) if isinstance(error, Mapping) else None,
+        )
+
+
+@dataclass(frozen=True)
+class BindingIssue:
+    """A shape binding that no longer resolves."""
+
+    shape_id: str
+    field: str
+    code: str
+    message: str
+    expression_error: Optional[ExpressionError] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "BindingIssue":
+        return cls(
+            shape_id=_text(payload, "shapeId"),
+            field=_text(payload, "field"),
+            code=_text(payload, "code"),
+            message=_text(payload, "message"),
+            expression_error=_expression_error(payload.get("expressionError")),
+        )
+
+
+def _parameters(payload: Mapping[str, Any]) -> List[ProjectParameter]:
+    return [ProjectParameter.from_payload(entry) for entry in payload.get("parameters") or [] if isinstance(entry, Mapping)]
+
+
+def _shapes(payload: Mapping[str, Any]) -> List[ShapeSummary]:
+    return [ShapeSummary.from_payload(entry) for entry in payload.get("shapes") or [] if isinstance(entry, Mapping)]
+
+
+@dataclass(frozen=True)
+class ParameterList:
+    parameters: List[ProjectParameter]
+    binding_issues: List[BindingIssue]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterList":
+        return cls(
+            parameters=_parameters(payload),
+            binding_issues=[BindingIssue.from_payload(entry) for entry in payload.get("bindingIssues") or [] if isinstance(entry, Mapping)],
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ParameterWriteResult:
+    """The written entry, the whole table, and the top-level shapes the write rebuilt or rewrote."""
+
+    parameter: ProjectParameter
+    parameters: List[ProjectParameter]
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterWriteResult":
+        parameter = payload.get("parameter")
+        return cls(
+            parameter=ProjectParameter.from_payload(parameter if isinstance(parameter, Mapping) else {}),
+            parameters=_parameters(payload),
+            shapes=_shapes(payload),
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ParameterDeleteResult:
+    deleted: bool
+    name: str
+    parameters: List[ProjectParameter]
+    shapes: List[ShapeSummary]
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterDeleteResult":
+        return cls(
+            deleted=bool(payload.get("deleted")),
+            name=_text(payload, "name"),
+            parameters=_parameters(payload),
+            shapes=_shapes(payload),
+            revision=int(_number(payload, "revision")),
+        )
+
+
+@dataclass(frozen=True)
+class ShapeDependent:
+    """A shape that a refused parameter delete still binds, and which fields."""
+
+    shape_id: str
+    fields: List[str]

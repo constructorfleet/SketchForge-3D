@@ -135,6 +135,12 @@ client.patterns.ring(projectId, ids, count, { x, z }, { sweepAngle?, rotateCopie
 
 client.imports.apply(projectId, { fileName, bytes, mediaType? }): Promise<MeshImportResult>
 client.imports.readable(fileName): boolean
+
+client.parameters.list(projectId): Promise<ParameterList>
+client.parameters.create(projectId, { name, expression, dimension }): Promise<ParameterWriteResult>
+client.parameters.update(projectId, name, { expression?, dimension? }): Promise<ParameterWriteResult>
+client.parameters.rename(projectId, name, newName): Promise<ParameterWriteResult>
+client.parameters.delete(projectId, name): Promise<ParameterDeleteResult>
 ```
 
 Set `expectedRevision` to the revision from a project's previous response to send `If-Match: "<revision>"` with each write request. A stale value raises `SketchForgeApiError` with status `409` and code `revision_mismatch`; the error's `revision` is the current project revision. Use a client configured for one conditional write at a time, then create a new one with the returned revision for the next write.
@@ -166,6 +172,8 @@ project.draftPrism(id, angle)
 project.align({ ids, axis, target }) | alignTops(ids, anchorId?) | distribute({ ids, axis?, spacing? })
 project.pattern(request) | row(ids, count, stepX, stepZ?) | ring(ids, count, { x, z }, options?)
 project.importMesh({ fileName, bytes })
+project.parameters() | addParameter({ name, expression, dimension }) | updateParameter(name, change)
+project.renameParameter(name, newName) | deleteParameter(name) | bindExpressions(id, expressions)
 ```
 
 Shapes are described as parameters, with a union per kind so a field that belongs to another kind is a compile error:
@@ -209,9 +217,25 @@ const top = await project.export({ format: "svg", view: "top" });
 plain revolves. Omitting the option preserves the default mesh listing;
 `topology: "mesh"` selects it explicitly.
 
+### Parameters and expressions
+
+A project parameter has a `name`, an `expression` and a `dimension` from `PARAMETER_DIMENSIONS` (`length`, `angle` or `unitless`). Shape fields bind to expressions through `expressions`, beside the numbers; feature settings use dotted keys such as `revolve.sweepAngle`. A summary reports each bound field's resolved number and its text under `expressions`:
+
+```ts
+await project.addParameter({ name: "wall", expression: "2 mm", dimension: "length" });
+const box = await project.add({ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5" } });
+const changed = await project.updateParameter("wall", { expression: "3 mm" });
+changed.shapes; // the rebuilt box, now 15 mm wide
+await project.bindExpressions(box.id, { width: null }); // unbinds; the width stays 15
+```
+
+Every parameter write returns the whole table and the top-level `shapes` it rebuilt or rewrote. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `bindingIssues`, the bindings that no longer resolve.
+
+`shapePatchFromSummary` keeps `expressions`, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `null` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expectedRevision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
+
 `ShapePatch` also accepts `faceDraft` to retain one face draft on a sketch extrusion. The source face is named by its stable ID from `GET /faces`; the draft stores the signed local pull axis and angle. Profile edits replay it only when one planar face matches its original normal. Send `faceDraft: null` to clear the operation. `.skf` preserves the operation and source frame; prism drafts and edge treatments cannot be combined with it yet.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`, and `isLimitExceeded`) or `SketchForgeTransportError`. `isLimitExceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looksDisabled`, `needsStorage`, `isProjectBusy`, and `isLimitExceeded`) or `SketchForgeTransportError`. Parameter failures add `isInvalidExpression`, `isParameterMissing`, `isParameterDuplicate` and `isParameterInUse`, with the details `parameter`, `reason`, `expressionError` (`code`, `message`, `span`, `cycle?`), `dependents`, `shapeDependents`, and, for a refused binding, `shapeId` or a batch `index`, `field` and `fields`. `isLimitExceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 ## Macros
 
@@ -259,9 +283,14 @@ npx sketchforge-macro projects create "Bracket"
 npx sketchforge-macro projects delete <project-id>
 npx sketchforge-macro export --format stl --out bracket.stl --project <project-id>
 npx sketchforge-macro import bracket.stl
+npx sketchforge-macro parameters list --project <project-id>
+npx sketchforge-macro parameters create wall "2 mm" --project <project-id>
+npx sketchforge-macro parameters update wall --expression "3 mm" --project <project-id>
+npx sketchforge-macro parameters rename wall shell --project <project-id>
+npx sketchforge-macro parameters delete shell --project <project-id>
 ```
 
-Export uses `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes into that selected project when given; without one, it creates a project named after the file. Direct file import supports STL, OBJ, and SVG; export supports STL, OBJ, 3MF, STEP, SKF, ZIP, SVG, and DXF.
+Parameter commands use `--project` or `SKETCHFORGE_PROJECT_ID`. `create` takes `--dimension length|angle|unitless` and defaults to `length`. Export uses `--project` or `SKETCHFORGE_PROJECT_ID`. Import writes into that selected project when given; without one, it creates a project named after the file. Direct file import supports STL, OBJ, and SVG; export supports STL, OBJ, 3MF, STEP, SKF, ZIP, SVG, and DXF.
 
 ### Project modes, and why there is no default
 
@@ -282,7 +311,7 @@ A module that exports a bare function instead of a definition runs in a `fresh` 
 
 ## Examples
 
-`examples/` holds the four worked macros, which double as the integration tests:
+`examples/` holds the five worked macros, which double as the integration tests:
 
 | Macro | Builds |
 | --- | --- |
@@ -290,6 +319,7 @@ A module that exports a bare function instead of a definition runs in a `fresh` 
 | `bolt-circle.macro.mjs` | A flange with N tapped holes on a ring of radius R |
 | `filleted-box.macro.mjs` | A box from three numbers, with every roundable edge filleted on the server |
 | `tap-drill-plate.macro.mjs` | A plate cut with an M8 thread through `project.cut`, exported as STL |
+| `parametric-box.macro.mjs` | A box bound to a `wall` parameter, rebuilt when the parameter changes |
 
 Tapped holes are `kind: "thread"` with `hole: true`: the form is cut wider by a clearance and the shape is marked as a hole, so grouping it with the plate in the editor or through `project.group` taps the plate. `project.cut` can also subtract a thread mesh directly. `tap-drill-plate.macro.mjs` runs the whole cut-and-export workflow through the API with an M8 thread cutter.
 

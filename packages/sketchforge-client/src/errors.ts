@@ -1,5 +1,7 @@
 /** Errors the API answers with, kept distinguishable so a macro can react to them. */
 
+import type { ExpressionError, ShapeDependent } from "./types.js";
+
 /**
  * The server's machine-readable reason, which a status code is too coarse to
  * carry: `404` is a missing project, a missing shape or an API that is switched
@@ -20,6 +22,10 @@ export const API_ERROR_CODES = [
   "revision_mismatch",
   "shape_not_found",
   "shape_locked",
+  "parameter_not_found",
+  "parameter_exists",
+  "parameter_in_use",
+  "invalid_expression",
   "unsupported_kind",
   "unsupported_format",
   "unapplicable_fields",
@@ -27,6 +33,7 @@ export const API_ERROR_CODES = [
   "limit_exceeded",
   "geometry_failed",
   "cad_failed",
+  "internal_error",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
@@ -132,9 +139,88 @@ export class SketchForgeApiError extends Error {
   }
 
   get unapplicableFields(): string[] {
-    const fields = (this.body as { fields?: unknown } | undefined)?.fields;
-    return Array.isArray(fields) ? fields.filter((field): field is string => typeof field === "string") : [];
+    return this.fields;
   }
+
+  /** A parameter or bound field does not evaluate; `expressionError` says where. */
+  get isInvalidExpression() {
+    return this.code === "invalid_expression";
+  }
+
+  get isParameterMissing() {
+    return this.code === "parameter_not_found";
+  }
+
+  /** The table already has a parameter with that name. */
+  get isParameterDuplicate() {
+    return this.code === "parameter_exists";
+  }
+
+  /** A delete was refused; `dependents` and `shapeDependents` name what still uses it. */
+  get isParameterInUse() {
+    return this.code === "parameter_in_use";
+  }
+
+  /** The parameter that failed, which can be a dependent of the one changed. */
+  get parameter(): string | undefined {
+    return this.text("parameter");
+  }
+
+  /** The engine's finer code, such as `outOfRange` or `duplicateName`. */
+  get reason(): string | undefined {
+    return this.text("reason");
+  }
+
+  get expressionError(): ExpressionError | undefined {
+    const detail = this.detailBody.expressionError;
+    return detail && typeof detail === "object" ? (detail as ExpressionError) : undefined;
+  }
+
+  /** Parameters whose expressions use the one a delete was refused for. */
+  get dependents(): string[] {
+    return strings(this.detailBody.dependents);
+  }
+
+  get shapeDependents(): ShapeDependent[] {
+    const entries = this.detailBody.shapeDependents;
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .filter((entry): entry is { shapeId: string; fields?: unknown } => !!entry && typeof entry === "object" && typeof (entry as { shapeId?: unknown }).shapeId === "string")
+      .map((entry) => ({ shapeId: entry.shapeId, fields: strings(entry.fields) }));
+  }
+
+  /** The shape a binding refusal is about. A batch create names its `index` instead. */
+  get shapeId(): string | undefined {
+    return this.text("shapeId");
+  }
+
+  get field(): string | undefined {
+    return this.text("field");
+  }
+
+  /** Fields named by `unapplicable_fields`, or the bound fields of a refused rebuild. */
+  get fields(): string[] {
+    return strings(this.detailBody.fields);
+  }
+
+  /** Position in a batch `POST /shapes`, whose new shape has no id yet. */
+  get index(): number | undefined {
+    const index = this.detailBody.index;
+    return typeof index === "number" ? index : undefined;
+  }
+
+  private get detailBody(): Record<string, unknown> {
+    return this.body && typeof this.body === "object" ? (this.body as Record<string, unknown>) : {};
+  }
+
+  private text(key: string): string | undefined {
+    const value = this.detailBody[key];
+    return typeof value === "string" ? value : undefined;
+  }
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
 /** The request never reached the server, or never came back. */

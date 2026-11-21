@@ -19,6 +19,7 @@ from .errors import SketchForgeApiError, SketchForgeTransportError
 from .types import (
     IMPORTABLE_MESH_FORMATS,
     MAX_SHAPES_PER_REQUEST,
+    PARAMETER_DIMENSIONS,
     AlignResult,
     BakedMirrorResult,
     BooleanCutResult,
@@ -34,6 +35,10 @@ from .types import (
     MeasurementSummary,
     InterferenceReport,
     ListPage,
+    ParameterDeleteResult,
+    ParameterDimension,
+    ParameterList,
+    ParameterWriteResult,
     ShapeProperties,
     MeshImportResult,
     PatternResult,
@@ -191,6 +196,70 @@ class Shapes:
                 self.update(project_id, shape.id, {"locked": False})
             self.delete(project_id, shape.id)
         return len(shapes)
+
+
+class Parameters:
+    """Owns the project parameter table. Each write rebuilds the shapes bound to what changed."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def list(self, project_id: str) -> ParameterList:
+        payload = self._transport.send("GET", "/parameters", {"projectId": project_id}) or {}
+        return ParameterList.from_payload(payload)
+
+    def create(
+        self, project_id: str, name: str, expression: str, dimension: ParameterDimension
+    ) -> ParameterWriteResult:
+        _check_dimension(dimension)
+        payload = self._transport.send(
+            "POST",
+            "/parameters",
+            {"projectId": project_id},
+            {"name": name, "expression": expression, "dimension": dimension},
+            retryable=True,
+        ) or {}
+        return ParameterWriteResult.from_payload(payload)
+
+    def update(
+        self,
+        project_id: str,
+        name: str,
+        expression: Optional[str] = None,
+        dimension: Optional[ParameterDimension] = None,
+    ) -> ParameterWriteResult:
+        """Changes the expression, the dimension, or both."""
+        if expression is None and dimension is None:
+            raise ValueError("A parameter change needs an expression or a dimension.")
+        if dimension is not None:
+            _check_dimension(dimension)
+        body: Dict[str, str] = {
+            **({"expression": expression} if expression is not None else {}),
+            **({"dimension": dimension} if dimension is not None else {}),
+        }
+        payload = self._transport.send(
+            "PATCH", "/parameters", {"projectId": project_id, "name": name}, body, retryable=True
+        ) or {}
+        return ParameterWriteResult.from_payload(payload)
+
+    def rename(self, project_id: str, name: str, new_name: str) -> ParameterWriteResult:
+        """Rewrites every expression and binding that uses the old name."""
+        payload = self._transport.send(
+            "PATCH", "/parameters", {"projectId": project_id, "name": name}, {"name": new_name}, retryable=True
+        ) or {}
+        return ParameterWriteResult.from_payload(payload)
+
+    def delete(self, project_id: str, name: str) -> ParameterDeleteResult:
+        """Refused with ``parameter_in_use`` while anything still uses the parameter."""
+        payload = self._transport.send(
+            "DELETE", "/parameters", {"projectId": project_id, "name": name}, retryable=True
+        ) or {}
+        return ParameterDeleteResult.from_payload(payload)
+
+
+def _check_dimension(dimension: str) -> None:
+    if dimension not in PARAMETER_DIMENSIONS:
+        raise ValueError(f"A parameter dimension must be one of: {', '.join(PARAMETER_DIMENSIONS)}.")
 
 
 class Edges:
@@ -931,6 +1000,12 @@ CLIENT_RESOURCE_OPERATIONS = {
     "patterns": {"patternShapes": ("apply", "row", "ring")},
     "imports": {"importGeometry": ("apply", "file")},
     "exports": {"exportProject": ("export", "file")},
+    "parameters": {
+        "listParameters": ("list",),
+        "createParameter": ("create",),
+        "updateParameter": ("update", "rename"),
+        "deleteParameter": ("delete",),
+    },
 }
 
 # Convenience helpers that emit a sequence of REST operations rather than one route.
@@ -980,6 +1055,7 @@ class SketchForgeClient:
         self.patterns = Patterns(self._transport)
         self.imports = Imports(self._transport)
         self.exports = Exports(self._transport)
+        self.parameters = Parameters(self._transport)
 
     @property
     def api_root(self) -> str:
@@ -1047,6 +1123,27 @@ class ProjectHandle:
 
     def update(self, shape_id: str, changes: ShapePatch) -> ShapeSummary:
         return self._client.shapes.update(self.id, shape_id, changes)
+
+    def bind_expressions(self, shape_id: str, expressions: Mapping[str, Optional[str]]) -> ShapeSummary:
+        """Binds fields to expressions; ``None`` clears a binding and keeps the number."""
+        return self._client.shapes.update(self.id, shape_id, {"expressions": dict(expressions)})
+
+    def parameters(self) -> ParameterList:
+        return self._client.parameters.list(self.id)
+
+    def add_parameter(self, name: str, expression: str, dimension: ParameterDimension) -> ParameterWriteResult:
+        return self._client.parameters.create(self.id, name, expression, dimension)
+
+    def update_parameter(
+        self, name: str, expression: Optional[str] = None, dimension: Optional[ParameterDimension] = None
+    ) -> ParameterWriteResult:
+        return self._client.parameters.update(self.id, name, expression, dimension)
+
+    def rename_parameter(self, name: str, new_name: str) -> ParameterWriteResult:
+        return self._client.parameters.rename(self.id, name, new_name)
+
+    def delete_parameter(self, name: str) -> ParameterDeleteResult:
+        return self._client.parameters.delete(self.id, name)
 
     def remove(self, shape_id: str) -> bool:
         return self._client.shapes.delete(self.id, shape_id)

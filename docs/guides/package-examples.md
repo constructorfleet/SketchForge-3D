@@ -79,6 +79,24 @@ Source: `packages/sketchforge-py/examples/filleted_box.py`.
 !!!include(../../packages/sketchforge-py/examples/filleted_box.py)!!!
 ```
 
+## TypeScript: parametric box
+
+Source: `packages/sketchforge-client/examples/parametric-box.macro.mjs`. Binds a box's width and position to a `wall` parameter, changes the parameter, and reports the exact volume and centre of mass before and after. The integration test also checks that a delete is refused while the box uses the parameter, that a rename rewrites the bindings, and that clearing them keeps the numbers.
+
+<!-- runnable-source: packages/sketchforge-client/examples/parametric-box.macro.mjs; tested-by: packages/sketchforge-client/tests/examples.integration.ts; ci: npm run test:integration -->
+```js
+!!!include(../../packages/sketchforge-client/examples/parametric-box.macro.mjs)!!!
+```
+
+## Python: parametric box
+
+Source: `packages/sketchforge-py/examples/parametric_box.py`. The same workflow through `sketchforge3d`.
+
+<!-- runnable-source: packages/sketchforge-py/examples/parametric_box.py; tested-by: packages/sketchforge-py/tests/integration/test_examples.py; ci: npm run client:test:py:integration -->
+```python
+!!!include(../../packages/sketchforge-py/examples/parametric_box.py)!!!
+```
+
 ## Run the examples
 
 The repository CI runs these same example files against an isolated local server:
