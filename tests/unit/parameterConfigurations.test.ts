@@ -183,8 +183,38 @@ describe("parameter configurations", () => {
       expect.objectContaining({ configuration: "Large", parameter: "depth" }),
     ]);
     expect(failed(activateConfiguration(current, "Large"))).toMatchObject({ code: "invalidExpression", parameter: "wall", configuration: "Large" });
-    // An unrelated base change is not blocked by the stale override.
+    // A base change to the overridden parameter itself does not touch the stale Large entry.
     expect(values(ok(updateParameter(current, "wall", { expression: "3" })))).toEqual({ wall: 3, depth: 15 });
+  });
+
+  it("does not let a stale override in an inactive configuration block edits to its dependents", () => {
+    // Large's wall override is stale, so Large's depth, which reads wall, fails there before and after each edit.
+    const current: Project = { ...configured(), configurations: [{ name: "Small", overrides: {} }, { name: "Large", overrides: { wall: "nope" } }] };
+
+    expect(values(ok(updateParameter(current, "depth", { expression: "wall * 6" })))).toEqual({ wall: 2, depth: 12 });
+    expect(values(ok(addParameter(current, { name: "lip", expression: "wall / 2", dimension: "length" })))).toEqual({ wall: 2, depth: 10, lip: 1 });
+    expect(values(ok(renameParameter(current, "depth", "deep")))).toEqual({ wall: 2, deep: 10 });
+    expect(values(ok(renameParameter(current, "wall", "shell")))).toEqual({ shell: 2, depth: 10 });
+    expect(ok(renameParameter(current, "wall", "shell")).configurations![1]!.overrides).toEqual({ shell: "nope" });
+    expect(values(ok(deleteParameter(current, "depth")))).toEqual({ wall: 2 });
+
+    // A new parameter must still resolve where its own dependencies do.
+    expect(failed(addParameter(current, { name: "bad", expression: "wall * wall", dimension: "length" }))).toMatchObject({ code: "invalidExpression", parameter: "bad" });
+    // A dependent the edit itself breaks is still refused, in Small, which resolved it before.
+    expect(failed(updateParameter(current, "depth", { expression: "30 deg" }))).toMatchObject({ code: "invalidExpression", parameter: "depth" });
+  });
+
+  it("does not let a stale base entry block a rename", () => {
+    const stale: Project = { ...configured(), parameters: [{ name: "wall", expression: "nope", dimension: "length", value: 2 }, configured().parameters[1]!] };
+    expect(values(ok(renameParameter(stale, "wall", "shell")))).toEqual({ shell: 2, depth: 10 });
+  });
+
+  it("does not count an override key that names no parameter as a dependent", () => {
+    const current: Project = { ...configured(), configurations: [{ name: "Small", overrides: { ghost: "wall * 3" } }, { name: "Large", overrides: { depth: "wall * 2" } }] };
+    expect(failed(deleteParameter(current, "wall"))).toMatchObject({ code: "parameterInUse", configurationDependents: ["Large"] });
+    const onlyGhost: Project = { ...current, configurations: [{ name: "Small", overrides: { ghost: "lip" } }] };
+    const withLip = ok(addParameter({ ...onlyGhost, configurations: [] }, { name: "lip", expression: "1", dimension: "length" }));
+    expect(ok(deleteParameter({ ...withLip, configurations: onlyGhost.configurations }, "lip")).parameters.map(({ name }) => name)).toEqual(["wall", "depth"]);
   });
 
   it("drops a stale override instead of applying it to a parameter added or renamed to its name", () => {

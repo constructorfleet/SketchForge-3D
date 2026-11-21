@@ -278,16 +278,22 @@ type ChangeRules = {
   switchesTable?: true;
 };
 
+/**
+ * In a configuration table, a touched entry failing only through a dependency is not refused:
+ * a dependency this change breaks fails the resolved-before check itself, and one already stale stays stale.
+ */
 function brokenEntries(
   before: readonly ProjectParameter[],
   after: readonly ProjectParameter[],
   touched: (index: number) => boolean,
   previousIndex: (index: number) => number,
+  inConfiguration: boolean,
 ) {
   return after.filter((parameter, index) => {
     if (!parameter.error) return false;
     const previous = previousIndex(index);
-    return touched(index) || (previous >= 0 && !before[previous]!.error);
+    if (previous >= 0 && !before[previous]!.error) return true;
+    return touched(index) && !(inConfiguration && parameter.error.expressionError?.code === "dependencyFailed");
   });
 }
 
@@ -318,7 +324,7 @@ function applyChange<T extends ProjectParameterHolder>(project: T, next: NextTab
       ? before(oldActive)
       : before(configuration && oldByName.get(rules.previousConfiguration?.(configuration.name) ?? configuration.name));
     if (!previous.ok) return previous;
-    broken = brokenEntries(previous.parameters, after.parameters, (index) => rules.touched(configuration, index), rules.previousIndex);
+    broken = brokenEntries(previous.parameters, after.parameters, (index) => rules.touched(configuration, index), rules.previousIndex, configuration !== undefined);
     if (broken.length) break;
   }
   const root = broken.find((parameter) => parameter.error!.expressionError?.code !== "dependencyFailed") ?? broken[0];
@@ -374,11 +380,19 @@ function shapesOf(project: ProjectParameterHolder): WorkplaneShape[] | undefined
   return Array.isArray(shapes) ? shapes as WorkplaneShape[] : undefined;
 }
 
-/** Lists configurations whose override expressions reference `name`. Overrides of `name` itself do not count. */
-export function configurationDependents(configurations: readonly ProjectConfiguration[], name: string): string[] {
+/**
+ * Lists configurations whose override expressions reference `name`. Overrides of `name` itself do not count,
+ * nor do overrides of keys outside `parameterNames`, which apply to nothing.
+ */
+export function configurationDependents(
+  configurations: readonly ProjectConfiguration[],
+  name: string,
+  parameterNames?: ReadonlySet<string>,
+): string[] {
   return (Array.isArray(configurations) ? configurations : [])
     .filter((configuration) => isRecord(configuration) && isRecord(configuration.overrides) && Object.entries(configuration.overrides)
-      .some(([key, expression]) => key !== name && expressionDependencies(expression as string).includes(name)))
+      .some(([key, expression]) => key !== name && (!parameterNames || parameterNames.has(key))
+        && expressionDependencies(expression as string).includes(name)))
     .map((configuration) => configuration.name);
 }
 
@@ -392,7 +406,7 @@ export function projectParameterDependents(
     parameters: parameterDependents(tableOf(project), name),
     shapes: parameterShapeDependents(shapes, name),
     sketchConstraints: parameterSketchConstraintDependents(shapes, name),
-    configurations: configurationDependents(configurationsOf(project), name),
+    configurations: configurationDependents(configurationsOf(project), name, new Set(tableOf(project).filter(isRecord).map((parameter) => parameter.name))),
   };
 }
 
@@ -454,7 +468,8 @@ export function renameParameter<T extends ProjectParameterHolder>(project: T, ol
       .map(([key, expression]) => [key === oldName ? newName : key, renameExpressionReference(expression, oldName, newName)])),
   }));
   const change = tableChange(project, next, index, (current) => current);
-  const renamed = applyChange(project, { ...change.next, configurations }, change.rules);
+  // A rename changes no value, so only an entry it breaks refuses it.
+  const renamed = applyChange(project, { ...change.next, configurations }, { ...change.rules, touched: () => false });
   const shapes = shapesOf(project);
   if (!renamed.ok || !shapes) return renamed;
   const renamedShapes = renameSketchConstraintReferences(renameShapeBindingReferences(shapes, oldName, newName), oldName, newName);
