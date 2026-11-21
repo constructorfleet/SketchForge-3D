@@ -10924,3 +10924,205 @@ html[data-theme="dark"] .parameters-delete-actions .parameters-delete-confirm {
   background: #b3261e;
   border-color: #d0453c;
 }
+
+/* Expression entry in dimension fields (#617). */
+.expression-input {
+  position: relative;
+  display: inline-grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.range-value-control.expression-input {
+  display: grid;
+  justify-items: end;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.range-value-control.expression-input:focus-within {
+  box-shadow: none;
+}
+
+.expression-input-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 88px;
+  min-height: 31px;
+  padding: 0 7px;
+  color: #51657a;
+  background: #fff;
+  border: 1px solid #c7d4df;
+  border-radius: 6px;
+}
+
+.expression-input-control:focus-within {
+  border-color: #55add8;
+  box-shadow: 0 0 0 3px rgba(0, 156, 222, 0.14);
+}
+
+.expression-input-control input {
+  width: 58px;
+  min-width: 0;
+  height: 29px;
+  padding: 0;
+  color: #2f4457;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: 750 14px/1 var(--font-ui);
+  text-align: right;
+}
+
+.expression-input.is-editing .expression-input-control input {
+  width: 128px;
+  text-align: left;
+}
+
+/* Bound fields carry a glyph and a dashed edge, not colour alone. */
+.expression-input.is-bound .expression-input-control {
+  border-style: dashed;
+  border-color: #3f7fa8;
+}
+
+.expression-input-badge {
+  color: #1f5f86;
+  font: italic 800 12px/1 var(--font-ui);
+}
+
+.expression-input.is-invalid .expression-input-control {
+  border-color: #c2414b;
+  background: #fff5f6;
+}
+
+.expression-input-options {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 40;
+  min-width: 180px;
+  max-height: 220px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #c7d4df;
+  border-radius: 7px;
+  box-shadow: 0 10px 26px rgba(25, 45, 65, 0.18);
+}
+
+.expression-input-options[hidden] {
+  display: none;
+}
+
+.expression-input-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  color: #2f4457;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.expression-input-options li.is-active {
+  color: #fff;
+  background: #1f6f9c;
+}
+
+.expression-input-option-name {
+  font-weight: 750;
+}
+
+.expression-input-error {
+  justify-self: stretch;
+  max-width: 190px;
+  padding: 5px 7px;
+  color: #9f2730;
+  background: #fff0f1;
+  border: 1px solid #efc4c8;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.sketch-constraint-row-value {
+  order: 1;
+}
+
+.sketch-constraint-row > button {
+  order: 2;
+}
+
+html[data-theme="dark"] .expression-input-control,
+html[data-theme="dark"] .expression-input-control input {
+  color: #d3e2ec;
+  background: #111b23;
+  border-color: #3a4e5c;
+}
+
+html[data-theme="dark"] .expression-input.is-bound .expression-input-control {
+  border-color: #6fb3dc;
+}
+
+html[data-theme="dark"] .expression-input-badge {
+  color: #9fd3f2;
+}
+
+html[data-theme="dark"] .expression-input-options {
+  background: #15212a;
+  border-color: #3a4d5a;
+}
+
+html[data-theme="dark"] .expression-input-options li {
+  color: #d6e5ef;
+}
+
+html[data-theme="dark"] .expression-input-options li.is-active {
+  color: #fff;
+  background: #1f6f9c;
+}
+
+html[data-theme="dark"] .expression-input-error {
+  color: #ffc2c6;
+  background: #3a1a1e;
+  border-color: #7a3036;
+}
+
+.sketch-constraint-row.has-value {
+  flex-wrap: wrap;
+}
+
+.sketch-constraint-row.has-value .sketch-constraint-row-label {
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+}
+
+.sketch-constraint-row-value {
+  flex: 1 1 auto;
+}
+
+.sketch-constraint-row-value .expression-input-control,
+.sketch-constraint-value .expression-input-control {
+  width: 100%;
+}
+
+.sketch-constraint-row-value .expression-input-control input,
+.sketch-constraint-value .expression-input-control input,
+.sketch-constraint-row-value.is-editing .expression-input-control input,
+.sketch-constraint-value .is-editing .expression-input-control input {
+  flex: 1 1 auto;
+  width: auto;
+  text-align: left;
+}
+
+.range-property-header:has(.expression-input.is-invalid) {
+  align-items: flex-start;
+}

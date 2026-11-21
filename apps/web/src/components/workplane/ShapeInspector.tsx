@@ -43,7 +43,11 @@ import {
   type ShapePropertyId,
   type TextPropertyConfig,
 } from "@/lib/shapeProperties";
-import type { GearType, GridSize, MeasurementAccuracy, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
+import type { BindableFieldSpec } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { ExpressionInput } from "@/components/ExpressionInput";
+import { isLiteralNumberEntry, propertyBindingField } from "@/lib/expressionFields";
+import type { ParameterMessage } from "@/lib/projectParameterEdits";
+import type { GearType, GridSize, MeasurementAccuracy, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export type { RangePropertyConfig, ShapeInspectorUpdate, ShapeInspectorUpdateOptions, ShapePropertyConfig, ShapePropertyId } from "@/lib/shapeProperties";
 export { getShapePropertiesWithAppLimits, propertyUsesLengthUnit, textFontLabel } from "@/lib/shapeProperties";
@@ -129,6 +133,7 @@ export function ShapeInspector({
   volumeMm3,
   onMaterialPriceChange,
   projectId,
+  expressionFields,
 }: {
   shape: WorkplaneShape;
   snap: GridSize;
@@ -159,6 +164,8 @@ export function ShapeInspector({
   volumeMm3?: number;
   onMaterialPriceChange?: (materialId: MaterialId, pricePerKg: number) => void;
   projectId?: string;
+  /** Present when number fields may follow parameter expressions. */
+  expressionFields?: ShapeExpressionFields;
 }) {
   const t = useTranslations();
   const solidColor = shape.color;
@@ -522,7 +529,7 @@ export function ShapeInspector({
                 onChange={(gearType) => onUpdate({ gearType })}
               />
             ) : null}
-            <ShapePropertyRows properties={primaryProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+            <ShapePropertyRows properties={primaryProperties} shape={shape} expressionFields={expressionFields} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
           </div>
         ) : null}
       </div>
@@ -568,7 +575,7 @@ export function ShapeInspector({
           </button>
           {taperOpen ? (
             <div className="property-list" id={`taper-${shape.id}`}>
-              <ShapePropertyRows properties={taperProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+              <ShapePropertyRows properties={taperProperties} shape={shape} expressionFields={expressionFields} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
             </div>
           ) : null}
         </div>
@@ -586,7 +593,7 @@ export function ShapeInspector({
         </button>
         {placementOpen ? (
           <div className="property-list" id={`placement-${shape.id}`}>
-            <ShapePropertyRows properties={placementRows} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+            <ShapePropertyRows properties={placementRows} shape={shape} expressionFields={expressionFields} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
           </div>
         ) : null}
       </div>
@@ -604,7 +611,7 @@ export function ShapeInspector({
           </button>
           {gearTeethOpen ? (
             <div className="property-list" id={`gear-teeth-${shape.id}`}>
-              <ShapePropertyRows properties={gearTeethProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+              <ShapePropertyRows properties={gearTeethProperties} shape={shape} expressionFields={expressionFields} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
             </div>
           ) : null}
         </div>
@@ -623,7 +630,7 @@ export function ShapeInspector({
           </button>
           {gearHelixOpen ? (
             <div className="property-list" id={`gear-helix-${shape.id}`}>
-              <ShapePropertyRows properties={gearHelixProperties} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
+              <ShapePropertyRows properties={gearHelixProperties} shape={shape} expressionFields={expressionFields} workspace={workspace} disabled={locked} onInteractionActiveChange={onInteractionActiveChange} />
             </div>
           ) : null}
         </div>
@@ -634,17 +641,48 @@ export function ShapeInspector({
   );
 }
 
+export type ShapeExpressionFields = {
+  parameters: readonly ProjectParameter[];
+  /** Binds, or with null unbinds, `field` as one undo step. Resolves to the refusal. */
+  onBind: (field: string, expression: string | null) => Promise<ParameterMessage | null>;
+  /** Drops the binding inside the current interaction, so a literal and its unbind are one step. */
+  onRelease: (field: string) => void;
+};
+
+type RangeBinding = {
+  spec: BindableFieldSpec;
+  expression?: string;
+  parameters: readonly ProjectParameter[];
+  onBind: (expression: string) => Promise<ParameterMessage | null>;
+  onRelease: () => void;
+};
+
 function ShapePropertyRows({
   properties,
+  shape,
+  expressionFields,
   workspace,
   disabled,
   onInteractionActiveChange,
 }: {
   properties: ShapePropertyConfig[];
+  shape: WorkplaneShape;
+  expressionFields?: ShapeExpressionFields;
   workspace: WorkplaneWorkspaceSettings;
   disabled?: boolean;
   onInteractionActiveChange?: (active: boolean) => void;
 }) {
+  const binding = (property: RangePropertyConfig): RangeBinding | undefined => {
+    const spec = expressionFields ? propertyBindingField(shape, property) : undefined;
+    if (!spec || !expressionFields) return undefined;
+    return {
+      spec,
+      expression: shape.expressions?.[spec.field],
+      parameters: expressionFields.parameters,
+      onBind: (expression) => expressionFields.onBind(spec.field, expression),
+      onRelease: () => expressionFields.onRelease(spec.field),
+    };
+  };
   const t = useTranslations();
   return properties.map((property) => {
     const label = t(`panels.property.${property.id}`);
@@ -654,7 +692,8 @@ function ShapePropertyRows({
     if (property.type === "select") {
       return <SelectProperty key={property.id} {...property} label={label} disabled={disabled} />;
     }
-    return <RangeProperty key={property.id} {...property} label={label} workspace={workspace} disabled={disabled} onInteractionActiveChange={onInteractionActiveChange} />;
+    // Keyed by shape too, so a draft or refusal never carries over to another selection.
+    return <RangeProperty key={`${shape.id}:${property.id}`} {...property} label={label} binding={binding(property)} workspace={workspace} disabled={disabled} onInteractionActiveChange={onInteractionActiveChange} />;
   });
 }
 
@@ -706,9 +745,16 @@ function RangeProperty({
   step = 0.01,
   workspace,
   disabled,
+  binding,
   onChange,
   onInteractionActiveChange,
-}: RangePropertyConfig & { label: string; workspace: WorkplaneWorkspaceSettings; disabled?: boolean; onInteractionActiveChange?: (active: boolean) => void }) {
+}: RangePropertyConfig & {
+  label: string;
+  workspace: WorkplaneWorkspaceSettings;
+  disabled?: boolean;
+  binding?: RangeBinding;
+  onInteractionActiveChange?: (active: boolean) => void;
+}) {
   const t = useTranslations();
   const allowsAboveSliderMax = ABOVE_SLIDER_MAX_PROPERTIES.includes(id);
   const allowsBelowSliderMin = BELOW_SLIDER_MIN_PROPERTIES.includes(id);
@@ -730,20 +776,90 @@ function RangeProperty({
   const [draft, setDraft] = useState(formatPropertyNumber(controlValue, accuracy, controlStep));
   const unit = isLength ? unitLabel(t, lengthDisplayUnit(workspace).label) : null;
   const toModelValue = (nextValue: number) => isLength ? displayToMillimeters(nextValue, workspace) : nextValue;
-  const commitDraft = () => {
-    const next = parseMeasurementInput(draft);
+  const applyLiteral = (text: string) => {
+    const next = parseMeasurementInput(text);
     const finiteNext = Number.isFinite(next) ? next : controlValue;
     const nextModelValue = toModelValue(finiteNext);
     const lowerBound = allowsBelowSliderMin ? Number.NEGATIVE_INFINITY : min;
     onChange(allowsAboveSliderMax ? Math.max(lowerBound, nextModelValue) : clamp(nextModelValue, lowerBound, max));
+  };
+  const commitDraft = () => {
+    applyLiteral(draft);
     setEditing(false);
     onInteractionActiveChange?.(false);
   };
+  const commitEntry = (text: string) => {
+    if (!binding) return null;
+    if (isLiteralNumberEntry(text)) {
+      // Literal wins: the unbind and the new number land in the focus interaction's one history entry.
+      if (binding.expression !== undefined) binding.onRelease();
+      applyLiteral(text);
+      return null;
+    }
+    // The bind is its own history entry, so the focus interaction ends first.
+    onInteractionActiveChange?.(false);
+    return binding.onBind(text.trim());
+  };
+  const formatted = formatPropertyNumber(controlValue, accuracy, controlStep);
+  const slider = (
+    <div className="range-control">
+      <input
+        type="range"
+        min={controlMin}
+        max={controlMax}
+        step={controlStep}
+        value={sliderValue}
+        disabled={disabled}
+        onFocus={() => onInteractionActiveChange?.(true)}
+        onBlur={() => {
+          setHeldRange(null);
+          onInteractionActiveChange?.(false);
+        }}
+        onPointerDown={(event) => {
+          // Captured so a release outside the track still ends the hold.
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setHeldRange({ min, max });
+          onInteractionActiveChange?.(true);
+        }}
+        onPointerUp={() => {
+          setHeldRange(null);
+          onInteractionActiveChange?.(false);
+        }}
+        onPointerCancel={() => {
+          setHeldRange(null);
+          onInteractionActiveChange?.(false);
+        }}
+        onChange={(event) => handleSliderChange(Number(event.currentTarget.value))}
+      />
+    </div>
+  );
   const handleSliderChange = (nextValue: number) => {
     const next = clamp(Number.isFinite(nextValue) ? nextValue : controlMin, controlMin, controlMax);
     onChange(clamp(toModelValue(next), sliderMin, sliderMax));
     setDraft(formatPropertyNumber(next, accuracy, controlStep));
   };
+  if (binding) {
+    return (
+      <label className={`range-property${binding.expression !== undefined ? " is-bound" : ""}`} style={{ "--slider-pos": `${position}%` } as CSSProperties}>
+        <span className="range-property-header">
+          <span className="range-property-name">{label}</span>
+          <ExpressionInput
+            className="range-value-control"
+            value={formatted}
+            expression={binding.expression}
+            parameters={binding.parameters}
+            label={label}
+            disabled={disabled}
+            suffix={unit ? <span className="range-value-unit">{unit}</span> : null}
+            onFocus={() => onInteractionActiveChange?.(true)}
+            onBlur={() => onInteractionActiveChange?.(false)}
+            onCommit={commitEntry}
+          />
+        </span>
+        {slider}
+      </label>
+    );
+  }
   return (
     <label className="range-property" style={{ "--slider-pos": `${position}%` } as CSSProperties}>
       <span className="range-property-header">
@@ -773,36 +889,7 @@ function RangeProperty({
           {unit ? <span className="range-value-unit">{unit}</span> : null}
         </span>
       </span>
-      <div className="range-control">
-        <input
-          type="range"
-          min={controlMin}
-          max={controlMax}
-          step={controlStep}
-          value={sliderValue}
-          disabled={disabled}
-          onFocus={() => onInteractionActiveChange?.(true)}
-          onBlur={() => {
-            setHeldRange(null);
-            onInteractionActiveChange?.(false);
-          }}
-          onPointerDown={(event) => {
-            // Captured so a release outside the track still ends the hold.
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setHeldRange({ min, max });
-            onInteractionActiveChange?.(true);
-          }}
-          onPointerUp={() => {
-            setHeldRange(null);
-            onInteractionActiveChange?.(false);
-          }}
-          onPointerCancel={() => {
-            setHeldRange(null);
-            onInteractionActiveChange?.(false);
-          }}
-          onChange={(event) => handleSliderChange(Number(event.currentTarget.value))}
-        />
-      </div>
+      {slider}
     </label>
   );
 }

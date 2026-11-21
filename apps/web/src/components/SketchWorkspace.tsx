@@ -14,7 +14,10 @@ import { isSketchPanGesture } from "@/lib/sketchPointerControls";
 import { shapeDisplayName } from "@/lib/shapeDisplayNames";
 import { mirrorSign, resizedImportedMeshPositions } from "@/lib/engine/workplaneShapes";
 import { createLocalId } from "@/lib/engine/localIds";
-import type { SketchConstraint } from "@/types/sketchforge";
+import type { ProjectParameter, SketchConstraint } from "@/types/sketchforge";
+import { ExpressionInput } from "@/components/ExpressionInput";
+import { constraintBindingMessage, resolveConstraintEntry, type ConstraintEntry } from "@/lib/expressionFields";
+import { formatParameterValue, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/engine/workplaneSettings";
 import type { GridSize, SketchImage, SketchOperation, SketchPoint, SketchProfile, SketchSegment, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -32,6 +35,12 @@ type SketchWorkspaceProps = {
   profile: SketchProfile;
   onAddConstraint: (constraint: SketchConstraint) => void;
   onRemoveConstraint: (constraintId: string) => void;
+  /** Sets a dimensional constraint, binding it to `expression` or, with null, unbinding it. */
+  onUpdateConstraint?: (constraintId: string, value: number, expression: string | null) => void;
+  /** Parameters a constraint value may follow. */
+  parameters?: readonly ProjectParameter[];
+  /** The output being edited, if any; its bound profile size refuses constraint bindings. */
+  sketchOutput?: WorkplaneShape | null;
   operation?: SketchOperation;
   sweepStage?: SketchSweepStage;
   sweepScreenRight?: string;
@@ -486,6 +495,9 @@ export function SketchWorkspace({
   profile,
   onAddConstraint,
   onRemoveConstraint,
+  onUpdateConstraint,
+  parameters = NO_PARAMETERS,
+  sketchOutput,
   operation = "extrude",
   sweepStage = "section",
   sweepScreenRight = "(0.00, 1.00, 0.00)",
@@ -1359,6 +1371,9 @@ export function SketchWorkspace({
           selected={selected}
           onAddConstraint={onAddConstraint}
           onRemoveConstraint={onRemoveConstraint}
+          onUpdateConstraint={onUpdateConstraint}
+          parameters={parameters}
+          sketchOutput={sketchOutput}
         />
       ) : null}
       <div className="grid-settings">
@@ -1421,16 +1436,38 @@ function SketchSweepHandleDepthInput({ point, handle, onSetDepth }: {
   );
 }
 
+type DimensionalConstraint = Extract<SketchConstraint, { kind: "distance" | "radius" | "diameter" | "angle" }>;
+type DimensionalKind = DimensionalConstraint["kind"];
+
+function isDimensionalConstraint(constraint: SketchConstraint): constraint is DimensionalConstraint {
+  return constraint.kind === "distance" || constraint.kind === "radius" || constraint.kind === "diameter" || constraint.kind === "angle";
+}
+
+/** Stands in for a constraint not yet added, so typed values resolve by the engine's rules. */
+function dimensionalStub(kind: DimensionalKind): SketchConstraint {
+  return kind === "angle"
+    ? { id: "new", kind, segmentIds: ["", ""], valueDeg: 0 }
+    : { id: "new", kind, pointIds: ["", ""], valueMm: 0 };
+}
+
+const NO_PARAMETERS: readonly ProjectParameter[] = [];
+
 function SketchConstraintPanel({
   profile,
   selected,
   onAddConstraint,
   onRemoveConstraint,
+  onUpdateConstraint,
+  parameters,
+  sketchOutput,
 }: {
   profile: SketchProfile;
   selected: SketchSelection;
   onAddConstraint: (constraint: SketchConstraint) => void;
   onRemoveConstraint: (constraintId: string) => void;
+  onUpdateConstraint?: (constraintId: string, value: number, expression: string | null) => void;
+  parameters: readonly ProjectParameter[];
+  sketchOutput?: WorkplaneShape | null;
 }) {
   type NewConstraint = SketchConstraint extends infer Constraint
     ? Constraint extends { id: string } ? Omit<Constraint, "id"> : never
@@ -1457,12 +1494,31 @@ function SketchConstraintPanel({
     return Boolean(start && end && Math.hypot(end.x - start.x, end.z - start.z) > 1e-5);
   });
   const symmetryAxis = symmetryAxisId || symmetryAxes[0]?.id || "";
-  const valueMm = Number(distanceValue);
-  const radiusMm = Number(radiusValue);
-  const diameterMm = Number(diameterValue);
-  const angleDeg = Number(angleValue);
+  const entry = (kind: DimensionalKind, text: string) => resolveConstraintEntry(dimensionalStub(kind), text, parameters, sketchOutput);
+  const distanceEntry = entry("distance", distanceValue);
+  const radiusEntry = entry("radius", radiusValue);
+  const diameterEntry = entry("diameter", diameterValue);
+  const angleEntry = entry("angle", angleValue);
+  const bound = (resolved: ConstraintEntry) => (resolved.ok && resolved.expression !== null ? { expression: resolved.expression } : {});
   const degreesOfFreedom = sketchConstraintDegreesOfFreedom(profile);
   const addConstraint = (constraint: NewConstraint) => onAddConstraint({ ...constraint, id: createLocalId("constraint") } as SketchConstraint);
+  const text = (message: ParameterMessage) => t(message.key, message.values);
+  const valueInput = (kind: DimensionalKind, label: string, value: string, setValue: (text: string) => void) => (
+    <label className="sketch-constraint-value">
+      <span>{label}</span>
+      <ExpressionInput
+        value={value}
+        parameters={parameters}
+        label={label}
+        onDraftChange={setValue}
+        onCommit={(typed) => {
+          setValue(typed);
+          const resolved = entry(kind, typed);
+          return resolved.ok ? null : constraintBindingMessage(resolved.error, kind === "angle" ? "angle" : "length");
+        }}
+      />
+    </label>
+  );
 
   return (
     <aside className="shape-inspector sketch-constraint-inspector" aria-label={t("editor.sketch.constraints.title")} onPointerDown={(event) => event.stopPropagation()}>
@@ -1482,11 +1538,8 @@ function SketchConstraintPanel({
         <button type="button" disabled={!selectedSegmentPair} onClick={() => selectedSegmentPair && addConstraint({ kind: "perpendicular", segmentIds: selectedSegmentPair })}>{t("editor.sketch.constraints.addPerpendicular")}</button>
         <button type="button" disabled={!selectedTangentPair} onClick={() => selectedTangentPair && addConstraint({ kind: "tangent", segmentIds: selectedTangentPair })}>{t("editor.sketch.constraints.addTangent")}</button>
         <button type="button" disabled={!selectedEqualLengthPair} onClick={() => selectedEqualLengthPair && addConstraint({ kind: "equalLength", segmentIds: selectedEqualLengthPair })}>{t("editor.sketch.constraints.addEqualLength")}</button>
-        <label>
-          <span>{t("editor.sketch.constraints.angleDeg")}</span>
-          <input type="number" min="0" max="180" step="1" value={angleValue} onChange={(event) => setAngleValue(event.currentTarget.value)} />
-        </label>
-        <button type="button" disabled={!selectedAnglePair || !Number.isFinite(angleDeg) || angleDeg < 0 || angleDeg > 180} onClick={() => selectedAnglePair && addConstraint({ kind: "angle", segmentIds: selectedAnglePair, valueDeg: angleDeg })}>{t("editor.sketch.constraints.addAngle")}</button>
+        {valueInput("angle", t("editor.sketch.constraints.angleDeg"), angleValue, setAngleValue)}
+        <button type="button" disabled={!selectedAnglePair || !angleEntry.ok} onClick={() => selectedAnglePair && angleEntry.ok && addConstraint({ kind: "angle", segmentIds: selectedAnglePair, valueDeg: angleEntry.value, ...bound(angleEntry) })}>{t("editor.sketch.constraints.addAngle")}</button>
         <label>
           <span>{t("editor.sketch.constraints.symmetryAxis")}</span>
           <select aria-label={t("editor.sketch.constraints.symmetryAxis")} value={symmetryAxis} onChange={(event) => setSymmetryAxisId(event.currentTarget.value)}>
@@ -1494,26 +1547,33 @@ function SketchConstraintPanel({
           </select>
         </label>
         <button type="button" disabled={!selectedSymmetryPair || !symmetryAxis || !isSketchSymmetrySetup(selectedSymmetryPair, symmetryAxis, profile)} onClick={() => selectedSymmetryPair && addConstraint({ kind: "symmetry", pointIds: selectedSymmetryPair, segmentId: symmetryAxis })}>{t("editor.sketch.constraints.addSymmetry")}</button>
-        <label>
-          <span>{t("editor.sketch.constraints.distanceMm")}</span>
-          <input type="number" min="0" step="0.1" value={distanceValue} onChange={(event) => setDistanceValue(event.currentTarget.value)} />
-        </label>
-        <button type="button" disabled={!selectedPair || !Number.isFinite(valueMm) || valueMm < 0} onClick={() => selectedPair && addConstraint({ kind: "distance", pointIds: selectedPair, valueMm })}>{t("editor.sketch.constraints.addDistance")}</button>
-        <label>
-          <span>{t("editor.sketch.constraints.radiusMm")}</span>
-          <input type="number" min="0" step="0.1" value={radiusValue} onChange={(event) => setRadiusValue(event.currentTarget.value)} />
-        </label>
-        <button type="button" disabled={!selectedPair || !Number.isFinite(radiusMm) || radiusMm <= 0} onClick={() => selectedPair && addConstraint({ kind: "radius", pointIds: selectedPair, valueMm: radiusMm })}>{t("editor.sketch.constraints.addRadius")}</button>
-        <label>
-          <span>{t("editor.sketch.constraints.diameterMm")}</span>
-          <input type="number" min="0" step="0.1" value={diameterValue} onChange={(event) => setDiameterValue(event.currentTarget.value)} />
-        </label>
-        <button type="button" disabled={!selectedPair || !Number.isFinite(diameterMm) || diameterMm <= 0} onClick={() => selectedPair && addConstraint({ kind: "diameter", pointIds: selectedPair, valueMm: diameterMm })}>{t("editor.sketch.constraints.addDiameter")}</button>
+        {valueInput("distance", t("editor.sketch.constraints.distanceMm"), distanceValue, setDistanceValue)}
+        <button type="button" disabled={!selectedPair || !distanceEntry.ok} onClick={() => selectedPair && distanceEntry.ok && addConstraint({ kind: "distance", pointIds: selectedPair, valueMm: distanceEntry.value, ...bound(distanceEntry) })}>{t("editor.sketch.constraints.addDistance")}</button>
+        {valueInput("radius", t("editor.sketch.constraints.radiusMm"), radiusValue, setRadiusValue)}
+        <button type="button" disabled={!selectedPair || !radiusEntry.ok} onClick={() => selectedPair && radiusEntry.ok && addConstraint({ kind: "radius", pointIds: selectedPair, valueMm: radiusEntry.value, ...bound(radiusEntry) })}>{t("editor.sketch.constraints.addRadius")}</button>
+        {valueInput("diameter", t("editor.sketch.constraints.diameterMm"), diameterValue, setDiameterValue)}
+        <button type="button" disabled={!selectedPair || !diameterEntry.ok} onClick={() => selectedPair && diameterEntry.ok && addConstraint({ kind: "diameter", pointIds: selectedPair, valueMm: diameterEntry.value, ...bound(diameterEntry) })}>{t("editor.sketch.constraints.addDiameter")}</button>
       </div>
       <div className="sketch-constraint-list">
         {(profile.constraints ?? []).map((constraint) => (
-          <div className="sketch-constraint-row" key={constraint.id}>
-            <span>{constraint.kind === "fixed"
+          <div className={`sketch-constraint-row${onUpdateConstraint && isDimensionalConstraint(constraint) ? " has-value" : ""}`} key={constraint.id}>
+            {onUpdateConstraint && isDimensionalConstraint(constraint) ? (
+              <ExpressionInput
+                className="sketch-constraint-row-value"
+                value={formatParameterValue(constraint.kind === "angle" ? constraint.valueDeg : constraint.valueMm)}
+                expression={constraint.expression}
+                parameters={parameters}
+                label={t("editor.expressionField.constraintValueOf", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })}
+                suffix={<span className="range-value-unit">{constraint.kind === "angle" ? "°" : unitLabel(t, "mm")}</span>}
+                onCommit={(typed) => {
+                  const resolved = resolveConstraintEntry(constraint, typed, parameters, sketchOutput);
+                  if (!resolved.ok) return constraintBindingMessage(resolved.error, constraint.kind === "angle" ? "angle" : "length");
+                  onUpdateConstraint(constraint.id, resolved.value, resolved.expression);
+                  return null;
+                }}
+              />
+            ) : null}
+            <span className="sketch-constraint-row-label">{constraint.kind === "fixed"
               ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.pointId} (${constraint.xMm}, ${constraint.zMm}) mm`
               : constraint.kind === "distance" || constraint.kind === "radius" || constraint.kind === "diameter"
                 ? `${t(`editor.sketch.constraints.kinds.${constraint.kind}`)} ${constraint.valueMm} mm ${constraint.pointIds.join("–")}`

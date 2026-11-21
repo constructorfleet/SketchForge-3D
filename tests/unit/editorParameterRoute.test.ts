@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { exportProjectScene, shapeFromRequest } from "@constructorfleet/sketchforge-engine";
+import { createEngine, exportProjectScene, shapeFromRequest, type ProjectDocument, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { activateConfiguration, addConfiguration, resolveProjectParameters } from "@constructorfleet/sketchforge-engine/projectParameters";
 import type { ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
 import type { ProjectConfiguration, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { POST } from "@/app/api/editor/parameters/route";
 import { editorParameterRequest } from "@/lib/editorCadRequests";
 import type { ParameterEdit } from "@/lib/projectParameterEdits";
+import type { EditorFieldBind } from "@/lib/expressionFields";
+import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { measureMesh } from "./support/meshMeasure";
 
 function table(entries: ProjectParameterInput[]) {
@@ -21,7 +23,24 @@ function boundBox(overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
   return { ...box, id: "box-1", name: "Bound box", x: 5, expressions: { width: "w", x: "w / 2" }, ...overrides };
 }
 
-async function post(shapes: WorkplaneShape[], edit: ParameterEdit) {
+/** Builds a 10 mm-wide ring revolved a full turn, through the engine's own request path. */
+async function revolveShape(): Promise<WorkplaneShape> {
+  let document = { metadata: { revision: 0 }, projectName: "r", createdAt: 0, shapes: [] as WorkplaneShape[], history: [], historyIndex: 0, assets: [] } as unknown as ProjectDocument;
+  const store: ProjectStore = {
+    read: async () => document,
+    write: async (_id, next, shapes) => {
+      document = { ...next, shapes };
+      return { revision: 1 };
+    },
+    withLock: async (_id, work) => ({ busy: false, result: await work() }),
+    list: async () => [],
+  };
+  const added = await createEngine(store).addShapes("r", [{ kind: "revolve", profile: [[5, -4], [10, -4], [10, 4], [5, 4]], sides: 48 }]);
+  if (!added.ok) throw new Error(JSON.stringify(added.failure));
+  return document.shapes[0]!;
+}
+
+async function post(shapes: WorkplaneShape[], edit: ParameterEdit | EditorFieldBind) {
   const parameters = table([{ name: "w", expression: "10", dimension: "length" }]);
   const request = editorParameterRequest("project-1", shapes, parameters, edit);
   const response = await POST(new Request(`http://localhost${request.url}`, {
@@ -105,7 +124,72 @@ describe("editor parameter route", () => {
     expect(body.shapes[0]).toMatchObject({ width: 30, expressions: { width: "size", x: "size / 2" } });
   });
 
+  it("binds a shape field through the engine, applying the resolved value", async () => {
+    const free = boundBox({ expressions: undefined, x: 0 });
+    const before = await stlMeasure([free]);
+    const { status, body } = await post([free], { kind: "bindShape", shapeId: "box-1", field: "width", expression: "w * 2" });
+
+    expect(status).toBe(200);
+    const [shape] = body.shapes as WorkplaneShape[];
+    expect(shape!.expressions).toEqual({ width: "w * 2" });
+    expect(shape!.width).toBe(20);
+    const after = await stlMeasure(body.shapes);
+    expect(after.volume).toBeCloseTo(before.volume * 2, 3);
+    // The box grows about its centre, so the whole centroid stays put.
+    after.centroid.forEach((value, axis) => expect(value).toBeCloseTo(before.centroid[axis]!, 3));
+  });
+
+  it("binds a revolve feature field, which rebuilds through the kernel", async () => {
+    const revolve = await revolveShape();
+    const full = await stlMeasure([revolve]);
+    const { status, body } = await post([revolve], { kind: "bindShape", shapeId: revolve.id, field: "revolve.sweepAngle", expression: "180" });
+
+    expect(status, JSON.stringify(body)).toBe(200);
+    const [shape] = body.shapes as WorkplaneShape[];
+    expect(shape!.expressions).toEqual({ "revolve.sweepAngle": "180" });
+    expect(shape!.sketchRevolve?.sweepAngle).toBe(180);
+    const half = await stlMeasure(body.shapes);
+    // Half the solid, within tessellation; the centre leaves the axis toward the kept half.
+    expect(half.volume / full.volume).toBeCloseTo(0.5, 2);
+    const shift = half.centroid.map((value, axis) => value - full.centroid[axis]!);
+    expect(Math.hypot(...shift)).toBeGreaterThan(3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("binds under the active configuration", async () => {
+    const added = addConfiguration({ parameters: table([{ name: "w", expression: "10", dimension: "length" }]), configurations: [] as ProjectConfiguration[], activeConfiguration: null as string | null }, { name: "Large", overrides: { w: "30" } });
+    if (!added.ok) throw new Error(added.error.message);
+    const active = activateConfiguration(added.project, "Large");
+    if (!active.ok) throw new Error(active.error.message);
+    const configuration = { configurations: active.project.configurations, activeConfiguration: "Large" };
+    const free = boundBox({ expressions: undefined, x: 0 });
+    const edit: EditorFieldBind = { kind: "bindShape", shapeId: "box-1", field: "width", expression: "w" };
+    const request = editorParameterRequest("project-1", [free], active.project.parameters, edit, configuration);
+    const response = await POST(new Request(`http://localhost${request.url}`, { method: "POST", body: JSON.stringify(request.body) }));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.shapes[0]).toMatchObject({ width: 30, expressions: { width: "w" } });
+    expect(body.activeConfiguration).toBe("Large");
+  });
+
+  it("removes a binding and keeps the number", async () => {
+    const { status, body } = await post([boundBox()], { kind: "bindShape", shapeId: "box-1", field: "x", expression: null });
+    expect(status).toBe(200);
+    expect(body.shapes[0]).toMatchObject({ x: 5, expressions: { width: "w" } });
+  });
+
+  it("refuses a bind the engine refuses, leaving shapes unchanged", async () => {
+    const invalid = await post([boundBox()], { kind: "bindShape", shapeId: "box-1", field: "width", expression: "nope" });
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.failure).toMatchObject({ reason: "binding_invalid", error: { code: "invalidExpression", field: "width" } });
+
+    const missing = await post([boundBox()], { kind: "bindShape", shapeId: "other", field: "width", expression: "w" });
+    expect(missing.status).toBe(422);
+    expect(missing.body.failure).toMatchObject({ reason: "shapes_not_found" });
+  });
+
   it("rejects malformed requests", async () => {
+    const bind = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body: JSON.stringify({ projectId: "p", shapes: [], parameters: [], edit: { kind: "bindShape", shapeId: "a", field: 3, expression: "w" } }) }));
+    expect(bind.status).toBe(400);
     const response = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body: JSON.stringify({ projectId: "p", shapes: [], parameters: [], edit: { kind: "drop" } }) }));
     expect(response.status).toBe(400);
   });

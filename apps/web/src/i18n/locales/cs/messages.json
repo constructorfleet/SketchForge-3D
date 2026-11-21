@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "Vazby náčrtu se nepodařilo splnit: {ids}",
       "constraintAdded": "Přidána vazba náčrtu: {kind}",
       "constraintRemoved": "Vazba náčrtu odebrána",
+      "constraintUpdated": "Vazba náčrtu byla upravena",
       "draftReplayFailed": "Náčrt nebyl aktualizován: úkos jeho profilu už nejde znovu vytvořit. Vraťte profil zpět, nebo úpravu náčrtu zrušte.",
       "shellNotReplayable": "Náčrt nebyl aktualizován: tento tvar má skořepinu a při obnovení z náčrtu ji už nelze znovu vytvořit. Nejprve skořepinu vraťte zpět, nebo úpravu náčrtu zrušte."
     },
@@ -908,6 +909,27 @@
         "serverError": "Server při aktualizaci navázaných tvarů selhal. Model zůstal beze změny.",
         "busy": "Nejprve dokončete aktuální úpravu.",
         "projectChanged": "Projekt se během aktualizace tvarů změnil. Zkuste to znovu."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Řídí se výrazem {expression}",
+      "suggestions": "Návrhy parametrů",
+      "constraintValueOf": "Hodnota vazby {kind}",
+      "notice": {
+        "bound": "Nyní se řídí výrazem {expression}"
+      },
+      "error": {
+        "needsLength": "Toto pole potřebuje délku. Použijte délkový parametr nebo jednotku, například mm.",
+        "needsAngle": "Toto pole potřebuje úhel. Použijte úhlový parametr nebo jednotku, například deg.",
+        "needsUnitless": "Toto pole potřebuje číslo bez jednotky.",
+        "outOfRange": "Výraz dává {value}, což je pro toto pole mimo rozsah.",
+        "notAnInteger": "Toto pole potřebuje celé číslo.",
+        "fieldNotBindable": "Toto pole se zde nemůže řídit výrazem.",
+        "constraintOutOfRange": "Výraz dává hodnotu, kterou tato vazba mít nemůže.",
+        "sketchNotRebuildable": "Tento náčrt nelze z výrazu znovu sestavit.",
+        "needsServer": "Aby se toto pole řídilo výrazem, potřebuje server SketchForge. Model se nezměnil.",
+        "constraintConflictsWithSize": "{fields} tohoto tvaru se řídí výrazem, který mění měřítko náčrtu. Nejprve tuto vazbu zrušte.",
+        "sizeConflictsWithConstraints": "Tuto velikost určují vázané vazby náčrtu ({constraints}). Nejprve je zrušte."
       }
     }
   },

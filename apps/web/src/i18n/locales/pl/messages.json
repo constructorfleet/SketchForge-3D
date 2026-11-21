@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "Nie udało się spełnić więzów szkicu: {ids}",
       "constraintAdded": "Dodano więz szkicu: {kind}",
       "constraintRemoved": "Usunięto więz szkicu",
+      "constraintUpdated": "Zaktualizowano wiązanie szkicu",
       "draftReplayFailed": "Szkic nie został zaktualizowany: nie można odtworzyć jego pochylenia na tym profilu. Przywróć poprzedni profil albo anuluj edycję szkicu.",
       "shellNotReplayable": "Szkic nie został zaktualizowany: ten kształt został wydrążony, a odtworzenie go ze szkicu nie odtworzy wydrążenia. Najpierw cofnij wydrążenie albo anuluj edycję szkicu."
     },
@@ -908,6 +909,27 @@
         "serverError": "Serwer zawiódł podczas aktualizacji powiązanych kształtów. Model się nie zmienił.",
         "busy": "Najpierw zakończ bieżącą edycję.",
         "projectChanged": "Projekt zmienił się podczas aktualizacji kształtów. Spróbuj ponownie."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Wynika z wyrażenia {expression}",
+      "suggestions": "Podpowiedzi parametrów",
+      "constraintValueOf": "Wartość wiązania {kind}",
+      "notice": {
+        "bound": "Teraz wynika z {expression}"
+      },
+      "error": {
+        "needsLength": "To pole wymaga długości. Użyj parametru długości lub jednostki, np. mm.",
+        "needsAngle": "To pole wymaga kąta. Użyj parametru kąta lub jednostki, np. deg.",
+        "needsUnitless": "To pole wymaga liczby bez jednostki.",
+        "outOfRange": "Wyrażenie daje {value}, co jest poza zakresem tego pola.",
+        "notAnInteger": "To pole wymaga liczby całkowitej.",
+        "fieldNotBindable": "To pole nie może tutaj wynikać z wyrażenia.",
+        "constraintOutOfRange": "Wyrażenie daje wartość, której to wiązanie nie może mieć.",
+        "sketchNotRebuildable": "Tego szkicu nie można odbudować z wyrażenia.",
+        "needsServer": "Aby to pole wynikało z wyrażenia, potrzebny jest serwer SketchForge. Model się nie zmienił.",
+        "constraintConflictsWithSize": "{fields} tego kształtu wynika z wyrażenia, które skaluje szkic. Najpierw usuń to powiązanie.",
+        "sizeConflictsWithConstraints": "Ten rozmiar wyznaczają powiązane wiązania szkicu ({constraints}). Najpierw usuń te powiązania."
       }
     }
   },

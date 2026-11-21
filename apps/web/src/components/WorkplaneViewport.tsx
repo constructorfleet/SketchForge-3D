@@ -16,7 +16,7 @@ import { MoveDimensionOverlay } from "@/components/workplane/MoveDimensionOverla
 import { SceneInspector } from "@/components/workplane/SceneInspector";
 import { SceneAnalysisPanel } from "@/components/workplane/SceneAnalysisPanel";
 import type { SceneAnalysisRunner } from "@/lib/sceneAnalysis";
-import { ShapeInspector, SnapGridControl, type ShapeInspectorUpdateOptions } from "@/components/workplane/ShapeInspector";
+import { ShapeInspector, SnapGridControl, type ShapeExpressionFields, type ShapeInspectorUpdateOptions } from "@/components/workplane/ShapeInspector";
 import { KeyTagTutorialPanel } from "@/components/workplane/KeyTagTutorialPanel";
 import { NameplateTutorialPanel } from "@/components/workplane/NameplateTutorialPanel";
 import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettingsModal";
@@ -248,6 +248,8 @@ type WorkplaneViewportProps = {
   /** Solid volume of the selected shape, for the inspector's material readout. */
   selectedShapeVolumeMm3?: number;
   onUpdateShape: (id: string, patch: ShapeUpdatePatch) => void;
+  /** Present when inspector number fields may follow parameter expressions. */
+  shapeExpressionFields?: (shapeId: string) => ShapeExpressionFields;
   onWorkspaceSettingsChange?: (settings: { workspace: WorkplaneWorkspaceSettings; snap: GridSize }) => void;
   onWorkplaneModeChange: (active: boolean) => void;
   modifierActive?: boolean;
@@ -2432,6 +2434,7 @@ export function WorkplaneViewport({
   onExplodeAssembly,
   selectedShapeVolumeMm3,
   onUpdateShape,
+  shapeExpressionFields,
   onWorkspaceSettingsChange,
   onWorkplaneModeChange,
   modifierActive = false,
@@ -5784,6 +5787,7 @@ export function WorkplaneViewport({
               materialPricesPerKg: { ...current.materialPricesPerKg, [materialId]: pricePerKg },
             }))}
             onInteractionActiveChange={onInteractionActiveChange}
+            expressionFields={shapeExpressionFields?.(selectedShape.id)}
           />
         ) : null}
 

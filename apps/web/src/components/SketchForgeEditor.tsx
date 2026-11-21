@@ -177,6 +177,10 @@ import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
 import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
+import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
+import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { conflictingConstraintBinding, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import type { ShapeExpressionFields } from "@/components/workplane/ShapeInspector";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import {
@@ -5258,6 +5262,8 @@ function debugShapeSummary(shape: WorkplaneShape): Record<string, unknown> {
     cadPrimitiveKind: shape.cadPrimitiveFrame?.kind ?? null,
     groupedCount: shape.groupedShapes?.length ?? 0,
     children: shape.groupedShapes?.map(debugShapeSummary) ?? [],
+    ...(shape.expressions ? { expressions: shape.expressions } : {}),
+    ...(shape.sketchRevolve ? { sketchRevolve: shape.sketchRevolve } : {}),
   };
 }
 
@@ -6318,10 +6324,10 @@ export function SketchForgeEditor({
     },
     move: (event) => {
       const step = keyboardNudgeStep(snapGridRef.current, event.shiftKey);
-      const next = moveShapesByKeyboard(
+      const next = releaseEditedBindings(shapesRef.current, moveShapesByKeyboard(
         shapesRef.current, selectedIdsRef.current, event, placementWorkplaneRef.current, step,
         cameraOrientationRef.current,
-      );
+      ));
       if (next === shapesRef.current) return;
       interactionHistoryChangedRef.current = true;
       shapesRef.current = next;
@@ -6413,7 +6419,8 @@ export function SketchForgeEditor({
 
   const commitShapes = useCallback(
     (next: WorkplaneShape[], nextSelection: string | string[] | null = selectedIds, message?: Notice) => {
-      const canonicalNext = next.map(canonicalizeShape);
+      // Every local edit lands here or in updateShape; an edited bound number keeps the edit (literal wins).
+      const canonicalNext = releaseEditedBindings(shapesRef.current, next.map(canonicalizeShape));
       const requestedSelection = Array.isArray(nextSelection) ? nextSelection : nextSelection ? [nextSelection] : [];
       const validSelection = requestedSelection.filter((id, index) => requestedSelection.indexOf(id) === index && canonicalNext.some((shape) => shape.id === id));
       shapesRef.current = canonicalNext;
@@ -7000,6 +7007,21 @@ export function SketchForgeEditor({
     commitSketchProfile(next, notice((t) => t("editor.sketch.constraintAdded", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })), []);
   }, [commitSketchProfile, sketchProfile]);
 
+  /** Sets a dimensional constraint's value, binding it to `expression` or, with null, unbinding it. */
+  const updateSketchConstraint = useCallback((constraintId: string, value: number, expression: string | null) => {
+    const output = editingSketchShapeId ? shapesRef.current.find((shape) => shape.id === editingSketchShapeId) : undefined;
+    const conflict = expression !== null && output ? conflictingConstraintBinding(output, constraintId) : undefined;
+    if (conflict) {
+      const message = constraintBindingMessage(conflict);
+      setNotice(notice((t) => t(message.key, message.values)));
+      return;
+    }
+    const next = withSketchConstraintValues(sketchProfile, { [constraintId]: value }, { [constraintId]: expression });
+    commitSketchProfile(next, notice((t) => (expression === null
+      ? t("editor.sketch.constraintUpdated")
+      : t("editor.expressionField.notice.bound", { expression }))), []);
+  }, [commitSketchProfile, editingSketchShapeId, sketchProfile]);
+
   const removeSketchConstraint = useCallback((constraintId: string) => {
     commitSketchProfile(removeConstraintFromProfile(sketchProfile, constraintId), notice((t) => t("editor.sketch.constraintRemoved")));
   }, [commitSketchProfile, sketchProfile]);
@@ -7202,6 +7224,8 @@ export function SketchForgeEditor({
       setNotice(notice((t) => t("editor.sketch.closeProfile")));
       return;
     }
+    // A rebuild starts from a fresh shape; bindings it leaves unchanged must survive it.
+    if (existing) resolved = withRebuiltBindings(existing, resolved);
     const nextShapes = existing ? shapes.map((shape) => (shape.id === existing.id ? resolved : shape)) : [...shapes, resolved];
     const operationName = sketchOperation;
     commitShapes(
@@ -7379,21 +7403,43 @@ export function SketchForgeEditor({
     [commitShapes, placementWorkplane, shapes, t],
   );
 
+  // Revolve settings commit after an async rebuild, so a typed literal's unbind waits for it: one history entry.
+  // Each release maps field to the expression released; the next scheduled rebuild claims it.
+  const pendingRevolveReleasesRef = useRef(new Map<string, Record<string, string>>());
+  const claimedRevolveReleasesRef = useRef(new Map<string, { requestId: number; released: Record<string, string> }>());
   const scheduleRevolveShapeUpdate = useCallback((id: string, settings: SketchRevolveSettings) => {
     const previousTimer = sketchRevolveUpdateTimerRef.current.get(id);
     if (previousTimer !== undefined) window.clearTimeout(previousTimer);
     const requestId = (sketchRevolveUpdateRequestRef.current.get(id) ?? 0) + 1;
     sketchRevolveUpdateRequestRef.current.set(id, requestId);
+    // A superseded request never lands, so its releases move to this one.
+    claimedRevolveReleasesRef.current.set(id, {
+      requestId,
+      released: { ...claimedRevolveReleasesRef.current.get(id)?.released, ...pendingRevolveReleasesRef.current.get(id) },
+    });
+    pendingRevolveReleasesRef.current.delete(id);
+    const takeReleases = () => {
+      const claimed = claimedRevolveReleasesRef.current.get(id);
+      if (claimed?.requestId !== requestId) return {};
+      claimedRevolveReleasesRef.current.delete(id);
+      return claimed.released;
+    };
     const timer = window.setTimeout(() => {
       sketchRevolveUpdateTimerRef.current.delete(id);
       const source = shapesRef.current.find((shape) => shape.id === id);
-      if (!source?.sketchProfile || source.sketchOperation !== "revolve") return;
+      if (!source?.sketchProfile || source.sketchOperation !== "revolve") {
+        takeReleases();
+        return;
+      }
       setNotice(notice((t) => t("editor.sketch.revolvePreviewUpdating")));
       void Promise.all([shapeFromRevolvedSketchProfile(source.sketchProfile, settings, source), getManifoldRuntime()])
         .then(([generated, runtime]) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) !== requestId) return;
           const current = shapesRef.current.find((shape) => shape.id === id);
-          if (!current?.importedMesh || current.sketchOperation !== "revolve") return;
+          if (!current?.importedMesh || current.sketchOperation !== "revolve") {
+            takeReleases();
+            return;
+          }
           const axis = recoveredRevolveAxis(runtime, current);
           const widthScale = current.width / Math.max(0.001, current.importedMesh.baseWidth);
           const depthScale = current.depth / Math.max(0.001, current.importedMesh.baseDepth);
@@ -7401,7 +7447,7 @@ export function SketchForgeEditor({
           const width = generated.width * widthScale;
           const depth = generated.depth * depthScale;
           const height = generated.height * heightScale;
-          const updated = placeRevolveOnAxis(canonicalizeShape({
+          const rebuilt = placeRevolveOnAxis(canonicalizeShape({
             ...generated,
             id: current.id,
             name: current.name,
@@ -7424,10 +7470,12 @@ export function SketchForgeEditor({
             hidden: current.hidden,
             sketchRevolve: settings,
           }), axis);
+          const updated = withRebuiltBindings(current, rebuilt, takeReleases());
           commitShapes(shapesRef.current.map((shape) => shape.id === id ? updated : shape), selectedIdsRef.current, notice((t) => t("editor.sketch.revolveShapeUpdated")));
         })
         .catch((error) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) === requestId) {
+            takeReleases();
             setNotice(notice((t) => errorText(t, error, "editor.sketch.revolveSettingsFailed")));
           }
         });
@@ -7455,7 +7503,8 @@ export function SketchForgeEditor({
 
           const patched = { ...shape, ...cleanedPatch };
           const canonicalBase = canonicalizeShape("hole" in cleanedPatch ? withHoleMode(patched, Boolean(cleanedPatch.hole), cleanedPatch.color) : patched);
-          const canonical = bakeTransform ? canonicalizeShape(bakeShapeTransformIntoMesh(canonicalBase)) : canonicalBase;
+          const baked = bakeTransform ? canonicalizeShape(bakeShapeTransformIntoMesh(canonicalBase)) : canonicalBase;
+          const [canonical] = releaseEditedBindings([shape], [baked]) as [WorkplaneShape];
           if (workplaneShapesEqual(shape, canonical)) {
             return shape;
           }
@@ -7740,6 +7789,94 @@ export function SketchForgeEditor({
     setNotice(notice((t) => t(`editor.parameters.notice.${noticeKey}`, { name })));
     return null;
   }, [adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
+
+  /**
+   * Binds or unbinds one shape field as one history entry, through the engine on the server.
+   * Unbinding, and plain primitives in the static build, need no kernel and run locally.
+   */
+  const bindShapeField = useCallback(async (shapeId: string, field: string, expression: string | null): Promise<ParameterMessage | null> => {
+    if (projectInteractionActiveRef.current || parameterEditPendingRef.current) return { key: "editor.parameters.error.busy", values: {} };
+    const startShapes = shapesRef.current;
+    const parameters = projectParametersRef.current;
+    // Values resolve under the active configuration (#618), so the server needs its rows.
+    const configuration = projectConfigurationRef.current;
+    const local = expression === null || STATIC_EXPORT_BUILD ? bindShapeFieldLocally(startShapes, parameters, shapeId, field, expression) : null;
+    if (local && !local.ok) return bindingFailureMessage(local.failure, startShapes);
+    let bound = local?.shapes;
+    if (!bound) {
+      if (STATIC_EXPORT_BUILD) return { key: "editor.expressionField.error.needsServer", values: {} };
+      // A server answer can land after the field is gone, so it also shows in the status line.
+      const refuse = (message: ParameterMessage) => {
+        setNotice(notice((t) => t(message.key, message.values)));
+        return message;
+      };
+      parameterEditPendingRef.current = true;
+      setParameterEditPending(true);
+      try {
+        const edit: EditorFieldBind = { kind: "bindShape", shapeId, field, expression };
+        const scope = bindScope(startShapes, shapeId);
+        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", scope, parameters, edit, configuration);
+        const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
+        const body = await response.json().catch(() => null) as { shapes?: WorkplaneShape[] } | null;
+        const merged = response.ok && body?.shapes ? mergeRecomputedShapes(startShapes, scope, body.shapes) : null;
+        if (!merged) return refuse(bindResponseMessage(response.ok ? 200 : response.status, body, startShapes));
+        bound = merged;
+      } catch {
+        return refuse(bindingFailureMessage(null, startShapes));
+      } finally {
+        parameterEditPendingRef.current = false;
+        setParameterEditPending(false);
+      }
+      if (shapesRef.current !== startShapes || projectParametersRef.current !== parameters || projectConfigurationRef.current !== configuration) {
+        return refuse({ key: "editor.parameters.error.projectChanged", values: {} });
+      }
+    }
+    invalidateCadModifierSession();
+    const nextShapes = bound.map(canonicalizeShape);
+    const nextSelection = selectedIdsRef.current.filter((id) => nextShapes.some((shape) => shape.id === id));
+    shapesRef.current = nextShapes;
+    selectedIdsRef.current = nextSelection;
+    setShapes(nextShapes);
+    setSelectedIds(nextSelection);
+    if (appendHistorySnapshot(nextShapes, nextSelection)) syncProjectShapes(nextShapes);
+    if (expression !== null) setNotice(notice((t) => t("editor.expressionField.notice.bound", { expression })));
+    return null;
+  }, [appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
+
+  /** Drops a binding inside the current interaction, so a typed literal and its unbind are one history entry. */
+  const releaseShapeBinding = useCallback((shapeId: string, field: string) => {
+    const target = shapesRef.current.find((shape) => shape.id === shapeId);
+    if (field.startsWith("revolve.") && target?.sketchOperation === "revolve" && target.sketchProfile) {
+      // The revolve rebuild that follows drops it, in the same history entry.
+      const expression = target.expressions?.[field];
+      if (expression !== undefined) {
+        pendingRevolveReleasesRef.current.set(shapeId, { ...pendingRevolveReleasesRef.current.get(shapeId), [field]: expression });
+      }
+      return;
+    }
+    const release = (current: WorkplaneShape[]) => {
+      const next = current.map((shape) => (shape.id === shapeId ? withoutBindings(shape, [field]) : shape));
+      return next.some((shape, index) => shape !== current[index]) ? next : current;
+    };
+    if (projectInteractionActiveRef.current) {
+      setShapes((current) => {
+        const next = release(current);
+        if (next === current) return current;
+        interactionHistoryChangedRef.current = true;
+        shapesRef.current = next;
+        return next;
+      });
+      return;
+    }
+    const next = release(shapesRef.current);
+    if (next !== shapesRef.current) commitShapes(next, selectedIdsRef.current);
+  }, [commitShapes]);
+
+  const shapeExpressionFields = useCallback((shapeId: string): ShapeExpressionFields => ({
+    parameters: projectParameters,
+    onBind: (field, expression) => bindShapeField(shapeId, field, expression),
+    onRelease: (field) => releaseShapeBinding(shapeId, field),
+  }), [bindShapeField, projectParameters, releaseShapeBinding]);
 
   const toggleAlignMode = useCallback(() => {
     if (selectedShapes.length < 2) {
@@ -10632,6 +10769,9 @@ export function SketchForgeEditor({
             profile={sketchProfile}
             onAddConstraint={addSketchConstraint}
             onRemoveConstraint={removeSketchConstraint}
+            onUpdateConstraint={updateSketchConstraint}
+            parameters={projectParameters}
+            sketchOutput={editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null}
             operation={sketchOperation}
             sweepStage={sweepStage}
             sweepScreenRight={formatSweepAxis(sketchProfile.sweepFrames?.spine.xAxis ?? activeSketchWorkplane.normal)}
@@ -10743,6 +10883,7 @@ export function SketchForgeEditor({
           onSeparateParts={separateSelectedParts}
           onExplodeAssembly={canExplodeSelectedAssembly ? explodeSelectedAssembly : undefined}
           onUpdateShape={updateShape}
+          shapeExpressionFields={shapeExpressionFields}
           onWorkspaceSettingsChange={updateProjectWorkspaceSettings}
           onWorkplaneModeChange={closeViewportWorkplaneMode}
           modifierActive={Boolean(edgeModifier)}
