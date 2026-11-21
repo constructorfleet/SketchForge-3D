@@ -15,15 +15,14 @@
 // The route imports this module, so it must stay free of anything that pulls
 // React in: "@/i18n/LocalizedError" only, never "@/i18n".
 import { LocalizedError, errorFromResponse, type ErrorKey, type ErrorResponseFields } from "@/i18n/LocalizedError";
+import { apiProjectId } from "@constructorfleet/sketchforge-engine/apiErrors";
 
 export const SERVER_PROJECTS_ENV = "SKETCHFORGE_PROJECTS_DIR";
 export const SERVER_PROJECTS_ENDPOINT = "/api/projects";
 
 /** A project id as the server will spell it on disk, or null when it cannot be one. */
 export function safeServerProjectId(projectId: string) {
-  const trimmed = projectId.trim();
-  if (!trimmed || trimmed.length > 120) return null;
-  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(trimmed) ? trimmed : null;
+  return apiProjectId(projectId) ?? null;
 }
 
 export function serverProjectMetadataFileName(projectId: string) {

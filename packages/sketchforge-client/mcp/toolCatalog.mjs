@@ -32,6 +32,12 @@ const resultAttributeProperties = {
   color: { type: "string", description: "Color for the result, stored as given as create_shape stores its color, such as #2a9d8f (default the first solid's color)." },
 };
 
+const urlProperty = { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." };
+const projectIdProperty = { type: "string", description: "The project id." };
+const PARAMETER_DIMENSIONS = ["length", "angle", "unitless"];
+const WORKS_BOTH_WAYS = "Works offline or against a server when url is supplied.";
+const REFUSAL_FORMAT = "A refusal ends its first line with [code]; a second line, when present, is JSON detail.";
+
 export const engineTools = [
   {
     name: "sketchforge_list_projects",
@@ -572,6 +578,83 @@ export const engineTools = [
           description: 'Faces to leave open. Direction names ("top", "bottom", "left", "right", "front", "back") or face indexes from sketchforge_list_faces. Omit for a sealed hollow.',
           items: { type: ["string", "number"] },
         },
+      },
+    },
+  },
+  {
+    name: "sketchforge_list_parameters",
+    description: `List the project's named parameters: name, expression, dimension, resolved value (null for a stale entry) and error, if any. bindingIssues lists shape bindings that no longer resolve. ${REFUSAL_FORMAT} ${WORKS_BOTH_WAYS}`,
+    inputSchema: {
+      type: "object",
+      required: ["projectId"],
+      properties: { url: urlProperty, projectId: projectIdProperty },
+    },
+  },
+  {
+    name: "sketchforge_set_parameter",
+    description: [
+      "Create a parameter, or change the expression or dimension of an existing one.",
+      "Send expression and dimension to create. An existing name is overwritten, not refused; created says which happened. Either one alone changes an existing parameter.",
+      "A bare number takes the dimension's unit, so 3 in a length parameter is 3 mm.",
+      "The reply has created, the parameter, the whole table, and the shapes the change rebuilt.",
+      REFUSAL_FORMAT,
+      "Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension or a cycle; expressionError has the span and any cycle path), parameter_not_found (a change to a name that does not exist), invalid_request (a bad name or dimension, or an empty or over-long expression), limit_exceeded (the table is full), shape_locked (a bound shape is locked; detail names shapeId and fields), geometry_failed (a bound sketch cannot be solved; detail names shapeId and constraintIds).",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        name: { type: "string", description: "Parameter name: a letter or underscore, then letters, digits or underscores." },
+        expression: { type: "string", description: 'For example "2", "3 mm", "wall * 2 + 1" or "max(wall, 2)". Units: mm, cm, m, in, ft, deg, rad.' },
+        dimension: { type: "string", enum: PARAMETER_DIMENSIONS, description: "length values are in mm and angle values in degrees." },
+      },
+    },
+  },
+  {
+    name: "sketchforge_rename_parameter",
+    description: `Rename a parameter, rewriting every parameter expression and shape binding that uses it. ${REFUSAL_FORMAT} Codes: parameter_not_found, parameter_exists (newName is taken), invalid_request (newName is not a valid name). ${WORKS_BOTH_WAYS}`,
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name", "newName"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        name: { type: "string", description: "The current name." },
+        newName: { type: "string", description: "The new name." },
+      },
+    },
+  },
+  {
+    name: "sketchforge_delete_parameter",
+    description: `Delete a parameter that nothing uses. ${REFUSAL_FORMAT} Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields), sketchConstraintDependents (shapeId and constraintIds) and configurationDependents (configuration names) to change or clear first. ${WORKS_BOTH_WAYS}`,
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name"],
+      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The parameter to delete." } },
+    },
+  },
+  {
+    name: "sketchforge_set_shape_expression",
+    description: [
+      "Bind one field of a stored shape to a parameter expression and apply its value, or pass expression null to clear the binding and keep the current number.",
+      "A changed parameter then rebuilds the shape. Bindable fields: x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, kind parameters such as sides or bevel, revolve.startAngle, revolve.sweepAngle and the other revolve settings, draftPrismAngle and faceDraft.angle.",
+      "The reply has the shape, as GET /api/v1/shapes reports it, and the revision. Repeating the stored expression writes nothing.",
+      REFUSAL_FORMAT,
+      "Codes: unapplicable_fields (this shape cannot bind the field), invalid_expression (detail names shapeId and field, with expressionError, or value, min and max for a result out of range), shape_not_found, shape_locked (detail names shapeId and fields).",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId", "field", "expression"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        shapeId: { type: "string", description: "The shape id." },
+        field: { type: "string", description: 'The field to bind, such as "width" or "revolve.sweepAngle".' },
+        expression: { type: ["string", "null"], description: 'For example "wall * 5". null clears the binding.' },
       },
     },
   },

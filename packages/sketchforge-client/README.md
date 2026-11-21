@@ -33,6 +33,13 @@ server; editor tools then require an open editor tab (`/?editor=1`). Remote
 REST operations also require `SKETCHFORGE_API_TOKEN` in the MCP process
 environment.
 
+Five tools manage named parameters and bind shape fields to expressions over
+them, in local mode and against a server: `sketchforge_list_parameters`,
+`sketchforge_set_parameter`, `sketchforge_rename_parameter`,
+`sketchforge_delete_parameter` and `sketchforge_set_shape_expression`. See
+[Drive a shape from parameters](https://github.com/constructorfleet/SketchForge-3D/blob/main/docs/mcp/EXAMPLES.md#drive-a-shape-from-parameters)
+for the error codes they return.
+
 Two of its tools run *macros* -- the scripts this package's runner executes --
 and only files already sitting in `SKETCHFORGE_MACRO_DIR`. There is deliberately
 no tool that accepts code to run. A Python macro needs `sketchforge3d` installed

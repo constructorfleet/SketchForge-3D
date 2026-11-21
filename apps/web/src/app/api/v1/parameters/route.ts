@@ -1,42 +1,21 @@
-import { apiEngine, apiEngineError, wireExpressionError } from "@/lib/apiEngine";
-import { apiShapeSummary } from "@/lib/apiShapes";
+import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody } from "@/lib/apiV1";
-import { parseApiV1Query, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
-import type { ParametersWritten } from "@/lib/engine/engine";
-import { shapeBindingIssues } from "@constructorfleet/sketchforge-engine/expressionBindings";
-import type { ProjectParameter, ProjectParameterDimension } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
-import type { ExpressionError } from "@constructorfleet/sketchforge-engine/parameterExpressions";
+import { parseApiV1Query, withApiV1Contract } from "@/lib/apiV1OperationContract";
+// The engine's checks, not the contract schema, so MCP local mode refuses the same bodies.
+import {
+  API_PARAMETER_MESSAGES,
+  apiParameterList,
+  apiParametersWritten as written,
+  isApiParameterChangeRequest,
+  isApiParameterCreateRequest,
+} from "@constructorfleet/sketchforge-engine/apiParameters";
+import type { ProjectParameterDimension } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 export const runtime = "nodejs";
 export const revalidate = false;
 
-function apiIssue({ code, message, expressionError }: { code: string; message: string; expressionError?: ExpressionError }) {
-  return { code, message, ...(expressionError ? { expressionError: wireExpressionError(expressionError) } : {}) };
-}
-
-/** Serializes one table entry. A stale entry's NaN becomes null, which JSON would write anyway. */
-function apiParameter(parameter: ProjectParameter) {
-  return {
-    name: parameter.name,
-    expression: parameter.expression,
-    dimension: parameter.dimension,
-    value: Number.isFinite(parameter.value) ? parameter.value : null,
-    ...(parameter.error ? { error: apiIssue(parameter.error) } : {}),
-  };
-}
-
-function written(value: ParametersWritten, name: string) {
-  const parameter = value.parameters.find((entry) => entry.name === name);
-  return {
-    ...(parameter ? { parameter: apiParameter(parameter) } : {}),
-    parameters: value.parameters.map(apiParameter),
-    shapes: value.shapes.map(apiShapeSummary),
-    revision: value.revision,
-  };
-}
-
 function invalidQuery(invalid: readonly string[]) {
-  return invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiError("A parameter name is required.", 400, "invalid_request");
+  return invalid.includes("projectId") ? apiErrors.invalidProjectId() : apiError(API_PARAMETER_MESSAGES.nameRequired, 400, "invalid_request");
 }
 
 async function getHandler(request: Request) {
@@ -47,12 +26,7 @@ async function getHandler(request: Request) {
 
   const project = await apiEngine(context.root, request).project(query.values.projectId!);
   if (!project.ok) return apiEngineError(project.failure);
-  const { parameters, shapes, revision } = project.value;
-  return apiJson({
-    parameters: parameters.map(apiParameter),
-    bindingIssues: shapeBindingIssues(shapes, parameters).map((issue) => ({ shapeId: issue.shapeId, field: issue.field, ...apiIssue(issue) })),
-    revision,
-  });
+  return apiJson(apiParameterList(project.value));
 }
 
 async function postHandler(request: Request) {
@@ -63,8 +37,8 @@ async function postHandler(request: Request) {
   const body = await apiJsonBody(request);
   if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
-  if (!validateApiV1RequestBody("POST /api/v1/parameters", body)) {
-    return apiError("A parameter needs a name, an expression, and a dimension of length, angle, or unitless.", 400, "invalid_request");
+  if (!isApiParameterCreateRequest(body)) {
+    return apiError(API_PARAMETER_MESSAGES.create, 400, "invalid_request");
   }
 
   const name = body.name as string;
@@ -86,8 +60,8 @@ async function patchHandler(request: Request) {
   const body = await apiJsonBody(request);
   if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
-  if (!validateApiV1RequestBody("PATCH /api/v1/parameters", body)) {
-    return apiError("Send name alone to rename, or expression and dimension to change the value.", 400, "invalid_request");
+  if (!isApiParameterChangeRequest(body)) {
+    return apiError(API_PARAMETER_MESSAGES.change, 400, "invalid_request");
   }
 
   const { projectId, name } = query.values as { projectId: string; name: string };

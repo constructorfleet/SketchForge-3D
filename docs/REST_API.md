@@ -163,6 +163,8 @@ A project can hold a table of named parameters, and any numeric shape field in t
 | `PATCH /parameters?projectId=&name=` | `{ expression?, dimension? }`, or `{ name }` alone to rename | `200 { parameter, parameters, shapes, revision }` |
 | `DELETE /parameters?projectId=&name=` | none | `200 { deleted: true, name, parameters, shapes, revision }` |
 
+The MCP server offers the same operations as tools; see [Drive a shape from parameters](mcp/EXAMPLES.md#drive-a-shape-from-parameters).
+
 `dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message }`. When the project has parameter configurations, `expression` is the base expression and `value` is resolved under the active configuration; no route edits configurations yet. A change that breaks a configuration's table, active or not, is refused with `configuration` naming it.
 
 `shapes` holds the top-level shapes the write rebuilt or rewrote, in the same form `GET /shapes` now returns them. A rename rewrites every expression and binding that uses the old name. A delete is refused with `409 parameter_in_use` while anything uses the parameter. All three writes honour `If-Match`. A change that does not evaluate (a parse error, a cycle, a wrong dimension, or a bound field it would break) answers `422 invalid_expression` and writes nothing. A change that would rebuild a locked shape answers `409 shape_locked`, also with nothing written:
@@ -177,7 +179,7 @@ A project can hold a table of named parameters, and any numeric shape field in t
 }
 ```
 
-`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `field`, and its `shapeId` or, in `POST /shapes`, its batch `index`, because the new shape has no stored id. A parameter change refused because a bound shape could not be rebuilt, for example `409 shape_locked`, names that `shapeId` and its bound `fields`.
+`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `field`, and its `shapeId` or, in `POST /shapes`, its batch `index`, because the new shape has no stored id. A parameter change refused because a bound shape could not be rebuilt, for example `409 shape_locked`, names that `shapeId` and its bound `fields`; one refused because a bound sketch cannot be solved answers `422 geometry_failed` with `shapeId` and `constraintIds`. A `PATCH /shapes` refused by a lock names the `shapeId`, and the `fields` its `expressions` would bind on that shape. While a sketch constraint uses a parameter, `parameter_in_use` also lists `sketchConstraintDependents` as `{ shapeId, constraintIds }`.
 
 ### Binding shape fields
 
@@ -200,7 +202,7 @@ A `PATCH` compares each side of a bound field with the shape's current state. A 
 | A different number and a different expression that disagree | `400 invalid_request` naming `shapeId` and `field` (or `index` in a batch `POST`), with nothing written. |
 | `expressions: { field: null }` | The binding is removed and the field keeps its current number. |
 
-Comparisons are exact, which a JSON round trip of the server's own number preserves.
+Comparisons are exact, which a JSON round trip of the server's own number preserves. A `PATCH` whose only content is echoed expressions changes nothing, so it writes nothing and returns the current revision; a locked shape still refuses it.
 
 **Send `If-Match` with a whole summary.** A summary read before someone else changed a parameter carries the old numbers, and against the current shape they count as edits. Without `If-Match`, such a `PATCH` removes those bindings and puts the old values back. With `If-Match` set to the revision you read, the same request answers `409 revision_mismatch` and changes nothing.
 
