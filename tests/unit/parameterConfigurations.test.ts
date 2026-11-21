@@ -204,6 +204,15 @@ describe("parameter configurations", () => {
     expect(failed(updateParameter(current, "depth", { expression: "30 deg" }))).toMatchObject({ code: "invalidExpression", parameter: "depth" });
   });
 
+  it("holds the active configuration to the base rule: a touched entry must resolve there", () => {
+    const current: Project = { ...configured(), configurations: [{ name: "Large", overrides: { wall: "nope" } }], activeConfiguration: "Large" };
+
+    expect(failed(addParameter(current, { name: "lip", expression: "wall / 2", dimension: "length" }))).toMatchObject({ parameter: "lip", configuration: "Large" });
+    expect(failed(updateParameter(current, "depth", { expression: "wall * 7" }))).toMatchObject({ parameter: "depth", configuration: "Large" });
+    // A literal does not read the stale entry, so it resolves.
+    expect(values(ok(updateParameter(current, "depth", { expression: "12" }))).depth).toBe(12);
+  });
+
   it("does not let a stale base entry block a rename", () => {
     const stale: Project = { ...configured(), parameters: [{ name: "wall", expression: "nope", dimension: "length", value: 2 }, configured().parameters[1]!] };
     expect(values(ok(renameParameter(stale, "wall", "shell")))).toEqual({ shell: 2, depth: 10 });

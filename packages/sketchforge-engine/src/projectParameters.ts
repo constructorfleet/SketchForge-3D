@@ -279,7 +279,7 @@ type ChangeRules = {
 };
 
 /**
- * In a configuration table, a touched entry failing only through a dependency is not refused:
+ * In an inactive configuration's table, a touched entry failing only through a dependency is not refused:
  * a dependency this change breaks fails the resolved-before check itself, and one already stale stays stale.
  */
 function brokenEntries(
@@ -287,13 +287,13 @@ function brokenEntries(
   after: readonly ProjectParameter[],
   touched: (index: number) => boolean,
   previousIndex: (index: number) => number,
-  inConfiguration: boolean,
+  inactiveConfiguration: boolean,
 ) {
   return after.filter((parameter, index) => {
     if (!parameter.error) return false;
     const previous = previousIndex(index);
     if (previous >= 0 && !before[previous]!.error) return true;
-    return touched(index) && !(inConfiguration && parameter.error.expressionError?.code === "dependencyFailed");
+    return touched(index) && !(inactiveConfiguration && parameter.error.expressionError?.code === "dependencyFailed");
   });
 }
 
@@ -324,7 +324,7 @@ function applyChange<T extends ProjectParameterHolder>(project: T, next: NextTab
       ? before(oldActive)
       : before(configuration && oldByName.get(rules.previousConfiguration?.(configuration.name) ?? configuration.name));
     if (!previous.ok) return previous;
-    broken = brokenEntries(previous.parameters, after.parameters, (index) => rules.touched(configuration, index), rules.previousIndex, configuration !== undefined);
+    broken = brokenEntries(previous.parameters, after.parameters, (index) => rules.touched(configuration, index), rules.previousIndex, configuration !== undefined && !isActive);
     if (broken.length) break;
   }
   const root = broken.find((parameter) => parameter.error!.expressionError?.code !== "dependencyFailed") ?? broken[0];
