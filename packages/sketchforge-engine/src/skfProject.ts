@@ -107,7 +107,7 @@ export type SkfShapeNodeV1 = {
   cadDisplayEdgesAssetId?: string;
 };
 
-// `parameters`: V3 only, an undo state's table when not empty. The scene state uses top-level `parameters`.
+// `parameters`: V3 and V4, an undo state's known table. The scene state uses top-level `parameters`.
 // `configurations`, `activeConfiguration`: V4 only, the same rule. Absent `configurations` means unknown.
 export type SkfStateV1 = {
   id: string;
@@ -127,7 +127,7 @@ export type SkfFeatureV1 = {
   parameters?: Record<string, unknown>;
 };
 
-// V3 writes it; readers accept it in any version. Readers recompute `value`, which is
+// V3 and V4 write it; readers accept it in any version. Readers recompute `value`, which is
 // the last known value of an entry that no longer resolves and absent when there is none.
 export type SkfParameterV3 = {
   name: string;

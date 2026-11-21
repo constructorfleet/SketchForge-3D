@@ -91,7 +91,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `configurations?` | `SkfConfigurationV4[]` |
 | `activeConfiguration?` | `string` |
 
-A state's `parameters` (V3 only) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level `parameters`.
+A state's `parameters` (V3 and V4) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level `parameters`.
 
 A state's `configurations` and `activeConfiguration` (V4 only) follow the same rule. A state without `configurations` has unknown configurations, and undoing to it keeps the current ones. The scene state uses the top-level fields.
 
