@@ -17,6 +17,11 @@ import {
   type ExpressionResult,
 } from "./parameterExpressions.js";
 import { parameterShapeDependents, renameShapeBindingReferences, type ShapeBindingDependent } from "./expressionBindings.js";
+import {
+  parameterSketchConstraintDependents,
+  renameSketchConstraintReferences,
+  type SketchConstraintDependent,
+} from "./sketchConstraintBindings.js";
 import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
 
 /** Bounds table size. `SKF_LIMITS.parameters` must match. */
@@ -49,6 +54,8 @@ export type ProjectParameterError = {
   readonly dependents?: readonly string[];
   /** Set for `parameterInUse`: shapes whose bindings reference it directly. */
   readonly shapeDependents?: readonly ShapeBindingDependent[];
+  /** Set for `parameterInUse`: sketch outputs whose constraint bindings reference it directly. */
+  readonly sketchConstraintDependents?: readonly SketchConstraintDependent[];
 };
 
 export type ProjectParameterResult<T> =
@@ -158,12 +165,17 @@ function shapesOf(project: ProjectParameterHolder): WorkplaneShape[] | undefined
   return Array.isArray(shapes) ? shapes as WorkplaneShape[] : undefined;
 }
 
-/** Lists parameters and shapes that reference `name` directly. Shapes are read from `project.shapes` when present. */
+/** Lists parameters, shapes and sketch constraints that reference `name` directly. Shapes are read from `project.shapes`. */
 export function projectParameterDependents(
   project: ProjectParameterHolder,
   name: string,
-): { parameters: string[]; shapes: ShapeBindingDependent[] } {
-  return { parameters: parameterDependents(tableOf(project), name), shapes: parameterShapeDependents(shapesOf(project) ?? [], name) };
+): { parameters: string[]; shapes: ShapeBindingDependent[]; sketchConstraints: SketchConstraintDependent[] } {
+  const shapes = shapesOf(project) ?? [];
+  return {
+    parameters: parameterDependents(tableOf(project), name),
+    shapes: parameterShapeDependents(shapes, name),
+    sketchConstraints: parameterSketchConstraintDependents(shapes, name),
+  };
 }
 
 /** Appends a parameter. */
@@ -214,20 +226,27 @@ export function renameParameter<T extends ProjectParameterHolder>(project: T, ol
   const renamed = applyChange(project, next, index, (current) => current);
   const shapes = shapesOf(project);
   if (!renamed.ok || !shapes) return renamed;
-  return { ok: true, project: { ...renamed.project, shapes: renameShapeBindingReferences(shapes, oldName, newName) } };
+  const renamedShapes = renameSketchConstraintReferences(renameShapeBindingReferences(shapes, oldName, newName), oldName, newName);
+  return { ok: true, project: { ...renamed.project, shapes: renamedShapes } };
 }
 
-/** Deletes an unreferenced parameter. Refuses with `parameterInUse` and its parameter and shape dependents otherwise. */
+/** Deletes an unreferenced parameter. Refuses with `parameterInUse` and its dependents otherwise. */
 export function deleteParameter<T extends ProjectParameterHolder>(project: T, name: string): ProjectParameterResult<T> {
   const parameters = tableOf(project);
   const index = indexOfParameter(parameters, name);
   if (index < 0) return unknown(name);
   const malformed = structuralError(parameters);
   if (malformed) return { ok: false, error: malformed };
-  const { parameters: dependents, shapes: shapeDependents } = projectParameterDependents(project, name);
-  if (dependents.length || shapeDependents.length) {
-    const users = [...dependents, ...shapeDependents.map((entry) => `shape ${entry.shapeId}`)];
-    return failure("parameterInUse", name, `Parameter "${name}" is used by ${users.join(", ")}.`, { dependents, shapeDependents });
+  const { parameters: dependents, shapes: shapeDependents, sketchConstraints } = projectParameterDependents(project, name);
+  if (dependents.length || shapeDependents.length || sketchConstraints.length) {
+    const users = [
+      ...dependents,
+      ...shapeDependents.map((entry) => `shape ${entry.shapeId}`),
+      ...sketchConstraints.map((entry) => `sketch ${entry.shapeId} constraint ${entry.constraintIds.join(", ")}`),
+    ];
+    return failure("parameterInUse", name, `Parameter "${name}" is used by ${users.join(", ")}.`, {
+      dependents, shapeDependents, sketchConstraintDependents: sketchConstraints,
+    });
   }
   return applyChange(project, parameters.filter((_, current) => current !== index), -1, (current) => (current < index ? current : current + 1));
 }

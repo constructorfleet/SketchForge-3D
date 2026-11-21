@@ -227,3 +227,23 @@ export {
   type ShapeBindingIssue,
   type ShapeBindingResult,
 } from "./expressionBindings.js";
+export {
+  bindableSketchConstraint,
+  boundSketchConstraints,
+  literalSketchProfile,
+  parameterSketchConstraintDependents,
+  renameSketchConstraintReferences,
+  resolveSketchConstraintBinding,
+  SKETCH_CONSTRAINT_BINDABLE_KINDS,
+  sketchConstraintBindingIssues,
+  sketchConstraintValue,
+  withSketchConstraintValues,
+  type BindableSketchConstraint,
+  type BindableSketchConstraintKind,
+  type SketchConstraintBindingError,
+  type SketchConstraintBindingErrorCode,
+  type SketchConstraintBindingIssue,
+  type SketchConstraintBindingResult,
+  type SketchConstraintBindingSpec,
+  type SketchConstraintDependent,
+} from "./sketchConstraintBindings.js";

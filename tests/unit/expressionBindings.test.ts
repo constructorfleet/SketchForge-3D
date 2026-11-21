@@ -146,7 +146,7 @@ describe("parameter operations and shape bindings", () => {
   });
 
   it("refuses to delete a parameter a shape binds and names the shapes", () => {
-    expect(projectParameterDependents(project, "lid")).toEqual({ parameters: [], shapes: [{ shapeId: "child", fields: ["width"] }] });
+    expect(projectParameterDependents(project, "lid")).toEqual({ parameters: [], shapes: [{ shapeId: "child", fields: ["width"] }], sketchConstraints: [] });
     const refused = deleteParameter(project, "lid");
     expect(refused).toMatchObject({
       ok: false,
