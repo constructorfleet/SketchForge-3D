@@ -36,7 +36,21 @@ function rectangle(extra: SketchConstraint[] = []): SketchProfile {
   };
 }
 
-const constraintOf = (shape: WorkplaneShape, id: string) => shape.sketchProfile!.constraints!.find((constraint) => constraint.id === id)!;
+/** A constrained 2 x 2 section swept along a 10 mm spine; `width` carries `expression` when given. */
+function sweepProfile(expression?: string): SketchProfile {
+  const section = rectangle();
+  return {
+    points: [
+      ...section.points.map((point) => ({ ...point, sweepRole: "section" as const })),
+      { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+    ],
+    segments: [...section.segments, { id: "spine", startId: "p0", endId: "p1" }],
+    constraints: section.constraints!.map((constraint) =>
+      (constraint.id === "width" && expression ? { ...constraint, expression } as SketchConstraint : constraint)),
+  };
+}
+
+const constraintOf =(shape: WorkplaneShape, id: string) => shape.sketchProfile!.constraints!.find((constraint) => constraint.id === id)!;
 
 function withoutExpressions(profile: SketchProfile): SketchProfile {
   return {
@@ -159,6 +173,145 @@ describe("expression-bound sketch constraints", () => {
     expect(bound.centerOfMass.x).toBeCloseTo(manual.centerOfMass.x, 6);
     expect(bound.centerOfMass.y).toBeCloseTo(manual.centerOfMass.y, 6);
     expect(bound.centerOfMass.z).toBeCloseTo(manual.centerOfMass.z, 6);
+    // Corner `a` stays put, so the 2 x 3 x 3 solid spans z -5..-2 around the unmoved 0.5 x 0.5 x 1 hole at z -4.
+    const solid = 2 * 3 * 3;
+    const hole = 0.5 * 0.5 * 1;
+    expect(bound.volume).toBeCloseTo(solid - hole, 4);
+    expect(bound.centerOfMass.x).toBeCloseTo(12, 4);
+    expect(bound.centerOfMass.y).toBeCloseTo(8.5, 4);
+    expect(bound.centerOfMass.z).toBeCloseTo((solid * -3.5 - hole * -4) / (solid - hole), 4);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses to bind, tag or unbind a sketch output inside a locked group, and writes nothing", async () => {
+    await project("locked-group");
+    const created = value(await engine.addShapes("locked-group", [
+      { kind: "box", width: 2, depth: 2, height: 3, x: 12, z: -4, elevation: 7 },
+      { kind: "box", width: 0.5, depth: 0.5, height: 1, x: 12, z: -4, elevation: 8, hole: true },
+    ])).shapes;
+    await asSketchExtrusion("locked-group", "sketch/locked", rectangle([
+      { id: "tagged", kind: "distance", pointIds: ["c", "d"], valueMm: 2, expression: "w" },
+    ]));
+    const cut = value(await engine.cut("locked-group", { solidIds: [created[0]!.id], holeIds: [created[1]!.id] })).shape;
+    value(await engine.addParameter("locked-group", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.changeShape("locked-group", cut.id, { locked: true }));
+    const before = JSON.stringify(await document("locked-group"));
+
+    const refusal = { ok: false, failure: { reason: "shape_locked", ids: [cut.id] } };
+    expect(await engine.bindSketchConstraint("locked-group", "sketch/locked", "width", "w * 2")).toMatchObject(refusal);
+    expect(await engine.bindSketchConstraint("locked-group", "sketch/locked", "depth", "w")).toMatchObject(refusal);
+    expect(await engine.bindSketchConstraint("locked-group", "sketch/locked", "tagged", null)).toMatchObject(refusal);
+    expect(JSON.stringify(await document("locked-group"))).toBe(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("treats a shelled sketch as not rebuildable: refuses a bind and leaves a stored binding stale", async () => {
+    const output = await sketchProject("shelled");
+    const current = await document("shelled");
+    await store.write("shelled", current, [{ ...current.shapes[0]!, shell: { thickness: 0.2 } }]);
+    value(await engine.addParameter("shelled", { name: "w", expression: "2", dimension: "length" }));
+
+    expect(await engine.bindSketchConstraint("shelled", output.id, "width", "w"))
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "sketchNotRebuildable" } } });
+
+    const stored = await document("shelled");
+    await store.write("shelled", stored, [{
+      ...stored.shapes[0]!,
+      sketchProfile: {
+        ...stored.shapes[0]!.sketchProfile!,
+        constraints: stored.shapes[0]!.sketchProfile!.constraints!.map((constraint) => (constraint.id === "width" ? { ...constraint, expression: "w" } : constraint)),
+      },
+    }]);
+    value(await engine.updateParameter("shelled", "w", { expression: "4" }));
+    expect(constraintOf((await document("shelled")).shapes[0]!, "width")).toMatchObject({ valueMm: 2, expression: "w" });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays a retained all-edge fillet after a constraint-driven re-solve", async () => {
+    await sketchProject("filleted");
+    await sketchProject("filleted-manual");
+    for (const projectId of ["filleted", "filleted-manual"]) {
+      value(await engine.treat(projectId, (await document(projectId)).shapes[0]!.id, { kind: "fillet", amount: 0.2 }));
+    }
+    const output = (await document("filleted")).shapes[0]!;
+    value(await engine.addParameter("filleted", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("filleted", output.id, "width", "w"));
+    const original = value(await engine.properties("filleted", output.id));
+
+    value(await engine.updateParameter("filleted", "w", { expression: "4" }));
+
+    const rebuilt = (await document("filleted")).shapes[0]!;
+    expect(rebuilt.edgeTreatments).toEqual([expect.objectContaining({ kind: "fillet", amount: 0.2, allEdges: true })]);
+    value(await engine.changeShape("filleted-manual", "sketch/filleted-manual", { sketchProfile: withoutExpressions(rebuilt.sketchProfile!) }));
+    const bound = value(await engine.properties("filleted", output.id));
+    const manual = value(await engine.properties("filleted-manual", (await document("filleted-manual")).shapes[0]!.id));
+    expect(bound.volume).toBeGreaterThan(original.volume + 5);
+    expect(bound.volume).toBeLessThan(24);
+    expect(bound.volume).toBeCloseTo(manual.volume, 6);
+    expect(bound.centerOfMass.x).toBeCloseTo(manual.centerOfMass.x, 6);
+    expect(bound.centerOfMass.y).toBeCloseTo(manual.centerOfMass.y, 6);
+    expect(bound.centerOfMass.z).toBeCloseTo(manual.centerOfMass.z, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("applies a shape binding and a constraint binding on the same output in one change", async () => {
+    const output = await sketchProject("both");
+    await sketchProject("both-manual");
+    value(await engine.addParameter("both", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("both", output.id, "width", "w"));
+    value(await engine.bindShapeField("both", output.id, "height", "w + 1"));
+    const before = await document("both");
+
+    value(await engine.updateParameter("both", "w", { expression: "4" }));
+
+    const after = await document("both");
+    expect(after.history).toHaveLength(before.history.length + 1);
+    const stored = after.shapes[0]!;
+    expect(stored).toMatchObject({ height: 5, expressions: { height: "w + 1" } });
+    expect(constraintOf(stored, "width")).toMatchObject({ valueMm: 4, expression: "w" });
+    value(await engine.changeShape("both-manual", "sketch/both-manual", { sketchProfile: withoutExpressions(stored.sketchProfile!) }));
+    value(await engine.changeShape("both-manual", (await document("both-manual")).shapes[0]!.id, { height: 5 }));
+    const bound = value(await engine.properties("both", output.id));
+    const manual = value(await engine.properties("both-manual", (await document("both-manual")).shapes[0]!.id));
+    expect(bound.volume).toBeCloseTo(4 * 2 * 5, 3);
+    expect(bound.volume).toBeCloseTo(manual.volume, 6);
+    expect(bound.centerOfMass.x).toBeCloseTo(manual.centerOfMass.x, 6);
+    expect(bound.centerOfMass.y).toBeCloseTo(manual.centerOfMass.y, 6);
+    expect(bound.centerOfMass.z).toBeCloseTo(manual.centerOfMass.z, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("resolves constraint expressions on create, rebuilds a bound sweep, and refuses invalid ones", async () => {
+    await project("sweep");
+    await project("sweep-manual");
+    value(await engine.addParameter("sweep", { name: "w", expression: "2", dimension: "length" }));
+    // The stored value says 2, but the expression wins on create, as for shape expressions.
+    const created = value(await engine.addShapes("sweep", [{ kind: "sketchSweep", name: "Bar", profile: sweepProfile("w * 2") }])).shapes[0]!;
+    expect(constraintOf(created, "width")).toMatchObject({ valueMm: 4, expression: "w * 2" });
+    expect(value(await engine.properties("sweep", created.id)).volume).toBeCloseTo(4 * 2 * 10, 2);
+    const first = value(await engine.properties("sweep", created.id));
+
+    value(await engine.updateParameter("sweep", "w", { expression: "3" }));
+
+    const rebuilt = (await document("sweep")).shapes[0]!;
+    expect(constraintOf(rebuilt, "width")).toMatchObject({ valueMm: 6, expression: "w * 2" });
+    // The twin takes the same path by hand: a literal create, then the same two profile edits.
+    const manual = value(await engine.addShapes("sweep-manual", [{ kind: "sketchSweep", name: "Bar", profile: sweepProfile() }])).shapes[0]!;
+    for (const edit of [created.sketchProfile!, rebuilt.sketchProfile!]) {
+      value(await engine.changeShape("sweep-manual", manual.sketchSourceId!, { sketchProfile: withoutExpressions(edit) }));
+    }
+    const bound = value(await engine.properties("sweep", created.id));
+    const reference = value(await engine.properties("sweep-manual", manual.id));
+    expect(bound.volume).toBeCloseTo(6 * 2 * 10, 2);
+    expect(bound.volume).toBeCloseTo(reference.volume, 4);
+    expect(bound.centerOfMass.x).toBeCloseTo(reference.centerOfMass.x, 4);
+    expect(bound.centerOfMass.y).toBeCloseTo(reference.centerOfMass.y, 4);
+    expect(bound.centerOfMass.z).toBeCloseTo(reference.centerOfMass.z, 4);
+    expect(bound.volume / first.volume).toBeCloseTo(6 / 4, 4);
+
+    const before = JSON.stringify(await document("sweep"));
+    const horizontal = sweepProfile();
+    horizontal.constraints = horizontal.constraints!.map((constraint) => (constraint.id === "h-ab" ? { ...constraint, expression: "w" } as SketchConstraint : constraint));
+    expect(await engine.addShapes("sweep", [{ kind: "sketchSweep", profile: horizontal }]))
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "constraintNotBindable", constraintId: "h-ab" } } });
+    expect(await engine.addShapes("sweep", [{ kind: "sketchSweep", profile: sweepProfile("unknown") }]))
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "invalidExpression", constraintId: "width" } } });
+    expect(JSON.stringify(await document("sweep"))).toBe(before);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("re-solves a bound revolve profile and keeps the solid on its axis", async () => {

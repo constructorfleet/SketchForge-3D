@@ -119,6 +119,25 @@ describe("sketch constraint bindings", () => {
     expect(constraintOf(renamed.shapes[1]!.edgeTreatmentHistory![0]!.before)).toMatchObject({ expression: "width * 1" });
   });
 
+  it("counts and reports bindings kept only in a treatment snapshot, once per shape, and a shelled sketch as stale", () => {
+    const before = sketch("treated", [distance("w * 3")]);
+    const treated = { ...sketch("treated", [distance("gone")]), edgeTreatmentHistory: [{ before, feature: { kind: "fillet", amount: 1, edgeCount: 1 } }] } as WorkplaneShape;
+    const echoed = { ...sketch("echo", [distance("w")]), edgeTreatmentHistory: [{ before: sketch("echo", [distance("w")]), feature: { kind: "fillet", amount: 1, edgeCount: 1 } }] } as WorkplaneShape;
+
+    const both = { parameters: table, shapes: [treated, echoed] };
+    const treatedOnly = { parameters: table, shapes: [treated] };
+    expect(projectParameterDependents(both, "w").sketchConstraints).toEqual([
+      { shapeId: "treated", constraintIds: ["d1"] },
+      { shapeId: "echo", constraintIds: ["d1"] },
+    ]);
+    expect(deleteParameter(treatedOnly, "w")).toMatchObject({ ok: false, error: { code: "parameterInUse" } });
+    expect(sketchConstraintBindingIssues([treated, echoed], table).map((issue) => [issue.shapeId, issue.code])).toEqual([
+      ["treated", "invalidExpression"],
+    ]);
+    const shelled = sketch("shelled", [distance("w")], { shell: { thickness: 0.2 } });
+    expect(sketchConstraintBindingIssues([shelled], table)).toEqual([expect.objectContaining({ shapeId: "shelled", code: "sketchNotRebuildable" })]);
+  });
+
   it("keeps a binding only when an incoming profile repeats it with the same value", () => {
     const existing = profile([distance("w", 3), { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 30, expression: "tilt" }]);
 

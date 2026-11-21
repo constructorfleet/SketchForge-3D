@@ -62,6 +62,16 @@ describe(".skf sketch constraint bindings", () => {
     ]);
   });
 
+  it("reports a binding on a shelled sketch as not rebuildable on load", async () => {
+    const shelled = { ...sketch([{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10, expression: "w" }]), shell: { thickness: 0.5 } };
+    const restored = await importSkfProject(await packaged(shelled));
+
+    expect(restored.shapes[0]?.sketchProfile?.constraints?.[0]).toMatchObject({ valueMm: 10, expression: "w" });
+    expect(restored.constraintBindingIssues).toEqual([
+      expect.objectContaining({ code: "sketchNotRebuildable", shapeId: "profile", constraintId: "d" }),
+    ]);
+  });
+
   it("refuses a malformed constraint expression", async () => {
     const bytes = await packaged(sketch([{ id: "d", kind: "distance", pointIds: ["a", "b"], valueMm: 10, expression: "w" }]));
     for (const broken of [42, "", "   "]) {

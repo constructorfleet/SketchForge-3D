@@ -129,17 +129,22 @@ export function withSketchConstraintValues(
 }
 
 /**
- * Reports whether a profile edit can rebuild `shape`. A nested output is reached only by its source ID.
+ * Reports whether a profile edit can rebuild `shape`. A nested output is reached only by its source ID,
+ * and a shell cannot be replayed from the recipe.
  */
 export function rebuildableSketch(shape: WorkplaneShape, topLevel: boolean): boolean {
-  return Boolean(shape.sketchProfile && shape.sketchOperation && (shape.sketchSourceId || topLevel));
+  return Boolean(shape.sketchProfile && shape.sketchOperation && !shape.shell && (shape.sketchSourceId || topLevel));
 }
 
-/** Visits every shape with a sketch profile, pre-order, skipping treatment `before` snapshots. */
+/**
+ * Visits every shape with a sketch profile, pre-order, then its treatment `before` snapshots,
+ * since reverting a treatment restores one. Rename walks the same set.
+ */
 function visitSketches(shapes: readonly WorkplaneShape[], visit: (shape: WorkplaneShape, topLevel: boolean) => void) {
   const walk = (shape: WorkplaneShape, topLevel: boolean) => {
     if (!shape || typeof shape !== "object") return;
     if (shape.sketchProfile) visit(shape, topLevel);
+    shape.edgeTreatmentHistory?.forEach((entry) => walk(entry.before, topLevel));
     shape.groupedShapes?.forEach((child) => walk(child, false));
   };
   shapes.forEach((shape) => walk(shape, true));
@@ -165,8 +170,13 @@ export function sketchConstraintBindingIssues(
 ): SketchConstraintBindingIssue[] {
   const scope = parameterScope(parameters);
   const issues: SketchConstraintBindingIssue[] = [];
+  const seen = new Set<string>();
   visitSketches(shapes, (shape, topLevel) => {
     for (const { constraint, expression } of boundSketchConstraints(shape)) {
+      // A snapshot shares its owner's ID, so one binding is reported once.
+      const key = JSON.stringify([shape.id, constraint.id, expression]);
+      if (seen.has(key)) continue;
+      seen.add(key);
       if (!rebuildableSketch(shape, topLevel)) {
         issues.push(sketchNotRebuildable(shape.id, constraint.id));
         continue;
@@ -182,14 +192,17 @@ export type SketchConstraintDependent = { readonly shapeId: string; readonly con
 
 /** Lists sketch outputs whose constraint bindings reference `name` directly, in tree order. */
 export function parameterSketchConstraintDependents(shapes: readonly WorkplaneShape[], name: string): SketchConstraintDependent[] {
-  const dependents: SketchConstraintDependent[] = [];
+  const byShape = new Map<string, Set<string>>();
   visitSketches(shapes, (shape) => {
     const constraintIds = boundSketchConstraints(shape)
       .filter(({ expression }) => expressionDependencies(expression).includes(name))
       .map(({ constraint }) => constraint.id);
-    if (constraintIds.length) dependents.push({ shapeId: shape.id, constraintIds });
+    if (!constraintIds.length) return;
+    const ids = byShape.get(shape.id) ?? new Set<string>();
+    constraintIds.forEach((id) => ids.add(id));
+    byShape.set(shape.id, ids);
   });
-  return dependents;
+  return [...byShape].map(([shapeId, ids]) => ({ shapeId, constraintIds: [...ids] }));
 }
 
 /** Rewrites `oldName` in every constraint binding, including treatment `before` snapshots. Keeps untouched shapes by reference. */

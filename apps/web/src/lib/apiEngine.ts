@@ -160,18 +160,19 @@ function bindingError(error: ShapeBindingError, index: number | undefined) {
 }
 
 /** Maps a sketch constraint binding refusal, in the shape `bindingError` uses for fields. */
-function constraintBindingError(error: SketchConstraintBindingError) {
+function constraintBindingError(error: SketchConstraintBindingError, index: number | undefined) {
   const detail = {
-    shapeId: error.shapeId,
+    ...(index === undefined ? { shapeId: error.shapeId } : { index }),
     constraintId: error.constraintId,
     reason: error.code,
     ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
   };
+  const message = atIndex(error.message, index);
   if (error.code === "constraintNotBindable" || error.code === "sketchNotRebuildable") {
-    return apiError(error.message, 422, "unapplicable_fields", detail);
+    return apiError(message, 422, "unapplicable_fields", detail);
   }
-  if (error.code === "invalidExpression" || error.code === "outOfRange") return apiError(error.message, 422, "invalid_expression", detail);
-  return apiError(error.message, 422, "invalid_request", detail);
+  if (error.code === "invalidExpression" || error.code === "outOfRange") return apiError(message, 422, "invalid_expression", detail);
+  return apiError(message, 422, "invalid_request", detail);
 }
 
 /** `detail` adds fields to every refusal; a wrapped binding failure uses it to name the bound shape. */
@@ -249,9 +250,12 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
     case "binding_invalid":
       return bindingError(failure.error, failure.index);
     case "constraint_binding_invalid":
-      return constraintBindingError(failure.error);
+      return constraintBindingError(failure.error, failure.index);
     case "sketch_unsolvable":
-      return fail(failure.message, 422, "geometry_failed", { shapeId: failure.shapeId, constraintIds: [...failure.constraintIds] });
+      return fail(atIndex(failure.message, failure.index), 422, "geometry_failed", {
+        ...(failure.index === undefined ? { shapeId: failure.shapeId } : { index: failure.index }),
+        constraintIds: [...failure.constraintIds],
+      });
     case "binding_failed":
       return apiEngineError(failure.failure, wording, {
         ...detail,

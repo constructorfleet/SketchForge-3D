@@ -290,9 +290,9 @@ export type EngineFailure =
   /** A binding does not resolve or names a field the shape cannot bind; nothing was written. */
   | { reason: "binding_invalid"; error: ShapeBindingError; index?: number }
   /** A constraint binding does not resolve, or names a constraint that cannot bind; nothing was written. */
-  | { reason: "constraint_binding_invalid"; error: SketchConstraintBindingError }
+  | { reason: "constraint_binding_invalid"; error: SketchConstraintBindingError; index?: number }
   /** The sketch on `shapeId` cannot satisfy `constraintIds` with the new values; nothing was written. */
-  | { reason: "sketch_unsolvable"; shapeId: string; constraintIds: string[]; message: string }
+  | { reason: "sketch_unsolvable"; shapeId: string; constraintIds: string[]; message: string; index?: number }
   /**
    * A resolved value could not be applied to `shapeId`; `failure` is the change's own refusal.
    * `constraintIds` names the sketch constraints whose values were being applied.
@@ -711,7 +711,7 @@ function conflictingLiteral(
 }
 
 /** Finds a sketch output by its own ID, or by a sketch source ID that names exactly one output. */
-function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): { shape: WorkplaneShape; topLevel: boolean } | undefined {
+function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): ReturnType<typeof findShapeInTree> {
   const byId = findShapeInTree(roots, id);
   if (byId?.shape.sketchProfile) return byId;
   const outputs = findSketchOutput([...roots], id);
@@ -1743,6 +1743,32 @@ export function createEngine(store: ProjectStore): Engine {
     return applied;
   }
 
+  /**
+   * Validates constraint expressions on a created shape and applies their values. The expression wins
+   * over the supplied value, as shape expressions do on create, so a stored value always matches it.
+   */
+  async function createdConstraintBindings(document: ProjectDocument, shape: WorkplaneShape): Promise<EngineResult<WorkplaneShape[]>> {
+    const values: Record<string, number> = {};
+    for (const constraint of shape.sketchProfile?.constraints ?? []) {
+      const expression = (constraint as { expression?: unknown }).expression;
+      if (expression === undefined) continue;
+      const invalid = (error: SketchConstraintBindingError) => failed<WorkplaneShape[]>({ reason: "constraint_binding_invalid", error });
+      if (typeof expression !== "string" || !expression.trim()) {
+        return invalid({ code: "invalidExpression", shapeId: shape.id, constraintId: constraint.id, message: `${constraint.id}: an expression must be a non-empty string.` });
+      }
+      const resolved = resolveSketchConstraintBinding(shape.id, constraint, expression, document.parameters ?? []);
+      if (!resolved.ok) return invalid(resolved.error);
+      if (!rebuildableSketch(shape, true)) return invalid(sketchNotRebuildable(shape.id, constraint.id));
+      if (sketchConstraintValue(constraint as BindableSketchConstraint) !== resolved.value) values[constraint.id] = resolved.value;
+    }
+    if (!Object.keys(values).length) return ok(document.shapes);
+    const solved = solvedSketchProfile(shape, values);
+    if (!solved.ok) return solved;
+    const applied = await applyBindingValues(document, shape.id, {}, solved.value);
+    if (!applied.ok) return failed({ reason: "binding_failed", shapeId: shape.id, fields: [], constraintIds: Object.keys(values), failure: applied.failure });
+    return applied;
+  }
+
   /** Re-resolves bindings that depend on a changed parameter and applies them, children first. */
   async function applyTable(
     document: ProjectDocument,
@@ -1887,6 +1913,17 @@ export function createEngine(store: ProjectStore): Engine {
       }
       return mutating(projectId, async (document) => {
         let shapes = [...document.shapes, ...built];
+        for (const [index, shape] of built.entries()) {
+          const applied = await createdConstraintBindings({ ...document, shapes }, shape);
+          if (!applied.ok) {
+            const { failure } = applied;
+            // A batch create names the shape by index, as #613 does; its id was never stored.
+            return failure.reason === "constraint_binding_invalid" || failure.reason === "sketch_unsolvable" || failure.reason === "binding_failed"
+              ? failed({ ...failure, index })
+              : applied;
+          }
+          shapes = applied.value;
+        }
         for (const [index, expressions] of bindings.entries()) {
           if (!Object.keys(expressions).length) continue;
           const conflict = conflictingLiteral(built[index]!, requests[index]!, expressions, document.parameters ?? []);
@@ -2302,7 +2339,8 @@ export function createEngine(store: ProjectStore): Engine {
       const found = findSketchOutputShape(document.shapes, shapeId);
       if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
       const output = found.shape;
-      if (output.locked) return failed({ reason: "shape_locked", ids: [output.id] });
+      // A locked group refuses edits to the outputs it holds, as a manual edit is refused.
+      if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
       const constraint = output.sketchProfile!.constraints?.find((candidate) => candidate.id === constraintId);
       if (!constraint) {
         return failed({
