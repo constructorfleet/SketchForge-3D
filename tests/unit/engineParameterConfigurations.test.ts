@@ -12,6 +12,7 @@ import {
   type ProjectStore,
 } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
+import { withCadKernel } from "@constructorfleet/sketchforge-engine/serverCadKernel";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { measureMesh } from "./support/meshMeasure";
 
@@ -139,6 +140,13 @@ describe("parameter configurations in the engine", () => {
     expect(undone.parameters).toEqual([{ name: "wall", expression: "2", dimension: "length", value: 2 }]);
     expect(undone.shapes.find((shape) => shape.id === sized)?.width).toBe(10);
     expect(undone.shapes.find((shape) => shape.id === placed)?.x).toBe(20);
+
+    // STEP too: the exported solid, read back by the kernel, is the Large box.
+    const step = new TextDecoder().decode((await exportProjectScene(after, { format: "step", shapeIds: [sized] })).data);
+    const imported = await withCadKernel((cad) => cad.queryBatch([cad.importStep(step)])[0]!);
+    expect(imported.volume).toBeCloseTo(2000, 3);
+    expect(imported.centerOfMass.x).toBeCloseTo(0, 4);
+    expect(Math.abs(imported.centerOfMass.y) + Math.abs(imported.centerOfMass.z)).toBeCloseTo(5, 4);
 
     const back = value(await engine.activateConfiguration("activate", null));
     expect(back.activeConfiguration).toBeNull();
