@@ -8,6 +8,7 @@ import * as projectsRoute from "@/app/api/v1/projects/route";
 import * as shapesRoute from "@/app/api/v1/shapes/route";
 import * as parametersRoute from "@/app/api/v1/parameters/route";
 import * as propertiesRoute from "@/app/api/v1/properties/route";
+import * as groupsRoute from "@/app/api/v1/groups/route";
 import * as sketchConstraintsRoute from "@/app/api/v1/sketch-constraints/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -310,6 +311,9 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
       [BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: "nowhere", constraintId: "width", expression: "w" })],
       [BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, constraintId: "x".repeat(201), expression: "w" })],
       [BIND_CONSTRAINT, (c) => ({ shapeId: c.shapeId, constraintId: "width", expression: "w" })],
+      [BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: " ", constraintId: "width", expression: "w" })],
+      [BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, expression: "w" })],
+      [BIND, (c) => ({ projectId: c.projectId, field: "width", expression: "w" })],
       // A bound sketch dimension and a bound size of the same output conflict.
       [BIND, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, field: "depth", expression: "w" })],
       ["sketchforge_delete_parameter", (c) => ({ projectId: c.projectId, name: "w" })],
@@ -326,12 +330,16 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
     expect(code(4)).toBe("invalid_request");
     expect(code(5)).toBe("unapplicable_fields");
     expect(code(6)).toBe("shape_not_found");
-    expect(code(9)).toBe("unapplicable_fields");
-    expect(JSON.parse(answers[9]!.local.text.split("\n")[1]!)).toMatchObject({ reason: "conflictingBinding", constraintIds: ["width"] });
-    expect(JSON.parse(answers[10]!.local.text.split("\n")[1]!).sketchConstraintDependents).toEqual([{ shapeId: a.shapeId, constraintIds: ["width"] }]);
-    expect(JSON.parse(answers[12]!.local.text).constraint).toEqual({ id: "width", kind: "distance", value: 3 });
-    expect(code(14)).toBe("unapplicable_fields");
-    expect(JSON.parse(answers[14]!.local.text.split("\n")[1]!)).toMatchObject({ reason: "conflictingBinding", fields: ["width"] });
+    expect(code(9)).toBe("invalid_shape_id");
+    expect(code(10)).toBe("invalid_request");
+    expect(answers[10]!.local.text).toMatch(/constraintId is required/);
+    expect(code(11)).toBe("invalid_shape_id");
+    expect(code(12)).toBe("unapplicable_fields");
+    expect(JSON.parse(answers[12]!.local.text.split("\n")[1]!)).toMatchObject({ reason: "conflictingBinding", constraintIds: ["width"] });
+    expect(JSON.parse(answers[13]!.local.text.split("\n")[1]!).sketchConstraintDependents).toEqual([{ shapeId: a.shapeId, constraintIds: ["width"] }]);
+    expect(JSON.parse(answers[15]!.local.text).constraint).toEqual({ id: "width", kind: "distance", value: 3 });
+    expect(code(17)).toBe("unapplicable_fields");
+    expect(JSON.parse(answers[17]!.local.text.split("\n")[1]!)).toMatchObject({ reason: "conflictingBinding", fields: ["width"] });
   }, 120_000);
 
   it("agrees when a constraint binding hits a lock or an unsolvable sketch", async () => {
@@ -351,5 +359,32 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
     }
     const locked = await both(BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, constraintId: "depth", expression: "w" }), a, b);
     expect(locked.local.text).toMatch(/\[shape_locked\]/);
+    expect(JSON.parse(locked.local.text.split("\n")[1]!)).toEqual({ shapeId: a.shapeId });
+  }, 60_000);
+
+  it("agrees on a locked group that holds the sketch, and names the group", async () => {
+    const BIND_CONSTRAINT = "sketchforge_bind_sketch_constraint";
+    const groups: string[] = [];
+    const fixtures = [];
+    for (let index = 0; index < 2; index += 1) {
+      const fixture = await sketchProject({ diagonal: false, bindWidth: false });
+      const box = await rest(shapesRoute.POST, `/api/v1/shapes?projectId=${fixture.projectId}`, { kind: "box", x: 20 });
+      const grouped = await rest(groupsRoute.POST, `/api/v1/groups?projectId=${fixture.projectId}`, { ids: [fixture.shapeId, box.shapes[0].id] });
+      const response = await shapesRoute.PATCH(new Request(new URL(`/api/v1/shapes?projectId=${fixture.projectId}&shapeId=${grouped.shape.id}`, "http://localhost"), {
+        method: "PATCH",
+        headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ locked: true }),
+      }));
+      expect(response.status).toBe(200);
+      groups.push(grouped.shape.id);
+      // The group id stands in for the shape id, so the replies normalize alike.
+      fixtures.push({ projectId: fixture.projectId, shapeId: grouped.shape.id });
+    }
+    // Grouping gives the child a new id; its sketchSourceId still finds it.
+    const locked = await both(BIND_CONSTRAINT, (c) => ({ projectId: c.projectId, shapeId: "sketch", constraintId: "width", expression: "w" }), fixtures[0]!, fixtures[1]!);
+    const [headline, detail] = locked.local.text.split("\n");
+    expect(headline).toMatch(/\[shape_locked\]$/);
+    expect(headline).toContain(groups[0]);
+    expect(JSON.parse(detail!)).toEqual({ shapeId: groups[0] });
   }, 60_000);
 });

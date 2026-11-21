@@ -1,4 +1,4 @@
-import { apiEngine, apiEngineError } from "@/lib/apiEngine";
+import { apiEngine } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody } from "@/lib/apiV1";
 import { parseApiV1Query, withApiV1Contract } from "@/lib/apiV1OperationContract";
 // The engine's checks and reply, so MCP local mode answers the same requests the same way.
@@ -6,7 +6,7 @@ import {
   API_SKETCH_CONSTRAINT_MESSAGES,
   apiSketchConstraintBound,
   isApiSketchConstraintBindRequest,
-  SKETCH_CONSTRAINT_WORDING,
+  sketchConstraintApiError,
 } from "@constructorfleet/sketchforge-engine/apiSketchConstraints";
 
 export const runtime = "nodejs";
@@ -33,7 +33,10 @@ async function patchHandler(request: Request) {
 
   const { projectId, shapeId, constraintId } = query.values as { projectId: string; shapeId: string; constraintId: string };
   const bound = await apiEngine(context.root, request).bindSketchConstraint(projectId, shapeId, constraintId, body.expression);
-  if (!bound.ok) return apiEngineError(bound.failure, SKETCH_CONSTRAINT_WORDING);
+  if (!bound.ok) {
+    const refusal = sketchConstraintApiError(bound.failure);
+    return apiError(refusal.message, refusal.status, refusal.code, refusal.detail);
+  }
   return apiJson(apiSketchConstraintBound(bound.value, constraintId));
 }
 

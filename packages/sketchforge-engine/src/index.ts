@@ -291,6 +291,7 @@ export {
 } from "./apiErrors.js";
 export {
   API_PARAMETER_DIMENSIONS,
+  API_PARAMETER_EXPRESSION_LIMIT,
   API_PARAMETER_EXPRESSION_MAX_LENGTH,
   API_PARAMETER_MESSAGES,
   API_PARAMETER_NAME_MAX_LENGTH,
@@ -310,4 +311,5 @@ export {
   apiSketchConstraintBound,
   isApiSketchConstraintBindRequest,
   SKETCH_CONSTRAINT_WORDING,
+  sketchConstraintApiError,
 } from "./apiSketchConstraints.js";

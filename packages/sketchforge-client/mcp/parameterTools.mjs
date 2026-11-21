@@ -38,14 +38,12 @@ function requireText(args, key) {
   return args[key];
 }
 
-/** Reads shapeId, the named target and an expression string or null. */
-function requireBinding(args, target = "field") {
-  const shapeId = requireText(args, "shapeId");
-  const bound = requireText(args, target);
+/** Requires an expression string or null; shapeId is left to the request checks, as REST checks it. */
+function requireExpression(args) {
   if (args.expression !== null && typeof args.expression !== "string") {
     throw new McpToolError("expression is required: an expression string, or null to clear the binding.", "invalid_request");
   }
-  return { shapeId, bound, expression: args.expression };
+  return args.expression;
 }
 
 /** Splits a set request into a create (both fields) or a change (either one). */
@@ -89,12 +87,14 @@ export async function callParameterTool(name, args, request) {
     case "sketchforge_delete_parameter":
       return request("DELETE", "/parameters", { query: { projectId, name: requireText(args, "name") } });
     case "sketchforge_set_shape_expression": {
-      const { shapeId, bound: field, expression } = requireBinding(args);
-      return request("PATCH", "/shapes", { query: { projectId, shapeId }, body: { expressions: { [field]: expression } } });
+      // field is a key of the body, not a query value, so it is checked here.
+      const field = requireText(args, "field");
+      const expression = requireExpression(args);
+      return request("PATCH", "/shapes", { query: { projectId, shapeId: args.shapeId }, body: { expressions: { [field]: expression } } });
     }
     case "sketchforge_bind_sketch_constraint": {
-      const { shapeId, bound: constraintId, expression } = requireBinding(args, "constraintId");
-      return request("PATCH", "/sketch-constraints", { query: { projectId, shapeId, constraintId }, body: { expression } });
+      const expression = requireExpression(args);
+      return request("PATCH", "/sketch-constraints", { query: { projectId, shapeId: args.shapeId, constraintId: args.constraintId }, body: { expression } });
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -175,7 +175,7 @@ export function localParameterRequest(engine, api) {
         if (!api.isApiSketchConstraintBindRequest(sent)) throw new McpToolError(api.API_SKETCH_CONSTRAINT_MESSAGES.body, "invalid_request");
         const bound = await unwrap(
           await engine.bindSketchConstraint(projectId, shapeId, constraintId, sent.expression),
-          (failure) => api.engineFailureToApiError(failure, api.SKETCH_CONSTRAINT_WORDING),
+          (failure) => api.sketchConstraintApiError(failure),
         );
         return api.apiSketchConstraintBound(bound, constraintId);
       }

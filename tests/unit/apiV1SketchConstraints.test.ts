@@ -6,6 +6,7 @@ import { POST as createProject } from "@/app/api/v1/projects/route";
 import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { GET as listParameters, POST as createParameter } from "@/app/api/v1/parameters/route";
 import { PATCH as patchConstraint } from "@/app/api/v1/sketch-constraints/route";
+import { POST as groupShapes } from "@/app/api/v1/groups/route";
 import { GET as getProperties } from "@/app/api/v1/properties/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
@@ -169,6 +170,9 @@ describe("/api/v1/sketch-constraints", () => {
       .toMatchObject({ expression: "w" });
     expect(await bind(projectId, shape.id, "width", {})).toMatchObject({ status: 400, body: { code: "invalid_request" } });
     expect(await bind(projectId, shape.id, "width", { expression: 3 })).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+    const tooLong = await bind(projectId, shape.id, "width", { expression: `${"1+".repeat(5000)}1` });
+    expect(tooLong).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+    expect(tooLong.body.error).toMatch(/10,000 characters/);
     expect((await call(patchConstraint, `/api/v1/sketch-constraints?projectId=${projectId}&shapeId=${shape.id}`, {
       method: "PATCH", body: JSON.stringify({ expression: "w" }),
     })).status).toBe(400);
@@ -194,7 +198,24 @@ describe("/api/v1/sketch-constraints", () => {
     expect(JSON.stringify((await store.read(projectId))!.shapes)).toBe(before);
 
     expect((await patchProfile(projectId, shape.id, { locked: true })).status).toBe(200);
-    expect(await bind(projectId, shape.id, "depth", { expression: "w" })).toMatchObject({ status: 409, body: { code: "shape_locked" } });
+    expect(await bind(projectId, shape.id, "depth", { expression: "w" })).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: shape.id } });
+  });
+
+  it("names a locked group that holds the sketch, so the caller knows what to unlock", async () => {
+    const { projectId, shape } = await sweepProject();
+    const box = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ kind: "box", x: 20 }) });
+    const grouped = await call(groupShapes, `/api/v1/groups?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ ids: [shape.id, (box.body.shapes as Summary[])[0]!.id] }),
+    });
+    expect(grouped.status, JSON.stringify(grouped.body)).toBe(201);
+    const groupId = (grouped.body.shape as Summary).id;
+    expect((await patchProfile(projectId, groupId, { locked: true })).status).toBe(200);
+
+    // Grouping gives the child a new id; its sketchSourceId still finds it.
+    expect(shape.sketchSourceId).toEqual(expect.any(String));
+    const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
+    expect(locked.body.error).toContain(groupId);
   });
 
   it("binds a new constraint expression sent in a PATCH /shapes profile, and refuses one that disagrees with its value", async () => {

@@ -77,12 +77,12 @@ Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
 | `parameter_not_found` | Changing, renaming or deleting a name that does not exist. A set without `dimension` says to send both fields to create. | `parameter` |
 | `parameter_exists` | Renaming to a name already in use. | `parameter` |
 | `parameter_in_use` | Deleting a parameter that something references. | `dependents`, `shapeDependents`, `sketchConstraintDependents` (`shapeId`, `constraintIds`), `configurationDependents` (configuration names) |
-| `shape_locked` | A binding, or a parameter change that would rebuild it, touches a locked shape. | `shapeId`, `fields` |
+| `shape_locked` | A binding, or a parameter change that would rebuild it, touches a locked shape. | `shapeId`, `fields`; for a sketch constraint, `shapeId` is the locked shape or the locked group holding it |
 | `geometry_failed` | A parameter change leaves a bound sketch unsolvable. | `shapeId`, `constraintIds` |
 | `unapplicable_fields` | The shape cannot bind that field. | `fields` |
-| `invalid_request` | A bad name or dimension, an empty or over-long (10,000 characters) expression, or a set with neither field. | `parameter`, `reason` when the engine refused it |
-| `invalid_project_id`, `invalid_shape_id` | `projectId` or `shapeId` is missing or malformed. | |
+| `invalid_request` | A bad name or dimension, an empty expression or one over 10,000 characters (the sentence says so), or a set with neither field. | `parameter`, `reason` when the engine refused it |
+| `invalid_project_id`, `invalid_shape_id` | `projectId` or `shapeId` is missing, blank or malformed. | |
 | `limit_exceeded` | The table is full. | |
 | `shape_not_found`, `project_not_found` | The id is not in the project or store. | |
 
-A sketch-constraint binding answers with the same codes, naming `constraintId`: `invalid_expression` (including `reason: "outOfRange"`), `unapplicable_fields` for a constraint that cannot bind, or `reason: "conflictingBinding"` when a bound size of the same shape drives that dimension (and the reverse, from `sketchforge_set_shape_expression`), `invalid_request` for an unknown `constraintId`, and `geometry_failed` with `constraintIds` when the sketch cannot be solved.
+A sketch-constraint binding answers with the same codes, naming `constraintId`: `invalid_expression` (including `reason: "outOfRange"`), `unapplicable_fields` for a constraint that cannot bind, or `reason: "conflictingBinding"` when a bound size of the same shape drives that dimension (and the reverse, from `sketchforge_set_shape_expression`), `invalid_request` for a missing or unknown `constraintId`, and `geometry_failed` with `constraintIds` when the sketch cannot be solved.

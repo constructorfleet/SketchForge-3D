@@ -665,7 +665,7 @@ export const engineTools = [
       "A changed parameter then re-solves the sketch. shapeId is the sketch output or its sketchSourceId.",
       "The reply has the rebuilt shape, as GET /api/v1/shapes reports it, the constraint as { id, kind, value, expression }, and the revision.",
       REFUSAL_FORMAT,
-      "Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension, or outOfRange; detail names shapeId and constraintId), unapplicable_fields (the constraint cannot bind, the sketch cannot be rebuilt, or conflictingBinding: a bound size of the same output drives that dimension; detail lists those fields), invalid_request (no such constraintId, or a bad body), geometry_failed (the sketch cannot be solved; detail lists constraintIds), shape_not_found, shape_locked.",
+      "Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension, or outOfRange; detail names shapeId and constraintId), unapplicable_fields (the constraint cannot bind, the sketch cannot be rebuilt, or conflictingBinding: a bound size of the same output drives that dimension; detail lists those fields), invalid_request (constraintId missing or unknown, or a bad body), geometry_failed (the sketch cannot be solved; detail lists constraintIds), shape_not_found, invalid_shape_id (shapeId missing or blank), shape_locked (detail shapeId names the locked shape or the locked group holding it).",
       WORKS_BOTH_WAYS,
     ].join(" "),
     inputSchema: {
