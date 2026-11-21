@@ -43,3 +43,8 @@ export function editorExportRequest(
     body: { operation: "export", projectId, format, name, ...(section ? { section } : {}), ...(shapes?.length ? { shapes } : {}) },
   };
 }
+
+/** Runs a parameter edit through the engine on the editor's in-memory project (#616). */
+export function editorParameterRequest(projectId: string, shapes: object[], parameters: object[], edit: object) {
+  return { url: "/api/editor/parameters", body: { projectId, shapes, parameters, edit } };
+}

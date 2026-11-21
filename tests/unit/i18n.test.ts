@@ -54,6 +54,7 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "editor.sketch.constraints.radiusMm", "editor.sketch.constraints.kinds.radius", "panels.property.text", "panels.property.positionX",
     "panels.property.positionY", "panels.property.positionZ", "panels.edgeModifier.radius", "panels.material.name.abs",
     "panels.material.name.asa", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
+    "editor.parameters.name", "editor.parameters.dimension",
   ],
   es: [
     "editor.sketch.constraints.addHorizontal", "editor.sketch.constraints.addPerpendicular",
@@ -71,7 +72,8 @@ const SAME_AS_ENGLISH: Partial<Record<Locale, readonly MessageKey[]>> = {
     "panels.inspector.faces.face", "panels.inspector.faces.title", "panels.loftShape.rectangle",
     "panels.loftShape.triangle", "panels.material.name.abs", "panels.material.name.asa", "panels.material.name.pa12",
     "panels.material.name.pc", "panels.material.name.petg", "panels.material.name.pla", "panels.material.name.tpu",
-    "panels.material.volume", "workspace.sketch.sweepSectionLabel",
+    "panels.material.volume", "workspace.sketch.sweepSectionLabel", "editor.parameters.expression",
+    "editor.parameters.dimension", "editor.parameters.dimensions.angle",
   ],
   pl: ["common.shape.torus", "editor.panel.import", "editor.panel.format", "editor.sketch.constraints.segmentOption"],
   pt: [
