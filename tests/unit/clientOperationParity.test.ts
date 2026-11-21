@@ -14,6 +14,14 @@ import {
 
 const root = process.cwd();
 
+/** REST operations the TypeScript and Python clients do not wrap yet. Each names its tracking issue. */
+const CLIENT_PENDING_OPERATIONS: Record<string, string> = {
+  listParameters: "#615",
+  createParameter: "#615",
+  updateParameter: "#615",
+  deleteParameter: "#615",
+};
+
 function pythonResources(): {
   resources: string[];
   operations: Record<string, unknown>;
@@ -446,7 +454,9 @@ describe("REST client operation parity", () => {
       const implemented = new Set(matrices[client]);
       expect([...implemented].filter((operationId) => !registered.has(operationId)), `${client} declares unknown REST operations`).toEqual([]);
       const missing = [...registered].filter((operationId) => !implemented.has(operationId)).sort();
-      const documentedGaps = client === "mcp" ? Object.keys(MCP_UNSUPPORTED_OPERATIONS).sort() : [];
+      const documentedGaps = (client === "mcp"
+        ? Object.keys(MCP_UNSUPPORTED_OPERATIONS)
+        : Object.keys(CLIENT_PENDING_OPERATIONS)).sort();
       expect(missing, `${client} operations missing from its resources`).toEqual(documentedGaps);
     }
   });

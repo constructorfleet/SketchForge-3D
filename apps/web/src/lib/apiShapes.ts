@@ -72,6 +72,8 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     rotationX: shape.rotationX ?? 0,
     rotationZ: shape.rotationZ ?? 0,
     ...parameters,
+    // Each bound field above holds its resolved number; this holds the expression.
+    ...(shape.expressions && Object.keys(shape.expressions).length ? { expressions: { ...shape.expressions } } : {}),
     ...(revolve ? { revolve: { ...revolve, ...(axis ? { axis } : {}) } } : {}),
     // The outline is the only part of a revolve that is not a number, and it is
     // what a fresh `POST` would have to carry, so it is reported alongside the

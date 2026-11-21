@@ -632,4 +632,38 @@ describe("the REST API over HTTP", () => {
     // `sides` was legitimate, but the request was refused whole.
     expect((after.body.shapes as Array<Record<string, any>>)[0].revolve.sides).toBe(64);
   });
+
+  it("binds a shape to a parameter and rebuilds it when the parameter changes", async () => {
+    const project = await api("/projects", { method: "POST", body: JSON.stringify({ name: "E2E parameters" }) });
+    const id = (project.body.project as Record<string, string>).id;
+    const wall = await api(`/parameters?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "wall", expression: "2", dimension: "length" }) });
+    expect(wall.status, JSON.stringify(wall.body)).toBe(201);
+
+    const created = await api(`/shapes?projectId=${id}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5" } }),
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const box = (created.body.shapes as Array<Record<string, any>>)[0];
+    expect(box).toMatchObject({ width: 10, expressions: { width: "wall * 5" } });
+
+    // The summary sent back whole keeps its binding.
+    const echoed = await api(`/shapes?projectId=${id}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ ...box, name: "Plate" }) });
+    expect(echoed.status, JSON.stringify(echoed.body)).toBe(200);
+    expect(echoed.body.shape).toMatchObject({ name: "Plate", width: 10, expressions: { width: "wall * 5" } });
+
+    const stale = await api(`/parameters?projectId=${id}&name=wall`, {
+      method: "PATCH", body: JSON.stringify({ expression: "3" }), headers: { "If-Match": `"${wall.body.revision}"` },
+    });
+    expect(stale).toMatchObject({ status: 409, body: { code: "revision_mismatch" } });
+
+    const changed = await api(`/parameters?projectId=${id}&name=wall`, { method: "PATCH", body: JSON.stringify({ expression: "3" }) });
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    expect(changed.body.shapes).toEqual([expect.objectContaining({ id: box.id, name: "Plate", width: 15 })]);
+    const properties = await api(`/properties?projectId=${id}&shapeId=${box.id}`);
+    expect((properties.body.properties as Record<string, number>).volume).toBeCloseTo(1500, 3);
+
+    const cycle = await api(`/parameters?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "loop", expression: "loop + 1", dimension: "length" }) });
+    expect(cycle).toMatchObject({ status: 422, body: { code: "invalid_expression", expressionError: { code: "cycle" } } });
+  });
 });

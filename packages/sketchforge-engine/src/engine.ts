@@ -128,6 +128,7 @@ import {
   type ShapeBindingError,
 } from "./expressionBindings.js";
 import { expressionDependencies } from "./parameterExpressions.js";
+import { echoedBindings, parseRequestExpressions, requestedBindingValue, type RequestExpressions } from "./shapeRequestExpressions.js";
 import {
   addParameter as addTableParameter,
   deleteParameter as deleteTableParameter,
@@ -241,7 +242,7 @@ export type EngineFailure =
   /** The `kind` asked for is not one that can be built from parameters. */
   | { reason: "unsupported_kind"; index: number; kinds: string[] }
   /** The request is malformed in a way only the request itself can explain. */
-  | { reason: "invalid_shape_request"; message: string; index?: number }
+  | { reason: "invalid_shape_request"; message: string; index?: number; shapeId?: string; field?: string }
   /** A revolve or a thread was described but could not be swept. */
   | { reason: "sweep_failed"; message: string; index?: number }
   /**
@@ -274,9 +275,9 @@ export type EngineFailure =
   /** The table change does not resolve; nothing was written. */
   | { reason: "parameter_invalid"; error: ProjectParameterError }
   /** A binding does not resolve or names a field the shape cannot bind; nothing was written. */
-  | { reason: "binding_invalid"; error: ShapeBindingError }
+  | { reason: "binding_invalid"; error: ShapeBindingError; index?: number }
   /** A resolved value could not be applied to `shapeId`; `failure` is the change's own refusal. */
-  | { reason: "binding_failed"; shapeId: string; fields: string[]; failure: EngineFailure };
+  | { reason: "binding_failed"; shapeId: string; fields: string[]; failure: EngineFailure; index?: number };
 
 export type EngineResult<T> = { ok: true; value: T } | { ok: false; failure: EngineFailure };
 
@@ -313,6 +314,8 @@ export type ProjectRead = {
   shapes: WorkplaneShape[];
   snapGrid: ProjectDocument["snapGrid"];
   workspace: ProjectDocument["workspace"];
+  /** The resolved parameter table. */
+  parameters: ProjectParameter[];
 };
 
 export type AlignRequest = {
@@ -653,6 +656,29 @@ function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
 }
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
+
+/**
+ * Finds a field whose literal and expression both changed and disagree.
+ * A literal equal to `current`'s value is an echo, so its new expression wins.
+ */
+function conflictingLiteral(
+  shape: WorkplaneShape,
+  request: ShapeRequest,
+  expressions: RequestExpressions,
+  parameters: readonly ProjectParameter[],
+  current?: WorkplaneShape,
+): { field: string; message: string } | undefined {
+  for (const [field, expression] of Object.entries(expressions)) {
+    if (expression === null) continue;
+    const literal = requestedBindingValue(request, field);
+    if (literal === undefined || (current && literal === boundFieldValue(current, field))) continue;
+    const resolved = resolveShapeBinding(shape, field, expression, parameters);
+    if (resolved.ok && resolved.value !== literal) {
+      return { field, message: `${field} is sent as ${literal}, but expressions.${field} gives ${resolved.value}. Send one or the other.` };
+    }
+  }
+  return undefined;
+}
 
 export function createEngine(store: ProjectStore): Engine {
   /** Read the project under its lock, run `work`, and report a busy project as a failure. */
@@ -1611,6 +1637,41 @@ export function createEngine(store: ProjectStore): Engine {
     return ok(shapes);
   }
 
+  /**
+   * Binds or clears fields on one shape and applies the resolved values, without writing.
+   * Returns `document.shapes` itself when nothing changed.
+   */
+  async function bindFieldsIn(
+    document: ProjectDocument,
+    shapeId: string,
+    expressions: RequestExpressions,
+  ): Promise<EngineResult<WorkplaneShape[]>> {
+    const found = findShapeInTree(document.shapes, shapeId);
+    if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+    if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
+    let shape = found.shape;
+    const values: Record<string, number> = {};
+    for (const [field, expression] of Object.entries(expressions)) {
+      if (expression === null) {
+        shape = withoutBindings(shape, [field]);
+        continue;
+      }
+      if (bindableField(found.shape, field)?.target === "shape" && !found.topLevel) {
+        return failed({ reason: "binding_invalid", error: { code: "fieldNotBindable", shapeId, field, message: `${field} binds on top-level shapes only.` } });
+      }
+      const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
+      if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
+      shape = { ...shape, expressions: { ...shape.expressions, [field]: expression } };
+      if (boundFieldValue(found.shape, field) !== resolved.value) values[field] = resolved.value;
+    }
+    if (shape === found.shape) return ok(document.shapes);
+    const shapes = replaceShapeInTree(document.shapes, shape);
+    if (!Object.keys(values).length) return ok(shapes);
+    const applied = await applyBindingValues({ ...document, shapes }, shapeId, values);
+    if (!applied.ok) return failed({ reason: "binding_failed", shapeId, fields: Object.keys(values), failure: applied.failure });
+    return applied;
+  }
+
   /** Re-resolves bindings that depend on a changed parameter and applies them, children first. */
   async function applyTable(
     document: ProjectDocument,
@@ -1690,34 +1751,73 @@ export function createEngine(store: ProjectStore): Engine {
       shapes: document.shapes,
       snapGrid: document.snapGrid,
       workspace: document.workspace,
+      parameters: document.parameters ?? [],
     })),
 
     addShapes: async (projectId, requests) => {
       const built: WorkplaneShape[] = [];
-      for (const [index, request] of requests.entries()) {
+      const bindings: RequestExpressions[] = [];
+      for (const [index, { expressions, ...request }] of requests.entries()) {
+        const parsed = parseRequestExpressions(expressions, { allowNull: false });
+        if (!parsed.ok) return failed({ reason: "invalid_shape_request", index, message: parsed.message });
         const shape = await builtShape(request, index);
         if (!shape.ok) return shape;
         built.push(shape.value);
+        bindings.push(parsed.expressions);
       }
-      return mutating(projectId, async (document) => ok({
-        shapes: built,
-        revision: await writeShapes(projectId, document, [...document.shapes, ...built]),
-      }));
+      return mutating(projectId, async (document) => {
+        let shapes = [...document.shapes, ...built];
+        for (const [index, expressions] of bindings.entries()) {
+          if (!Object.keys(expressions).length) continue;
+          const conflict = conflictingLiteral(built[index]!, requests[index]!, expressions, document.parameters ?? []);
+          if (conflict) return failed({ reason: "invalid_shape_request", index, ...conflict });
+          const bound = await bindFieldsIn({ ...document, shapes }, built[index]!.id, expressions);
+          if (!bound.ok) {
+            const { failure } = bound;
+            return failure.reason === "binding_invalid" || failure.reason === "binding_failed" ? failed({ ...failure, index }) : bound;
+          }
+          shapes = bound.value;
+        }
+        return ok({
+          shapes: shapes.slice(document.shapes.length),
+          revision: await writeShapes(projectId, document, shapes),
+        });
+      });
     },
 
-    changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
+    changeShape: (projectId, shapeId, { expressions: requested, ...changes }) => mutating(projectId, async (document) => {
+      const parsed = parseRequestExpressions(requested, { allowNull: true });
+      if (!parsed.ok) return failed({ reason: "invalid_shape_request", message: parsed.message });
+      const before = findShapeInTree(document.shapes, shapeId)?.shape;
+      // An entry repeating the stored expression is an echo: not re-resolved, so a stale one survives.
+      const expressions = Object.fromEntries(Object.entries(parsed.expressions)
+        .filter(([field, expression]) => expression === null || before?.expressions?.[field] !== expression));
+      if (Object.keys(expressions).length) {
+        if (!before) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+        const conflict = conflictingLiteral(before, changes, expressions, document.parameters ?? [], before);
+        if (conflict) return failed({ reason: "invalid_shape_request", shapeId, ...conflict });
+      }
       const changed = await changeShapeIn(document, shapeId, changes);
       if (!changed.ok) return changed;
-      // A literal value replaces the expression bound to that field, named or changed by a rebuild.
+      // A literal replaces the field's binding unless it repeats the current value.
+      // A rebuild that moves a bound value also drops that binding.
+      const echoed = before ? echoedBindings(before, changes) : [];
       const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
       const drifted = Object.keys(changed.value.shape.expressions ?? {})
         .filter((field) => previous && boundFieldValue(previous, field) !== boundFieldValue(changed.value.shape, field));
-      const literal = [...boundFieldsNamedBy(changes), ...drifted];
+      const literal = [...boundFieldsNamedBy(changes).filter((field) => !echoed.includes(field)), ...drifted];
       const unbound = withoutBindings(changed.value.shape, literal);
-      const shapes = unbound === changed.value.shape
+      let shapes = unbound === changed.value.shape
         ? changed.value.shapes
         : replaceShapeInTree(changed.value.shapes, unbound);
-      return ok({ shape: unbound, revision: await writeShapes(projectId, document, shapes) });
+      let shape = unbound;
+      if (Object.keys(expressions).length) {
+        const bound = await bindFieldsIn({ ...document, shapes }, unbound.id, expressions);
+        if (!bound.ok) return bound;
+        shapes = bound.value;
+        shape = findShapeInTree(shapes, unbound.id)?.shape ?? unbound;
+      }
+      return ok({ shape, revision: await writeShapes(projectId, document, shapes) });
     }),
 
     removeShape: (projectId, shapeId) => mutating(projectId, async (document) => {
@@ -2063,28 +2163,11 @@ export function createEngine(store: ProjectStore): Engine {
     deleteParameter: (projectId, name) => parameterOperation(projectId, (project) => deleteTableParameter(project, name)),
 
     bindShapeField: (projectId, shapeId, field, expression) => mutating(projectId, async (document) => {
-      const found = findShapeInTree(document.shapes, shapeId);
-      if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
-      if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
-      if (expression === null) {
-        const unbound = withoutBindings(found.shape, [field]);
-        if (unbound === found.shape) return ok({ shape: found.shape, revision: documentRevision(document) });
-        return ok({ shape: unbound, revision: await writeShapes(projectId, document, replaceShapeInTree(document.shapes, unbound)) });
-      }
-      if (bindableField(found.shape, field)?.target === "shape" && !found.topLevel) {
-        return failed({ reason: "binding_invalid", error: { code: "fieldNotBindable", shapeId, field, message: `${field} binds on top-level shapes only.` } });
-      }
-      const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
-      if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
-      const bound = { ...found.shape, expressions: { ...found.shape.expressions, [field]: expression } };
-      let shapes = replaceShapeInTree(document.shapes, bound);
-      if (boundFieldValue(found.shape, field) !== resolved.value) {
-        const applied = await applyBindingValues({ ...document, shapes }, shapeId, { [field]: resolved.value });
-        if (!applied.ok) return failed({ reason: "binding_failed", shapeId, fields: [field], failure: applied.failure });
-        shapes = applied.value;
-      }
-      const shape = findShapeInTree(shapes, shapeId)?.shape ?? bound;
-      return ok({ shape, revision: await writeShapes(projectId, document, shapes) });
+      const bound = await bindFieldsIn(document, shapeId, { [field]: expression });
+      if (!bound.ok) return bound;
+      const shape = findShapeInTree(bound.value, shapeId)!.shape;
+      if (bound.value === document.shapes) return ok({ shape, revision: documentRevision(document) });
+      return ok({ shape, revision: await writeShapes(projectId, document, bound.value) });
     }),
   };
 }
