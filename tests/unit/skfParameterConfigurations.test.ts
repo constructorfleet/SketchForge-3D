@@ -129,6 +129,24 @@ describe(".skf parameter configurations", () => {
     expect(restored.history[1]).toMatchObject(rows("Large"));
   });
 
+  it("does not merge an unknown undo state with a known empty one that has the same fingerprint, in either order", async () => {
+    const unknownRows = editorHistoryEntry([box(4)], [], table(2));
+    const emptyRows = editorHistoryEntry([box(4)], [], table(2), { configurations: [], activeConfiguration: null });
+    const unknownTable = editorHistoryEntry([box(5)], []);
+    const emptyTable = editorHistoryEntry([box(5)], [], [], { configurations: [], activeConfiguration: null });
+    const scene = editorHistoryEntry([box(4)], [], table(2), rows(null));
+    expect(unknownRows.fingerprint).toBe(emptyRows.fingerprint);
+    expect(unknownTable.fingerprint).toBe(emptyTable.fingerprint);
+    const known = (entry: { configurations?: unknown; parameters?: unknown }) =>
+      `${Array.isArray(entry.parameters) ? "p" : "-"}${Array.isArray(entry.configurations) ? "c" : "-"}`;
+
+    for (const order of [[unknownRows, emptyRows, unknownTable, emptyTable], [emptyRows, unknownRows, emptyTable, unknownTable]]) {
+      const history = [...order, scene];
+      const restored = await importSkfProject(await exportSkfProject(input(scene.shapes, table(2), rows(null), history)));
+      expect(restored.history.map(known)).toEqual(history.map(known));
+    }
+  });
+
   it("recomputes values under the active configuration instead of trusting stored ones", async () => {
     const exported = mutateProject(await exportSkfProject(input([box(8)], table(4), rows("Large"))), (document) => {
       document.parameters![0]!.value = 999;

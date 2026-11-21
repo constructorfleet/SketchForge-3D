@@ -979,35 +979,39 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     const shapes = repairDuplicateGroupedObjectIds(entry.shapes);
     return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, entry.parameters, entryConfiguration(entry));
   });
-  const sceneFingerprint = exportEntries[hydrated.index]?.fingerprint;
   // V3 whenever any table is written, including one kept only for undo.
   const anyTable = parameters.length > 0 || exportEntries.some((entry) => entry.parameters?.length);
   // V4 whenever any configurations are written, the same way.
   const anyConfigurations = hasConfigurations(configuration) || exportEntries.some((entry) => hasConfigurations(entryConfiguration(entry)));
+  const knownTable = (entry: EditorHistoryEntry) => (anyTable || anyConfigurations) && Array.isArray(entry.parameters);
+  const knownRows = (entry: EditorHistoryEntry) => anyConfigurations && entryConfiguration(entry) !== undefined;
+  // An empty table or configuration list leaves the fingerprint unchanged, so what an entry knows is part of the key.
+  const stateKey = (entry: EditorHistoryEntry) => `${entry.fingerprint}|${knownTable(entry) ? "p" : "-"}${knownRows(entry) ? "c" : "-"}`;
+  const sceneEntry = exportEntries[hydrated.index];
+  const sceneKey = sceneEntry && stateKey(sceneEntry);
   const builder = new SkfArchiveBuilder();
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
   const sourceAssetsByArchiveId = new Map(builder.assets.filter((asset) => asset.kind === "source").map((asset) => [asset.id, asset]));
   const states: SkfStateV1[] = [];
-  const stateIdByFingerprint = new Map<string, string>();
+  const stateIdByKey = new Map<string, string>();
   const historyEntries: SkfProjectDocumentV1["history"]["entries"] = [];
 
   for (const entry of exportEntries) {
-    let stateId = stateIdByFingerprint.get(entry.fingerprint);
+    const key = stateKey(entry);
+    let stateId = stateIdByKey.get(key);
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
       const state = await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId);
       // A state without `parameters` reads back as an unknown table; an empty list is a known empty one.
-      const undoState = entry.fingerprint !== sceneFingerprint;
+      const undoState = key !== sceneKey;
       const rows = entryConfiguration(entry);
-      const knownRows = anyConfigurations && undoState && rows;
-      const known = (anyTable || anyConfigurations) && undoState && Array.isArray(entry.parameters);
       states.push({
         ...state,
-        ...(known ? { parameters: resolvedSkfParameters(entry.parameters!, rows).map(skfParameter) } : {}),
-        ...(knownRows ? skfConfigurationFields(rows) : {}),
+        ...(undoState && knownTable(entry) ? { parameters: resolvedSkfParameters(entry.parameters!, rows).map(skfParameter) } : {}),
+        ...(undoState && knownRows(entry) ? skfConfigurationFields(rows!) : {}),
       });
-      stateIdByFingerprint.set(entry.fingerprint, stateId);
+      stateIdByKey.set(key, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
   }
