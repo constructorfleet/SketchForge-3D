@@ -82,6 +82,11 @@ export function apiProjectId(value: unknown): string | undefined {
   return trimmed.length <= API_PROJECT_ID_MAX_LENGTH && new RegExp(API_PROJECT_ID_PATTERN).test(trimmed) ? trimmed : undefined;
 }
 
+/** Returns the trimmed `?shapeId=`, or undefined when it is missing or blank. */
+export function apiShapeId(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 /**
  * How a route words the refusals whose wording is its own.
  *

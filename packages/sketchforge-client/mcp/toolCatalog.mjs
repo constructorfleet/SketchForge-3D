@@ -658,4 +658,26 @@ export const engineTools = [
       },
     },
   },
+  {
+    name: "sketchforge_bind_sketch_constraint",
+    description: [
+      "Bind one dimensional constraint of a stored shape's sketch (distance, radius, diameter or angle) to a parameter expression, re-solve the sketch and rebuild the shape; or pass expression null to unbind it and keep its value.",
+      "A changed parameter then re-solves the sketch. shapeId is the sketch output or its sketchSourceId.",
+      "The reply has the rebuilt shape, as GET /api/v1/shapes reports it, the constraint as { id, kind, value, expression }, and the revision.",
+      REFUSAL_FORMAT,
+      "Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension, or outOfRange; detail names shapeId and constraintId), unapplicable_fields (the constraint cannot bind, the sketch cannot be rebuilt, or conflictingBinding: a bound size of the same output drives that dimension; detail lists those fields), invalid_request (constraintId missing or unknown, or a bad body), geometry_failed (the sketch cannot be solved; detail lists constraintIds), shape_not_found, invalid_shape_id (shapeId missing or blank), shape_locked (detail shapeId names the locked shape or the locked group holding it).",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "shapeId", "constraintId", "expression"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        shapeId: { type: "string", description: "The sketch output shape, or its sketchSourceId." },
+        constraintId: { type: "string", description: 'The constraint id in the sketch profile, such as "width".' },
+        expression: { type: ["string", "null"], description: 'For example "w * 2". null removes the binding.' },
+      },
+    },
+  },
 ];

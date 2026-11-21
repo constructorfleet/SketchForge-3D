@@ -12,6 +12,7 @@ export const PARAMETER_TOOL_NAMES = new Set([
   "sketchforge_rename_parameter",
   "sketchforge_delete_parameter",
   "sketchforge_set_shape_expression",
+  "sketchforge_bind_sketch_constraint",
 ]);
 
 const CREATE_HINT = "Pass expression and dimension together to create it.";
@@ -37,13 +38,12 @@ function requireText(args, key) {
   return args[key];
 }
 
-function requireBinding(args) {
-  const shapeId = requireText(args, "shapeId");
-  const field = requireText(args, "field");
+/** Requires an expression string or null; shapeId is left to the request checks, as REST checks it. */
+function requireExpression(args) {
   if (args.expression !== null && typeof args.expression !== "string") {
     throw new McpToolError("expression is required: an expression string, or null to clear the binding.", "invalid_request");
   }
-  return { shapeId, field, expression: args.expression };
+  return args.expression;
 }
 
 /** Splits a set request into a create (both fields) or a change (either one). */
@@ -87,8 +87,14 @@ export async function callParameterTool(name, args, request) {
     case "sketchforge_delete_parameter":
       return request("DELETE", "/parameters", { query: { projectId, name: requireText(args, "name") } });
     case "sketchforge_set_shape_expression": {
-      const { shapeId, field, expression } = requireBinding(args);
-      return request("PATCH", "/shapes", { query: { projectId, shapeId }, body: { expressions: { [field]: expression } } });
+      // field is a key of the body, not a query value, so it is checked here.
+      const field = requireText(args, "field");
+      const expression = requireExpression(args);
+      return request("PATCH", "/shapes", { query: { projectId, shapeId: args.shapeId }, body: { expressions: { [field]: expression } } });
+    }
+    case "sketchforge_bind_sketch_constraint": {
+      const expression = requireExpression(args);
+      return request("PATCH", "/sketch-constraints", { query: { projectId, shapeId: args.shapeId, constraintId: args.constraintId }, body: { expression } });
     }
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -114,6 +120,11 @@ export function localParameterRequest(engine, api) {
     const projectId = api.apiProjectId(queryText(query.projectId));
     if (!projectId) throw new McpToolError(api.API_ERROR_MESSAGES.invalidProjectId, "invalid_project_id");
     return projectId;
+  };
+  const requireShape = (query) => {
+    const shapeId = api.apiShapeId(queryText(query.shapeId));
+    if (!shapeId) throw new McpToolError(api.API_ERROR_MESSAGES.shapeIdRequired, "invalid_shape_id");
+    return shapeId;
   };
   const requireName = (query) => {
     const parameterName = api.apiParameterName(queryText(query.name));
@@ -149,13 +160,24 @@ export function localParameterRequest(engine, api) {
       }
       case "PATCH /shapes": {
         const projectId = requireProject(query);
-        const shapeId = queryText(query.shapeId)?.trim();
-        if (!shapeId) throw new McpToolError(api.API_ERROR_MESSAGES.shapeIdRequired, "invalid_shape_id");
+        const shapeId = requireShape(query);
         const changed = await unwrap(
           await engine.changeShape(projectId, shapeId, sent),
           (failure) => api.shapeChangeApiError(failure, shapeId),
         );
         return { shape: api.apiShapeSummary(changed.shape), revision: changed.revision };
+      }
+      case "PATCH /sketch-constraints": {
+        const projectId = requireProject(query);
+        const shapeId = requireShape(query);
+        const constraintId = api.apiConstraintId(queryText(query.constraintId));
+        if (!constraintId) throw new McpToolError(api.API_SKETCH_CONSTRAINT_MESSAGES.constraintIdRequired, "invalid_request");
+        if (!api.isApiSketchConstraintBindRequest(sent)) throw new McpToolError(api.API_SKETCH_CONSTRAINT_MESSAGES.body, "invalid_request");
+        const bound = await unwrap(
+          await engine.bindSketchConstraint(projectId, shapeId, constraintId, sent.expression),
+          (failure) => api.sketchConstraintApiError(failure),
+        );
+        return api.apiSketchConstraintBound(bound, constraintId);
       }
       default:
         throw new Error(`No local route for ${method} ${route}.`);

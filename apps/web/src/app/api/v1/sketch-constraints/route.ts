@@ -1,8 +1,13 @@
-import { apiEngine, apiEngineError } from "@/lib/apiEngine";
-import { apiShapeSummary } from "@/lib/apiShapes";
+import { apiEngine } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody } from "@/lib/apiV1";
-import { parseApiV1Query, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
-import { sketchConstraintSummary, type BindableSketchConstraint } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import { parseApiV1Query, withApiV1Contract } from "@/lib/apiV1OperationContract";
+// The engine's checks and reply, so MCP local mode answers the same requests the same way.
+import {
+  API_SKETCH_CONSTRAINT_MESSAGES,
+  apiSketchConstraintBound,
+  isApiSketchConstraintBindRequest,
+  sketchConstraintApiError,
+} from "@constructorfleet/sketchforge-engine/apiSketchConstraints";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -17,24 +22,22 @@ async function patchHandler(request: Request) {
   if (!query.ok) {
     if (query.invalid.includes("projectId")) return apiErrors.invalidProjectId();
     if (query.invalid.includes("shapeId")) return apiErrors.shapeIdRequired();
-    return apiError("A constraintId is required.", 400, "invalid_request");
+    return apiError(API_SKETCH_CONSTRAINT_MESSAGES.constraintIdRequired, 400, "invalid_request");
   }
   const body = await apiJsonBody(request);
   if (body instanceof Response) return body;
   if (!body) return apiErrors.jsonBodyRequired();
-  if (!validateApiV1RequestBody(KEY, body)) {
-    return apiError("Send expression as a non-empty string, or null to remove the binding.", 400, "invalid_request");
+  if (!isApiSketchConstraintBindRequest(body)) {
+    return apiError(API_SKETCH_CONSTRAINT_MESSAGES.body, 400, "invalid_request");
   }
 
   const { projectId, shapeId, constraintId } = query.values as { projectId: string; shapeId: string; constraintId: string };
-  const bound = await apiEngine(context.root, request).bindSketchConstraint(projectId, shapeId, constraintId, body.expression as string | null);
-  if (!bound.ok) return apiEngineError(bound.failure, { oneShape: true });
-  const constraint = bound.value.shape.sketchProfile?.constraints?.find((candidate) => candidate.id === constraintId);
-  return apiJson({
-    shape: apiShapeSummary(bound.value.shape),
-    constraint: sketchConstraintSummary(constraint as BindableSketchConstraint),
-    revision: bound.value.revision,
-  });
+  const bound = await apiEngine(context.root, request).bindSketchConstraint(projectId, shapeId, constraintId, body.expression);
+  if (!bound.ok) {
+    const refusal = sketchConstraintApiError(bound.failure);
+    return apiError(refusal.message, refusal.status, refusal.code, refusal.detail);
+  }
+  return apiJson(apiSketchConstraintBound(bound.value, constraintId));
 }
 
 export const PATCH = withApiV1Contract(KEY, patchHandler);

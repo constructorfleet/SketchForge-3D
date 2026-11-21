@@ -347,3 +347,53 @@ describe.each(MODES)("MCP parameter tools over %s", (_label, open) => {
     }
   }, 120_000);
 });
+
+/** A 2 x 2 section with both sides dimensioned, swept along a 10 mm spine. */
+const sweepProfile = {
+  points: [
+    { id: "a", x: -1, z: -1, sweepRole: "section" }, { id: "b", x: 1, z: -1, sweepRole: "section" },
+    { id: "c", x: 1, z: 1, sweepRole: "section" }, { id: "d", x: -1, z: 1, sweepRole: "section" },
+    { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" },
+  ],
+  segments: [
+    { id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" },
+    { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" },
+    { id: "spine", startId: "p0", endId: "p1" },
+  ],
+  constraints: [
+    { id: "fix-a", kind: "fixed", pointId: "a", xMm: -1, zMm: -1 },
+    { id: "h-ab", kind: "horizontal", segmentId: "ab" },
+    { id: "v-bc", kind: "vertical", segmentId: "bc" },
+    { id: "h-cd", kind: "horizontal", segmentId: "cd" },
+    { id: "v-da", kind: "vertical", segmentId: "da" },
+    { id: "width", kind: "distance", pointIds: ["a", "b"], valueMm: 2 },
+    { id: "depth", kind: "distance", pointIds: ["b", "c"], valueMm: 2 },
+  ],
+};
+
+describe("sketchforge_bind_sketch_constraint over Streamable HTTP /mcp", () => {
+  it("binds a sketch dimension, rebuilds the solid, and unbinds it", async () => {
+    const mode = hostedHttpMode();
+    const projectId = await mode.project();
+    const created = await rest(shapesRoute.POST, `/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ kind: "sketchSweep", profile: sweepProfile }) });
+    const shapeId = created.shapes[0].id as string;
+    const measure = async () => {
+      const read = json(await mode.call("sketchforge_shape_properties", { projectId, shapeId }));
+      return (read.properties ?? read) as { volume: number; centerOfMass: { x: number; y: number; z: number } };
+    };
+    const before = await measure();
+    json(await mode.call("sketchforge_set_parameter", { projectId, name: "w", expression: "3", dimension: "length" }));
+
+    const bound = json(await mode.call("sketchforge_bind_sketch_constraint", { projectId, shapeId, constraintId: "width", expression: "w" }));
+    expect(bound.constraint).toEqual({ id: "width", kind: "distance", value: 3, expression: "w" });
+    // A 2 x 2 section swept 10 mm (40 mm³) widens to 3 x 2 (60 mm³); a sweep keeps its box centre, (0, 5, 0).
+    const after = await measure();
+    expect(before.volume).toBeCloseTo(40, 2);
+    expect(after.volume).toBeCloseTo(60, 2);
+    expect(after.centerOfMass).toMatchObject({ x: expect.closeTo(0, 4), y: expect.closeTo(5, 4), z: expect.closeTo(0, 4) });
+
+    const unbound = json(await mode.call("sketchforge_bind_sketch_constraint", { projectId, shapeId, constraintId: "width", expression: null }));
+    expect(unbound.constraint).toEqual({ id: "width", kind: "distance", value: 3 });
+    expect(refusal(await mode.call("sketchforge_bind_sketch_constraint", { projectId, shapeId, constraintId: "h-ab", expression: "w" })).code).toBe("unapplicable_fields");
+  }, 120_000);
+});

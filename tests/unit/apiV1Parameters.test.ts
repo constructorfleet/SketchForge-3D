@@ -219,6 +219,11 @@ describe("/api/v1/parameters", () => {
     expect(lockedEcho).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: box.id, fields: ["width"] } });
     expect((await list(projectId)).body.parameters).toEqual([{ name: "wall", expression: "2", dimension: "length", value: 2 }]);
 
+    const tooLong = await post(projectId, { name: "big", expression: `${"1+".repeat(5000)}1`, dimension: "unitless" });
+    expect(tooLong).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+    expect(tooLong.body.error).toMatch(/10,000 characters/);
+    expect((await patch(projectId, "wall", { expression: `${"1+".repeat(5000)}1` })).body.error).toMatch(/10,000 characters/);
+
     const noProject = await call(listParameters, "/api/v1/parameters");
     expect(noProject.status).toBe(400);
     expect((await call(listParameters, "/api/v1/parameters?projectId=absent")).status).toBe(404);

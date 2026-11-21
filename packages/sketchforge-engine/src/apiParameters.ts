@@ -15,11 +15,13 @@ import type { ExpressionError } from "./parameterExpressions.js";
 
 export const API_PARAMETER_NAME_MAX_LENGTH = 64;
 export const API_PARAMETER_EXPRESSION_MAX_LENGTH = 10_000;
+/** The limit as refusals word it. */
+export const API_PARAMETER_EXPRESSION_LIMIT = `${API_PARAMETER_EXPRESSION_MAX_LENGTH.toLocaleString("en-US")} characters`;
 export const API_PARAMETER_DIMENSIONS: readonly ProjectParameterDimension[] = ["length", "angle", "unitless"];
 
 export const API_PARAMETER_MESSAGES = {
-  create: "A parameter needs a name, an expression, and a dimension of length, angle, or unitless.",
-  change: "Send name alone to rename, or expression and dimension to change the value.",
+  create: `A parameter needs a name, an expression of at most ${API_PARAMETER_EXPRESSION_LIMIT}, and a dimension of length, angle, or unitless.`,
+  change: `Send name alone to rename, or expression (at most ${API_PARAMETER_EXPRESSION_LIMIT}) and dimension to change the value.`,
   nameRequired: "A parameter name is required.",
 } as const;
 
