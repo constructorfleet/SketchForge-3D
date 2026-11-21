@@ -10,7 +10,7 @@ const table: ProjectParameter[] = [{ name: "w", expression: "10", dimension: "le
 function sketch(constraints: SketchConstraint[]): WorkplaneShape {
   return {
     id: "profile", name: "profile", kind: "box", color: "#12a4cc", x: 0, z: 0,
-    size: 10, width: 10, depth: 10, height: 10, rotation: 0,
+    size: 10, width: 10, depth: 10, height: 10, rotation: 0, sketchOperation: "extrude", sketchSourceId: "sketch/profile",
     sketchProfile: {
       points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 }, { id: "c", x: 10, z: 10 }],
       segments: [{ id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" }],

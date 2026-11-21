@@ -120,7 +120,9 @@ import type { EdgeTreatmentFeature, ProjectAsset, ProjectParameter, SketchFaceDr
 import {
   boundSketchConstraints,
   literalSketchProfile,
+  rebuildableSketch,
   resolveSketchConstraintBinding,
+  sketchNotRebuildable,
   sketchConstraintValue,
   withSketchConstraintValues,
   type BindableSketchConstraint,
@@ -1776,7 +1778,8 @@ export function createEngine(store: ProjectStore): Engine {
         }
       }
       const constraintValues: Record<string, number> = {};
-      for (const { constraint, expression } of boundSketchConstraints(shape)) {
+      // A binding on a sketch no edit can rebuild stays stale, as on load.
+      for (const { constraint, expression } of rebuildableSketch(shape, topLevel) ? boundSketchConstraints(shape) : []) {
         if (invalidConstraint || !expressionDependencies(expression).some((name) => changed.has(name))) continue;
         const resolved = resolveSketchConstraintBinding(shape.id, constraint, expression, next);
         if (resolved.ok) {
@@ -2303,6 +2306,9 @@ export function createEngine(store: ProjectStore): Engine {
       if (expression === null) {
         if ((constraint as { expression?: string }).expression === undefined) return ok({ shape: output, revision: documentRevision(document) });
         return write({ ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: null }) });
+      }
+      if (!rebuildableSketch(output, found.topLevel)) {
+        return failed({ reason: "constraint_binding_invalid", error: sketchNotRebuildable(output.id, constraintId) });
       }
       const resolved = resolveSketchConstraintBinding(output.id, constraint, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "constraint_binding_invalid", error: resolved.error });

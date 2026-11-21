@@ -222,6 +222,43 @@ describe("expression-bound sketch constraints", () => {
     expect(JSON.stringify(await document("pinned"))).toBe(before);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("binds to a new value by solving and rebuilding in one write", async () => {
+    const output = await sketchProject("direct");
+    const before = await document("direct");
+
+    const bound = value(await engine.bindSketchConstraint("direct", "sketch/direct", "width", "4"));
+
+    expect(constraintOf(bound.shape, "width")).toMatchObject({ valueMm: 4, expression: "4" });
+    expect((await document("direct")).history).toHaveLength(before.history.length + 1);
+    const properties = value(await engine.properties("direct", output.id));
+    expect(properties.volume).toBeCloseTo(24, 3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses to bind a profile with no rebuild recipe, and leaves such a stale binding out of a parameter change", async () => {
+    await project("plain");
+    value(await engine.addShapes("plain", [{ kind: "box", width: 2, depth: 2, height: 3 }]));
+    const current = await document("plain");
+    const plain = { ...current.shapes[0]!, sketchProfile: rectangle() };
+    await store.write("plain", current, [plain]);
+    value(await engine.addParameter("plain", { name: "w", expression: "2", dimension: "length" }));
+
+    expect(await engine.bindSketchConstraint("plain", plain.id, "width", "w"))
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "sketchNotRebuildable", shapeId: plain.id } } });
+
+    // As loaded from a file: the binding is kept, reported, and does not block the parameter.
+    const stored = await document("plain");
+    const tagged = stored.shapes.map((shape) => ({
+      ...shape,
+      sketchProfile: {
+        ...shape.sketchProfile!,
+        constraints: shape.sketchProfile!.constraints!.map((constraint) => (constraint.id === "width" ? { ...constraint, expression: "w" } : constraint)),
+      },
+    }));
+    await store.write("plain", stored, tagged);
+    value(await engine.updateParameter("plain", "w", { expression: "4" }));
+    expect(constraintOf((await document("plain")).shapes[0]!, "width")).toMatchObject({ valueMm: 2, expression: "w" });
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("does not let a constraint the editor already left unsatisfied block a re-solve", async () => {
     // The editor commits a profile with unsatisfied constraints and shows a notice; these two can never agree.
     const base = rectangle([

@@ -8,6 +8,7 @@ import {
   resolveSketchConstraintBinding,
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
   sketchConstraintBindingIssues,
+  withSketchConstraintValues,
   type ProjectParameter,
   type ProjectParameterResult,
 } from "@constructorfleet/sketchforge-engine";
@@ -81,6 +82,13 @@ describe("sketch constraint bindings", () => {
       ["s2", "d1", "invalidExpression"],
     ]);
     expect(shapes[0]!.sketchProfile!.constraints![0]).toMatchObject({ valueMm: 2, expression: "missing * 2" });
+
+    const plain = sketch("plain", [distance("w")], { sketchOperation: undefined });
+    const nested = { ...sketch("group", []), groupedShapes: [sketch("orphan", [distance("w")], { sketchSourceId: undefined })] };
+    expect(sketchConstraintBindingIssues([plain, nested], table).map((issue) => [issue.shapeId, issue.code])).toEqual([
+      ["plain", "sketchNotRebuildable"],
+      ["orphan", "sketchNotRebuildable"],
+    ]);
   });
 
   it("counts constraint references as dependents, refuses to delete them, and renames them everywhere", () => {
@@ -123,5 +131,19 @@ describe("sketch constraint bindings", () => {
 
     const smuggled = literalSketchProfile(existing, profile([distance("w * 9", 3)]));
     expect(smuggled.constraints![0]).toEqual(distance(undefined, 3));
+
+    const turned = literalSketchProfile(existing, profile([distance("w", 3), { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 60, expression: "tilt" }]));
+    expect(turned.constraints![1]).toEqual({ id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 60 });
+  });
+
+  it("writes an angle's value to valueDeg and a length's to valueMm", () => {
+    const set = withSketchConstraintValues(
+      profile([distance("w", 2), { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 30, expression: "tilt" }]),
+      { d1: 7, a1: 60 },
+    );
+    expect(set.constraints).toEqual([
+      distance("w", 7),
+      { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 60, expression: "tilt" },
+    ]);
   });
 });

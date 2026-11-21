@@ -45,7 +45,8 @@ export function sketchConstraintValue(constraint: BindableSketchConstraint): num
 }
 
 export type SketchConstraintBindingErrorCode =
-  | "shapeNotFound" | "constraintNotFound" | "constraintNotBindable" | "invalidExpression" | "outOfRange";
+  | "shapeNotFound" | "constraintNotFound" | "constraintNotBindable" | "invalidExpression" | "outOfRange"
+  | "sketchNotRebuildable";
 
 export type SketchConstraintBindingError = {
   readonly code: SketchConstraintBindingErrorCode;
@@ -117,14 +118,26 @@ export function withSketchConstraintValues(
   return { ...profile, constraints };
 }
 
+/**
+ * Reports whether a profile edit can rebuild `shape`. A nested output is reached only by its source ID.
+ */
+export function rebuildableSketch(shape: WorkplaneShape, topLevel: boolean): boolean {
+  return Boolean(shape.sketchProfile && shape.sketchOperation && (shape.sketchSourceId || topLevel));
+}
+
 /** Visits every shape with a sketch profile, pre-order, skipping treatment `before` snapshots. */
-function visitSketches(shapes: readonly WorkplaneShape[], visit: (shape: WorkplaneShape) => void) {
-  const walk = (shape: WorkplaneShape) => {
+function visitSketches(shapes: readonly WorkplaneShape[], visit: (shape: WorkplaneShape, topLevel: boolean) => void) {
+  const walk = (shape: WorkplaneShape, topLevel: boolean) => {
     if (!shape || typeof shape !== "object") return;
-    if (shape.sketchProfile) visit(shape);
-    shape.groupedShapes?.forEach(walk);
+    if (shape.sketchProfile) visit(shape, topLevel);
+    shape.groupedShapes?.forEach((child) => walk(child, false));
   };
-  shapes.forEach(walk);
+  shapes.forEach((shape) => walk(shape, true));
+}
+
+/** Refuses a binding whose sketch no profile edit can rebuild. */
+export function sketchNotRebuildable(shapeId: string, constraintId: string): SketchConstraintBindingError {
+  return { code: "sketchNotRebuildable", shapeId, constraintId, message: `The sketch on ${shapeId} has no rebuild recipe, so its constraints cannot bind.` };
 }
 
 /** Yields each bound constraint of `shape`'s profile. */
@@ -142,8 +155,12 @@ export function sketchConstraintBindingIssues(
 ): SketchConstraintBindingIssue[] {
   const scope = parameterScope(parameters);
   const issues: SketchConstraintBindingIssue[] = [];
-  visitSketches(shapes, (shape) => {
+  visitSketches(shapes, (shape, topLevel) => {
     for (const { constraint, expression } of boundSketchConstraints(shape)) {
+      if (!rebuildableSketch(shape, topLevel)) {
+        issues.push(sketchNotRebuildable(shape.id, constraint.id));
+        continue;
+      }
       const result = resolveSketchConstraintBinding(shape.id, constraint, expression, scope);
       if (!result.ok) issues.push(result.error);
     }

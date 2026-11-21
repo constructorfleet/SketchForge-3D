@@ -232,6 +232,7 @@ export {
   boundSketchConstraints,
   literalSketchProfile,
   parameterSketchConstraintDependents,
+  rebuildableSketch,
   renameSketchConstraintReferences,
   resolveSketchConstraintBinding,
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
