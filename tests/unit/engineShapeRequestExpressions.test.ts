@@ -121,6 +121,19 @@ describe("shape requests with expressions", () => {
     expect(cleared.shape.expressions).toBeUndefined();
   });
 
+  it("writes nothing when every expression repeats the stored one", async () => {
+    await project("repeat");
+    const [shape] = value(await engine.addShapes("repeat", [{ kind: "box", width: 10, depth: 10, height: 10 }])).shapes;
+    const bound = value(await engine.changeShape("repeat", shape!.id, { expressions: { width: "wall * 3" } }));
+    const stored = await document("repeat");
+
+    const again = value(await engine.changeShape("repeat", shape!.id, { expressions: { width: "wall * 3" } }));
+    expect(again.revision).toBe(bound.revision);
+    expect(again.shape).toMatchObject({ id: shape!.id, width: 15, expressions: { width: "wall * 3" } });
+    expect(await document("repeat")).toEqual(stored);
+    expect(await engine.changeShape("repeat", "missing", { expressions: { width: "wall" } })).toMatchObject({ ok: false, failure: { reason: "shapes_not_found" } });
+  });
+
   it("refuses a change whose number and expression disagree, and writes nothing", async () => {
     await project("conflict");
     const [shape] = value(await engine.addShapes("conflict", [{ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 2" } }])).shapes;

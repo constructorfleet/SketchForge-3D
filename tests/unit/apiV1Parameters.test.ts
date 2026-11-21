@@ -210,6 +210,8 @@ describe("/api/v1/parameters", () => {
     await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ locked: true }) });
     const locked = await patch(projectId, "wall", { expression: "3" });
     expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: box.id, fields: ["width"] } });
+    const lockedBind = await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ expressions: { depth: "wall" } }) });
+    expect(lockedBind).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: box.id, fields: ["depth"] } });
     expect((await list(projectId)).body.parameters).toEqual([{ name: "wall", expression: "2", dimension: "length", value: 2 }]);
 
     const noProject = await call(listParameters, "/api/v1/parameters");

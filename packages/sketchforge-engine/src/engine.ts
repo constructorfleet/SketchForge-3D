@@ -2023,6 +2023,11 @@ export function createEngine(store: ProjectStore): Engine {
       // An entry repeating the stored expression is an echo: not re-resolved, so a stale one survives.
       const expressions = Object.fromEntries(Object.entries(parsed.expressions)
         .filter(([field, expression]) => expression === null || before?.expressions?.[field] !== expression));
+      // Only echoed expressions and nothing else: no change, so no write and no new revision.
+      if (!Object.keys(expressions).length && Object.keys(parsed.expressions).length && !Object.keys(changes).length) {
+        if (!before) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+        return ok({ shape: before, revision: documentRevision(document) });
+      }
       if (Object.keys(expressions).length) {
         if (!before) return failed({ reason: "shapes_not_found", ids: [shapeId] });
         const conflict = conflictingLiteral(before, changes, expressions, document.parameters ?? [], before);

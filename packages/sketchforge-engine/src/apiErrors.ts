@@ -325,3 +325,15 @@ export function engineFailureToApiError(failure: EngineFailure, wording: ApiFail
       );
   }
 }
+
+/**
+ * Maps a `PATCH /shapes` refusal. A locked shape names itself and any fields the
+ * request would bind, as a parameter change blocked by the same lock does.
+ */
+export function shapeChangeApiError(failure: EngineFailure, shapeId: string, request: { expressions?: unknown }): ApiErrorReply {
+  if (failure.reason !== "shape_locked") return engineFailureToApiError(failure, SHAPE_CHANGE_WORDING);
+  const bound = request.expressions && typeof request.expressions === "object" && !Array.isArray(request.expressions)
+    ? Object.keys(request.expressions)
+    : [];
+  return engineFailureToApiError(failure, SHAPE_CHANGE_WORDING, { shapeId, ...(bound.length ? { fields: bound } : {}) });
+}

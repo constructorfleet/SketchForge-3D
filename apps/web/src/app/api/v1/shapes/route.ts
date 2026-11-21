@@ -4,7 +4,7 @@ import { apiShapeSummary } from "@/lib/apiShapes";
 import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { paginateApiV1 } from "@/lib/apiV1Pagination";
 import { parseRequestExpressions } from "@constructorfleet/sketchforge-engine/shapeRequestExpressions";
-import { SHAPE_CHANGE_WORDING } from "@constructorfleet/sketchforge-engine/apiErrors";
+import { shapeChangeApiError } from "@constructorfleet/sketchforge-engine/apiErrors";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -102,7 +102,8 @@ async function patchHandler(request: Request) {
 
   const changed = await apiEngine(context.root, request).changeShape(projectId, shapeId, parsed.body);
   if (!changed.ok) {
-    return apiEngineError(changed.failure, SHAPE_CHANGE_WORDING);
+    const refusal = shapeChangeApiError(changed.failure, shapeId, parsed.body);
+    return apiError(refusal.message, refusal.status, refusal.code, refusal.detail);
   }
   return apiJson({ shape: apiShapeSummary(changed.value.shape), revision: changed.value.revision });
 }

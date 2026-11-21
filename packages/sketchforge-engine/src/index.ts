@@ -276,6 +276,7 @@ export {
   apiProjectId,
   engineFailureToApiError,
   SHAPE_CHANGE_WORDING,
+  shapeChangeApiError,
   wireExpressionError,
   type ApiErrorCode,
   type ApiErrorReply,
