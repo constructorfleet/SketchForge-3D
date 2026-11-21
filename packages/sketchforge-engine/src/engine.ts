@@ -119,7 +119,9 @@ import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import {
   boundSketchConstraints,
+  conflictingConstraintBinding,
   literalSketchProfile,
+  profileSizeFields,
   rebuildableSketch,
   resolveSketchConstraintBinding,
   resolveSketchConstraintBindings,
@@ -1757,6 +1759,21 @@ export function createEngine(store: ProjectStore): Engine {
       }
       const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
+      const constraintIds = profileSizeFields(found.shape).includes(field)
+        ? boundSketchConstraints(found.shape).map(({ constraint }) => constraint.id)
+        : [];
+      if (constraintIds.length) {
+        return failed({
+          reason: "binding_invalid",
+          error: {
+            code: "conflictingBinding",
+            shapeId,
+            field,
+            constraintIds,
+            message: `${field} cannot bind: it would rescale the sketch on ${shapeId}, whose ${constraintIds.join(", ")} is bound. Clear one binding first.`,
+          },
+        });
+      }
       shape = { ...shape, expressions: { ...shape.expressions, [field]: expression } };
       if (boundFieldValue(found.shape, field) !== resolved.value) values[field] = resolved.value;
     }
@@ -2410,6 +2427,8 @@ export function createEngine(store: ProjectStore): Engine {
       }
       const resolved = resolveSketchConstraintBinding(output.id, constraint, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "constraint_binding_invalid", error: resolved.error });
+      const conflict = conflictingConstraintBinding(output, constraintId);
+      if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
       const tagged = { ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: expression }) };
       if (sketchConstraintValue(constraint as BindableSketchConstraint) === resolved.value) return write(tagged);
       const solved = solvedSketchProfile(tagged, { [constraintId]: resolved.value });

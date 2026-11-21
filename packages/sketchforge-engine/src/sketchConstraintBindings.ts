@@ -46,7 +46,7 @@ export function sketchConstraintValue(constraint: BindableSketchConstraint): num
 
 export type SketchConstraintBindingErrorCode =
   | "shapeNotFound" | "constraintNotFound" | "constraintNotBindable" | "invalidExpression" | "outOfRange"
-  | "sketchNotRebuildable";
+  | "sketchNotRebuildable" | "conflictingBinding";
 
 export type SketchConstraintBindingError = {
   readonly code: SketchConstraintBindingErrorCode;
@@ -56,6 +56,8 @@ export type SketchConstraintBindingError = {
   readonly constraintId: string;
   /** Set for `invalidExpression`. */
   readonly expressionError?: ExpressionError;
+  /** Set for `conflictingBinding`: the bound size fields on the output. */
+  readonly fields?: readonly string[];
 };
 
 export type SketchConstraintBindingIssue = SketchConstraintBindingError;
@@ -155,6 +157,33 @@ export function sketchNotRebuildable(shapeId: string, constraintId: string): Ske
   return { code: "sketchNotRebuildable", shapeId, constraintId, message: `The sketch on ${shapeId} has no rebuild recipe, so its constraints cannot bind.` };
 }
 
+/**
+ * Lists the size fields a sketch output's profile determines. Binding one rescales the
+ * solved profile, so it conflicts with constraint bindings. Extrusion height is not in the profile.
+ */
+export function profileSizeFields(shape: WorkplaneShape): readonly string[] {
+  if (!shape.sketchProfile) return [];
+  return shape.sketchOperation === "extrude" ? ["width", "depth"] : ["width", "depth", "height"];
+}
+
+/** Lists the bound profile size fields on `shape`. */
+export function boundProfileSizeFields(shape: WorkplaneShape): string[] {
+  return profileSizeFields(shape).filter((field) => typeof shape.expressions?.[field] === "string");
+}
+
+/** Refuses a constraint binding on an output whose profile size is already bound. */
+export function conflictingConstraintBinding(shape: WorkplaneShape, constraintId: string): SketchConstraintBindingError | undefined {
+  const fields = boundProfileSizeFields(shape);
+  if (!fields.length) return undefined;
+  return {
+    code: "conflictingBinding",
+    shapeId: shape.id,
+    constraintId,
+    fields,
+    message: `${constraintId} cannot bind: ${fields.join(", ")} on ${shape.id} is bound and rescales the sketch. Clear one binding first.`,
+  };
+}
+
 /** Yields each bound constraint of `shape`'s profile. */
 export function boundSketchConstraints(shape: WorkplaneShape): Array<{ constraint: BindableSketchConstraint; expression: string }> {
   return (shape.sketchProfile?.constraints ?? []).flatMap((constraint) => {
@@ -179,6 +208,11 @@ export function sketchConstraintBindingIssues(
       seen.add(key);
       if (!rebuildableSketch(shape, topLevel)) {
         issues.push(sketchNotRebuildable(shape.id, constraint.id));
+        continue;
+      }
+      const conflict = conflictingConstraintBinding(shape, constraint.id);
+      if (conflict) {
+        issues.push(conflict);
         continue;
       }
       const result = resolveSketchConstraintBinding(shape.id, constraint, expression, scope);

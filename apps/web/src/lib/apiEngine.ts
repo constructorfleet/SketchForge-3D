@@ -164,6 +164,9 @@ function bindingError(error: ShapeBindingError, index: number | undefined) {
   const message = atIndex(error.message, index);
   if (error.code === "shapeNotFound") return apiError(message, 404, "shape_not_found", detail);
   if (error.code === "fieldNotBindable") return apiError(message, 422, "unapplicable_fields", { ...detail, fields: [error.field] });
+  if (error.code === "conflictingBinding") {
+    return apiError(message, 422, "unapplicable_fields", { ...detail, fields: [error.field], constraintIds: error.constraintIds ?? [] });
+  }
   return apiError(message, 422, "invalid_expression", detail);
 }
 
@@ -179,6 +182,7 @@ function constraintBindingError(error: SketchConstraintBindingError, index: numb
   if (error.code === "constraintNotBindable" || error.code === "sketchNotRebuildable") {
     return apiError(message, 422, "unapplicable_fields", detail);
   }
+  if (error.code === "conflictingBinding") return apiError(message, 422, "unapplicable_fields", { ...detail, fields: error.fields ?? [] });
   if (error.code === "invalidExpression" || error.code === "outOfRange") return apiError(message, 422, "invalid_expression", detail);
   return apiError(message, 422, "invalid_request", detail);
 }

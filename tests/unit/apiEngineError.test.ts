@@ -39,6 +39,26 @@ describe("API sketch constraint binding failure mapping", () => {
     expect(body.expressionError).toMatchObject({ code: "unknownName" });
   });
 
+  it("maps a size binding that conflicts with constraint bindings, from either side, naming both", async () => {
+    const field = apiEngineError({
+      reason: "binding_invalid",
+      error: { code: "conflictingBinding", shapeId: "s1", field: "width", constraintIds: ["w1", "w2"], message: "width cannot bind." },
+    });
+    expect(field.status).toBe(422);
+    expect(await field.json()).toMatchObject({
+      code: "unapplicable_fields", shapeId: "s1", field: "width", fields: ["width"], constraintIds: ["w1", "w2"], reason: "conflictingBinding",
+    });
+
+    const constraint = apiEngineError({
+      reason: "constraint_binding_invalid",
+      error: { code: "conflictingBinding", shapeId: "s1", constraintId: "w1", fields: ["width", "depth"], message: "w1 cannot bind." },
+    });
+    expect(constraint.status).toBe(422);
+    expect(await constraint.json()).toMatchObject({
+      code: "unapplicable_fields", shapeId: "s1", constraintId: "w1", fields: ["width", "depth"], reason: "conflictingBinding",
+    });
+  });
+
   it("maps an unsolvable sketch and a wrapped rebuild failure with their constraint IDs", async () => {
     const unsolvable = apiEngineError({ reason: "sketch_unsolvable", shapeId: "s1", constraintIds: ["diagonal"], message: "The sketch on s1 cannot satisfy diagonal." });
     expect(unsolvable.status).toBe(422);
