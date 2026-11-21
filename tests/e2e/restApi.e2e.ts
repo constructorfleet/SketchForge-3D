@@ -650,6 +650,7 @@ describe("the REST API over HTTP", () => {
     // The summary sent back whole keeps its binding.
     const echoed = await api(`/shapes?projectId=${id}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ ...box, name: "Plate" }) });
     expect(echoed.status, JSON.stringify(echoed.body)).toBe(200);
+    expect(echoed.body.shape).toMatchObject({ name: "Plate", width: 10, expressions: { width: "wall * 5" } });
 
     const stale = await api(`/parameters?projectId=${id}&name=wall`, {
       method: "PATCH", body: JSON.stringify({ expression: "3" }), headers: { "If-Match": `"${wall.body.revision}"` },

@@ -126,8 +126,12 @@ describe("shape requests with expressions", () => {
     const [shape] = value(await engine.addShapes("conflict", [{ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 2" } }])).shapes;
     const before = await document("conflict");
 
-    const conflicting = await engine.changeShape("conflict", shape!.id, { width: 30, expressions: { width: "wall * 2" } });
-    expect(conflicting).toMatchObject({ ok: false, failure: { reason: "invalid_shape_request" } });
+    // Both sides changed and they disagree.
+    const conflicting = await engine.changeShape("conflict", shape!.id, { width: 30, expressions: { width: "wall * 3" } });
+    expect(conflicting).toMatchObject({ ok: false, failure: { reason: "invalid_shape_request", shapeId: shape!.id, field: "width" } });
+    const createConflict = await engine.addShapes("conflict", [{ kind: "box" }, { kind: "box", width: 7, expressions: { width: "wall * 4" } }]);
+    expect(createConflict).toMatchObject({ ok: false, failure: { reason: "invalid_shape_request", index: 1, field: "width" } });
+    expect((createConflict as { failure: Record<string, unknown> }).failure.shapeId).toBeUndefined();
     const invalid = await engine.changeShape("conflict", shape!.id, { name: "Not applied", expressions: { height: "wall /" } });
     expect(invalid).toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { code: "invalidExpression", field: "height" } } });
     const malformed = await engine.changeShape("conflict", shape!.id, { expressions: ["width"] });
@@ -136,6 +140,37 @@ describe("shape requests with expressions", () => {
     const after = await document("conflict");
     expect(after.metadata.revision).toBe(before.metadata.revision);
     expect(after.shapes).toEqual(before.shapes);
+  });
+
+  it("lets the side a read-modify-write changed win over the side it echoed", async () => {
+    await project("rmw");
+    const [shape] = value(await engine.addShapes("rmw", [{ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 2" } }])).shapes;
+    const summary = { width: 10, depth: 10, height: 10, expressions: { width: "wall * 2" } };
+
+    // Changed number, echoed expression: the number wins and the binding goes.
+    const edited = value(await engine.changeShape("rmw", shape!.id, { ...summary, width: 12 }));
+    expect(edited.shape.width).toBe(12);
+    expect(edited.shape.expressions).toBeUndefined();
+
+    value(await engine.changeShape("rmw", shape!.id, { expressions: { width: "wall * 2" } }));
+    // Changed expression, echoed number: the expression wins.
+    const rebound = value(await engine.changeShape("rmw", shape!.id, { ...summary, expressions: { width: "wall * 3" } }));
+    expect(rebound.shape).toMatchObject({ width: 15, expressions: { width: "wall * 3" } });
+
+    // Both changed and agreeing is a rebind.
+    const agreed = value(await engine.changeShape("rmw", shape!.id, { width: 20, expressions: { width: "wall * 4" } }));
+    expect(agreed.shape).toMatchObject({ width: 20, expressions: { width: "wall * 4" } });
+  });
+
+  it("does not re-resolve an echoed binding that no longer resolves", async () => {
+    await project("stale");
+    const [shape] = value(await engine.addShapes("stale", [{ kind: "box", width: 4, depth: 10, height: 10 }])).shapes;
+    const current = await document("stale");
+    await store.write("stale", current, [{ ...current.shapes[0]!, expressions: { width: "gone * 2" } }]);
+
+    const echoed = value(await engine.changeShape("stale", shape!.id, { name: "Echo", width: 4, expressions: { width: "gone * 2" } }));
+
+    expect(echoed.shape).toMatchObject({ name: "Echo", width: 4, expressions: { width: "gone * 2" } });
   });
 
   it("keeps a revolve binding when the summary's nested revolve settings are echoed", async () => {

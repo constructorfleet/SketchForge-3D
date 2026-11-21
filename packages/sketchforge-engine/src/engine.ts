@@ -242,7 +242,7 @@ export type EngineFailure =
   /** The `kind` asked for is not one that can be built from parameters. */
   | { reason: "unsupported_kind"; index: number; kinds: string[] }
   /** The request is malformed in a way only the request itself can explain. */
-  | { reason: "invalid_shape_request"; message: string; index?: number }
+  | { reason: "invalid_shape_request"; message: string; index?: number; shapeId?: string; field?: string }
   /** A revolve or a thread was described but could not be swept. */
   | { reason: "sweep_failed"; message: string; index?: number }
   /**
@@ -277,7 +277,7 @@ export type EngineFailure =
   /** A binding does not resolve or names a field the shape cannot bind; nothing was written. */
   | { reason: "binding_invalid"; error: ShapeBindingError; index?: number }
   /** A resolved value could not be applied to `shapeId`; `failure` is the change's own refusal. */
-  | { reason: "binding_failed"; shapeId: string; fields: string[]; failure: EngineFailure };
+  | { reason: "binding_failed"; shapeId: string; fields: string[]; failure: EngineFailure; index?: number };
 
 export type EngineResult<T> = { ok: true; value: T } | { ok: false; failure: EngineFailure };
 
@@ -657,20 +657,24 @@ function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
 
-/** Describes a literal that disagrees with the expression sent for the same field, or undefined. */
+/**
+ * Finds a field whose literal and expression both changed and disagree.
+ * A literal equal to `current`'s value is an echo, so its new expression wins.
+ */
 function conflictingLiteral(
   shape: WorkplaneShape,
   request: ShapeRequest,
   expressions: RequestExpressions,
   parameters: readonly ProjectParameter[],
-): string | undefined {
+  current?: WorkplaneShape,
+): { field: string; message: string } | undefined {
   for (const [field, expression] of Object.entries(expressions)) {
     if (expression === null) continue;
     const literal = requestedBindingValue(request, field);
-    if (literal === undefined) continue;
+    if (literal === undefined || (current && literal === boundFieldValue(current, field))) continue;
     const resolved = resolveShapeBinding(shape, field, expression, parameters);
     if (resolved.ok && resolved.value !== literal) {
-      return `${field} is sent as ${literal}, but expressions.${field} gives ${resolved.value}. Send one or the other.`;
+      return { field, message: `${field} is sent as ${literal}, but expressions.${field} gives ${resolved.value}. Send one or the other.` };
     }
   }
   return undefined;
@@ -1766,9 +1770,12 @@ export function createEngine(store: ProjectStore): Engine {
         for (const [index, expressions] of bindings.entries()) {
           if (!Object.keys(expressions).length) continue;
           const conflict = conflictingLiteral(built[index]!, requests[index]!, expressions, document.parameters ?? []);
-          if (conflict) return failed({ reason: "invalid_shape_request", index, message: conflict });
+          if (conflict) return failed({ reason: "invalid_shape_request", index, ...conflict });
           const bound = await bindFieldsIn({ ...document, shapes }, built[index]!.id, expressions);
-          if (!bound.ok) return bound.failure.reason === "binding_invalid" ? failed({ ...bound.failure, index }) : bound;
+          if (!bound.ok) {
+            const { failure } = bound;
+            return failure.reason === "binding_invalid" || failure.reason === "binding_failed" ? failed({ ...failure, index }) : bound;
+          }
           shapes = bound.value;
         }
         return ok({
@@ -1781,12 +1788,14 @@ export function createEngine(store: ProjectStore): Engine {
     changeShape: (projectId, shapeId, { expressions: requested, ...changes }) => mutating(projectId, async (document) => {
       const parsed = parseRequestExpressions(requested, { allowNull: true });
       if (!parsed.ok) return failed({ reason: "invalid_shape_request", message: parsed.message });
-      const { expressions } = parsed;
       const before = findShapeInTree(document.shapes, shapeId)?.shape;
+      // An entry repeating the stored expression is an echo: not re-resolved, so a stale one survives.
+      const expressions = Object.fromEntries(Object.entries(parsed.expressions)
+        .filter(([field, expression]) => expression === null || before?.expressions?.[field] !== expression));
       if (Object.keys(expressions).length) {
         if (!before) return failed({ reason: "shapes_not_found", ids: [shapeId] });
-        const conflict = conflictingLiteral(before, changes, expressions, document.parameters ?? []);
-        if (conflict) return failed({ reason: "invalid_shape_request", message: conflict });
+        const conflict = conflictingLiteral(before, changes, expressions, document.parameters ?? [], before);
+        if (conflict) return failed({ reason: "invalid_shape_request", shapeId, ...conflict });
       }
       const changed = await changeShapeIn(document, shapeId, changes);
       if (!changed.ok) return changed;

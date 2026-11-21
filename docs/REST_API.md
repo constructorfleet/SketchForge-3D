@@ -177,7 +177,7 @@ A project can hold a table of named parameters, and any numeric shape field in t
 }
 ```
 
-`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `shapeId` and `field`, and in a batch `POST /shapes` its `index`.
+`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `field`, and its `shapeId` or, in `POST /shapes`, its batch `index`, because the new shape has no stored id. A parameter change refused because a bound shape could not be rebuilt, for example `409 shape_locked`, names that `shapeId` and its bound `fields`.
 
 ### Binding shape fields
 
@@ -189,16 +189,16 @@ A project can hold a table of named parameters, and any numeric shape field in t
 
 A bare number takes the field's unit, so `wall + 3` in a length field adds 3 mm. Count fields such as `sides` must evaluate to a whole number. A summary reports each bound field as its resolved number, and the expression under `expressions`. A field that cannot be bound on that shape answers `422 unapplicable_fields`.
 
-A `PATCH` decides what happens to a binding from what it sends for that field:
+A `PATCH` compares each side of a bound field with the shape's current state. A number equal to the current value, or an expression equal to the stored one, is an echo:
 
 | Sent for a bound field | Result |
 | --- | --- |
-| Nothing | The binding stays. |
-| The field's current number | The binding stays. Sending a whole summary back does not unbind anything. |
-| A different number | The number replaces the binding. |
-| `expressions: { field: "…" }` | The field is bound, or rebound, to that expression. |
+| Nothing, or an echoed number and an echoed expression | The binding stays. Sending a whole summary back does not unbind anything, and an echoed binding is not re-evaluated, so one that no longer resolves stays as it is. |
+| A different number, with no expression or an echoed one | The number replaces the binding. |
+| A different expression, with no number or an echoed one | The field is rebound to that expression. |
+| A different number and a different expression that agree | The field is rebound to that expression. |
+| A different number and a different expression that disagree | `400 invalid_request` naming `shapeId` and `field` (or `index` in a batch `POST`), with nothing written. |
 | `expressions: { field: null }` | The binding is removed and the field keeps its current number. |
-| A number and an expression that disagree | `400 invalid_request`, with nothing written. |
 
 Comparisons are exact, which a JSON round trip of the server's own number preserves. A client that read the shape before someone else changed a parameter can send a stale number, and that number counts as an edit. Send `If-Match` with the revision you read to turn that case into `409 revision_mismatch`.
 

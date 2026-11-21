@@ -94,13 +94,13 @@ function atIndex(message: string, index: number | undefined) {
 }
 
 /** The three readings of `unapplicable_fields`, each a 422 with `fields` attached. */
-function unapplicableFields(failure: Extract<EngineFailure, { reason: "unapplicable_fields" }>) {
+function unapplicableFields(failure: Extract<EngineFailure, { reason: "unapplicable_fields" }>, detail: Record<string, unknown>) {
   const message = failure.because === "no_sweep"
     ? `A shape of kind "${failure.kind}" has no sweep to change: ${failure.fields.join(", ")}.`
     : failure.because === "outline_not_described"
       ? "That revolve's outline was drawn rather than described, so the sweep cannot be rebuilt from it. Send a profile to replace it."
       : `A shape of kind "${failure.kind}" cannot take: ${failure.fields.join(", ")}.`;
-  return apiError(message, 422, "unapplicable_fields", { fields: failure.fields });
+  return apiError(message, 422, "unapplicable_fields", { fields: failure.fields, ...detail });
 }
 
 /** Serializes an evaluation error: code, message, span and, for a cycle, its path. */
@@ -140,11 +140,11 @@ function parameterError(error: ProjectParameterError) {
 
 /** Maps a binding refusal. An unbindable field reads as `unapplicable_fields`, as an unknown literal does. */
 function bindingError(error: ShapeBindingError, index: number | undefined) {
+  // A batch create names the shape by index; its id was never stored.
   const detail = {
-    shapeId: error.shapeId,
+    ...(index === undefined ? { shapeId: error.shapeId } : { index }),
     field: error.field,
     reason: error.code,
-    ...(index === undefined ? {} : { index }),
     ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
     ...Object.fromEntries((["value", "min", "max", "stored"] as const)
       .filter((key) => typeof error[key] === "number")
@@ -156,55 +156,62 @@ function bindingError(error: ShapeBindingError, index: number | undefined) {
   return apiError(message, 422, "invalid_expression", detail);
 }
 
-export function apiEngineError(failure: EngineFailure, wording: ApiFailureWording = {}) {
+/** `detail` adds fields to every refusal; a wrapped binding failure uses it to name the bound shape. */
+export function apiEngineError(failure: EngineFailure, wording: ApiFailureWording = {}, detail: Record<string, unknown> = {}) {
+  const fail = (message: string, status: number, code: ApiErrorCode, extra?: Record<string, unknown>) =>
+    apiError(message, status, code, { ...extra, ...detail });
   switch (failure.reason) {
     case "project_busy":
-      return apiErrors.projectBusy();
+      return apiErrors.projectBusy(detail);
     case "project_not_found":
-      return apiErrors.projectNotFound();
+      return apiErrors.projectNotFound(detail);
     case "shapes_not_found":
-      return wording.oneShape ? apiErrors.shapeNotFound() : apiErrors.shapesNotFound(failure.ids);
+      return wording.oneShape ? apiErrors.shapeNotFound(detail) : apiErrors.shapesNotFound(failure.ids, detail);
     case "shape_locked":
-      return apiErrors.shapeLocked(wording.locked?.(failure.ids));
+      return apiErrors.shapeLocked(wording.locked?.(failure.ids), detail);
     case "geometry_failed":
-      return apiError(failure.message, failure.status === 500 ? 422 : failure.status, "geometry_failed");
+      return fail(failure.message, failure.status === 500 ? 422 : failure.status, "geometry_failed");
     case "cad_refused":
-      return apiError(failure.message, failure.status, "cad_failed");
+      return fail(failure.message, failure.status, "cad_failed");
     case "cad_failed":
-      return apiError(wording.cadFailed ?? "The CAD kernel could not complete that operation.", 500, "cad_failed");
+      return fail(wording.cadFailed ?? "The CAD kernel could not complete that operation.", 500, "cad_failed");
     case "interference_refused": {
       const refusal = failure.refusal;
-      if (refusal.reason === "invalid_clearance") return apiError("clearance must be a finite, non-negative number of millimetres.", 400, "invalid_request");
-      if (refusal.reason === "too_many_shapes") return apiErrors.limitExceeded(`Interference check refused: ${refusal.given} shapes exceed the limit of ${refusal.limit}. Narrow the ids list.`, refusal.limit, refusal.given);
-      return apiErrors.limitExceeded(`Interference check refused: more than ${refusal.limit} candidate pairs; narrow the ids list or reduce clearance.`, refusal.limit, refusal.given);
+      if (refusal.reason === "invalid_clearance") return fail("clearance must be a finite, non-negative number of millimetres.", 400, "invalid_request");
+      if (refusal.reason === "too_many_shapes") return apiErrors.limitExceeded(`Interference check refused: ${refusal.given} shapes exceed the limit of ${refusal.limit}. Narrow the ids list.`, refusal.limit, refusal.given, detail);
+      return apiErrors.limitExceeded(`Interference check refused: more than ${refusal.limit} candidate pairs; narrow the ids list or reduce clearance.`, refusal.limit, refusal.given, detail);
     }
     case "unsupported_kind":
-      return apiError(
+      return fail(
         `Shape ${failure.index} has an unsupported kind. The API can build: ${failure.kinds.join(", ")}.`,
         422,
         "unsupported_kind",
       );
     case "invalid_shape_request":
-      return apiError(atIndex(failure.message, failure.index), 400, "invalid_request");
+      return fail(atIndex(failure.message, failure.index), 400, "invalid_request", {
+        ...(failure.index === undefined ? {} : { index: failure.index }),
+        ...(failure.shapeId === undefined ? {} : { shapeId: failure.shapeId }),
+        ...(failure.field === undefined ? {} : { field: failure.field }),
+      });
     case "sweep_failed":
-      return apiError(atIndex(`${failure.message}.`, failure.index), 422, "geometry_failed");
+      return fail(atIndex(`${failure.message}.`, failure.index), 422, "geometry_failed");
     case "unapplicable_fields":
-      return unapplicableFields(failure);
+      return unapplicableFields(failure, detail);
     case "selection_too_small":
-      return apiError(
+      return fail(
         wording.tooFewShapes?.(failure.needed, failure.given)
           ?? `This needs at least ${failure.needed} shapes; ${failure.given} were given.`,
         422,
         "invalid_request",
       );
     case "no_distribute_axis":
-      return apiError(
+      return fail(
         "Every shape sits at the same place along both axes, so there is nothing to spread. Move them apart, or send axis as x or z.",
         422,
         "invalid_request",
       );
     case "pattern_has_no_step":
-      return apiError(
+      return fail(
         failure.kind === "linear"
           ? "A row needs a stepX or a stepZ, or every copy lands on top of the original."
           : "A ring needs a sweepAngle other than zero, or every copy lands on top of the original.",
@@ -212,21 +219,25 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
         "invalid_request",
       );
     case "import_unsupported":
-      return apiError(
+      return fail(
         `Nothing here can read "${failure.fileName}". The readable formats are: ${failure.formats.join(", ")}.`,
         415,
         "unsupported_format",
       );
     case "import_failed":
-      return apiError(`${failure.fileName}: ${failure.message}`, 422, "geometry_failed");
+      return fail(`${failure.fileName}: ${failure.message}`, 422, "geometry_failed");
     case "parameter_invalid":
       return parameterError(failure.error);
     case "binding_invalid":
       return bindingError(failure.error, failure.index);
     case "binding_failed":
-      return apiEngineError(failure.failure, wording);
+      return apiEngineError(failure.failure, wording, {
+        ...detail,
+        ...(failure.index === undefined ? { shapeId: failure.shapeId } : { index: failure.index }),
+        fields: [...failure.fields],
+      });
     default:
-      return apiError(
+      return fail(
         wording.refusal?.[failure.reason] ?? DEFAULT_REFUSALS[failure.reason],
         422,
         REFUSAL_CODES[failure.reason],

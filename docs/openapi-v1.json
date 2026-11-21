@@ -23767,6 +23767,24 @@
                         "invalid_body",
                         "invalid_request"
                       ]
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -23821,6 +23839,24 @@
                         "project_not_found",
                         "shape_not_found"
                       ]
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -23852,6 +23888,24 @@
                     },
                     "revision": {
                       "type": "number"
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -23968,6 +24022,24 @@
                         "cad_failed",
                         "internal_error"
                       ]
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
@@ -24050,7 +24122,7 @@
                 "properties": {
                   "expressions": {
                     "type": "object",
-                    "description": "Binds fields to expressions, or clears a binding with null. A bound field sent with its current value keeps its binding; a different number replaces it.",
+                    "description": "Binds fields to expressions, or clears a binding with null. Each side is compared with the current shape: an echoed number or expression changes nothing, the side that changed wins, and two changed sides that disagree return 400.",
                     "additionalProperties": {
                       "type": [
                         "string",

@@ -3,6 +3,7 @@ import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from
 import { apiShapeSummary } from "@/lib/apiShapes";
 import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { paginateApiV1 } from "@/lib/apiV1Pagination";
+import { parseRequestExpressions } from "@constructorfleet/sketchforge-engine/shapeRequestExpressions";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -60,7 +61,13 @@ async function postHandler(request: Request) {
     }
   }
   if (!validateApiV1RequestBody("POST /api/v1/shapes", body)) {
-    return apiError('Each shape request must include a "kind".', 400, "invalid_request");
+    const entries = requested as Record<string, unknown>[];
+    const expressionIssues = entries.map((entry) => parseRequestExpressions(entry.expressions, { allowNull: false }));
+    const malformed = expressionIssues.findIndex((issue) => !issue.ok);
+    const issue = expressionIssues[malformed];
+    return entries.every((entry) => entry.kind !== undefined) && issue && !issue.ok
+      ? apiError(`Shape ${malformed}: ${issue.message}`, 400, "invalid_request", { index: malformed })
+      : apiError('Each shape request must include a "kind".', 400, "invalid_request");
   }
 
   const added = await apiEngine(context.root, request).addShapes(projectId, requested as Record<string, unknown>[]);

@@ -14,6 +14,7 @@ import { GET as getProperties } from "@/app/api/v1/properties/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
+import { directoryProjectStore } from "@/lib/engine/projectStore";
 
 const TOKEN = "test-token-value";
 
@@ -207,7 +208,7 @@ describe("/api/v1/parameters", () => {
 
     await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ locked: true }) });
     const locked = await patch(projectId, "wall", { expression: "3" });
-    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked" } });
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: box.id, fields: ["width"] } });
     expect((await list(projectId)).body.parameters).toEqual([{ name: "wall", expression: "2", dimension: "length", value: 2 }]);
 
     const noProject = await call(listParameters, "/api/v1/parameters");
@@ -261,6 +262,42 @@ describe("shape requests carrying expressions", () => {
     expect(rebuilt.volume).toBeCloseTo(2000, 3);
   });
 
+  it("lets whichever side of a whole-summary PATCH changed win", async () => {
+    const projectId = await makeProject();
+    await post(projectId, { name: "wall", expression: "2", dimension: "length" });
+    const box = await addShape(projectId, { kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5" } });
+    const url = `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`;
+
+    // Changed expression, echoed number: rebinds.
+    const rebound = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ ...await readShape(projectId, box.id), expressions: { width: "wall * 6" } }) });
+    expect(rebound.status, JSON.stringify(rebound.body)).toBe(200);
+    expect(rebound.body.shape).toMatchObject({ width: 12, expressions: { width: "wall * 6" } });
+    expect((await volumeAndCentre(projectId, box.id)).volume).toBeCloseTo(1200, 3);
+
+    // Changed number, echoed expression: the number replaces the binding.
+    const edited = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ ...await readShape(projectId, box.id), width: 7 }) });
+    expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+    expect(edited.body.shape).toMatchObject({ width: 7 });
+    expect((edited.body.shape as Json).expressions).toBeUndefined();
+    expect((await volumeAndCentre(projectId, box.id)).volume).toBeCloseTo(700, 3);
+  });
+
+  it("keeps an echoed binding that no longer resolves", async () => {
+    const projectId = await makeProject();
+    const box = await addShape(projectId, { kind: "box", width: 4, depth: 10, height: 10 });
+    const store = directoryProjectStore(projectsRoot);
+    const current = (await store.read(projectId))!;
+    await store.write(projectId, current, [{ ...current.shapes[0]!, expressions: { width: "gone * 2" } }]);
+
+    const summary = await readShape(projectId, box.id);
+    expect(summary.expressions).toEqual({ width: "gone * 2" });
+    const echoed = await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, {
+      method: "PATCH", body: JSON.stringify({ ...summary, name: "Still stale" }),
+    });
+    expect(echoed.status, JSON.stringify(echoed.body)).toBe(200);
+    expect(echoed.body.shape).toMatchObject({ name: "Still stale", width: 4, expressions: { width: "gone * 2" } });
+  });
+
   it("drops a binding for a changed number, clears one on null, and refuses a contradiction", async () => {
     const projectId = await makeProject();
     await post(projectId, { name: "wall", expression: "2", dimension: "length" });
@@ -270,8 +307,13 @@ describe("shape requests carrying expressions", () => {
     const edited = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ width: 12 }) });
     expect(edited.body.shape).toMatchObject({ width: 12, expressions: { depth: "wall * 4" } });
 
-    const contradiction = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ depth: 3, expressions: { depth: "wall * 4" } }) });
-    expect(contradiction).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+    const contradiction = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ depth: 3, expressions: { depth: "wall * 6" } }) });
+    expect(contradiction).toMatchObject({ status: 400, body: { code: "invalid_request", shapeId: box.id, field: "depth" } });
+    const createContradiction = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ shapes: [{ kind: "box" }, { kind: "box", width: 3, expressions: { width: "wall * 6" } }] }),
+    });
+    expect(createContradiction).toMatchObject({ status: 400, body: { code: "invalid_request", index: 1, field: "width" } });
+    expect(createContradiction.body.shapeId).toBeUndefined();
 
     const cleared = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ expressions: { depth: null } }) });
     expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
@@ -307,8 +349,24 @@ describe("shape requests carrying expressions", () => {
     const clamped = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ expressions: { width: "wall * 10000" } }) });
     expect(clamped).toMatchObject({ status: 422, body: { code: "invalid_expression", reason: "outOfRange", field: "width", value: 20000, max: 10000 } });
 
+    const batchClamped = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ shapes: [{ kind: "box" }, { kind: "box", expressions: { width: "wall * 10000" } }] }),
+    });
+    expect(batchClamped).toMatchObject({ status: 422, body: { code: "invalid_expression", reason: "outOfRange", index: 1, field: "width" } });
+    expect(batchClamped.body.shapeId).toBeUndefined();
+
     const malformed = await call(patchShape, url, { method: "PATCH", body: JSON.stringify({ expressions: { width: 3 } }) });
     expect(malformed).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+
+    for (const expressions of [{ width: 3 }, ["width"], { width: null }, { width: " " }]) {
+      const refused = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, {
+        method: "POST", body: JSON.stringify({ shapes: [{ kind: "box" }, { kind: "box", expressions }] }),
+      });
+      expect(refused, JSON.stringify(expressions)).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+      expect(String(refused.body.error), JSON.stringify(expressions)).toMatch(/^Shape 1: expressions/);
+    }
+    const kindless = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ width: 3 }) });
+    expect(String(kindless.body.error)).toMatch(/"kind"/);
 
     expect((await call(getShapes, `/api/v1/shapes?projectId=${projectId}`)).body.shapes).toHaveLength(1);
   });
