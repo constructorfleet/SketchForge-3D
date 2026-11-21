@@ -200,7 +200,11 @@ A `PATCH` compares each side of a bound field with the shape's current state. A 
 | A different number and a different expression that disagree | `400 invalid_request` naming `shapeId` and `field` (or `index` in a batch `POST`), with nothing written. |
 | `expressions: { field: null }` | The binding is removed and the field keeps its current number. |
 
-Comparisons are exact, which a JSON round trip of the server's own number preserves. A client that read the shape before someone else changed a parameter can send a stale number, and that number counts as an edit. Send `If-Match` with the revision you read to turn that case into `409 revision_mismatch`.
+Comparisons are exact, which a JSON round trip of the server's own number preserves.
+
+**Send `If-Match` with a whole summary.** A summary read before someone else changed a parameter carries the old numbers, and against the current shape they count as edits. Without `If-Match`, such a `PATCH` removes those bindings and puts the old values back. With `If-Match` set to the revision you read, the same request answers `409 revision_mismatch` and changes nothing.
+
+**Sending a binding's exact text back does not re-evaluate it.** That keeps a stale binding (one listed in `bindingIssues`) as it is. To make it resolve again, send `expressions: { field: null }` and then bind it again, or send edited text.
 
 Sketch constraint values are not bound through REST yet. They will be added to these routes once the engine supports them (#612).
 
