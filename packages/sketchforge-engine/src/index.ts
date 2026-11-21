@@ -280,6 +280,7 @@ export {
   API_PROJECT_ID_MAX_LENGTH,
   API_PROJECT_ID_PATTERN,
   apiProjectId,
+  apiShapeId,
   engineFailureToApiError,
   SHAPE_CHANGE_WORDING,
   shapeChangeApiError,
@@ -302,3 +303,11 @@ export {
   type ApiParameterChange,
 } from "./apiParameters.js";
 export { apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";
+export {
+  API_CONSTRAINT_ID_MAX_LENGTH,
+  API_SKETCH_CONSTRAINT_MESSAGES,
+  apiConstraintId,
+  apiSketchConstraintBound,
+  isApiSketchConstraintBindRequest,
+  SKETCH_CONSTRAINT_WORDING,
+} from "./apiSketchConstraints.js";

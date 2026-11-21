@@ -39,7 +39,7 @@ The [example source](./examples/local-stl-import.mjs) validates each call agains
 
 ## Drive a shape from parameters
 
-Five tools manage a project's named parameters and bind shape fields to them. They work in local mode, against a server when a tool call passes `url` (through REST v1 [parameters and expressions](../REST_API.md#parameters-and-expressions), which needs `SKETCHFORGE_API_TOKEN`), and on a server's `/mcp` endpoint.
+Six tools manage a project's named parameters and bind shape fields and sketch dimensions to them. They work in local mode, against a server when a tool call passes `url` (through REST v1 [parameters and expressions](../REST_API.md#parameters-and-expressions) and [sketch constraint bindings](../REST_API.md#binding-sketch-constraints), which need `SKETCHFORGE_API_TOKEN`), and on a server's `/mcp` endpoint.
 
 | Tool | Does |
 | --- | --- |
@@ -48,6 +48,7 @@ Five tools manage a project's named parameters and bind shape fields to them. Th
 | `sketchforge_rename_parameter` | Renames a parameter and rewrites every expression and shape binding that uses it. |
 | `sketchforge_delete_parameter` | Deletes a parameter that nothing uses. |
 | `sketchforge_set_shape_expression` | Binds one shape field to an expression, or clears the binding with `expression: null`, which keeps the current number. Repeating the stored expression changes nothing and writes nothing. |
+| `sketchforge_bind_sketch_constraint` | Binds one distance, radius, diameter or angle constraint of a shape's sketch to an expression, re-solves the sketch and rebuilds the shape. `expression: null` unbinds it and keeps its value. The reply has the shape and the constraint as `{ id, kind, value, expression }`. |
 
 A write to a parameter returns the whole table and the shapes it rebuilt, so the new geometry is in the reply. For example, these calls make a box whose width and position follow `wall`:
 
@@ -84,4 +85,4 @@ Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
 | `limit_exceeded` | The table is full. | |
 | `shape_not_found`, `project_not_found` | The id is not in the project or store. | |
 
-Binding a sketch constraint has no MCP tool yet; a constraint bound another way still appears in these refusals.
+A sketch-constraint binding answers with the same codes, naming `constraintId`: `invalid_expression` (including `reason: "outOfRange"`), `unapplicable_fields` for a constraint that cannot bind, or `reason: "conflictingBinding"` when a bound size of the same shape drives that dimension (and the reverse, from `sketchforge_set_shape_expression`), `invalid_request` for an unknown `constraintId`, and `geometry_failed` with `constraintIds` when the sketch cannot be solved.

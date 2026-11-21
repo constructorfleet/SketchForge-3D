@@ -33,10 +33,11 @@ server; editor tools then require an open editor tab (`/?editor=1`). Remote
 REST operations also require `SKETCHFORGE_API_TOKEN` in the MCP process
 environment.
 
-Five tools manage named parameters and bind shape fields to expressions over
-them, in local mode and against a server: `sketchforge_list_parameters`,
-`sketchforge_set_parameter`, `sketchforge_rename_parameter`,
-`sketchforge_delete_parameter` and `sketchforge_set_shape_expression`. See
+Six tools manage named parameters and bind shape fields and sketch dimensions
+to expressions over them, in local mode and against a server:
+`sketchforge_list_parameters`, `sketchforge_set_parameter`,
+`sketchforge_rename_parameter`, `sketchforge_delete_parameter`,
+`sketchforge_set_shape_expression` and `sketchforge_bind_sketch_constraint`. See
 [Drive a shape from parameters](https://github.com/constructorfleet/SketchForge-3D/blob/main/docs/mcp/EXAMPLES.md#drive-a-shape-from-parameters)
 for the error codes they return.
 

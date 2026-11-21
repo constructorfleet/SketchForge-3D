@@ -7,6 +7,7 @@ import {
   isApiParameterChangeRequest,
   isApiParameterCreateRequest,
 } from "@constructorfleet/sketchforge-engine/apiParameters";
+import { API_CONSTRAINT_ID_MAX_LENGTH, apiConstraintId, isApiSketchConstraintBindRequest } from "@constructorfleet/sketchforge-engine/apiSketchConstraints";
 
 /** The routes validate with the engine's checks; the published schema has to say the same thing. */
 function schemaFor(key: string) {
@@ -57,5 +58,18 @@ describe("parameter request checks", () => {
     expect(apiParameterName(" wall ")).toBe("wall");
     expect(apiParameterName("   ")).toBeUndefined();
     expect(apiParameterName("x".repeat(rule.maxLength + 1))).toBeUndefined();
+  });
+
+  it("agree with the published sketch constraint body schema and constraintId rule", () => {
+    const key = "PATCH /api/v1/sketch-constraints";
+    const schema = schemaFor(key);
+    for (const body of [...bodies, { expression: null }, { expression: null, other: 1 }, { expression: 5 }, { expression: "w", name: "x" }]) {
+      expect(isApiSketchConstraintBindRequest(body), `${key} ${JSON.stringify(body).slice(0, 80)}`).toBe(validateApiV1Schema(body, schema));
+    }
+    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key)!.query!.properties.constraintId as { maxLength: number };
+    expect(rule.maxLength).toBe(API_CONSTRAINT_ID_MAX_LENGTH);
+    expect(apiConstraintId(" width ")).toBe("width");
+    expect(apiConstraintId(" ")).toBeUndefined();
+    expect(apiConstraintId("x".repeat(rule.maxLength + 1))).toBeUndefined();
   });
 });

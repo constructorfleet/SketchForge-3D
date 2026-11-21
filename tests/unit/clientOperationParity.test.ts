@@ -466,6 +466,7 @@ describe("REST client operation parity", () => {
         sketchforge_rename_parameter: { projectId: PROJECT_ID, name: "wall", newName: "thickness" },
         sketchforge_delete_parameter: { projectId: PROJECT_ID, name: "wall" },
         sketchforge_set_shape_expression: { projectId: PROJECT_ID, shapeId: SHAPE_ID, field: "width", expression: "wall * 5" },
+        sketchforge_bind_sketch_constraint: { projectId: PROJECT_ID, shapeId: SHAPE_ID, constraintId: "width", expression: "wall * 2" },
       };
       // Setting an existing name tries the create, is refused, then changes it.
       const mcpResponses: Record<string, Record<string, { status: number; body: unknown }>> = {
