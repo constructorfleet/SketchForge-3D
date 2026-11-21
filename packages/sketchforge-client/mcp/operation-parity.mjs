@@ -19,6 +19,12 @@ export const MCP_RESOURCE_OPERATIONS = {
   sketchforge_delete_parameter: ["deleteParameter"],
   sketchforge_set_shape_expression: ["updateShape"],
   sketchforge_bind_sketch_constraint: ["bindSketchConstraint"],
+  sketchforge_list_parameter_configurations: ["listParameterConfigurations"],
+  sketchforge_create_parameter_configuration: ["createParameterConfiguration"],
+  sketchforge_rename_parameter_configuration: ["updateParameterConfiguration"],
+  sketchforge_set_configuration_override: ["updateParameterConfiguration"],
+  sketchforge_delete_parameter_configuration: ["deleteParameterConfiguration"],
+  sketchforge_activate_parameter_configuration: ["activateParameterConfiguration"],
 };
 
 /** Runtime tools implemented by the local engine, filesystem, or editor bridge. */
@@ -70,9 +76,4 @@ export const MCP_UNSUPPORTED_OPERATIONS = {
   groupShapes: "Grouping uses the local engine/editor bridge, not POST /groups.",
   ungroupShape: "Ungrouping uses the local engine/editor bridge, not DELETE /groups.",
   splitParts: "Part separation uses the local engine/editor bridge, not POST /parts.",
-  listParameterConfigurations: "MCP parameter configuration tools are tracked in #618.",
-  createParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
-  updateParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
-  deleteParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
-  activateParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
 };

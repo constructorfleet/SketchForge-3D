@@ -9,6 +9,8 @@ import * as shapesRoute from "@/app/api/v1/shapes/route";
 import * as parametersRoute from "@/app/api/v1/parameters/route";
 import * as propertiesRoute from "@/app/api/v1/properties/route";
 import * as groupsRoute from "@/app/api/v1/groups/route";
+import * as configurationsRoute from "@/app/api/v1/parameter-configurations/route";
+import * as activateRoute from "@/app/api/v1/parameter-configurations/activate/route";
 import * as sketchConstraintsRoute from "@/app/api/v1/sketch-constraints/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
@@ -63,6 +65,8 @@ const ROUTES: Record<string, Json> = {
   "/api/v1/parameters": parametersRoute,
   "/api/v1/properties": propertiesRoute,
   "/api/v1/sketch-constraints": sketchConstraintsRoute,
+  "/api/v1/parameter-configurations": configurationsRoute,
+  "/api/v1/parameter-configurations/activate": activateRoute,
 };
 
 async function restServer() {
@@ -387,4 +391,87 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
     expect(headline).toContain(groups[0]);
     expect(JSON.parse(detail!)).toEqual({ shapeId: groups[0] });
   }, 60_000);
+
+  it("agrees on parameter configurations, and an activation rebuilds bound geometry", async () => {
+    const LIST = "sketchforge_list_parameter_configurations";
+    const CREATE = "sketchforge_create_parameter_configuration";
+    const RENAME = "sketchforge_rename_parameter_configuration";
+    const OVERRIDE = "sketchforge_set_configuration_override";
+    const DELETE = "sketchforge_delete_parameter_configuration";
+    const ACTIVATE = "sketchforge_activate_parameter_configuration";
+    const a = await boxProject();
+    const b = await boxProject();
+    await both(SET, (c) => ({ projectId: c.projectId, name: "wall", expression: "2", dimension: "length" }), a, b);
+    await both(BIND, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, field: "width", expression: "wall * 5" }), a, b);
+    await both(BIND, (c) => ({ projectId: c.projectId, shapeId: c.shapeId, field: "x", expression: "wall * 10" }), a, b);
+    const measure = async (mode: typeof local, fixture: Fixture, url?: string) => {
+      const read = JSON.parse((await mode.call("sketchforge_shape_properties", { projectId: fixture.projectId, shapeId: fixture.shapeId, ...(url ? { url } : {}) })).text);
+      return (read.properties ?? read) as { volume: number; centerOfMass: { x: number } };
+    };
+    const geometryIs = async (volume: number, x: number) => {
+      for (const [mode, fixture, url] of [[local, a, undefined], [remote, b, api.url]] as const) {
+        const read = await measure(mode, fixture, url);
+        expect(read.volume).toBeCloseTo(volume, 3);
+        expect(read.centerOfMass.x).toBeCloseTo(x, 3);
+      }
+    };
+    await geometryIs(1000, 20);
+
+    const steps: [string, (fixture: Fixture) => Json][] = [
+      [LIST, (c) => ({ projectId: c.projectId })],
+      [LIST, () => ({})],
+      [CREATE, (c) => ({ projectId: c.projectId, name: "big", overrides: { wall: "3" } })],
+      [CREATE, (c) => ({ projectId: c.projectId, name: "big" })],
+      [CREATE, (c) => ({ projectId: c.projectId, name: "ghostly", overrides: { ghost: "1" } })],
+      [CREATE, (c) => ({ projectId: c.projectId, overrides: { wall: "3" } })],
+      [CREATE, (c) => ({ projectId: c.projectId, name: "x".repeat(101) })],
+      [CREATE, (c) => ({ projectId: c.projectId, name: "negative", overrides: { wall: "-1" } })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall", expression: "4" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall", expression: null })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall", expression: "3" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall", expression: "wall +" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: "nowhere", parameter: "wall", expression: "3" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: " ", parameter: "wall", expression: "3" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: 5, parameter: "wall", expression: "3" })],
+      [RENAME, (c) => ({ projectId: c.projectId, name: 5, newName: "five" })],
+      [DELETE, (c) => ({ projectId: c.projectId, name: 5 })],
+      [ACTIVATE, (c) => ({ projectId: c.projectId, name: "big" })],
+    ];
+    const answers: { local: Answer; remote: Answer }[] = [];
+    for (const [name, args] of steps) answers.push(await both(name, args, a, b));
+    const code = (index: number) => /\[([a-z_]+)\]$/.exec(answers[index]!.local.text.split("\n")[0]!)?.[1];
+    expect(JSON.parse(answers[2]!.local.text)).toMatchObject({ configuration: { name: "big", overrides: { wall: "3" } }, activeConfiguration: null });
+    expect(code(3)).toBe("configuration_exists");
+    expect(JSON.parse(answers[3]!.local.text.split("\n")[1]!)).toEqual({ reason: "duplicateConfigurationName", configuration: "big" });
+    expect(code(5)).toBe("invalid_request");
+    expect(code(13)).toBe("configuration_not_found");
+    for (const index of [15, 16, 17]) expect(code(index)).toBe("invalid_request");
+    expect(JSON.parse(answers[18]!.local.text)).toMatchObject({ activeConfiguration: "big" });
+    // wall = 3: the box is 15 wide and centred at x = 30.
+    await geometryIs(1500, 30);
+
+    const refused = await both(ACTIVATE, (c) => ({ projectId: c.projectId, name: "negative" }), a, b);
+    expect(refused.local.isError).toBe(true);
+    await geometryIs(1500, 30);
+    expect((await both(ACTIVATE, (c) => ({ projectId: c.projectId, name: "missing" }), a, b)).local.text).toMatch(/\[configuration_not_found\]/);
+    await both(ACTIVATE, (c) => ({ projectId: c.projectId }), a, b);
+    await both(ACTIVATE, (c) => ({ projectId: c.projectId, name: null }), a, b);
+    await geometryIs(1000, 20);
+
+    for (const [name, args] of [
+      [RENAME, (c: Fixture) => ({ projectId: c.projectId, name: "big", newName: "large" })],
+      [RENAME, (c: Fixture) => ({ projectId: c.projectId, name: "large", newName: "negative" })],
+      [RENAME, (c: Fixture) => ({ projectId: c.projectId, name: "ghost", newName: "z" })],
+      [DELETE, (c: Fixture) => ({ projectId: c.projectId, name: "large" })],
+      [DELETE, (c: Fixture) => ({ projectId: c.projectId, name: "large" })],
+      ["sketchforge_delete_parameter", (c: Fixture) => ({ projectId: c.projectId, name: "wall" })],
+      [ACTIVATE, (c: Fixture) => ({ projectId: c.projectId, name: null })],
+      [LIST, (c: Fixture) => ({ projectId: c.projectId })],
+    ] as const) answers.push(await both(name, args, a, b));
+    expect(answers.at(-7)!.local.text).toMatch(/\[configuration_exists\]/);
+    expect(answers.at(-6)!.local.text).toMatch(/\[configuration_not_found\]/);
+    expect(answers.at(-4)!.local.text).toMatch(/\[configuration_not_found\]/);
+    await geometryIs(1000, 20);
+  }, 120_000);
 });

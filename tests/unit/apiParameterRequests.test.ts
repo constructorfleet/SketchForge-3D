@@ -11,6 +11,7 @@ import {
   isApiParameterChangeRequest,
   isApiParameterCreateRequest,
 } from "@constructorfleet/sketchforge-engine/apiParameters";
+import { apiConfigurationName } from "@constructorfleet/sketchforge-engine/apiParameters";
 import { API_CONSTRAINT_ID_MAX_LENGTH, apiConstraintId, isApiSketchConstraintBindRequest } from "@constructorfleet/sketchforge-engine/apiSketchConstraints";
 
 /** The routes validate with the engine's checks; the published schema has to say the same thing. */
@@ -111,5 +112,16 @@ describe("parameter request checks", () => {
       expect(isApiConfigurationChangeRequest(body), `PATCH ${label}`).toBe(validateApiV1Schema(body, change));
       expect(isApiConfigurationActivateRequest(body), `activate ${label}`).toBe(validateApiV1Schema(body, activate));
     }
+  });
+
+  it("reads a configuration ?name= as the contract does: untrimmed, 1 to 100 characters", () => {
+    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === "PATCH /api/v1/parameter-configurations")!.query!.properties.name as { minLength: number; maxLength: number; trim?: boolean };
+    expect(rule.maxLength).toBe(API_CONFIGURATION_NAME_MAX_LENGTH);
+    expect(rule.trim).toBeUndefined();
+    expect(apiConfigurationName("big")).toBe("big");
+    expect(apiConfigurationName(" big ")).toBe(" big ");
+    expect(apiConfigurationName("")).toBeUndefined();
+    expect(apiConfigurationName("x".repeat(rule.maxLength))).toBe("x".repeat(rule.maxLength));
+    expect(apiConfigurationName("x".repeat(rule.maxLength + 1))).toBeUndefined();
   });
 });

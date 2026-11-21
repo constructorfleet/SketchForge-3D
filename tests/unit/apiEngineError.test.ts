@@ -81,3 +81,20 @@ describe("API sketch constraint binding failure mapping", () => {
     expect(await response.json()).toMatchObject({ reason: "parameterInUse", sketchConstraintDependents: [{ shapeId: "s1", constraintIds: ["width"] }] });
   });
 });
+
+describe("API configuration failure mapping", () => {
+  it("names the configuration, and no parameter, for a configuration-level refusal", async () => {
+    const response = apiEngineError({
+      reason: "parameter_invalid",
+      error: { code: "duplicateConfigurationName", parameter: "", configuration: "Large", message: 'Configuration "Large" already exists.' },
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'Configuration "Large" already exists.', code: "configuration_exists", reason: "duplicateConfigurationName", configuration: "Large" });
+
+    const override = apiEngineError({
+      reason: "parameter_invalid",
+      error: { code: "unknownParameter", parameter: "gone", configuration: "Large", message: 'There is no parameter "gone".' },
+    });
+    expect(await override.json()).toMatchObject({ code: "parameter_not_found", parameter: "gone", configuration: "Large" });
+  });
+});

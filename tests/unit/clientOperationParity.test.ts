@@ -477,6 +477,12 @@ describe("REST client operation parity", () => {
         sketchforge_delete_parameter: { projectId: PROJECT_ID, name: "wall" },
         sketchforge_set_shape_expression: { projectId: PROJECT_ID, shapeId: SHAPE_ID, field: "width", expression: "wall * 5" },
         sketchforge_bind_sketch_constraint: { projectId: PROJECT_ID, shapeId: SHAPE_ID, constraintId: "width", expression: "wall * 2" },
+        sketchforge_list_parameter_configurations: { projectId: PROJECT_ID },
+        sketchforge_create_parameter_configuration: { projectId: PROJECT_ID, name: "big", overrides: { wall: "3" } },
+        sketchforge_rename_parameter_configuration: { projectId: PROJECT_ID, name: "big", newName: "large" },
+        sketchforge_set_configuration_override: { projectId: PROJECT_ID, name: "big", parameter: "wall", expression: "4" },
+        sketchforge_delete_parameter_configuration: { projectId: PROJECT_ID, name: "big" },
+        sketchforge_activate_parameter_configuration: { projectId: PROJECT_ID, name: "big" },
       };
       // Setting an existing name tries the create, is refused, then changes it.
       const mcpResponses: Record<string, Record<string, { status: number; body: unknown }>> = {

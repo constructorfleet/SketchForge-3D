@@ -680,4 +680,79 @@ export const engineTools = [
       },
     },
   },
+  {
+    name: "sketchforge_list_parameter_configurations",
+    description: `List the project's parameter configurations: named sets of parameter expression overrides. The reply has configurations, activeConfiguration (null for the base table), the parameter table as the active configuration resolves it, and issues for overrides that no longer resolve. ${REFUSAL_FORMAT} ${WORKS_BOTH_WAYS}`,
+    inputSchema: { type: "object", required: ["projectId"], properties: { url: urlProperty, projectId: projectIdProperty } },
+  },
+  {
+    name: "sketchforge_create_parameter_configuration",
+    description: [
+      "Create a parameter configuration, optionally with overrides that map parameter names to expressions. Creating one does not activate it.",
+      "The reply has the configuration and the whole configuration state.",
+      REFUSAL_FORMAT,
+      "Codes: configuration_exists, invalid_request (a bad name or overrides body), invalid_expression (an override that does not resolve; detail names parameter and configuration), parameter_not_found (an override for a parameter that does not exist), limit_exceeded.",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        name: { type: "string", description: "The configuration name, 1 to 100 characters." },
+        overrides: { type: "object", additionalProperties: { type: "string" }, description: 'Parameter name to expression, for example { "wall": "3 mm" }.' },
+      },
+    },
+  },
+  {
+    name: "sketchforge_rename_parameter_configuration",
+    description: `Rename a parameter configuration; an active one stays active under its new name. ${REFUSAL_FORMAT} Codes: configuration_not_found, configuration_exists (newName is taken), invalid_request. ${WORKS_BOTH_WAYS}`,
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name", "newName"],
+      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The configuration name, 1 to 100 characters." }, newName: { type: "string", description: "The configuration name, 1 to 100 characters." } },
+    },
+  },
+  {
+    name: "sketchforge_set_configuration_override",
+    description: [
+      "Set one parameter's expression in a configuration, or pass expression null to remove that override so the base expression applies.",
+      "If the configuration is active, every shape bound to the changed value is rebuilt in the same write and returned in the reply's shapes.",
+      REFUSAL_FORMAT,
+      "Codes: configuration_not_found, parameter_not_found, invalid_expression (detail has expressionError), shape_locked (a bound shape the change would rebuild is locked), invalid_request.",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name", "parameter", "expression"],
+      properties: {
+        url: urlProperty,
+        projectId: projectIdProperty,
+        name: { type: "string", description: "The configuration name, 1 to 100 characters." },
+        parameter: { type: "string", description: "The parameter to override." },
+        expression: { type: ["string", "null"], description: 'For example "3 mm". null removes the override.' },
+      },
+    },
+  },
+  {
+    name: "sketchforge_delete_parameter_configuration",
+    description: `Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes, so it can be refused as an activation can. ${REFUSAL_FORMAT} Codes: configuration_not_found, invalid_request, and for the active one invalid_expression (a bound result out of range), shape_locked (a bound shape that would change is locked) and geometry_failed (a bound sketch cannot be solved). ${WORKS_BOTH_WAYS}`,
+    inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The configuration name, 1 to 100 characters." } } },
+  },
+  {
+    name: "sketchforge_activate_parameter_configuration",
+    description: [
+      "Activate a parameter configuration, or pass name null to return to the base table. Every bound shape is re-resolved and rebuilt in the same write, and the reply lists the rebuilt shapes.",
+      "A refused activation leaves the project, the active configuration and the geometry unchanged.",
+      REFUSAL_FORMAT,
+      "Codes: configuration_not_found, invalid_expression (an override, or a bound result such as an out-of-range size; detail names it), shape_locked (a bound shape that would change is locked), geometry_failed (a bound sketch cannot be solved), invalid_request.",
+      WORKS_BOTH_WAYS,
+    ].join(" "),
+    inputSchema: {
+      type: "object",
+      required: ["projectId", "name"],
+      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: ["string", "null"], description: "The configuration to activate, or null for the base table." } },
+    },
+  },
 ];

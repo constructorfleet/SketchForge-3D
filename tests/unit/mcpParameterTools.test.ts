@@ -397,3 +397,30 @@ describe("sketchforge_bind_sketch_constraint over Streamable HTTP /mcp", () => {
     expect(refusal(await mode.call("sketchforge_bind_sketch_constraint", { projectId, shapeId, constraintId: "h-ab", expression: "w" })).code).toBe("unapplicable_fields");
   }, 120_000);
 });
+
+describe("parameter configuration tools over Streamable HTTP /mcp", () => {
+  it("creates, activates and deletes a configuration, rebuilding the bound box", async () => {
+    const mode = hostedHttpMode();
+    const projectId = await mode.project();
+    json(await mode.call("sketchforge_set_parameter", { projectId, name: "wall", expression: "2", dimension: "length" }));
+    const boxId = await mode.box(projectId, { width: 10, depth: 10, height: 10, x: 0 });
+    json(await mode.call("sketchforge_set_shape_expression", { projectId, shapeId: boxId, field: "width", expression: "wall * 5" }));
+    json(await mode.call("sketchforge_set_shape_expression", { projectId, shapeId: boxId, field: "x", expression: "wall * 10" }));
+
+    const created = json(await mode.call("sketchforge_create_parameter_configuration", { projectId, name: "big", overrides: { wall: "3" } }));
+    expect(created).toMatchObject({ configuration: { name: "big", overrides: { wall: "3" } }, activeConfiguration: null });
+    const activated = json(await mode.call("sketchforge_activate_parameter_configuration", { projectId, name: "big" }));
+    expect(activated.activeConfiguration).toBe("big");
+    const big = await volumeAndCentre(mode, projectId, boxId);
+    expect(big.volume).toBeCloseTo(1500, 3);
+    expect(big.x).toBeCloseTo(30, 3);
+
+    expect(json(await mode.call("sketchforge_list_parameter_configurations", { projectId })).activeConfiguration).toBe("big");
+    expect(refusal(await mode.call("sketchforge_activate_parameter_configuration", { projectId, name: "missing" })).code).toBe("configuration_not_found");
+    json(await mode.call("sketchforge_activate_parameter_configuration", { projectId, name: null }));
+    const base = await volumeAndCentre(mode, projectId, boxId);
+    expect(base.volume).toBeCloseTo(1000, 3);
+    expect(base.x).toBeCloseTo(20, 3);
+    expect(json(await mode.call("sketchforge_delete_parameter_configuration", { projectId, name: "big" }))).toMatchObject({ deleted: true, name: "big" });
+  }, 120_000);
+});

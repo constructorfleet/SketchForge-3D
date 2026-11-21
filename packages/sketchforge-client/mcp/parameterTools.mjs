@@ -13,6 +13,12 @@ export const PARAMETER_TOOL_NAMES = new Set([
   "sketchforge_delete_parameter",
   "sketchforge_set_shape_expression",
   "sketchforge_bind_sketch_constraint",
+  "sketchforge_list_parameter_configurations",
+  "sketchforge_create_parameter_configuration",
+  "sketchforge_rename_parameter_configuration",
+  "sketchforge_set_configuration_override",
+  "sketchforge_delete_parameter_configuration",
+  "sketchforge_activate_parameter_configuration",
 ]);
 
 const CREATE_HINT = "Pass expression and dimension together to create it.";
@@ -44,6 +50,17 @@ function requireExpression(args) {
     throw new McpToolError("expression is required: an expression string, or null to clear the binding.", "invalid_request");
   }
   return args.expression;
+}
+
+/**
+ * Returns a configuration name bound for `?name=`. A query would stringify a
+ * number, so a non-string is refused here; a missing one is left to the request checks.
+ */
+function configurationQueryName(args) {
+  if (args.name !== undefined && args.name !== null && typeof args.name !== "string") {
+    throw new McpToolError("name must be a configuration name string.", "invalid_request");
+  }
+  return args.name;
 }
 
 /** Splits a set request into a create (both fields) or a change (either one). */
@@ -96,6 +113,22 @@ export async function callParameterTool(name, args, request) {
       const expression = requireExpression(args);
       return request("PATCH", "/sketch-constraints", { query: { projectId, shapeId: args.shapeId, constraintId: args.constraintId }, body: { expression } });
     }
+    // Configuration bodies go to the request checks unread, so both modes refuse them as REST does.
+    case "sketchforge_list_parameter_configurations":
+      return request("GET", "/parameter-configurations", { query: { projectId } });
+    case "sketchforge_create_parameter_configuration":
+      return request("POST", "/parameter-configurations", { query: { projectId }, body: { name: args.name, overrides: args.overrides } });
+    case "sketchforge_rename_parameter_configuration":
+      return request("PATCH", "/parameter-configurations", { query: { projectId, name: configurationQueryName(args) }, body: { name: args.newName } });
+    case "sketchforge_set_configuration_override":
+      return request("PATCH", "/parameter-configurations", {
+        query: { projectId, name: configurationQueryName(args) },
+        body: { parameter: args.parameter, expression: args.expression },
+      });
+    case "sketchforge_delete_parameter_configuration":
+      return request("DELETE", "/parameter-configurations", { query: { projectId, name: configurationQueryName(args) } });
+    case "sketchforge_activate_parameter_configuration":
+      return request("POST", "/parameter-configurations/activate", { query: { projectId }, body: { name: args.name } });
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -125,6 +158,11 @@ export function localParameterRequest(engine, api) {
     const shapeId = api.apiShapeId(queryText(query.shapeId));
     if (!shapeId) throw new McpToolError(api.API_ERROR_MESSAGES.shapeIdRequired, "invalid_shape_id");
     return shapeId;
+  };
+  const requireConfigurationName = (query) => {
+    const configuration = api.apiConfigurationName(queryText(query.name));
+    if (configuration === undefined) throw new McpToolError(api.API_CONFIGURATION_MESSAGES.nameRequired, "invalid_request");
+    return configuration;
   };
   const requireName = (query) => {
     const parameterName = api.apiParameterName(queryText(query.name));
@@ -178,6 +216,35 @@ export function localParameterRequest(engine, api) {
           (failure) => api.sketchConstraintApiError(failure),
         );
         return api.apiSketchConstraintBound(bound, constraintId);
+      }
+      case "GET /parameter-configurations":
+        return api.apiConfigurationList(await unwrap(await engine.project(requireProject(query))));
+      case "POST /parameter-configurations": {
+        const projectId = requireProject(query);
+        if (!api.isApiConfigurationCreateRequest(sent)) throw new McpToolError(api.API_CONFIGURATION_MESSAGES.create, "invalid_request");
+        return api.apiConfigurationsWritten(await unwrap(await engine.addConfiguration(projectId, sent.name, sent.overrides)), sent.name);
+      }
+      case "PATCH /parameter-configurations": {
+        const projectId = requireProject(query);
+        const configuration = requireConfigurationName(query);
+        if (!api.isApiConfigurationChangeRequest(sent)) throw new McpToolError(api.API_CONFIGURATION_MESSAGES.change, "invalid_request");
+        if ("name" in sent) {
+          return api.apiConfigurationsWritten(await unwrap(await engine.renameConfiguration(projectId, configuration, sent.name)), sent.name);
+        }
+        const changed = sent.expression === null
+          ? await engine.clearConfigurationOverride(projectId, configuration, sent.parameter)
+          : await engine.setConfigurationOverride(projectId, configuration, sent.parameter, sent.expression);
+        return api.apiConfigurationsWritten(await unwrap(changed), configuration);
+      }
+      case "DELETE /parameter-configurations": {
+        const projectId = requireProject(query);
+        const configuration = requireConfigurationName(query);
+        return { deleted: true, name: configuration, ...api.apiConfigurationsWritten(await unwrap(await engine.deleteConfiguration(projectId, configuration))) };
+      }
+      case "POST /parameter-configurations/activate": {
+        const projectId = requireProject(query);
+        if (!api.isApiConfigurationActivateRequest(sent)) throw new McpToolError(api.API_CONFIGURATION_MESSAGES.activate, "invalid_request");
+        return api.apiConfigurationsWritten(await unwrap(await engine.activateConfiguration(projectId, sent.name)));
       }
       default:
         throw new Error(`No local route for ${method} ${route}.`);
