@@ -163,9 +163,9 @@ A project can hold a table of named parameters, and any numeric shape field in t
 | `PATCH /parameters?projectId=&name=` | `{ expression?, dimension? }`, or `{ name }` alone to rename | `200 { parameter, parameters, shapes, revision }` |
 | `DELETE /parameters?projectId=&name=` | none | `200 { deleted: true, name, parameters, shapes, revision }` |
 
-The MCP server offers the same operations as tools; see [Drive a shape from parameters](mcp/EXAMPLES.md#drive-a-shape-from-parameters).
+The MCP server offers these operations, sketch-constraint binding and configurations as tools, with the same replies and refusals; see [Drive a shape from parameters](mcp/EXAMPLES.md#drive-a-shape-from-parameters) and [Configurations](mcp/EXAMPLES.md#configurations).
 
-`dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message }`. `expression` is always the base expression, and `value` is resolved under `activeConfiguration`, which is `null` for the base table (see [Parameter configurations](#parameter-configurations)). A change that breaks a configuration's table, active or not, is refused with `configuration` naming it.
+`dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error` as `{ code, message, expressionError? }`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message, expressionError? }`. `expression` is always the base expression, and `value` is resolved under `activeConfiguration`, which is `null` for the base table (see [Parameter configurations](#parameter-configurations)). A change that breaks a configuration's table, active or not, is refused with `configuration` naming it.
 
 `shapes` holds the top-level shapes the write rebuilt or rewrote, in the same form `GET /shapes` now returns them. A rename rewrites every expression and binding that uses the old name. A delete is refused with `409 parameter_in_use` while anything uses the parameter. All three writes honour `If-Match`. A change that does not evaluate (a parse error, a cycle, a wrong dimension, or a bound field it would break) answers `422 invalid_expression` and writes nothing. A change that would rebuild a locked shape answers `409 shape_locked`, also with nothing written:
 
@@ -193,7 +193,7 @@ A configuration is a named row of parameter overrides, such as `Small` and `Larg
 | `DELETE /parameter-configurations?projectId=&name=` | none | `200 { deleted: true, name, configurations, activeConfiguration, parameters, issues, shapes, revision }` |
 | `POST /parameter-configurations/activate?projectId=` | `{ name }`, or `{ name: null }` for the base table | `200 { configurations, activeConfiguration, parameters, issues, shapes, revision }` |
 
-A configuration reads as `{ name, overrides }`, where `overrides` maps parameter names to expressions. A name has 1 to 100 characters, with no control characters and no surrounding whitespace. A name can contain spaces and other reserved characters, so percent-encode it in the `name` query value, for example `?projectId=p&name=Extra%20Large`. `parameters` is the table with base expressions and values under the active configuration, as `GET /parameters` returns it. `issues` lists the stored overrides that no longer resolve, as `{ configuration, parameter, code, message }`: an override of a deleted parameter, or one that fails where its base entry resolves.
+A configuration reads as `{ name, overrides }`, where `overrides` maps parameter names to expressions. A name has 1 to 100 characters, with no control characters and no surrounding whitespace. A name can contain spaces and other reserved characters, so percent-encode it in the `name` query value, for example `?projectId=p&name=Extra%20Large`. `parameters` is the table with base expressions and values under the active configuration, as `GET /parameters` returns it. `issues` lists the stored overrides that no longer resolve, as `{ configuration, parameter, code, message, expressionError? }`: an override of a deleted parameter, or one that fails where its base entry resolves.
 
 Each write is one undo step and honours `If-Match`. A write that changes the active table rebuilds every bound shape in the same write: activating, deleting the active configuration, or changing an override in it. `shapes` lists those rebuilt shapes, and it is empty for every other write. A write that changes nothing, such as activating the active configuration or clearing an override that is not set, writes nothing and keeps the revision. Renaming the active configuration keeps it active. Creating a configuration does not activate it.
 
@@ -279,7 +279,7 @@ Refusals name the `shapeId` and `constraintId` and carry the engine's `reason`:
 
 The refusals in the table above apply here too, and a locked output answers `409 shape_locked` before the profile is checked or solved. A `PATCH` that binds a constraint and sends `expressions: { width: null }` clears the conflicting size binding in the same write. A `PATCH` that binds a constraint and also sends a new literal `width`, `depth` or `height` for that sketch is refused with `400 invalid_request` naming `shapeId`, `field` and `constraintId`, because the resize would unbind it again; the current size sent back is an echo and is accepted. With a `sketchProfile`, an echoed `width`, `depth` or `height` is not applied as a resize, so a whole summary sent back with an edited profile gives the size the new profile builds; an echoed `x`, `z` or `elevation` still applies, so the shape stays centred where it was read.
 
-`GET /parameters` lists constraint bindings that no longer resolve, or that conflict with a bound size field, in `constraintBindingIssues` as `{ shapeId, constraintId, code, message }`.
+`GET /parameters` lists constraint bindings that no longer resolve, or that conflict with a bound size field, in `constraintBindingIssues` as `{ shapeId, constraintId, code, message, expressionError? }`; a conflict also lists the bound size `fields`.
 
 ## Errors
 
@@ -302,7 +302,7 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `parameter_exists` | 409 | A parameter with that name is already in the table. |
 | `configuration_not_found` | 404 | No parameter configuration has that name. |
 | `configuration_exists` | 409 | A parameter configuration with that name already exists. |
-| `parameter_in_use` | 409 | A delete was refused because something still uses the parameter. `dependents` lists parameters, `shapeDependents` lists `{ shapeId, fields }`, and `configurationDependents` lists parameter configurations whose overrides use it. |
+| `parameter_in_use` | 409 | A delete was refused because something still uses the parameter. `dependents` lists parameters, `shapeDependents` lists `{ shapeId, fields }`, `sketchConstraintDependents` lists `{ shapeId, constraintIds }`, and `configurationDependents` lists parameter configurations whose overrides use it. |
 | `invalid_expression` | 422 | A parameter or bound field does not evaluate. `expressionError` has the evaluator's `code`, `message`, `span` and, for a cycle, `cycle`. |
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
 | `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |
@@ -311,6 +311,7 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `too_many_shapes` | 413 (legacy) | Compatibility code used by older servers for more than 200 shapes in one `POST`; current servers return `limit_exceeded`. |
 | `geometry_failed` | 422 | The sweep, the boolean, or an imported model could not be built. |
 | `cad_failed` | 4xx / 500 | OCCT refused, or fell over. |
+| `internal_error` | 500 | An unexpected server fault, or a reply that failed its own response schema. |
 
 A server from before codes sends only `error`, so a client should keep whatever prose match it had as a fallback. Both bundled client libraries do exactly that.
 
