@@ -630,6 +630,7 @@ export async function recompute(
           name: shape.name,
           color: shape.color,
           locked: shape.locked,
+          ...(shape.expressions ? { expressions: shape.expressions } : {}),
           x: center.x,
           z: center.z,
           elevation: center.y - height / 2,

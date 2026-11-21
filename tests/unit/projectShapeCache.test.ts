@@ -61,4 +61,19 @@ describe("browser project shape cache", () => {
   it("defaults to an empty table", () => {
     expect(projectShapeCacheEntry(1, []).parameters).toEqual([]);
   });
+
+  it("keeps undo history whose entries carry the table, through an autosave package", async () => {
+    const older = { ...parameters[0]!, expression: "1", value: 1 };
+    const history = [
+      editorHistoryEntry([{ ...box, width: 4 }], [], [older, { ...parameters[1]!, value: 4 }]),
+      editorHistoryEntry([box], [], parameters),
+    ];
+
+    const entry = projectShapeCacheEntry(3, [box], history, 1, [], parameters);
+    const restored = await importSkfProject(await projectSkfPackage("project-1", entry, context));
+
+    expect(entry.history).toHaveLength(2);
+    expect(restored.history).toHaveLength(2);
+    expect(restored.history[0]!.parameters?.[0]).toEqual(older);
+  });
 });

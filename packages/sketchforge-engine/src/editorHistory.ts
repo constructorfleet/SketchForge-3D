@@ -1,4 +1,4 @@
-import type { WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectParameter, WorkplaneShape } from "./domain/sketchforge.js";
 import { canonicalizeShape } from "./workplaneShapes.js";
 
 export const MAX_EDITOR_HISTORY_ENTRIES = 5000;
@@ -7,6 +7,11 @@ export type EditorHistoryExportLimit = "unlimited" | number;
 export type EditorHistoryEntry = {
   shapes: WorkplaneShape[];
   selectedIds: string[];
+  /**
+   * Restores the table with the shapes on undo. Absent means unknown: the entry predates
+   * tables in history, matches by shapes alone, and restoring it keeps the current table.
+   */
+  parameters?: ProjectParameter[];
   fingerprint: string;
   estimatedBytes: number;
 };
@@ -258,14 +263,43 @@ export function projectShapesFingerprint(shapes: WorkplaneShape[]) {
   return serializedSceneSignature(shapes).fingerprint;
 }
 
-export function editorHistoryEntry(shapes: WorkplaneShape[], selectedIds: string[]): EditorHistoryEntry {
+function parameterTableSignature(parameters: readonly ProjectParameter[]) {
+  return signatureFromSerialized(JSON.stringify(parameters.map(({ name, expression, dimension, value }) => [name, expression, dimension, value])));
+}
+
+/**
+ * Fingerprints shapes and table together. An empty or unknown table keeps the shapes-only fingerprint.
+ * Omitting `parameters` records an unknown table.
+ */
+export function editorHistoryEntry(
+  shapes: WorkplaneShape[],
+  selectedIds: string[],
+  parameters?: readonly ProjectParameter[],
+): EditorHistoryEntry {
   const canonicalShapes = shapes.map(canonicalizeShape);
   const validSelection = selectedIds.filter((id, index) => selectedIds.indexOf(id) === index && canonicalShapes.some((shape) => shape.id === id));
+  const scene = serializedSceneSignature(canonicalShapes);
+  if (!parameters) return { shapes: canonicalShapes, selectedIds: validSelection, ...scene };
+  if (!parameters.length) return { shapes: canonicalShapes, selectedIds: validSelection, parameters: [], ...scene };
+  const table = parameterTableSignature(parameters);
   return {
     shapes: canonicalShapes,
     selectedIds: validSelection,
-    ...serializedSceneSignature(canonicalShapes),
+    parameters: parameters.map((parameter) => ({ ...parameter })),
+    fingerprint: `${scene.fingerprint}|p${table.fingerprint}`,
+    estimatedBytes: scene.estimatedBytes + table.estimatedBytes,
   };
+}
+
+function entryParameters(entry: EditorHistoryEntry | undefined) {
+  return Array.isArray(entry?.parameters) ? entry.parameters : undefined;
+}
+
+/** Compares an entry with the current scene, by shapes alone when its table is unknown. */
+function entryMatches(entry: EditorHistoryEntry, shapes: WorkplaneShape[], parameters: readonly ProjectParameter[]) {
+  const table = entryParameters(entry);
+  if (!table) return entry.fingerprint === projectShapesFingerprint(shapes);
+  return entry.fingerprint === editorHistoryEntry(shapes, [], parameters).fingerprint;
 }
 
 export function boundedEditorHistory(entries: EditorHistoryEntry[], limit: EditorHistoryExportLimit = "unlimited") {
@@ -312,6 +346,10 @@ export function appendEditorHistorySnapshot(
   return { entries: nextEntries, index: nextEntries.length - 1, changed: true };
 }
 
+function sameParameters(left: readonly ProjectParameter[], right: readonly ProjectParameter[]) {
+  return left === right || parameterTableSignature(left).fingerprint === parameterTableSignature(right).fingerprint;
+}
+
 // `hydrateEditorHistoryState` re-derives every stored entry, which is right for
 // entries parsed out of a file and pure waste for the live editor state an
 // autosave is writing out: those entries were built by `editorHistoryEntry`
@@ -325,9 +363,10 @@ export function liveEditorHistoryState(
   storedEntries: EditorHistoryEntry[] | undefined,
   requestedIndex: number | undefined,
   limit: EditorHistoryExportLimit = "unlimited",
+  currentParameters: readonly ProjectParameter[] = [],
 ): EditorHistoryState {
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
-    return { entries: [editorHistoryEntry(currentShapes, [])], index: 0 };
+    return { entries: [editorHistoryEntry(currentShapes, [], currentParameters)], index: 0 };
   }
   const index = Number.isInteger(requestedIndex)
     ? Math.min(Math.max(0, requestedIndex as number), storedEntries.length - 1)
@@ -336,10 +375,13 @@ export function liveEditorHistoryState(
   // The reference check is the cheap path and the fingerprint the correct one:
   // a caller that hands over the active entry's own shapes array pays nothing,
   // and anything else is compared by content, exactly as hydration would.
+  const current = () => editorHistoryEntry(currentShapes, [], currentParameters);
+  const activeTable = entryParameters(active);
   const agrees = Array.isArray(active?.shapes)
-    && (active.shapes === currentShapes || active.fingerprint === editorHistoryEntry(currentShapes, []).fingerprint);
+    && (active.shapes === currentShapes && (!activeTable || sameParameters(activeTable, currentParameters))
+      || entryMatches(active, currentShapes, currentParameters));
   if (!agrees) {
-    return { entries: [editorHistoryEntry(currentShapes, [])], index: 0 };
+    return { entries: [current()], index: 0 };
   }
   return boundedEditorHistoryState(storedEntries, index, limit);
 }
@@ -349,8 +391,9 @@ export function hydrateEditorHistoryState(
   storedEntries: EditorHistoryEntry[] | undefined,
   requestedIndex: number | undefined,
   limit: EditorHistoryExportLimit = "unlimited",
+  currentParameters: readonly ProjectParameter[] = [],
 ): EditorHistoryState {
-  const fallback = editorHistoryEntry(currentShapes, []);
+  const fallback = editorHistoryEntry(currentShapes, [], currentParameters);
   if (!Array.isArray(storedEntries) || storedEntries.length === 0) {
     return { entries: [fallback], index: 0 };
   }
@@ -360,12 +403,13 @@ export function hydrateEditorHistoryState(
       editorHistoryEntry(
         Array.isArray(entry?.shapes) ? entry.shapes : [],
         Array.isArray(entry?.selectedIds) ? entry.selectedIds.filter((id): id is string => typeof id === "string") : [],
+        entryParameters(entry),
       ),
     );
     const index = Number.isInteger(requestedIndex)
       ? Math.min(Math.max(0, requestedIndex as number), normalized.length - 1)
       : normalized.length - 1;
-    if (normalized[index]?.fingerprint !== fallback.fingerprint) {
+    if (!normalized[index] || !entryMatches(normalized[index], currentShapes, currentParameters)) {
       return { entries: [fallback], index: 0 };
     }
 

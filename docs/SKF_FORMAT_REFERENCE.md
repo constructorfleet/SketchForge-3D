@@ -77,6 +77,19 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 | `cadBrepAssetId?` | `string` |
 | `cadDisplayEdgesAssetId?` | `string` |
 
+### `SkfStateV1`
+
+| Field | Serialized type |
+| --- | --- |
+| `id` | `string` |
+| `rootNodeIds` | `string[]` |
+| `nodes` | `SkfShapeNodeV1[]` |
+| `parameters?` | `SkfParameterV3[]` |
+
+A state's `parameters` (V3 only) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level `parameters`.
+
+A shape definition may carry `expressions`, a record from a bindable field name to a parameter expression. The field itself keeps the resolved number, so a reader that ignores `expressions` still gets the right geometry. Readers refuse a record that is not an object of non-empty strings, and keep a binding that no longer resolves together with its stored number.
+
 ### `SkfFeatureV1`
 
 | Field | Serialized type |
@@ -101,7 +114,7 @@ A packaged file is a ZIP with a root `project.json` and binary or JSON payloads 
 
 ## Reader compatibility
 
-- V3 is written only when the project parameter table is not empty, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
+- V3 is written only when the project parameter table is not empty, or an undo state keeps a table, with minimum reader version 3. Readers before V3 reject such a file rather than drop its parameters.
 - V2 is written for every other project and requires a reader at least version 2. Writers never put a `parameters` field in it. Readers accept `parameters` in any version, and a file without one loads with an empty table.
 - V1 packaged projects are accepted and migrate inline display edges into shared assets on import; the next save writes V2.
 - V0 legacy JSON projects are accepted by the explicit migration path, which preserves valid object IDs and history.

@@ -31,7 +31,7 @@ export function projectShapeCacheEntry(
   assets: ProjectAsset[] = [],
   parameters: ProjectParameter[] = [],
 ): ProjectShapeCacheEntry {
-  const hydrated = hydrateEditorHistoryState(shapes, history, historyIndex);
+  const hydrated = hydrateEditorHistoryState(shapes, history, historyIndex, "unlimited", parameters);
   return {
     revision,
     shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,

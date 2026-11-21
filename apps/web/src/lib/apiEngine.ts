@@ -163,6 +163,11 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
       );
     case "import_failed":
       return apiError(`${failure.fileName}: ${failure.message}`, 422, "geometry_failed");
+    case "parameter_invalid":
+    case "binding_invalid":
+      return apiError(failure.error.message, 422, "invalid_request");
+    case "binding_failed":
+      return apiEngineError(failure.failure, wording);
     default:
       return apiError(
         wording.refusal?.[failure.reason] ?? DEFAULT_REFUSALS[failure.reason],

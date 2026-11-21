@@ -16,7 +16,8 @@ import {
   type ExpressionError,
   type ExpressionResult,
 } from "./parameterExpressions.js";
-import type { ProjectParameter, ProjectParameterDimension } from "./domain/sketchforge.js";
+import { parameterShapeDependents, renameShapeBindingReferences, type ShapeBindingDependent } from "./expressionBindings.js";
+import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
 
 /** Bounds table size. `SKF_LIMITS.parameters` must match. */
 export const PROJECT_PARAMETER_LIMIT = 2_000;
@@ -46,6 +47,8 @@ export type ProjectParameterError = {
   readonly expressionError?: ExpressionError;
   /** Set for `parameterInUse`: parameters whose expressions reference it directly. */
   readonly dependents?: readonly string[];
+  /** Set for `parameterInUse`: shapes whose bindings reference it directly. */
+  readonly shapeDependents?: readonly ShapeBindingDependent[];
 };
 
 export type ProjectParameterResult<T> =
@@ -150,6 +153,19 @@ export function parameterDependents(parameters: readonly ProjectParameter[], nam
     .map((parameter) => parameter.name);
 }
 
+function shapesOf(project: ProjectParameterHolder): WorkplaneShape[] | undefined {
+  const shapes = (project as { shapes?: unknown }).shapes;
+  return Array.isArray(shapes) ? shapes as WorkplaneShape[] : undefined;
+}
+
+/** Lists parameters and shapes that reference `name` directly. Shapes are read from `project.shapes` when present. */
+export function projectParameterDependents(
+  project: ProjectParameterHolder,
+  name: string,
+): { parameters: string[]; shapes: ShapeBindingDependent[] } {
+  return { parameters: parameterDependents(tableOf(project), name), shapes: parameterShapeDependents(shapesOf(project) ?? [], name) };
+}
+
 /** Appends a parameter. */
 export function addParameter<T extends ProjectParameterHolder>(project: T, input: ProjectParameterInput): ProjectParameterResult<T> {
   const parameters = tableOf(project);
@@ -195,19 +211,23 @@ export function renameParameter<T extends ProjectParameterHolder>(project: T, ol
     name: parameter.name === oldName ? newName : parameter.name,
     expression: renameExpressionReference(parameter.expression, oldName, newName),
   }));
-  return applyChange(project, next, index, (current) => current);
+  const renamed = applyChange(project, next, index, (current) => current);
+  const shapes = shapesOf(project);
+  if (!renamed.ok || !shapes) return renamed;
+  return { ok: true, project: { ...renamed.project, shapes: renameShapeBindingReferences(shapes, oldName, newName) } };
 }
 
-/** Deletes an unreferenced parameter. Refuses with `parameterInUse` and its dependents otherwise. */
+/** Deletes an unreferenced parameter. Refuses with `parameterInUse` and its parameter and shape dependents otherwise. */
 export function deleteParameter<T extends ProjectParameterHolder>(project: T, name: string): ProjectParameterResult<T> {
   const parameters = tableOf(project);
   const index = indexOfParameter(parameters, name);
   if (index < 0) return unknown(name);
   const malformed = structuralError(parameters);
   if (malformed) return { ok: false, error: malformed };
-  const dependents = parameterDependents(parameters, name);
-  if (dependents.length) {
-    return failure("parameterInUse", name, `Parameter "${name}" is used by ${dependents.join(", ")}.`, { dependents });
+  const { parameters: dependents, shapes: shapeDependents } = projectParameterDependents(project, name);
+  if (dependents.length || shapeDependents.length) {
+    const users = [...dependents, ...shapeDependents.map((entry) => `shape ${entry.shapeId}`)];
+    return failure("parameterInUse", name, `Parameter "${name}" is used by ${users.join(", ")}.`, { dependents, shapeDependents });
   }
   return applyChange(project, parameters.filter((_, current) => current !== index), -1, (current) => (current < index ? current : current + 1));
 }

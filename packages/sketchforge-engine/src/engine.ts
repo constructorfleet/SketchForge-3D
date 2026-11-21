@@ -116,7 +116,27 @@ import {
   withHoleMode,
 } from "./workplaneShapes.js";
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
-import type { EdgeTreatmentFeature, ProjectAsset, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
+import type { EdgeTreatmentFeature, ProjectAsset, ProjectParameter, SketchFaceDraft, WorkplaneShape } from "./domain/sketchforge.js";
+import {
+  bindableField,
+  boundFieldsNamedBy,
+  boundFieldValue,
+  resolveShapeBinding,
+  resolveShapeBindings,
+  withoutBindings,
+  withoutShapeBindings,
+  type ShapeBindingError,
+} from "./expressionBindings.js";
+import { expressionDependencies } from "./parameterExpressions.js";
+import {
+  addParameter as addTableParameter,
+  deleteParameter as deleteTableParameter,
+  renameParameter as renameTableParameter,
+  updateParameter as updateTableParameter,
+  type ProjectParameterError,
+  type ProjectParameterInput,
+  type ProjectParameterResult,
+} from "./projectParameters.js";
 
 const FACE_DRAFT_AXES = new Set(["x", "y", "z", "-x", "-y", "-z"]);
 
@@ -249,7 +269,14 @@ export type EngineFailure =
   /** Nothing here can read that file. */
   | { reason: "import_unsupported"; fileName: string; formats: string[] }
   /** The file was read and could not be understood. */
-  | { reason: "import_failed"; fileName: string; message: string };
+  | { reason: "import_failed"; fileName: string; message: string }
+  // --- parameters and bindings -----------------------------------------------
+  /** The table change does not resolve; nothing was written. */
+  | { reason: "parameter_invalid"; error: ProjectParameterError }
+  /** A binding does not resolve or names a field the shape cannot bind; nothing was written. */
+  | { reason: "binding_invalid"; error: ShapeBindingError }
+  /** A resolved value could not be applied to `shapeId`; `failure` is the change's own refusal. */
+  | { reason: "binding_failed"; shapeId: string; fields: string[]; failure: EngineFailure };
 
 export type EngineResult<T> = { ok: true; value: T } | { ok: false; failure: EngineFailure };
 
@@ -257,6 +284,11 @@ export type EngineResult<T> = { ok: true; value: T } | { ok: false; failure: Eng
 export type ShapeWritten = { shape: WorkplaneShape; revision: number };
 /** Several shapes written, with the revision the write landed on. */
 export type ShapesWritten = { shapes: WorkplaneShape[]; revision: number };
+
+/** The table after a parameter operation, the top-level shapes it changed, and the revision. */
+export type ParametersWritten = { parameters: ProjectParameter[]; shapes: WorkplaneShape[]; revision: number };
+
+type ShapeChanged = { shape: WorkplaneShape; shapes: WorkplaneShape[] };
 
 /** One shape removed, with the revision the write landed on. */
 export type ShapeRemoved = { id: string; revision: number };
@@ -406,6 +438,26 @@ export type Engine = {
   ): Promise<EngineResult<ServerCadMeasurementPair>>;
   /** Exact, bounded gaps and overlap volumes between visible non-cutter shapes. */
   interference(projectId: string, request?: InterferenceRequest): Promise<EngineResult<InterferenceReport>>;
+  /** Appends a parameter. Re-resolves bindings that referenced the name. */
+  addParameter(projectId: string, input: ProjectParameterInput): Promise<EngineResult<ParametersWritten>>;
+  /**
+   * Changes a parameter and re-resolves every bound field that depends on it,
+   * replaying retained features as a manual edit does. One write, one undo step.
+   */
+  updateParameter(
+    projectId: string,
+    name: string,
+    changes: Partial<Pick<ProjectParameter, "expression" | "dimension">>,
+  ): Promise<EngineResult<ParametersWritten>>;
+  /** Renames a parameter and every table and shape reference to it. */
+  renameParameter(projectId: string, oldName: string, newName: string): Promise<EngineResult<ParametersWritten>>;
+  /** Deletes a parameter that nothing references. */
+  deleteParameter(projectId: string, name: string): Promise<EngineResult<ParametersWritten>>;
+  /**
+   * Binds `field` on a shape anywhere in the tree to `expression` and applies its value,
+   * or removes the binding when `expression` is null. See `EXPRESSION_BINDABLE_FIELDS`.
+   */
+  bindShapeField(projectId: string, shapeId: string, field: string, expression: string | null): Promise<EngineResult<ShapeWritten>>;
 };
 
 function ok<T>(value: T): EngineResult<T> {
@@ -557,6 +609,51 @@ async function builtShape(request: ShapeRequest, index: number): Promise<EngineR
     : failed({ reason: "unsupported_kind", index, kinds: [...REQUESTABLE_SHAPE_KINDS, "revolve", "thread"] });
 }
 
+function replaceShapeInTree(roots: readonly WorkplaneShape[], replacement: WorkplaneShape): WorkplaneShape[] {
+  const visit = (shape: WorkplaneShape): WorkplaneShape => {
+    if (shape.id === replacement.id) return replacement;
+    if (!shape.groupedShapes?.length) return shape;
+    const children = shape.groupedShapes.map(visit);
+    return children.some((child, index) => child !== shape.groupedShapes![index]) ? { ...shape, groupedShapes: children } : shape;
+  };
+  return roots.map(visit);
+}
+
+/** Finds a shape anywhere in the tree. `locked` names the shape or nearest locked ancestor. */
+function findShapeInTree(
+  roots: readonly WorkplaneShape[],
+  id: string,
+): { shape: WorkplaneShape; topLevel: boolean; locked?: string } | undefined {
+  const pending: Array<{ shape: WorkplaneShape; topLevel: boolean; locked?: string }> = roots.map((shape) => ({ shape, topLevel: true }));
+  while (pending.length) {
+    const next = pending.shift()!;
+    const locked = next.shape.locked ? next.shape.id : next.locked;
+    if (next.shape.id === id) return { ...next, ...(locked ? { locked } : {}) };
+    next.shape.groupedShapes?.forEach((child) => pending.push({ shape: child, topLevel: false, ...(locked ? { locked } : {}) }));
+  }
+  return undefined;
+}
+
+function changedParameterNames(previous: readonly ProjectParameter[], next: readonly ProjectParameter[]) {
+  const before = new Map(previous.map((parameter) => [parameter.name, parameter]));
+  const after = new Map(next.map((parameter) => [parameter.name, parameter]));
+  const changed = new Set<string>();
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    const left = before.get(name);
+    const right = after.get(name);
+    // Object.is: an unresolved entry keeps NaN, which must not count as a change.
+    if (!left || !right || !Object.is(left.value, right.value) || left.dimension !== right.dimension) changed.add(name);
+  }
+  return changed;
+}
+
+/** Separated and exploded parts are new bodies; no binding on the source describes them. */
+function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
+  return withoutBindings(shape, Object.keys(shape.expressions ?? {}));
+}
+
+const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
+
 export function createEngine(store: ProjectStore): Engine {
   /** Read the project under its lock, run `work`, and report a busy project as a failure. */
   async function mutating<T>(
@@ -619,9 +716,10 @@ export function createEngine(store: ProjectStore): Engine {
       const locked = lockedIds(resolved.value);
       if (locked) return failed({ reason: "shape_locked", ids: locked });
 
-      const operands = holes
+      // Grouping rewrites operand placement into the group frame, a literal change.
+      const operands = (holes
         ? resolved.value.map((shape) => withHoleMode(shape, holes.has(shape.id)))
-        : resolved.value;
+        : resolved.value).map(withoutShapeBindings);
       const outcome = await buildGroupFromSelection(operands);
       if ("error" in outcome) {
         return failed({ reason: "geometry_failed", message: outcome.error, status: outcome.status });
@@ -682,7 +780,9 @@ export function createEngine(store: ProjectStore): Engine {
 
       let changed: WorkplaneShape;
       try {
-        changed = await run(found.value);
+        changed = withoutBindings(await run(found.value), operation === "prism-draft"
+          ? ["draftPrismAngle"]
+          : ["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
       } catch (error) {
         return failed(cadFailure(error));
       }
@@ -725,7 +825,7 @@ export function createEngine(store: ProjectStore): Engine {
       const deltaById = new Map(shifts.map((shift) => [shift.id, shift.delta]));
       const shapes = document.shapes.map((shape) => {
         const delta = deltaById.get(shape.id);
-        return delta === undefined ? shape : shapeMovedAlong(shape, axis, delta);
+        return delta === undefined ? shape : withoutBindings(shapeMovedAlong(shape, axis, delta), [axis === "y" ? "elevation" : axis]);
       });
       const selected = new Set(ids);
       return ok({
@@ -733,6 +833,851 @@ export function createEngine(store: ProjectStore): Engine {
         moved: shifts.length,
         revision: await writeShapes(projectId, document, shapes),
       });
+    });
+  }
+
+  /** Applies one shape change to `document` without writing. `changeShape` and parameter recompute share it. */
+  async function changeShapeIn(
+    document: ProjectDocument,
+    shapeId: string,
+    changes: ShapeRequest,
+  ): Promise<EngineResult<ShapeChanged>> {
+    const byOutputId = oneShape(document, shapeId);
+    // A persisted sketch source is an input node, not a renderable shape.
+    // When a caller edits that node's profile or revolve settings, resolve
+    // its dependent output and rebuild it before the single project write. The
+    // output keeps its own stable object ID; SKF export derives the source
+    // node from the synchronized profile on that output.
+    const sourceFeatureInputChanged = changes.sketchProfile !== undefined
+      || changes.draftPrismAngle !== undefined
+      || Object.hasOwn(changes, "faceDraft")
+      || REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined);
+    const sourceOutputs = !byOutputId.ok && sourceFeatureInputChanged
+      ? findSketchOutput(document.shapes, shapeId)
+      : [];
+    const sourceSketchTarget = !byOutputId.ok && sourceOutputs.length === 1;
+    const found = byOutputId.ok
+      ? byOutputId
+      : sourceSketchTarget
+        ? ok(sourceOutputs[0]!)
+        : byOutputId;
+    if (!found.ok) return found;
+    const existing = found.value;
+    if (sourceSketchTarget) {
+      const isRevolveSource = isRevolveShape(existing);
+      const outputFields = Object.keys(changes).filter((field) =>
+        field !== "sketchProfile" && field !== "draftPrismAngle" && field !== "faceDraft"
+        && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
+      );
+      if (outputFields.length > 0) {
+        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
+      }
+    }
+    // A locked shape refuses every change but the one that unlocks it, which
+    // may arrive in the same request as the rest: `locked: false` alongside a
+    // new width is one call rather than two.
+    if (existing.locked && changes.locked !== false) return failed({ reason: "shape_locked", ids: [shapeId] });
+
+    const replacingSketchProfile = changes.sketchProfile !== undefined;
+    const faceDraftChanged = Object.hasOwn(changes, "faceDraft");
+    const clearingFaceDraft = faceDraftChanged && changes.faceDraft === null && existing.faceDraft !== undefined;
+    const requestedFaceDraft = faceDraftChanged
+      ? changes.faceDraft === null ? undefined : faceDraftInput(changes.faceDraft)
+      : existing.faceDraft;
+    const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
+    const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
+    const isSketchRevolve = isRevolveShape(existing);
+    const rebuildsFromSource = replacingSketchProfile || faceDraftChanged || changes.draftPrismAngle !== undefined
+      || (isSketchRevolve && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined));
+    if (existing.shell && rebuildsFromSource) {
+      return failed({
+        reason: "sweep_failed",
+        message: "This shape was shelled, and a rebuild from its source cannot replay a shell, so the edit would lose it",
+      });
+    }
+    if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
+      return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
+    }
+    const isExactSketchRevolve = isPlainFullTurnSketchRevolve(existing);
+    if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft))
+      && !isSketchExtrusion && !isSketchSweep && !isExactSketchRevolve) {
+      return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
+    }
+    const hasExistingTreatment = (existing.edgeTreatments?.length ?? 0) > 0
+      || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+    const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
+      && existing.draftPrismAngle === undefined
+      && (!faceDraftChanged || requestedFaceDraft !== undefined && requestedFaceDraft !== null
+        && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId)
+      && (isPlainFullTurnSketchRevolve(existing)
+        || isSingleLoopSketchExtrusion(existing)
+          && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
+        || isSingleSectionSketchSweep(existing)
+          && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer"))
+      && existing.edgeTreatments?.length === 1
+      && (existing.edgeTreatments[0]?.kind === "chamfer" || existing.edgeTreatments[0]?.kind === "fillet")
+      && existing.edgeTreatments[0]?.allEdges === true
+      && existing.edgeTreatmentHistory?.length === 1
+      && existing.edgeTreatmentHistory[0]?.feature.kind === existing.edgeTreatments[0]?.kind
+      && existing.edgeTreatmentHistory[0]?.feature.allEdges === true
+      && (existing.edgeTreatments[0]?.kind !== "chamfer"
+        || Math.abs((existing.edgeTreatments[0].chamferAngle ?? 45) - 45) < 0.001
+        && Math.abs((existing.edgeTreatmentHistory[0]?.feature.chamferAngle ?? 45) - 45) < 0.001);
+    if (requestedFaceDraft
+      && (existing.draftPrismAngle !== undefined || hasExistingTreatment && !canReplayFaceDraftTreatment)) {
+      return failed({ reason: "invalid_shape_request", message: "This face draft cannot be combined with the requested persisted draft or treatment history." });
+    }
+    const canReselectUntreatedExtrusionFace = isSingleLoopSketchExtrusion(existing)
+      && existing.draftPrismAngle === undefined
+      && !hasExistingTreatment;
+    if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
+      && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId
+      && replacingSketchProfile) {
+      return failed({ reason: "invalid_shape_request", message: "Change the sketch profile and face draft selection in separate edits." });
+    }
+    if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
+      && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
+      let currentOutputFaces: ServerCadFace[];
+      try {
+        currentOutputFaces = await shapeFaces(existing);
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+      if (!canReselectUntreatedExtrusionFace
+        || !existing.faceDraftSourceFaceIds?.includes(requestedFaceDraft.sourceFaceId)
+        || currentOutputFaces.filter((face) => face.id === requestedFaceDraft.sourceFaceId && face.surfaceType === "plane").length !== 1) {
+        return failed({ reason: "invalid_shape_request", message: "Clear the existing face draft before selecting a different source face." });
+      }
+    }
+    const draftPrismChanged = changes.draftPrismAngle !== undefined;
+    const requestedDraftPrismAngle = typeof changes.draftPrismAngle === "number" ? changes.draftPrismAngle : undefined;
+    if (draftPrismChanged && (!isSketchExtrusion || requestedDraftPrismAngle === undefined || !Number.isFinite(requestedDraftPrismAngle)
+      || requestedDraftPrismAngle === 0 || Math.abs(requestedDraftPrismAngle) >= 45)) {
+      return failed({
+        reason: "invalid_shape_request",
+        message: "A draft prism angle must be non-zero and between -45 and 45 degrees on a sketch extrusion.",
+      });
+    }
+    if (draftPrismChanged && requestedFaceDraft) {
+      return failed({ reason: "invalid_shape_request", message: "Face drafts cannot be combined with prism drafts yet." });
+    }
+    if (draftPrismChanged && existing.draftPrismAngle === undefined
+      && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0)) {
+      return failed({ reason: "invalid_shape_request", message: "A prism draft cannot be added after an edge treatment." });
+    }
+    if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
+      return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
+    }
+
+    if (sourceSketchTarget && rebuildsFromSource) {
+      if (replacingSketchProfile && isSketchSweep) {
+        const invalidProfile = invalidSketchSweepProfile(changes.sketchProfile);
+        if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
+      }
+      let recipeFaceDraft = existing.faceDraft;
+      let recipeFaceDraftSourceFaceIds = existing.faceDraftSourceFaceIds;
+      let recipeFaceDraftSourceSegmentId = existing.faceDraftSourceSegmentId;
+      let recipeFaceDraftSourceFrame = existing.faceDraftSourceFrame;
+      if (faceDraftChanged) {
+        if (!requestedFaceDraft) {
+          recipeFaceDraft = undefined;
+          recipeFaceDraftSourceFaceIds = undefined;
+          recipeFaceDraftSourceSegmentId = undefined;
+          recipeFaceDraftSourceFrame = undefined;
+        } else if (existing.faceDraft && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId) {
+          recipeFaceDraft = { ...existing.faceDraft, ...requestedFaceDraft };
+        } else {
+          try {
+            const resolved = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
+              existing,
+              source: existing,
+              request: requestedFaceDraft,
+              profileChanged: false,
+            }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
+            const retained = retainedFaceDraftFields(existing.faceIds, existing, resolved, requestedFaceDraft);
+            recipeFaceDraft = retained.faceDraft;
+            recipeFaceDraftSourceFaceIds = retained.faceDraftSourceFaceIds;
+            recipeFaceDraftSourceSegmentId = retained.faceDraftSourceSegmentId;
+            recipeFaceDraftSourceFrame = retained.faceDraftSourceFrame;
+          } catch (error) {
+            return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The selected face could not be resolved." });
+          }
+        }
+      }
+      const recipe: WorkplaneShape = {
+        ...existing,
+        ...(replacingSketchProfile ? { sketchProfile: changes.sketchProfile as WorkplaneShape["sketchProfile"] } : {}),
+        ...(draftPrismChanged ? { draftPrismAngle: requestedDraftPrismAngle } : {}),
+        ...(faceDraftChanged ? { faceDraft: recipeFaceDraft } : {}),
+        ...(faceDraftChanged ? {
+          faceDraftSourceFaceIds: recipeFaceDraftSourceFaceIds,
+          faceDraftSourceSegmentId: recipeFaceDraftSourceSegmentId,
+          faceDraftSourceFrame: !recipeFaceDraft && existing.faceDraft
+            ? existing.faceDraftSourceFrame
+            : recipeFaceDraftSourceFrame,
+        } : {}),
+        ...(isRevolveShape(existing) && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined)
+          ? { sketchRevolve: requestedRevolveSettings(existing.sketchRevolve!, changes) }
+          : {}),
+      };
+      const candidate = replaceSketchOutput(document.shapes, shapeId, recipe);
+      if (candidate.matchCount !== 1) {
+        return failed({ reason: "sweep_failed", message: `Sketch source ${shapeId} has no unique output node.` });
+      }
+      const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
+      if (!recomputed.ok) return failed({ reason: "sweep_failed", message: recomputed.message ?? "The sketch source could not be recomputed." });
+      return ok({ shape: recomputed.updated, shapes: recomputed.shapes });
+    }
+
+    const sweptShape = isRevolveShape(existing);
+    const misplaced = REVOLVE_ONLY_FIELDS.filter((field) => changes[field] !== undefined);
+    if (!sweptShape && misplaced.length > 0) {
+      return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: [...misplaced], because: "no_sweep" });
+    }
+
+    // A pitch, a turn count or a new outline is geometry rather than a
+    // property, so the mesh is swept again here. Refusing to rebuild would
+    // leave a thread's pitch readable but not writable.
+    const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => changes[field] !== undefined) : [];
+    let swept = existing;
+    if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)
+      || (faceDraftChanged && isSketchExtrusion)) {
+      // A treatment is built from the extrusion at the size it was shown
+      // (#539), and its record keeps that shape as `before`. Replaying it on
+      // a new profile rebuilds at that same resize, or the edit would hand
+      // back the treatment at the size the sketch was first drawn.
+      const treatmentSource = existing.edgeTreatmentHistory?.[0]?.before;
+      const recordedTreatmentScale = hasExistingTreatment && !existing.faceDraft && existing.draftPrismAngle === undefined
+        && treatmentSource?.sketchOperation === "extrude" && treatmentSource.cadBrep
+        ? sketchResizeFactors(treatmentSource)
+        : undefined;
+      // A treatment recorded before #539 kept the resize in `before` but was
+      // built, and stored, at the drawn size. Its shape is nearer that drawn
+      // size than the resized one on every resized axis, and its edit keeps
+      // the old behaviour: rebuilt at the profile's own size.
+      const nearerResized = (current: number, resized: number, factor: number) =>
+        Math.abs(factor - 1) < 1e-8 || Math.abs(current - resized) < Math.abs(current - resized / factor);
+      const treatmentSourceScale = recordedTreatmentScale && treatmentSource
+        && nearerResized(existing.width, treatmentSource.width, recordedTreatmentScale.width)
+        && nearerResized(existing.depth, treatmentSource.depth, recordedTreatmentScale.depth)
+        && nearerResized(existing.height, treatmentSource.height, recordedTreatmentScale.height)
+        ? recordedTreatmentScale
+        : undefined;
+      const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
+      const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
+      const recordedFaceDraftScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
+        // Editor-written drafts predate this field. Their output bounds
+        // include the taper, so they cannot be used to infer the source
+        // resize ratio; these shapes were only retained before resize support.
+        width: 1, depth: 1, height: 1,
+      } : {
+        width: ratio(existing.width, sourceFrame?.width ?? existing.importedMesh?.baseWidth),
+        depth: ratio(existing.depth, sourceFrame?.depth ?? existing.importedMesh?.baseDepth),
+        height: ratio(existing.height, sourceFrame?.height ?? existing.importedMesh?.baseHeight),
+      });
+      // Height is unchanged by face drafting, so a later dimension edit can
+      // be composed with the original scale without trying to infer scale
+      // from the tapered width/depth bounds.
+      const faceDraftSourceScale = existing.faceDraft && sourceFrame
+        ? { ...recordedFaceDraftScale, height: ratio(existing.height, sourceFrame.height) }
+        : recordedFaceDraftScale;
+      const rebuildScale = existing.faceDraft || faceDraftChanged
+        ? faceDraftSourceScale
+        : treatmentSourceScale ?? { width: 1, depth: 1, height: 1 };
+      // The extrusion is rebuilt at the height it was drawn and then scaled
+      // by `rebuildScale`, as its width is. Rebuilding a height-resized
+      // extrusion at its shown height applied that resize twice (#546).
+      const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height
+        ?? (treatmentSourceScale ? treatmentSource!.height / treatmentSourceScale.height
+          : existing.height / rebuildScale.height);
+      try {
+        const rebuilt = await sketchExtrusionShapeFromRequest({
+          id: existing.id,
+          sketchSourceId: existing.sketchSourceId ?? `sketch/${existing.id}`,
+          name: existing.name,
+          color: existing.color,
+          hole: existing.hole,
+          profile: replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile,
+          height: sourceHeight,
+          x: 0,
+          z: 0,
+          elevation: 0,
+          rotation: existing.rotation,
+          rotationX: existing.rotationX,
+          rotationZ: existing.rotationZ,
+        });
+        const {
+          faceIds: _oldFaceIds,
+          faceColors: _faceColors,
+          edgeTreatments: _edgeTreatments,
+          edgeTreatmentHistory: _edgeTreatmentHistory,
+          faceDraft: _faceDraft,
+          cadDisplayEdges: _cadDisplayEdges,
+          cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
+          ...sourceMetadata
+        } = existing;
+        const draftPrismAngle = draftPrismChanged ? requestedDraftPrismAngle : existing.draftPrismAngle;
+        const rebuiltSource = {
+          ...sourceMetadata,
+          ...rebuilt,
+          mirrorX: existing.mirrorX,
+          mirrorY: existing.mirrorY,
+          mirrorZ: existing.mirrorZ,
+          ...retainedDraftSourcePlacement(
+            existing,
+            rebuilt.cadBrepFrame!,
+            existing.faceDraft && !hasExistingTreatment ? existing.cadBrepFrame : undefined,
+          ),
+          // A cleared draft's resize is not kept: the bounds carry it from here.
+          faceDraftSourceScale: clearingFaceDraft ? undefined
+            : existing.faceDraft || faceDraftChanged ? faceDraftSourceScale : existing.faceDraftSourceScale,
+          width: rebuilt.width * rebuildScale.width,
+          depth: rebuilt.depth * rebuildScale.depth,
+          height: rebuilt.height * rebuildScale.height,
+          size: Math.max(rebuilt.width * rebuildScale.width, rebuilt.depth * rebuildScale.depth),
+          id: existing.id,
+          sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+          faceDraft: undefined,
+          faceDraftSourceFrame: undefined,
+          faceDraftSourceFaceIds: undefined,
+          faceDraftSourceSegmentId: undefined,
+          ...(faceDraftChanged && !replacingSketchProfile && !existing.faceDraft && !hasExistingTreatment
+            && existing.draftPrismAngle === undefined && existing.faceIds?.length === rebuilt.faceIds?.length
+            ? { faceIds: existing.faceIds }
+            : {}),
+          ...(!replacingSketchProfile && existing.faceDraft && existing.faceDraftSourceFaceIds?.length === rebuilt.faceIds?.length
+            ? { faceIds: existing.faceDraftSourceFaceIds }
+            : {}),
+          ...(draftPrismAngle === undefined ? {} : {
+            draftPrismSourceHeight: sourceHeight,
+            ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
+          }),
+        };
+        const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
+          || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+        const replayDraftAndTreatment = hasRetainedTreatments
+          && draftPrismAngle !== undefined
+          && (replacingSketchProfile || clearingFaceDraft || draftPrismChanged);
+        const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
+        const replayOriginal = clearingFaceDraft
+          ? { ...existing, faceDraft: undefined }
+          : replayFaceDraftAndTreatment && existing.faceDraft
+            ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
+            : existing;
+        const replayedSource = (replacingSketchProfile || clearingFaceDraft || draftPrismChanged || replayFaceDraftAndTreatment)
+          && hasRetainedTreatments
+          ? await replaySingleAllEdgeTreatment(
+            replayOriginal,
+            rebuiltSource,
+            draftPrismChanged ? requestedDraftPrismAngle : undefined,
+          )
+          : rebuiltSource;
+        if (requestedFaceDraft && replayedSource.faceDraft) {
+          swept = replayedSource;
+        } else if (requestedFaceDraft) {
+          // The resolver the editor's draft, edit and replay call too (#384).
+          const { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch } = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
+            existing,
+            source: replayedSource,
+            request: requestedFaceDraft,
+            profileChanged: replacingSketchProfile,
+          }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
+          const result = await applySketchFaceDraft(replayedSource, {
+            ...requestedFaceDraft,
+            sourceFaceId: currentFaceId,
+          });
+          // The same record the editor writes for a draft it makes (#384).
+          const drafted = shapeWithCadResult(replayedSource, result);
+          swept = {
+            ...retainDraftSourceMirrors(drafted, replayedSource),
+            ...(!replayedSource.mirrorX && !replayedSource.mirrorY && !replayedSource.mirrorZ
+              ? retainedDraftSourcePlacement({
+                  ...replayedSource,
+                  faceDraftSourceFrame: undefined,
+                  draftPrismSourceFrame: undefined,
+                }, drafted.cadBrepFrame!)
+              : {}),
+            ...retainedFaceDraftFields(
+              replayedSource.faceIds,
+              existing,
+              { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch },
+              requestedFaceDraft,
+            ),
+            faceDraftSourceScale,
+          };
+        } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
+          swept = {
+            ...retainDraftSourceMirrors(
+              shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
+              replayedSource,
+            ),
+            draftPrismAngle,
+          };
+        } else {
+          swept = replayedSource;
+        }
+      } catch (error) {
+        return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The sketch extrusion could not be rebuilt." });
+      }
+    }
+    if ((replacingSketchProfile || faceDraftChanged) && isSketchSweep) {
+      const profileToBuild = replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile;
+      const invalidProfile = replacingSketchProfile ? invalidSketchSweepProfile(profileToBuild) : undefined;
+      if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
+      const frame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
+      try {
+        const rebuilt = await sketchSweepShapeFromRequest({
+          id: existing.id,
+          name: existing.name,
+          color: existing.color,
+          hole: existing.hole,
+          profile: profileToBuild,
+          x: existing.x - (frame?.x ?? 0),
+          z: existing.z - (frame?.z ?? 0),
+          elevation: (existing.elevation ?? 0) - (frame?.elevation ?? 0),
+          rotation: existing.rotation,
+          rotationX: existing.rotationX,
+          rotationZ: existing.rotationZ,
+        });
+        const baseDimensions = {
+          width: frame?.width ?? existing.importedMesh?.baseWidth ?? existing.width,
+          depth: frame?.depth ?? existing.importedMesh?.baseDepth ?? existing.depth,
+          height: frame?.height ?? existing.importedMesh?.baseHeight ?? existing.height,
+        };
+        const resized = {
+          ...rebuilt,
+          width: rebuilt.width * existing.width / Math.max(0.01, baseDimensions.width),
+          depth: rebuilt.depth * existing.depth / Math.max(0.01, baseDimensions.depth),
+          height: rebuilt.height * existing.height / Math.max(0.01, baseDimensions.height),
+        };
+        resized.size = Math.max(resized.width, resized.depth);
+        const refreshedFaceIds = (await shapeFaces(rebuilt))
+          .map((face) => `face_${createLocalId(`${existing.id}-${face.index}`)}`);
+        const {
+          faceIds: _oldFaceIds,
+          faceColors: _faceColors,
+          edgeTreatments: _edgeTreatments,
+          edgeTreatmentHistory: _edgeTreatmentHistory,
+          cadDisplayEdges: _cadDisplayEdges,
+          cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
+          faceDraft: _faceDraft,
+          faceDraftSourceFrame: _faceDraftSourceFrame,
+          ...sourceMetadata
+        } = existing;
+        const rebuiltSweep = {
+          ...sourceMetadata,
+          ...resized,
+          mirrorX: existing.mirrorX,
+          mirrorY: existing.mirrorY,
+          mirrorZ: existing.mirrorZ,
+          id: existing.id,
+          sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
+          faceIds: refreshedFaceIds,
+          faceDraft: undefined,
+          faceDraftSourceFrame: undefined,
+        };
+        const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
+          || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
+        const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
+        const replayOriginal = clearingFaceDraft
+          ? { ...existing, faceDraft: undefined }
+          : replayFaceDraftAndTreatment && existing.faceDraft
+            ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
+            : existing;
+        const replayedSource = (replacingSketchProfile || clearingFaceDraft || replayFaceDraftAndTreatment) && hasRetainedTreatments
+          ? await replaySingleAllEdgeTreatment(replayOriginal, rebuiltSweep)
+          : rebuiltSweep;
+        if (requestedFaceDraft && replayedSource.faceDraft) {
+          // `replaySingleAllEdgeTreatment` has already rebuilt the retained
+          // draft before its treatment; applying the draft again would try
+          // to operate on post-fillet topology and make source edits fail.
+          swept = replayedSource;
+        } else if (requestedFaceDraft) {
+          const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
+            ? existing.faceDraft.sourceFaceNormal
+            : undefined;
+          const selectedOnPrior = priorReference ? undefined
+            : (await shapeFaces(unmirroredDraftSource(existing), isExactSketchRevolve ? { topology: "exact" } : undefined))
+              .find((face) => face.id === requestedFaceDraft.sourceFaceId);
+          const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+          if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
+            throw new Error("The selected source face has no stable planar reference.");
+          }
+          const currentFace = await findUniqueDraftFace(unmirroredDraftSource(replayedSource), sourceFaceNormal);
+          if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+          const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+          const result = await applySketchFaceDraft(replayedSource, {
+            ...requestedFaceDraft,
+            sourceFaceId: currentFace.id,
+          });
+          swept = {
+            ...retainDraftSourceMirrors(shapeWithCadResult(replayedSource, result), replayedSource),
+            faceDraft,
+            faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
+          };
+        } else {
+          swept = replayedSource;
+        }
+      } catch (error) {
+        return failed({
+          reason: "sweep_failed",
+          message: error instanceof Error ? error.message : "The sketch sweep could not be rebuilt",
+        });
+      }
+    }
+    if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)
+      || (revolveChanges.length > 0 && existing.faceDraft)) && isSketchRevolve) {
+      try {
+        const runtime = await serverManifoldRuntime();
+        const sourceFrame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
+        const rebuildSeed = sourceFrame ? {
+          ...existing,
+          x: sourceFrame.x,
+          z: sourceFrame.z,
+          elevation: sourceFrame.elevation,
+        } : existing;
+        const rebuiltAtNaturalScale = rebuiltRevolveShape(runtime, rebuildSeed, {
+          profile: (replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile) as NonNullable<WorkplaneShape["sketchProfile"]>,
+          settings: revolveChanges.length > 0
+            ? requestedRevolveSettings(existing.sketchRevolve!, changes)
+            : existing.sketchRevolve!,
+        });
+        const sourceScale = existing.faceDraftSourceScale ?? revolveSourceScale(existing);
+        const rebuilt = resizeRebuiltRevolve(rebuiltAtNaturalScale, sourceScale);
+        if (requestedFaceDraft) {
+          const exactBase = {
+            ...retainDraftSourceMirrors(shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt)), rebuilt),
+            faceDraftSourceScale: sourceScale,
+          };
+          const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
+            ? existing.faceDraft.sourceFaceNormal
+            : undefined;
+          const selectedOnPrior = priorReference ? undefined
+            : (await shapeFaces(unmirroredDraftSource(existing), { topology: "exact" }))
+              .find((face) => face.id === requestedFaceDraft.sourceFaceId);
+          const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
+          if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
+            throw new Error("The selected source face has no stable planar reference.");
+          }
+          const currentFace = await findUniqueDraftFace(unmirroredDraftSource(exactBase), sourceFaceNormal);
+          if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
+          const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
+          const result = await applySketchFaceDraft(exactBase, {
+            ...requestedFaceDraft,
+            sourceFaceId: currentFace.id,
+          });
+          swept = {
+            ...retainDraftSourceMirrors(shapeWithCadResult(exactBase, result), exactBase),
+            faceDraft,
+            faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame ?? exactBase.cadBrepFrame,
+            faceDraftSourceScale: sourceScale,
+          };
+          swept = await replaySingleAllEdgeTreatment(existing, swept);
+        } else {
+          const clearedDraft = {
+            ...rebuilt,
+            faceDraft: undefined,
+            faceDraftSourceFrame: undefined,
+            faceDraftSourceScale: undefined,
+          };
+          swept = clearingFaceDraft
+            ? await replaySingleAllEdgeTreatment({ ...existing, faceDraft: undefined }, clearedDraft)
+            : clearedDraft;
+        }
+      } catch (error) {
+        return failed({
+          reason: "sweep_failed",
+          message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
+        });
+      }
+    } else if (replacingSketchProfile && isSketchRevolve) {
+      try {
+        const runtime = await serverManifoldRuntime();
+        const rebuilt = rebuiltRevolveShape(runtime, existing, {
+          profile: changes.sketchProfile as NonNullable<WorkplaneShape["sketchProfile"]>,
+          settings: existing.sketchRevolve!,
+        });
+        swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
+      } catch (error) {
+        return failed({
+          reason: "sweep_failed",
+          message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
+        });
+      }
+    }
+    if (revolveChanges.length > 0 && sweptShape && !existing.faceDraft) {
+      const outline = changes.profile ?? changes.outline ?? outlineFromProfile(existing.sketchProfile!);
+      if (!outline) {
+        return failed({
+          reason: "unapplicable_fields",
+          kind: existing.kind,
+          fields: [...revolveChanges],
+          because: "outline_not_described",
+        });
+      }
+      const parsed = parseRevolveRequest({ profile: outline });
+      if (!parsed.ok) return failed({ reason: "invalid_shape_request", message: parsed.error });
+      try {
+        const runtime = await serverManifoldRuntime();
+        const rebuilt = rebuiltRevolveShape(runtime, existing, {
+          profile: parsed.profile,
+          settings: requestedRevolveSettings(existing.sketchRevolve!, changes),
+        });
+        swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
+      } catch (error) {
+        return failed({
+          reason: "sweep_failed",
+          message: error instanceof Error ? error.message : "The revolve could not be rebuilt",
+        });
+      }
+    }
+
+    // The sweep's own fields are already applied, so they are kept out of the
+    // per-kind pass -- which would refuse them, the stored kind being `mesh`.
+    const sweepFields: readonly string[] = [
+      ...(sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS),
+      "sketchProfile",
+      "draftPrismAngle",
+      "faceDraft",
+    ];
+    // Shape summaries expose the source ID for identity; echoing a full
+    // summary into PATCH must not let callers replace that identity.
+    let requestedChanges = Object.fromEntries(
+      Object.entries(changes).filter(([field]) =>
+        field !== "sketchSourceId"
+        && field !== "faceIds"
+        && !(replacingSketchProfile && field === "faceColors")
+        && !sweepFields.includes(field)),
+    );
+    let changeBase = swept;
+    if (!replacingSketchProfile && changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {
+      const colors = changes.faceColors as Record<string, unknown>;
+      if (Object.keys(colors).some((key) => !/^\d+$/.test(key))) {
+        try {
+          const faces = await shapeFaces(existing);
+          const faceIds = existing.faceIds ?? faces.map((face) => face.id);
+          const known = new Set(faceIds);
+          if (Object.keys(colors).some((key) => !/^\d+$/.test(key) && !known.has(key))) {
+            return failed({ reason: "invalid_shape_request", message: "A face color references an unknown face ID." });
+          }
+          changeBase = { ...swept, faceIds };
+          requestedChanges = {
+            ...requestedChanges,
+            faceColors: Object.fromEntries(Object.entries(colors).map(([key, color]) => [
+              /^\d+$/.test(key) ? (faceIds[Number(key)] ?? key) : key,
+              color,
+            ])),
+          };
+        } catch (error) {
+          return failed(cadFailure(error));
+        }
+      }
+    }
+    const changed = shapeWithRequestedChanges(changeBase, Object.fromEntries(
+      Object.entries(requestedChanges),
+    ));
+    if (!changed.ok) {
+      return failed({
+        reason: "unapplicable_fields",
+        kind: existing.kind,
+        fields: changed.unapplicable,
+        because: "not_this_kind",
+      });
+    }
+
+    const geometryFields = ["width", "depth", "height", "size", ...Object.keys(SHAPE_PARAMETERS)];
+    const geometryChanged = geometryFields.some((field) =>
+      JSON.stringify((existing as unknown as Record<string, unknown>)[field])
+      !== JSON.stringify((changed.shape as unknown as Record<string, unknown>)[field]),
+    );
+    let updatedShape = changed.shape;
+    if (existing.kind === "mesh" && existing.importedMesh && !existing.cadBrep
+      && ["rotation", "rotationX", "rotationZ"].some((field) => field in requestedChanges)) {
+      const previousMesh = worldMeshForShape(existing);
+      const mesh = worldMeshForShape(updatedShape);
+      if (previousMesh?.vertices.length && mesh?.vertices.length) {
+        const lowestPointOf = (vertices: Array<[number, number, number]>) =>
+          vertices.reduce((lowest, [, y]) => Math.min(lowest, y), Number.POSITIVE_INFINITY);
+        const previousLowestPoint = lowestPointOf(previousMesh.vertices);
+        const lowestPoint = lowestPointOf(mesh.vertices);
+        const targetElevation = typeof requestedChanges.elevation === "number"
+          ? requestedChanges.elevation
+          : previousLowestPoint;
+        updatedShape = {
+          ...updatedShape,
+          elevation: (updatedShape.elevation ?? 0) + targetElevation - lowestPoint,
+        };
+      }
+    }
+    if (!replacingSketchProfile && geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
+      try {
+        updatedShape = await preserveUnambiguousFaceMetadata(existing, changed.shape);
+      } catch (error) {
+        return failed(cadFailure(error));
+      }
+    }
+
+    if (sourceSketchTarget) {
+      const candidate = replaceSketchOutput(document.shapes, shapeId, updatedShape);
+      if (candidate.matchCount !== 1) {
+        return failed({
+          reason: "sweep_failed",
+          message: candidate.matchCount === 0
+            ? `Sketch source ${shapeId} has no output node.`
+            : `Sketch source ${shapeId} has multiple output nodes.`,
+        });
+      }
+      const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
+      if (!recomputed.ok) {
+        return failed({
+          reason: "sweep_failed",
+          message: recomputed.message ?? (recomputed.reason === "dependency_ambiguous"
+            ? "The sketch source has multiple dependent outputs."
+            : "The sketch source has no dependent output."),
+        });
+      }
+      return ok({ shape: recomputed.updated, shapes: recomputed.shapes });
+    }
+    const shapes = document.shapes.map((shape) => (shape.id === existing.id ? updatedShape : shape));
+    return ok({ shape: updatedShape, shapes });
+  }
+
+  /** Rebuilds a sketch output with new treatment settings through the recompute graph. */
+  async function retreatSketchOutput(document: ProjectDocument, shape: WorkplaneShape, values: Record<string, number>): Promise<EngineResult<ShapeChanged>> {
+    const sourceId = shape.sketchSourceId!;
+    const tune = (feature: EdgeTreatmentFeature): EdgeTreatmentFeature => ({
+      ...feature,
+      ...(values["edgeTreatments.0.amount"] !== undefined ? { amount: values["edgeTreatments.0.amount"] } : {}),
+      ...(values["edgeTreatments.0.chamferAngle"] !== undefined ? { chamferAngle: values["edgeTreatments.0.chamferAngle"] } : {}),
+    });
+    const recipe: WorkplaneShape = {
+      ...shape,
+      edgeTreatments: shape.edgeTreatments!.map((feature, index) => (index === 0 ? tune(feature) : feature)),
+      ...(shape.edgeTreatmentHistory ? {
+        edgeTreatmentHistory: shape.edgeTreatmentHistory.map((entry, index) => (index === 0 ? { ...entry, feature: tune(entry.feature) } : entry)),
+      } : {}),
+    };
+    const candidate = replaceSketchOutput(document.shapes, sourceId, recipe);
+    if (candidate.matchCount !== 1) return failed({ reason: "sweep_failed", message: `Sketch source ${sourceId} has no unique output node.` });
+    const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [sourceId], document);
+    if (!recomputed.ok) return failed({ reason: "sweep_failed", message: recomputed.message ?? "The treatment could not be replayed." });
+    return ok({ shape: recomputed.updated, shapes: recomputed.shapes });
+  }
+
+  /**
+   * Applies resolved values to one shape through the manual-edit paths:
+   * treatment settings, then sketch-source features, then the shape's own fields.
+   */
+  async function applyBindingValues(document: ProjectDocument, shapeId: string, values: Record<string, number>): Promise<EngineResult<WorkplaneShape[]>> {
+    let shapes = document.shapes;
+    const initial = findShapeInTree(shapes, shapeId);
+    if (!initial) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+    const fields = Object.keys(values);
+    const pick = (accept: (field: string) => boolean) => Object.fromEntries(fields.filter(accept).map((field) => [field, values[field]!]));
+    const treatment = pick((field) => TREATMENT_BINDINGS.has(field));
+    const feature = pick((field) => !TREATMENT_BINDINGS.has(field) && bindableField(initial.shape, field)?.target === "feature");
+    const own = pick((field) => !(field in treatment) && !(field in feature));
+    const step = async (run: (shape: WorkplaneShape, topLevel: boolean) => Promise<EngineResult<ShapeChanged>>) => {
+      const found = findShapeInTree(shapes, shapeId);
+      if (!found) return failed<ShapeChanged>({ reason: "shapes_not_found", ids: [shapeId] });
+      const changed = await run(found.shape, found.topLevel);
+      if (changed.ok) shapes = changed.value.shapes;
+      return changed;
+    };
+    if (Object.keys(treatment).length) {
+      const result = await step((shape) => retreatSketchOutput({ ...document, shapes }, shape, treatment));
+      if (!result.ok) return result;
+    }
+    if (Object.keys(feature).length) {
+      const result = await step(async (shape, topLevel) => {
+        const request: ShapeRequest = {};
+        for (const [field, number] of Object.entries(feature)) {
+          if (field.startsWith("revolve.")) request[field.slice("revolve.".length)] = number;
+          else if (field === "faceDraft.angle" && shape.faceDraft) {
+            request.faceDraft = { sourceFaceId: shape.faceDraft.sourceFaceId, angle: number, pullDirection: shape.faceDraft.pullDirection };
+          } else request[field] = number;
+        }
+        // Source-ID edits reach nested outputs and rebuild retained booleans around them.
+        const target = shape.sketchSourceId ?? (topLevel ? shape.id : undefined);
+        if (!target) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+        return changeShapeIn({ ...document, shapes }, target, request);
+      });
+      if (!result.ok) return result;
+    }
+    if (Object.keys(own).length) {
+      const result = await step((shape) => changeShapeIn({ ...document, shapes }, shape.id, own));
+      if (!result.ok) return result;
+    }
+    return ok(shapes);
+  }
+
+  /** Re-resolves bindings that depend on a changed parameter and applies them, children first. */
+  async function applyTable(
+    document: ProjectDocument,
+    shapes: WorkplaneShape[],
+    previous: readonly ProjectParameter[],
+    next: readonly ProjectParameter[],
+  ): Promise<EngineResult<WorkplaneShape[]>> {
+    const changed = changedParameterNames(previous, next);
+    if (!changed.size) return ok(shapes);
+    const pending: Array<{ id: string; values: Record<string, number>; locked: string | undefined }> = [];
+    let invalid: ShapeBindingError | undefined;
+    const visit = (shape: WorkplaneShape, topLevel: boolean, lockedAncestor: string | undefined) => {
+      const locked = shape.locked ? shape.id : lockedAncestor;
+      shape.groupedShapes?.forEach((child) => visit(child, false, locked));
+      const values: Record<string, number> = {};
+      const expressions = Object.entries(shape.expressions ?? {});
+      if (invalid || !expressions.some(([, expression]) => expressionDependencies(expression).some((name) => changed.has(name)))) return;
+      // Every binding on a touched shape is rechecked, since one field's limit can depend on another's value.
+      const after = resolveShapeBindings(shape, next);
+      const before = resolveShapeBindings(shape, previous);
+      for (const [field] of expressions) {
+        // A misplaced shape binding stays stale, as on load.
+        if (invalid || bindableField(shape, field)?.target === "shape" && !topLevel) continue;
+        const resolved = after.get(field)!;
+        if (resolved.ok) {
+          if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
+        } else if (before.get(field)!.ok) {
+          // Refuses only a binding this change breaks; one already stale stays stale.
+          invalid = resolved.error;
+        }
+      }
+      if (Object.keys(values).length) pending.push({ id: shape.id, values, locked });
+    };
+    shapes.forEach((shape) => visit(shape, true, undefined));
+    if (invalid) return failed({ reason: "binding_invalid", error: invalid });
+    // A change that would alter a locked shape, or rebuild a locked group around one, is refused as a manual edit is.
+    const blocked = pending.find((entry) => entry.locked);
+    if (blocked) {
+      return failed({ reason: "binding_failed", shapeId: blocked.id, fields: Object.keys(blocked.values), failure: { reason: "shape_locked", ids: [blocked.locked!] } });
+    }
+    let current = shapes;
+    for (const { id, values } of pending) {
+      const applied = await applyBindingValues({ ...document, shapes: current }, id, values);
+      if (!applied.ok) return failed({ reason: "binding_failed", shapeId: id, fields: Object.keys(values), failure: applied.failure });
+      current = applied.value;
+    }
+    return ok(current);
+  }
+
+  type ParameterProject = { parameters: ProjectParameter[]; shapes: WorkplaneShape[] };
+
+  /** Runs a pure table operation, recomputes bound geometry, and writes both once. */
+  function parameterOperation(
+    projectId: string,
+    operation: (project: ParameterProject) => ProjectParameterResult<ParameterProject>,
+  ): Promise<EngineResult<ParametersWritten>> {
+    return mutating(projectId, async (document) => {
+      const previous = document.parameters ?? [];
+      const result = operation({ parameters: previous, shapes: document.shapes });
+      if (!result.ok) return failed({ reason: "parameter_invalid", error: result.error });
+      const { parameters } = result.project;
+      const applied = await applyTable(document, result.project.shapes, previous, parameters);
+      if (!applied.ok) return applied;
+      const shapes = applied.value;
+      const revision = await writeShapes(projectId, { ...document, parameters }, shapes);
+      const before = new Set(document.shapes);
+      return ok({ parameters, shapes: shapes.filter((shape) => !before.has(shape)), revision });
     });
   }
 
@@ -761,704 +1706,18 @@ export function createEngine(store: ProjectStore): Engine {
     },
 
     changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
-      const byOutputId = oneShape(document, shapeId);
-      // A persisted sketch source is an input node, not a renderable shape.
-      // When a caller edits that node's profile or revolve settings, resolve
-      // its dependent output and rebuild it before the single project write. The
-      // output keeps its own stable object ID; SKF export derives the source
-      // node from the synchronized profile on that output.
-      const sourceFeatureInputChanged = changes.sketchProfile !== undefined
-        || changes.draftPrismAngle !== undefined
-        || Object.hasOwn(changes, "faceDraft")
-        || REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined);
-      const sourceOutputs = !byOutputId.ok && sourceFeatureInputChanged
-        ? findSketchOutput(document.shapes, shapeId)
-        : [];
-      const sourceSketchTarget = !byOutputId.ok && sourceOutputs.length === 1;
-      const found = byOutputId.ok
-        ? byOutputId
-        : sourceSketchTarget
-          ? ok(sourceOutputs[0]!)
-          : byOutputId;
-      if (!found.ok) return found;
-      const existing = found.value;
-      if (sourceSketchTarget) {
-        const isRevolveSource = isRevolveShape(existing);
-        const outputFields = Object.keys(changes).filter((field) =>
-          field !== "sketchProfile" && field !== "draftPrismAngle" && field !== "faceDraft"
-          && !(isRevolveSource && REVOLVE_CHANGE_FIELDS.includes(field as typeof REVOLVE_CHANGE_FIELDS[number])),
-        );
-        if (outputFields.length > 0) {
-          return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
-        }
-      }
-      // A locked shape refuses every change but the one that unlocks it, which
-      // may arrive in the same request as the rest: `locked: false` alongside a
-      // new width is one call rather than two.
-      if (existing.locked && changes.locked !== false) return failed({ reason: "shape_locked", ids: [shapeId] });
-
-      const replacingSketchProfile = changes.sketchProfile !== undefined;
-      const faceDraftChanged = Object.hasOwn(changes, "faceDraft");
-      const clearingFaceDraft = faceDraftChanged && changes.faceDraft === null && existing.faceDraft !== undefined;
-      const requestedFaceDraft = faceDraftChanged
-        ? changes.faceDraft === null ? undefined : faceDraftInput(changes.faceDraft)
-        : existing.faceDraft;
-      const isSketchSweep = existing.sketchOperation === "sweep" && Boolean(existing.sketchProfile);
-      const isSketchExtrusion = existing.sketchOperation === "extrude" && Boolean(existing.sketchProfile);
-      const isSketchRevolve = isRevolveShape(existing);
-      const rebuildsFromSource = replacingSketchProfile || faceDraftChanged || changes.draftPrismAngle !== undefined
-        || (isSketchRevolve && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined));
-      if (existing.shell && rebuildsFromSource) {
-        return failed({
-          reason: "sweep_failed",
-          message: "This shape was shelled, and a rebuild from its source cannot replay a shell, so the edit would lose it",
-        });
-      }
-      if (faceDraftChanged && changes.faceDraft !== null && !requestedFaceDraft) {
-        return failed({ reason: "invalid_shape_request", message: "A face draft requires a stable source face ID, a non-zero angle below 45 degrees, and a signed local pull axis." });
-      }
-      const isExactSketchRevolve = isPlainFullTurnSketchRevolve(existing);
-      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft))
-        && !isSketchExtrusion && !isSketchSweep && !isExactSketchRevolve) {
-        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["faceDraft"], because: "not_this_kind" });
-      }
-      const hasExistingTreatment = (existing.edgeTreatments?.length ?? 0) > 0
-        || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
-      const canReplayFaceDraftTreatment = existing.faceDraft !== undefined
-        && existing.draftPrismAngle === undefined
-        && (!faceDraftChanged || requestedFaceDraft !== undefined && requestedFaceDraft !== null
-          && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId)
-        && (isPlainFullTurnSketchRevolve(existing)
-          || isSingleLoopSketchExtrusion(existing)
-            && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer")
-          || isSingleSectionSketchSweep(existing)
-            && (existing.edgeTreatments?.[0]?.kind === "fillet" || existing.edgeTreatments?.[0]?.kind === "chamfer"))
-        && existing.edgeTreatments?.length === 1
-        && (existing.edgeTreatments[0]?.kind === "chamfer" || existing.edgeTreatments[0]?.kind === "fillet")
-        && existing.edgeTreatments[0]?.allEdges === true
-        && existing.edgeTreatmentHistory?.length === 1
-        && existing.edgeTreatmentHistory[0]?.feature.kind === existing.edgeTreatments[0]?.kind
-        && existing.edgeTreatmentHistory[0]?.feature.allEdges === true
-        && (existing.edgeTreatments[0]?.kind !== "chamfer"
-          || Math.abs((existing.edgeTreatments[0].chamferAngle ?? 45) - 45) < 0.001
-          && Math.abs((existing.edgeTreatmentHistory[0]?.feature.chamferAngle ?? 45) - 45) < 0.001);
-      if (requestedFaceDraft
-        && (existing.draftPrismAngle !== undefined || hasExistingTreatment && !canReplayFaceDraftTreatment)) {
-        return failed({ reason: "invalid_shape_request", message: "This face draft cannot be combined with the requested persisted draft or treatment history." });
-      }
-      const canReselectUntreatedExtrusionFace = isSingleLoopSketchExtrusion(existing)
-        && existing.draftPrismAngle === undefined
-        && !hasExistingTreatment;
-      if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
-        && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId
-        && replacingSketchProfile) {
-        return failed({ reason: "invalid_shape_request", message: "Change the sketch profile and face draft selection in separate edits." });
-      }
-      if (faceDraftChanged && existing.faceDraft && requestedFaceDraft
-        && requestedFaceDraft.sourceFaceId !== existing.faceDraft.sourceFaceId) {
-        let currentOutputFaces: ServerCadFace[];
-        try {
-          currentOutputFaces = await shapeFaces(existing);
-        } catch (error) {
-          return failed(cadFailure(error));
-        }
-        if (!canReselectUntreatedExtrusionFace
-          || !existing.faceDraftSourceFaceIds?.includes(requestedFaceDraft.sourceFaceId)
-          || currentOutputFaces.filter((face) => face.id === requestedFaceDraft.sourceFaceId && face.surfaceType === "plane").length !== 1) {
-          return failed({ reason: "invalid_shape_request", message: "Clear the existing face draft before selecting a different source face." });
-        }
-      }
-      const draftPrismChanged = changes.draftPrismAngle !== undefined;
-      const requestedDraftPrismAngle = typeof changes.draftPrismAngle === "number" ? changes.draftPrismAngle : undefined;
-      if (draftPrismChanged && (!isSketchExtrusion || requestedDraftPrismAngle === undefined || !Number.isFinite(requestedDraftPrismAngle)
-        || requestedDraftPrismAngle === 0 || Math.abs(requestedDraftPrismAngle) >= 45)) {
-        return failed({
-          reason: "invalid_shape_request",
-          message: "A draft prism angle must be non-zero and between -45 and 45 degrees on a sketch extrusion.",
-        });
-      }
-      if (draftPrismChanged && requestedFaceDraft) {
-        return failed({ reason: "invalid_shape_request", message: "Face drafts cannot be combined with prism drafts yet." });
-      }
-      if (draftPrismChanged && existing.draftPrismAngle === undefined
-        && ((existing.edgeTreatments?.length ?? 0) > 0 || (existing.edgeTreatmentHistory?.length ?? 0) > 0)) {
-        return failed({ reason: "invalid_shape_request", message: "A prism draft cannot be added after an edge treatment." });
-      }
-      if (replacingSketchProfile && !isSketchSweep && !isSketchExtrusion && !isSketchRevolve) {
-        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: ["sketchProfile"], because: "no_sweep" });
-      }
-
-      if (sourceSketchTarget && rebuildsFromSource) {
-        if (replacingSketchProfile && isSketchSweep) {
-          const invalidProfile = invalidSketchSweepProfile(changes.sketchProfile);
-          if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
-        }
-        let recipeFaceDraft = existing.faceDraft;
-        let recipeFaceDraftSourceFaceIds = existing.faceDraftSourceFaceIds;
-        let recipeFaceDraftSourceSegmentId = existing.faceDraftSourceSegmentId;
-        let recipeFaceDraftSourceFrame = existing.faceDraftSourceFrame;
-        if (faceDraftChanged) {
-          if (!requestedFaceDraft) {
-            recipeFaceDraft = undefined;
-            recipeFaceDraftSourceFaceIds = undefined;
-            recipeFaceDraftSourceSegmentId = undefined;
-            recipeFaceDraftSourceFrame = undefined;
-          } else if (existing.faceDraft && requestedFaceDraft.sourceFaceId === existing.faceDraft.sourceFaceId) {
-            recipeFaceDraft = { ...existing.faceDraft, ...requestedFaceDraft };
-          } else {
-            try {
-              const resolved = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
-                existing,
-                source: existing,
-                request: requestedFaceDraft,
-                profileChanged: false,
-              }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
-              const retained = retainedFaceDraftFields(existing.faceIds, existing, resolved, requestedFaceDraft);
-              recipeFaceDraft = retained.faceDraft;
-              recipeFaceDraftSourceFaceIds = retained.faceDraftSourceFaceIds;
-              recipeFaceDraftSourceSegmentId = retained.faceDraftSourceSegmentId;
-              recipeFaceDraftSourceFrame = retained.faceDraftSourceFrame;
-            } catch (error) {
-              return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The selected face could not be resolved." });
-            }
-          }
-        }
-        const recipe: WorkplaneShape = {
-          ...existing,
-          ...(replacingSketchProfile ? { sketchProfile: changes.sketchProfile as WorkplaneShape["sketchProfile"] } : {}),
-          ...(draftPrismChanged ? { draftPrismAngle: requestedDraftPrismAngle } : {}),
-          ...(faceDraftChanged ? { faceDraft: recipeFaceDraft } : {}),
-          ...(faceDraftChanged ? {
-            faceDraftSourceFaceIds: recipeFaceDraftSourceFaceIds,
-            faceDraftSourceSegmentId: recipeFaceDraftSourceSegmentId,
-            faceDraftSourceFrame: !recipeFaceDraft && existing.faceDraft
-              ? existing.faceDraftSourceFrame
-              : recipeFaceDraftSourceFrame,
-          } : {}),
-          ...(isRevolveShape(existing) && REVOLVE_CHANGE_FIELDS.some((field) => changes[field] !== undefined)
-            ? { sketchRevolve: requestedRevolveSettings(existing.sketchRevolve!, changes) }
-            : {}),
-        };
-        const candidate = replaceSketchOutput(document.shapes, shapeId, recipe);
-        if (candidate.matchCount !== 1) {
-          return failed({ reason: "sweep_failed", message: `Sketch source ${shapeId} has no unique output node.` });
-        }
-        const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
-        if (!recomputed.ok) return failed({ reason: "sweep_failed", message: recomputed.message ?? "The sketch source could not be recomputed." });
-        return ok({ shape: recomputed.updated, revision: await writeShapes(projectId, document, recomputed.shapes) });
-      }
-
-      const sweptShape = isRevolveShape(existing);
-      const misplaced = REVOLVE_ONLY_FIELDS.filter((field) => changes[field] !== undefined);
-      if (!sweptShape && misplaced.length > 0) {
-        return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: [...misplaced], because: "no_sweep" });
-      }
-
-      // A pitch, a turn count or a new outline is geometry rather than a
-      // property, so the mesh is swept again here. Refusing to rebuild would
-      // leave a thread's pitch readable but not writable.
-      const revolveChanges = sweptShape ? REVOLVE_CHANGE_FIELDS.filter((field) => changes[field] !== undefined) : [];
-      let swept = existing;
-      if ((replacingSketchProfile && isSketchExtrusion) || (draftPrismChanged && isSketchExtrusion)
-        || (faceDraftChanged && isSketchExtrusion)) {
-        // A treatment is built from the extrusion at the size it was shown
-        // (#539), and its record keeps that shape as `before`. Replaying it on
-        // a new profile rebuilds at that same resize, or the edit would hand
-        // back the treatment at the size the sketch was first drawn.
-        const treatmentSource = existing.edgeTreatmentHistory?.[0]?.before;
-        const recordedTreatmentScale = hasExistingTreatment && !existing.faceDraft && existing.draftPrismAngle === undefined
-          && treatmentSource?.sketchOperation === "extrude" && treatmentSource.cadBrep
-          ? sketchResizeFactors(treatmentSource)
-          : undefined;
-        // A treatment recorded before #539 kept the resize in `before` but was
-        // built, and stored, at the drawn size. Its shape is nearer that drawn
-        // size than the resized one on every resized axis, and its edit keeps
-        // the old behaviour: rebuilt at the profile's own size.
-        const nearerResized = (current: number, resized: number, factor: number) =>
-          Math.abs(factor - 1) < 1e-8 || Math.abs(current - resized) < Math.abs(current - resized / factor);
-        const treatmentSourceScale = recordedTreatmentScale && treatmentSource
-          && nearerResized(existing.width, treatmentSource.width, recordedTreatmentScale.width)
-          && nearerResized(existing.depth, treatmentSource.depth, recordedTreatmentScale.depth)
-          && nearerResized(existing.height, treatmentSource.height, recordedTreatmentScale.height)
-          ? recordedTreatmentScale
-          : undefined;
-        const sourceFrame = existing.faceDraftSourceFrame ?? existing.draftPrismSourceFrame ?? existing.cadBrepFrame;
-        const ratio = (drawn: number, source: number | undefined) => source && source > 0 && drawn > 0 ? drawn / source : 1;
-        const recordedFaceDraftScale = (existing.faceDraft ? existing.faceDraftSourceScale : undefined) ?? (existing.faceDraft ? {
-          // Editor-written drafts predate this field. Their output bounds
-          // include the taper, so they cannot be used to infer the source
-          // resize ratio; these shapes were only retained before resize support.
-          width: 1, depth: 1, height: 1,
-        } : {
-          width: ratio(existing.width, sourceFrame?.width ?? existing.importedMesh?.baseWidth),
-          depth: ratio(existing.depth, sourceFrame?.depth ?? existing.importedMesh?.baseDepth),
-          height: ratio(existing.height, sourceFrame?.height ?? existing.importedMesh?.baseHeight),
-        });
-        // Height is unchanged by face drafting, so a later dimension edit can
-        // be composed with the original scale without trying to infer scale
-        // from the tapered width/depth bounds.
-        const faceDraftSourceScale = existing.faceDraft && sourceFrame
-          ? { ...recordedFaceDraftScale, height: ratio(existing.height, sourceFrame.height) }
-          : recordedFaceDraftScale;
-        const rebuildScale = existing.faceDraft || faceDraftChanged
-          ? faceDraftSourceScale
-          : treatmentSourceScale ?? { width: 1, depth: 1, height: 1 };
-        // The extrusion is rebuilt at the height it was drawn and then scaled
-        // by `rebuildScale`, as its width is. Rebuilding a height-resized
-        // extrusion at its shown height applied that resize twice (#546).
-        const sourceHeight = existing.draftPrismSourceHeight ?? existing.faceDraftSourceFrame?.height
-          ?? (treatmentSourceScale ? treatmentSource!.height / treatmentSourceScale.height
-            : existing.height / rebuildScale.height);
-        try {
-          const rebuilt = await sketchExtrusionShapeFromRequest({
-            id: existing.id,
-            sketchSourceId: existing.sketchSourceId ?? `sketch/${existing.id}`,
-            name: existing.name,
-            color: existing.color,
-            hole: existing.hole,
-            profile: replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile,
-            height: sourceHeight,
-            x: 0,
-            z: 0,
-            elevation: 0,
-            rotation: existing.rotation,
-            rotationX: existing.rotationX,
-            rotationZ: existing.rotationZ,
-          });
-          const {
-            faceIds: _oldFaceIds,
-            faceColors: _faceColors,
-            edgeTreatments: _edgeTreatments,
-            edgeTreatmentHistory: _edgeTreatmentHistory,
-            faceDraft: _faceDraft,
-            cadDisplayEdges: _cadDisplayEdges,
-            cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
-            ...sourceMetadata
-          } = existing;
-          const draftPrismAngle = draftPrismChanged ? requestedDraftPrismAngle : existing.draftPrismAngle;
-          const rebuiltSource = {
-            ...sourceMetadata,
-            ...rebuilt,
-            mirrorX: existing.mirrorX,
-            mirrorY: existing.mirrorY,
-            mirrorZ: existing.mirrorZ,
-            ...retainedDraftSourcePlacement(
-              existing,
-              rebuilt.cadBrepFrame!,
-              existing.faceDraft && !hasExistingTreatment ? existing.cadBrepFrame : undefined,
-            ),
-            // A cleared draft's resize is not kept: the bounds carry it from here.
-            faceDraftSourceScale: clearingFaceDraft ? undefined
-              : existing.faceDraft || faceDraftChanged ? faceDraftSourceScale : existing.faceDraftSourceScale,
-            width: rebuilt.width * rebuildScale.width,
-            depth: rebuilt.depth * rebuildScale.depth,
-            height: rebuilt.height * rebuildScale.height,
-            size: Math.max(rebuilt.width * rebuildScale.width, rebuilt.depth * rebuildScale.depth),
-            id: existing.id,
-            sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
-            faceDraft: undefined,
-            faceDraftSourceFrame: undefined,
-            faceDraftSourceFaceIds: undefined,
-            faceDraftSourceSegmentId: undefined,
-            ...(faceDraftChanged && !replacingSketchProfile && !existing.faceDraft && !hasExistingTreatment
-              && existing.draftPrismAngle === undefined && existing.faceIds?.length === rebuilt.faceIds?.length
-              ? { faceIds: existing.faceIds }
-              : {}),
-            ...(!replacingSketchProfile && existing.faceDraft && existing.faceDraftSourceFaceIds?.length === rebuilt.faceIds?.length
-              ? { faceIds: existing.faceDraftSourceFaceIds }
-              : {}),
-            ...(draftPrismAngle === undefined ? {} : {
-              draftPrismSourceHeight: sourceHeight,
-              ...(sourceFrame ? { draftPrismSourceFrame: sourceFrame } : {}),
-            }),
-          };
-          const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
-            || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
-          const replayDraftAndTreatment = hasRetainedTreatments
-            && draftPrismAngle !== undefined
-            && (replacingSketchProfile || clearingFaceDraft || draftPrismChanged);
-          const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
-          const replayOriginal = clearingFaceDraft
-            ? { ...existing, faceDraft: undefined }
-            : replayFaceDraftAndTreatment && existing.faceDraft
-              ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
-              : existing;
-          const replayedSource = (replacingSketchProfile || clearingFaceDraft || draftPrismChanged || replayFaceDraftAndTreatment)
-            && hasRetainedTreatments
-            ? await replaySingleAllEdgeTreatment(
-              replayOriginal,
-              rebuiltSource,
-              draftPrismChanged ? requestedDraftPrismAngle : undefined,
-            )
-            : rebuiltSource;
-          if (requestedFaceDraft && replayedSource.faceDraft) {
-            swept = replayedSource;
-          } else if (requestedFaceDraft) {
-            // The resolver the editor's draft, edit and replay call too (#384).
-            const { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch } = await withCadKernel((cad) => resolveRetainedFaceDraft(cad, {
-              existing,
-              source: replayedSource,
-              request: requestedFaceDraft,
-              profileChanged: replacingSketchProfile,
-            }, (kernel, shape) => orientedSolidForShape(kernel, unmirroredDraftSource(shape as WorkplaneShape))));
-            const result = await applySketchFaceDraft(replayedSource, {
-              ...requestedFaceDraft,
-              sourceFaceId: currentFaceId,
-            });
-            // The same record the editor writes for a draft it makes (#384).
-            const drafted = shapeWithCadResult(replayedSource, result);
-            swept = {
-              ...retainDraftSourceMirrors(drafted, replayedSource),
-              ...(!replayedSource.mirrorX && !replayedSource.mirrorY && !replayedSource.mirrorZ
-                ? retainedDraftSourcePlacement({
-                    ...replayedSource,
-                    faceDraftSourceFrame: undefined,
-                    draftPrismSourceFrame: undefined,
-                  }, drafted.cadBrepFrame!)
-                : {}),
-              ...retainedFaceDraftFields(
-                replayedSource.faceIds,
-                existing,
-                { faceId: currentFaceId, normal: sourceFaceNormal, segmentMatch },
-                requestedFaceDraft,
-              ),
-              faceDraftSourceScale,
-            };
-          } else if (draftPrismAngle !== undefined && !replayDraftAndTreatment) {
-            swept = {
-              ...retainDraftSourceMirrors(
-                shapeWithCadResult(replayedSource, await applyDraftPrism(replayedSource, { angle: draftPrismAngle })),
-                replayedSource,
-              ),
-              draftPrismAngle,
-            };
-          } else {
-            swept = replayedSource;
-          }
-        } catch (error) {
-          return failed({ reason: "sweep_failed", message: error instanceof Error ? error.message : "The sketch extrusion could not be rebuilt." });
-        }
-      }
-      if ((replacingSketchProfile || faceDraftChanged) && isSketchSweep) {
-        const profileToBuild = replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile;
-        const invalidProfile = replacingSketchProfile ? invalidSketchSweepProfile(profileToBuild) : undefined;
-        if (invalidProfile) return failed({ reason: "invalid_shape_request", message: invalidProfile });
-        const frame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
-        try {
-          const rebuilt = await sketchSweepShapeFromRequest({
-            id: existing.id,
-            name: existing.name,
-            color: existing.color,
-            hole: existing.hole,
-            profile: profileToBuild,
-            x: existing.x - (frame?.x ?? 0),
-            z: existing.z - (frame?.z ?? 0),
-            elevation: (existing.elevation ?? 0) - (frame?.elevation ?? 0),
-            rotation: existing.rotation,
-            rotationX: existing.rotationX,
-            rotationZ: existing.rotationZ,
-          });
-          const baseDimensions = {
-            width: frame?.width ?? existing.importedMesh?.baseWidth ?? existing.width,
-            depth: frame?.depth ?? existing.importedMesh?.baseDepth ?? existing.depth,
-            height: frame?.height ?? existing.importedMesh?.baseHeight ?? existing.height,
-          };
-          const resized = {
-            ...rebuilt,
-            width: rebuilt.width * existing.width / Math.max(0.01, baseDimensions.width),
-            depth: rebuilt.depth * existing.depth / Math.max(0.01, baseDimensions.depth),
-            height: rebuilt.height * existing.height / Math.max(0.01, baseDimensions.height),
-          };
-          resized.size = Math.max(resized.width, resized.depth);
-          const refreshedFaceIds = (await shapeFaces(rebuilt))
-            .map((face) => `face_${createLocalId(`${existing.id}-${face.index}`)}`);
-          const {
-            faceIds: _oldFaceIds,
-            faceColors: _faceColors,
-            edgeTreatments: _edgeTreatments,
-            edgeTreatmentHistory: _edgeTreatmentHistory,
-            cadDisplayEdges: _cadDisplayEdges,
-            cadDisplayEdgesVersion: _cadDisplayEdgesVersion,
-            faceDraft: _faceDraft,
-            faceDraftSourceFrame: _faceDraftSourceFrame,
-            ...sourceMetadata
-          } = existing;
-          const rebuiltSweep = {
-            ...sourceMetadata,
-            ...resized,
-            mirrorX: existing.mirrorX,
-            mirrorY: existing.mirrorY,
-            mirrorZ: existing.mirrorZ,
-            id: existing.id,
-            sketchSourceId: existing.sketchSourceId ?? rebuilt.sketchSourceId,
-            faceIds: refreshedFaceIds,
-            faceDraft: undefined,
-            faceDraftSourceFrame: undefined,
-          };
-          const hasRetainedTreatments = (existing.edgeTreatments?.length ?? 0) > 0
-            || (existing.edgeTreatmentHistory?.length ?? 0) > 0;
-          const replayFaceDraftAndTreatment = hasRetainedTreatments && faceDraftChanged && requestedFaceDraft !== undefined;
-          const replayOriginal = clearingFaceDraft
-            ? { ...existing, faceDraft: undefined }
-            : replayFaceDraftAndTreatment && existing.faceDraft
-              ? { ...existing, faceDraft: { ...existing.faceDraft, ...requestedFaceDraft } }
-              : existing;
-          const replayedSource = (replacingSketchProfile || clearingFaceDraft || replayFaceDraftAndTreatment) && hasRetainedTreatments
-            ? await replaySingleAllEdgeTreatment(replayOriginal, rebuiltSweep)
-            : rebuiltSweep;
-          if (requestedFaceDraft && replayedSource.faceDraft) {
-            // `replaySingleAllEdgeTreatment` has already rebuilt the retained
-            // draft before its treatment; applying the draft again would try
-            // to operate on post-fillet topology and make source edits fail.
-            swept = replayedSource;
-          } else if (requestedFaceDraft) {
-            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
-              ? existing.faceDraft.sourceFaceNormal
-              : undefined;
-            const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(unmirroredDraftSource(existing), isExactSketchRevolve ? { topology: "exact" } : undefined))
-                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
-            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
-            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
-              throw new Error("The selected source face has no stable planar reference.");
-            }
-            const currentFace = await findUniqueDraftFace(unmirroredDraftSource(replayedSource), sourceFaceNormal);
-            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
-            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
-            const result = await applySketchFaceDraft(replayedSource, {
-              ...requestedFaceDraft,
-              sourceFaceId: currentFace.id,
-            });
-            swept = {
-              ...retainDraftSourceMirrors(shapeWithCadResult(replayedSource, result), replayedSource),
-              faceDraft,
-              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame,
-            };
-          } else {
-            swept = replayedSource;
-          }
-        } catch (error) {
-          return failed({
-            reason: "sweep_failed",
-            message: error instanceof Error ? error.message : "The sketch sweep could not be rebuilt",
-          });
-        }
-      }
-      if ((faceDraftChanged || (replacingSketchProfile && existing.faceDraft)
-        || (revolveChanges.length > 0 && existing.faceDraft)) && isSketchRevolve) {
-        try {
-          const runtime = await serverManifoldRuntime();
-          const sourceFrame = existing.faceDraftSourceFrame ?? existing.cadBrepFrame;
-          const rebuildSeed = sourceFrame ? {
-            ...existing,
-            x: sourceFrame.x,
-            z: sourceFrame.z,
-            elevation: sourceFrame.elevation,
-          } : existing;
-          const rebuiltAtNaturalScale = rebuiltRevolveShape(runtime, rebuildSeed, {
-            profile: (replacingSketchProfile ? changes.sketchProfile : existing.sketchProfile) as NonNullable<WorkplaneShape["sketchProfile"]>,
-            settings: revolveChanges.length > 0
-              ? requestedRevolveSettings(existing.sketchRevolve!, changes)
-              : existing.sketchRevolve!,
-          });
-          const sourceScale = existing.faceDraftSourceScale ?? revolveSourceScale(existing);
-          const rebuilt = resizeRebuiltRevolve(rebuiltAtNaturalScale, sourceScale);
-          if (requestedFaceDraft) {
-            const exactBase = {
-              ...retainDraftSourceMirrors(shapeWithCadResult(rebuilt, await exactPlainSketchRevolveResult(rebuilt)), rebuilt),
-              faceDraftSourceScale: sourceScale,
-            };
-            const priorReference = existing.faceDraft?.sourceFaceId === requestedFaceDraft.sourceFaceId
-              ? existing.faceDraft.sourceFaceNormal
-              : undefined;
-            const selectedOnPrior = priorReference ? undefined
-              : (await shapeFaces(unmirroredDraftSource(existing), { topology: "exact" }))
-                .find((face) => face.id === requestedFaceDraft.sourceFaceId);
-            const sourceFaceNormal = priorReference ?? selectedOnPrior?.normal;
-            if (!sourceFaceNormal || selectedOnPrior && selectedOnPrior.surfaceType !== "plane") {
-              throw new Error("The selected source face has no stable planar reference.");
-            }
-            const currentFace = await findUniqueDraftFace(unmirroredDraftSource(exactBase), sourceFaceNormal);
-            if (!currentFace) throw new Error("The selected source face is missing or ambiguous after the sketch edit.");
-            const faceDraft = { ...requestedFaceDraft, sourceFaceNormal };
-            const result = await applySketchFaceDraft(exactBase, {
-              ...requestedFaceDraft,
-              sourceFaceId: currentFace.id,
-            });
-            swept = {
-              ...retainDraftSourceMirrors(shapeWithCadResult(exactBase, result), exactBase),
-              faceDraft,
-              faceDraftSourceFrame: existing.faceDraftSourceFrame ?? existing.cadBrepFrame ?? exactBase.cadBrepFrame,
-              faceDraftSourceScale: sourceScale,
-            };
-            swept = await replaySingleAllEdgeTreatment(existing, swept);
-          } else {
-            const clearedDraft = {
-              ...rebuilt,
-              faceDraft: undefined,
-              faceDraftSourceFrame: undefined,
-              faceDraftSourceScale: undefined,
-            };
-            swept = clearingFaceDraft
-              ? await replaySingleAllEdgeTreatment({ ...existing, faceDraft: undefined }, clearedDraft)
-              : clearedDraft;
-          }
-        } catch (error) {
-          return failed({
-            reason: "sweep_failed",
-            message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
-          });
-        }
-      } else if (replacingSketchProfile && isSketchRevolve) {
-        try {
-          const runtime = await serverManifoldRuntime();
-          const rebuilt = rebuiltRevolveShape(runtime, existing, {
-            profile: changes.sketchProfile as NonNullable<WorkplaneShape["sketchProfile"]>,
-            settings: existing.sketchRevolve!,
-          });
-          swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
-        } catch (error) {
-          return failed({
-            reason: "sweep_failed",
-            message: error instanceof Error ? error.message : "The sketch revolve could not be rebuilt.",
-          });
-        }
-      }
-      if (revolveChanges.length > 0 && sweptShape && !existing.faceDraft) {
-        const outline = changes.profile ?? changes.outline ?? outlineFromProfile(existing.sketchProfile!);
-        if (!outline) {
-          return failed({
-            reason: "unapplicable_fields",
-            kind: existing.kind,
-            fields: [...revolveChanges],
-            because: "outline_not_described",
-          });
-        }
-        const parsed = parseRevolveRequest({ profile: outline });
-        if (!parsed.ok) return failed({ reason: "invalid_shape_request", message: parsed.error });
-        try {
-          const runtime = await serverManifoldRuntime();
-          const rebuilt = rebuiltRevolveShape(runtime, existing, {
-            profile: parsed.profile,
-            settings: requestedRevolveSettings(existing.sketchRevolve!, changes),
-          });
-          swept = await replaySingleAllEdgeTreatment(existing, rebuilt);
-        } catch (error) {
-          return failed({
-            reason: "sweep_failed",
-            message: error instanceof Error ? error.message : "The revolve could not be rebuilt",
-          });
-        }
-      }
-
-      // The sweep's own fields are already applied, so they are kept out of the
-      // per-kind pass -- which would refuse them, the stored kind being `mesh`.
-      const sweepFields: readonly string[] = [
-        ...(sweptShape ? REVOLVE_CHANGE_FIELDS : REVOLVE_ONLY_FIELDS),
-        "sketchProfile",
-        "draftPrismAngle",
-        "faceDraft",
-      ];
-      // Shape summaries expose the source ID for identity; echoing a full
-      // summary into PATCH must not let callers replace that identity.
-      let requestedChanges = Object.fromEntries(
-        Object.entries(changes).filter(([field]) =>
-          field !== "sketchSourceId"
-          && field !== "faceIds"
-          && !(replacingSketchProfile && field === "faceColors")
-          && !sweepFields.includes(field)),
-      );
-      let changeBase = swept;
-      if (!replacingSketchProfile && changes.faceColors && typeof changes.faceColors === "object" && !Array.isArray(changes.faceColors)) {
-        const colors = changes.faceColors as Record<string, unknown>;
-        if (Object.keys(colors).some((key) => !/^\d+$/.test(key))) {
-          try {
-            const faces = await shapeFaces(existing);
-            const faceIds = existing.faceIds ?? faces.map((face) => face.id);
-            const known = new Set(faceIds);
-            if (Object.keys(colors).some((key) => !/^\d+$/.test(key) && !known.has(key))) {
-              return failed({ reason: "invalid_shape_request", message: "A face color references an unknown face ID." });
-            }
-            changeBase = { ...swept, faceIds };
-            requestedChanges = {
-              ...requestedChanges,
-              faceColors: Object.fromEntries(Object.entries(colors).map(([key, color]) => [
-                /^\d+$/.test(key) ? (faceIds[Number(key)] ?? key) : key,
-                color,
-              ])),
-            };
-          } catch (error) {
-            return failed(cadFailure(error));
-          }
-        }
-      }
-      const changed = shapeWithRequestedChanges(changeBase, Object.fromEntries(
-        Object.entries(requestedChanges),
-      ));
-      if (!changed.ok) {
-        return failed({
-          reason: "unapplicable_fields",
-          kind: existing.kind,
-          fields: changed.unapplicable,
-          because: "not_this_kind",
-        });
-      }
-
-      const geometryFields = ["width", "depth", "height", "size", ...Object.keys(SHAPE_PARAMETERS)];
-      const geometryChanged = geometryFields.some((field) =>
-        JSON.stringify((existing as unknown as Record<string, unknown>)[field])
-        !== JSON.stringify((changed.shape as unknown as Record<string, unknown>)[field]),
-      );
-      let updatedShape = changed.shape;
-      if (existing.kind === "mesh" && existing.importedMesh && !existing.cadBrep
-        && ["rotation", "rotationX", "rotationZ"].some((field) => field in requestedChanges)) {
-        const previousMesh = worldMeshForShape(existing);
-        const mesh = worldMeshForShape(updatedShape);
-        if (previousMesh?.vertices.length && mesh?.vertices.length) {
-          const lowestPointOf = (vertices: Array<[number, number, number]>) =>
-            vertices.reduce((lowest, [, y]) => Math.min(lowest, y), Number.POSITIVE_INFINITY);
-          const previousLowestPoint = lowestPointOf(previousMesh.vertices);
-          const lowestPoint = lowestPointOf(mesh.vertices);
-          const targetElevation = typeof requestedChanges.elevation === "number"
-            ? requestedChanges.elevation
-            : previousLowestPoint;
-          updatedShape = {
-            ...updatedShape,
-            elevation: (updatedShape.elevation ?? 0) + targetElevation - lowestPoint,
-          };
-        }
-      }
-      if (!replacingSketchProfile && geometryChanged && (existing.faceIds?.length || existing.faceColors)) {
-        try {
-          updatedShape = await preserveUnambiguousFaceMetadata(existing, changed.shape);
-        } catch (error) {
-          return failed(cadFailure(error));
-        }
-      }
-
-      if (sourceSketchTarget) {
-        const candidate = replaceSketchOutput(document.shapes, shapeId, updatedShape);
-        if (candidate.matchCount !== 1) {
-          return failed({
-            reason: "sweep_failed",
-            message: candidate.matchCount === 0
-              ? `Sketch source ${shapeId} has no output node.`
-              : `Sketch source ${shapeId} has multiple output nodes.`,
-          });
-        }
-        const recomputed = await recompute({ ...document, shapes: candidate.shapes }, [shapeId], document);
-        if (!recomputed.ok) {
-          return failed({
-            reason: "sweep_failed",
-            message: recomputed.message ?? (recomputed.reason === "dependency_ambiguous"
-              ? "The sketch source has multiple dependent outputs."
-              : "The sketch source has no dependent output."),
-          });
-        }
-        return ok({ shape: recomputed.updated, revision: await writeShapes(projectId, document, recomputed.shapes) });
-      }
-      const shapes = document.shapes.map((shape) => (shape.id === existing.id ? updatedShape : shape));
-      return ok({ shape: updatedShape, revision: await writeShapes(projectId, document, shapes) });
+      const changed = await changeShapeIn(document, shapeId, changes);
+      if (!changed.ok) return changed;
+      // A literal value replaces the expression bound to that field, named or changed by a rebuild.
+      const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
+      const drifted = Object.keys(changed.value.shape.expressions ?? {})
+        .filter((field) => previous && boundFieldValue(previous, field) !== boundFieldValue(changed.value.shape, field));
+      const literal = [...boundFieldsNamedBy(changes), ...drifted];
+      const unbound = withoutBindings(changed.value.shape, literal);
+      const shapes = unbound === changed.value.shape
+        ? changed.value.shapes
+        : replaceShapeInTree(changed.value.shapes, unbound);
+      return ok({ shape: unbound, revision: await writeShapes(projectId, document, shapes) });
     }),
 
     removeShape: (projectId, shapeId) => mutating(projectId, async (document) => {
@@ -1531,7 +1790,7 @@ export function createEngine(store: ProjectStore): Engine {
         // The copy turns about the ring's centre, so its own rotation gains the
         // same angle the placement did.
         return canonicalizeShape({
-          ...clone,
+          ...withoutBindings(clone, ["x", "z", ...(placement.rotation === 0 ? [] : ["rotation"])]),
           x: storedCoordinate(clone.x + placement.dx),
           z: storedCoordinate(clone.z + placement.dz),
           rotation: placement.rotation === 0 ? clone.rotation : cleanRotationDegrees(clone.rotation + placement.rotation),
@@ -1594,7 +1853,8 @@ export function createEngine(store: ProjectStore): Engine {
 
       // A group can have been moved, turned and resized since it was made, so
       // its children come back carrying all of that.
-      const children = restoreGroupedChildren(found.value);
+      // Children come back in world placement, so group-local shape bindings no longer apply.
+      const children = restoreGroupedChildren(found.value).map(withoutShapeBindings);
       const shapes = [...document.shapes.filter((shape) => shape.id !== shapeId), ...children];
       return ok({ shapes: children, revision: await writeShapes(projectId, document, shapes) });
     }),
@@ -1605,7 +1865,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (found.value.locked) return failed({ reason: "shape_locked", ids: [shapeId] });
       if (found.value.hole) return failed({ reason: "hole_has_no_parts" });
 
-      const parts = separateShapeParts(found.value);
+      const parts = separateShapeParts(found.value).map(withoutAnyBindings);
       // A shape built from parameters is one body by construction, so this is
       // answered without meshing anything.
       if (parts.length <= 1) return failed({ reason: "single_body" });
@@ -1622,7 +1882,7 @@ export function createEngine(store: ProjectStore): Engine {
       const source = assetId ? document.assets.find((asset) => asset.id === assetId) : undefined;
       if (!source) return failed({ reason: "cad_refused", message: "The imported STEP source asset is no longer available.", status: 422 });
       try {
-        const parts = await explodeStepAssembly(found.value, source);
+        const parts = (await explodeStepAssembly(found.value, source)).map(withoutAnyBindings);
         const index = document.shapes.findIndex((shape) => shape.id === shapeId);
         const shapes = [...document.shapes.slice(0, index), ...parts, ...document.shapes.slice(index + 1)];
         return ok({ shapes: parts, revision: await writeShapes(projectId, document, shapes) });
@@ -1773,7 +2033,8 @@ export function createEngine(store: ProjectStore): Engine {
           : (bounds.minZ + bounds.maxZ) / 2;
       const changed: WorkplaneShape[] = [];
       try {
-        for (const shape of resolved.value) changed.push(await applyBakedMirror(shape, axis, pivot));
+        // Baking rewrites placement into the solid, so bound placement and size are literals now.
+        for (const shape of resolved.value) changed.push(withoutShapeBindings(await applyBakedMirror(shape, axis, pivot)));
       } catch (error) {
         return failed(cadFailure(error));
       }
@@ -1795,5 +2056,35 @@ export function createEngine(store: ProjectStore): Engine {
         ...(request.openFaces?.length ? { openFaces: [...request.openFaces] } : {}),
       },
     })),
+
+    addParameter: (projectId, input) => parameterOperation(projectId, (project) => addTableParameter(project, input)),
+    updateParameter: (projectId, name, changes) => parameterOperation(projectId, (project) => updateTableParameter(project, name, changes)),
+    renameParameter: (projectId, oldName, newName) => parameterOperation(projectId, (project) => renameTableParameter(project, oldName, newName)),
+    deleteParameter: (projectId, name) => parameterOperation(projectId, (project) => deleteTableParameter(project, name)),
+
+    bindShapeField: (projectId, shapeId, field, expression) => mutating(projectId, async (document) => {
+      const found = findShapeInTree(document.shapes, shapeId);
+      if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+      if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
+      if (expression === null) {
+        const unbound = withoutBindings(found.shape, [field]);
+        if (unbound === found.shape) return ok({ shape: found.shape, revision: documentRevision(document) });
+        return ok({ shape: unbound, revision: await writeShapes(projectId, document, replaceShapeInTree(document.shapes, unbound)) });
+      }
+      if (bindableField(found.shape, field)?.target === "shape" && !found.topLevel) {
+        return failed({ reason: "binding_invalid", error: { code: "fieldNotBindable", shapeId, field, message: `${field} binds on top-level shapes only.` } });
+      }
+      const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
+      if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
+      const bound = { ...found.shape, expressions: { ...found.shape.expressions, [field]: expression } };
+      let shapes = replaceShapeInTree(document.shapes, bound);
+      if (boundFieldValue(found.shape, field) !== resolved.value) {
+        const applied = await applyBindingValues({ ...document, shapes }, shapeId, { [field]: resolved.value });
+        if (!applied.ok) return failed({ reason: "binding_failed", shapeId, fields: [field], failure: applied.failure });
+        shapes = applied.value;
+      }
+      const shape = findShapeInTree(shapes, shapeId)?.shape ?? bound;
+      return ok({ shape, revision: await writeShapes(projectId, document, shapes) });
+    }),
   };
 }
