@@ -27,6 +27,8 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "parameter_not_found",
     "parameter_exists",
     "parameter_in_use",
+    "configuration_not_found",
+    "configuration_exists",
     "invalid_expression",
     "unsupported_kind",
     "unsupported_format",
@@ -151,6 +153,16 @@ class SketchForgeApiError(SketchForgeError):
     def is_parameter_in_use(self) -> bool:
         """A delete was refused; ``dependents`` and ``shape_dependents`` name what still uses it."""
         return self.code == "parameter_in_use"
+
+    @property
+    def is_configuration_missing(self) -> bool:
+        """No parameter configuration has that name."""
+        return self.code == "configuration_not_found"
+
+    @property
+    def is_configuration_duplicate(self) -> bool:
+        """A parameter configuration with that name already exists."""
+        return self.code == "configuration_exists"
 
     @property
     def _detail(self) -> Dict[str, Any]:

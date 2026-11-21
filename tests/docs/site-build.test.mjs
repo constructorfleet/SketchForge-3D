@@ -96,8 +96,8 @@ test("documentation status records durable capabilities and outstanding requirem
   const shippedCapabilities = capabilities.split("## Remaining gaps, ranked")[0];
 
   assert.match(spec, /Current implementation status/i);
-  assert.match(spec, /37 operations; generated OpenAPI describes 33 and explains why 4 remain omitted/i);
-  assert.match(spec, /All 33 non-OPTIONS resource operations have runtime schemas and response validation/i);
+  assert.match(spec, /42 operations; generated OpenAPI describes 38 and explains why 4 remain omitted/i);
+  assert.match(spec, /All 38 non-OPTIONS resource operations have runtime schemas and response validation/i);
   assert.match(spec, /Pages reference per resource operation with operation ID, method\/path, auth, parameters, request body, responses, errors, and source links/i);
   assert.doesNotMatch(spec, /Additional runtime schemas and route response validations remain outstanding/i);
   assert.doesNotMatch(spec, /complete REST contracts, all-language runnable-block coverage/i);
@@ -120,7 +120,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /does not establish general topology lineage/i);
   assert.match(spec, /The editor writes the same retained face and prism drafts on an eligible sketch extrusion, and its arbitrary-shape face-draft workflow remains baked/i);
   assert.doesNotMatch(spec, /The editor's arbitrary-shape face-draft workflow remains baked/i);
-  assert.match(spec, /OpenAPI baseline (?:is|remains) 33 of 37 operations; the four omitted operations are `OPTIONS` preflights/i);
+  assert.match(spec, /OpenAPI baseline (?:is|remains) 38 of 42 operations; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /Seven generators write tracked output/i);
   assert.match(spec, /`docs\/openapi-v1\.json` is linked directly from `docs\/REST_API\.md`/i);
   assert.match(spec, /Pull-request docs CI runs `docs:generate` before generated-output verification and the site build/i);
@@ -136,14 +136,14 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.doesNotMatch(spec, /PR \[#216\]/i);
   assert.match(spec, /external failures do\s+not fail the required local docs check or site build/i);
   assert.match(spec, /drift alone does not fail the docs build/i);
-  assert.match(spec, /all 33 non-OPTIONS resource operations have runtime-backed request\/response contracts/i);
+  assert.match(spec, /all 38 non-OPTIONS resource operations have runtime-backed request\/response contracts/i);
   assert.match(spec, /Stable ownership metadata is enforced for all maintained `docs\/\*\*\/\*\.md` pages/i);
   assert.match(spec, /Changed-source-to-page diagnostics are implemented for the REST route tree, the REST guide's included `docs\/examples\/rest-hole-plate\.mjs` fixture, TypeScript client source and MCP trees, engine source, and Python client source/i);
   assert.match(spec, /selected editor sources now include `apps\/web\/src\/components\/SketchForgeEditor\.tsx`, `apps\/web\/src\/components\/SketchWorkspace\.tsx`, and `apps\/web\/src\/lib\/sketchConstraints\.ts`; the editor component maps to both edit-and-export and sketch-constraints guides/i);
   assert.match(spec, /face-drafting guide[’']s browser acceptance covers one supported inspector case: face 1, local \+Z pull axis, and -5°; it captures a screenshot/i);
   assert.match(spec, /Current implementation status:[\s\S]*?Browser acceptance also covers the STEP assembly workflow from editor import through the actual `.skf` download to local MCP import and explode\.[\s\S]*?`tests\/browser\/editor-quickstart\.test\.mjs`/i);
   assert.match(spec, /Other face-drafting combinations and most task-oriented editor workflows remain untested/i);
-  assert.match(spec, /current baseline is 33 of 37 operations with runtime-backed request\/response contracts in generated OpenAPI; the four omitted operations are `OPTIONS` preflights/i);
+  assert.match(spec, /current baseline is 38 of 42 operations with runtime-backed request\/response contracts in generated OpenAPI; the four omitted operations are `OPTIONS` preflights/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
   assert.doesNotMatch(spec, /Page ownership metadata and source-to-owning-page diagnostics remain incomplete/i);
   assert.match(spec, /Desktop configuration ownership is met for `SKETCHFORGE_DESKTOP_PORT`, which has a registry row, implementation source, and owner page/i);
@@ -168,7 +168,7 @@ test("documentation status records durable capabilities and outstanding requirem
   assert.match(spec, /`tests\/unit\/localMcpEngine\.test\.ts` separately covers the local MCP import\/explode path/i);
   assert.match(spec, /End-to-end coverage from every changed source to its owning page and tested example remains open/i);
 
-  assert.match(migration, /33 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The four `OPTIONS`\s+preflights are intentionally omitted; all resource route coverage is complete/i);
+  assert.match(migration, /38 operations have runtime-backed request and\s+response contracts and appear in generated OpenAPI\. The four `OPTIONS`\s+preflights are intentionally omitted; all resource route coverage is complete/i);
   assert.match(migration, /REST contracts and generated operation pages — met for resource operations/i);
   assert.doesNotMatch(migration, /Complete REST reference: add runtime-backed request\/response contracts/i);
   assert.match(migration, /desktop entry includes `SKETCHFORGE_DESKTOP_PORT`/i);

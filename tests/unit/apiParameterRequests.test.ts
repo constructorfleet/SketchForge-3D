@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { API_V1_OPERATIONS, validateApiV1Schema, type ApiV1FieldSchema } from "@/lib/apiV1OperationContract";
 import {
+  API_CONFIGURATION_NAME_MAX_LENGTH,
   API_PARAMETER_EXPRESSION_MAX_LENGTH,
   API_PARAMETER_NAME_MAX_LENGTH,
   apiParameterName,
+  isApiConfigurationActivateRequest,
+  isApiConfigurationChangeRequest,
+  isApiConfigurationCreateRequest,
   isApiParameterChangeRequest,
   isApiParameterCreateRequest,
 } from "@constructorfleet/sketchforge-engine/apiParameters";
@@ -71,5 +75,41 @@ describe("parameter request checks", () => {
     expect(apiConstraintId(" width ")).toBe("width");
     expect(apiConstraintId(" ")).toBeUndefined();
     expect(apiConstraintId("x".repeat(rule.maxLength + 1))).toBeUndefined();
+  });
+
+  it("agree with the published configuration schemas", () => {
+    const create = schemaFor("POST /api/v1/parameter-configurations");
+    const change = schemaFor("PATCH /api/v1/parameter-configurations");
+    const activate = schemaFor("POST /api/v1/parameter-configurations/activate");
+    const configurationBodies: unknown[] = [
+      ...bodies,
+      [],
+      null,
+      { name: "x".repeat(API_CONFIGURATION_NAME_MAX_LENGTH) },
+      { name: "x".repeat(API_CONFIGURATION_NAME_MAX_LENGTH + 1) },
+      { name: null },
+      { name: "Large", overrides: {} },
+      { name: "Large", overrides: { wall: "4" } },
+      { name: "Large", overrides: { wall: 4 } },
+      { name: "Large", overrides: { wall: " " } },
+      { name: "Large", overrides: ["wall"] },
+      { name: "Large", overrides: null },
+      { name: "Large", extra: 1 },
+      { parameter: "wall", expression: "4" },
+      { parameter: "wall", expression: null },
+      { parameter: "wall", expression: " " },
+      { parameter: "wall", expression: 4 },
+      { parameter: "wall" },
+      { parameter: "", expression: "4" },
+      { parameter: "x".repeat(API_PARAMETER_NAME_MAX_LENGTH + 1), expression: "4" },
+      { parameter: "wall", expression: "4", name: "Large" },
+      { expression: "4" },
+    ];
+    for (const body of configurationBodies) {
+      const label = JSON.stringify(body)?.slice(0, 80);
+      expect(isApiConfigurationCreateRequest(body), `POST ${label}`).toBe(validateApiV1Schema(body, create));
+      expect(isApiConfigurationChangeRequest(body), `PATCH ${label}`).toBe(validateApiV1Schema(body, change));
+      expect(isApiConfigurationActivateRequest(body), `activate ${label}`).toBe(validateApiV1Schema(body, activate));
+    }
   });
 });

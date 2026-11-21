@@ -231,7 +231,7 @@ const shapeSummary = {
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
 } as const;
-const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "parameter_not_found", "parameter_exists", "parameter_in_use", "invalid_expression", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "parameter_not_found", "parameter_exists", "parameter_in_use", "configuration_not_found", "configuration_exists", "invalid_expression", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
 const limitErrorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["limit_exceeded"] }, limit: int, given: int }, additionalProperties: false } as const;
 const faceError = (...codes: string[]): ApiV1FieldSchema => {
   const conditionalWriteError = codes.includes("project_busy") || codes.includes("shape_locked");
@@ -623,17 +623,19 @@ const parameterWrite = {
   },
   additionalProperties: false,
 } as const;
+const activeConfigurationSchema = { type: "string", nullable: true, description: "The active parameter configuration, or null for the base table." } as const;
 const parameterOperations = [
   {
     ...operation("GET", "/api/v1/parameters", "listParameters", [200, ...commonErrors]),
-    description: "Lists the project's parameter table with resolved values, and the shape bindings that no longer resolve.",
+    description: "Lists the project's parameter table with values resolved under the active configuration, and the shape bindings that no longer resolve.",
     query: projectQuery,
     responseSchemas: {
       200: {
         type: "object",
-        required: ["parameters", "bindingIssues", "constraintBindingIssues", "revision"],
+        required: ["parameters", "activeConfiguration", "bindingIssues", "constraintBindingIssues", "revision"],
         properties: {
           parameters: { type: "array", items: parameterSchema },
+          activeConfiguration: activeConfigurationSchema,
           bindingIssues: { type: "array", items: bindingIssueSchema },
           constraintBindingIssues: { type: "array", items: constraintBindingIssueSchema },
           revision: num,
@@ -717,6 +719,101 @@ const sketchConstraintOperation = {
     400: constraintErrorSchema, 401: errorSchema, 404: constraintErrorSchema, 409: constraintErrorSchema, 422: constraintErrorSchema, 500: errorSchema, 503: errorSchema,
   },
 } as const satisfies ApiV1Operation;
+const configurationName = { type: "string", minimumLength: 1, maximumLength: 100, description: "1 to 100 characters, with no control characters or surrounding whitespace." } as const;
+const configurationSchema = {
+  type: "object",
+  required: ["name", "overrides"],
+  properties: {
+    name: str,
+    overrides: { type: "object", description: "Parameter name to override expression. A parameter not listed keeps its base expression.", additionalProperties: str },
+  },
+  additionalProperties: false,
+} as const;
+const configurationIssueSchema = {
+  type: "object",
+  required: ["configuration", "parameter", "code", "message"],
+  properties: { configuration: str, parameter: str, code: str, message: str, expressionError: expressionErrorSchema },
+  additionalProperties: false,
+} as const;
+const configurationQuery = {
+  required: ["projectId", "name"],
+  properties: { ...projectQuery.properties, name: { type: "string", minLength: 1, maxLength: 100, description: "The configuration to change or delete." } },
+} as const;
+const configurationState = {
+  configurations: { type: "array", items: configurationSchema },
+  activeConfiguration: activeConfigurationSchema,
+  parameters: { type: "array", description: "Base expressions, with values resolved under the active configuration.", items: parameterSchema },
+  issues: { type: "array", description: "Configuration entries that fail although their base entry resolves, and overrides of unknown parameters.", items: configurationIssueSchema },
+} as const;
+const configurationStateRequired = ["configurations", "activeConfiguration", "parameters", "issues"] as const;
+const configurationWrite = (extra: Readonly<Record<string, ApiV1FieldSchema>>, required: readonly string[]) => ({
+  type: "object",
+  required: [...required, ...configurationStateRequired, "shapes", "revision"],
+  properties: {
+    ...extra,
+    ...configurationState,
+    shapes: { type: "array", description: "Top-level shapes this write rebuilt, as GET /shapes now reports them. Empty unless the active table changed.", items: shapeSummary },
+    revision: num,
+  },
+  additionalProperties: false,
+}) as const;
+const configurationWriteErrors = { ...parameterReadErrors, 422: parameterErrorSchema } as const;
+const configurationOperations = [
+  {
+    ...operation("GET", "/api/v1/parameter-configurations", "listParameterConfigurations", [200, ...commonErrors]),
+    description: "Lists the project's parameter configurations, the active one, and the overrides that no longer resolve.",
+    query: projectQuery,
+    responseSchemas: {
+      200: { type: "object", required: [...configurationStateRequired, "revision"], properties: { ...configurationState, revision: num }, additionalProperties: false },
+      ...parameterReadErrors,
+    },
+  },
+  {
+    ...operation("POST", "/api/v1/parameter-configurations", "createParameterConfiguration", [201, 400, 401, 404, 409, 413, 422, 500, 503], json({
+      type: "object",
+      required: ["name"],
+      properties: { name: configurationName, overrides: { type: "object", additionalProperties: parameterExpression } },
+      additionalProperties: false,
+    })),
+    description: "Appends a configuration. Every override must name a parameter and resolve. Creating one does not activate it.",
+    query: projectQuery,
+    responseSchemas: { 201: configurationWrite({ configuration: configurationSchema }, ["configuration"]), ...configurationWriteErrors },
+  },
+  {
+    ...operation("PATCH", "/api/v1/parameter-configurations", "updateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object",
+      oneOf: [
+        { type: "object", required: ["name"], properties: { name: configurationName }, additionalProperties: false },
+        {
+          type: "object",
+          required: ["parameter", "expression"],
+          properties: { parameter: parameterName, expression: { ...parameterExpression, nullable: true, description: "The override expression, or null to clear the override." } },
+          additionalProperties: false,
+        },
+      ],
+    })),
+    description: "Renames a configuration (send name alone), or sets or clears one parameter override. An override change to the active configuration rebuilds every bound shape in the same write.",
+    query: configurationQuery,
+    responseSchemas: { 200: configurationWrite({ configuration: configurationSchema }, ["configuration"]), ...configurationWriteErrors },
+  },
+  {
+    ...operation("DELETE", "/api/v1/parameter-configurations", "deleteParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503]),
+    description: "Deletes a configuration. Deleting the active one switches to the base table and rebuilds bound shapes.",
+    query: configurationQuery,
+    responseSchemas: { 200: configurationWrite({ deleted: { type: "boolean" }, name: str }, ["deleted", "name"]), ...configurationWriteErrors },
+  },
+  {
+    ...operation("POST", "/api/v1/parameter-configurations/activate", "activateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object",
+      required: ["name"],
+      properties: { name: { ...configurationName, nullable: true, description: "The configuration to activate, or null for the base table." } },
+      additionalProperties: false,
+    })),
+    description: "Switches the active configuration, or to the base table for null, and rebuilds every bound shape in the same write. A refused switch writes nothing.",
+    query: projectQuery,
+    responseSchemas: { 200: configurationWrite({}, []), ...configurationWriteErrors },
+  },
+] as const satisfies readonly ApiV1Operation[];
 
 const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
 const patternRequest = {
@@ -1157,6 +1254,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
   shapeOperations[3],
   ...parameterOperations,
   sketchConstraintOperation,
+  ...configurationOperations,
   ...featureOperations.slice(2, 3),
   {
     ...operation("GET", "/api/v1/thickness", "estimateThickness", [200, 400, 401, 404, 413, 422, 500, 503]),

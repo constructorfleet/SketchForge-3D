@@ -349,6 +349,9 @@ export type ProjectRead = {
   workspace: ProjectDocument["workspace"];
   /** The resolved parameter table. */
   parameters: ProjectParameter[];
+  configurations: ProjectConfiguration[];
+  /** Null for the base table. */
+  activeConfiguration: string | null;
 };
 
 export type AlignRequest = {
@@ -1871,6 +1874,8 @@ export function createEngine(store: ProjectStore): Engine {
       snapGrid: document.snapGrid,
       workspace: document.workspace,
       parameters: document.parameters ?? [],
+      configurations: document.configurations ?? [],
+      activeConfiguration: document.activeConfiguration ?? null,
     })),
 
     addShapes: async (projectId, requests) => {
