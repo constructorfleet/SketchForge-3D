@@ -12,7 +12,7 @@ import {
   type ParameterEdit,
   type ParameterMessage,
 } from "@/lib/projectParameterEdits";
-import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
+import type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
 
 const DIMENSIONS: readonly ProjectParameterDimension[] = ["length", "angle", "unitless"];
 
@@ -24,12 +24,15 @@ export type ParameterEditHandler = (edit: ParameterEdit) => Promise<ParameterMes
 
 export function ProjectParametersPanel({
   parameters,
+  configurations = [],
   shapes,
   busy,
   onEdit,
   onClose,
 }: {
   parameters: readonly ProjectParameter[];
+  /** Read for the delete warning: an override that uses a parameter blocks deleting it. */
+  configurations?: readonly ProjectConfiguration[];
   shapes: readonly WorkplaneShape[];
   busy: boolean;
   onEdit: ParameterEditHandler;
@@ -104,7 +107,7 @@ export function ProjectParametersPanel({
   };
 
   const requestDelete = (name: string) => {
-    const warning = parameterDeleteWarning({ parameters: [...parameters], shapes: [...shapes] }, name);
+    const warning = parameterDeleteWarning({ parameters: [...parameters], shapes: [...shapes], configurations }, name);
     if (!warning) {
       void submit(name, "name", { kind: "delete", name });
       return;
@@ -322,11 +325,12 @@ function DeleteWarning({
   onRelease: () => void;
 }) {
   const t = useTranslations();
-  const blocked = warning.parameters.length > 0;
+  const blocked = warning.parameters.length > 0 || warning.configurations.length > 0;
   return (
     <div className="parameters-delete-warning" role="alert">
       <strong>{t("editor.parameters.inUse", { name })}</strong>
       {warning.parameters.length ? <p>{t("editor.parameters.usedByParameters", { names: warning.parameters.join(", ") })}</p> : null}
+      {warning.configurations.length ? <p>{t("editor.parameters.usedByConfigurations", { names: warning.configurations.join(", ") })}</p> : null}
       {warning.shapes.length ? (
         <>
           <p>{t("editor.parameters.usedByShapes")}</p>

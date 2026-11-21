@@ -77,6 +77,7 @@ test("the parameter panel edits, refuses inline, recomputes, undoes in one step,
     snapGrid: "1.0 mm",
     placementElevation: 0,
     parameters,
+    configurations: [{ name: "Wide", overrides: { stale: "w * 3" } }],
   }));
   const { baseURL, stop } = await startNextServer();
   let browser;
@@ -199,6 +200,7 @@ test("the parameter panel edits, refuses inline, recomputes, undoes in one step,
     await warning.waitFor();
     assert.match(await warning.textContent(), /w is still in use/);
     assert.match(await warning.textContent(), /Parameters using it: half/);
+    assert.match(await warning.textContent(), /Configurations using it: Wide/);
     assert.match(await warning.textContent(), /Bound box: width/);
     assert.equal(await warning.getByRole("button", { name: "Delete and keep shape values" }).count(), 0, "a parameter dependent blocks the delete");
     await warning.getByRole("button", { name: "Cancel" }).click();

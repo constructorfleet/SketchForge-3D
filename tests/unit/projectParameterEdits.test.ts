@@ -125,9 +125,10 @@ describe("parameterDeleteWarning", () => {
   it("lists dependent parameters and shapes by name", () => {
     expect(parameterDeleteWarning(project(), "depth")).toEqual({
       parameters: [],
+      configurations: [],
       shapes: [{ shapeId: "box-1", name: "Box", fields: ["width"], constraints: [] }],
     });
-    expect(parameterDeleteWarning(project(), "wall")).toEqual({ parameters: ["depth"], shapes: [] });
+    expect(parameterDeleteWarning(project(), "wall")).toEqual({ parameters: ["depth"], configurations: [], shapes: [] });
     expect(parameterDeleteWarning(project(), "spare")).toBeNull();
   });
 });

@@ -7,10 +7,11 @@ import {
   mergeRecomputedShapes,
   parameterDeleteWarning,
   parameterRecomputeResponseMessage,
+  parameterStateKey,
   planParameterEdit,
   recomputeScope,
 } from "@/lib/projectParameterEdits";
-import type { WorkplaneShape } from "@/types/sketchforge";
+import type { ProjectConfiguration, WorkplaneShape } from "@/types/sketchforge";
 
 function table(entries: ProjectParameterInput[]) {
   const resolved = resolveProjectParameters(entries);
@@ -136,7 +137,7 @@ describe("sketch constraint bindings (#612)", () => {
 
   it("are listed before delete and released with the shapes, keeping the value", () => {
     const project = { parameters: before, shapes: [sketch("s", "free")] };
-    expect(parameterDeleteWarning(project, "free")).toEqual({ parameters: [], shapes: [{ shapeId: "s", name: "Sketch", fields: [], constraints: ["c1"] }] });
+    expect(parameterDeleteWarning(project, "free")).toEqual({ parameters: [], configurations: [], shapes: [{ shapeId: "s", name: "Sketch", fields: [], constraints: ["c1"] }] });
     const released = planParameterEdit(project, { kind: "delete", name: "free", releaseShapes: true });
     expect(released.ok).toBe(true);
     if (!released.ok) return;
@@ -148,12 +149,37 @@ describe("sketch constraint bindings (#612)", () => {
 
 describe("configurations (#618)", () => {
   function configured() {
-    const added = addConfiguration({ parameters: before, shapes: [box("a", { expressions: { width: "w" } })] }, { name: "Large", overrides: { w: "30" } });
+    const added = addConfiguration(
+      { parameters: before, shapes: [box("a", { expressions: { width: "w" } })], configurations: [] as ProjectConfiguration[], activeConfiguration: null as string | null },
+      { name: "Large", overrides: { w: "30" } },
+    );
     if (!added.ok) throw new Error(added.error.message);
     const active = activateConfiguration(added.project, "Large");
     if (!active.ok) throw new Error(active.error.message);
     return active.project;
   }
+
+  it("lists configurations that use a parameter, and they block the delete like parameters do", () => {
+    const added = addConfiguration({ parameters: before, shapes: [box("a", { expressions: { width: "free" } })] }, { name: "Wide", overrides: { w: "free * 3" } });
+    if (!added.ok) throw new Error(added.error.message);
+    expect(parameterDeleteWarning(added.project, "free")).toEqual({
+      parameters: [],
+      configurations: ["Wide"],
+      shapes: [{ shapeId: "a", name: "a", fields: ["width"], constraints: [] }],
+    });
+    expect(planParameterEdit(added.project, { kind: "delete", name: "free", releaseShapes: true }))
+      .toMatchObject({ ok: false, error: { code: "parameterInUse", configurationDependents: ["Wide"] } });
+  });
+
+  it("keys host state by table and configurations, so a remote configuration change is adopted", () => {
+    const project = configured();
+    const base = parameterStateKey(project.parameters, { configurations: [], activeConfiguration: null });
+    const configuredKey = parameterStateKey(project.parameters, { configurations: project.configurations!, activeConfiguration: "Large" });
+    expect(configuredKey).not.toBe(base);
+    expect(parameterStateKey(project.parameters, { configurations: project.configurations!, activeConfiguration: null })).not.toBe(configuredKey);
+    expect(parameterStateKey(project.parameters.map((parameter) => ({ ...parameter })), { configurations: [...project.configurations!], activeConfiguration: "Large" }))
+      .toBe(configuredKey);
+  });
 
   it("edits base expressions, resolving values under the active configuration", () => {
     const project = configured();

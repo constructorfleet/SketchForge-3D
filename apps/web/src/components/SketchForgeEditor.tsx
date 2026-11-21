@@ -175,7 +175,7 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterTableKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
@@ -5557,8 +5557,8 @@ export function SketchForgeEditor({
   const projectParametersRef = useRef(initialParameters);
   const projectConfigurationRef = useRef(initialConfiguration);
   const [projectParameters, setProjectParameters] = useState(initialParameters);
-  // The table the host last passed or was sent. A host prop equal to it is not a remote change.
-  const hostParametersKeyRef = useRef(parameterTableKey(initialParameters));
+  // The table and configurations the host last passed or was sent. An equal host prop is not a remote change.
+  const hostParametersKeyRef = useRef(parameterStateKey(initialParameters, initialConfiguration));
   const [parameterEditPending, setParameterEditPending] = useState(false);
   const parameterEditPendingRef = useRef(false);
   const adoptProjectParameters = useCallback((parameters: ProjectParameter[]) => {
@@ -6179,7 +6179,7 @@ export function SketchForgeEditor({
         projectSyncTimerRef.current = null;
         lastProjectShapesSyncRef.current = serialized;
         lastProjectShapesEchoRef.current = serialized;
-        hostParametersKeyRef.current = parameterTableKey(projectParametersRef.current);
+        hostParametersKeyRef.current = parameterStateKey(projectParametersRef.current, projectConfigurationRef.current);
         onProjectShapesChange({
           projectId,
           shapes: canonicalNext,
@@ -7240,8 +7240,6 @@ export function SketchForgeEditor({
     if (projectInteractionActiveRef.current) {
       return;
     }
-    // Configurations come from the host; the table follows `hostProjectSync` below.
-    projectConfigurationRef.current = initialConfiguration;
     const projectChanged = lastProjectIdRef.current !== projectId;
     if (projectChanged) {
       lastProjectIdRef.current = projectId;
@@ -7256,7 +7254,7 @@ export function SketchForgeEditor({
     }
     const incoming = initialShapes.map(canonicalizeShape);
     const incomingSerialized = projectShapesFingerprint(incoming);
-    const hostParametersKey = parameterTableKey(initialParameters);
+    const hostParametersKey = parameterStateKey(initialParameters, initialConfiguration);
     const sync = hostProjectSync({
       projectChanged,
       hostTableKey: hostParametersKey,
@@ -7268,6 +7266,7 @@ export function SketchForgeEditor({
     if (sync.adoptTable) {
       hostParametersKeyRef.current = hostParametersKey;
       adoptProjectParameters(initialParameters);
+      projectConfigurationRef.current = initialConfiguration;
     }
     // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
     if (sync.action === "echo") {
@@ -10813,6 +10812,7 @@ export function SketchForgeEditor({
       {topPanel === "parameters" ? (
         <ProjectParametersPanel
           parameters={projectParameters}
+          configurations={projectConfigurationRef.current.configurations}
           shapes={shapes}
           busy={parameterEditPending}
           onEdit={applyParameterEdit}

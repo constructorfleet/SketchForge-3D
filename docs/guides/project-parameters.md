@@ -96,14 +96,15 @@ model is unchanged.
 
 ## Delete a parameter that is in use
 
-When other parameters or shapes use a parameter, **Delete** shows a warning that
+When other parameters, configurations or shapes use a parameter, **Delete** shows a warning that
 lists them, with the bound fields and sketch constraints of each shape.
 
 ![The delete warning for post_d lists the Post shape and its bound fields.](../screenshots/parameter-panel-delete-warning.png)
 
 ![The same warning in the dark theme.](../screenshots/parameter-panel-dark.png)
 
-- If a parameter uses it, the delete is blocked. Change that parameter first.
+- If a parameter or a configuration override uses it, the delete is blocked.
+  Change that parameter or override first.
 - If only shapes use it, **Delete and keep shape values** removes the parameter
   and the field and constraint bindings that use it. Each shape keeps its current size and stops
   following the parameter. Undo restores the parameter and the bindings.

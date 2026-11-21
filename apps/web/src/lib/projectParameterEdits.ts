@@ -96,7 +96,9 @@ function runEdit(project: ParameterProject, edit: ParameterEdit): ProjectParamet
       return renameParameter(project, edit.name, edit.newName);
     case "delete": {
       const dependents = projectParameterDependents(project, edit.name);
-      if (!edit.releaseShapes || dependents.parameters.length || (!dependents.shapes.length && !dependents.sketchConstraints.length)) {
+      // Parameters and configurations that use it are edited first; only shape bindings are released.
+      if (!edit.releaseShapes || dependents.parameters.length || dependents.configurations.length
+        || (!dependents.shapes.length && !dependents.sketchConstraints.length)) {
         return deleteParameter(project, edit.name);
       }
       return deleteParameter({ ...project, shapes: releaseShapeBindings(project.shapes, edit.name) }, edit.name);
@@ -131,6 +133,8 @@ function shapeNameIndex(shapes: readonly WorkplaneShape[]) {
 
 export type ParameterDeleteWarning = {
   parameters: string[];
+  /** Configurations whose overrides use it. Like `parameters`, they block the delete. */
+  configurations: string[];
   /** `fields` are bound shape fields; `constraints` are bound sketch constraint IDs. */
   shapes: Array<{ shapeId: string; name: string; fields: readonly string[]; constraints: readonly string[] }>;
 };
@@ -138,7 +142,7 @@ export type ParameterDeleteWarning = {
 /** Lists what still references `name`, or null when it can be deleted outright. */
 export function parameterDeleteWarning(project: ParameterProject, name: string): ParameterDeleteWarning | null {
   const dependents = projectParameterDependents(project, name);
-  if (!dependents.parameters.length && !dependents.shapes.length && !dependents.sketchConstraints.length) return null;
+  if (!dependents.parameters.length && !dependents.configurations.length && !dependents.shapes.length && !dependents.sketchConstraints.length) return null;
   const names = shapeNameIndex(project.shapes);
   const byShape = new Map<string, { shapeId: string; name: string; fields: readonly string[]; constraints: readonly string[] }>();
   const entry = (shapeId: string) => {
@@ -148,7 +152,7 @@ export function parameterDeleteWarning(project: ParameterProject, name: string):
   };
   dependents.shapes.forEach(({ shapeId, fields }) => { entry(shapeId).fields = fields; });
   dependents.sketchConstraints.forEach(({ shapeId, constraintIds }) => { entry(shapeId).constraints = constraintIds; });
-  return { parameters: dependents.parameters, shapes: [...byShape.values()] };
+  return { parameters: dependents.parameters, configurations: dependents.configurations, shapes: [...byShape.values()] };
 }
 
 const UNIT_LABELS: Record<ProjectParameterDimension, string> = { length: "mm", angle: "°", unitless: "" };
@@ -199,6 +203,14 @@ export function parameterNameOptions(
     .filter((parameter) => (!dimension || parameter.dimension === dimension) && parameter.name.toLowerCase().includes(needle))
     .sort((left, right) => rank(left.name) - rank(right.name) || left.name.localeCompare(right.name))
     .map(({ name, dimension: entryDimension, expression, value }) => ({ name, dimension: entryDimension, expression, value }));
+}
+
+/** Keys the table and its configurations by content, so the host re-passing an equal state is not a change. */
+export function parameterStateKey(
+  parameters: readonly ProjectParameter[],
+  configuration: { configurations: readonly ProjectConfiguration[]; activeConfiguration: string | null },
+) {
+  return JSON.stringify([parameterTableKey(parameters), configuration.configurations, configuration.activeConfiguration]);
 }
 
 /** Keys a table by content, so the host re-passing an equal table is not a change. */
