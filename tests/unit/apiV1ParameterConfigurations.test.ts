@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as createProject } from "@/app/api/v1/projects/route";
 import { GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
-import { GET as listParameters, POST as createParameter } from "@/app/api/v1/parameters/route";
+import { GET as listParameters, PATCH as patchParameter, POST as createParameter } from "@/app/api/v1/parameters/route";
 import {
   DELETE as deleteConfiguration,
   GET as listConfigurations,
@@ -255,14 +255,14 @@ describe("/api/v1/parameter-configurations", () => {
 
     const outOfRange = await activate(projectId, { name: "Huge" });
     expect(outOfRange).toMatchObject({ status: 422, body: { code: "invalid_expression", reason: "outOfRange", shapeId: box.id, field: "width", value: 25000, max: 10000 } });
+    expect((await list(projectId)).body).toEqual(before.body);
 
-    await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ locked: true }) });
+    const lock = await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${box.id}`, { method: "PATCH", body: JSON.stringify({ locked: true }) });
+    const lockedBefore = await list(projectId);
+    expect(lockedBefore.body.revision).toBe(lock.body.revision);
     const locked = await activate(projectId, { name: "Large" });
     expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: box.id, fields: expect.arrayContaining(["width", "x"]) } });
-
-    const after = await list(projectId);
-    expect(after.body.activeConfiguration).toBeNull();
-    expect(after.body.configurations).toEqual(before.body.configurations);
+    expect((await list(projectId)).body).toEqual(lockedBefore.body);
     await expectGeometry(projectId, box.id, 1000, 20);
   });
 
@@ -300,12 +300,42 @@ describe("/api/v1/parameter-configurations", () => {
     const engine = createEngine(store);
     expect((await engine.bindSketchConstraint(projectId, box.id, "width", "w")).ok).toBe(true);
     await create(projectId, { name: "Wide", overrides: { w: "4" } });
+    const before = await list(projectId);
+    const geometry = await volumeAndCentre(projectId, box.id);
+    expect(geometry.volume).toBeCloseTo(12, 3);
 
     const refused = await activate(projectId, { name: "Wide" });
 
     expect(refused).toMatchObject({ status: 422, body: { code: "geometry_failed", shapeId: box.id, constraintIds: expect.arrayContaining(["diagonal"]) } });
-    expect((await list(projectId)).body.activeConfiguration).toBeNull();
+    expect((await list(projectId)).body).toEqual(before.body);
+    const unchanged = await volumeAndCentre(projectId, box.id);
+    expect(unchanged.volume).toBeCloseTo(geometry.volume, 6);
+    for (const axis of ["x", "y", "z"] as const) expect(unchanged.centre[axis]).toBeCloseTo(geometry.centre[axis], 6);
   }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps active values when a base expression changes, and rewrites override keys on rename", async () => {
+    const { projectId, box } = await boundProject();
+    await create(projectId, { name: "Large", overrides: { wall: "4" } });
+    await activate(projectId, { name: "Large" });
+    await expectGeometry(projectId, box.id, 2000, 40);
+    const url = (name: string) => `/api/v1/parameters?projectId=${projectId}&name=${name}`;
+
+    const changed = await call(patchParameter, url("wall"), { method: "PATCH", body: JSON.stringify({ expression: "3" }) });
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    expect(changed.body).toMatchObject({ parameter: { name: "wall", expression: "3", value: 4 }, shapes: [] });
+    await expectGeometry(projectId, box.id, 2000, 40);
+
+    const renamed = await call(patchParameter, url("wall"), { method: "PATCH", body: JSON.stringify({ name: "thickness" }) });
+    expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
+    expect(renamed.body.parameter).toMatchObject({ name: "thickness", expression: "3", value: 4 });
+    expect((await list(projectId)).body).toMatchObject({ configurations: [{ name: "Large", overrides: { thickness: "4" } }], activeConfiguration: "Large", issues: [] });
+    expect(await readShape(projectId, box.id)).toMatchObject({ expressions: { width: "thickness * 5", x: "thickness * 10" } });
+
+    const baseTable = await activate(projectId, { name: null });
+    expect(baseTable.status, JSON.stringify(baseTable.body)).toBe(200);
+    expect(baseTable.body.shapes).toEqual([expect.objectContaining({ id: box.id, width: 15, x: 30 })]);
+    await expectGeometry(projectId, box.id, 1500, 30);
+  });
 
   it("lists stale overrides as issues", async () => {
     const { projectId } = await boundProject();
@@ -332,6 +362,12 @@ describe("/api/v1/parameter-configurations", () => {
       expect(await activate(projectId, body), JSON.stringify(body)).toMatchObject({ status: 400, body: { code: "invalid_request" } });
     }
     expect((await call(patchConfiguration, `${base}?projectId=${projectId}`, { method: "PATCH", body: JSON.stringify({ name: "B" }) })).status).toBe(400);
+    const tooLong = await remove(projectId, "x".repeat(101));
+    expect(tooLong).toMatchObject({ status: 400, body: { code: "invalid_request" } });
+    expect(String(tooLong.body.error)).toMatch(/1 to 100 characters/);
+
+    expect((await create(projectId, { name: "Extra Large & Co" })).status).toBe(201);
+    expect(await remove(projectId, "Extra Large & Co")).toMatchObject({ status: 200, body: { deleted: true, name: "Extra Large & Co" } });
     expect((await call(listConfigurations, base)).body).toMatchObject({ code: "invalid_project_id" });
     expect((await call(listConfigurations, `${base}?projectId=absent`)).status).toBe(404);
   });
