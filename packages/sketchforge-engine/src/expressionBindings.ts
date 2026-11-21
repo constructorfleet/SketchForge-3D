@@ -14,7 +14,16 @@ import {
   type ExpressionError,
   type ExpressionQuantity,
 } from "./parameterExpressions.js";
-import { SHAPE_PARAMETERS, type ShapeParameterName } from "./shapeRequests.js";
+import { MAX_GEAR_HELIX_ANGLE, MAX_GEAR_TEETH, MIN_GEAR_HELIX_ANGLE, MIN_GEAR_TEETH } from "./gearProfile.js";
+import { MAX_LOFT_LAYERS, MAX_LOFT_SEGMENTS, MIN_LOFT_LAYERS, MIN_LOFT_SEGMENTS } from "./loftProfile.js";
+import {
+  MAX_REQUESTED_DIMENSION,
+  MIN_REQUESTED_DIMENSION,
+  SHAPE_PARAMETERS,
+  shapeWithRequestedChanges,
+  type ShapeParameterName,
+} from "./shapeRequests.js";
+import { MAX_REVOLVE_PITCH, MAX_REVOLVE_TURNS, normalizeSketchRevolveSettings } from "./sketchRevolve.js";
 import type { ProjectParameter, ProjectParameterDimension, ShapeKind, WorkplaneShape } from "./domain/sketchforge.js";
 
 /** Names the retained feature a feature field needs on the shape. */
@@ -34,6 +43,13 @@ export type BindableFieldSpec = {
   /** Kinds that carry the field. Absent means every kind. */
   readonly kinds?: readonly ShapeKind[];
   readonly requires?: BindableFieldRequirement;
+  /** Static bounds. Fields bounded by the shape itself, such as a gear's tooth size, have none. */
+  readonly min?: number;
+  readonly max?: number;
+  /** `min` and `max` are excluded, and so is 0 for drafts. */
+  readonly exclusive?: true;
+  /** Accepts any angle and stores it normalized to [0, 360). */
+  readonly periodic?: true;
 };
 
 const ALL_SHAPE_KINDS: readonly ShapeKind[] = [
@@ -41,16 +57,22 @@ const ALL_SHAPE_KINDS: readonly ShapeKind[] = [
   "halfSphere", "torus", "tube", "gear", "ring", "wedge", "polygon", "icosahedron", "mesh", "loft",
 ];
 
-const NUMERIC_SHAPE_PARAMETERS: ReadonlyArray<readonly [ShapeParameterName, ProjectParameterDimension, boolean]> = [
-  ["steps", "unitless", true], ["sides", "unitless", true], ["bevel", "length", false], ["segments", "unitless", true],
-  ["topRadius", "length", false], ["baseRadius", "length", false],
-  ["taperTopWidth", "length", false], ["taperTopDepth", "length", false],
-  ["taperBottomWidth", "length", false], ["taperBottomDepth", "length", false],
-  ["teeth", "unitless", true], ["toothSize", "length", false], ["toothWidth", "length", false],
-  ["centerHoleSize", "length", false], ["helixAngle", "angle", false],
-  ["loftTopWidth", "length", false], ["loftTopDepth", "length", false],
-  ["loftBottomRotation", "angle", false], ["loftTopRotation", "angle", false],
-  ["loftSegments", "unitless", true], ["loftLayers", "unitless", true],
+const SIZE = { min: MIN_REQUESTED_DIMENSION, max: MAX_REQUESTED_DIMENSION };
+const COUNT = { integer: true as const };
+const TURN = { periodic: true as const };
+
+const NUMERIC_SHAPE_PARAMETERS: ReadonlyArray<readonly [ShapeParameterName, ProjectParameterDimension, Partial<BindableFieldSpec>]> = [
+  ["steps", "unitless", { ...COUNT, min: 4 }], ["sides", "unitless", { ...COUNT, min: 3 }], ["bevel", "length", {}],
+  ["segments", "unitless", { ...COUNT, min: 1 }],
+  ["topRadius", "length", { min: 0 }], ["baseRadius", "length", { min: MIN_REQUESTED_DIMENSION }],
+  ["taperTopWidth", "length", SIZE], ["taperTopDepth", "length", SIZE],
+  ["taperBottomWidth", "length", SIZE], ["taperBottomDepth", "length", SIZE],
+  ["teeth", "unitless", { ...COUNT, min: MIN_GEAR_TEETH, max: MAX_GEAR_TEETH }], ["toothSize", "length", {}], ["toothWidth", "length", {}],
+  ["centerHoleSize", "length", {}], ["helixAngle", "angle", { min: MIN_GEAR_HELIX_ANGLE, max: MAX_GEAR_HELIX_ANGLE }],
+  ["loftTopWidth", "length", { min: 0.01 }], ["loftTopDepth", "length", { min: 0.01 }],
+  ["loftBottomRotation", "angle", TURN], ["loftTopRotation", "angle", TURN],
+  ["loftSegments", "unitless", { ...COUNT, min: MIN_LOFT_SEGMENTS, max: MAX_LOFT_SEGMENTS }],
+  ["loftLayers", "unitless", { ...COUNT, min: MIN_LOFT_LAYERS, max: MAX_LOFT_LAYERS }],
 ];
 
 function spec(field: string, dimension: ProjectParameterDimension, extra: Partial<BindableFieldSpec> = {}): BindableFieldSpec {
@@ -59,30 +81,31 @@ function spec(field: string, dimension: ProjectParameterDimension, extra: Partia
 
 /** Lists every bindable numeric field with its dimension. REST, MCP, clients and the editor share it. */
 export const EXPRESSION_BINDABLE_FIELDS: readonly BindableFieldSpec[] = Object.freeze([
-  ...(["x", "z", "elevation", "width", "depth", "height"] as const).map((field) => spec(field, "length")),
-  ...(["rotation", "rotationX", "rotationZ"] as const).map((field) => spec(field, "angle")),
-  ...NUMERIC_SHAPE_PARAMETERS.map(([field, dimension, integer]) => spec(field, dimension, {
-    ...(integer ? { integer: true as const } : {}),
+  ...(["x", "z", "elevation"] as const).map((field) => spec(field, "length")),
+  ...(["width", "depth", "height"] as const).map((field) => spec(field, "length", SIZE)),
+  ...(["rotation", "rotationX", "rotationZ"] as const).map((field) => spec(field, "angle", TURN)),
+  ...NUMERIC_SHAPE_PARAMETERS.map(([field, dimension, extra]) => spec(field, dimension, {
+    ...extra,
     kinds: Object.freeze(ALL_SHAPE_KINDS.filter((kind) => SHAPE_PARAMETERS[field].appliesTo(kind))),
   })),
-  spec("revolve.startAngle", "angle", { target: "feature", requires: "revolve" }),
-  spec("revolve.sweepAngle", "angle", { target: "feature", requires: "revolve" }),
-  spec("revolve.sides", "unitless", { target: "feature", requires: "revolve", integer: true }),
-  spec("revolve.quality", "unitless", { target: "feature", requires: "revolve" }),
-  spec("revolve.pitch", "length", { target: "feature", requires: "revolve" }),
-  spec("revolve.turns", "unitless", { target: "feature", requires: "revolve" }),
-  spec("revolve.coreRadius", "length", { target: "feature", requires: "revolve" }),
-  spec("draftPrismAngle", "angle", { target: "feature", requires: "draftPrism" }),
-  spec("faceDraft.angle", "angle", { target: "feature", requires: "faceDraft" }),
-  spec("edgeTreatments.0.amount", "length", { target: "feature", requires: "sketchEdgeTreatment" }),
-  spec("edgeTreatments.0.chamferAngle", "angle", { target: "feature", requires: "sketchChamfer" }),
+  spec("revolve.startAngle", "angle", { target: "feature", requires: "revolve", ...TURN }),
+  spec("revolve.sweepAngle", "angle", { target: "feature", requires: "revolve", min: -360, max: 360 }),
+  spec("revolve.sides", "unitless", { target: "feature", requires: "revolve", ...COUNT, min: 3 }),
+  spec("revolve.quality", "unitless", { target: "feature", requires: "revolve", ...COUNT, min: 1, max: 10 }),
+  spec("revolve.pitch", "length", { target: "feature", requires: "revolve", min: -MAX_REVOLVE_PITCH, max: MAX_REVOLVE_PITCH }),
+  spec("revolve.turns", "unitless", { target: "feature", requires: "revolve", min: 0.1, max: MAX_REVOLVE_TURNS }),
+  spec("revolve.coreRadius", "length", { target: "feature", requires: "revolve", min: 0 }),
+  spec("draftPrismAngle", "angle", { target: "feature", requires: "draftPrism", min: -45, max: 45, exclusive: true }),
+  spec("faceDraft.angle", "angle", { target: "feature", requires: "faceDraft", min: -45, max: 45, exclusive: true }),
+  spec("edgeTreatments.0.amount", "length", { target: "feature", requires: "sketchEdgeTreatment", min: 0, exclusive: true }),
+  spec("edgeTreatments.0.chamferAngle", "angle", { target: "feature", requires: "sketchChamfer", min: 0, max: 90, exclusive: true }),
 ]);
 
 const SPEC_BY_FIELD = new Map(EXPRESSION_BINDABLE_FIELDS.map((entry) => [entry.field, entry]));
 
-/** Treatment amounts replay only through a sketch recipe rebuild, so plain solids cannot bind them. */
+/** Treatment amounts replay only through a sketch recipe rebuild, which plain solids and shells lack. */
 function hasSketchRecipe(shape: WorkplaneShape) {
-  return Boolean(shape.sketchSourceId && shape.sketchProfile && shape.sketchOperation);
+  return Boolean(shape.sketchSourceId && shape.sketchProfile && shape.sketchOperation && !shape.shell);
 }
 
 function meetsRequirement(shape: WorkplaneShape, requirement: BindableFieldRequirement | undefined) {
@@ -152,7 +175,7 @@ export function withoutBindings(shape: WorkplaneShape, fields: readonly string[]
   return Object.keys(expressions).length ? { ...rest, expressions } : rest;
 }
 
-export type ShapeBindingErrorCode = "shapeNotFound" | "fieldNotBindable" | "invalidExpression" | "notAnInteger";
+export type ShapeBindingErrorCode = "shapeNotFound" | "fieldNotBindable" | "invalidExpression" | "notAnInteger" | "outOfRange";
 
 export type ShapeBindingError = {
   readonly code: ShapeBindingErrorCode;
@@ -161,6 +184,11 @@ export type ShapeBindingError = {
   readonly field: string;
   /** Set for `invalidExpression`. */
   readonly expressionError?: ExpressionError;
+  /** Set for `outOfRange`: the resolved value, the field's static bounds, and what the field would store. */
+  readonly value?: number;
+  readonly min?: number;
+  readonly max?: number;
+  readonly stored?: number;
 };
 
 export type ShapeBindingResult =
@@ -174,6 +202,31 @@ export function parameterScope(parameters: readonly ProjectParameter[]): Map<str
 
 function bindingFailure(code: ShapeBindingErrorCode, shapeId: string, field: string, message: string, expressionError?: ExpressionError) {
   return { ok: false as const, error: { code, shapeId, field, message, ...(expressionError ? { expressionError } : {}) } };
+}
+
+function insideBounds(found: BindableFieldSpec, value: number) {
+  if (found.exclusive) {
+    if ((found.requires === "draftPrism" || found.requires === "faceDraft") && value === 0) return false;
+    return (found.min === undefined || value > found.min) && (found.max === undefined || value < found.max);
+  }
+  return (found.min === undefined || value >= found.min) && (found.max === undefined || value <= found.max);
+}
+
+/**
+ * Returns what the shape would store for `value`, via the same normalizers a manual edit uses.
+ * NaN means a value no edit accepts.
+ */
+export function storedBindingValue(shape: WorkplaneShape, field: string, value: number): number {
+  const found = bindableField(shape, field);
+  if (!found) return Number.NaN;
+  if (!insideBounds(found, value) && !found.periodic) return Number.NaN;
+  if (field.startsWith("revolve.")) {
+    const name = field.slice("revolve.".length) as keyof NonNullable<WorkplaneShape["sketchRevolve"]>;
+    return normalizeSketchRevolveSettings({ ...shape.sketchRevolve, [name]: value })[name];
+  }
+  if (found.target === "feature") return value;
+  const changed = shapeWithRequestedChanges(shape, { [field]: value });
+  return changed.ok ? boundFieldValue(changed.shape, field) ?? Number.NaN : Number.NaN;
 }
 
 /** Evaluates `expression` for `field` on `shape`. A bare number takes the field's unit. Never throws. */
@@ -190,14 +243,33 @@ export function resolveShapeBinding(
   if (!result.ok) {
     return bindingFailure("invalidExpression", shape.id, field, `${field}: ${result.error.message}`, result.error);
   }
+  let value = result.value;
   if (found.integer) {
-    const rounded = Math.round(result.value);
-    if (Math.abs(result.value - rounded) > 1e-9) {
-      return bindingFailure("notAnInteger", shape.id, field, `${field} needs a whole number, got ${result.value}.`);
+    const rounded = Math.round(value);
+    if (Math.abs(value - rounded) > 1e-9) {
+      return bindingFailure("notAnInteger", shape.id, field, `${field} needs a whole number, got ${value}.`);
     }
-    return { ok: true, value: rounded };
+    value = rounded;
   }
-  return { ok: true, value: result.value };
+  const stored = storedBindingValue(shape, field, value);
+  if (found.periodic && Number.isFinite(stored)) return { ok: true, value: stored };
+  // Refused, not clamped: a clamped binding would differ from its expression forever.
+  if (!Number.isFinite(stored) || Math.abs(stored - value) > 1e-9 * Math.max(1, Math.abs(value))) {
+    const bounds = found.min !== undefined || found.max !== undefined
+      ? ` It must be ${found.exclusive ? "strictly " : ""}between ${found.min ?? "-∞"} and ${found.max ?? "∞"}.`
+      : "";
+    return {
+      ok: false,
+      error: {
+        code: "outOfRange", shapeId: shape.id, field, value,
+        message: `${field} cannot be ${value}.${bounds}`,
+        ...(found.min !== undefined ? { min: found.min } : {}),
+        ...(found.max !== undefined ? { max: found.max } : {}),
+        ...(Number.isFinite(stored) ? { stored } : {}),
+      },
+    };
+  }
+  return { ok: true, value };
 }
 
 /** Visits active shapes pre-order, skipping treatment `before` snapshots. */
@@ -235,16 +307,25 @@ export function shapeBindingIssues(shapes: readonly WorkplaneShape[], parameters
 
 export type ShapeBindingDependent = { readonly shapeId: string; readonly fields: readonly string[] };
 
-/** Lists active shapes whose bindings reference `name` directly, in tree order. */
+/**
+ * Lists shapes whose bindings reference `name` directly, in tree order. Includes treatment
+ * `before` snapshots, the set `renameShapeBindingReferences` rewrites, merged by shape ID.
+ */
 export function parameterShapeDependents(shapes: readonly WorkplaneShape[], name: string): ShapeBindingDependent[] {
-  const dependents: ShapeBindingDependent[] = [];
-  visitBoundShapes(shapes, (shape) => {
-    const fields = Object.entries(shape.expressions ?? {})
-      .filter(([, expression]) => expressionDependencies(expression).includes(name))
-      .map(([field]) => field);
-    if (fields.length) dependents.push({ shapeId: shape.id, fields });
-  });
-  return dependents;
+  const fieldsById = new Map<string, Set<string>>();
+  const visit = (shape: WorkplaneShape) => {
+    if (!shape || typeof shape !== "object") return;
+    for (const [field, expression] of Object.entries(shape.expressions ?? {})) {
+      if (!expressionDependencies(expression).includes(name)) continue;
+      const fields = fieldsById.get(shape.id) ?? new Set<string>();
+      fields.add(field);
+      fieldsById.set(shape.id, fields);
+    }
+    shape.groupedShapes?.forEach(visit);
+    shape.edgeTreatmentHistory?.forEach((entry) => visit(entry.before));
+  };
+  shapes.forEach(visit);
+  return [...fieldsById].map(([shapeId, fields]) => ({ shapeId, fields: [...fields] }));
 }
 
 /**

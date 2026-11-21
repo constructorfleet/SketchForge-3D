@@ -11,6 +11,8 @@ import {
   type ProjectStore,
 } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
+import { shapeFaces } from "@constructorfleet/sketchforge-engine/serverCadShell";
+import { sketchExtrusionShapeFromRequest } from "@constructorfleet/sketchforge-engine/sketchExtrusionRequest";
 import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { measureMesh } from "./support/meshMeasure";
@@ -329,5 +331,242 @@ describe("expression-bound fields and parameter recompute", () => {
     expect(bound.centerOfMass.z).toBeCloseTo(manual.centerOfMass.z, 6);
     const stored = (await document("bound-draft")).shapes[0]!.groupedShapes!.find((shape) => shape.id === child.id)!;
     expect(stored).toMatchObject({ draftPrismAngle: 12, expressions: { draftPrismAngle: "taper" } });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  async function boundBoxes(projectId: string, count: number, extra: Record<string, unknown> = {}) {
+    await project(projectId);
+    const shapes = value(await engine.addShapes(projectId, Array.from({ length: count }, (_, index) => ({
+      kind: "box", width: 4, depth: 4, height: 4, x: index * 20, ...extra,
+    })))).shapes;
+    value(await engine.addParameter(projectId, { name: "wall", expression: "2", dimension: "length" }));
+    value(await engine.addParameter(projectId, { name: "tilt", expression: "30 deg", dimension: "angle" }));
+    return shapes;
+  }
+
+  async function filletedExtrusion(projectId: string, kind: "fillet" | "chamfer" = "fillet", angle?: number) {
+    await project(projectId);
+    value(await engine.addShapes(projectId, [{ kind: "box", width: 2, depth: 2, height: 3 }]));
+    await asSketchExtrusion(projectId, `sketch/${projectId}`);
+    const shape = (await document(projectId)).shapes[0]!;
+    value(await engine.treat(projectId, shape.id, { kind, amount: 0.2, ...(angle === undefined ? {} : { angle }) }));
+    return shape.id;
+  }
+
+  async function revolve(projectId: string) {
+    await project(projectId);
+    return value(await engine.addShapes(projectId, [{ kind: "revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]], sides: 48 }])).shapes[0]!;
+  }
+
+  async function faceDrafted(projectId: string, angle = 5) {
+    await project(projectId);
+    const extrusion = await sketchExtrusionShapeFromRequest({
+      id: `drafted-${projectId}`, sketchSourceId: `sketch/drafted-${projectId}`, name: "Drafted",
+      profile: extrusionProfile(), height: 3, x: 0, z: 0, elevation: 0,
+    });
+    await store.write(projectId, await document(projectId), [extrusion]);
+    const face = (await shapeFaces(extrusion)).find((candidate) => candidate.normal && candidate.surfaceType === "plane"
+      && Math.abs(candidate.normal.x) > 0.99)!;
+    value(await engine.changeShape(projectId, extrusion.id, { faceDraft: { sourceFaceId: face.id, angle, pullDirection: "y" } }));
+    return { id: extrusion.id, faceId: face.id };
+  }
+
+  async function unchanged(projectId: string, run: () => Promise<EngineResult<unknown>>) {
+    const before = await document(projectId);
+    const result = await run();
+    const after = await document(projectId);
+    expect(after.metadata.revision).toBe(before.metadata.revision);
+    expect(after.shapes).toEqual(before.shapes);
+    expect(after.parameters).toEqual(before.parameters);
+    return result;
+  }
+
+  it("drops placement bindings on a baked mirror, a distribute and a cut", async () => {
+    const [a, b, c, hole] = await boundBoxes("bakes", 4);
+    for (const shape of [a!, b!, c!]) value(await engine.bindShapeField("bakes", shape.id, "x", `wall * ${shape === b ? 3 : shape === a ? 0 : 20}`));
+    value(await engine.bindShapeField("bakes", a!.id, "rotation", "tilt"));
+    value(await engine.bindShapeField("bakes", a!.id, "height", "wall * 3"));
+
+    value(await engine.mirrorBaked("bakes", [a!.id], "x"));
+    expect((await document("bakes")).shapes.find((shape) => shape.id === a!.id)!.expressions).toBeUndefined();
+
+    value(await engine.distribute("bakes", { ids: [a!.id, b!.id, c!.id], axis: "x" }));
+    const middle = (await document("bakes")).shapes.find((shape) => shape.id === b!.id)!;
+    expect(middle.expressions).toBeUndefined();
+    const middleX = middle.x;
+
+    value(await engine.changeShape("bakes", hole!.id, { x: 40, width: 1, depth: 1, hole: true }));
+    value(await engine.bindShapeField("bakes", hole!.id, "height", "wall * 4"));
+    const cut = value(await engine.cut("bakes", { solidIds: [c!.id], holeIds: [hole!.id] })).shape;
+    expect(cut.groupedShapes!.every((child) => child.expressions === undefined)).toBe(true);
+
+    value(await engine.updateParameter("bakes", "wall", { expression: "4" }));
+    expect((await document("bakes")).shapes.find((shape) => shape.id === b!.id)!.x).toBe(middleX);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("drops shape-field bindings on children an ungroup puts back in world placement", async () => {
+    const [a, b] = await boundBoxes("ungroup", 2);
+    const group = value(await engine.group("ungroup", [a!.id, b!.id])).shape;
+    const current = await document("ungroup");
+    await store.write("ungroup", current, current.shapes.map((shape) => shape.id === group.id
+      ? { ...shape, groupedShapes: shape.groupedShapes!.map((child) => ({ ...child, expressions: { x: "wall", height: "wall * 2" } })) }
+      : shape));
+
+    const children = value(await engine.ungroup("ungroup", group.id)).shapes;
+
+    expect(children.every((child) => child.expressions === undefined)).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("drops a draft binding when draftPrism sets the angle", async () => {
+    await project("redraft");
+    value(await engine.addShapes("redraft", [{ kind: "box", width: 2, depth: 2, height: 3 }]));
+    await asSketchExtrusion("redraft", "sketch/redraft");
+    const drafted = (await document("redraft")).shapes[0]!;
+    value(await engine.draftPrism("redraft", drafted.id, 5));
+    value(await engine.addParameter("redraft", { name: "taper", expression: "5", dimension: "angle" }));
+    value(await engine.bindShapeField("redraft", drafted.id, "draftPrismAngle", "taper"));
+    value(await engine.draftPrism("redraft", drafted.id, 8));
+    expect((await document("redraft")).shapes[0]!.expressions).toBeUndefined();
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses, atomically, a parameter change that would alter a locked shape through any binding", async () => {
+    const treated = await filletedExtrusion("locked-treatment");
+    const turned = await revolve("locked-revolve");
+    const drafted = await faceDrafted("locked-draft");
+    const cases: Array<[string, string, string, string]> = [
+      ["locked-treatment", treated, "edgeTreatments.0.amount", "0.3"],
+      ["locked-revolve", turned.id, "revolve.sweepAngle", "180"],
+      ["locked-draft", drafted.id, "faceDraft.angle", "8"],
+    ];
+    for (const [projectId, shapeId, field, next] of cases) {
+      const [other] = value(await engine.addShapes(projectId, [{ kind: "box", width: 4, depth: 4, height: 4, x: 50 }])).shapes;
+      const initial = field === "edgeTreatments.0.amount" ? "0.2" : field === "faceDraft.angle" ? "5" : "360";
+      value(await engine.addParameter(projectId, { name: "p", expression: initial, dimension: field === "edgeTreatments.0.amount" ? "length" : "angle" }));
+      value(await engine.bindShapeField(projectId, shapeId, field, "p"));
+      value(await engine.addParameter(projectId, { name: "q", expression: "p", dimension: field === "edgeTreatments.0.amount" ? "length" : "angle" }));
+      value(await engine.bindShapeField(projectId, other!.id, field === "edgeTreatments.0.amount" ? "height" : "rotation", "q"));
+      value(await engine.changeShape(projectId, shapeId, { locked: true }));
+
+      const refused = await unchanged(projectId, () => engine.updateParameter(projectId, "p", { expression: next }));
+
+      expect(refused, `${projectId}`).toMatchObject({ ok: false, failure: { reason: "binding_failed", shapeId, failure: { reason: "shape_locked" } } });
+    }
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses out-of-range values when binding and when a parameter changes, and accepts periodic angles", async () => {
+    const [box] = await boundBoxes("ranges", 1);
+    const [cylinder] = value(await engine.addShapes("ranges", [{ kind: "cylinder", width: 10, height: 10 }])).shapes;
+    const [gear] = value(await engine.addShapes("ranges", [{ kind: "gear", width: 40, depth: 40, height: 5 }])).shapes;
+    value(await engine.addParameter("ranges", { name: "n", expression: "2", dimension: "unitless" }));
+
+    for (const [shapeId, field, expression, code] of [
+      [cylinder!.id, "sides", "n", "outOfRange"],
+      [box!.id, "width", "-5", "outOfRange"],
+      [gear!.id, "teeth", "n", "outOfRange"],
+      [gear!.id, "helixAngle", "60", "outOfRange"],
+      [cylinder!.id, "sides", "n / 4", "notAnInteger"],
+    ] as const) {
+      const refused = await unchanged("ranges", () => engine.bindShapeField("ranges", shapeId, field, expression));
+      expect(refused, `${field} = ${expression}`).toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { code, field } } });
+    }
+
+    value(await engine.bindShapeField("ranges", box!.id, "width", "wall * 2"));
+    const shrunk = await unchanged("ranges", () => engine.updateParameter("ranges", "wall", { expression: "-1" }));
+    expect(shrunk).toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { code: "outOfRange", field: "width", min: 0.01 } } });
+
+    value(await engine.bindShapeField("ranges", box!.id, "rotation", "tilt - 60"));
+    expect((await document("ranges")).shapes[0]!.rotation).toBe(330);
+    value(await engine.bindShapeField("ranges", box!.id, "rotationX", "12.34"));
+    expect((await document("ranges")).shapes[0]!.rotationX).toBe(12.3);
+    const same = value(await engine.updateParameter("ranges", "tilt", { expression: "30.0 deg" }));
+    expect(same.shapes).toEqual([]);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("rebuilds revolve settings, a face draft angle, a chamfer angle and a rotation from their bindings", async () => {
+    const turned = await revolve("revolve-bound");
+    const full = value(await engine.properties("revolve-bound", turned.id));
+    value(await engine.addParameter("revolve-bound", { name: "sweep", expression: "360", dimension: "angle" }));
+    value(await engine.bindShapeField("revolve-bound", turned.id, "revolve.sweepAngle", "sweep"));
+    value(await engine.bindShapeField("revolve-bound", turned.id, "revolve.startAngle", "-90"));
+    value(await engine.updateParameter("revolve-bound", "sweep", { expression: "180" }));
+    const half = (await document("revolve-bound")).shapes[0]!;
+    expect(half.sketchRevolve).toMatchObject({ sweepAngle: 180, startAngle: 270 });
+    expect(value(await engine.properties("revolve-bound", turned.id)).volume).toBeCloseTo(full.volume / 2, 0);
+
+    const bound = await faceDrafted("draft-bound");
+    const manual = await faceDrafted("draft-manual");
+    value(await engine.addParameter("draft-bound", { name: "taper", expression: "5", dimension: "angle" }));
+    value(await engine.bindShapeField("draft-bound", bound.id, "faceDraft.angle", "taper"));
+    value(await engine.updateParameter("draft-bound", "taper", { expression: "8" }));
+    const manualShape = (await document("draft-manual")).shapes[0]!;
+    value(await engine.changeShape("draft-manual", manual.id, { faceDraft: { ...manualShape.faceDraft!, angle: 8 } }));
+    const draftBound = value(await engine.properties("draft-bound", bound.id));
+    const draftManual = value(await engine.properties("draft-manual", manual.id));
+    expect((await document("draft-bound")).shapes[0]!.faceDraft?.angle).toBe(8);
+    expect(draftBound.volume).toBeCloseTo(draftManual.volume, 6);
+    expect(draftBound.centerOfMass.x).toBeCloseTo(draftManual.centerOfMass.x, 6);
+
+    const chamfered = await filletedExtrusion("chamfer-bound", "chamfer", 45);
+    const reference = await filletedExtrusion("chamfer-reference", "chamfer", 60);
+    value(await engine.addParameter("chamfer-bound", { name: "bevel", expression: "45", dimension: "angle" }));
+    value(await engine.bindShapeField("chamfer-bound", chamfered, "edgeTreatments.0.chamferAngle", "bevel"));
+    value(await engine.updateParameter("chamfer-bound", "bevel", { expression: "60" }));
+    const chamferBound = value(await engine.properties("chamfer-bound", chamfered));
+    const chamferReference = value(await engine.properties("chamfer-reference", reference));
+    expect(chamferBound.volume).toBeCloseTo(chamferReference.volume, 5);
+    expect(chamferBound.centerOfMass.y).toBeCloseTo(chamferReference.centerOfMass.y, 5);
+
+    const [wedge] = await boundBoxes("rotation-bound", 1, { kind: "wedge", x: 0 });
+    value(await engine.bindShapeField("rotation-bound", wedge!.id, "rotation", "tilt"));
+    const at30 = value(await engine.properties("rotation-bound", wedge!.id));
+    value(await engine.updateParameter("rotation-bound", "tilt", { expression: "120 deg" }));
+    const at120 = value(await engine.properties("rotation-bound", wedge!.id));
+    expect((await document("rotation-bound")).shapes[0]!.rotation).toBe(120);
+    expect(at120.volume).toBeCloseTo(at30.volume, 6);
+    expect(Math.hypot(at120.centerOfMass.x - at30.centerOfMass.x, at120.centerOfMass.z - at30.centerOfMass.z)).toBeGreaterThan(0.1);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("replays a bound treatment on a sketch output inside a cut", async () => {
+    const setUp = async (projectId: string, amount: number) => {
+      await project(projectId);
+      const created = value(await engine.addShapes(projectId, [
+        { kind: "box", width: 2, depth: 2, height: 3 },
+        { kind: "box", width: 0.5, depth: 0.5, height: 1, elevation: 2.5, hole: true },
+      ])).shapes;
+      await asSketchExtrusion(projectId, `sketch/${projectId}`);
+      value(await engine.treat(projectId, created[0]!.id, { kind: "fillet", amount }));
+      const cut = value(await engine.cut(projectId, { solidIds: [created[0]!.id], holeIds: [created[1]!.id] })).shape;
+      return { cut, child: cut.groupedShapes!.find((shape) => shape.sketchSourceId === `sketch/${projectId}`)!.id };
+    };
+    const bound = await setUp("nested-treatment", 0.2);
+    const reference = await setUp("nested-reference", 0.4);
+    value(await engine.addParameter("nested-treatment", { name: "rounding", expression: "0.2", dimension: "length" }));
+    value(await engine.bindShapeField("nested-treatment", bound.child, "edgeTreatments.0.amount", "rounding"));
+
+    value(await engine.updateParameter("nested-treatment", "rounding", { expression: "0.4" }));
+
+    const rebuilt = value(await engine.properties("nested-treatment", bound.cut.id));
+    const expected = value(await engine.properties("nested-reference", reference.cut.id));
+    expect(rebuilt.volume).toBeCloseTo(expected.volume, 4);
+    expect(rebuilt.centerOfMass.y).toBeCloseTo(expected.centerOfMass.y, 5);
+    const child = (await document("nested-treatment")).shapes[0]!.groupedShapes!.find((shape) => shape.id === bound.child)!;
+    expect(child.expressions).toEqual({ "edgeTreatments.0.amount": "rounding" });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("renames into treatment before snapshots and refuses to delete a parameter only a snapshot uses", async () => {
+    const id = await filletedExtrusion("snapshot");
+    const current = await document("snapshot");
+    const shape = current.shapes[0]!;
+    value(await engine.addParameter("snapshot", { name: "wall", expression: "0", dimension: "length" }));
+    const withParameter = await document("snapshot");
+    await store.write("snapshot", withParameter, [{
+      ...shape,
+      edgeTreatmentHistory: shape.edgeTreatmentHistory!.map((entry) => ({ ...entry, before: { ...entry.before, expressions: { x: "wall" } } })),
+    }]);
+
+    value(await engine.renameParameter("snapshot", "wall", "offset"));
+    expect((await document("snapshot")).shapes[0]!.edgeTreatmentHistory![0]!.before.expressions).toEqual({ x: "offset" });
+
+    const refused = await unchanged("snapshot", () => engine.deleteParameter("snapshot", "offset"));
+    expect(refused).toMatchObject({ ok: false, failure: { reason: "parameter_invalid", error: { code: "parameterInUse", shapeDependents: [{ shapeId: id, fields: ["x"] }] } } });
   }, CAD_TEST_TIMEOUT_MS);
 });

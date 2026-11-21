@@ -108,7 +108,7 @@ ${fields("SkfShapeNodeV1")}
 | --- | --- |
 ${fields("SkfStateV1")}
 
-A state's \`parameters\` (V3 only) is the table of an undo or redo state when it is not empty. The scene state uses the top-level \`parameters\`.
+A state's \`parameters\` (V3 only) is the table of an undo or redo state; an empty list is a known empty table. A state without it has an unknown table, and undoing to it keeps the current one. The scene state uses the top-level \`parameters\`.
 
 A shape definition may carry \`expressions\`, a record from a bindable field name to a parameter expression. The field itself keeps the resolved number, so a reader that ignores \`expressions\` still gets the right geometry. Readers refuse a record that is not an object of non-empty strings, and keep a binding that no longer resolves together with its stored number.
 

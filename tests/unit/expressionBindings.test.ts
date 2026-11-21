@@ -76,6 +76,8 @@ describe("bindable field catalog", () => {
     });
     expect(bindableField(filleted, "edgeTreatments.0.amount")).toMatchObject({ dimension: "length", target: "feature" });
     expect(bindableField(filleted, "edgeTreatments.0.chamferAngle")).toMatchObject({ dimension: "angle" });
+    // A shell cannot be replayed from the sketch recipe, so its treatment cannot follow a parameter.
+    expect(bindableField({ ...filleted, shell: { thickness: 0.2 } }, "edgeTreatments.0.amount")).toBeUndefined();
   });
 
   it("maps a change request to the binding keys it sets literally", () => {
@@ -151,5 +153,53 @@ describe("parameter operations and shape bindings", () => {
       error: { code: "parameterInUse", dependents: [], shapeDependents: [{ shapeId: "child", fields: ["width"] }] },
     });
     expect(projectParameterDependents(project, "wall").shapes.map((entry) => entry.shapeId)).toEqual(["outer", "child", "treated"]);
+  });
+
+  it("counts a binding kept only in a treatment's before snapshot, so delete is refused", () => {
+    const beforeOnly = {
+      parameters: parameters(["wall", "2", "length"]),
+      shapes: [shape({
+        id: "treated",
+        edgeTreatmentHistory: [{ id: "t", createdAt: 1, feature: { kind: "fillet", amount: 1, edgeCount: 12 }, before: shape({ id: "treated", expressions: { x: "wall" } }) }],
+      })],
+    };
+    expect(projectParameterDependents(beforeOnly, "wall").shapes).toEqual([{ shapeId: "treated", fields: ["x"] }]);
+    expect(deleteParameter(beforeOnly, "wall")).toMatchObject({ ok: false, error: { code: "parameterInUse" } });
+  });
+});
+
+describe("binding value ranges", () => {
+  const table = parameters(["n", "2", "unitless"], ["w", "-5", "length"], ["a", "-30", "angle"]);
+  const revolve = shape({
+    kind: "mesh",
+    sketchOperation: "revolve",
+    sketchProfile: { points: [], segments: [] },
+    sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 32, quality: 1, pitch: 0, turns: 1, coreRadius: 0 },
+  });
+
+  it("refuses a value the field would clamp, and names the allowed range", () => {
+    expect(resolveShapeBinding(shape({ kind: "cylinder" }), "sides", "n", table)).toMatchObject({
+      ok: false, error: { code: "outOfRange", field: "sides", value: 2, min: 3 },
+    });
+    expect(resolveShapeBinding(shape(), "width", "w", table)).toMatchObject({
+      ok: false, error: { code: "outOfRange", value: -5, min: 0.01, max: 10_000 },
+    });
+    expect(resolveShapeBinding(shape({ kind: "gear" }), "teeth", "n", table)).toMatchObject({ ok: false, error: { code: "outOfRange", min: 6, max: 64 } });
+    expect(resolveShapeBinding(shape({ kind: "gear" }), "helixAngle", "60", table)).toMatchObject({ ok: false, error: { code: "outOfRange", min: -45, max: 45 } });
+    expect(resolveShapeBinding(shape({ kind: "loft" }), "loftSegments", "n", table)).toMatchObject({ ok: false, error: { code: "outOfRange", min: 8 } });
+    expect(resolveShapeBinding(revolve, "revolve.sweepAngle", "400", table)).toMatchObject({ ok: false, error: { code: "outOfRange", min: -360, max: 360 } });
+    expect(resolveShapeBinding(shape({ draftPrismAngle: 5, sketchOperation: "extrude", sketchProfile: { points: [], segments: [] } }), "draftPrismAngle", "50", table))
+      .toMatchObject({ ok: false, error: { code: "outOfRange" } });
+  });
+
+  it("accepts a periodic angle and resolves it to its stored form", () => {
+    expect(resolveShapeBinding(revolve, "revolve.startAngle", "a", table)).toEqual({ ok: true, value: 330 });
+    expect(resolveShapeBinding(shape(), "rotation", "a", table)).toEqual({ ok: true, value: 330 });
+    expect(resolveShapeBinding(shape(), "rotation", "12.34", table)).toEqual({ ok: true, value: 12.3 });
+  });
+
+  it("treats revolve quality as a count", () => {
+    expect(bindableField(revolve, "revolve.quality")).toMatchObject({ integer: true });
+    expect(resolveShapeBinding(revolve, "revolve.quality", "2.5", table)).toMatchObject({ ok: false, error: { code: "notAnInteger" } });
   });
 });

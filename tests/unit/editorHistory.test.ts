@@ -338,4 +338,15 @@ describe("parameter tables in history snapshots", () => {
     expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(2)).entries).toHaveLength(2);
     expect(liveEditorHistoryState(shapes, entries, 1, "unlimited", wall(9)).entries).toHaveLength(1);
   });
+
+  it("keeps entries written without a table, which mean the table is unknown", () => {
+    const shapes = [box()];
+    const legacy = [editorHistoryEntry([], []), editorHistoryEntry(shapes, [])];
+    expect(legacy[1]!.parameters).toBeUndefined();
+    expect(editorHistoryEntry(shapes, [], []).parameters).toEqual([]);
+
+    expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries).toHaveLength(2);
+    expect(liveEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries).toHaveLength(2);
+    expect(hydrateEditorHistoryState(shapes, legacy, 1, "unlimited", wall(2)).entries[0]!.parameters).toBeUndefined();
+  });
 });

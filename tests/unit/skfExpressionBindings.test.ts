@@ -64,6 +64,29 @@ describe(".skf shape bindings", () => {
     expect(restored.history[1]).toMatchObject({ parameters: wall(3), shapes: [{ width: 6 }] });
   });
 
+  it("keeps undo history from files whose states carry no table", async () => {
+    const before = editorHistoryEntry([box(4)], []);
+    const after = editorHistoryEntry([box(6)], []);
+    const exported = await exportSkfProject(input(after.shapes, wall(3), [before, after]));
+    const legacy = mutateProject(exported, (document) => {
+      document.states.forEach((state) => { delete state.parameters; });
+    });
+
+    const restored = await importSkfProject(legacy);
+
+    expect(restored.history).toHaveLength(2);
+    expect(restored.history[0]!.parameters).toBeUndefined();
+    expect(restored.parameters).toEqual(wall(3));
+  });
+
+  it("writes a known empty undo-state table, so undo can clear the table", async () => {
+    const empty = editorHistoryEntry([box(4)], [], []);
+    const after = editorHistoryEntry([box(6)], [], wall(3));
+    const restored = await importSkfProject(await exportSkfProject(input(after.shapes, wall(3), [empty, after])));
+
+    expect(restored.history[0]!.parameters).toEqual([]);
+  });
+
   it("keeps a stale binding and its stored number on load, and flags it", async () => {
     const exported = await exportSkfProject(input([box(4, { width: "wall * 2" })], wall(2)));
     const stale = mutateProject(exported, (document) => {

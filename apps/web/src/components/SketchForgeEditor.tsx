@@ -7606,7 +7606,7 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
-    projectParametersRef.current = entry?.parameters ?? [];
+    projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
@@ -7633,7 +7633,7 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
-    projectParametersRef.current = entry?.parameters ?? [];
+    projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);

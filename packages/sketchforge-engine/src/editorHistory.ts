@@ -7,7 +7,10 @@ export type EditorHistoryExportLimit = "unlimited" | number;
 export type EditorHistoryEntry = {
   shapes: WorkplaneShape[];
   selectedIds: string[];
-  /** Restores the table with the shapes on undo. Absent means an empty table. */
+  /**
+   * Restores the table with the shapes on undo. Absent means unknown: the entry predates
+   * tables in history, matches by shapes alone, and restoring it keeps the current table.
+   */
   parameters?: ProjectParameter[];
   fingerprint: string;
   estimatedBytes: number;
@@ -264,16 +267,20 @@ function parameterTableSignature(parameters: readonly ProjectParameter[]) {
   return signatureFromSerialized(JSON.stringify(parameters.map(({ name, expression, dimension, value }) => [name, expression, dimension, value])));
 }
 
-/** Fingerprints shapes and table together. An empty table keeps the shapes-only fingerprint. */
+/**
+ * Fingerprints shapes and table together. An empty or unknown table keeps the shapes-only fingerprint.
+ * Omitting `parameters` records an unknown table.
+ */
 export function editorHistoryEntry(
   shapes: WorkplaneShape[],
   selectedIds: string[],
-  parameters: readonly ProjectParameter[] = [],
+  parameters?: readonly ProjectParameter[],
 ): EditorHistoryEntry {
   const canonicalShapes = shapes.map(canonicalizeShape);
   const validSelection = selectedIds.filter((id, index) => selectedIds.indexOf(id) === index && canonicalShapes.some((shape) => shape.id === id));
   const scene = serializedSceneSignature(canonicalShapes);
-  if (!parameters.length) return { shapes: canonicalShapes, selectedIds: validSelection, ...scene };
+  if (!parameters) return { shapes: canonicalShapes, selectedIds: validSelection, ...scene };
+  if (!parameters.length) return { shapes: canonicalShapes, selectedIds: validSelection, parameters: [], ...scene };
   const table = parameterTableSignature(parameters);
   return {
     shapes: canonicalShapes,
@@ -285,7 +292,14 @@ export function editorHistoryEntry(
 }
 
 function entryParameters(entry: EditorHistoryEntry | undefined) {
-  return Array.isArray(entry?.parameters) ? entry.parameters : [];
+  return Array.isArray(entry?.parameters) ? entry.parameters : undefined;
+}
+
+/** Compares an entry with the current scene, by shapes alone when its table is unknown. */
+function entryMatches(entry: EditorHistoryEntry, shapes: WorkplaneShape[], parameters: readonly ProjectParameter[]) {
+  const table = entryParameters(entry);
+  if (!table) return entry.fingerprint === projectShapesFingerprint(shapes);
+  return entry.fingerprint === editorHistoryEntry(shapes, [], parameters).fingerprint;
 }
 
 export function boundedEditorHistory(entries: EditorHistoryEntry[], limit: EditorHistoryExportLimit = "unlimited") {
@@ -362,9 +376,10 @@ export function liveEditorHistoryState(
   // a caller that hands over the active entry's own shapes array pays nothing,
   // and anything else is compared by content, exactly as hydration would.
   const current = () => editorHistoryEntry(currentShapes, [], currentParameters);
+  const activeTable = entryParameters(active);
   const agrees = Array.isArray(active?.shapes)
-    && (active.shapes === currentShapes && sameParameters(entryParameters(active), currentParameters)
-      || active.fingerprint === current().fingerprint);
+    && (active.shapes === currentShapes && (!activeTable || sameParameters(activeTable, currentParameters))
+      || entryMatches(active, currentShapes, currentParameters));
   if (!agrees) {
     return { entries: [current()], index: 0 };
   }
@@ -394,7 +409,7 @@ export function hydrateEditorHistoryState(
     const index = Number.isInteger(requestedIndex)
       ? Math.min(Math.max(0, requestedIndex as number), normalized.length - 1)
       : normalized.length - 1;
-    if (normalized[index]?.fingerprint !== fallback.fingerprint) {
+    if (!normalized[index] || !entryMatches(normalized[index], currentShapes, currentParameters)) {
       return { entries: [fallback], index: 0 };
     }
 

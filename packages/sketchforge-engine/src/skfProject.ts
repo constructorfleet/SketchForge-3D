@@ -916,6 +916,8 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     return shapes === entry.shapes ? entry : editorHistoryEntry(shapes, entry.selectedIds, entry.parameters);
   });
   const sceneFingerprint = exportEntries[hydrated.index]?.fingerprint;
+  // V3 whenever any table is written, including one kept only for undo.
+  const anyTable = parameters.length > 0 || exportEntries.some((entry) => entry.parameters?.length);
   const builder = new SkfArchiveBuilder();
   const stateShapes = exportEntries.map((entry) => entry.shapes);
   await builder.addSources(input.assets, referencedSourceAssetIds(stateShapes));
@@ -929,15 +931,15 @@ export async function exportSkfProject(input: SkfProjectExportInput) {
     if (!stateId) {
       stateId = `state-${states.length + 1}`;
       const state = await serializeState(stateId, entry.shapes, builder, sourceAssetsByArchiveId);
-      const stateParameters = entry.fingerprint === sceneFingerprint ? [] : resolvedSkfParameters(entry.parameters ?? []);
-      states.push(stateParameters.length ? { ...state, parameters: stateParameters.map(skfParameter) } : state);
+      // A state without `parameters` reads back as an unknown table; an empty list is a known empty one.
+      const known = anyTable && entry.fingerprint !== sceneFingerprint && Array.isArray(entry.parameters);
+      states.push(known ? { ...state, parameters: resolvedSkfParameters(entry.parameters!).map(skfParameter) } : state);
       stateIdByFingerprint.set(entry.fingerprint, stateId);
     }
     historyEntries.push({ stateId, selectedObjectIds: [...entry.selectedIds] });
   }
 
-  // V3 whenever any table is written, including one kept only for undo.
-  const formatVersion = parameters.length || states.some((state) => state.parameters) ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
+  const formatVersion = anyTable ? SKF_PARAMETERS_FORMAT_VERSION : SKF_BASE_FORMAT_VERSION;
   const sceneStateId = historyEntries[hydrated.index]?.stateId;
   const activeState = states.find((state) => state.id === sceneStateId);
   if (!activeState) throw new LocalizedError("errors.skf.activeStateUnknown");
@@ -1930,12 +1932,12 @@ async function restoreV1(
   for (const [stateId, shapes] of restoredStates) restoredStates.set(stateId, migratePre548CutBrepFrames(shapes, migrationMemo));
   const stateParameters = new Map(document.states.map((state) => [
     state.id,
-    state.id === document.sceneStateId ? parameters : readSkfParameters(state.parameters),
+    state.id === document.sceneStateId ? parameters : state.parameters === undefined ? undefined : readSkfParameters(state.parameters),
   ]));
   const history = document.history.entries.map((entry) => editorHistoryEntry(
     restoredStates.get(entry.stateId) ?? [],
     entry.selectedObjectIds,
-    stateParameters.get(entry.stateId) ?? [],
+    stateParameters.get(entry.stateId),
   ));
   const shapes = restoredStates.get(document.sceneStateId) ?? [];
   const hydrated = liveEditorHistoryState(shapes, history, document.history.index, "unlimited", parameters);

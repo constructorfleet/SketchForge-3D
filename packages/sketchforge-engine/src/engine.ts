@@ -618,12 +618,17 @@ function replaceShapeInTree(roots: readonly WorkplaneShape[], replacement: Workp
   return roots.map(visit);
 }
 
-function findShapeInTree(roots: readonly WorkplaneShape[], id: string): { shape: WorkplaneShape; topLevel: boolean } | undefined {
-  const pending = roots.map((shape) => ({ shape, topLevel: true }));
+/** Finds a shape anywhere in the tree. `locked` names the shape or nearest locked ancestor. */
+function findShapeInTree(
+  roots: readonly WorkplaneShape[],
+  id: string,
+): { shape: WorkplaneShape; topLevel: boolean; locked?: string } | undefined {
+  const pending: Array<{ shape: WorkplaneShape; topLevel: boolean; locked?: string }> = roots.map((shape) => ({ shape, topLevel: true }));
   while (pending.length) {
     const next = pending.shift()!;
-    if (next.shape.id === id) return next;
-    next.shape.groupedShapes?.forEach((child) => pending.push({ shape: child, topLevel: false }));
+    const locked = next.shape.locked ? next.shape.id : next.locked;
+    if (next.shape.id === id) return { ...next, ...(locked ? { locked } : {}) };
+    next.shape.groupedShapes?.forEach((child) => pending.push({ shape: child, topLevel: false, ...(locked ? { locked } : {}) }));
   }
   return undefined;
 }
@@ -639,6 +644,11 @@ function changedParameterNames(previous: readonly ProjectParameter[], next: read
     if (!left || !right || !Object.is(left.value, right.value) || left.dimension !== right.dimension) changed.add(name);
   }
   return changed;
+}
+
+/** Separated and exploded parts are new bodies; no binding on the source describes them. */
+function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
+  return withoutBindings(shape, Object.keys(shape.expressions ?? {}));
 }
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
@@ -1609,10 +1619,11 @@ export function createEngine(store: ProjectStore): Engine {
   ): Promise<EngineResult<WorkplaneShape[]>> {
     const changed = changedParameterNames(previous, next);
     if (!changed.size) return ok(shapes);
-    const pending: Array<{ id: string; values: Record<string, number> }> = [];
+    const pending: Array<{ id: string; values: Record<string, number>; locked: string | undefined }> = [];
     let invalid: ShapeBindingError | undefined;
-    const visit = (shape: WorkplaneShape, topLevel: boolean) => {
-      shape.groupedShapes?.forEach((child) => visit(child, false));
+    const visit = (shape: WorkplaneShape, topLevel: boolean, lockedAncestor: string | undefined) => {
+      const locked = shape.locked ? shape.id : lockedAncestor;
+      shape.groupedShapes?.forEach((child) => visit(child, false, locked));
       const values: Record<string, number> = {};
       for (const [field, expression] of Object.entries(shape.expressions ?? {})) {
         if (invalid || !expressionDependencies(expression).some((name) => changed.has(name))) continue;
@@ -1626,10 +1637,15 @@ export function createEngine(store: ProjectStore): Engine {
           invalid = resolved.error;
         }
       }
-      if (Object.keys(values).length) pending.push({ id: shape.id, values });
+      if (Object.keys(values).length) pending.push({ id: shape.id, values, locked });
     };
-    shapes.forEach((shape) => visit(shape, true));
+    shapes.forEach((shape) => visit(shape, true, undefined));
     if (invalid) return failed({ reason: "binding_invalid", error: invalid });
+    // A change that would alter a locked shape, or rebuild a locked group around one, is refused as a manual edit is.
+    const blocked = pending.find((entry) => entry.locked);
+    if (blocked) {
+      return failed({ reason: "binding_failed", shapeId: blocked.id, fields: Object.keys(blocked.values), failure: { reason: "shape_locked", ids: [blocked.locked!] } });
+    }
     let current = shapes;
     for (const { id, values } of pending) {
       const applied = await applyBindingValues({ ...document, shapes: current }, id, values);
@@ -1829,7 +1845,8 @@ export function createEngine(store: ProjectStore): Engine {
 
       // A group can have been moved, turned and resized since it was made, so
       // its children come back carrying all of that.
-      const children = restoreGroupedChildren(found.value);
+      // Children come back in world placement, so group-local shape bindings no longer apply.
+      const children = restoreGroupedChildren(found.value).map(withoutShapeBindings);
       const shapes = [...document.shapes.filter((shape) => shape.id !== shapeId), ...children];
       return ok({ shapes: children, revision: await writeShapes(projectId, document, shapes) });
     }),
@@ -1840,7 +1857,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (found.value.locked) return failed({ reason: "shape_locked", ids: [shapeId] });
       if (found.value.hole) return failed({ reason: "hole_has_no_parts" });
 
-      const parts = separateShapeParts(found.value);
+      const parts = separateShapeParts(found.value).map(withoutAnyBindings);
       // A shape built from parameters is one body by construction, so this is
       // answered without meshing anything.
       if (parts.length <= 1) return failed({ reason: "single_body" });
@@ -1857,7 +1874,7 @@ export function createEngine(store: ProjectStore): Engine {
       const source = assetId ? document.assets.find((asset) => asset.id === assetId) : undefined;
       if (!source) return failed({ reason: "cad_refused", message: "The imported STEP source asset is no longer available.", status: 422 });
       try {
-        const parts = await explodeStepAssembly(found.value, source);
+        const parts = (await explodeStepAssembly(found.value, source)).map(withoutAnyBindings);
         const index = document.shapes.findIndex((shape) => shape.id === shapeId);
         const shapes = [...document.shapes.slice(0, index), ...parts, ...document.shapes.slice(index + 1)];
         return ok({ shapes: parts, revision: await writeShapes(projectId, document, shapes) });
@@ -2008,7 +2025,8 @@ export function createEngine(store: ProjectStore): Engine {
           : (bounds.minZ + bounds.maxZ) / 2;
       const changed: WorkplaneShape[] = [];
       try {
-        for (const shape of resolved.value) changed.push(await applyBakedMirror(shape, axis, pivot));
+        // Baking rewrites placement into the solid, so bound placement and size are literals now.
+        for (const shape of resolved.value) changed.push(withoutShapeBindings(await applyBakedMirror(shape, axis, pivot)));
       } catch (error) {
         return failed(cadFailure(error));
       }
@@ -2039,7 +2057,7 @@ export function createEngine(store: ProjectStore): Engine {
     bindShapeField: (projectId, shapeId, field, expression) => mutating(projectId, async (document) => {
       const found = findShapeInTree(document.shapes, shapeId);
       if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
-      if (found.shape.locked) return failed({ reason: "shape_locked", ids: [shapeId] });
+      if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
       if (expression === null) {
         const unbound = withoutBindings(found.shape, [field]);
         if (unbound === found.shape) return ok({ shape: found.shape, revision: documentRevision(document) });
