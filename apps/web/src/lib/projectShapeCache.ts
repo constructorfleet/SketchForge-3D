@@ -1,4 +1,4 @@
-import { editorHistoryForAutosave, hydrateEditorHistoryState, type EditorHistoryEntry } from "@/lib/engine/editorHistory";
+import { editorHistoryForAutosave, hydrateEditorHistoryState, NO_CONFIGURATIONS, type EditorHistoryEntry, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import type { PlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import { dedupeProjectAssets } from "@/lib/engine/projectAssets";
 import { exportSkfProject } from "@/lib/engine/skfProject";
@@ -11,6 +11,7 @@ export type ProjectShapeCacheEntry = {
   historyIndex: number;
   assets: ProjectAsset[];
   parameters: ProjectParameter[];
+  configuration: ProjectConfigurationState;
 };
 
 export type ProjectShapeSaveContext = {
@@ -30,8 +31,9 @@ export function projectShapeCacheEntry(
   historyIndex?: number,
   assets: ProjectAsset[] = [],
   parameters: ProjectParameter[] = [],
+  configuration: ProjectConfigurationState = NO_CONFIGURATIONS,
 ): ProjectShapeCacheEntry {
-  const hydrated = hydrateEditorHistoryState(shapes, history, historyIndex, "unlimited", parameters);
+  const hydrated = hydrateEditorHistoryState(shapes, history, historyIndex, "unlimited", parameters, configuration);
   return {
     revision,
     shapes: hydrated.entries[hydrated.index]?.shapes ?? shapes,
@@ -39,6 +41,7 @@ export function projectShapeCacheEntry(
     historyIndex: hydrated.index,
     assets: dedupeProjectAssets(assets),
     parameters,
+    configuration,
   };
 }
 
@@ -49,9 +52,10 @@ export function projectShapeCacheEntryFromEditor(
   historyIndex: number,
   assets: ProjectAsset[],
   parameters: ProjectParameter[],
+  configuration: ProjectConfigurationState = NO_CONFIGURATIONS,
 ): ProjectShapeCacheEntry {
   if (history.length === 0) {
-    return projectShapeCacheEntry(revision, shapes, history, historyIndex, assets, parameters);
+    return projectShapeCacheEntry(revision, shapes, history, historyIndex, assets, parameters, configuration);
   }
   return {
     revision,
@@ -60,6 +64,7 @@ export function projectShapeCacheEntryFromEditor(
     historyIndex: Math.min(Math.max(0, historyIndex), history.length - 1),
     assets: dedupeProjectAssets(assets),
     parameters,
+    configuration,
   };
 }
 
@@ -81,6 +86,7 @@ export function projectSkfPackage(projectId: string, entry: ProjectShapeCacheEnt
     placementWorkplane: context.placementWorkplane,
     sketchPlacementWorkplane: context.sketchPlacementWorkplane,
     parameters: entry.parameters,
+    ...entry.configuration,
     compressionLevel: 1,
   });
 }

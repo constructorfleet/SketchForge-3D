@@ -186,15 +186,30 @@ export {
   type ParameterTableResult,
 } from "./parameterExpressions.js";
 export {
+  activateConfiguration,
+  addConfiguration,
   addParameter,
+  clearConfigurationOverride,
+  configurationDependents,
+  configurationIssues,
+  deleteConfiguration,
   deleteParameter,
+  isValidConfigurationName,
   parameterDependents,
+  projectConfigurationError,
   projectParameterDependents,
+  PROJECT_CONFIGURATION_LIMIT,
   PROJECT_PARAMETER_DIMENSIONS,
   PROJECT_PARAMETER_LIMIT,
+  renameConfiguration,
   renameParameter,
+  resolveConfiguration,
+  resolveConfiguredParameters,
   resolveProjectParameters,
+  setConfigurationOverride,
   updateParameter,
+  type ProjectConfigurationInput,
+  type ProjectConfigurationIssue,
   type ProjectParameterError,
   type ProjectParameterErrorCode,
   type ProjectParameterHolder,
@@ -202,7 +217,8 @@ export {
   type ProjectParameterResult,
   type ResolvedProjectParameters,
 } from "./projectParameters.js";
-export type { ProjectParameter, ProjectParameterDimension } from "./domain/sketchforge.js";
+export type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension } from "./domain/sketchforge.js";
+export type { ProjectConfigurationState } from "./editorHistory.js";
 export {
   bindableField,
   bindableFieldsFor,

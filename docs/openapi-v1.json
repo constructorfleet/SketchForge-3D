@@ -24859,6 +24859,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -25077,6 +25088,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -25240,6 +25262,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {
@@ -26666,6 +26699,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -26884,6 +26928,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -27047,6 +27102,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {
@@ -27265,6 +27331,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {
@@ -28738,6 +28815,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -28956,6 +29044,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -29119,6 +29218,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {
@@ -29337,6 +29447,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {
@@ -30758,6 +30879,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -30976,6 +31108,17 @@
                         "additionalProperties": false
                       }
                     },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "shapeId": {
                       "type": "string"
                     },
@@ -31139,6 +31282,17 @@
                           }
                         },
                         "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
                       }
                     },
                     "shapeId": {

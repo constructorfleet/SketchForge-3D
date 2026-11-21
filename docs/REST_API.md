@@ -163,7 +163,7 @@ A project can hold a table of named parameters, and any numeric shape field in t
 | `PATCH /parameters?projectId=&name=` | `{ expression?, dimension? }`, or `{ name }` alone to rename | `200 { parameter, parameters, shapes, revision }` |
 | `DELETE /parameters?projectId=&name=` | none | `200 { deleted: true, name, parameters, shapes, revision }` |
 
-`dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message }`.
+`dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message }`. When the project has parameter configurations, `expression` is the base expression and `value` is resolved under the active configuration; no route edits configurations yet. A change that breaks a configuration's table, active or not, is refused with `configuration` naming it.
 
 `shapes` holds the top-level shapes the write rebuilt or rewrote, in the same form `GET /shapes` now returns them. A rename rewrites every expression and binding that uses the old name. A delete is refused with `409 parameter_in_use` while anything uses the parameter. All three writes honour `If-Match`. A change that does not evaluate (a parse error, a cycle, a wrong dimension, or a bound field it would break) answers `422 invalid_expression` and writes nothing. A change that would rebuild a locked shape answers `409 shape_locked`, also with nothing written:
 
@@ -227,7 +227,7 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `shape_locked` | 409 | The shape is locked. Unlock it; retrying will not help. |
 | `parameter_not_found` | 404 | No parameter has that name. |
 | `parameter_exists` | 409 | A parameter with that name is already in the table. |
-| `parameter_in_use` | 409 | A delete was refused because something still uses the parameter. `dependents` lists parameters, `shapeDependents` lists `{ shapeId, fields }`. |
+| `parameter_in_use` | 409 | A delete was refused because something still uses the parameter. `dependents` lists parameters, `shapeDependents` lists `{ shapeId, fields }`, and `configurationDependents` lists parameter configurations whose overrides use it. |
 | `invalid_expression` | 422 | A parameter or bound field does not evaluate. `expressionError` has the evaluator's `code`, `message`, `span` and, for a cycle, `cycle`. |
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
 | `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |

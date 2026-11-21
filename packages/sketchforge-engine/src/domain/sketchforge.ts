@@ -52,10 +52,17 @@ export type ProjectParameter = {
   name: string;
   expression: string;
   dimension: ProjectParameterDimension;
-  /** Caches the resolved value in mm, degrees, or plain units. Recomputed on load and on every change. */
+  /** Caches the value under the active configuration in mm, degrees, or plain units. Recomputed on load and on every change. */
   value: number;
   /** Set when the entry does not resolve; `value` is then its last known value, or NaN. Never stored. */
   error?: ProjectParameterError;
+};
+
+/** Names a row of parameter expression overrides. Parameters it does not list keep their base expression. */
+export type ProjectConfiguration = {
+  name: string;
+  /** Maps a parameter name to the expression that replaces its base expression. */
+  overrides: Record<string, string>;
 };
 
 export type GridSize = "Off" | "0.1 mm" | "0.25 mm" | "0.5 mm" | "1.0 mm" | "2.0 mm" | "5.0 mm" | "Brick";

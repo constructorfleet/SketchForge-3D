@@ -76,4 +76,19 @@ describe("browser project shape cache", () => {
     expect(restored.history).toHaveLength(2);
     expect(restored.history[0]!.parameters?.[0]).toEqual(older);
   });
+
+  it("keeps configurations and the active name through an autosave package and the editor's cache entry", async () => {
+    const configuration = { configurations: [{ name: "Large", overrides: { wall: "4" } }], activeConfiguration: "Large" };
+    const large = [{ ...parameters[0]!, value: 4 }, { ...parameters[1]!, value: 16 }];
+    const history = [editorHistoryEntry([box], [], large, configuration)];
+
+    const entry = projectShapeCacheEntry(4, [box], history, 0, [], large, configuration);
+    const restored = await importSkfProject(await projectSkfPackage("project-1", entry, context));
+
+    expect(entry.configuration).toEqual(configuration);
+    expect(restored.configurations).toEqual(configuration.configurations);
+    expect(restored.activeConfiguration).toBe("Large");
+    expect(projectShapeCacheEntryFromEditor(5, [box], history, 0, [], large, configuration).configuration).toEqual(configuration);
+    expect(projectShapeCacheEntry(1, []).configuration).toEqual({ configurations: [], activeConfiguration: null });
+  });
 });

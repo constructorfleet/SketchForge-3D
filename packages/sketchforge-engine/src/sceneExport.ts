@@ -100,6 +100,8 @@ function skfBytes(document: ProjectDocument, shapes: WorkplaneShape[]) {
     placementWorkplane: document.placementWorkplane,
     sketchPlacementWorkplane: document.sketchPlacementWorkplane,
     parameters: document.parameters,
+    configurations: document.configurations,
+    activeConfiguration: document.activeConfiguration,
   });
 }
 

@@ -15,6 +15,7 @@ import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 import { directoryProjectStore } from "@/lib/engine/projectStore";
+import { createEngine } from "@constructorfleet/sketchforge-engine";
 
 const TOKEN = "test-token-value";
 
@@ -369,5 +370,26 @@ describe("shape requests carrying expressions", () => {
     expect(String(kindless.body.error)).toMatch(/"kind"/);
 
     expect((await call(getShapes, `/api/v1/shapes?projectId=${projectId}`)).body.shapes).toHaveLength(1);
+  });
+
+  it("reads values under the active configuration and reports configuration refusals", async () => {
+    // No configuration route exists yet (#618 follow-up), so the engine sets one up.
+    const projectId = await makeProject();
+    expect((await post(projectId, { name: "wall", expression: "2", dimension: "length" })).status).toBe(201);
+    expect((await post(projectId, { name: "lip", expression: "1", dimension: "length" })).status).toBe(201);
+    const engine = createEngine(directoryProjectStore(projectsRoot));
+    expect((await engine.addConfiguration(projectId, "Large", { wall: "4", lip: "wall / 2" })).ok).toBe(true);
+    expect((await engine.activateConfiguration(projectId, "Large")).ok).toBe(true);
+
+    expect((await list(projectId)).body.parameters).toEqual([
+      { name: "wall", expression: "2", dimension: "length", value: 4 },
+      { name: "lip", expression: "1", dimension: "length", value: 2 },
+    ]);
+
+    const inUse = await remove(projectId, "wall");
+    expect(inUse).toMatchObject({ status: 409, body: { code: "parameter_in_use", parameter: "wall", configurationDependents: ["Large"] } });
+
+    const broken = await patch(projectId, "wall", { expression: "30", dimension: "angle" });
+    expect(broken).toMatchObject({ status: 422, body: { code: "invalid_expression", configuration: "Large" } });
   });
 });

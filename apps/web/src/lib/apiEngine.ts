@@ -123,6 +123,12 @@ const PARAMETER_ERROR_STATUS: Record<ProjectParameterError["code"], readonly [nu
   parameterInUse: [409, "parameter_in_use"],
   invalidExpression: [422, "invalid_expression"],
   tooManyParameters: [413, "limit_exceeded"],
+  // No route edits configurations yet (#618); `reason` keeps the finer code.
+  invalidConfiguration: [400, "invalid_request"],
+  invalidConfigurationName: [400, "invalid_request"],
+  duplicateConfigurationName: [400, "invalid_request"],
+  unknownConfiguration: [400, "invalid_request"],
+  tooManyConfigurations: [413, "limit_exceeded"],
 };
 
 /** Maps a table refusal. `reason` carries the engine's finer code. */
@@ -131,12 +137,14 @@ function parameterError(error: ProjectParameterError) {
   return apiError(error.message, status, code, {
     parameter: error.parameter,
     reason: error.code,
+    ...(error.configuration !== undefined ? { configuration: error.configuration } : {}),
     ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
     ...(error.code === "parameterInUse" ? {
       dependents: [...(error.dependents ?? [])],
       shapeDependents: (error.shapeDependents ?? []).map(({ shapeId, fields }) => ({ shapeId, fields: [...fields] })),
       sketchConstraintDependents: (error.sketchConstraintDependents ?? [])
         .map(({ shapeId, constraintIds }) => ({ shapeId, constraintIds: [...constraintIds] })),
+      configurationDependents: [...(error.configurationDependents ?? [])],
     } : {}),
   });
 }

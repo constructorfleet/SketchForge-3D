@@ -9,14 +9,17 @@ import { strFromU8, unzipSync } from "fflate";
 import { chromium } from "playwright";
 import { exportSkfProject, shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 
-// Issue #609: the browser keeps a project's parameter table through opening an
-// .skf, editor autosave, a reload, and "Export all projects". No editor UI
-// changes the table yet, so every save must carry it through unchanged.
+// Issues #609 and #618: the browser keeps a project's parameter table and its
+// configurations through opening an .skf, editor autosave, a reload, and
+// "Export all projects". No editor UI changes them yet, so every save must
+// carry them through unchanged.
 
+// Values resolve under the active configuration, Large (wall = 4 mm).
 const parameters = [
-  { name: "wall", expression: "2", dimension: "length", value: 2 },
-  { name: "depth", expression: "wall * 5", dimension: "length", value: 10 },
+  { name: "wall", expression: "2", dimension: "length", value: 4 },
+  { name: "depth", expression: "wall * 5", dimension: "length", value: 20 },
 ];
+const configurations = [{ name: "Small", overrides: {} }, { name: "Large", overrides: { wall: "4" } }];
 
 async function unusedPort() {
   const listener = createServer();
@@ -72,7 +75,7 @@ async function goHomeAndWaitForShapes(page, shapes) {
   }, shapes, { timeout: 60_000 });
 }
 
-test("an opened .skf keeps its parameter table through autosave, reload and Export all projects", { timeout: 240_000 }, async () => {
+test("an opened .skf keeps its parameter table and configurations through autosave, reload and Export all projects", { timeout: 240_000 }, async () => {
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-parameters-"));
   const fixture = path.join(fixtureDir, "parameters.skf");
   const box = shapeFromRequest({ kind: "box", width: 10 });
@@ -89,6 +92,8 @@ test("an opened .skf keeps its parameter table through autosave, reload and Expo
     snapGrid: "1.0 mm",
     placementElevation: 0,
     parameters,
+    configurations,
+    activeConfiguration: "Large",
   }));
   const { baseURL, stop } = await startNextServer();
   let browser;
@@ -122,7 +127,9 @@ test("an opened .skf keeps its parameter table through autosave, reload and Expo
     const scene = document.states.find((state) => state.id === document.sceneStateId);
 
     assert.deepEqual(document.parameters, parameters, "the table survives every browser save");
-    assert.equal(document.formatVersion, 3);
+    assert.deepEqual(document.configurations, configurations, "the configurations survive every browser save");
+    assert.equal(document.activeConfiguration, "Large");
+    assert.equal(document.formatVersion, 4);
     assert.equal(scene.rootNodeIds.length, 3, "both added shapes were saved");
   } finally {
     if (browser) await browser.close();
