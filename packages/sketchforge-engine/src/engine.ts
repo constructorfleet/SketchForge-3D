@@ -715,15 +715,21 @@ function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): { 
   return outputs.length === 1 ? findShapeInTree(roots, outputs[0]!.id) : undefined;
 }
 
-/** Sets resolved constraint values on `shape`'s profile and solves it. */
+/**
+ * Sets resolved constraint values on `shape`'s profile and solves it. Refuses only constraints
+ * the change breaks: the editor saves profiles with constraints it could not satisfy.
+ */
 function solvedSketchProfile(shape: WorkplaneShape, values: Readonly<Record<string, number>>): EngineResult<SketchProfile> {
   const solved = solveSketchConstraints(withSketchConstraintValues(shape.sketchProfile!, values));
-  if (solved.unsatisfiedConstraintIds.length) {
+  if (!solved.unsatisfiedConstraintIds.length) return ok(solved.profile);
+  const already = new Set(solveSketchConstraints(shape.sketchProfile!).unsatisfiedConstraintIds);
+  const broken = solved.unsatisfiedConstraintIds.filter((id) => Object.hasOwn(values, id) || !already.has(id));
+  if (broken.length) {
     return failed({
       reason: "sketch_unsolvable",
       shapeId: shape.id,
-      constraintIds: solved.unsatisfiedConstraintIds,
-      message: `The sketch on ${shape.id} cannot satisfy ${solved.unsatisfiedConstraintIds.join(", ")} with the new values.`,
+      constraintIds: broken,
+      message: `The sketch on ${shape.id} cannot satisfy ${broken.join(", ")} with the new values.`,
     });
   }
   return ok(solved.profile);

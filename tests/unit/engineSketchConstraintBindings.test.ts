@@ -222,6 +222,23 @@ describe("expression-bound sketch constraints", () => {
     expect(JSON.stringify(await document("pinned"))).toBe(before);
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("does not let a constraint the editor already left unsatisfied block a re-solve", async () => {
+    // The editor commits a profile with unsatisfied constraints and shows a notice; these two can never agree.
+    const base = rectangle([
+      { id: "fix-e1", kind: "fixed", pointId: "e", xMm: 5, zMm: 5 },
+      { id: "fix-e2", kind: "fixed", pointId: "e", xMm: 6, zMm: 6 },
+    ]);
+    const output = await sketchProject("unsatisfied", { ...base, points: [...base.points, { id: "e", x: 5, z: 5 }] });
+    value(await engine.addParameter("unsatisfied", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("unsatisfied", output.id, "width", "w"));
+
+    value(await engine.updateParameter("unsatisfied", "w", { expression: "4" }));
+
+    const stored = (await document("unsatisfied")).shapes[0]!;
+    expect(constraintOf(stored, "width")).toMatchObject({ valueMm: 4, expression: "w" });
+    expect(stored.sketchProfile!.points.find((point) => point.id === "b")!.x).toBeCloseTo(3, 6);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("refuses a parameter change that would rebuild a locked sketch output, and writes nothing", async () => {
     const output = await sketchProject("locked");
     const box = value(await engine.addShapes("locked", [{ kind: "box", width: 2, depth: 2, height: 2, x: 10 }])).shapes[0]!;
