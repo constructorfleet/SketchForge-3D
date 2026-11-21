@@ -629,7 +629,7 @@ export const engineTools = [
   },
   {
     name: "sketchforge_delete_parameter",
-    description: `Delete a parameter that nothing uses. ${REFUSAL_FORMAT} Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields) and sketchConstraintDependents (shapeId and constraintIds) to change or clear first. ${WORKS_BOTH_WAYS}`,
+    description: `Delete a parameter that nothing uses. ${REFUSAL_FORMAT} Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields), sketchConstraintDependents (shapeId and constraintIds) and configurationDependents (configuration names) to change or clear first. ${WORKS_BOTH_WAYS}`,
     inputSchema: {
       type: "object",
       required: ["projectId", "name"],

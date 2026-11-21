@@ -67,7 +67,7 @@ A refusal is an MCP tool error. Its first line ends with the REST error code in 
 
 ```text
 Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
-{"parameter":"wall","reason":"parameterInUse","dependents":["lip"],"shapeDependents":[{"shapeId":"<box id>","fields":["width"]}],"sketchConstraintDependents":[]}
+{"parameter":"wall","reason":"parameterInUse","dependents":["lip"],"shapeDependents":[{"shapeId":"<box id>","fields":["width"]}],"sketchConstraintDependents":[],"configurationDependents":[]}
 ```
 
 | Code | When | Detail |
@@ -75,7 +75,7 @@ Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
 | `invalid_expression` | Bad syntax, an unknown name, the wrong dimension, a cycle, or a bound result out of the field's range. | `expressionError` with `code`, `message`, `span` and `cycle`; `shapeId` and `field` for a binding; `value`, `min`, `max` for a range. |
 | `parameter_not_found` | Changing, renaming or deleting a name that does not exist. A set without `dimension` says to send both fields to create. | `parameter` |
 | `parameter_exists` | Renaming to a name already in use. | `parameter` |
-| `parameter_in_use` | Deleting a parameter that something references. | `dependents`, `shapeDependents`, `sketchConstraintDependents` (`shapeId`, `constraintIds`) |
+| `parameter_in_use` | Deleting a parameter that something references. | `dependents`, `shapeDependents`, `sketchConstraintDependents` (`shapeId`, `constraintIds`), `configurationDependents` (configuration names) |
 | `shape_locked` | A binding, or a parameter change that would rebuild it, touches a locked shape. | `shapeId`, `fields` |
 | `geometry_failed` | A parameter change leaves a bound sketch unsolvable. | `shapeId`, `constraintIds` |
 | `unapplicable_fields` | The shape cannot bind that field. | `fields` |

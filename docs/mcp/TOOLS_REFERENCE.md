@@ -2229,7 +2229,7 @@ Rename a parameter, rewriting every parameter expression and shape binding that 
 
 ### Description
 
-Delete a parameter that nothing uses. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields) and sketchConstraintDependents (shapeId and constraintIds) to change or clear first. Works offline or against a server when url is supplied.
+Delete a parameter that nothing uses. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields), sketchConstraintDependents (shapeId and constraintIds) and configurationDependents (configuration names) to change or clear first. Works offline or against a server when url is supplied.
 
 ### Input schema
 
