@@ -175,7 +175,8 @@ export function withoutBindings(shape: WorkplaneShape, fields: readonly string[]
   return Object.keys(expressions).length ? { ...rest, expressions } : rest;
 }
 
-export type ShapeBindingErrorCode = "shapeNotFound" | "fieldNotBindable" | "invalidExpression" | "notAnInteger" | "outOfRange";
+export type ShapeBindingErrorCode =
+  | "shapeNotFound" | "fieldNotBindable" | "invalidExpression" | "notAnInteger" | "outOfRange" | "conflictingBinding";
 
 export type ShapeBindingError = {
   readonly code: ShapeBindingErrorCode;
@@ -189,6 +190,8 @@ export type ShapeBindingError = {
   readonly min?: number;
   readonly max?: number;
   readonly stored?: number;
+  /** Set for `conflictingBinding`: the bound sketch constraints that drive the same size. */
+  readonly constraintIds?: readonly string[];
 };
 
 export type ShapeBindingResult =

@@ -245,9 +245,12 @@ export {
 } from "./expressionBindings.js";
 export {
   bindableSketchConstraint,
+  boundProfileSizeFields,
   boundSketchConstraints,
+  conflictingConstraintBinding,
   literalSketchProfile,
   parameterSketchConstraintDependents,
+  profileSizeFields,
   rebuildableSketch,
   renameSketchConstraintReferences,
   resolveSketchConstraintBinding,

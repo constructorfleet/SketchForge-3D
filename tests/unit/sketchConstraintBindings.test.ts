@@ -3,6 +3,7 @@ import {
   bindableSketchConstraint,
   deleteParameter,
   literalSketchProfile,
+  profileSizeFields,
   projectParameterDependents,
   renameParameter,
   resolveSketchConstraintBinding,
@@ -164,5 +165,23 @@ describe("sketch constraint bindings", () => {
       distance("w", 7),
       { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 60, expression: "tilt" },
     ]);
+  });
+});
+
+describe("size bindings that rescale a bound sketch", () => {
+  it("names the profile size fields per operation and reports a stored conflict once per constraint", () => {
+    expect(profileSizeFields(sketch("e", []))).toEqual(["width", "depth"]);
+    expect(profileSizeFields(sketch("r", [], { sketchOperation: "revolve" }))).toEqual(["width", "depth", "height"]);
+    expect(profileSizeFields(sketch("s", [], { sketchOperation: "sweep" }))).toEqual(["width", "depth", "height"]);
+    expect(profileSizeFields({ ...sketch("box", []), sketchProfile: undefined })).toEqual([]);
+
+    const tall = sketch("tall", [distance("w")], { expressions: { height: "w", x: "w" } });
+    expect(sketchConstraintBindingIssues([tall], table)).toEqual([]);
+    const wide = sketch("wide", [distance("w")], { expressions: { width: "w" } });
+    expect(sketchConstraintBindingIssues([wide], table)).toEqual([
+      expect.objectContaining({ shapeId: "wide", constraintId: "d1", code: "conflictingBinding", fields: ["width"] }),
+    ]);
+    // The stored values stay as they are; the field still drives the size.
+    expect(wide.sketchProfile!.constraints![0]).toMatchObject({ valueMm: 2, expression: "w" });
   });
 });

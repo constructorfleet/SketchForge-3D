@@ -187,7 +187,7 @@ A project can hold a table of named parameters, and any numeric shape field in t
 { "kind": "box", "depth": 10, "height": 10, "expressions": { "width": "wall * 5", "x": "wall * 10" } }
 ```
 
-A bare number takes the field's unit, so `wall + 3` in a length field adds 3 mm. Count fields such as `sides` must evaluate to a whole number. A summary reports each bound field as its resolved number, and the expression under `expressions`. A field that cannot be bound on that shape answers `422 unapplicable_fields`.
+A bare number takes the field's unit, so `wall + 3` in a length field adds 3 mm. Count fields such as `sides` must evaluate to a whole number. A summary reports each bound field as its resolved number, and the expression under `expressions`. A field that cannot be bound on that shape answers `422 unapplicable_fields`. On a sketch output whose sketch has bound constraints, `width` and `depth` (and `height` on a revolve or sweep) cannot be bound, because the resize would overrule the constraints: the answer is `422 unapplicable_fields` with `reason: "conflictingBinding"`, `fields` and the bound `constraintIds`. Clear the constraint bindings first, or drive the size through them. A literal `width`, `depth` or `height` that resizes such a sketch output removes its constraint bindings, and each constraint keeps its number. A bound `x`, `z`, `elevation` or rotation is put back after the sketch is re-solved, so a solve that moves the sketch's centre does not unbind it or leave it stale.
 
 A `PATCH` compares each side of a bound field with the shape's current state. A number equal to the current value, or an expression equal to the stored one, is an echo:
 

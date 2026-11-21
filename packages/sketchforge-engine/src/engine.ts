@@ -119,7 +119,9 @@ import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import {
   boundSketchConstraints,
+  conflictingConstraintBinding,
   literalSketchProfile,
+  profileSizeFields,
   rebuildableSketch,
   resolveSketchConstraintBinding,
   resolveSketchConstraintBindings,
@@ -711,6 +713,20 @@ function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
 }
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
+
+const PLACEMENT_BINDINGS = ["x", "z", "elevation", "rotation", "rotationX", "rotationZ"] as const;
+
+/**
+ * Returns `before`'s values for bound placement fields a rebuild moved.
+ * A solve can shift a sketch's centre; the bound placement must still hold.
+ */
+function driftedPlacement(before: WorkplaneShape, after: WorkplaneShape): Record<string, number> {
+  return Object.fromEntries(PLACEMENT_BINDINGS.flatMap((field) => {
+    if (before.expressions?.[field] === undefined || after.expressions?.[field] === undefined) return [];
+    const value = boundFieldValue(before, field);
+    return value !== undefined && value !== boundFieldValue(after, field) ? [[field, value]] : [];
+  }));
+}
 
 /**
  * Finds a field whose literal and expression both changed and disagree.
@@ -1726,6 +1742,10 @@ export function createEngine(store: ProjectStore): Engine {
       });
       if (!result.ok) return result;
     }
+    const current = findShapeInTree(shapes, shapeId);
+    if (current?.topLevel) {
+      for (const [field, number] of Object.entries(driftedPlacement(initial.shape, current.shape))) own[field] ??= number;
+    }
     if (Object.keys(own).length) {
       const result = await step((shape) => changeShapeIn({ ...document, shapes }, shape.id, own));
       if (!result.ok) return result;
@@ -1757,6 +1777,21 @@ export function createEngine(store: ProjectStore): Engine {
       }
       const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
+      const constraintIds = profileSizeFields(found.shape).includes(field)
+        ? boundSketchConstraints(found.shape).map(({ constraint }) => constraint.id)
+        : [];
+      if (constraintIds.length) {
+        return failed({
+          reason: "binding_invalid",
+          error: {
+            code: "conflictingBinding",
+            shapeId,
+            field,
+            constraintIds,
+            message: `${field} cannot bind: it would rescale the sketch on ${shapeId}, whose ${constraintIds.join(", ")} is bound. Clear one binding first.`,
+          },
+        });
+      }
       shape = { ...shape, expressions: { ...shape.expressions, [field]: expression } };
       if (boundFieldValue(found.shape, field) !== resolved.value) values[field] = resolved.value;
     }
@@ -2003,17 +2038,42 @@ export function createEngine(store: ProjectStore): Engine {
       } : changes;
       const changed = await changeShapeIn(document, shapeId, request);
       if (!changed.ok) return changed;
+      const named = boundFieldsNamedBy(changes);
+      const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
+      let rebuilt = changed.value;
+      const restore = previous
+        ? Object.fromEntries(Object.entries(driftedPlacement(previous, rebuilt.shape)).filter(([field]) => !named.includes(field)))
+        : {};
+      if (Object.keys(restore).length && findShapeInTree(rebuilt.shapes, rebuilt.shape.id)?.topLevel) {
+        const locked = rebuilt.shape.locked;
+        const placed = await changeShapeIn({ ...document, shapes: rebuilt.shapes }, rebuilt.shape.id, { ...restore, ...(locked ? { locked: false } : {}) });
+        if (!placed.ok) return placed;
+        rebuilt = locked
+          ? { shape: { ...placed.value.shape, locked }, shapes: replaceShapeInTree(placed.value.shapes, { ...placed.value.shape, locked }) }
+          : placed.value;
+      }
       // A literal replaces the field's binding unless it repeats the current value.
       // A rebuild that moves a bound value also drops that binding.
       const echoed = before ? echoedBindings(before, changes) : [];
-      const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
-      const drifted = Object.keys(changed.value.shape.expressions ?? {})
-        .filter((field) => previous && boundFieldValue(previous, field) !== boundFieldValue(changed.value.shape, field));
-      const literal = [...boundFieldsNamedBy(changes).filter((field) => !echoed.includes(field)), ...drifted];
-      const unbound = withoutBindings(changed.value.shape, literal);
-      let shapes = unbound === changed.value.shape
-        ? changed.value.shapes
-        : replaceShapeInTree(changed.value.shapes, unbound);
+      const drifted = Object.keys(rebuilt.shape.expressions ?? {})
+        .filter((field) => previous && boundFieldValue(previous, field) !== boundFieldValue(rebuilt.shape, field));
+      const literal = [...named.filter((field) => !echoed.includes(field)), ...drifted];
+      let unbound = withoutBindings(rebuilt.shape, literal);
+      // A literal resize rescales the solved sketch, so its constraint bindings no longer describe it.
+      const resized = previous ? profileSizeFields(previous).filter((field) => {
+        const requested = requestedBindingValue(changes, field);
+        return requested !== undefined && requested !== boundFieldValue(previous, field);
+      }) : [];
+      const loose = resized.length ? boundSketchConstraints(unbound).map(({ constraint }) => constraint.id) : [];
+      if (loose.length) {
+        unbound = {
+          ...unbound,
+          sketchProfile: withSketchConstraintValues(unbound.sketchProfile!, {}, Object.fromEntries(loose.map((id) => [id, null]))),
+        };
+      }
+      let shapes = unbound === rebuilt.shape
+        ? rebuilt.shapes
+        : replaceShapeInTree(rebuilt.shapes, unbound);
       let shape = unbound;
       if (Object.keys(expressions).length) {
         const bound = await bindFieldsIn({ ...document, shapes }, unbound.id, expressions);
@@ -2410,6 +2470,8 @@ export function createEngine(store: ProjectStore): Engine {
       }
       const resolved = resolveSketchConstraintBinding(output.id, constraint, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "constraint_binding_invalid", error: resolved.error });
+      const conflict = conflictingConstraintBinding(output, constraintId);
+      if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
       const tagged = { ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: expression }) };
       if (sketchConstraintValue(constraint as BindableSketchConstraint) === resolved.value) return write(tagged);
       const solved = solvedSketchProfile(tagged, { [constraintId]: resolved.value });
