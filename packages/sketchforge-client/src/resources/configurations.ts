@@ -1,5 +1,6 @@
 import type { Transport } from "../http.js";
 import type {
+  ConfigurationActivateResult,
   ConfigurationDeleteResult,
   ConfigurationList,
   ConfigurationRequest,
@@ -47,8 +48,8 @@ export class Configurations {
   }
 
   /** `null` switches to the base table. */
-  activate(projectId: string, name: string | null): Promise<ConfigurationWriteResult> {
-    return this.transport.send<ConfigurationWriteResult>({ method: "POST", path: `${PATH}/activate`, query: { projectId }, body: { name }, retryable: true });
+  activate(projectId: string, name: string | null): Promise<ConfigurationActivateResult> {
+    return this.transport.send<ConfigurationActivateResult>({ method: "POST", path: `${PATH}/activate`, query: { projectId }, body: { name }, retryable: true });
   }
 
   private change(projectId: string, name: string, body: Record<string, unknown>) {

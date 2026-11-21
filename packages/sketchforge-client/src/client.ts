@@ -36,6 +36,7 @@ import type {
   BakedMirrorResult,
   BooleanCutRequest,
   BooleanCutResult,
+  ConfigurationActivateResult,
   ConfigurationDeleteResult,
   ConfigurationList,
   ConfigurationRequest,
@@ -301,7 +302,7 @@ export class ProjectHandle {
   }
 
   /** `null` switches to the base table. */
-  activateConfiguration(name: string | null): Promise<ConfigurationWriteResult> {
+  activateConfiguration(name: string | null): Promise<ConfigurationActivateResult> {
     return this.client.configurations.activate(this.id, name);
   }
 

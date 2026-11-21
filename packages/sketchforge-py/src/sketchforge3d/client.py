@@ -312,6 +312,8 @@ class Configurations:
         return self._change(project_id, name, {"name": new_name})
 
     def set_override(self, project_id: str, name: str, parameter: str, expression: str) -> ConfigurationWriteResult:
+        if not isinstance(expression, str):
+            raise ValueError("An override expression must be a string; use clear_override to clear one.")
         return self._change(project_id, name, {"parameter": parameter, "expression": expression})
 
     def clear_override(self, project_id: str, name: str, parameter: str) -> ConfigurationWriteResult:

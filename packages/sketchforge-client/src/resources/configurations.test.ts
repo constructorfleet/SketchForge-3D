@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
 import { SketchForgeApiError } from "../errors.js";
 import { fakeServer, type FakeServer } from "../testing.js";
+import type { Configurations } from "./configurations.js";
+import type { ConfigurationActivateResult, ConfigurationWriteResult, ParameterConfiguration } from "../types.js";
 
 function client(server: FakeServer) {
   return new SketchForgeClient({ baseUrl: "http://localhost:3100", token: "t", fetch: server.fetch });
@@ -151,5 +153,15 @@ describe("parameter configurations", () => {
     expect(taken.isConfigurationDuplicate).toBe(true);
     expect(taken.isConfigurationMissing).toBe(false);
     expect(taken.isProjectBusy).toBe(false);
+  });
+});
+
+describe("configuration result types", () => {
+  it("names the configuration on a create, rename or override result, but not after an activation", () => {
+    expectTypeOf<ConfigurationWriteResult["configuration"]>().toEqualTypeOf<ParameterConfiguration>();
+    expectTypeOf<"configuration" extends keyof ConfigurationActivateResult ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<Configurations["create"]>().returns.resolves.toEqualTypeOf<ConfigurationWriteResult>();
+    expectTypeOf<Configurations["setOverride"]>().returns.resolves.toEqualTypeOf<ConfigurationWriteResult>();
+    expectTypeOf<Configurations["activate"]>().returns.resolves.toEqualTypeOf<ConfigurationActivateResult>();
   });
 });

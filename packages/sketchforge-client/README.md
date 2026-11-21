@@ -151,7 +151,7 @@ client.configurations.rename(projectId, name, newName): Promise<ConfigurationWri
 client.configurations.setOverride(projectId, name, parameter, expression): Promise<ConfigurationWriteResult>
 client.configurations.clearOverride(projectId, name, parameter): Promise<ConfigurationWriteResult>
 client.configurations.delete(projectId, name): Promise<ConfigurationDeleteResult>
-client.configurations.activate(projectId, name | null): Promise<ConfigurationWriteResult>
+client.configurations.activate(projectId, name | null): Promise<ConfigurationActivateResult>
 ```
 
 `sketchConstraints.bind` binds a sketch output's `distance`, `radius`, `diameter` or `angle` constraint to an expression, re-solves the sketch and rebuilds the solid. `shapeId` is the output or its `sketchSourceId`, and `null` removes the binding and keeps the value. The result's `constraint` is `{ id, kind, value, expression? }`. Every summary of a sketch output lists the same entries in the read-only `sketchConstraints`. `parameters.list` reports constraint bindings that no longer resolve, or that conflict with a bound size field, in `constraintBindingIssues`.

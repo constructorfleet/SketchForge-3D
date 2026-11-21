@@ -82,6 +82,12 @@ class ConfigurationsTests(unittest.TestCase):
             ],
         )
 
+    def test_refuses_none_as_an_override_expression(self) -> None:
+        opener = FakeOpener(WRITTEN)
+        with self.assertRaisesRegex(ValueError, "clear_override"):
+            client(opener).configurations.set_override("p1", "Large", "wall", None)  # type: ignore[arg-type]
+        self.assertEqual(opener.calls, [])
+
     def test_deletes_a_configuration(self) -> None:
         body = {"deleted": True, "name": "Large", **STATE, "activeConfiguration": None, "shapes": [BOUND_BOX], "revision": 7}
         opener = FakeOpener(body)

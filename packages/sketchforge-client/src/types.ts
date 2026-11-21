@@ -908,8 +908,11 @@ export type ConfigurationList = ConfigurationState & { revision: number };
 
 export type ConfigurationRequest = { name: string; overrides?: Record<string, string> };
 
-/** `shapes` is empty unless the active table changed. `configuration` is absent after an activation. */
-export type ConfigurationWriteResult = ConfigurationState & { configuration?: ParameterConfiguration; shapes: ShapeSummary[]; revision: number };
+/** A create, rename or override change. `shapes` is empty unless the active table changed. */
+export type ConfigurationWriteResult = ConfigurationState & { configuration: ParameterConfiguration; shapes: ShapeSummary[]; revision: number };
+
+/** An activation names no single configuration; `shapes` holds what it rebuilt. */
+export type ConfigurationActivateResult = ConfigurationState & { shapes: ShapeSummary[]; revision: number };
 
 export type ConfigurationDeleteResult = ConfigurationState & { deleted: true; name: string; shapes: ShapeSummary[]; revision: number };
 

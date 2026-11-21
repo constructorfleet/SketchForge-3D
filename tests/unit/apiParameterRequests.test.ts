@@ -4,7 +4,6 @@ import {
   API_CONFIGURATION_NAME_MAX_LENGTH,
   API_PARAMETER_EXPRESSION_MAX_LENGTH,
   API_PARAMETER_NAME_MAX_LENGTH,
-  apiConfigurationName,
   apiParameterName,
   isApiConfigurationActivateRequest,
   isApiConfigurationChangeRequest,
@@ -112,14 +111,5 @@ describe("parameter request checks", () => {
       expect(isApiConfigurationChangeRequest(body), `PATCH ${label}`).toBe(validateApiV1Schema(body, change));
       expect(isApiConfigurationActivateRequest(body), `activate ${label}`).toBe(validateApiV1Schema(body, activate));
     }
-  });
-
-  it("bounds a configuration query name as the contract does, without trimming", () => {
-    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === "PATCH /api/v1/parameter-configurations")!.query!.properties.name as { minLength: number; maxLength: number };
-    expect(rule.maxLength).toBe(API_CONFIGURATION_NAME_MAX_LENGTH);
-    expect(apiConfigurationName("Extra Large")).toBe("Extra Large");
-    expect(apiConfigurationName(" Large")).toBe(" Large");
-    expect(apiConfigurationName("")).toBeUndefined();
-    expect(apiConfigurationName("x".repeat(rule.maxLength + 1))).toBeUndefined();
   });
 });

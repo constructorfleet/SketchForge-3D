@@ -82,11 +82,6 @@ export function isApiConfigurationActivateRequest(body: unknown): body is { name
   return isObject(body) && onlyKeys(body, ["name"]) && "name" in body && (body.name === null || isConfigurationName(body.name));
 }
 
-/** Returns the `?name=` value untrimmed, since a stored name has no surrounding whitespace. */
-export function apiConfigurationName(value: unknown): string | undefined {
-  return isConfigurationName(value) ? value as string : undefined;
-}
-
 /** Returns the trimmed `?name=` value, or undefined when it is missing or out of bounds. */
 export function apiParameterName(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
