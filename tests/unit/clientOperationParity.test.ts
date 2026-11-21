@@ -261,14 +261,20 @@ function capturePythonRequests(): { requests: CapturedRequest[]; calls: { resour
   return JSON.parse(output) as { requests: CapturedRequest[]; calls: { resource: string; method: string; requestCount: number; queries: string[] }[]; compositeRequests: CapturedRequest[]; unlockedCompositeRequests: CapturedRequest[] };
 }
 
-function captureMcpRequest(toolName: string, args: Record<string, unknown>, filesDir: string): CapturedRequest[] {
+/** `responses` maps "METHOD /path" to the status and body the fetch spy answers. */
+function captureMcpRequest(
+  toolName: string,
+  args: Record<string, unknown>,
+  filesDir: string,
+  responses: Record<string, { status: number; body: unknown }> = {},
+): CapturedRequest[] {
   const serverPath = path.join(root, "packages/sketchforge-client/mcp/server.mjs");
   const spyPath = path.join(root, "tests/unit/support/mcp-rest-fetch-spy.mjs");
   const input = `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: { ...args, url: "http://parity.test" } } })}\n`;
   const result = spawnSync(process.execPath, ["--import", pathToFileURL(spyPath).href, serverPath], {
     input,
     encoding: "utf8",
-    env: { ...process.env, SKETCHFORGE_API_TOKEN: "test", SKETCHFORGE_MCP_FILES_DIR: filesDir },
+    env: { ...process.env, SKETCHFORGE_API_TOKEN: "test", SKETCHFORGE_MCP_FILES_DIR: filesDir, SKETCHFORGE_TEST_RESPONSES: JSON.stringify(responses) },
   });
   expect(result.status, `MCP ${toolName} handler should exit cleanly: ${result.stderr}`).toBe(0);
   return result.stderr.split("\n")
@@ -437,9 +443,18 @@ describe("REST client operation parity", () => {
         sketchforge_section_view: { projectId: PROJECT_ID, plane: "xy", offset: 0 },
         sketchforge_export_scene: { projectId: PROJECT_ID, format: "svg" },
         sketchforge_check_interference: { projectId: PROJECT_ID, ids: [SHAPE_ID] },
+        sketchforge_list_parameters: { projectId: PROJECT_ID },
+        sketchforge_set_parameter: { projectId: PROJECT_ID, name: "wall", expression: "2", dimension: "length" },
+        sketchforge_rename_parameter: { projectId: PROJECT_ID, name: "wall", newName: "thickness" },
+        sketchforge_delete_parameter: { projectId: PROJECT_ID, name: "wall" },
+        sketchforge_set_shape_expression: { projectId: PROJECT_ID, shapeId: SHAPE_ID, field: "width", expression: "wall * 5" },
+      };
+      // Setting an existing name tries the create, is refused, then changes it.
+      const mcpResponses: Record<string, Record<string, { status: number; body: unknown }>> = {
+        sketchforge_set_parameter: { "POST /api/v1/parameters": { status: 409, body: { error: "Parameter \"wall\" already exists.", code: "parameter_exists" } } },
       };
       for (const toolName of apiBackedTools) {
-        const actual = captureMcpRequest(toolName, mcpArgs[toolName] ?? {}, filesDir);
+        const actual = captureMcpRequest(toolName, mcpArgs[toolName] ?? {}, filesDir, mcpResponses[toolName]);
         const expected = MCP_RESOURCE_OPERATIONS[toolName].map((operationId) => {
           const operation = operationById.get(operationId)!;
           return { method: operation.method, pathname: operation.path };

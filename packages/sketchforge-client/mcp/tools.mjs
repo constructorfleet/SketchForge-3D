@@ -3,6 +3,7 @@ import path from "node:path";
 import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 import { callLocalEngineTool } from "./localEngine.mjs";
+import { callRemoteParameterTool, McpToolError, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
 import { engineTools } from "./toolCatalog.mjs";
 
 const MCP_ROUTE = "/api/sketchforge-mcp";
@@ -23,7 +24,7 @@ const API_TOKEN_ENV = "SKETCHFORGE_API_TOKEN";
  * to ask one for. The token is the same one the server was started with, and
  * without it every route answers 404 rather than saying it is switched off.
  */
-async function restRequest(method, path, { query = {}, body, baseUrl } = {}) {
+async function restRequest(method, path, { query = {}, body, baseUrl, withDetail = false } = {}) {
   const token = process.env[API_TOKEN_ENV];
   if (!token) {
     throw new Error(
@@ -43,11 +44,9 @@ async function restRequest(method, path, { query = {}, body, baseUrl } = {}) {
   if (!response.ok) {
     // The sentence is for whoever reads the log; the code is the half a client
     // can act on, so carry both rather than flattening to a status.
-    throw new Error(
-      payload?.error
-        ? `${payload.error}${payload.code ? ` [${payload.code}]` : ""}`
-        : `SketchForge API returned HTTP ${response.status}`,
-    );
+    if (!payload?.error) throw new McpToolError(`SketchForge API returned HTTP ${response.status}`);
+    const { error, code, ...detail } = payload;
+    throw new McpToolError(error, code, withDetail ? detail : {});
   }
   return payload;
 }
@@ -99,6 +98,9 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000, baseUr
 }
 
 async function callRemoteTool(name, args, baseUrl) {
+  if (PARAMETER_TOOL_NAMES.has(name)) {
+    return callRemoteParameterTool(name, args, (method, route, options) => restRequest(method, route, { ...options, baseUrl, withDetail: true }));
+  }
   switch (name) {
     case "sketchforge_list_editors":
       return bridgeGet(baseUrl);

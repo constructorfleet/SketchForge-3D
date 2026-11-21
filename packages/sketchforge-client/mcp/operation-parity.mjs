@@ -13,6 +13,11 @@ export const MCP_RESOURCE_OPERATIONS = {
   sketchforge_section_view: ["exportProject"],
   sketchforge_export_scene: ["exportProject"],
   sketchforge_check_interference: ["analyzeInterference"],
+  sketchforge_list_parameters: ["listParameters"],
+  sketchforge_set_parameter: ["createParameter", "updateParameter"],
+  sketchforge_rename_parameter: ["updateParameter"],
+  sketchforge_delete_parameter: ["deleteParameter"],
+  sketchforge_set_shape_expression: ["updateShape"],
 };
 
 /** Runtime tools implemented by the local engine, filesystem, or editor bridge. */
@@ -53,7 +58,6 @@ export const MCP_UNSUPPORTED_OPERATIONS = {
   deleteProject: "MCP exposes no project-delete API tool.",
   listShapes: "Object listing uses the local engine/editor bridge, not GET /shapes.",
   createShapes: "Shape creation uses the local engine/editor bridge, not POST /shapes.",
-  updateShape: "Object updates use the local engine/editor bridge, not PATCH /shapes.",
   deleteShape: "Object deletion uses the local engine/editor bridge, not DELETE /shapes.",
   listEdges: "Edge listing uses the local engine/editor bridge, not GET /edges.",
   treatShape: "Edge treatments use the local engine/editor bridge, not POST /treatments.",
@@ -65,8 +69,4 @@ export const MCP_UNSUPPORTED_OPERATIONS = {
   groupShapes: "Grouping uses the local engine/editor bridge, not POST /groups.",
   ungroupShape: "Ungrouping uses the local engine/editor bridge, not DELETE /groups.",
   splitParts: "Part separation uses the local engine/editor bridge, not POST /parts.",
-  listParameters: "MCP parameter tools are tracked in #614.",
-  createParameter: "MCP parameter tools are tracked in #614.",
-  updateParameter: "MCP parameter tools are tracked in #614.",
-  deleteParameter: "MCP parameter tools are tracked in #614.",
 };

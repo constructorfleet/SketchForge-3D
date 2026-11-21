@@ -36,3 +36,48 @@ This second executable workflow creates a temporary project, imports a tetrahedr
 ```
 
 The [example source](./examples/local-stl-import.mjs) validates each call against the current `tools/list` schema before invoking it. The import source and exported STL are both kept inside the temporary project directory, matching the configured MCP file-root rules.
+
+## Drive a shape from parameters
+
+Five tools manage a project's named parameters and bind shape fields to them. They work in local mode, against a server when a tool call passes `url` (through REST v1 [parameters and expressions](../REST_API.md#parameters-and-expressions), which needs `SKETCHFORGE_API_TOKEN`), and on a server's `/mcp` endpoint.
+
+| Tool | Does |
+| --- | --- |
+| `sketchforge_list_parameters` | Returns the table, with each resolved `value`, and `bindingIssues` for bindings that no longer resolve. |
+| `sketchforge_set_parameter` | Creates a parameter when given `expression` and `dimension`, and changes it if the name exists. Either field alone changes an existing parameter. The reply has `created`. |
+| `sketchforge_rename_parameter` | Renames a parameter and rewrites every expression and shape binding that uses it. |
+| `sketchforge_delete_parameter` | Deletes a parameter that nothing uses. |
+| `sketchforge_set_shape_expression` | Binds one shape field to an expression, or clears the binding with `expression: null`, which keeps the current number. |
+
+A write to a parameter returns the whole table and the shapes it rebuilt, so the new geometry is in the reply. For example, these calls make a box whose width and position follow `wall`:
+
+```json
+{ "name": "sketchforge_set_parameter", "arguments": { "projectId": "bracket", "name": "wall", "expression": "2", "dimension": "length" } }
+{ "name": "sketchforge_set_shape_expression", "arguments": { "projectId": "bracket", "shapeId": "<box id>", "field": "width", "expression": "wall * 5" } }
+{ "name": "sketchforge_set_parameter", "arguments": { "projectId": "bracket", "name": "wall", "expression": "3" } }
+```
+
+The last call answers `created: false` and lists the box with `width: 15`. A bare number takes the parameter's unit, so `3` in a length parameter is 3 mm.
+
+### Refusals
+
+A refusal is an MCP tool error. Its first line ends with the REST error code in brackets; a second line, when present, holds the detail as JSON. Local and remote mode use the same codes and detail fields:
+
+```text
+Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
+{"parameter":"wall","reason":"parameterInUse","dependents":["lip"],"shapeDependents":[{"shapeId":"<box id>","fields":["width"]}]}
+```
+
+| Code | When | Detail |
+| --- | --- | --- |
+| `invalid_expression` | Bad syntax, an unknown name, the wrong dimension, a cycle, or a bound result out of the field's range. | `expressionError` with `code`, `message`, `span` and `cycle`; `shapeId` and `field` for a binding; `value`, `min`, `max` for a range. |
+| `parameter_not_found` | Changing, renaming or deleting a name that does not exist. A set without `dimension` says to send both fields to create. | `parameter` |
+| `parameter_exists` | Renaming to a name already in use. | `parameter` |
+| `parameter_in_use` | Deleting a parameter that something references. | `dependents`, `shapeDependents` |
+| `shape_locked` | A binding, or a parameter change that would rebuild it, touches a locked shape. | `shapeId`, `fields` |
+| `unapplicable_fields` | The shape cannot bind that field. | `fields` |
+| `invalid_request` | A bad name or dimension, or a set with neither field. | |
+| `limit_exceeded` | The table is full. | |
+| `shape_not_found`, `project_not_found` | The id is not in the project or store. | |
+
+Sketch constraint bindings have no MCP tool yet.

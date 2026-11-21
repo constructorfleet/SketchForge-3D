@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
+import { callLocalParameterTool, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
 
 // SKETCHFORGE_MCP_FILES_DIR is resolved by the shared MCP filesystem path policy.
 
@@ -37,8 +38,13 @@ async function unwrap(result) {
 }
 
 function objectSummary(shape) {
-  const { id, name, kind, x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, color, hole, locked, group, features } = shape;
-  return { id, name, kind, x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, color, hole, locked, ...(group ? { group } : {}), ...(features ? { features } : {}) };
+  const { id, name, kind, x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, color, hole, locked, group, features, expressions } = shape;
+  return {
+    id, name, kind, x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, color, hole, locked,
+    ...(group ? { group } : {}),
+    ...(features ? { features } : {}),
+    ...(expressions && Object.keys(expressions).length ? { expressions: { ...expressions } } : {}),
+  };
 }
 
 function compactMutationValue(value) {
@@ -359,6 +365,9 @@ async function callLocalEngineToolRaw(name, args = {}) {
     return { projectId: id, name: projectName, shapeCount: imported.shapes.length, revision: 1 };
   }
   const id = requireProjectId(args);
+  if (PARAMETER_TOOL_NAMES.has(name)) {
+    return callLocalParameterTool(name, args, { engine, enginePackage, projectId: id, summarize: objectSummary });
+  }
   switch (name) {
     case "sketchforge_read_scene":
     case "sketchforge_list_objects":

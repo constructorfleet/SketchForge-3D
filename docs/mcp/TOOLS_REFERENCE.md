@@ -12,7 +12,7 @@ sources:
 Generated from the running `tools/list` registry in `packages/sketchforge-client/mcp/server.mjs`.
 Regenerate with `node scripts/generate-mcp-reference.mjs`; `--check` verifies that this file matches the current public registry.
 
-The server currently exposes 40 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
+The server currently exposes 45 tools. Input schemas below are the exact JSON Schema values advertised over MCP.
 
 A SketchForge server's `/mcp` endpoint lists the stored-project subset of these tools, without the editor targeting fields; see the [MCP endpoint guide](../guides/deployment.md#mcp-endpoint).
 
@@ -2115,6 +2115,187 @@ Hollow a stored project shape out to a wall of a given thickness, optionally lea
           "number"
         ]
       }
+    }
+  }
+}
+```
+## sketchforge_list_parameters
+
+### Description
+
+List the project's named parameters: name, expression, dimension, resolved value (null for a stale entry) and error, if any. bindingIssues lists shape bindings that no longer resolve. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Works offline or against a server when url is supplied.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The project id."
+    }
+  }
+}
+```
+## sketchforge_set_parameter
+
+### Description
+
+Create a parameter, or change the expression or dimension of an existing one. Send expression and dimension to create; a name that exists is changed instead. Either one alone changes an existing parameter. A bare number takes the dimension's unit, so 3 in a length parameter is 3 mm. The reply has created, the parameter, the whole table, and the shapes the change rebuilt. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension or a cycle; expressionError has the span and any cycle path), parameter_not_found (a change to a name that does not exist), invalid_request (a bad name or dimension), limit_exceeded (the table is full), shape_locked (a bound shape is locked; detail names shapeId and fields). Works offline or against a server when url is supplied.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId",
+    "name"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The project id."
+    },
+    "name": {
+      "type": "string",
+      "description": "Parameter name: a letter or underscore, then letters, digits or underscores."
+    },
+    "expression": {
+      "type": "string",
+      "description": "For example \"2\", \"3 mm\", \"wall * 2 + 1\" or \"max(wall, 2)\". Units: mm, cm, m, in, ft, deg, rad."
+    },
+    "dimension": {
+      "type": "string",
+      "enum": [
+        "length",
+        "angle",
+        "unitless"
+      ],
+      "description": "length values are in mm and angle values in degrees."
+    }
+  }
+}
+```
+## sketchforge_rename_parameter
+
+### Description
+
+Rename a parameter, rewriting every parameter expression and shape binding that uses it. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found, parameter_exists (newName is taken), invalid_request (newName is not a valid name). Works offline or against a server when url is supplied.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId",
+    "name",
+    "newName"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The project id."
+    },
+    "name": {
+      "type": "string",
+      "description": "The current name."
+    },
+    "newName": {
+      "type": "string",
+      "description": "The new name."
+    }
+  }
+}
+```
+## sketchforge_delete_parameter
+
+### Description
+
+Delete a parameter that nothing uses. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names) and shapeDependents (shapeId and fields) to change or clear first. Works offline or against a server when url is supplied.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId",
+    "name"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The project id."
+    },
+    "name": {
+      "type": "string",
+      "description": "The parameter to delete."
+    }
+  }
+}
+```
+## sketchforge_set_shape_expression
+
+### Description
+
+Bind one field of a stored shape to a parameter expression and apply its value, or pass expression null to clear the binding and keep the current number. A changed parameter then rebuilds the shape. Bindable fields: x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, kind parameters such as sides or bevel, revolve.startAngle, revolve.sweepAngle and the other revolve settings, draftPrismAngle and faceDraft.angle. The reply has the shape, with expressions, and the revision. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: unapplicable_fields (this shape cannot bind the field), invalid_expression (detail names shapeId and field, with expressionError, or value, min and max for a result out of range), shape_not_found, shape_locked. Works offline or against a server when url is supplied.
+
+### Input schema
+
+```json
+{
+  "type": "object",
+  "required": [
+    "projectId",
+    "shapeId",
+    "field",
+    "expression"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Optional SketchForge server URL. Omit to work offline with local project files."
+    },
+    "projectId": {
+      "type": "string",
+      "description": "The project id."
+    },
+    "shapeId": {
+      "type": "string",
+      "description": "The shape id."
+    },
+    "field": {
+      "type": "string",
+      "description": "The field to bind, such as \"width\" or \"revolve.sweepAngle\"."
+    },
+    "expression": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "For example \"wall * 5\". null clears the binding."
     }
   }
 }
