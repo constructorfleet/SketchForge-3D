@@ -433,6 +433,9 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
       [OVERRIDE, (c) => ({ projectId: c.projectId, name: "big", parameter: "wall", expression: "wall +" })],
       [OVERRIDE, (c) => ({ projectId: c.projectId, name: "nowhere", parameter: "wall", expression: "3" })],
       [OVERRIDE, (c) => ({ projectId: c.projectId, name: " ", parameter: "wall", expression: "3" })],
+      [OVERRIDE, (c) => ({ projectId: c.projectId, name: 5, parameter: "wall", expression: "3" })],
+      [RENAME, (c) => ({ projectId: c.projectId, name: 5, newName: "five" })],
+      [DELETE, (c) => ({ projectId: c.projectId, name: 5 })],
       [ACTIVATE, (c) => ({ projectId: c.projectId, name: "big" })],
     ];
     const answers: { local: Answer; remote: Answer }[] = [];
@@ -440,9 +443,11 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
     const code = (index: number) => /\[([a-z_]+)\]$/.exec(answers[index]!.local.text.split("\n")[0]!)?.[1];
     expect(JSON.parse(answers[2]!.local.text)).toMatchObject({ configuration: { name: "big", overrides: { wall: "3" } }, activeConfiguration: null });
     expect(code(3)).toBe("configuration_exists");
+    expect(JSON.parse(answers[3]!.local.text.split("\n")[1]!)).toEqual({ reason: "duplicateConfigurationName", configuration: "big" });
     expect(code(5)).toBe("invalid_request");
     expect(code(13)).toBe("configuration_not_found");
-    expect(JSON.parse(answers[15]!.local.text)).toMatchObject({ activeConfiguration: "big" });
+    for (const index of [15, 16, 17]) expect(code(index)).toBe("invalid_request");
+    expect(JSON.parse(answers[18]!.local.text)).toMatchObject({ activeConfiguration: "big" });
     // wall = 3: the box is 15 wide and centred at x = 30.
     await geometryIs(1500, 30);
 

@@ -52,6 +52,17 @@ function requireExpression(args) {
   return args.expression;
 }
 
+/**
+ * Returns a configuration name bound for `?name=`. A query would stringify a
+ * number, so a non-string is refused here; a missing one is left to the request checks.
+ */
+function configurationQueryName(args) {
+  if (args.name !== undefined && args.name !== null && typeof args.name !== "string") {
+    throw new McpToolError("name must be a configuration name string.", "invalid_request");
+  }
+  return args.name;
+}
+
 /** Splits a set request into a create (both fields) or a change (either one). */
 function parameterChanges(args) {
   const changes = {
@@ -102,20 +113,20 @@ export async function callParameterTool(name, args, request) {
       const expression = requireExpression(args);
       return request("PATCH", "/sketch-constraints", { query: { projectId, shapeId: args.shapeId, constraintId: args.constraintId }, body: { expression } });
     }
-    // Configuration values go to the request checks unread, so both modes refuse them as REST does.
+    // Configuration bodies go to the request checks unread, so both modes refuse them as REST does.
     case "sketchforge_list_parameter_configurations":
       return request("GET", "/parameter-configurations", { query: { projectId } });
     case "sketchforge_create_parameter_configuration":
       return request("POST", "/parameter-configurations", { query: { projectId }, body: { name: args.name, overrides: args.overrides } });
     case "sketchforge_rename_parameter_configuration":
-      return request("PATCH", "/parameter-configurations", { query: { projectId, name: args.name }, body: { name: args.newName } });
+      return request("PATCH", "/parameter-configurations", { query: { projectId, name: configurationQueryName(args) }, body: { name: args.newName } });
     case "sketchforge_set_configuration_override":
       return request("PATCH", "/parameter-configurations", {
-        query: { projectId, name: args.name },
+        query: { projectId, name: configurationQueryName(args) },
         body: { parameter: args.parameter, expression: args.expression },
       });
     case "sketchforge_delete_parameter_configuration":
-      return request("DELETE", "/parameter-configurations", { query: { projectId, name: args.name } });
+      return request("DELETE", "/parameter-configurations", { query: { projectId, name: configurationQueryName(args) } });
     case "sketchforge_activate_parameter_configuration":
       return request("POST", "/parameter-configurations/activate", { query: { projectId }, body: { name: args.name } });
     default:

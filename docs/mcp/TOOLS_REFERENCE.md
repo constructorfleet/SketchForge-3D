@@ -2492,7 +2492,7 @@ Set one parameter's expression in a configuration, or pass expression null to re
 
 ### Description
 
-Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: configuration_not_found, invalid_request. Works offline or against a server when url is supplied.
+Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes, so it can be refused as an activation can. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: configuration_not_found, invalid_request, and for the active one invalid_expression (a bound result out of range), shape_locked (a bound shape that would change is locked) and geometry_failed (a bound sketch cannot be solved). Works offline or against a server when url is supplied.
 
 ### Input schema
 

@@ -737,7 +737,7 @@ export const engineTools = [
   },
   {
     name: "sketchforge_delete_parameter_configuration",
-    description: `Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes. ${REFUSAL_FORMAT} Codes: configuration_not_found, invalid_request. ${WORKS_BOTH_WAYS}`,
+    description: `Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes, so it can be refused as an activation can. ${REFUSAL_FORMAT} Codes: configuration_not_found, invalid_request, and for the active one invalid_expression (a bound result out of range), shape_locked (a bound shape that would change is locked) and geometry_failed (a bound sketch cannot be solved). ${WORKS_BOTH_WAYS}`,
     inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The configuration name, 1 to 100 characters." } } },
   },
   {

@@ -72,7 +72,7 @@ A configuration is a named set of parameter overrides, such as a `large` variant
 { "name": "sketchforge_activate_parameter_configuration", "arguments": { "projectId": "bracket", "name": null } }
 ```
 
-Creating a configuration does not activate it. Activating one, or changing an override of the active one, rebuilds every bound shape in the same write and lists the rebuilt shapes in `shapes`; `name: null` returns to the base table. Every write replies with `configurations`, `activeConfiguration` and the table as the active configuration resolves it. A refused activation, for example one whose override would make a bound width negative (`invalid_expression` with `reason: "outOfRange"`), leaves the project, the active configuration and the geometry as they were. Deleting the active configuration returns the project to the base table. Unknown and duplicate names answer `configuration_not_found` and `configuration_exists`.
+Creating a configuration does not activate it. Activating one, or changing an override of the active one, rebuilds every bound shape in the same write and lists the rebuilt shapes in `shapes`; `name: null` returns to the base table. Every write replies with `configurations`, `activeConfiguration` and the table as the active configuration resolves it. A refused activation, for example one whose override would make a bound width negative (`invalid_expression` with `reason: "outOfRange"`), leaves the project, the active configuration and the geometry as they were. Deleting the active configuration returns the project to the base table and rebuilds bound shapes, so it can be refused with the same codes as an activation (`invalid_expression`, `shape_locked`, `geometry_failed`), leaving it in place. A configuration `name` must be a string; a number is refused as `invalid_request` rather than read as text. Unknown and duplicate names answer `configuration_not_found` and `configuration_exists`.
 
 ### Refusals
 
@@ -95,7 +95,7 @@ Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
 | `invalid_request` | A bad name or dimension, an empty expression or one over 10,000 characters (the sentence says so), or a set with neither field. | `parameter`, `reason` when the engine refused it |
 | `invalid_project_id`, `invalid_shape_id` | `projectId` or `shapeId` is missing, blank or malformed. | |
 | `limit_exceeded` | The table is full. | |
-| `configuration_not_found`, `configuration_exists` | A configuration name that does not exist, or one already taken. | `configuration` |
+| `configuration_not_found`, `configuration_exists` | A configuration name that does not exist, or one already taken. | `configuration`, and `reason` (`unknownConfiguration`, `duplicateConfigurationName`); `parameter` only when the refusal is about one parameter's override |
 | `shape_not_found`, `project_not_found` | The id is not in the project or store. | |
 
 A sketch-constraint binding answers with the same codes, naming `constraintId`: `invalid_expression` (including `reason: "outOfRange"`), `unapplicable_fields` for a constraint that cannot bind, or `reason: "conflictingBinding"` when a bound size of the same shape drives that dimension (and the reverse, from `sketchforge_set_shape_expression`), `invalid_request` for a missing or unknown `constraintId`, and `geometry_failed` with `constraintIds` when the sketch cannot be solved.

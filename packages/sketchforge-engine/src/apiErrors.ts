@@ -183,7 +183,8 @@ const PARAMETER_ERROR_STATUS: Record<ProjectParameterError["code"], readonly [nu
 function parameterError(error: ProjectParameterError) {
   const [status, code] = PARAMETER_ERROR_STATUS[error.code];
   return reply(error.message, status, code, {
-    parameter: error.parameter,
+    // A configuration-level refusal carries an empty parameter; it names `configuration` instead.
+    ...(error.parameter ? { parameter: error.parameter } : {}),
     reason: error.code,
     ...(error.configuration !== undefined ? { configuration: error.configuration } : {}),
     ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),

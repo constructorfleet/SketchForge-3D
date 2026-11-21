@@ -232,6 +232,8 @@ describe("/api/v1/parameter-configurations", () => {
       await activate(projectId, { name: "Missing" }),
     ]) {
       expect(refused).toMatchObject({ status: 404, body: { code: "configuration_not_found", configuration: "Missing", reason: "unknownConfiguration" } });
+      // A refusal about a configuration names no parameter.
+      expect(refused.body).not.toHaveProperty("parameter");
     }
 
     expect(await create(projectId, { name: "Ghost", overrides: { gone: "1" } })).toMatchObject({ status: 404, body: { code: "parameter_not_found", parameter: "gone", configuration: "Ghost" } });
