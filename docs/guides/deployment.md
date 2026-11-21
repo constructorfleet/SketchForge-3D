@@ -27,6 +27,7 @@ Server-backed projects and the shared project library are available to any calle
 
 - `GET /api/projects` is unauthenticated: it lists every server-backed project, and `GET /api/projects?projectId=…` reads that project's `.skf` file. When `SKETCHFORGE_PROJECTS_DIR` is configured, `POST` creates or overwrites a project and `DELETE` removes it.
 - `GET /api/shared-projects` is unauthenticated: it lists or downloads shared projects and thumbnails. When `SKETCHFORGE_SHARED_PROJECTS_DIR` is configured, `POST` publishes or replaces a shared project and `DELETE` removes one.
+- `POST /api/editor/cad` and `POST /api/editor/parameters` are unauthenticated and not covered by the REST API token. They run CAD kernel work on shapes the caller sends, up to 32 MB per request, and store nothing. A caller that can reach them can use server CPU and memory.
 - The write and delete handlers reject browser requests whose `Origin` does not match the server origin. They accept requests with no `Origin` header, which includes common command-line and scripted clients. A non-browser caller can also set request headers itself, so this same-origin check is a cross-site request defense, not authentication or an authorization boundary.
 - `SKETCHFORGE_API_TOKEN` protects the separate scripting API under `/api/v1` and the [MCP endpoint](#mcp-endpoint) at `/mcp`. It does not protect `/api/projects` or `/api/shared-projects`.
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiRequestBodyBytes } from "@/lib/apiV1";
 import { createEngine, type Engine, type ProjectDocument, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
@@ -76,13 +77,12 @@ function run(engine: Engine, edit: Edit) {
  * binding recompute, so bound geometry moves exactly as through REST. Stores nothing.
  */
 export async function POST(request: Request) {
-  const size = Number(request.headers.get("content-length") ?? 0);
-  if (size > MAX_EDITOR_PARAMETER_REQUEST_BYTES) return json({ error: "The editor parameter request is too large." }, 413);
+  // Streamed and capped: a chunked body has no content-length to check up front.
+  const bytes = await apiRequestBodyBytes(request, { maxBytes: MAX_EDITOR_PARAMETER_REQUEST_BYTES });
+  if (bytes instanceof Response) return bytes;
   let body: Record<string, unknown>;
   try {
-    const raw = await request.text();
-    if (Buffer.byteLength(raw, "utf8") > MAX_EDITOR_PARAMETER_REQUEST_BYTES) return json({ error: "The editor parameter request is too large." }, 413);
-    const value: unknown = JSON.parse(raw);
+    const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
     if (!isRecord(value)) return json({ error: "Expected a JSON object." }, 400);
     body = value;
   } catch {
@@ -102,7 +102,8 @@ export async function POST(request: Request) {
     if (!result.ok) return json({ failure: result.failure }, 422);
     const { shapes, parameters } = memory.current();
     return json({ shapes, parameters: parameters ?? [] });
-  } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "The parameter edit could not be applied." }, 422);
+  } catch {
+    // Kernel exception text can carry server paths; the editor shows its own message.
+    return json({ error: "The parameter edit could not be applied." }, 422);
   }
 }

@@ -73,6 +73,21 @@ describe("editor parameter route", () => {
     expect(invalid.body.failure).toMatchObject({ reason: "parameter_invalid", error: { code: "invalidExpression" } });
   });
 
+  it("stops reading a streamed body past the limit", async () => {
+    const chunk = new Uint8Array(17 * 1024 * 1024).fill(32);
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 4) controller.close();
+        else controller.enqueue(chunk);
+      },
+    });
+    const response = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body, duplex: "half" } as RequestInit));
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThan(4);
+  });
+
   it("rejects malformed requests", async () => {
     const response = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body: JSON.stringify({ projectId: "p", shapes: [], parameters: [], edit: { kind: "drop" } }) }));
     expect(response.status).toBe(400);
