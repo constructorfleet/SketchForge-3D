@@ -113,11 +113,17 @@ export function releaseEditedBindings(previous: readonly WorkplaneShape[], next:
 
 /**
  * Carries `previous`'s bindings onto a shape rebuilt from scratch, such as a revolve.
- * Drops `released` fields and any binding whose number the rebuild changed.
+ * Drops any binding whose number the rebuild changed, and each `released` field still bound to the released expression.
  */
-export function withRebuiltBindings(previous: WorkplaneShape, rebuilt: WorkplaneShape, released: readonly string[] = []): WorkplaneShape {
+export function withRebuiltBindings(
+  previous: WorkplaneShape,
+  rebuilt: WorkplaneShape,
+  released: Readonly<Record<string, string>> = {},
+): WorkplaneShape {
   if (!previous.expressions) return rebuilt;
-  const carried = withoutBindings({ ...rebuilt, expressions: previous.expressions }, released);
+  // A field rebound since its release keeps the new binding.
+  const stillReleased = Object.keys(released).filter((field) => previous.expressions![field] === released[field]);
+  const carried = withoutBindings({ ...rebuilt, expressions: previous.expressions }, stillReleased);
   return releaseEditedBindings([previous], [carried])[0]!;
 }
 

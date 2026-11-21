@@ -149,9 +149,12 @@ describe("withRebuiltBindings", () => {
     expect(withRebuiltBindings(revolve({}), rebuilt)).toBe(rebuilt);
   });
 
-  it("drops the bindings named as released", () => {
+  it("drops a released binding only while it is still the expression that was released", () => {
     const previous = revolve({}, { "revolve.sweepAngle": "tilt * 12", x: "wall" });
-    expect(withRebuiltBindings(previous, revolve({}), ["revolve.sweepAngle"]).expressions).toEqual({ x: "wall" });
+    expect(withRebuiltBindings(previous, revolve({}), { "revolve.sweepAngle": "tilt * 12" }).expressions).toEqual({ x: "wall" });
+    // Rebound while the rebuild was pending: the new binding stays.
+    const rebound = revolve({}, { "revolve.sweepAngle": "tilt * 3" });
+    expect(withRebuiltBindings(rebound, revolve({}), { "revolve.sweepAngle": "tilt * 12" }).expressions).toEqual({ "revolve.sweepAngle": "tilt * 3" });
   });
 });
 

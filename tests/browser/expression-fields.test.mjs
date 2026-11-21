@@ -368,6 +368,14 @@ test("revolve setting fields keep other bindings through a rebuild, and a typed 
   await withEditor([await revolveShape()], async ({ page, shapeWhen, select }) => {
     await select("Ring");
     const sweep = page.getByRole("combobox", { name: "Sweep" });
+    // A server refusal also reaches the status line, which outlives the field.
+    await sweep.fill("tilt * 20");
+    await sweep.press("Enter");
+    const outOfRange = "The expression gives 600, which is out of range for this field.";
+    await page.getByRole("alert").filter({ hasText: outOfRange }).waitFor();
+    await page.waitForFunction((text) => [...document.querySelectorAll("body *")].filter((node) => node.children.length === 0 && node.textContent?.trim() === text).length >= 2, outOfRange, { timeout: 15_000 });
+    await sweep.focus();
+    await sweep.press("Escape");
     await sweep.fill("tilt * 6");
     await sweep.press("Enter");
     await shapeWhen(0, (shape) => shape.sketchRevolve?.sweepAngle === 180 && shape.expressions?.["revolve.sweepAngle"] === "tilt * 6", "sweep follows tilt * 6");

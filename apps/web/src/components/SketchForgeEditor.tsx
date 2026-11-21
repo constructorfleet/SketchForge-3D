@@ -7404,22 +7404,42 @@ export function SketchForgeEditor({
   );
 
   // Revolve settings commit after an async rebuild, so a typed literal's unbind waits for it: one history entry.
-  const revolveReleasesRef = useRef(new Map<string, Set<string>>());
+  // Each release maps field to the expression released; the next scheduled rebuild claims it.
+  const pendingRevolveReleasesRef = useRef(new Map<string, Record<string, string>>());
+  const claimedRevolveReleasesRef = useRef(new Map<string, { requestId: number; released: Record<string, string> }>());
   const scheduleRevolveShapeUpdate = useCallback((id: string, settings: SketchRevolveSettings) => {
     const previousTimer = sketchRevolveUpdateTimerRef.current.get(id);
     if (previousTimer !== undefined) window.clearTimeout(previousTimer);
     const requestId = (sketchRevolveUpdateRequestRef.current.get(id) ?? 0) + 1;
     sketchRevolveUpdateRequestRef.current.set(id, requestId);
+    // A superseded request never lands, so its releases move to this one.
+    claimedRevolveReleasesRef.current.set(id, {
+      requestId,
+      released: { ...claimedRevolveReleasesRef.current.get(id)?.released, ...pendingRevolveReleasesRef.current.get(id) },
+    });
+    pendingRevolveReleasesRef.current.delete(id);
+    const takeReleases = () => {
+      const claimed = claimedRevolveReleasesRef.current.get(id);
+      if (claimed?.requestId !== requestId) return {};
+      claimedRevolveReleasesRef.current.delete(id);
+      return claimed.released;
+    };
     const timer = window.setTimeout(() => {
       sketchRevolveUpdateTimerRef.current.delete(id);
       const source = shapesRef.current.find((shape) => shape.id === id);
-      if (!source?.sketchProfile || source.sketchOperation !== "revolve") return;
+      if (!source?.sketchProfile || source.sketchOperation !== "revolve") {
+        takeReleases();
+        return;
+      }
       setNotice(notice((t) => t("editor.sketch.revolvePreviewUpdating")));
       void Promise.all([shapeFromRevolvedSketchProfile(source.sketchProfile, settings, source), getManifoldRuntime()])
         .then(([generated, runtime]) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) !== requestId) return;
           const current = shapesRef.current.find((shape) => shape.id === id);
-          if (!current?.importedMesh || current.sketchOperation !== "revolve") return;
+          if (!current?.importedMesh || current.sketchOperation !== "revolve") {
+            takeReleases();
+            return;
+          }
           const axis = recoveredRevolveAxis(runtime, current);
           const widthScale = current.width / Math.max(0.001, current.importedMesh.baseWidth);
           const depthScale = current.depth / Math.max(0.001, current.importedMesh.baseDepth);
@@ -7450,14 +7470,12 @@ export function SketchForgeEditor({
             hidden: current.hidden,
             sketchRevolve: settings,
           }), axis);
-          const released = [...(revolveReleasesRef.current.get(id) ?? [])];
-          revolveReleasesRef.current.delete(id);
-          const updated = withRebuiltBindings(current, rebuilt, released);
+          const updated = withRebuiltBindings(current, rebuilt, takeReleases());
           commitShapes(shapesRef.current.map((shape) => shape.id === id ? updated : shape), selectedIdsRef.current, notice((t) => t("editor.sketch.revolveShapeUpdated")));
         })
         .catch((error) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) === requestId) {
-            revolveReleasesRef.current.delete(id);
+            takeReleases();
             setNotice(notice((t) => errorText(t, error, "editor.sketch.revolveSettingsFailed")));
           }
         });
@@ -7787,6 +7805,11 @@ export function SketchForgeEditor({
     let bound = local?.shapes;
     if (!bound) {
       if (STATIC_EXPORT_BUILD) return { key: "editor.expressionField.error.needsServer", values: {} };
+      // A server answer can land after the field is gone, so it also shows in the status line.
+      const refuse = (message: ParameterMessage) => {
+        setNotice(notice((t) => t(message.key, message.values)));
+        return message;
+      };
       parameterEditPendingRef.current = true;
       setParameterEditPending(true);
       try {
@@ -7796,16 +7819,16 @@ export function SketchForgeEditor({
         const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
         const body = await response.json().catch(() => null) as { shapes?: WorkplaneShape[] } | null;
         const merged = response.ok && body?.shapes ? mergeRecomputedShapes(startShapes, scope, body.shapes) : null;
-        if (!merged) return bindResponseMessage(response.ok ? 200 : response.status, body, startShapes);
+        if (!merged) return refuse(bindResponseMessage(response.ok ? 200 : response.status, body, startShapes));
         bound = merged;
       } catch {
-        return bindingFailureMessage(null, startShapes);
+        return refuse(bindingFailureMessage(null, startShapes));
       } finally {
         parameterEditPendingRef.current = false;
         setParameterEditPending(false);
       }
       if (shapesRef.current !== startShapes || projectParametersRef.current !== parameters || projectConfigurationRef.current !== configuration) {
-        return { key: "editor.parameters.error.projectChanged", values: {} };
+        return refuse({ key: "editor.parameters.error.projectChanged", values: {} });
       }
     }
     invalidateCadModifierSession();
@@ -7825,9 +7848,10 @@ export function SketchForgeEditor({
     const target = shapesRef.current.find((shape) => shape.id === shapeId);
     if (field.startsWith("revolve.") && target?.sketchOperation === "revolve" && target.sketchProfile) {
       // The revolve rebuild that follows drops it, in the same history entry.
-      const pending = revolveReleasesRef.current.get(shapeId) ?? new Set<string>();
-      pending.add(field);
-      revolveReleasesRef.current.set(shapeId, pending);
+      const expression = target.expressions?.[field];
+      if (expression !== undefined) {
+        pendingRevolveReleasesRef.current.set(shapeId, { ...pendingRevolveReleasesRef.current.get(shapeId), [field]: expression });
+      }
       return;
     }
     const release = (current: WorkplaneShape[]) => {

@@ -168,6 +168,10 @@ expression. Examples are dragging the shape, the gizmo, a slider, the arrow
 keys, align, and typing a number. Without this, the next parameter change would
 move the shape back.
 
+This also applies to rebuilds. Changing a revolve's sweep moves the centre of
+its bounding box, so it changes the shape's X and Z and drops any X or Z
+binding. Bindings whose numbers the rebuild leaves alone are kept.
+
 ```mermaid
 flowchart LR
   A[Type in a field] --> B{Plain number?}
