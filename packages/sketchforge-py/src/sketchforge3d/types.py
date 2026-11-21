@@ -560,6 +560,26 @@ class StepComponent:
 
 
 @dataclass(frozen=True)
+class SketchConstraintSummary:
+    """One dimensional constraint: its resolved value in mm or degrees, and its expression when bound."""
+
+    id: str
+    kind: str
+    value: float
+    expression: Optional[str] = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "SketchConstraintSummary":
+        expression = payload.get("expression")
+        return cls(
+            id=_text(payload, "id"),
+            kind=_text(payload, "kind"),
+            value=_number(payload, "value"),
+            expression=expression if isinstance(expression, str) else None,
+        )
+
+
+@dataclass(frozen=True)
 class ShapeSummary:
     """
     A shape as the server reports it.
@@ -613,6 +633,9 @@ class ShapeSummary:
     step_component: Optional[StepComponent] = None
     #: Bound fields' expressions. Each bound field still carries its resolved number.
     expressions: Dict[str, str] = field(default_factory=dict)
+    #: A sketch output's dimensional constraints. Read-only: change them in
+    #: ``sketchProfile`` or with ``sketch_constraints.bind``.
+    sketch_constraints: List[SketchConstraintSummary] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     _KNOWN = (
@@ -644,6 +667,7 @@ class ShapeSummary:
         "stepAssembly",
         "stepComponent",
         "expressions",
+        "sketchConstraints",
     ) + SHAPE_PARAMETER_NAMES
 
     @classmethod
@@ -684,6 +708,11 @@ class ShapeSummary:
             revolve=dict(revolve) if isinstance(revolve, Mapping) else None,
             profile=[[float(value) for value in point] for point in profile] if isinstance(profile, list) else None,
             expressions=_string_map(payload.get("expressions")),
+            sketch_constraints=[
+                SketchConstraintSummary.from_payload(entry)
+                for entry in payload.get("sketchConstraints") or []
+                if isinstance(entry, Mapping)
+            ],
             extra={key: value for key, value in payload.items() if key not in cls._KNOWN},
         )
 
@@ -1326,6 +1355,48 @@ class BindingIssue:
         )
 
 
+@dataclass(frozen=True)
+class ConstraintBindingIssue:
+    """A sketch constraint binding that no longer resolves, or conflicts with bound size ``fields``."""
+
+    shape_id: str
+    constraint_id: str
+    code: str
+    message: str
+    expression_error: Optional[ExpressionError] = None
+    fields: List[str] = field(default_factory=list)
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ConstraintBindingIssue":
+        return cls(
+            shape_id=_text(payload, "shapeId"),
+            constraint_id=_text(payload, "constraintId"),
+            code=_text(payload, "code"),
+            message=_text(payload, "message"),
+            expression_error=_expression_error(payload.get("expressionError")),
+            fields=[value for value in (payload.get("fields") or []) if isinstance(value, str)],
+        )
+
+
+@dataclass(frozen=True)
+class SketchConstraintBindResult:
+    """Holds the rebuilt sketch output, the bound constraint, and the new revision."""
+
+    shape: ShapeSummary
+    constraint: SketchConstraintSummary
+    revision: int
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "SketchConstraintBindResult":
+        shape = payload.get("shape")
+        constraint = payload.get("constraint")
+        return cls(
+            shape=ShapeSummary.from_payload(shape if isinstance(shape, Mapping) else {}),
+            constraint=SketchConstraintSummary.from_payload(constraint if isinstance(constraint, Mapping) else {}),
+            revision=int(_number(payload, "revision")),
+        )
+
+
 def _parameters(payload: Mapping[str, Any]) -> List[ProjectParameter]:
     return [ProjectParameter.from_payload(entry) for entry in payload.get("parameters") or [] if isinstance(entry, Mapping)]
 
@@ -1339,6 +1410,7 @@ class ParameterList:
     parameters: List[ProjectParameter]
     binding_issues: List[BindingIssue]
     revision: int
+    constraint_binding_issues: List[ConstraintBindingIssue] = field(default_factory=list)
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterList":
@@ -1346,6 +1418,11 @@ class ParameterList:
             parameters=_parameters(payload),
             binding_issues=[BindingIssue.from_payload(entry) for entry in payload.get("bindingIssues") or [] if isinstance(entry, Mapping)],
             revision=int(_number(payload, "revision")),
+            constraint_binding_issues=[
+                ConstraintBindingIssue.from_payload(entry)
+                for entry in payload.get("constraintBindingIssues") or []
+                if isinstance(entry, Mapping)
+            ],
         )
 
 

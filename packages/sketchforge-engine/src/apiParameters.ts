@@ -10,6 +10,7 @@ import { wireExpressionError } from "./apiErrors.js";
 import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
 import type { ParametersWritten } from "./engine.js";
 import { shapeBindingIssues } from "./expressionBindings.js";
+import { sketchConstraintBindingIssues } from "./sketchConstraintBindings.js";
 import type { ExpressionError } from "./parameterExpressions.js";
 
 export const API_PARAMETER_NAME_MAX_LENGTH = 64;
@@ -74,6 +75,12 @@ export function apiParameterList(project: { parameters: readonly ProjectParamete
     parameters: project.parameters.map(apiParameter),
     bindingIssues: shapeBindingIssues(project.shapes, project.parameters)
       .map((issue) => ({ shapeId: issue.shapeId, field: issue.field, ...apiIssue(issue) })),
+    constraintBindingIssues: sketchConstraintBindingIssues(project.shapes, project.parameters).map((issue) => ({
+      shapeId: issue.shapeId,
+      constraintId: issue.constraintId,
+      ...apiIssue(issue),
+      ...(issue.fields ? { fields: [...issue.fields] } : {}),
+    })),
     revision: project.revision,
   };
 }

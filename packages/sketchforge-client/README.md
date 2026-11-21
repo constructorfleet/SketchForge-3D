@@ -141,7 +141,12 @@ client.parameters.create(projectId, { name, expression, dimension }): Promise<Pa
 client.parameters.update(projectId, name, { expression?, dimension? }): Promise<ParameterWriteResult>
 client.parameters.rename(projectId, name, newName): Promise<ParameterWriteResult>
 client.parameters.delete(projectId, name): Promise<ParameterDeleteResult>
+
+client.sketchConstraints.bind(projectId, shapeId, constraintId, expression | null): Promise<SketchConstraintBindResult>
+client.sketchConstraints.unbind(projectId, shapeId, constraintId): Promise<SketchConstraintBindResult>
 ```
+
+`sketchConstraints.bind` binds a sketch output's `distance`, `radius`, `diameter` or `angle` constraint to an expression, re-solves the sketch and rebuilds the solid. `shapeId` is the output or its `sketchSourceId`, and `null` removes the binding and keeps the value. The result's `constraint` is `{ id, kind, value, expression? }`. Every summary of a sketch output lists the same entries in the read-only `sketchConstraints`. `parameters.list` reports constraint bindings that no longer resolve, or that conflict with a bound size field, in `constraintBindingIssues`.
 
 Set `expectedRevision` to the revision from a project's previous response to send `If-Match: "<revision>"` with each write request. A stale value raises `SketchForgeApiError` with status `409` and code `revision_mismatch`; the error's `revision` is the current project revision. Use a client configured for one conditional write at a time, then create a new one with the returned revision for the next write.
 

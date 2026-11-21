@@ -11,6 +11,7 @@
 import { isRevolveShape, outlineFromProfile, reportedRevolveAxis } from "./revolveRequests.js";
 import { isRequestableShapeKind, shapeParameterNamesFor } from "./shapeRequests.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
+import { sketchConstraintSummaries } from "./sketchConstraintBindings.js";
 
 /**
  * The `kind` a `POST` would need to build this shape again, when there is one.
@@ -43,6 +44,8 @@ export function apiShapeSummary(shape: WorkplaneShape) {
   for (const name of shapeParameterNamesFor(shape.kind)) {
     if (shape[name] !== undefined) parameters[name] = shape[name];
   }
+  // Only a sweep reports its whole profile; every sketch output reports its dimensions.
+  const constraints = sketchConstraintSummaries(shape.sketchProfile);
 
   return {
     id: shape.id,
@@ -74,6 +77,7 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     ...parameters,
     // Each bound field above holds its resolved number; this holds the expression.
     ...(shape.expressions && Object.keys(shape.expressions).length ? { expressions: { ...shape.expressions } } : {}),
+    ...(constraints.length ? { sketchConstraints: constraints } : {}),
     ...(revolve ? { revolve: { ...revolve, ...(axis ? { axis } : {}) } } : {}),
     // The outline is the only part of a revolve that is not a number, and it is
     // what a fresh `POST` would have to carry, so it is reported alongside the

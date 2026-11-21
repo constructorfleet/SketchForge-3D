@@ -268,6 +268,113 @@ export function renameSketchConstraintReferences(shapes: readonly WorkplaneShape
   return shapes.map(rename);
 }
 
+export type SketchConstraintSummary = {
+  readonly id: string;
+  readonly kind: BindableSketchConstraintKind;
+  readonly value: number;
+  readonly expression?: string;
+};
+
+/** Describes one dimensional constraint: its resolved value, and its expression when bound. */
+export function sketchConstraintSummary(constraint: BindableSketchConstraint): SketchConstraintSummary {
+  return {
+    id: constraint.id,
+    kind: constraint.kind,
+    value: sketchConstraintValue(constraint),
+    ...(typeof constraint.expression === "string" ? { expression: constraint.expression } : {}),
+  };
+}
+
+/** Lists a profile's dimensional constraints as shape summaries report them. */
+export function sketchConstraintSummaries(profile: SketchProfile | undefined): SketchConstraintSummary[] {
+  return (profile?.constraints ?? []).flatMap((constraint) =>
+    bindableSketchConstraint(constraint) ? [sketchConstraintSummary(constraint as BindableSketchConstraint)] : []);
+}
+
+/** Reports whether `sent` repeats `profile`'s summaries exactly, in order. */
+export function echoesSketchConstraints(profile: SketchProfile | undefined, sent: unknown): boolean {
+  const current = sketchConstraintSummaries(profile);
+  if (!Array.isArray(sent) || sent.length !== current.length) return false;
+  return current.every((summary, index) => {
+    const entry = sent[index] as Record<string, unknown> | null;
+    if (!entry || typeof entry !== "object" || Object.keys(entry).some((key) => !["id", "kind", "value", "expression"].includes(key))) return false;
+    return entry.id === summary.id && entry.kind === summary.kind && entry.value === summary.value && entry.expression === summary.expression;
+  });
+}
+
+export type RequestedSketchProfile =
+  | {
+    readonly ok: true;
+    readonly profile: SketchProfile;
+    /** Resolved values that differ from the sent ones; the sketch must be solved with them. */
+    readonly values: Readonly<Record<string, number>>;
+    /** Constraints this request binds or rebinds. */
+    readonly bound: readonly string[];
+  }
+  | { readonly ok: false; readonly error: SketchConstraintBindingError }
+  | { readonly ok: false; readonly contradiction: { readonly constraintId: string; readonly message: string } };
+
+/**
+ * Applies changed-side-wins to constraint expressions in a sent profile, as for shape fields.
+ * An echoed value keeps the stored binding; `expression: null` clears it. Never throws.
+ */
+export function requestedSketchProfile(
+  shapeId: string,
+  existing: SketchProfile | undefined,
+  incoming: SketchProfile,
+  parameters: readonly ProjectParameter[],
+): RequestedSketchProfile {
+  if (!Array.isArray(incoming.constraints)) return { ok: true, profile: incoming, values: {}, bound: [] };
+  const stored = new Map((existing?.constraints ?? []).map((constraint) => [constraint.id, constraint]));
+  const scope = parameterScope(parameters);
+  const values: Record<string, number> = {};
+  const bound: string[] = [];
+  const constraints: SketchConstraint[] = [];
+  for (const constraint of incoming.constraints) {
+    const { expression, ...rest } = constraint as SketchConstraint & { expression?: unknown };
+    const literal = rest as SketchConstraint;
+    if (!bindableSketchConstraint(constraint)) {
+      if (expression !== undefined && expression !== null) {
+        return failure("constraintNotBindable", shapeId, constraint.id, `A ${constraint.kind} constraint has no value to bind.`);
+      }
+      constraints.push(literal);
+      continue;
+    }
+    const previous = stored.get(constraint.id);
+    const same = previous?.kind === constraint.kind ? previous as BindableSketchConstraint : undefined;
+    const sent = sketchConstraintValue(constraint as BindableSketchConstraint);
+    const valueEchoed = same !== undefined && sketchConstraintValue(same) === sent;
+    if (expression === null) {
+      constraints.push(literal);
+      continue;
+    }
+    if (expression === undefined || expression === same?.expression) {
+      // An echoed binding is not re-evaluated, so a stale one survives.
+      constraints.push(valueEchoed && same.expression !== undefined ? { ...literal, expression: same.expression } as SketchConstraint : literal);
+      continue;
+    }
+    if (typeof expression !== "string" || !expression.trim()) {
+      return failure("invalidExpression", shapeId, constraint.id, `${constraint.id}: an expression must be a non-empty string.`);
+    }
+    const resolved = resolveSketchConstraintBinding(shapeId, constraint, expression, scope);
+    if (!resolved.ok) return resolved;
+    // A constraint the stored profile lacks takes its expression's value, as on create.
+    if (same && !valueEchoed && resolved.value !== sent) {
+      return {
+        ok: false,
+        contradiction: {
+          constraintId: constraint.id,
+          message: `${constraint.id} is sent as ${sent}, but its expression gives ${resolved.value}. Send one or the other.`,
+        },
+      };
+    }
+    bound.push(constraint.id);
+    if (resolved.value !== sent) values[constraint.id] = resolved.value;
+    constraints.push({ ...literal, expression } as SketchConstraint);
+  }
+  return { ok: true, profile: { ...incoming, constraints }, values, bound };
+}
+
 /**
  * Treats an incoming profile's constraint values as literals. Keeps an expression only
  * when the stored constraint has the same expression and value; binding goes through the engine.

@@ -912,6 +912,39 @@
                             "type": "string"
                           }
                         },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
                         "revolve": {
                           "type": "object",
                           "additionalProperties": true
@@ -2394,6 +2427,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -3871,6 +3937,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -5318,6 +5417,39 @@
                           "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                           "additionalProperties": {
                             "type": "string"
+                          }
+                        },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "revolve": {
@@ -7028,6 +7160,39 @@
                             "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                             "additionalProperties": {
                               "type": "string"
+                            }
+                          },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "revolve": {
@@ -8985,6 +9150,39 @@
                             "type": "string"
                           }
                         },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
                         "revolve": {
                           "type": "object",
                           "additionalProperties": true
@@ -10417,6 +10615,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -11771,6 +12002,39 @@
                           "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                           "additionalProperties": {
                             "type": "string"
+                          }
+                        },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "revolve": {
@@ -14439,6 +14703,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -15885,6 +16182,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -17074,6 +17404,39 @@
                             "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                             "additionalProperties": {
                               "type": "string"
+                            }
+                          },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "revolve": {
@@ -18397,6 +18760,39 @@
                                     "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                                     "additionalProperties": {
                                       "type": "string"
+                                    }
+                                  },
+                                  "sketchConstraints": {
+                                    "type": "array",
+                                    "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "kind",
+                                        "value"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "distance",
+                                            "radius",
+                                            "diameter",
+                                            "angle"
+                                          ]
+                                        },
+                                        "value": {
+                                          "type": "number"
+                                        },
+                                        "expression": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
                                     }
                                   },
                                   "revolve": {
@@ -20868,6 +21264,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -22161,6 +22590,39 @@
                             "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                             "additionalProperties": {
                               "type": "string"
+                            }
+                          },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "revolve": {
@@ -23711,6 +24173,39 @@
                             "type": "string"
                           }
                         },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
                         "revolve": {
                           "type": "object",
                           "additionalProperties": true
@@ -23775,6 +24270,15 @@
                       "type": "string"
                     },
                     "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -23852,6 +24356,15 @@
                         "type": "string"
                       }
                     },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "index": {
                       "type": "integer"
                     },
@@ -23896,6 +24409,15 @@
                       "type": "string"
                     },
                     "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -24030,6 +24552,15 @@
                       "type": "string"
                     },
                     "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -24560,6 +25091,7 @@
                   "required": [
                     "parameters",
                     "bindingIssues",
+                    "constraintBindingIssues",
                     "revision"
                   ],
                   "properties": {
@@ -24720,6 +25252,80 @@
                               }
                             },
                             "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "constraintBindingIssues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "constraintId",
+                          "code",
+                          "message"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "constraintId": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "expressionError": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "message",
+                              "span"
+                            ],
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "span": {
+                                "type": "object",
+                                "required": [
+                                  "start",
+                                  "end"
+                                ],
+                                "description": "Half-open character range in the expression.",
+                                "properties": {
+                                  "start": {
+                                    "type": "integer"
+                                  },
+                                  "end": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "cycle": {
+                                "type": "array",
+                                "description": "Set for a cycle: the parameters around it, back to the first.",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         },
                         "additionalProperties": false
@@ -26536,6 +27142,39 @@
                             "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                             "additionalProperties": {
                               "type": "string"
+                            }
+                          },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "revolve": {
@@ -28654,6 +29293,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -30718,6 +31390,39 @@
                               "type": "string"
                             }
                           },
+                          "sketchConstraints": {
+                            "type": "array",
+                            "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "kind",
+                                "value"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "distance",
+                                    "radius",
+                                    "diameter",
+                                    "angle"
+                                  ]
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "expression": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
                           "revolve": {
                             "type": "object",
                             "additionalProperties": true
@@ -31484,6 +32189,2043 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/sketch-constraints": {
+      "patch": {
+        "operationId": "bindSketchConstraint",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "shape",
+                    "constraint",
+                    "revision"
+                  ],
+                  "properties": {
+                    "shape": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "kind",
+                        "color",
+                        "hole",
+                        "locked",
+                        "hidden",
+                        "x",
+                        "z",
+                        "elevation",
+                        "width",
+                        "depth",
+                        "rotation",
+                        "rotationX",
+                        "rotationZ"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "requestKind": {
+                          "type": "string"
+                        },
+                        "sketchOperation": {
+                          "type": "string"
+                        },
+                        "sketchSourceId": {
+                          "type": "string"
+                        },
+                        "draftPrismAngle": {
+                          "type": "number"
+                        },
+                        "faceDraft": {
+                          "type": "object",
+                          "required": [
+                            "sourceFaceId",
+                            "angle",
+                            "pullDirection",
+                            "sourceFaceNormal"
+                          ],
+                          "properties": {
+                            "sourceFaceId": {
+                              "type": "string"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "pullDirection": {
+                              "type": "string",
+                              "enum": [
+                                "x",
+                                "y",
+                                "z",
+                                "-x",
+                                "-y",
+                                "-z"
+                              ]
+                            },
+                            "sourceFaceNormal": {
+                              "type": "object",
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "sketchProfile": {
+                          "type": "object",
+                          "required": [
+                            "points",
+                            "segments"
+                          ],
+                          "properties": {
+                            "points": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "segments": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "sweepFrames": {
+                              "type": "object",
+                              "additionalProperties": true
+                            }
+                          },
+                          "additionalProperties": true
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "faceIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "faceColors": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "stepAssembly": {
+                          "type": "array",
+                          "description": "Optional STEP product hierarchy metadata. Imported geometry remains one mesh until exploded.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "name",
+                              "children"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "children": {
+                                "type": "array",
+                                "maxItems": 2000,
+                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "name",
+                                    "children"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "children": {
+                                      "type": "array",
+                                      "maxItems": 2000,
+                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                      "items": {
+                                        "type": "object",
+                                        "required": [
+                                          "name",
+                                          "children"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "children": {
+                                            "type": "array",
+                                            "maxItems": 2000,
+                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                            "items": {
+                                              "type": "object",
+                                              "required": [
+                                                "name",
+                                                "children"
+                                              ],
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string"
+                                                },
+                                                "name": {
+                                                  "type": "string"
+                                                },
+                                                "children": {
+                                                  "type": "array",
+                                                  "maxItems": 2000,
+                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "name",
+                                                      "children"
+                                                    ],
+                                                    "properties": {
+                                                      "id": {
+                                                        "type": "string"
+                                                      },
+                                                      "name": {
+                                                        "type": "string"
+                                                      },
+                                                      "children": {
+                                                        "type": "array",
+                                                        "maxItems": 2000,
+                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                        "items": {
+                                                          "type": "object",
+                                                          "required": [
+                                                            "name",
+                                                            "children"
+                                                          ],
+                                                          "properties": {
+                                                            "id": {
+                                                              "type": "string"
+                                                            },
+                                                            "name": {
+                                                              "type": "string"
+                                                            },
+                                                            "children": {
+                                                              "type": "array",
+                                                              "maxItems": 2000,
+                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                              "items": {
+                                                                "type": "object",
+                                                                "required": [
+                                                                  "name",
+                                                                  "children"
+                                                                ],
+                                                                "properties": {
+                                                                  "id": {
+                                                                    "type": "string"
+                                                                  },
+                                                                  "name": {
+                                                                    "type": "string"
+                                                                  },
+                                                                  "children": {
+                                                                    "type": "array",
+                                                                    "maxItems": 2000,
+                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                    "items": {
+                                                                      "type": "object",
+                                                                      "required": [
+                                                                        "name",
+                                                                        "children"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "id": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "name": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "children": {
+                                                                          "type": "array",
+                                                                          "maxItems": 2000,
+                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                          "items": {
+                                                                            "type": "object",
+                                                                            "required": [
+                                                                              "name",
+                                                                              "children"
+                                                                            ],
+                                                                            "properties": {
+                                                                              "id": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "name": {
+                                                                                "type": "string"
+                                                                              },
+                                                                              "children": {
+                                                                                "type": "array",
+                                                                                "maxItems": 2000,
+                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                "items": {
+                                                                                  "type": "object",
+                                                                                  "required": [
+                                                                                    "name",
+                                                                                    "children"
+                                                                                  ],
+                                                                                  "properties": {
+                                                                                    "id": {
+                                                                                      "type": "string"
+                                                                                    },
+                                                                                    "name": {
+                                                                                      "type": "string"
+                                                                                    },
+                                                                                    "children": {
+                                                                                      "type": "array",
+                                                                                      "maxItems": 2000,
+                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                      "items": {
+                                                                                        "type": "object",
+                                                                                        "required": [
+                                                                                          "name",
+                                                                                          "children"
+                                                                                        ],
+                                                                                        "properties": {
+                                                                                          "id": {
+                                                                                            "type": "string"
+                                                                                          },
+                                                                                          "name": {
+                                                                                            "type": "string"
+                                                                                          },
+                                                                                          "children": {
+                                                                                            "type": "array",
+                                                                                            "maxItems": 2000,
+                                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                            "items": {
+                                                                                              "type": "object",
+                                                                                              "required": [
+                                                                                                "name",
+                                                                                                "children"
+                                                                                              ],
+                                                                                              "properties": {
+                                                                                                "id": {
+                                                                                                  "type": "string"
+                                                                                                },
+                                                                                                "name": {
+                                                                                                  "type": "string"
+                                                                                                },
+                                                                                                "children": {
+                                                                                                  "type": "array",
+                                                                                                  "maxItems": 2000,
+                                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                  "items": {
+                                                                                                    "type": "object",
+                                                                                                    "required": [
+                                                                                                      "name",
+                                                                                                      "children"
+                                                                                                    ],
+                                                                                                    "properties": {
+                                                                                                      "id": {
+                                                                                                        "type": "string"
+                                                                                                      },
+                                                                                                      "name": {
+                                                                                                        "type": "string"
+                                                                                                      },
+                                                                                                      "children": {
+                                                                                                        "type": "array",
+                                                                                                        "maxItems": 2000,
+                                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                        "items": {
+                                                                                                          "type": "object",
+                                                                                                          "required": [
+                                                                                                            "name",
+                                                                                                            "children"
+                                                                                                          ],
+                                                                                                          "properties": {
+                                                                                                            "id": {
+                                                                                                              "type": "string"
+                                                                                                            },
+                                                                                                            "name": {
+                                                                                                              "type": "string"
+                                                                                                            },
+                                                                                                            "children": {
+                                                                                                              "type": "array",
+                                                                                                              "maxItems": 2000,
+                                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                              "items": {
+                                                                                                                "type": "object",
+                                                                                                                "required": [
+                                                                                                                  "name",
+                                                                                                                  "children"
+                                                                                                                ],
+                                                                                                                "properties": {
+                                                                                                                  "id": {
+                                                                                                                    "type": "string"
+                                                                                                                  },
+                                                                                                                  "name": {
+                                                                                                                    "type": "string"
+                                                                                                                  },
+                                                                                                                  "children": {
+                                                                                                                    "type": "array",
+                                                                                                                    "maxItems": 2000,
+                                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                    "items": {
+                                                                                                                      "type": "object",
+                                                                                                                      "required": [
+                                                                                                                        "name",
+                                                                                                                        "children"
+                                                                                                                      ],
+                                                                                                                      "properties": {
+                                                                                                                        "id": {
+                                                                                                                          "type": "string"
+                                                                                                                        },
+                                                                                                                        "name": {
+                                                                                                                          "type": "string"
+                                                                                                                        },
+                                                                                                                        "children": {
+                                                                                                                          "type": "array",
+                                                                                                                          "maxItems": 2000,
+                                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                          "items": {
+                                                                                                                            "type": "object",
+                                                                                                                            "required": [
+                                                                                                                              "name",
+                                                                                                                              "children"
+                                                                                                                            ],
+                                                                                                                            "properties": {
+                                                                                                                              "id": {
+                                                                                                                                "type": "string"
+                                                                                                                              },
+                                                                                                                              "name": {
+                                                                                                                                "type": "string"
+                                                                                                                              },
+                                                                                                                              "children": {
+                                                                                                                                "type": "array",
+                                                                                                                                "maxItems": 2000,
+                                                                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                "items": {
+                                                                                                                                  "type": "object",
+                                                                                                                                  "required": [
+                                                                                                                                    "name",
+                                                                                                                                    "children"
+                                                                                                                                  ],
+                                                                                                                                  "properties": {
+                                                                                                                                    "id": {
+                                                                                                                                      "type": "string"
+                                                                                                                                    },
+                                                                                                                                    "name": {
+                                                                                                                                      "type": "string"
+                                                                                                                                    },
+                                                                                                                                    "children": {
+                                                                                                                                      "type": "array",
+                                                                                                                                      "maxItems": 2000,
+                                                                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                      "items": {
+                                                                                                                                        "type": "object",
+                                                                                                                                        "required": [
+                                                                                                                                          "name",
+                                                                                                                                          "children"
+                                                                                                                                        ],
+                                                                                                                                        "properties": {
+                                                                                                                                          "id": {
+                                                                                                                                            "type": "string"
+                                                                                                                                          },
+                                                                                                                                          "name": {
+                                                                                                                                            "type": "string"
+                                                                                                                                          },
+                                                                                                                                          "children": {
+                                                                                                                                            "type": "array",
+                                                                                                                                            "maxItems": 2000,
+                                                                                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                            "items": {
+                                                                                                                                              "type": "object",
+                                                                                                                                              "required": [
+                                                                                                                                                "name",
+                                                                                                                                                "children"
+                                                                                                                                              ],
+                                                                                                                                              "properties": {
+                                                                                                                                                "id": {
+                                                                                                                                                  "type": "string"
+                                                                                                                                                },
+                                                                                                                                                "name": {
+                                                                                                                                                  "type": "string"
+                                                                                                                                                },
+                                                                                                                                                "children": {
+                                                                                                                                                  "type": "array",
+                                                                                                                                                  "maxItems": 2000,
+                                                                                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                  "items": {
+                                                                                                                                                    "type": "object",
+                                                                                                                                                    "required": [
+                                                                                                                                                      "name",
+                                                                                                                                                      "children"
+                                                                                                                                                    ],
+                                                                                                                                                    "properties": {
+                                                                                                                                                      "id": {
+                                                                                                                                                        "type": "string"
+                                                                                                                                                      },
+                                                                                                                                                      "name": {
+                                                                                                                                                        "type": "string"
+                                                                                                                                                      },
+                                                                                                                                                      "children": {
+                                                                                                                                                        "type": "array",
+                                                                                                                                                        "maxItems": 2000,
+                                                                                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                        "items": {
+                                                                                                                                                          "type": "object",
+                                                                                                                                                          "required": [
+                                                                                                                                                            "name",
+                                                                                                                                                            "children"
+                                                                                                                                                          ],
+                                                                                                                                                          "properties": {
+                                                                                                                                                            "id": {
+                                                                                                                                                              "type": "string"
+                                                                                                                                                            },
+                                                                                                                                                            "name": {
+                                                                                                                                                              "type": "string"
+                                                                                                                                                            },
+                                                                                                                                                            "children": {
+                                                                                                                                                              "type": "array",
+                                                                                                                                                              "maxItems": 2000,
+                                                                                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                              "items": {
+                                                                                                                                                                "type": "object",
+                                                                                                                                                                "required": [
+                                                                                                                                                                  "name",
+                                                                                                                                                                  "children"
+                                                                                                                                                                ],
+                                                                                                                                                                "properties": {
+                                                                                                                                                                  "id": {
+                                                                                                                                                                    "type": "string"
+                                                                                                                                                                  },
+                                                                                                                                                                  "name": {
+                                                                                                                                                                    "type": "string"
+                                                                                                                                                                  },
+                                                                                                                                                                  "children": {
+                                                                                                                                                                    "type": "array",
+                                                                                                                                                                    "maxItems": 2000,
+                                                                                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                    "items": {
+                                                                                                                                                                      "type": "object",
+                                                                                                                                                                      "required": [
+                                                                                                                                                                        "name",
+                                                                                                                                                                        "children"
+                                                                                                                                                                      ],
+                                                                                                                                                                      "properties": {
+                                                                                                                                                                        "id": {
+                                                                                                                                                                          "type": "string"
+                                                                                                                                                                        },
+                                                                                                                                                                        "name": {
+                                                                                                                                                                          "type": "string"
+                                                                                                                                                                        },
+                                                                                                                                                                        "children": {
+                                                                                                                                                                          "type": "array",
+                                                                                                                                                                          "maxItems": 2000,
+                                                                                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                          "items": {
+                                                                                                                                                                            "type": "object",
+                                                                                                                                                                            "required": [
+                                                                                                                                                                              "name",
+                                                                                                                                                                              "children"
+                                                                                                                                                                            ],
+                                                                                                                                                                            "properties": {
+                                                                                                                                                                              "id": {
+                                                                                                                                                                                "type": "string"
+                                                                                                                                                                              },
+                                                                                                                                                                              "name": {
+                                                                                                                                                                                "type": "string"
+                                                                                                                                                                              },
+                                                                                                                                                                              "children": {
+                                                                                                                                                                                "type": "array",
+                                                                                                                                                                                "maxItems": 2000,
+                                                                                                                                                                                "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                "items": {
+                                                                                                                                                                                  "type": "object",
+                                                                                                                                                                                  "required": [
+                                                                                                                                                                                    "name",
+                                                                                                                                                                                    "children"
+                                                                                                                                                                                  ],
+                                                                                                                                                                                  "properties": {
+                                                                                                                                                                                    "id": {
+                                                                                                                                                                                      "type": "string"
+                                                                                                                                                                                    },
+                                                                                                                                                                                    "name": {
+                                                                                                                                                                                      "type": "string"
+                                                                                                                                                                                    },
+                                                                                                                                                                                    "children": {
+                                                                                                                                                                                      "type": "array",
+                                                                                                                                                                                      "maxItems": 2000,
+                                                                                                                                                                                      "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                      "items": {
+                                                                                                                                                                                        "type": "object",
+                                                                                                                                                                                        "required": [
+                                                                                                                                                                                          "name",
+                                                                                                                                                                                          "children"
+                                                                                                                                                                                        ],
+                                                                                                                                                                                        "properties": {
+                                                                                                                                                                                          "id": {
+                                                                                                                                                                                            "type": "string"
+                                                                                                                                                                                          },
+                                                                                                                                                                                          "name": {
+                                                                                                                                                                                            "type": "string"
+                                                                                                                                                                                          },
+                                                                                                                                                                                          "children": {
+                                                                                                                                                                                            "type": "array",
+                                                                                                                                                                                            "maxItems": 2000,
+                                                                                                                                                                                            "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                            "items": {
+                                                                                                                                                                                              "type": "object",
+                                                                                                                                                                                              "required": [
+                                                                                                                                                                                                "name",
+                                                                                                                                                                                                "children"
+                                                                                                                                                                                              ],
+                                                                                                                                                                                              "properties": {
+                                                                                                                                                                                                "id": {
+                                                                                                                                                                                                  "type": "string"
+                                                                                                                                                                                                },
+                                                                                                                                                                                                "name": {
+                                                                                                                                                                                                  "type": "string"
+                                                                                                                                                                                                },
+                                                                                                                                                                                                "children": {
+                                                                                                                                                                                                  "type": "array",
+                                                                                                                                                                                                  "maxItems": 2000,
+                                                                                                                                                                                                  "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                  "items": {
+                                                                                                                                                                                                    "type": "object",
+                                                                                                                                                                                                    "required": [
+                                                                                                                                                                                                      "name",
+                                                                                                                                                                                                      "children"
+                                                                                                                                                                                                    ],
+                                                                                                                                                                                                    "properties": {
+                                                                                                                                                                                                      "id": {
+                                                                                                                                                                                                        "type": "string"
+                                                                                                                                                                                                      },
+                                                                                                                                                                                                      "name": {
+                                                                                                                                                                                                        "type": "string"
+                                                                                                                                                                                                      },
+                                                                                                                                                                                                      "children": {
+                                                                                                                                                                                                        "type": "array",
+                                                                                                                                                                                                        "maxItems": 2000,
+                                                                                                                                                                                                        "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                        "items": {
+                                                                                                                                                                                                          "type": "object",
+                                                                                                                                                                                                          "required": [
+                                                                                                                                                                                                            "name",
+                                                                                                                                                                                                            "children"
+                                                                                                                                                                                                          ],
+                                                                                                                                                                                                          "properties": {
+                                                                                                                                                                                                            "id": {
+                                                                                                                                                                                                              "type": "string"
+                                                                                                                                                                                                            },
+                                                                                                                                                                                                            "name": {
+                                                                                                                                                                                                              "type": "string"
+                                                                                                                                                                                                            },
+                                                                                                                                                                                                            "children": {
+                                                                                                                                                                                                              "type": "array",
+                                                                                                                                                                                                              "maxItems": 2000,
+                                                                                                                                                                                                              "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                              "items": {
+                                                                                                                                                                                                                "type": "object",
+                                                                                                                                                                                                                "required": [
+                                                                                                                                                                                                                  "name",
+                                                                                                                                                                                                                  "children"
+                                                                                                                                                                                                                ],
+                                                                                                                                                                                                                "properties": {
+                                                                                                                                                                                                                  "id": {
+                                                                                                                                                                                                                    "type": "string"
+                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                  "name": {
+                                                                                                                                                                                                                    "type": "string"
+                                                                                                                                                                                                                  },
+                                                                                                                                                                                                                  "children": {
+                                                                                                                                                                                                                    "type": "array",
+                                                                                                                                                                                                                    "maxItems": 2000,
+                                                                                                                                                                                                                    "description": "Direct product children; hierarchy depth is capped at 32.",
+                                                                                                                                                                                                                    "items": {
+                                                                                                                                                                                                                      "type": "object",
+                                                                                                                                                                                                                      "required": [
+                                                                                                                                                                                                                        "name",
+                                                                                                                                                                                                                        "children"
+                                                                                                                                                                                                                      ],
+                                                                                                                                                                                                                      "properties": {
+                                                                                                                                                                                                                        "id": {
+                                                                                                                                                                                                                          "type": "string"
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                        "name": {
+                                                                                                                                                                                                                          "type": "string"
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                        "children": {
+                                                                                                                                                                                                                          "type": "array",
+                                                                                                                                                                                                                          "maxItems": 0,
+                                                                                                                                                                                                                          "description": "Direct product children; hierarchy depth is capped at 32."
+                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                      },
+                                                                                                                                                                                                                      "additionalProperties": false
+                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                "additionalProperties": false
+                                                                                                                                                                                                              }
+                                                                                                                                                                                                            }
+                                                                                                                                                                                                          },
+                                                                                                                                                                                                          "additionalProperties": false
+                                                                                                                                                                                                        }
+                                                                                                                                                                                                      }
+                                                                                                                                                                                                    },
+                                                                                                                                                                                                    "additionalProperties": false
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                }
+                                                                                                                                                                                              },
+                                                                                                                                                                                              "additionalProperties": false
+                                                                                                                                                                                            }
+                                                                                                                                                                                          }
+                                                                                                                                                                                        },
+                                                                                                                                                                                        "additionalProperties": false
+                                                                                                                                                                                      }
+                                                                                                                                                                                    }
+                                                                                                                                                                                  },
+                                                                                                                                                                                  "additionalProperties": false
+                                                                                                                                                                                }
+                                                                                                                                                                              }
+                                                                                                                                                                            },
+                                                                                                                                                                            "additionalProperties": false
+                                                                                                                                                                          }
+                                                                                                                                                                        }
+                                                                                                                                                                      },
+                                                                                                                                                                      "additionalProperties": false
+                                                                                                                                                                    }
+                                                                                                                                                                  }
+                                                                                                                                                                },
+                                                                                                                                                                "additionalProperties": false
+                                                                                                                                                              }
+                                                                                                                                                            }
+                                                                                                                                                          },
+                                                                                                                                                          "additionalProperties": false
+                                                                                                                                                        }
+                                                                                                                                                      }
+                                                                                                                                                    },
+                                                                                                                                                    "additionalProperties": false
+                                                                                                                                                  }
+                                                                                                                                                }
+                                                                                                                                              },
+                                                                                                                                              "additionalProperties": false
+                                                                                                                                            }
+                                                                                                                                          }
+                                                                                                                                        },
+                                                                                                                                        "additionalProperties": false
+                                                                                                                                      }
+                                                                                                                                    }
+                                                                                                                                  },
+                                                                                                                                  "additionalProperties": false
+                                                                                                                                }
+                                                                                                                              }
+                                                                                                                            },
+                                                                                                                            "additionalProperties": false
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      },
+                                                                                                                      "additionalProperties": false
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                },
+                                                                                                                "additionalProperties": false
+                                                                                                              }
+                                                                                                            }
+                                                                                                          },
+                                                                                                          "additionalProperties": false
+                                                                                                        }
+                                                                                                      }
+                                                                                                    },
+                                                                                                    "additionalProperties": false
+                                                                                                  }
+                                                                                                }
+                                                                                              },
+                                                                                              "additionalProperties": false
+                                                                                            }
+                                                                                          }
+                                                                                        },
+                                                                                        "additionalProperties": false
+                                                                                      }
+                                                                                    }
+                                                                                  },
+                                                                                  "additionalProperties": false
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "additionalProperties": false
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "additionalProperties": false
+                                                              }
+                                                            }
+                                                          },
+                                                          "additionalProperties": false
+                                                        }
+                                                      }
+                                                    },
+                                                    "additionalProperties": false
+                                                  }
+                                                }
+                                              },
+                                              "additionalProperties": false
+                                            }
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "stepComponent": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "occurrenceId",
+                            "path"
+                          ],
+                          "description": "STEP source occurrence identity and root-to-component ancestry for a selectable exploded solid.",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "occurrenceId": {
+                              "type": "string"
+                            },
+                            "path": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "name"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "hole": {
+                          "type": "boolean"
+                        },
+                        "locked": {
+                          "type": "boolean"
+                        },
+                        "hidden": {
+                          "type": "boolean"
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "z": {
+                          "type": "number"
+                        },
+                        "elevation": {
+                          "type": "number"
+                        },
+                        "width": {
+                          "type": "number"
+                        },
+                        "depth": {
+                          "type": "number"
+                        },
+                        "height": {
+                          "type": "number"
+                        },
+                        "rotation": {
+                          "type": "number"
+                        },
+                        "rotationX": {
+                          "type": "number"
+                        },
+                        "rotationZ": {
+                          "type": "number"
+                        },
+                        "groupedCount": {
+                          "type": "integer"
+                        },
+                        "expressions": {
+                          "type": "object",
+                          "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "revolve": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "profile": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "constraint": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "kind",
+                        "value"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "distance",
+                            "radius",
+                            "diameter",
+                            "angle"
+                          ]
+                        },
+                        "value": {
+                          "type": "number"
+                        },
+                        "expression": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The project revision after this write.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"[0-9]+\\\"$"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    },
+                    "parameter": {
+                      "type": "string",
+                      "description": "The parameter that failed; it can be a dependent of the one changed."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "The engine's finer code, such as invalidName, invalidExpression, or notAnInteger."
+                    },
+                    "expressionError": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "span"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "span": {
+                          "type": "object",
+                          "required": [
+                            "start",
+                            "end"
+                          ],
+                          "description": "Half-open character range in the expression.",
+                          "properties": {
+                            "start": {
+                              "type": "integer"
+                            },
+                            "end": {
+                              "type": "integer"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "cycle": {
+                          "type": "array",
+                          "description": "Set for a cycle: the parameters around it, back to the first.",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "dependents": {
+                      "type": "array",
+                      "description": "Parameters that reference the one being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeDependents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "fields"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the expression's value."
+                    },
+                    "min": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static lower bound."
+                    },
+                    "max": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static upper bound."
+                    },
+                    "stored": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the value the field would have stored instead."
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
+                      "type": "array",
+                      "description": "Constraints the sketch could not satisfy, or the bound ones a size binding conflicts with.",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found or API disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    },
+                    "parameter": {
+                      "type": "string",
+                      "description": "The parameter that failed; it can be a dependent of the one changed."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "The engine's finer code, such as invalidName, invalidExpression, or notAnInteger."
+                    },
+                    "expressionError": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "span"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "span": {
+                          "type": "object",
+                          "required": [
+                            "start",
+                            "end"
+                          ],
+                          "description": "Half-open character range in the expression.",
+                          "properties": {
+                            "start": {
+                              "type": "integer"
+                            },
+                            "end": {
+                              "type": "integer"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "cycle": {
+                          "type": "array",
+                          "description": "Set for a cycle: the parameters around it, back to the first.",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "dependents": {
+                      "type": "array",
+                      "description": "Parameters that reference the one being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeDependents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "fields"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the expression's value."
+                    },
+                    "min": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static lower bound."
+                    },
+                    "max": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static upper bound."
+                    },
+                    "stored": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the value the field would have stored instead."
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
+                      "type": "array",
+                      "description": "Constraints the sketch could not satisfy, or the bound ones a size binding conflicts with.",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is busy or the request conflicts with current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    },
+                    "parameter": {
+                      "type": "string",
+                      "description": "The parameter that failed; it can be a dependent of the one changed."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "The engine's finer code, such as invalidName, invalidExpression, or notAnInteger."
+                    },
+                    "expressionError": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "span"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "span": {
+                          "type": "object",
+                          "required": [
+                            "start",
+                            "end"
+                          ],
+                          "description": "Half-open character range in the expression.",
+                          "properties": {
+                            "start": {
+                              "type": "integer"
+                            },
+                            "end": {
+                              "type": "integer"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "cycle": {
+                          "type": "array",
+                          "description": "Set for a cycle: the parameters around it, back to the first.",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "dependents": {
+                      "type": "array",
+                      "description": "Parameters that reference the one being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeDependents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "fields"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the expression's value."
+                    },
+                    "min": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static lower bound."
+                    },
+                    "max": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static upper bound."
+                    },
+                    "stored": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the value the field would have stored instead."
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
+                      "type": "array",
+                      "description": "Constraints the sketch could not satisfy, or the bound ones a size binding conflicts with.",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds the supported size or item limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request is valid JSON but cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    },
+                    "parameter": {
+                      "type": "string",
+                      "description": "The parameter that failed; it can be a dependent of the one changed."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "The engine's finer code, such as invalidName, invalidExpression, or notAnInteger."
+                    },
+                    "expressionError": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "span"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "span": {
+                          "type": "object",
+                          "required": [
+                            "start",
+                            "end"
+                          ],
+                          "description": "Half-open character range in the expression.",
+                          "properties": {
+                            "start": {
+                              "type": "integer"
+                            },
+                            "end": {
+                              "type": "integer"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "cycle": {
+                          "type": "array",
+                          "description": "Set for a cycle: the parameters around it, back to the first.",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "dependents": {
+                      "type": "array",
+                      "description": "Parameters that reference the one being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeDependents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "fields"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "configuration": {
+                      "type": "string",
+                      "description": "The parameter configuration whose table failed. Absent for the base table."
+                    },
+                    "configurationDependents": {
+                      "type": "array",
+                      "description": "Configurations whose overrides reference the parameter being deleted.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "shapeId": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "index": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the expression's value."
+                    },
+                    "min": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static lower bound."
+                    },
+                    "max": {
+                      "type": "number",
+                      "description": "Set for outOfRange where the field has a static upper bound."
+                    },
+                    "stored": {
+                      "type": "number",
+                      "description": "Set for outOfRange: the value the field would have stored instead."
+                    },
+                    "constraintId": {
+                      "type": "string"
+                    },
+                    "constraintIds": {
+                      "type": "array",
+                      "description": "Constraints the sketch could not satisfy, or the bound ones a size binding conflicts with.",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server-side failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "api_disabled",
+                        "unauthorized",
+                        "storage_unconfigured",
+                        "invalid_project_id",
+                        "invalid_shape_id",
+                        "invalid_body",
+                        "invalid_request",
+                        "project_not_found",
+                        "project_exists",
+                        "project_busy",
+                        "revision_mismatch",
+                        "shape_not_found",
+                        "shape_locked",
+                        "parameter_not_found",
+                        "parameter_exists",
+                        "parameter_in_use",
+                        "invalid_expression",
+                        "unsupported_kind",
+                        "unsupported_format",
+                        "unapplicable_fields",
+                        "too_many_shapes",
+                        "limit_exceeded",
+                        "geometry_failed",
+                        "cad_failed",
+                        "internal_error"
+                      ]
+                    },
+                    "revision": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "description": "Binds a dimensional sketch constraint to an expression, re-solves the sketch and rebuilds its output, or unbinds it with null. shapeId is the output or its sketchSourceId.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sketchForgeToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "shapeId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "constraintId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Apply this write only when the project still has the quoted revision returned by a previous write. A mismatch returns 409 revision_mismatch with the current revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\\"[0-9]+\\\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expression"
+                ],
+                "properties": {
+                  "expression": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 10000,
+                    "pattern": "\\S",
+                    "description": "A parameter expression, or null to remove the binding and keep the value."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/shell": {
@@ -32390,6 +35132,39 @@
                           "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                           "additionalProperties": {
                             "type": "string"
+                          }
+                        },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "revolve": {
@@ -34132,6 +36907,39 @@
                           "description": "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
                           "additionalProperties": {
                             "type": "string"
+                          }
+                        },
+                        "sketchConstraints": {
+                          "type": "array",
+                          "description": "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "distance",
+                                  "radius",
+                                  "diameter",
+                                  "angle"
+                                ]
+                              },
+                              "value": {
+                                "type": "number"
+                              },
+                              "expression": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "revolve": {

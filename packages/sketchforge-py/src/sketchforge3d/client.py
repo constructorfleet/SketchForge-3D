@@ -39,6 +39,7 @@ from .types import (
     ParameterDimension,
     ParameterList,
     ParameterWriteResult,
+    SketchConstraintBindResult,
     ShapeProperties,
     MeshImportResult,
     PatternResult,
@@ -255,6 +256,31 @@ class Parameters:
             "DELETE", "/parameters", {"projectId": project_id, "name": name}, retryable=True
         ) or {}
         return ParameterDeleteResult.from_payload(payload)
+
+
+class SketchConstraints:
+    """Binds sketch dimensional constraints to parameter expressions. Each bind re-solves the sketch and rebuilds its output."""
+
+    def __init__(self, transport: Transport) -> None:
+        self._transport = transport
+
+    def bind(
+        self, project_id: str, shape_id: str, constraint_id: str, expression: Optional[str]
+    ) -> SketchConstraintBindResult:
+        """``shape_id`` is the output or its ``sketchSourceId``. ``None`` removes the binding and keeps the value."""
+        if expression is not None and not expression.strip():
+            raise ValueError("A constraint expression must be a non-empty string, or None to unbind.")
+        payload = self._transport.send(
+            "PATCH",
+            "/sketch-constraints",
+            {"projectId": project_id, "shapeId": shape_id, "constraintId": constraint_id},
+            {"expression": expression},
+            retryable=True,
+        ) or {}
+        return SketchConstraintBindResult.from_payload(payload)
+
+    def unbind(self, project_id: str, shape_id: str, constraint_id: str) -> SketchConstraintBindResult:
+        return self.bind(project_id, shape_id, constraint_id, None)
 
 
 def _check_dimension(dimension: str) -> None:
@@ -1006,6 +1032,7 @@ CLIENT_RESOURCE_OPERATIONS = {
         "updateParameter": ("update", "rename"),
         "deleteParameter": ("delete",),
     },
+    "sketch_constraints": {"bindSketchConstraint": ("bind", "unbind")},
 }
 
 # Convenience helpers that emit a sequence of REST operations rather than one route.
@@ -1056,6 +1083,7 @@ class SketchForgeClient:
         self.imports = Imports(self._transport)
         self.exports = Exports(self._transport)
         self.parameters = Parameters(self._transport)
+        self.sketch_constraints = SketchConstraints(self._transport)
 
     @property
     def api_root(self) -> str:
@@ -1144,6 +1172,12 @@ class ProjectHandle:
 
     def delete_parameter(self, name: str) -> ParameterDeleteResult:
         return self._client.parameters.delete(self.id, name)
+
+    def bind_sketch_constraint(
+        self, shape_id: str, constraint_id: str, expression: Optional[str]
+    ) -> SketchConstraintBindResult:
+        """Binds a sketch dimensional constraint; ``None`` clears the binding and keeps the value."""
+        return self._client.sketch_constraints.bind(self.id, shape_id, constraint_id, expression)
 
     def remove(self, shape_id: str) -> bool:
         return self._client.shapes.delete(self.id, shape_id)

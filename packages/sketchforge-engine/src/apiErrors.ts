@@ -265,6 +265,7 @@ export function engineFailureToApiError(failure: EngineFailure, wording: ApiFail
         ...(failure.index === undefined ? {} : { index: failure.index }),
         ...(failure.shapeId === undefined ? {} : { shapeId: failure.shapeId }),
         ...(failure.field === undefined ? {} : { field: failure.field }),
+        ...(failure.constraintId === undefined ? {} : { constraintId: failure.constraintId }),
       });
     case "sweep_failed":
       return fail(atIndex(`${failure.message}.`, failure.index), 422, "geometry_failed");

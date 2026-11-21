@@ -6,6 +6,7 @@ import {
   profileSizeFields,
   projectParameterDependents,
   renameParameter,
+  requestedSketchProfile,
   resolveSketchConstraintBinding,
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
   sketchConstraintBindingIssues,
@@ -165,6 +166,42 @@ describe("sketch constraint bindings", () => {
       distance("w", 7),
       { id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg: 60, expression: "tilt" },
     ]);
+  });
+});
+
+describe("constraint expressions in a changed profile", () => {
+  const angle = (valueDeg: number, expression?: string): SketchConstraint =>
+    ({ id: "a1", kind: "angle", segmentIds: ["ab", "bc"], valueDeg, ...(expression === undefined ? {} : { expression }) }) as SketchConstraint;
+  const existing = profile([distance("w", 3), angle(30, "tilt")]);
+  const plan = (incoming: SketchProfile, stored: SketchProfile | undefined = existing) => requestedSketchProfile("s", stored, incoming, table);
+
+  it("keeps echoed and omitted bindings while the value is unchanged, and unbinds a changed value or null", () => {
+    expect(plan(existing)).toEqual({ ok: true, profile: existing, values: {}, bound: [] });
+    // Omitting the expression with the same value is an echo, as for shape fields.
+    expect(plan(profile([distance(undefined, 3), angle(30)]))).toMatchObject({ ok: true, profile: { constraints: [distance("w", 3), angle(30, "tilt")] } });
+    expect(plan(profile([distance("w", 5), angle(60)]))).toMatchObject({ ok: true, profile: { constraints: [distance(undefined, 5), angle(60)] }, bound: [] });
+    const cleared = plan(profile([{ ...distance(undefined, 3), expression: null } as unknown as SketchConstraint, angle(30, "tilt")]));
+    expect(cleared).toMatchObject({ ok: true, profile: { constraints: [distance(undefined, 3), angle(30, "tilt")] }, bound: [] });
+  });
+
+  it("binds a changed expression, resolving it when the value is echoed or agrees, and refuses a disagreement", () => {
+    expect(plan(profile([distance("w * 2", 3), angle(30, "tilt")])))
+      .toEqual({ ok: true, profile: profile([distance("w * 2", 3), angle(30, "tilt")]), values: { d1: 6 }, bound: ["d1"] });
+    expect(plan(profile([distance("w * 2", 6), angle(30, "tilt")])))
+      .toEqual({ ok: true, profile: profile([distance("w * 2", 6), angle(30, "tilt")]), values: {}, bound: ["d1"] });
+    expect(plan(profile([distance("w * 2", 5), angle(30, "tilt")])))
+      .toMatchObject({ ok: false, contradiction: { constraintId: "d1" } });
+    // A constraint the stored profile lacks takes its expression's value, as on create.
+    expect(plan(profile([distance("w", 9)]), profile([]))).toMatchObject({ ok: true, values: { d1: 3 }, bound: ["d1"] });
+  });
+
+  it("refuses an expression that does not resolve or sits on a kind that cannot bind", () => {
+    expect(plan(profile([distance("tilt", 3)]))).toMatchObject({ ok: false, error: { code: "invalidExpression", constraintId: "d1" } });
+    expect(plan(profile([distance("-w", 3)]))).toMatchObject({ ok: false, error: { code: "outOfRange", constraintId: "d1" } });
+    expect(plan(profile([{ ...distance(undefined, 3), expression: " " } as SketchConstraint])))
+      .toMatchObject({ ok: false, error: { code: "invalidExpression", constraintId: "d1" } });
+    expect(plan(profile([{ id: "h", kind: "horizontal", segmentId: "ab", expression: "w" } as unknown as SketchConstraint])))
+      .toMatchObject({ ok: false, error: { code: "constraintNotBindable", constraintId: "h" } });
   });
 });
 
