@@ -419,7 +419,8 @@ export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): b
     if (schema.required?.some((name) => !(name in object))) return false;
     if (Object.entries(schema.properties ?? {}).some(([name, child]) => name in object && !validateApiV1Schema(object[name], child))) return false;
     if (Object.entries(object).some(([name, child]) => {
-      if (name in (schema.properties ?? {})) return false;
+      // `in` would treat Object.prototype names such as "constructor" as declared.
+      if (Object.hasOwn(schema.properties ?? {}, name)) return false;
       const matchingPatterns = Object.entries(schema.patternProperties ?? {}).filter(([pattern]) => new RegExp(pattern).test(name));
       if (matchingPatterns.length) return matchingPatterns.some(([, childSchema]) => !validateApiV1Schema(child, childSchema));
       if (schema.additionalProperties === false) return true;

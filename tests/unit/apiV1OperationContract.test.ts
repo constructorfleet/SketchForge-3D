@@ -715,4 +715,17 @@ describe("REST API v1 operation contract", () => {
         .toMatchObject({ auth: "none", responses: [204] });
     }
   });
+
+  it("refuses undeclared keys named after Object.prototype members under additionalProperties: false", async () => {
+    const { validateApiV1Schema, validateApiV1RequestBody } = await import("@/lib/apiV1OperationContract");
+    const schema: ApiV1FieldSchema = { type: "object", properties: { name: { type: "string" } }, additionalProperties: false };
+    expect(validateApiV1Schema({ name: "w" }, schema)).toBe(true);
+    for (const key of ["constructor", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(validateApiV1Schema({ name: "w", [key]: 1 }, schema), key).toBe(false);
+    }
+    expect(validateApiV1Schema(JSON.parse('{ "name": "w", "__proto__": 1 }'), schema)).toBe(false);
+    const body = { name: "w", expression: "1", dimension: "length" };
+    expect(validateApiV1RequestBody("POST /api/v1/parameters", body)).toBe(true);
+    expect(validateApiV1RequestBody("POST /api/v1/parameters", { ...body, constructor: 1 })).toBe(false);
+  });
 });
