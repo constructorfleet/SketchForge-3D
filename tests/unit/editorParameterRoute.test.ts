@@ -197,6 +197,11 @@ describe("editor parameter route", () => {
     expect(activated.status).toBe(200);
     expect(activated.body.activeConfiguration).toBe("Large");
     expect(activated.body.shapes[0]).toMatchObject({ width: 30, x: 15 });
+    // Volume triples with the width, and the centre follows x = w / 2.
+    const before = await stlMeasure([boundBox()]);
+    const after = await stlMeasure(activated.body.shapes);
+    expect(after.volume).toBeCloseTo(before.volume * 3, 3);
+    expect(after.centroid[0] - before.centroid[0]).toBeCloseTo(10, 3);
 
     const overridden = await send(activated.body.shapes, activated.body.parameters, { configurations: activated.body.configurations, activeConfiguration: "Large" },
       { kind: "setOverride", configuration: "Large", name: "w", expression: "-4" });

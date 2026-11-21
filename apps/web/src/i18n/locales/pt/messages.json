@@ -912,13 +912,11 @@
       },
       "configurations": {
         "heading": "Configuração",
-        "active": "Configuração ativa",
         "base": "Tabela base",
-        "hint": "Uma configuração substitui algumas expressões base enquanto está ativa. Deixe uma substituição vazia para usar a expressão base.",
+        "hint": "Escolha uma configuração para editar suas substituições; Ativar a aplica ao modelo. Deixe uma substituição vazia para usar a expressão base.",
         "newName": "Nome da nova configuração",
         "create": "Adicionar configuração",
         "renameLabel": "Nome da configuração {name}",
-        "rename": "Renomear",
         "delete": "Excluir a configuração {name}",
         "override": "Substituição em {name}",
         "overrideOf": "Substituição de {parameter} em {name}",
@@ -932,7 +930,15 @@
           "deleted": "Configuração {name} excluída",
           "overrideSet": "{parameter} definido em {name}",
           "overrideCleared": "Substituição de {parameter} removida em {name}"
-        }
+        },
+        "editing": "Editar configuração",
+        "activeStatus": "Ativa: {name}",
+        "activeBase": "Ativa: tabela base",
+        "activate": "Ativar",
+        "activateLabel": "Ativar {name}",
+        "useBase": "Usar a tabela base",
+        "activeOption": "{name} (ativa)",
+        "issues": "{name} tem substituições que não se resolvem:"
       }
     },
     "expressionField": {

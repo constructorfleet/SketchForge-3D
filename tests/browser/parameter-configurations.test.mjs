@@ -8,9 +8,9 @@ import { test } from "node:test";
 import { chromium } from "playwright";
 import { exportSkfProject, shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 
-// Issue #618: the parameter panel picks the active configuration, edits its
-// overrides and manages configurations. Each change is one undo step, and a
-// refusal shows inline with the model unchanged.
+// Issue #618: the parameter panel edits any configuration, active or not, and
+// activates one only on an explicit action. Each change is one undo step; a
+// refusal shows inline, changes nothing, and adds no undo step.
 
 async function unusedPort() {
   const listener = createServer();
@@ -52,7 +52,7 @@ async function startNextServer() {
   throw new Error(`Next.js did not become ready:\n${logs}`);
 }
 
-test("configurations switch, override, undo and manage from the parameter panel", { timeout: 240_000 }, async () => {
+test("configurations are edited apart from activation, and undo with the panel open", { timeout: 300_000 }, async () => {
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-configurations-"));
   const fixture = path.join(fixtureDir, "configured.skf");
   const box = shapeFromRequest({ kind: "box", width: 10, depth: 10, height: 10 });
@@ -69,7 +69,13 @@ test("configurations switch, override, undo and manage from the parameter panel"
     snapGrid: "1.0 mm",
     placementElevation: 0,
     parameters: [{ name: "w", expression: "10", dimension: "length", value: 10 }],
-    configurations: [{ name: "Large", overrides: { w: "30" } }],
+    configurations: [
+      { name: "Large", overrides: { w: "30" } },
+      // A bound width cannot take -5, so activating Broken is refused until it is fixed.
+      { name: "Broken", overrides: { w: "-5" } },
+      // Stale on load: the override names nothing.
+      { name: "Stale", overrides: { w: "missing * 2" } },
+    ],
   }));
   const { baseURL, stop } = await startNextServer();
   let browser;
@@ -93,68 +99,81 @@ test("configurations switch, override, undo and manage from the parameter panel"
       }
       assert.fail(`${message}: ${JSON.stringify(last)}`);
     };
-    let panel;
-    const openPanel = async () => {
-      await page.getByRole("button", { name: "Project parameters" }).click();
-      panel = page.getByRole("dialog", { name: "Parameters" });
-      await panel.waitFor();
-    };
-    const closePanel = () => panel.getByRole("button", { name: "Close Parameters" }).click();
+    await page.getByRole("button", { name: "Project parameters" }).click();
+    const panel = page.getByRole("dialog", { name: "Parameters" });
+    await panel.waitFor();
+    // The panel stays open: undo and redo are pressed in the toolbar beside it.
     const undo = () => page.getByRole("button", { name: "Undo", exact: true }).click();
-    const picker = () => panel.getByRole("combobox", { name: "Active configuration" });
-    const override = () => panel.getByRole("textbox", { name: "Override of w in Large" });
+    const redo = () => page.getByRole("button", { name: "Redo", exact: true }).click();
+    const editing = panel.getByRole("combobox", { name: "Edit configuration" });
+    const status = panel.locator(".parameters-configuration-status");
+    const override = (name) => panel.getByRole("textbox", { name: `Override of w in ${name}` });
+    const activate = (name) => panel.getByRole("button", { name: `Activate ${name}` });
 
-    // Activating a configuration recomputes bound geometry, as one undo step.
-    await openPanel();
-    assert.equal(await picker().inputValue(), "");
-    await picker().selectOption("Large");
+    // Choosing a configuration to edit does not activate it.
+    await editing.selectOption("Large");
+    assert.match(await status.textContent(), /Active: base table/);
+    assert.equal(await override("Large").inputValue(), "30");
+    await panel.locator("output[aria-label=\"w = 10 mm\"]").waitFor();
+    assert.equal((await shape()).width, 10, "editing a configuration moves nothing");
+
+    // Activation is explicit, one undo step, and the panel follows undo and redo while open.
+    await activate("Large").click();
     await shapeWhen((current) => current.width === 30 && current.x === 15, "Large drives the bound box");
-    await panel.locator("output[aria-label=\"w = 30 mm\"]").waitFor();
-    assert.equal(await panel.getByRole("textbox", { name: "Expression of w" }).inputValue(), "10", "the base expression stays");
-    assert.equal(await override().inputValue(), "30");
-    await closePanel();
+    assert.match(await status.textContent(), /Active: Large/);
     await undo();
     await shapeWhen((current) => current.width === 10, "undo returns to the base table");
-    await openPanel();
-    assert.equal(await picker().inputValue(), "", "undo restores the base table in the picker");
-    await picker().selectOption("Large");
-    await shapeWhen((current) => current.width === 30, "activate again");
+    await panel.locator("output[aria-label=\"w = 10 mm\"]").waitFor();
+    assert.match(await status.textContent(), /Active: base table/, "the open panel follows undo");
+    assert.equal(await override("Large").inputValue(), "30", "the override column still shows the selected configuration");
+    await redo();
+    await shapeWhen((current) => current.width === 30, "redo activates Large again");
+    await panel.locator("output[aria-label=\"w = 30 mm\"]").waitFor();
+    assert.match(await status.textContent(), /Active: Large/, "the open panel follows redo");
 
-    // An override the bound field cannot take is refused inline; the model is unchanged.
-    await override().fill("-5");
-    await override().press("Enter");
+    // A refused activation shows inline, changes nothing and adds no undo step.
+    await editing.selectOption("Broken");
+    await activate("Broken").click();
     await panel.getByRole("alert").filter({ hasText: "out of range" }).waitFor();
-    assert.equal((await shape()).width, 30, "a refused override leaves geometry alone");
-
-    // Setting and clearing an override move the geometry; clearing falls back to the base expression.
-    await override().fill("40");
-    await override().press("Enter");
-    await shapeWhen((current) => current.width === 40, "the new override applies");
-    assert.equal(await panel.getByRole("alert").count(), 0, "a committed override clears the error");
-    await override().fill("");
-    await override().press("Enter");
-    await shapeWhen((current) => current.width === 10, "a cleared override uses the base expression");
-    await closePanel();
+    assert.equal((await shape()).width, 30);
+    assert.match(await status.textContent(), /Active: Large/);
     await undo();
-    await shapeWhen((current) => current.width === 40, "undo restores the cleared override");
+    await shapeWhen((current) => current.width === 10, "the one undo step left is the Large activation");
+    await redo();
+    await shapeWhen((current) => current.width === 30, "redo again");
 
-    // Create, rename and delete configurations.
-    await openPanel();
-    await panel.getByRole("textbox", { name: "New configuration name" }).fill("Small");
-    await panel.getByRole("button", { name: "Add configuration" }).click();
-    await panel.getByRole("option", { name: "Small" }).waitFor({ state: "attached" });
-    const rename = panel.getByRole("textbox", { name: "Name of configuration Large" });
-    await rename.fill("Big");
+    // The refused configuration can be fixed while it is not active; that moves nothing.
+    await override("Broken").fill("20");
+    await override("Broken").press("Enter");
+    await panel.locator("output[aria-label=\"w = 30 mm\"]").waitFor();
+    assert.equal((await shape()).width, 30, "an inactive override does not recompute");
+    await activate("Broken").click();
+    await shapeWhen((current) => current.width === 20, "the fixed configuration activates");
+
+    // A stale configuration lists its issue and can be renamed and deleted.
+    await editing.selectOption("Stale");
+    await panel.locator(".parameters-configuration-issues", { hasText: "w" }).waitFor();
+    const rename = panel.getByRole("textbox", { name: "Name of configuration Stale" });
+    await rename.fill("Older");
     await rename.press("Enter");
-    await panel.getByRole("option", { name: "Big" }).waitFor({ state: "attached" });
-    assert.equal(await picker().inputValue(), "Big", "the active name follows a rename");
-    await panel.getByRole("button", { name: "Delete configuration Big" }).click();
-    await shapeWhen((current) => current.width === 10, "deleting the active configuration returns to the base table");
-    assert.equal(await picker().inputValue(), "");
-    assert.equal(await panel.getByRole("option", { name: "Big" }).count(), 0);
-    await closePanel();
-    await undo();
-    await shapeWhen((current) => current.width === 40, "undo brings the deleted configuration back, still active");
+    await panel.getByRole("option", { name: "Older" }).waitFor({ state: "attached" });
+    assert.equal(await editing.inputValue(), "Older", "the selection follows a rename");
+    await panel.getByRole("button", { name: "Delete configuration Older" }).click();
+    await panel.getByRole("option", { name: "Older" }).waitFor({ state: "detached" });
+    assert.equal((await shape()).width, 20, "deleting an inactive configuration moves nothing");
+
+    // A refused rename marks its field.
+    await editing.selectOption("Large");
+    const largeName = panel.getByRole("textbox", { name: "Name of configuration Large" });
+    await largeName.fill("Broken");
+    await largeName.press("Enter");
+    await panel.getByRole("alert").filter({ hasText: "already exists" }).waitFor();
+    assert.equal(await largeName.getAttribute("aria-invalid"), "true");
+
+    // Back to the base table, explicitly.
+    await panel.getByRole("button", { name: "Use base table" }).click();
+    await shapeWhen((current) => current.width === 10, "the base table applies");
+    assert.equal(await panel.getByRole("alert").count(), 0, "a committed change clears the error");
   } finally {
     if (browser) await browser.close();
     stop();

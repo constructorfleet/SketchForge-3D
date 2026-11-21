@@ -11176,3 +11176,83 @@ html[data-theme="dark"] .parameters-override-input::placeholder {
 .top-action-panel.parameters-action-panel {
   width: min(760px, calc(100vw - 28px));
 }
+
+.parameters-configuration-status {
+  margin: 0;
+  color: #20384d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.parameters-configuration-field {
+  display: grid;
+  flex: 1 1 160px;
+  gap: 3px;
+  color: #40586c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.parameters-configuration-field .parameters-input {
+  width: 100%;
+}
+
+.parameters-configuration-row:has(.parameters-configuration-field) {
+  align-items: end;
+}
+
+.parameters-activate-button {
+  min-height: 28px;
+  padding: 0 12px;
+  color: #087f9f;
+  background: #eefafd;
+  border: 1px solid #a9dce9;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parameters-activate-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.parameters-configuration-issues {
+  padding: 7px 9px;
+  color: #6a3a00;
+  background: #fff6e5;
+  border: 1px solid #f0c27a;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.parameters-configuration-issues p,
+.parameters-configuration-issues ul {
+  margin: 0;
+}
+
+.parameters-configuration-issues ul {
+  padding-left: 18px;
+}
+
+html[data-theme="dark"] .parameters-configuration-status {
+  color: #dceaf3;
+}
+
+html[data-theme="dark"] .parameters-configuration-field {
+  color: #a9bbc9;
+}
+
+html[data-theme="dark"] .parameters-activate-button {
+  color: #9fe3f5;
+  background: #12303a;
+  border-color: #2f6575;
+}
+
+html[data-theme="dark"] .parameters-configuration-issues {
+  color: #ffd9a1;
+  background: #3a2a12;
+  border-color: #7a5520;
+}

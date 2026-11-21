@@ -912,13 +912,11 @@
       },
       "configurations": {
         "heading": "Configuration",
-        "active": "Active configuration",
         "base": "Base table",
-        "hint": "A configuration replaces some base expressions while it is active. Leave an override empty to use the base expression.",
+        "hint": "Choose a configuration to edit its overrides; Activate applies it to the model. Leave an override empty to use the base expression.",
         "newName": "New configuration name",
         "create": "Add configuration",
         "renameLabel": "Name of configuration {name}",
-        "rename": "Rename",
         "delete": "Delete configuration {name}",
         "override": "Override in {name}",
         "overrideOf": "Override of {parameter} in {name}",
@@ -932,7 +930,15 @@
           "deleted": "Deleted configuration {name}",
           "overrideSet": "Set {parameter} in {name}",
           "overrideCleared": "Cleared the {parameter} override in {name}"
-        }
+        },
+        "editing": "Edit configuration",
+        "activeStatus": "Active: {name}",
+        "activeBase": "Active: base table",
+        "activate": "Activate",
+        "activateLabel": "Activate {name}",
+        "useBase": "Use base table",
+        "activeOption": "{name} (active)",
+        "issues": "{name} has overrides that do not resolve:"
       }
     },
     "expressionField": {

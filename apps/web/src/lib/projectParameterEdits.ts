@@ -11,6 +11,7 @@ import {
   addConfiguration,
   addParameter,
   clearConfigurationOverride,
+  configurationIssues,
   deleteConfiguration,
   deleteParameter,
   renameConfiguration,
@@ -133,6 +134,17 @@ function runEdit(project: ParameterProject, edit: ParameterEdit): ProjectParamet
   }
 }
 
+/** Lists a configuration's entries that fail although their base entries resolve, for example after a load. */
+export function configurationIssueMessages(
+  project: ParameterProject,
+  configuration: string | null,
+): Array<{ parameter: string; message: ParameterMessage }> {
+  if (!configuration) return [];
+  return configurationIssues(project)
+    .filter((issue) => issue.configuration === configuration)
+    .map((issue) => ({ parameter: issue.parameter, message: baseErrorMessage(issue.error) }));
+}
+
 /** Names a committed edit for the status line. */
 export function parameterEditNotice(edit: ParameterEdit): ParameterMessage {
   switch (edit.kind) {
@@ -223,13 +235,13 @@ export type ParameterRow = {
   error?: ParameterMessage;
 };
 
+/** Rows for the panel. `overridesOf` names the configuration whose overrides are shown, active or not. */
 export function parameterRows(
   parameters: readonly ProjectParameter[],
-  configuration?: { configurations?: readonly ProjectConfiguration[]; activeConfiguration?: string | null },
+  configurations: readonly ProjectConfiguration[] = [],
+  overridesOf: string | null = null,
 ): ParameterRow[] {
-  const overrides = configuration?.activeConfiguration
-    ? configuration.configurations?.find((entry) => entry.name === configuration.activeConfiguration)?.overrides ?? {}
-    : {};
+  const overrides = overridesOf ? configurations.find((entry) => entry.name === overridesOf)?.overrides ?? {} : {};
   return parameters.map((parameter) => ({
     name: parameter.name,
     ...(Object.hasOwn(overrides, parameter.name) ? { override: overrides[parameter.name] } : {}),

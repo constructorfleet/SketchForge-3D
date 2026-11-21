@@ -912,13 +912,11 @@
       },
       "configurations": {
         "heading": "Konfiguration",
-        "active": "Aktive Konfiguration",
         "base": "Basistabelle",
-        "hint": "Eine Konfiguration ersetzt einige Basisausdrücke, solange sie aktiv ist. Lassen Sie eine Überschreibung leer, um den Basisausdruck zu verwenden.",
+        "hint": "Wählen Sie eine Konfiguration, um ihre Überschreibungen zu bearbeiten; Aktivieren wendet sie auf das Modell an. Lassen Sie eine Überschreibung leer, um den Basisausdruck zu verwenden.",
         "newName": "Name der neuen Konfiguration",
         "create": "Konfiguration hinzufügen",
         "renameLabel": "Name der Konfiguration {name}",
-        "rename": "Umbenennen",
         "delete": "Konfiguration {name} löschen",
         "override": "Überschreibung in {name}",
         "overrideOf": "Überschreibung von {parameter} in {name}",
@@ -932,7 +930,15 @@
           "deleted": "Konfiguration {name} gelöscht",
           "overrideSet": "{parameter} in {name} gesetzt",
           "overrideCleared": "Überschreibung von {parameter} in {name} entfernt"
-        }
+        },
+        "editing": "Konfiguration bearbeiten",
+        "activeStatus": "Aktiv: {name}",
+        "activeBase": "Aktiv: Basistabelle",
+        "activate": "Aktivieren",
+        "activateLabel": "{name} aktivieren",
+        "useBase": "Basistabelle verwenden",
+        "activeOption": "{name} (aktiv)",
+        "issues": "{name} hat Überschreibungen, die sich nicht auflösen lassen:"
       }
     },
     "expressionField": {

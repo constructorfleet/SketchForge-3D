@@ -4,6 +4,7 @@ import { resolveProjectParameters, type ProjectParameterInput } from "@construct
 import { SOURCE_MESSAGES } from "@/i18n/locales";
 import {
   applyBindingsLocally,
+  configurationIssueMessages,
   parameterEditNotice,
   parameterErrorMessage,
   parameterRows,
@@ -49,9 +50,15 @@ describe("configuration edits", () => {
     expect(added.recompute).toBe(false);
     expect(added.project.configurations).toEqual([{ name: "Large", overrides: { w: "30" } }]);
     const renamed = planned(added.project, { kind: "renameConfiguration", configuration: "Large", newName: "Big" });
+    expect(renamed.recompute).toBe(false);
     expect(renamed.project.configurations).toEqual([{ name: "Big", overrides: { w: "30" } }]);
     const deleted = planned(renamed.project, { kind: "deleteConfiguration", configuration: "Big" });
+    expect(deleted.recompute).toBe(false);
     expect(deleted.project.configurations).toEqual([]);
+    // Deleting the active configuration returns to the base table, which moves bound geometry.
+    const active = planned(planned(added.project, { kind: "activateConfiguration", configuration: "Large" }).project, { kind: "deleteConfiguration", configuration: "Large" });
+    expect(active.recompute).toBe(true);
+    expect(active.project.activeConfiguration).toBeNull();
   });
 
   it("activates a configuration, re-resolving values and asking for a recompute", () => {
@@ -81,9 +88,10 @@ describe("configuration edits", () => {
 
   it("refuses an override that breaks the configuration, leaving the project unchanged", () => {
     const start = project([{ name: "Large", overrides: {} }]);
+    const before = JSON.stringify(start);
     const refused = planParameterEdit(start, { kind: "setOverride", configuration: "Large", name: "w", expression: "h +" });
     expect(refused).toMatchObject({ ok: false, error: { code: "invalidExpression", configuration: "Large" } });
-    expect(start.configurations).toEqual([{ name: "Large", overrides: {} }]);
+    expect(JSON.stringify(start)).toBe(before);
     if (refused.ok) return;
     const shown = parameterErrorMessage(refused.error);
     expect(shown).toMatchObject({ key: "editor.parameters.error.parseError", configuration: "Large" });
@@ -106,11 +114,26 @@ describe("configuration edits", () => {
     }
   });
 
-  it("shows each row's override for the active configuration", () => {
-    const active = planned(project([{ name: "Large", overrides: { w: "30" } }]), { kind: "activateConfiguration", configuration: "Large" });
-    expect(parameterRows(active.project.parameters, active.project).map(({ name, value, override }) => ({ name, value, override }))).toEqual([
-      { name: "w", value: "30", override: "30" },
-      { name: "h", value: "5", override: undefined },
-    ]);
+  it("shows the overrides of the configuration being edited, active or not", () => {
+    const start = project([{ name: "Large", overrides: { w: "30" } }, { name: "Small", overrides: { h: "2" } }]);
+    const active = planned(start, { kind: "activateConfiguration", configuration: "Large" });
+    const rows = (configuration: string | null) => parameterRows(active.project.parameters, active.project.configurations, configuration)
+      .map(({ name, value, override }) => ({ name, value, override }));
+    expect(rows("Large")).toEqual([{ name: "w", value: "30", override: "30" }, { name: "h", value: "5", override: undefined }]);
+    // Values stay those of the active configuration; overrides are those of the one selected.
+    expect(rows("Small")).toEqual([{ name: "w", value: "30", override: undefined }, { name: "h", value: "5", override: "2" }]);
+    expect(rows(null).every((row) => row.override === undefined)).toBe(true);
+  });
+
+  it("lists the issues of a stale configuration so it can be fixed", () => {
+    const stale = project([{ name: "Old", overrides: { w: "missing * 2" } }]);
+    expect(configurationIssueMessages(stale, "Old")).toEqual([{ parameter: "w", message: { key: "editor.parameters.error.unknownName", values: { name: "w" } } }]);
+    expect(configurationIssueMessages(stale, null)).toEqual([]);
+    // A stale configuration can still be renamed, edited and deleted while it is not active.
+    const fixed = planned(stale, { kind: "setOverride", configuration: "Old", name: "w", expression: "12" });
+    expect(fixed.recompute).toBe(false);
+    expect(configurationIssueMessages(fixed.project, "Old")).toEqual([]);
+    expect(planned(stale, { kind: "renameConfiguration", configuration: "Old", newName: "Older" }).project.configurations).toEqual([{ name: "Older", overrides: { w: "missing * 2" } }]);
+    expect(planned(stale, { kind: "deleteConfiguration", configuration: "Old" }).project.configurations).toEqual([]);
   });
 });

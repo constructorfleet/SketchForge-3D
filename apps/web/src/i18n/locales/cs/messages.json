@@ -912,13 +912,11 @@
       },
       "configurations": {
         "heading": "Konfigurace",
-        "active": "Aktivní konfigurace",
         "base": "Základní tabulka",
-        "hint": "Konfigurace nahrazuje některé základní výrazy, dokud je aktivní. Ponechte přepis prázdný, chcete-li použít základní výraz.",
+        "hint": "Vyberte konfiguraci a upravte její přepisy; Aktivovat ji použije na model. Ponechte přepis prázdný, chcete-li použít základní výraz.",
         "newName": "Název nové konfigurace",
         "create": "Přidat konfiguraci",
         "renameLabel": "Název konfigurace {name}",
-        "rename": "Přejmenovat",
         "delete": "Smazat konfiguraci {name}",
         "override": "Přepis v {name}",
         "overrideOf": "Přepis {parameter} v {name}",
@@ -932,7 +930,15 @@
           "deleted": "Konfigurace {name} smazána",
           "overrideSet": "{parameter} nastaven v {name}",
           "overrideCleared": "Přepis {parameter} v {name} odebrán"
-        }
+        },
+        "editing": "Upravit konfiguraci",
+        "activeStatus": "Aktivní: {name}",
+        "activeBase": "Aktivní: základní tabulka",
+        "activate": "Aktivovat",
+        "activateLabel": "Aktivovat {name}",
+        "useBase": "Použít základní tabulku",
+        "activeOption": "{name} (aktivní)",
+        "issues": "{name} má přepisy, které nelze vyhodnotit:"
       }
     },
     "expressionField": {
