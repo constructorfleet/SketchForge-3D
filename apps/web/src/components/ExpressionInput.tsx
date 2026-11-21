@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "@/i18n";
 import { applyExpressionCompletion, expressionCompletionAt, type ExpressionCompletion } from "@/lib/expressionFields";
 import { formatParameterValue, parameterNameOptions, parameterUnitLabel, type ParameterMessage } from "@/lib/projectParameterEdits";
@@ -54,6 +54,13 @@ export function ExpressionInput({
   // Escape reverts; the blur that follows must not commit.
   const skipCommitRef = useRef(false);
   const startTextRef = useRef("");
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // Focus swaps the value for the expression, which drops the selection; select it again so typing replaces it.
   useLayoutEffect(() => {
     if (editing && document.activeElement === inputRef.current) inputRef.current?.select();
@@ -107,6 +114,8 @@ export function ExpressionInput({
     const pending = onCommit(text);
     onBlur?.();
     const refusal = await pending;
+    // A late answer belongs to the field that asked; a remounted field starts clean.
+    if (!mountedRef.current) return;
     setError(refusal);
     if (refusal) setDraft(text);
   };

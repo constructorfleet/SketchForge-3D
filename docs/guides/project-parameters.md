@@ -149,6 +149,13 @@ dimension, or gives a value out of the field's range is refused. The message
 shows under the field, the field is marked invalid, and the model does not
 change. Correct the text, or press <kbd>Escape</kbd> to restore the field.
 
+A sketch shape can follow expressions in its size or in its sketch
+constraints, but not in both. A bound size rescales the sketch, which would
+fight a bound constraint. So a constraint expression is refused while the
+shape's width or depth follows an expression. For revolves and sweeps, height
+counts too. A size expression is refused while a constraint follows one. Clear
+one binding first. A plain number is always accepted.
+
 ![An angle parameter typed into Width is refused with "This field needs a length".](../screenshots/expression-field-inline-error.png)
 
 ### Undo and later edits

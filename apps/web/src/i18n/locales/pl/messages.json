@@ -927,7 +927,9 @@
         "fieldNotBindable": "To pole nie może tutaj wynikać z wyrażenia.",
         "constraintOutOfRange": "Wyrażenie daje wartość, której to wiązanie nie może mieć.",
         "sketchNotRebuildable": "Tego szkicu nie można odbudować z wyrażenia.",
-        "needsServer": "Aby to pole wynikało z wyrażenia, potrzebny jest serwer SketchForge. Model się nie zmienił."
+        "needsServer": "Aby to pole wynikało z wyrażenia, potrzebny jest serwer SketchForge. Model się nie zmienił.",
+        "constraintConflictsWithSize": "{fields} tego kształtu wynika z wyrażenia, które skaluje szkic. Najpierw usuń to powiązanie.",
+        "sizeConflictsWithConstraints": "Ten rozmiar wyznaczają powiązane wiązania szkicu ({constraints}). Najpierw usuń te powiązania."
       }
     }
   },

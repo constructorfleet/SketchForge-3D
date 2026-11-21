@@ -39,6 +39,8 @@ type SketchWorkspaceProps = {
   onUpdateConstraint?: (constraintId: string, value: number, expression: string | null) => void;
   /** Parameters a constraint value may follow. */
   parameters?: readonly ProjectParameter[];
+  /** The output being edited, if any; its bound profile size refuses constraint bindings. */
+  sketchOutput?: WorkplaneShape | null;
   operation?: SketchOperation;
   sweepStage?: SketchSweepStage;
   sweepScreenRight?: string;
@@ -495,6 +497,7 @@ export function SketchWorkspace({
   onRemoveConstraint,
   onUpdateConstraint,
   parameters = NO_PARAMETERS,
+  sketchOutput,
   operation = "extrude",
   sweepStage = "section",
   sweepScreenRight = "(0.00, 1.00, 0.00)",
@@ -1370,6 +1373,7 @@ export function SketchWorkspace({
           onRemoveConstraint={onRemoveConstraint}
           onUpdateConstraint={onUpdateConstraint}
           parameters={parameters}
+          sketchOutput={sketchOutput}
         />
       ) : null}
       <div className="grid-settings">
@@ -1455,6 +1459,7 @@ function SketchConstraintPanel({
   onRemoveConstraint,
   onUpdateConstraint,
   parameters,
+  sketchOutput,
 }: {
   profile: SketchProfile;
   selected: SketchSelection;
@@ -1462,6 +1467,7 @@ function SketchConstraintPanel({
   onRemoveConstraint: (constraintId: string) => void;
   onUpdateConstraint?: (constraintId: string, value: number, expression: string | null) => void;
   parameters: readonly ProjectParameter[];
+  sketchOutput?: WorkplaneShape | null;
 }) {
   type NewConstraint = SketchConstraint extends infer Constraint
     ? Constraint extends { id: string } ? Omit<Constraint, "id"> : never
@@ -1488,7 +1494,7 @@ function SketchConstraintPanel({
     return Boolean(start && end && Math.hypot(end.x - start.x, end.z - start.z) > 1e-5);
   });
   const symmetryAxis = symmetryAxisId || symmetryAxes[0]?.id || "";
-  const entry = (kind: DimensionalKind, text: string) => resolveConstraintEntry(dimensionalStub(kind), text, parameters);
+  const entry = (kind: DimensionalKind, text: string) => resolveConstraintEntry(dimensionalStub(kind), text, parameters, sketchOutput);
   const distanceEntry = entry("distance", distanceValue);
   const radiusEntry = entry("radius", radiusValue);
   const diameterEntry = entry("diameter", diameterValue);
@@ -1560,7 +1566,7 @@ function SketchConstraintPanel({
                 label={t("editor.expressionField.constraintValueOf", { kind: t(`editor.sketch.constraints.kinds.${constraint.kind}`) })}
                 suffix={<span className="range-value-unit">{constraint.kind === "angle" ? "°" : unitLabel(t, "mm")}</span>}
                 onCommit={(typed) => {
-                  const resolved = resolveConstraintEntry(constraint, typed, parameters);
+                  const resolved = resolveConstraintEntry(constraint, typed, parameters, sketchOutput);
                   if (!resolved.ok) return constraintBindingMessage(resolved.error, constraint.kind === "angle" ? "angle" : "length");
                   onUpdateConstraint(constraint.id, resolved.value, resolved.expression);
                   return null;

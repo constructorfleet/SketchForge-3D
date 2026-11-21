@@ -14,6 +14,7 @@ import {
 } from "@constructorfleet/sketchforge-engine/expressionBindings";
 import {
   bindableSketchConstraint,
+  conflictingConstraintBinding,
   resolveSketchConstraintBinding,
   sketchConstraintValue,
   type BindableSketchConstraint,
@@ -35,7 +36,8 @@ import {
 import type { RangePropertyConfig } from "@/lib/shapeProperties";
 import type { ProjectParameter, ProjectParameterDimension, SketchConstraint, SketchProfile, WorkplaneShape } from "@/types/sketchforge";
 
-const LITERAL_NUMBER = /^[+-]?(?:\d[\d.,]*|[.,]\d+)$/;
+// Matches what parseMeasurementInput reads as a number, including exponents such as 1e3.
+const LITERAL_NUMBER = /^[+-]?(?:\d[\d.,]*|[.,]\d+)(?:[eE][+-]?\d+)?$/;
 
 /** Reports whether `text` is a plain number, which sets a literal and removes any binding. */
 export function isLiteralNumberEntry(text: string) {
@@ -107,6 +109,16 @@ export function releaseEditedBindings(previous: readonly WorkplaneShape[], next:
     return result;
   });
   return changed ? released : next;
+}
+
+/**
+ * Carries `previous`'s bindings onto a shape rebuilt from scratch, such as a revolve.
+ * Drops `released` fields and any binding whose number the rebuild changed.
+ */
+export function withRebuiltBindings(previous: WorkplaneShape, rebuilt: WorkplaneShape, released: readonly string[] = []): WorkplaneShape {
+  if (!previous.expressions) return rebuilt;
+  const carried = withoutBindings({ ...rebuilt, expressions: previous.expressions }, released);
+  return releaseEditedBindings([previous], [carried])[0]!;
 }
 
 /** Binds, or with `expression: null` unbinds, one shape field through `POST /api/editor/parameters`. */
@@ -183,6 +195,10 @@ export function bindingFailureMessage(failure: ParameterEditFailure | null, shap
     if (error.code === "outOfRange") return { key: "editor.expressionField.error.outOfRange", values: { value: formatParameterValue(error.value ?? Number.NaN) } };
     if (error.code === "notAnInteger") return { key: "editor.expressionField.error.notAnInteger", values: {} };
     if (error.code === "fieldNotBindable") return { key: "editor.expressionField.error.fieldNotBindable", values: {} };
+    if ((error.code as string) === "conflictingBinding") {
+      const constraints = (failure.error as { constraintIds?: readonly string[] }).constraintIds ?? [];
+      return { key: "editor.expressionField.error.sizeConflictsWithConstraints", values: { constraints: constraints.join(", ") } };
+    }
   }
   if (failure?.reason === "constraint_binding_invalid" && failure.error) {
     return constraintBindingMessage(failure.error as unknown as SketchConstraintBindingError);
@@ -200,6 +216,7 @@ export function bindResponseMessage(status: number, body: unknown, shapes: reado
 export function constraintBindingMessage(error: SketchConstraintBindingError, dimension: ProjectParameterDimension = "length"): ParameterMessage {
   if (error.code === "invalidExpression") return expressionMessage(error.expressionError, error.constraintId, dimension);
   if (error.code === "outOfRange") return { key: "editor.expressionField.error.constraintOutOfRange", values: {} };
+  if (error.code === "conflictingBinding") return { key: "editor.expressionField.error.constraintConflictsWithSize", values: { fields: (error.fields ?? []).join(", ") } };
   if (error.code === "sketchNotRebuildable") return { key: "editor.expressionField.error.sketchNotRebuildable", values: {} };
   return { key: "editor.expressionField.error.fieldNotBindable", values: {} };
 }
@@ -209,9 +226,17 @@ export type ConstraintEntry =
   | { ok: false; error: SketchConstraintBindingError };
 
 /** Resolves typed text for a dimensional constraint. A plain number is a literal; `expression: null` clears a binding. */
-export function resolveConstraintEntry(constraint: SketchConstraint, text: string, parameters: readonly ProjectParameter[]): ConstraintEntry {
+export function resolveConstraintEntry(
+  constraint: SketchConstraint,
+  text: string,
+  parameters: readonly ProjectParameter[],
+  /** The sketch's existing output, whose bound profile size refuses a constraint binding (#629). */
+  output?: WorkplaneShape | null,
+): ConstraintEntry {
   const literal = isLiteralNumberEntry(text);
   const source = literal ? String(parseMeasurementInput(text)) : text.trim();
+  const conflict = !literal && output ? conflictingConstraintBinding(output, constraint.id) : undefined;
+  if (conflict) return { ok: false, error: conflict };
   const resolved = resolveSketchConstraintBinding("sketch", constraint, source, parameters);
   if (!resolved.ok) return resolved;
   return { ok: true, value: resolved.value, expression: literal ? null : source };

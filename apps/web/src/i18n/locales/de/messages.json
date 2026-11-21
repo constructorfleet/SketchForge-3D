@@ -927,7 +927,9 @@
         "fieldNotBindable": "Dieses Feld kann hier keinem Ausdruck folgen.",
         "constraintOutOfRange": "Der Ausdruck ergibt einen Wert, den diese Bedingung nicht haben kann.",
         "sketchNotRebuildable": "Diese Skizze kann nicht aus einem Ausdruck neu aufgebaut werden.",
-        "needsServer": "Damit dieses Feld einem Ausdruck folgt, wird der SketchForge-Server gebraucht. Das Modell ist unverändert."
+        "needsServer": "Damit dieses Feld einem Ausdruck folgt, wird der SketchForge-Server gebraucht. Das Modell ist unverändert.",
+        "constraintConflictsWithSize": "{fields} dieser Form folgt einem Ausdruck, der die Skizze skaliert. Heben Sie diese Bindung zuerst auf.",
+        "sizeConflictsWithConstraints": "Die gebundenen Bedingungen der Skizze ({constraints}) legen diese Größe fest. Heben Sie diese Bindungen zuerst auf."
       }
     }
   },

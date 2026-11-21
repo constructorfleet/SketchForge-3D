@@ -692,7 +692,8 @@ function ShapePropertyRows({
     if (property.type === "select") {
       return <SelectProperty key={property.id} {...property} label={label} disabled={disabled} />;
     }
-    return <RangeProperty key={property.id} {...property} label={label} binding={binding(property)} workspace={workspace} disabled={disabled} onInteractionActiveChange={onInteractionActiveChange} />;
+    // Keyed by shape too, so a draft or refusal never carries over to another selection.
+    return <RangeProperty key={`${shape.id}:${property.id}`} {...property} label={label} binding={binding(property)} workspace={workspace} disabled={disabled} onInteractionActiveChange={onInteractionActiveChange} />;
   });
 }
 

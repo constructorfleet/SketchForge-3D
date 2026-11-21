@@ -132,9 +132,11 @@ describe("editor parameter route", () => {
     expect(status).toBe(200);
     const [shape] = body.shapes as WorkplaneShape[];
     expect(shape!.expressions).toEqual({ width: "w * 2" });
+    expect(shape!.width).toBe(20);
     const after = await stlMeasure(body.shapes);
     expect(after.volume).toBeCloseTo(before.volume * 2, 3);
-    expect(after.centroid[0]).toBeCloseTo(before.centroid[0], 3);
+    // The box grows about its centre, so the whole centroid stays put.
+    after.centroid.forEach((value, axis) => expect(value).toBeCloseTo(before.centroid[axis]!, 3));
   });
 
   it("binds a revolve feature field, which rebuilds through the kernel", async () => {

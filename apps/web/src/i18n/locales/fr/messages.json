@@ -927,7 +927,9 @@
         "fieldNotBindable": "Ce champ ne peut pas suivre une expression ici.",
         "constraintOutOfRange": "L'expression donne une valeur que cette contrainte ne peut pas avoir.",
         "sketchNotRebuildable": "Cette esquisse ne peut pas être reconstruite à partir d'une expression.",
-        "needsServer": "Pour suivre une expression, ce champ a besoin du serveur SketchForge. Le modèle n'a pas changé."
+        "needsServer": "Pour suivre une expression, ce champ a besoin du serveur SketchForge. Le modèle n'a pas changé.",
+        "constraintConflictsWithSize": "{fields} de cette forme suit une expression qui met l'esquisse à l'échelle. Supprimez d'abord cette liaison.",
+        "sizeConflictsWithConstraints": "Les contraintes liées de l'esquisse ({constraints}) fixent cette taille. Supprimez d'abord ces liaisons."
       }
     }
   },

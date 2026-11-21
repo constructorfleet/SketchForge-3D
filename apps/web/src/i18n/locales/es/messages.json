@@ -927,7 +927,9 @@
         "fieldNotBindable": "Este campo no puede seguir una expresión aquí.",
         "constraintOutOfRange": "La expresión da un valor que esta restricción no puede tener.",
         "sketchNotRebuildable": "Este boceto no se puede reconstruir a partir de una expresión.",
-        "needsServer": "Para que este campo siga una expresión hace falta el servidor de SketchForge. El modelo no ha cambiado."
+        "needsServer": "Para que este campo siga una expresión hace falta el servidor de SketchForge. El modelo no ha cambiado.",
+        "constraintConflictsWithSize": "{fields} de esta forma sigue una expresión que reescala el boceto. Quite primero ese vínculo.",
+        "sizeConflictsWithConstraints": "Las restricciones vinculadas del boceto ({constraints}) fijan este tamaño. Quite primero esos vínculos."
       }
     }
   },

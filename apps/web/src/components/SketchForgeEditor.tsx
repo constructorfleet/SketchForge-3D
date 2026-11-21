@@ -177,9 +177,9 @@ import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
 import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
-import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, releaseEditedBindings, type EditorFieldBind } from "@/lib/expressionFields";
+import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
 import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
-import { withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import { conflictingConstraintBinding, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import type { ShapeExpressionFields } from "@/components/workplane/ShapeInspector";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
@@ -5263,6 +5263,7 @@ function debugShapeSummary(shape: WorkplaneShape): Record<string, unknown> {
     groupedCount: shape.groupedShapes?.length ?? 0,
     children: shape.groupedShapes?.map(debugShapeSummary) ?? [],
     ...(shape.expressions ? { expressions: shape.expressions } : {}),
+    ...(shape.sketchRevolve ? { sketchRevolve: shape.sketchRevolve } : {}),
   };
 }
 
@@ -7008,11 +7009,18 @@ export function SketchForgeEditor({
 
   /** Sets a dimensional constraint's value, binding it to `expression` or, with null, unbinding it. */
   const updateSketchConstraint = useCallback((constraintId: string, value: number, expression: string | null) => {
+    const output = editingSketchShapeId ? shapesRef.current.find((shape) => shape.id === editingSketchShapeId) : undefined;
+    const conflict = expression !== null && output ? conflictingConstraintBinding(output, constraintId) : undefined;
+    if (conflict) {
+      const message = constraintBindingMessage(conflict);
+      setNotice(notice((t) => t(message.key, message.values)));
+      return;
+    }
     const next = withSketchConstraintValues(sketchProfile, { [constraintId]: value }, { [constraintId]: expression });
     commitSketchProfile(next, notice((t) => (expression === null
       ? t("editor.sketch.constraintUpdated")
       : t("editor.expressionField.notice.bound", { expression }))), []);
-  }, [commitSketchProfile, sketchProfile]);
+  }, [commitSketchProfile, editingSketchShapeId, sketchProfile]);
 
   const removeSketchConstraint = useCallback((constraintId: string) => {
     commitSketchProfile(removeConstraintFromProfile(sketchProfile, constraintId), notice((t) => t("editor.sketch.constraintRemoved")));
@@ -7216,6 +7224,8 @@ export function SketchForgeEditor({
       setNotice(notice((t) => t("editor.sketch.closeProfile")));
       return;
     }
+    // A rebuild starts from a fresh shape; bindings it leaves unchanged must survive it.
+    if (existing) resolved = withRebuiltBindings(existing, resolved);
     const nextShapes = existing ? shapes.map((shape) => (shape.id === existing.id ? resolved : shape)) : [...shapes, resolved];
     const operationName = sketchOperation;
     commitShapes(
@@ -7393,6 +7403,8 @@ export function SketchForgeEditor({
     [commitShapes, placementWorkplane, shapes, t],
   );
 
+  // Revolve settings commit after an async rebuild, so a typed literal's unbind waits for it: one history entry.
+  const revolveReleasesRef = useRef(new Map<string, Set<string>>());
   const scheduleRevolveShapeUpdate = useCallback((id: string, settings: SketchRevolveSettings) => {
     const previousTimer = sketchRevolveUpdateTimerRef.current.get(id);
     if (previousTimer !== undefined) window.clearTimeout(previousTimer);
@@ -7415,7 +7427,7 @@ export function SketchForgeEditor({
           const width = generated.width * widthScale;
           const depth = generated.depth * depthScale;
           const height = generated.height * heightScale;
-          const updated = placeRevolveOnAxis(canonicalizeShape({
+          const rebuilt = placeRevolveOnAxis(canonicalizeShape({
             ...generated,
             id: current.id,
             name: current.name,
@@ -7438,10 +7450,14 @@ export function SketchForgeEditor({
             hidden: current.hidden,
             sketchRevolve: settings,
           }), axis);
+          const released = [...(revolveReleasesRef.current.get(id) ?? [])];
+          revolveReleasesRef.current.delete(id);
+          const updated = withRebuiltBindings(current, rebuilt, released);
           commitShapes(shapesRef.current.map((shape) => shape.id === id ? updated : shape), selectedIdsRef.current, notice((t) => t("editor.sketch.revolveShapeUpdated")));
         })
         .catch((error) => {
           if (sketchRevolveUpdateRequestRef.current.get(id) === requestId) {
+            revolveReleasesRef.current.delete(id);
             setNotice(notice((t) => errorText(t, error, "editor.sketch.revolveSettingsFailed")));
           }
         });
@@ -7806,6 +7822,14 @@ export function SketchForgeEditor({
 
   /** Drops a binding inside the current interaction, so a typed literal and its unbind are one history entry. */
   const releaseShapeBinding = useCallback((shapeId: string, field: string) => {
+    const target = shapesRef.current.find((shape) => shape.id === shapeId);
+    if (field.startsWith("revolve.") && target?.sketchOperation === "revolve" && target.sketchProfile) {
+      // The revolve rebuild that follows drops it, in the same history entry.
+      const pending = revolveReleasesRef.current.get(shapeId) ?? new Set<string>();
+      pending.add(field);
+      revolveReleasesRef.current.set(shapeId, pending);
+      return;
+    }
     const release = (current: WorkplaneShape[]) => {
       const next = current.map((shape) => (shape.id === shapeId ? withoutBindings(shape, [field]) : shape));
       return next.some((shape, index) => shape !== current[index]) ? next : current;
@@ -10723,6 +10747,7 @@ export function SketchForgeEditor({
             onRemoveConstraint={removeSketchConstraint}
             onUpdateConstraint={updateSketchConstraint}
             parameters={projectParameters}
+            sketchOutput={editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null}
             operation={sketchOperation}
             sweepStage={sweepStage}
             sweepScreenRight={formatSweepAxis(sketchProfile.sweepFrames?.spine.xAxis ?? activeSketchWorkplane.normal)}

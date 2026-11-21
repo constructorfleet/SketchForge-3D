@@ -927,7 +927,9 @@
         "fieldNotBindable": "This field cannot follow an expression here.",
         "constraintOutOfRange": "The expression gives a value this constraint cannot have.",
         "sketchNotRebuildable": "This sketch cannot be rebuilt from an expression.",
-        "needsServer": "This field needs the SketchForge server to follow an expression. The model is unchanged."
+        "needsServer": "This field needs the SketchForge server to follow an expression. The model is unchanged.",
+        "constraintConflictsWithSize": "{fields} on this shape follows an expression, which rescales the sketch. Clear that binding first.",
+        "sizeConflictsWithConstraints": "The sketch's bound constraints ({constraints}) set this size. Clear those bindings first."
       }
     }
   },

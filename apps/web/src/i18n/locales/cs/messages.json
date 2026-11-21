@@ -927,7 +927,9 @@
         "fieldNotBindable": "Toto pole se zde nemůže řídit výrazem.",
         "constraintOutOfRange": "Výraz dává hodnotu, kterou tato vazba mít nemůže.",
         "sketchNotRebuildable": "Tento náčrt nelze z výrazu znovu sestavit.",
-        "needsServer": "Aby se toto pole řídilo výrazem, potřebuje server SketchForge. Model se nezměnil."
+        "needsServer": "Aby se toto pole řídilo výrazem, potřebuje server SketchForge. Model se nezměnil.",
+        "constraintConflictsWithSize": "{fields} tohoto tvaru se řídí výrazem, který mění měřítko náčrtu. Nejprve tuto vazbu zrušte.",
+        "sizeConflictsWithConstraints": "Tuto velikost určují vázané vazby náčrtu ({constraints}). Nejprve je zrušte."
       }
     }
   },

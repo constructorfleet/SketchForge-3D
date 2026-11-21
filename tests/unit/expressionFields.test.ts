@@ -11,6 +11,7 @@ import {
   isLiteralNumberEntry,
   propertyBindingField,
   releaseEditedBindings,
+  withRebuiltBindings,
   resolveConstraintEntry,
 } from "@/lib/expressionFields";
 import { getShapePropertiesWithAppLimits, placementProperties, type RangePropertyConfig } from "@/lib/shapeProperties";
@@ -47,11 +48,11 @@ function range(shape: WorkplaneShape, id: string) {
 
 describe("isLiteralNumberEntry", () => {
   it("accepts plain numbers in either decimal style", () => {
-    for (const text of ["12", " -3.5 ", "+4", ".5", "2,5", "1.234,5", "1,234.5"]) expect(isLiteralNumberEntry(text), text).toBe(true);
+    for (const text of ["12", " -3.5 ", "+4", ".5", "2,5", "1.234,5", "1,234.5", "1e3", "2.5E-2", "-1e+2"]) expect(isLiteralNumberEntry(text), text).toBe(true);
   });
 
   it("treats anything with a name, unit or operator as an expression", () => {
-    for (const text of ["wall", "wall * 2", "2 mm", "1+1", "(3)", "", "  ", "2e3x"]) expect(isLiteralNumberEntry(text), text).toBe(false);
+    for (const text of ["wall", "wall * 2", "2 mm", "1+1", "(3)", "", "  ", "2e3x", "2e", "e3"]) expect(isLiteralNumberEntry(text), text).toBe(false);
   });
 });
 
@@ -127,6 +128,33 @@ describe("releaseEditedBindings", () => {
   });
 });
 
+describe("withRebuiltBindings", () => {
+  const revolve = (settings: Record<string, number>, expressions?: Record<string, string>) => box({
+    kind: "mesh",
+    sketchOperation: "revolve",
+    sketchRevolve: { startAngle: 0, sweepAngle: 360, sides: 48, quality: 3, pitch: 0, turns: 1, coreRadius: 0, ...settings },
+    ...(expressions ? { expressions } : {}),
+  } as Partial<WorkplaneShape>);
+
+  it("keeps the bindings a rebuild did not change, and drops those it did", () => {
+    const previous = revolve({}, { "revolve.sweepAngle": "tilt * 12", "revolve.startAngle": "tilt", x: "wall" });
+    const rebuilt = revolve({ startAngle: 45 });
+    const kept = withRebuiltBindings(previous, rebuilt);
+    expect(kept.expressions).toEqual({ "revolve.sweepAngle": "tilt * 12", x: "wall" });
+    expect(kept.sketchRevolve?.startAngle).toBe(45);
+  });
+
+  it("returns the rebuilt shape unchanged when nothing was bound", () => {
+    const rebuilt = revolve({ startAngle: 45 });
+    expect(withRebuiltBindings(revolve({}), rebuilt)).toBe(rebuilt);
+  });
+
+  it("drops the bindings named as released", () => {
+    const previous = revolve({}, { "revolve.sweepAngle": "tilt * 12", x: "wall" });
+    expect(withRebuiltBindings(previous, revolve({}), ["revolve.sweepAngle"]).expressions).toEqual({ x: "wall" });
+  });
+});
+
 describe("bindShapeFieldLocally", () => {
   it("resolves the expression through the engine and stores value and binding", () => {
     const result = bindShapeFieldLocally([box()], parameters, "box-1", "width", "wall * 15");
@@ -186,6 +214,11 @@ describe("bindingFailureMessage", () => {
     expect(message).toEqual({ key: "editor.expressionField.error.needsLength", values: {} });
   });
 
+  it("names the bound constraints when a size bind would rescale the sketch", () => {
+    const failure = { reason: "binding_invalid", error: { code: "conflictingBinding", shapeId: "box-1", field: "width", constraintIds: ["d1", "d2"] } };
+    expect(bindingFailureMessage(failure, [box()])).toEqual({ key: "editor.expressionField.error.sizeConflictsWithConstraints", values: { constraints: "d1, d2" } });
+  });
+
   it("maps out-of-range and unknown names", () => {
     const shapes = [box()];
     const range = bindShapeFieldLocally(shapes, parameters, "box-1", "width", "wall * -1");
@@ -224,6 +257,19 @@ describe("resolveConstraintEntry", () => {
 
   it("binds an expression and resolves its value", () => {
     expect(resolveConstraintEntry(distance, "wall * 3", parameters)).toEqual({ ok: true, value: 6, expression: "wall * 3" });
+  });
+
+  it("refuses a constraint expression when the output's profile size is bound, as the engine does", () => {
+    const output = box({ kind: "sketch", sketchProfile: { points: [], segments: [], constraints: [distance] }, sketchOperation: "extrude", expressions: { width: "wall * 10" } } as Partial<WorkplaneShape>);
+    const refused = resolveConstraintEntry(distance, "wall * 3", parameters, output);
+    expect(refused).toMatchObject({ ok: false, error: { code: "conflictingBinding", fields: ["width"] } });
+    if (refused.ok) return;
+    expect(constraintBindingMessage(refused.error)).toEqual({ key: "editor.expressionField.error.constraintConflictsWithSize", values: { fields: "width" } });
+    // A literal is not a binding, so it does not conflict.
+    expect(resolveConstraintEntry(distance, "8", parameters, output)).toEqual({ ok: true, value: 8, expression: null });
+    // An extrusion's height is not in the profile.
+    const tall = { ...output, expressions: { height: "wall * 10" } };
+    expect(resolveConstraintEntry(distance, "wall * 3", parameters, tall).ok).toBe(true);
   });
 
   it("takes a plain number as a literal that clears the binding", () => {
