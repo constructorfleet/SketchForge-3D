@@ -494,6 +494,7 @@
       "constraintUnsatisfied": "Could not satisfy sketch constraint(s): {ids}",
       "constraintAdded": "Added {kind} sketch constraint",
       "constraintRemoved": "Sketch constraint removed",
+      "constraintUpdated": "Updated the sketch constraint",
       "constraints": {
         "title": "Constraints",
         "hint": "Select one point to fix it at its current workplane coordinates, two points for coincident, distance, radius, or diameter, one segment for horizontal or vertical, two segments for parallel, perpendicular, equal length, or angle, or two points and an axis for symmetry.",
@@ -908,6 +909,25 @@
         "serverError": "The server failed while updating bound shapes. The model is unchanged.",
         "busy": "Finish the current edit first.",
         "projectChanged": "The project changed while shapes were updating. Try again."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Follows the expression {expression}",
+      "suggestions": "Parameter suggestions",
+      "constraintValueOf": "Value of {kind}",
+      "notice": {
+        "bound": "Now follows {expression}"
+      },
+      "error": {
+        "needsLength": "This field needs a length. Use a length parameter or a unit such as mm.",
+        "needsAngle": "This field needs an angle. Use an angle parameter or a unit such as deg.",
+        "needsUnitless": "This field needs a plain number without a unit.",
+        "outOfRange": "The expression gives {value}, which is out of range for this field.",
+        "notAnInteger": "This field needs a whole number.",
+        "fieldNotBindable": "This field cannot follow an expression here.",
+        "constraintOutOfRange": "The expression gives a value this constraint cannot have.",
+        "sketchNotRebuildable": "This sketch cannot be rebuilt from an expression.",
+        "needsServer": "This field needs the SketchForge server to follow an expression. The model is unchanged."
       }
     }
   },

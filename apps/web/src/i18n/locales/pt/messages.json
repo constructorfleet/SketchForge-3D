@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "Não foi possível satisfazer as restrições do esboço: {ids}",
       "constraintAdded": "Restrição adicionada ao esboço: {kind}",
       "constraintRemoved": "Restrição do esboço removida",
+      "constraintUpdated": "Restrição do esboço atualizada",
       "draftReplayFailed": "O esboço não foi atualizado: o ângulo de saída não pode ser reconstruído neste perfil. Volte o perfil ao anterior ou cancele a edição do esboço.",
       "shellNotReplayable": "O esboço não foi atualizado: esta forma foi esvaziada, e reconstruí-la a partir do esboço não refaz o esvaziamento. Desfaça o esvaziamento primeiro ou cancele a edição do esboço."
     },
@@ -908,6 +909,25 @@
         "serverError": "O servidor falhou ao atualizar as formas vinculadas. O modelo não mudou.",
         "busy": "Conclua primeiro a edição atual.",
         "projectChanged": "O projeto mudou enquanto as formas eram atualizadas. Tente novamente."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Segue a expressão {expression}",
+      "suggestions": "Sugestões de parâmetros",
+      "constraintValueOf": "Valor de {kind}",
+      "notice": {
+        "bound": "Agora segue {expression}"
+      },
+      "error": {
+        "needsLength": "Este campo precisa de um comprimento. Use um parâmetro de comprimento ou uma unidade como mm.",
+        "needsAngle": "Este campo precisa de um ângulo. Use um parâmetro de ângulo ou uma unidade como deg.",
+        "needsUnitless": "Este campo precisa de um número sem unidade.",
+        "outOfRange": "A expressão dá {value}, que está fora do intervalo deste campo.",
+        "notAnInteger": "Este campo precisa de um número inteiro.",
+        "fieldNotBindable": "Este campo não pode seguir uma expressão aqui.",
+        "constraintOutOfRange": "A expressão dá um valor que esta restrição não pode ter.",
+        "sketchNotRebuildable": "Este esboço não pode ser reconstruído a partir de uma expressão.",
+        "needsServer": "Para seguir uma expressão, este campo precisa do servidor SketchForge. O modelo não mudou."
       }
     }
   },

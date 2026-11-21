@@ -74,7 +74,7 @@ test("a user can size two opposite sketch points with a diameter", { timeout: 12
     await page.mouse.up();
 
     assert.equal(await page.locator('[data-sketch-entity="point"].selected').count(), 2, "the marquee selects the side's two endpoints");
-    await page.getByRole("spinbutton", { name: "Diameter (mm)" }).fill("30");
+    await page.getByRole("combobox", { name: "Diameter (mm)" }).fill("30");
     const diameterButton = page.getByRole("button", { name: "Diameter", exact: true });
     assert.equal(await diameterButton.isDisabled(), false, "Diameter is available for two selected points");
     await diameterButton.click();

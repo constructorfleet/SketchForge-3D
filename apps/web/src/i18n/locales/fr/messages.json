@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "Impossible de satisfaire la ou les contraintes d’esquisse : {ids}",
       "constraintAdded": "Contrainte d’esquisse ajoutée : {kind}",
       "constraintRemoved": "Contrainte d’esquisse supprimée",
+      "constraintUpdated": "Contrainte d'esquisse modifiée",
       "draftReplayFailed": "L’esquisse n’a pas été mise à jour : sa dépouille ne peut pas être reconstruite sur ce profil. Revenez au profil précédent ou annulez la modification de l’esquisse.",
       "shellNotReplayable": "L’esquisse n’a pas été mise à jour : cette forme a été évidée, et sa reconstruction à partir de l’esquisse ne peut pas reproduire l’évidement. Annulez d’abord l’évidement, ou annulez la modification de l’esquisse."
     },
@@ -908,6 +909,25 @@
         "serverError": "Le serveur a échoué lors de la mise à jour des formes liées. Le modèle n'a pas changé.",
         "busy": "Terminez d'abord la modification en cours.",
         "projectChanged": "Le projet a changé pendant la mise à jour des formes. Réessayez."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Suit l'expression {expression}",
+      "suggestions": "Suggestions de paramètres",
+      "constraintValueOf": "Valeur de {kind}",
+      "notice": {
+        "bound": "Suit maintenant {expression}"
+      },
+      "error": {
+        "needsLength": "Ce champ demande une longueur. Utilisez un paramètre de longueur ou une unité comme mm.",
+        "needsAngle": "Ce champ demande un angle. Utilisez un paramètre d'angle ou une unité comme deg.",
+        "needsUnitless": "Ce champ demande un nombre sans unité.",
+        "outOfRange": "L'expression donne {value}, ce qui est hors limites pour ce champ.",
+        "notAnInteger": "Ce champ demande un nombre entier.",
+        "fieldNotBindable": "Ce champ ne peut pas suivre une expression ici.",
+        "constraintOutOfRange": "L'expression donne une valeur que cette contrainte ne peut pas avoir.",
+        "sketchNotRebuildable": "Cette esquisse ne peut pas être reconstruite à partir d'une expression.",
+        "needsServer": "Pour suivre une expression, ce champ a besoin du serveur SketchForge. Le modèle n'a pas changé."
       }
     }
   },

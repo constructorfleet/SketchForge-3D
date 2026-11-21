@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "No se pudieron cumplir estas restricciones del boceto: {ids}",
       "constraintAdded": "Se agregó la restricción de boceto: {kind}",
       "constraintRemoved": "Se quitó la restricción del boceto",
+      "constraintUpdated": "Restricción del boceto actualizada",
       "draftReplayFailed": "El boceto no se actualizó: su desmoldeo no se puede reconstruir con este perfil. Devuelve el perfil a como estaba o cancela la edición del boceto.",
       "shellNotReplayable": "El boceto no se actualizó: esta forma se vació y el vaciado no se puede volver a aplicar al reconstruirla desde su boceto. Deshaz el vaciado primero o cancela la edición del boceto."
     },
@@ -908,6 +909,25 @@
         "serverError": "El servidor falló al actualizar las formas vinculadas. El modelo no ha cambiado.",
         "busy": "Termina primero la edición actual.",
         "projectChanged": "El proyecto cambió mientras se actualizaban las formas. Inténtalo de nuevo."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Sigue la expresión {expression}",
+      "suggestions": "Sugerencias de parámetros",
+      "constraintValueOf": "Valor de {kind}",
+      "notice": {
+        "bound": "Ahora sigue {expression}"
+      },
+      "error": {
+        "needsLength": "Este campo necesita una longitud. Use un parámetro de longitud o una unidad como mm.",
+        "needsAngle": "Este campo necesita un ángulo. Use un parámetro de ángulo o una unidad como deg.",
+        "needsUnitless": "Este campo necesita un número sin unidad.",
+        "outOfRange": "La expresión da {value}, que está fuera del rango de este campo.",
+        "notAnInteger": "Este campo necesita un número entero.",
+        "fieldNotBindable": "Este campo no puede seguir una expresión aquí.",
+        "constraintOutOfRange": "La expresión da un valor que esta restricción no puede tener.",
+        "sketchNotRebuildable": "Este boceto no se puede reconstruir a partir de una expresión.",
+        "needsServer": "Para que este campo siga una expresión hace falta el servidor de SketchForge. El modelo no ha cambiado."
       }
     }
   },

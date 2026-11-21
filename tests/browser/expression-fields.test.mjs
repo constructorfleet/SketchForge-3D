@@ -1,0 +1,307 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { createServer } from "node:net";
+import { test } from "node:test";
+import { chromium } from "playwright";
+import { exportSkfProject, shapeFromRequest } from "@constructorfleet/sketchforge-engine";
+
+// Issue #617: dimension fields take expressions. A bind shows the resolved value,
+// marks the field as bound, shows the expression on focus, refuses errors inline,
+// autocompletes parameter names, is one undo step, and a literal edit removes it.
+
+const parameters = [
+  { name: "wall", expression: "2", dimension: "length", value: 2 },
+  { name: "width_total", expression: "wall * 20", dimension: "length", value: 40 },
+  { name: "tilt", expression: "30 deg", dimension: "angle", value: 30 },
+];
+
+async function unusedPort() {
+  const listener = createServer();
+  await new Promise((resolve, reject) => listener.listen(0, "127.0.0.1", (error) => error ? reject(error) : resolve()));
+  const address = listener.address();
+  assert.ok(address && typeof address !== "string");
+  const { port } = address;
+  await new Promise((resolve, reject) => listener.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
+
+async function startNextServer() {
+  const port = await unusedPort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
+    cwd: process.cwd(),
+    detached: process.platform !== "win32",
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let logs = "";
+  const keepLogs = (chunk) => { logs = `${logs}${chunk}`.slice(-8_000); };
+  server.stdout.on("data", keepLogs);
+  server.stderr.on("data", keepLogs);
+  const stop = () => {
+    if (server.exitCode !== null) return;
+    try { if (process.platform === "win32") server.kill("SIGTERM"); else process.kill(-server.pid, "SIGTERM"); } catch { /* server already exited */ }
+  };
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) throw new Error(`Next.js exited with ${server.exitCode}:\n${logs}`);
+    try {
+      if ((await fetch(baseURL)).ok) return { baseURL, stop };
+    } catch {
+      // The server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  stop();
+  throw new Error(`Next.js did not become ready:\n${logs}`);
+}
+
+test("dimension fields bind to expressions, refuse inline, autocomplete, undo in one step, and lose the binding to a literal", { timeout: 240_000 }, async () => {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-expression-fields-"));
+  const fixture = path.join(fixtureDir, "fields.skf");
+  const box = shapeFromRequest({ kind: "box", width: 20, depth: 20, height: 20 });
+  assert.ok(box);
+  fs.writeFileSync(fixture, await exportSkfProject({
+    projectName: "fields",
+    createdAt: Date.now(),
+    modifiedAt: Date.now(),
+    shapes: [{ ...box, name: "Plate" }],
+    history: [],
+    historyIndex: 0,
+    assets: [],
+    workspace: undefined,
+    snapGrid: "1.0 mm",
+    placementElevation: 0,
+    parameters,
+  }));
+  const { baseURL, stop } = await startNextServer();
+  let browser;
+
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/app-update**", (route) => route.abort());
+    await page.goto(baseURL);
+    await page.locator("input.hidden-file-input[accept^=\".skf,.stl\"]").setInputFiles(fixture);
+    await page.getByRole("button", { name: "Home dashboard" }).waitFor({ state: "visible", timeout: 60_000 });
+
+    const shape = async () => (await page.locator("pre[data-codex-state]").evaluate((node) => JSON.parse(node.textContent).shapes))[0];
+    const shapeWhen = async (check, message) => {
+      const until = Date.now() + 30_000;
+      let last;
+      while (Date.now() < until) {
+        last = await shape();
+        if (check(last)) return last;
+        await page.waitForTimeout(100);
+      }
+      assert.fail(`${message}: ${JSON.stringify(last)}`);
+    };
+    const select = async () => {
+      await page.locator(".scene-inspector-list .scene-row-name").first().click({ force: true });
+      await page.locator(".shape-inspector").first().waitFor();
+    };
+    await select();
+    const width = page.getByRole("combobox", { name: "Width" });
+    await width.waitFor();
+    assert.equal(await width.inputValue(), "20.00");
+    assert.equal(await width.getAttribute("aria-description"), null, "an unbound field has no binding description");
+
+    // Autocomplete: typing a name prefix offers matching parameters; Enter accepts.
+    await width.click();
+    await width.fill("");
+    await width.pressSequentially("wid");
+    const options = page.getByRole("listbox", { name: "Parameter suggestions" });
+    await options.getByRole("option", { name: /width_total/ }).waitFor();
+    assert.equal(await width.getAttribute("aria-expanded"), "true");
+    assert.ok(await width.getAttribute("aria-activedescendant"), "the active option is announced");
+    await page.screenshot({ path: "docs/screenshots/expression-field-autocomplete.png" });
+    await width.press("Enter");
+    assert.equal(await width.inputValue(), "width_total");
+    assert.equal(await width.getAttribute("aria-expanded"), "false");
+    await width.pressSequentially(" / 2 + wall");
+    await width.press("Enter");
+
+    // The bind applies the resolved value and keeps the expression.
+    const bound = await shapeWhen((current) => current.width === 22, "width follows width_total / 2 + wall");
+    assert.deepEqual(bound.expressions, { width: "width_total / 2 + wall" });
+    assert.equal(await width.inputValue(), "22.00", "at rest the field shows the resolved value");
+    assert.equal(await width.getAttribute("aria-description"), "Follows the expression width_total / 2 + wall");
+    assert.equal(await page.locator(".range-property.is-bound .expression-input-badge").count(), 1, "a bound field shows a marker that is not colour alone");
+    await page.mouse.move(10, 10);
+    await page.screenshot({ path: "docs/screenshots/expression-field-bound.png" });
+
+    // Focus shows the expression.
+    await width.focus();
+    assert.equal(await width.inputValue(), "width_total / 2 + wall");
+    await page.screenshot({ path: "docs/screenshots/expression-field-focus.png" });
+
+    // An error appears inline and changes nothing.
+    await width.fill("tilt * 2");
+    await width.press("Enter");
+    const alert = page.getByRole("alert").filter({ hasText: "needs a length" });
+    await alert.waitFor();
+    assert.equal(await width.getAttribute("aria-invalid"), "true");
+    assert.equal(await width.getAttribute("aria-describedby"), await alert.getAttribute("id"));
+    await alert.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "docs/screenshots/expression-field-inline-error.png" });
+    const unchanged = await shape();
+    assert.equal(unchanged.width, 22, "a refused expression leaves geometry alone");
+    assert.deepEqual(unchanged.expressions, { width: "width_total / 2 + wall" });
+    await width.focus();
+    await width.press("Escape");
+    assert.equal(await page.getByRole("alert").filter({ hasText: "needs a length" }).count(), 0, "Escape clears the refused draft");
+    assert.equal(await width.inputValue(), "22.00");
+
+    // One bind is one undo step.
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    const undone = await shapeWhen((current) => current.width === 20, "undo restores the width");
+    assert.equal(undone.expressions, undefined, "undo removes the binding in the same step");
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await shapeWhen((current) => current.width === 22 && current.expressions?.width, "redo binds again");
+
+    // A parameter change moves the bound field.
+    await page.getByRole("button", { name: "Project parameters" }).click();
+    const panel = page.getByRole("dialog", { name: "Parameters" });
+    await panel.getByRole("textbox", { name: "Expression of wall" }).fill("3");
+    await panel.getByRole("textbox", { name: "Expression of wall" }).press("Enter");
+    await shapeWhen((current) => current.width === 33, "width follows wall: 60 / 2 + 3");
+    await panel.getByRole("button", { name: "Close Parameters" }).click();
+
+    // A plain number is a literal: it removes the binding, as one undo step.
+    await select();
+    await width.fill("25");
+    await width.press("Enter");
+    const literal = await shapeWhen((current) => current.width === 25, "a typed number sets the width");
+    assert.equal(literal.expressions, undefined, "a typed number removes the binding");
+    assert.equal(await width.getAttribute("aria-description"), null);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await shapeWhen((current) => current.width === 33 && current.expressions?.width, "one undo restores value and binding");
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    await shapeWhen((current) => current.width === 25 && !current.expressions, "redo the literal");
+
+    // A placement field binds too, and a keyboard nudge drops that binding.
+    const positionX = page.locator('[id^="placement-"]').getByRole("combobox", { name: "X", exact: true });
+    await positionX.fill("wall * 4");
+    await positionX.press("Enter");
+    await shapeWhen((current) => current.x === 12 && current.expressions?.x === "wall * 4", "x follows wall * 4");
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await page.keyboard.press("ArrowRight");
+    const nudged = await shapeWhen((current) => current.x !== 12, "the nudge moves the shape");
+    assert.equal(nudged.expressions, undefined, "a local edit to a bound field removes its binding");
+    await page.getByRole("button", { name: "Project parameters" }).click();
+    await panel.getByRole("textbox", { name: "Expression of wall" }).fill("5");
+    await panel.getByRole("textbox", { name: "Expression of wall" }).press("Enter");
+    await panel.getByRole("button", { name: "Close Parameters" }).click();
+    await page.waitForTimeout(500);
+    assert.equal((await shape()).x, nudged.x, "a later parameter change does not snap the nudge back");
+
+    // Typing the number a bound field already shows still removes the binding.
+    await select();
+    const height = page.getByRole("combobox", { name: "Height" });
+    await height.fill("wall * 4");
+    await height.press("Enter");
+    await shapeWhen((current) => current.height === 20 && current.expressions?.height === "wall * 4", "height follows wall * 4");
+    await height.fill("20");
+    await height.press("Enter");
+    await shapeWhen((current) => current.height === 20 && !current.expressions, "the same number as a literal unbinds height");
+
+    // A slider move is a local edit too.
+    await height.fill("wall * 4");
+    await height.press("Enter");
+    await shapeWhen((current) => current.expressions?.height === "wall * 4", "height is bound again");
+    const heightSlider = page.locator("label.range-property").filter({ has: height }).locator('input[type="range"]');
+    await heightSlider.focus();
+    await heightSlider.press("ArrowRight");
+    await heightSlider.blur();
+    const slid = await shapeWhen((current) => current.height !== 20, "the slider changes the height");
+    assert.equal(slid.expressions, undefined, "a slider move removes the height binding");
+  } finally {
+    if (browser) await browser.close();
+    stop();
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});
+
+test("sketch dimension inputs bind constraints to expressions and a typed number unbinds them", { timeout: 240_000 }, async () => {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-expression-sketch-"));
+  const fixture = path.join(fixtureDir, "sketch.skf");
+  fs.writeFileSync(fixture, await exportSkfProject({
+    projectName: "sketch",
+    createdAt: Date.now(),
+    modifiedAt: Date.now(),
+    shapes: [],
+    history: [],
+    historyIndex: 0,
+    assets: [],
+    workspace: undefined,
+    snapGrid: "1.0 mm",
+    placementElevation: 0,
+    parameters,
+  }));
+  const { baseURL, stop } = await startNextServer();
+  let browser;
+
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/app-update**", (route) => route.abort());
+    await page.goto(baseURL);
+    await page.locator("input.hidden-file-input[accept^=\".skf,.stl\"]").setInputFiles(fixture);
+    await page.getByRole("button", { name: "Home dashboard" }).waitFor({ state: "visible", timeout: 60_000 });
+    await page.getByRole("tab", { name: "Sketch" }).click();
+    await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+    await page.getByRole("menuitem", { name: /Extrude sketch/ }).click();
+    await page.getByRole("button", { name: "Add sketch shape" }).click();
+    await page.getByRole("menuitem", { name: "Rectangle" }).click();
+
+    const side = page.locator('[data-sketch-entity="segment"]').first();
+    const bounds = await side.boundingBox();
+    assert.ok(bounds, "the rectangle has a selectable side");
+    await page.mouse.move(bounds.x - 6, bounds.y - 6);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width + 6, bounds.y + bounds.height + 6);
+    await page.mouse.up();
+    assert.equal(await page.locator('[data-sketch-entity="point"].selected').count(), 2, "the marquee selects the side's two endpoints");
+
+    // A new constraint takes an expression, with name completion.
+    const distance = page.getByRole("combobox", { name: "Distance (mm)" });
+    await distance.fill("");
+    await distance.pressSequentially("wa");
+    await page.getByRole("option", { name: /wall/ }).waitFor();
+    await distance.press("Enter");
+    await distance.pressSequentially(" * 6");
+    await page.getByRole("button", { name: "Set distance", exact: true }).click();
+    const list = page.locator(".sketch-constraint-list");
+    await list.getByText(/^Distance 12 mm /).waitFor();
+    const rowValue = list.getByRole("combobox", { name: "Value of Distance" });
+    assert.equal(await rowValue.getAttribute("aria-description"), "Follows the expression wall * 6");
+    assert.equal(await rowValue.inputValue(), "12");
+
+    // A refused entry stays inline and changes nothing.
+    await rowValue.fill("tilt");
+    await rowValue.press("Enter");
+    await page.getByRole("alert").filter({ hasText: "needs a length" }).waitFor();
+    await list.getByText(/^Distance 12 mm /).waitFor();
+
+    // A typed number is a literal: the constraint keeps it and stops following wall.
+    await rowValue.fill("15");
+    await rowValue.press("Enter");
+    await list.getByText(/^Distance 15 mm /).waitFor();
+    assert.equal(await rowValue.getAttribute("aria-description"), null);
+
+    // Rebinding the row resolves through the table again.
+    await rowValue.fill("width_total / 2");
+    await rowValue.press("Enter");
+    await list.getByText(/^Distance 20 mm /).waitFor();
+    assert.equal(await rowValue.getAttribute("aria-description"), "Follows the expression width_total / 2");
+    await list.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "docs/screenshots/expression-field-sketch-constraint.png" });
+  } finally {
+    if (browser) await browser.close();
+    stop();
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});

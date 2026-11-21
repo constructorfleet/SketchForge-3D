@@ -107,6 +107,8 @@ export type ShapePropertyId =
 export type RangePropertyConfig = {
   type?: "range";
   id: ShapePropertyId;
+  /** Names the `EXPRESSION_BINDABLE_FIELDS` entry the row drives, when one does. */
+  field?: string;
   value: number;
   min: number;
   max: number;
@@ -198,88 +200,88 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
     // this is the plain revolve it has always been, and Turns does nothing --
     // which is why Turns sits next to Pitch rather than next to Sweep.
     return [
-      { id: "startAngle", value: settings.startAngle, min: 0, max: 359, step: 1, onChange: (startAngle) => updateRevolve({ startAngle }) },
-      { id: "sweep", value: settings.sweepAngle, min: -360, max: 360, step: 1, onChange: (sweepAngle) => updateRevolve({ sweepAngle }) },
-      { id: "pitch", value: settings.pitch, min: -20, max: 20, step: 0.1, onChange: (pitch) => updateRevolve({ pitch }) },
-      { id: "turns", value: settings.turns, min: 0.1, max: MAX_REVOLVE_TURNS, step: 0.1, onChange: (turns) => updateRevolve({ turns }) },
-      { id: "core", value: settings.coreRadius, min: 0, max: 80, step: 0.05, onChange: (coreRadius) => updateRevolve({ coreRadius }) },
-      { id: "sides", value: settings.sides, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => updateRevolve({ sides }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "startAngle", field: "revolve.startAngle", value: settings.startAngle, min: 0, max: 359, step: 1, onChange: (startAngle) => updateRevolve({ startAngle }) },
+      { id: "sweep", field: "revolve.sweepAngle", value: settings.sweepAngle, min: -360, max: 360, step: 1, onChange: (sweepAngle) => updateRevolve({ sweepAngle }) },
+      { id: "pitch", field: "revolve.pitch", value: settings.pitch, min: -20, max: 20, step: 0.1, onChange: (pitch) => updateRevolve({ pitch }) },
+      { id: "turns", field: "revolve.turns", value: settings.turns, min: 0.1, max: MAX_REVOLVE_TURNS, step: 0.1, onChange: (turns) => updateRevolve({ turns }) },
+      { id: "core", field: "revolve.coreRadius", value: settings.coreRadius, min: 0, max: 80, step: 0.05, onChange: (coreRadius) => updateRevolve({ coreRadius }) },
+      { id: "sides", field: "revolve.sides", value: settings.sides, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => updateRevolve({ sides }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "box") {
     return [
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "cylinder") {
     return [
-      { id: "sides", value: shape.sides ?? 96, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "sides", field: "sides", value: shape.sides ?? 96, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "sphere") {
     return [
-      { id: "steps", value: shape.steps ?? 24, min: 6, max: 64, step: 1, onChange: (steps) => onUpdate({ steps: Math.round(steps) }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "steps", field: "steps", value: shape.steps ?? 24, min: 6, max: 64, step: 1, onChange: (steps) => onUpdate({ steps: Math.round(steps) }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "halfSphere") {
     return [
-      { id: "steps", value: shape.steps ?? 32, min: 6, max: 64, step: 1, onChange: (steps) => onUpdate({ steps: Math.round(steps) }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "steps", field: "steps", value: shape.steps ?? 32, min: 6, max: 64, step: 1, onChange: (steps) => onUpdate({ steps: Math.round(steps) }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "cone") {
     return [
-      { id: "topRadius", value: shape.topRadius ?? 0, min: 0, max: 40, onChange: (topRadius) => onUpdate({ topRadius }) },
-      { id: "baseRadius", value: shape.baseRadius ?? baseWidth / 2, min: MIN_SHAPE_SIZE, max: 80, onChange: setBaseRadius },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setConeWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
-      { id: "sides", value: shape.sides ?? 96, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { id: "topRadius", field: "topRadius", value: shape.topRadius ?? 0, min: 0, max: 40, onChange: (topRadius) => onUpdate({ topRadius }) },
+      { id: "baseRadius", field: "baseRadius", value: shape.baseRadius ?? baseWidth / 2, min: MIN_SHAPE_SIZE, max: 80, onChange: setBaseRadius },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setConeWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "sides", field: "sides", value: shape.sides ?? 96, min: 3, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
     ];
   }
 
   if (shape.kind === "pyramid") {
     return [
-      { id: "sides", value: shape.sides ?? 4, min: 3, max: 24, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "sides", field: "sides", value: shape.sides ?? 4, min: 3, max: 24, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "roundRoof") {
     return [
-      { id: "sides", value: shape.sides ?? 64, min: 4, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "sides", field: "sides", value: shape.sides ?? 64, min: 4, max: MAX_HIGH_RESOLUTION_SIDES, step: 1, onChange: (sides) => onUpdate({ sides: Math.round(sides) }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
   if (shape.kind === "tube" || shape.kind === "ring") {
     return [
-      { id: "thickness", value: shape.bevel ?? 4, min: 0.5, max: 20, onChange: (bevel) => onUpdate({ bevel }) },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "thickness", field: "bevel", value: shape.bevel ?? 4, min: 0.5, max: 20, onChange: (bevel) => onUpdate({ bevel }) },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     ];
   }
 
@@ -302,7 +304,7 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
     const centerHoleLimits = gearCenterHoleLimits(width, depth, toothSize);
     const properties: ShapePropertyConfig[] = [
       {
-        id: "teeth",
+        id: "teeth", field: "teeth",
         value: teeth,
         min: 6,
         max: 64,
@@ -316,7 +318,7 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
         },
       },
       {
-        id: "toothSize",
+        id: "toothSize", field: "toothSize",
         value: toothSize,
         min: 0.2,
         max: Math.max(0.2, Math.min(width, depth) * 0.22),
@@ -327,7 +329,7 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
         }),
       },
       {
-        id: "toothWidth",
+        id: "toothWidth", field: "toothWidth",
         value: normalizeGearToothWidth(shape.toothWidth, width, depth, teeth),
         min: toothPitch * 0.12,
         max: toothPitch * 0.82,
@@ -337,7 +339,7 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
     ];
     if (normalizeGearType(shape.gearType) === "helical") {
       properties.push({
-        id: "helixAngle",
+        id: "helixAngle", field: "helixAngle",
         value: normalizeGearHelixAngle(shape.helixAngle ?? DEFAULT_GEAR_HELIX_ANGLE),
         min: MIN_GEAR_HELIX_ANGLE,
         max: MAX_GEAR_HELIX_ANGLE,
@@ -355,16 +357,16 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
     }
     properties.push(
       {
-        id: "centerHole",
+        id: "centerHole", field: "centerHoleSize",
         value: normalizeGearCenterHoleSize(shape.centerHoleSize, width, depth, toothSize),
         min: centerHoleLimits.min,
         max: centerHoleLimits.max,
         step: 0.1,
         onChange: (centerHoleSize) => onUpdate({ centerHoleSize }),
       },
-      { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearDepth },
-      { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearWidth },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearDepth },
+      { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setGearWidth },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     );
     return properties;
   }
@@ -380,22 +382,22 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
       { type: "select", id: "topShape", value: settings.topShape, options: LOFT_PROFILE_SHAPES, optionLabel: loftProfileShapeLabel, onChange: (value) => onUpdate({ loftTopShape: value as LoftProfileShape }) },
     ];
     if (!isPolygonLoftShape(settings.topShape)) {
-      properties.push({ id: "topLength", value: topDepth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopDepth: value }) });
+      properties.push({ id: "topLength", field: "loftTopDepth", value: topDepth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopDepth: value }) });
     }
     properties.push(
-      { id: "topWidth", value: topWidth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopWidth: value }) },
-      { id: "topRotation", value: settings.topRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftTopRotation: value }) },
+      { id: "topWidth", field: "loftTopWidth", value: topWidth, min: MIN_SHAPE_SIZE, max: 160, onChange: (value) => onUpdate({ loftTopWidth: value }) },
+      { id: "topRotation", field: "loftTopRotation", value: settings.topRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftTopRotation: value }) },
       { type: "select", id: "bottomShape", value: settings.bottomShape, options: LOFT_PROFILE_SHAPES, optionLabel: loftProfileShapeLabel, onChange: (value) => onUpdate({ loftBottomShape: value as LoftProfileShape }) },
     );
     if (!isPolygonLoftShape(settings.bottomShape)) {
-      properties.push({ id: "bottomLength", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth });
+      properties.push({ id: "bottomLength", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth });
     }
     properties.push(
-      { id: "bottomWidth", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-      { id: "bottomRotation", value: settings.bottomRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftBottomRotation: value }) },
-      { id: "segments", value: settings.segments, min: MIN_LOFT_SEGMENTS, max: MAX_LOFT_SEGMENTS, step: 1, onChange: (value) => onUpdate({ loftSegments: Math.round(value) }) },
-      { id: "layers", value: settings.layers, min: MIN_LOFT_LAYERS, max: MAX_LOFT_LAYERS, step: 1, onChange: (value) => onUpdate({ loftLayers: Math.round(value) }) },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+      { id: "bottomWidth", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+      { id: "bottomRotation", field: "loftBottomRotation", value: settings.bottomRotation, min: 0, max: 359, step: 1, onChange: (value) => onUpdate({ loftBottomRotation: value }) },
+      { id: "segments", field: "loftSegments", value: settings.segments, min: MIN_LOFT_SEGMENTS, max: MAX_LOFT_SEGMENTS, step: 1, onChange: (value) => onUpdate({ loftSegments: Math.round(value) }) },
+      { id: "layers", field: "loftLayers", value: settings.layers, min: MIN_LOFT_LAYERS, max: MAX_LOFT_LAYERS, step: 1, onChange: (value) => onUpdate({ loftLayers: Math.round(value) }) },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
     );
     return properties;
   }
@@ -413,16 +415,16 @@ export function getShapePropertiesWithAppLimits(shape: WorkplaneShape, onUpdate:
         },
       },
       { type: "select", id: "font", value: shape.font ?? "Multilanguage", options: TEXT_FONT_OPTIONS, optionLabel: textFontLabel, onChange: (font) => onUpdate({ font }) },
-      { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 40, onChange: setHeight },
-      { id: "bevel", value: shape.bevel ?? 0, min: 0, max: 8, onChange: (bevel) => onUpdate({ bevel }) },
-      { id: "segments", value: shape.segments ?? 0, min: 0, max: 24, step: 1, onChange: (segments) => onUpdate({ segments: Math.round(segments) }) },
+      { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 40, onChange: setHeight },
+      { id: "bevel", field: "bevel", value: shape.bevel ?? 0, min: 0, max: 8, onChange: (bevel) => onUpdate({ bevel }) },
+      { id: "segments", field: "segments", value: shape.segments ?? 0, min: 0, max: 24, step: 1, onChange: (segments) => onUpdate({ segments: Math.round(segments) }) },
     ];
   }
 
   return [
-    { id: "length", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
-    { id: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
-    { id: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
+    { id: "length", field: "depth", value: depth, min: MIN_SHAPE_SIZE, max: 160, onChange: setDepth },
+    { id: "width", field: "width", value: width, min: MIN_SHAPE_SIZE, max: 160, onChange: setWidth },
+    { id: "height", field: "height", value: shape.height, min: MIN_SHAPE_SIZE, max: 160, onChange: setHeight },
   ];
 }
 
@@ -437,28 +439,28 @@ export function getShapeTaperProperties(
   const taper = shapeTaperDimensions(shape);
   return [
     {
-      id: "topLength",
+      id: "topLength", field: "taperTopDepth",
       value: taper.topDepth,
       min: MIN_SHAPE_SIZE,
       max: taperDimensionMax,
       onChange: (taperTopDepth) => onUpdate({ taperTopDepth, taperTopWidth: taper.topWidth, taperTopScale: undefined }),
     },
     {
-      id: "topWidth",
+      id: "topWidth", field: "taperTopWidth",
       value: taper.topWidth,
       min: MIN_SHAPE_SIZE,
       max: taperDimensionMax,
       onChange: (taperTopWidth) => onUpdate({ taperTopWidth, taperTopDepth: taper.topDepth, taperTopScale: undefined }),
     },
     {
-      id: "bottomLength",
+      id: "bottomLength", field: "taperBottomDepth",
       value: taper.bottomDepth,
       min: MIN_SHAPE_SIZE,
       max: taperDimensionMax,
       onChange: (taperBottomDepth) => onUpdate({ taperBottomDepth, taperBottomWidth: taper.bottomWidth, taperBottomScale: undefined }),
     },
     {
-      id: "bottomWidth",
+      id: "bottomWidth", field: "taperBottomWidth",
       value: taper.bottomWidth,
       min: MIN_SHAPE_SIZE,
       max: taperDimensionMax,
@@ -514,12 +516,12 @@ export function placementProperties(
   const reachY = sliderReach(bounds.maxElevation, elevation);
   const reachZ = sliderReach(bounds.halfDepth, shape.z);
   return [
-    { id: "positionX", value: shape.x, min: -reachX, max: reachX, step: 0.1, onChange: (x) => spin({ x }) },
+    { id: "positionX", field: "x", value: shape.x, min: -reachX, max: reachX, step: 0.1, onChange: (x) => spin({ x }) },
     // Typing places a shape on or above the plate; a drag may leave it below.
-    { id: "positionY", value: elevation, min: elevation < 0 ? -reachY : 0, max: reachY, step: 0.1, onChange: (next) => spin({ elevation: next }) },
-    { id: "positionZ", value: shape.z, min: -reachZ, max: reachZ, step: 0.1, onChange: (z) => spin({ z }) },
-    { id: "rotationX", value: signedDegrees(shape.rotationX ?? 0), min: -180, max: 180, step: 1, onChange: (rotationX) => spin({ rotationX }) },
-    { id: "rotationY", value: signedDegrees(shape.rotation), min: -180, max: 180, step: 1, onChange: (rotation) => spin({ rotation }) },
-    { id: "rotationZ", value: signedDegrees(shape.rotationZ ?? 0), min: -180, max: 180, step: 1, onChange: (rotationZ) => spin({ rotationZ }) },
+    { id: "positionY", field: "elevation", value: elevation, min: elevation < 0 ? -reachY : 0, max: reachY, step: 0.1, onChange: (next) => spin({ elevation: next }) },
+    { id: "positionZ", field: "z", value: shape.z, min: -reachZ, max: reachZ, step: 0.1, onChange: (z) => spin({ z }) },
+    { id: "rotationX", field: "rotationX", value: signedDegrees(shape.rotationX ?? 0), min: -180, max: 180, step: 1, onChange: (rotationX) => spin({ rotationX }) },
+    { id: "rotationY", field: "rotation", value: signedDegrees(shape.rotation), min: -180, max: 180, step: 1, onChange: (rotation) => spin({ rotation }) },
+    { id: "rotationZ", field: "rotationZ", value: signedDegrees(shape.rotationZ ?? 0), min: -180, max: 180, step: 1, onChange: (rotationZ) => spin({ rotationZ }) },
   ];
 }

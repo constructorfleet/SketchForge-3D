@@ -8,17 +8,16 @@ sources:
   - apps/web/src/components/SketchForgeEditor.tsx
   - apps/web/src/lib/projectParameterEdits.ts
   - apps/web/src/app/api/editor/parameters/route.ts
+  - apps/web/src/components/ExpressionInput.tsx
+  - apps/web/src/lib/expressionFields.ts
 ---
 
 # Edit project parameters
 
 A project can hold a table of named parameters, such as `plate_width = 40 mm`
 or `post_d = plate_width / 5`. Shape fields that are bound to a parameter
-follow it. This guide covers the **Parameters** panel in the editor.
-
-Fields are bound through the engine package, REST and `.skf` today. Typing an
-expression into a dimension field is planned in
-[#617](https://github.com/constructorfleet/SketchForge-3D/issues/617).
+follow it. This guide covers the **Parameters** panel in the editor, and
+typing expressions into dimension fields.
 
 ## Open the panel
 
@@ -109,6 +108,80 @@ lists them, with the bound fields and sketch constraints of each shape.
   and the field and constraint bindings that use it. Each shape keeps its current size and stops
   following the parameter. Undo restores the parameter and the bindings.
 
+## Type an expression into a dimension field
+
+The number fields in the object panel accept expressions. That includes size
+and shape fields such as **Width** or **Sides**, the **Placement** fields
+(**X**, **Y**, **Z** and the rotations), and revolve settings. In the sketch
+editor, the **Distance**, **Radius**, **Diameter** and **Angle** inputs accept
+them too, and so does the value field of each of those constraints in the
+constraint list.
+
+- **Bind**: type an expression such as `wall * 2` and press <kbd>Enter</kbd> or
+  move focus away. The field follows the expression. It shows the resolved
+  value, a dashed border and an **ƒx** mark. Screen readers announce
+  "Follows the expression wall * 2" as the field's description.
+- **See the expression**: focus the field, or hover over it.
+- **Unbind**: type a plain number, such as `25`. The field keeps that number
+  and stops following the expression, even when the number is the same as
+  the current value.
+- **Autocomplete**: while you type a name, a list shows the matching
+  parameters with their values. Use <kbd>↑</kbd> and <kbd>↓</kbd> to choose,
+  and <kbd>Enter</kbd> or <kbd>Tab</kbd> to insert the name. <kbd>Escape</kbd>
+  closes the list. Press <kbd>Escape</kbd> again to discard the entry.
+
+![The Width field bound to width_total / 2 + wall shows 22.00 with the ƒx mark.](../screenshots/expression-field-bound.png)
+
+![With focus, the Width field shows its expression.](../screenshots/expression-field-focus.png)
+
+![Typing wid lists the width_total parameter.](../screenshots/expression-field-autocomplete.png)
+
+A bare number in an expression takes the field's unit: millimetres for
+lengths and degrees for angles. This is also true when the workspace shows
+inches. A plain number on its own is a typed value in the unit that the field
+shows. To give an expression a different unit, write the unit, for example
+`wall + 0.5 in`.
+
+### Errors stay in the field
+
+An expression that does not parse, names an unknown parameter, has the wrong
+dimension, or gives a value out of the field's range is refused. The message
+shows under the field, the field is marked invalid, and the model does not
+change. Correct the text, or press <kbd>Escape</kbd> to restore the field.
+
+![An angle parameter typed into Width is refused with "This field needs a length".](../screenshots/expression-field-inline-error.png)
+
+### Undo and later edits
+
+Each bind is one undo step, and so is typing a plain number into a bound
+field. **Undo** restores the old value and the old binding together.
+
+A bound value that you change in any other way also stops following its
+expression. Examples are dragging the shape, the gizmo, a slider, the arrow
+keys, align, and typing a number. Without this, the next parameter change would
+move the shape back.
+
+```mermaid
+flowchart LR
+  A[Type in a field] --> B{Plain number?}
+  B -- yes --> C[Set the number, remove the binding]
+  B -- no --> D{Engine resolves it?}
+  D -- no --> E[Inline error, model unchanged]
+  D -- yes --> F[Bind and apply the value]
+  C --> G[One history entry]
+  F --> G
+```
+
+The engine resolves and applies the value on the SketchForge server, as for a
+parameter change. In the static web build, size and placement fields on
+plain primitive shapes bind in the browser. A field that needs a rebuild,
+such as a revolve setting, is refused there with a message. Sketch constraint
+values bind in the sketch editor in both builds. The sketch is rebuilt when
+you finish it.
+
+Not covered yet: the edge treatment, draft and shell inputs, and the numbers
+you type during a drag.
+
 ## Changes from REST or MCP
 
 The open editor does not receive live updates from REST or MCP. Reload the page
@@ -123,3 +196,10 @@ checks the inline errors, the recompute, undo and redo, adding, and the delete
 warning. `tests/unit/projectParameterEdits.test.ts` and
 `tests/unit/editorParameterRoute.test.ts` cover the panel logic and the server
 recompute, which is checked by mesh volume and centre.
+
+`tests/browser/expression-fields.test.mjs` binds the width and placement of a
+box and a sketch distance constraint. It checks autocomplete, the inline error,
+undo and redo, unbinding by typing a number, and that a keyboard nudge and a
+slider move remove the binding. `tests/unit/expressionFields.test.ts` covers
+the entry rules, and `tests/unit/editorParameterRoute.test.ts` covers the
+server bind, which is checked by mesh volume and centre.

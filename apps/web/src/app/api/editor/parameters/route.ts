@@ -15,12 +15,18 @@ type Edit =
   | { kind: "add"; name: string; expression: string; dimension: ProjectParameter["dimension"] }
   | { kind: "update"; name: string; expression?: string; dimension?: ProjectParameter["dimension"] }
   | { kind: "rename"; name: string; newName: string }
-  | { kind: "delete"; name: string };
+  | { kind: "delete"; name: string }
+  | { kind: "bindShape"; shapeId: string; field: string; expression: string | null };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
 
 function readEdit(value: unknown): Edit | null {
-  if (!isRecord(value) || typeof value.name !== "string") return null;
+  if (!isRecord(value)) return null;
+  if (value.kind === "bindShape") {
+    const expressionOk = value.expression === null || typeof value.expression === "string";
+    return typeof value.shapeId === "string" && typeof value.field === "string" && expressionOk ? value as Edit : null;
+  }
+  if (typeof value.name !== "string") return null;
   const optional = (key: string) => value[key] === undefined || typeof value[key] === "string";
   if (value.kind === "add" && typeof value.expression === "string" && typeof value.dimension === "string") return value as Edit;
   if (value.kind === "update" && optional("expression") && optional("dimension")) return value as Edit;
@@ -76,6 +82,7 @@ function run(engine: Engine, edit: Edit) {
     });
   }
   if (edit.kind === "rename") return engine.renameParameter(id, edit.name, edit.newName);
+  if (edit.kind === "bindShape") return engine.bindShapeField(id, edit.shapeId, edit.field, edit.expression);
   return engine.deleteParameter(id, edit.name);
 }
 

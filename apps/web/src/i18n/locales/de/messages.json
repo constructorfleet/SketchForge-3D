@@ -566,6 +566,7 @@
       "constraintUnsatisfied": "Die Bedingungen der Skizze konnten nicht erfüllt werden: {ids}",
       "constraintAdded": "Bedingung „{kind}“ zur Skizze hinzugefügt",
       "constraintRemoved": "Bedingung aus der Skizze entfernt",
+      "constraintUpdated": "Skizzenbedingung geändert",
       "draftReplayFailed": "Die Skizze wurde nicht aktualisiert: Ihre Formschräge lässt sich auf diesem Profil nicht neu aufbauen. Stellen Sie das Profil wieder her oder brechen Sie die Skizzenbearbeitung ab.",
       "shellNotReplayable": "Die Skizze wurde nicht aktualisiert: Diese Form wurde ausgehöhlt, und beim erneuten Aufbau aus der Skizze lässt sich das Aushöhlen nicht erneut anwenden. Machen Sie zuerst das Aushöhlen rückgängig, oder brechen Sie die Skizzenbearbeitung ab."
     },
@@ -908,6 +909,25 @@
         "serverError": "Beim Aktualisieren gebundener Formen ist auf dem Server ein Fehler aufgetreten. Das Modell ist unverändert.",
         "busy": "Schließen Sie zuerst die aktuelle Bearbeitung ab.",
         "projectChanged": "Das Projekt hat sich während der Aktualisierung geändert. Versuchen Sie es erneut."
+      }
+    },
+    "expressionField": {
+      "boundTo": "Folgt dem Ausdruck {expression}",
+      "suggestions": "Parametervorschläge",
+      "constraintValueOf": "Wert von {kind}",
+      "notice": {
+        "bound": "Folgt jetzt {expression}"
+      },
+      "error": {
+        "needsLength": "Dieses Feld braucht eine Länge. Verwenden Sie einen Längenparameter oder eine Einheit wie mm.",
+        "needsAngle": "Dieses Feld braucht einen Winkel. Verwenden Sie einen Winkelparameter oder eine Einheit wie deg.",
+        "needsUnitless": "Dieses Feld braucht eine Zahl ohne Einheit.",
+        "outOfRange": "Der Ausdruck ergibt {value}, was für dieses Feld außerhalb des Bereichs liegt.",
+        "notAnInteger": "Dieses Feld braucht eine ganze Zahl.",
+        "fieldNotBindable": "Dieses Feld kann hier keinem Ausdruck folgen.",
+        "constraintOutOfRange": "Der Ausdruck ergibt einen Wert, den diese Bedingung nicht haben kann.",
+        "sketchNotRebuildable": "Diese Skizze kann nicht aus einem Ausdruck neu aufgebaut werden.",
+        "needsServer": "Damit dieses Feld einem Ausdruck folgt, wird der SketchForge-Server gebraucht. Das Modell ist unverändert."
       }
     }
   },

@@ -90,7 +90,7 @@ test("a user can set the angle between two selected sketch segments", { timeout:
 
     const selectedSegments = page.locator('[data-sketch-entity="segment"].selected');
     assert.equal(await selectedSegments.count(), 2, "the marquee selects two adjoining line segments");
-    const angleInput = page.getByRole("spinbutton", { name: "Angle (°)" });
+    const angleInput = page.getByRole("combobox", { name: "Angle (°)" });
     await angleInput.fill("45");
     const setAngle = page.getByRole("button", { name: "Set angle", exact: true });
     assert.equal(await setAngle.isDisabled(), false, "Set angle is available for two non-degenerate lines");
