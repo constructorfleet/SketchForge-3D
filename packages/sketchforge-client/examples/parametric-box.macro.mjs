@@ -30,7 +30,7 @@ export default {
 
     const changed = await project.updateParameter("wall", { expression: `${params.resized} mm` });
     const rebuilt = changed.shapes.find((shape) => shape.id === box.id);
-    log(`wall ${params.wall} -> ${changed.parameter.value} mm rebuilt ${changed.shapes.length} shape(s)`);
+    log(`wall ${params.wall} -> ${changed.parameter?.value} mm rebuilt ${changed.shapes.length} shape(s)`);
     const after = await project.propertiesOf(box.id);
 
     return {

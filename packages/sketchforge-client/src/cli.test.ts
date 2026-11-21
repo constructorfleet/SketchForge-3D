@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SketchForgeClient } from "./client.js";
 import { fakeServer } from "./testing.js";
-import { executeDirectCommand } from "./cli.js";
+import { executeDirectCommand, explainFailure } from "./cli.js";
+import { SketchForgeApiError } from "./errors.js";
 
 const directories: string[] = [];
 
@@ -100,5 +101,35 @@ describe("direct CLI commands", () => {
     await expect(executeDirectCommand(["parameters", "create", "wall", "2", "--dimension", "volume"], client(server), { SKETCHFORGE_PROJECT_ID: "p1" })).rejects.toThrow(/length, angle, unitless/);
     await expect(executeDirectCommand(["parameters", "update", "wall"], client(server), { SKETCHFORGE_PROJECT_ID: "p1" })).rejects.toThrow(/--expression or --dimension/);
     expect(server.calls).toHaveLength(0);
+  });
+});
+
+describe("CLI failure messages", () => {
+  function inUse(body: Record<string, unknown>) {
+    return new SketchForgeApiError({
+      method: "DELETE",
+      url: "http://localhost:3100/api/v1/parameters?projectId=p1&name=wall",
+      status: 409,
+      code: "parameter_in_use",
+      detail: "Parameter \"wall\" is in use.",
+      body: { error: "Parameter \"wall\" is in use.", code: "parameter_in_use", parameter: "wall", ...body },
+    });
+  }
+
+  it("names everything that still uses a parameter a delete was refused for", () => {
+    const message = explainFailure(inUse({
+      dependents: ["gap"],
+      shapeDependents: [{ shapeId: "s1", fields: ["width", "x"] }],
+      sketchConstraintDependents: [{ shapeId: "s2", constraintIds: ["c1", "c2"] }],
+      configurationDependents: ["Large"],
+    }));
+    expect(message).toBe([
+      "Parameter \"wall\" is in use.",
+      "Still used by: parameter gap, shape s1 (width, x), sketch s2 (constraints c1, c2), configuration Large.",
+    ].join("\n"));
+  });
+
+  it("keeps the server's sentence alone when it names no dependents", () => {
+    expect(explainFailure(inUse({}))).toBe("Parameter \"wall\" is in use.");
   });
 });

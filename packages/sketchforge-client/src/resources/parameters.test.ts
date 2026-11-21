@@ -1,9 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { SketchForgeClient } from "../client.js";
 import { SketchForgeApiError } from "../errors.js";
 import { fakeServer, type FakeServer } from "../testing.js";
-import { PARAMETER_DIMENSIONS, type ShapePatch, type ShapeRequest, type ShapeSummary } from "../types.js";
-import { shapePatchFromSummary } from "./shapes.js";
+import {
+  PARAMETER_DIMENSIONS,
+  type ParameterDimension,
+  type ParameterWriteResult,
+  type ProjectParameter,
+  type ShapePatch,
+  type ShapeRequest,
+  type ShapeSummary,
+} from "../types.js";
 
 function client(server: FakeServer) {
   return new SketchForgeClient({ baseUrl: "http://localhost:3100", token: "t", fetch: server.fetch });
@@ -73,7 +80,7 @@ describe("parameters", () => {
     const result = await client(server).parameters.rename("p1", "wall", "shell");
 
     expect(server.calls[0]).toMatchObject({ method: "PATCH", url: "http://localhost:3100/api/v1/parameters?projectId=p1&name=wall", body: { name: "shell" } });
-    expect(result.parameter.name).toBe("shell");
+    expect(result.parameter?.name).toBe("shell");
   });
 
   it("deletes a parameter by name and returns the rewritten table", async () => {
@@ -125,32 +132,41 @@ describe("parameters", () => {
   });
 });
 
-describe("shape expressions", () => {
-  it("sends expressions on create, beside the numbers", async () => {
-    const server = fakeServer({ status: 201, body: { shapes: [boundBox], revision: 2 } });
-    const request: ShapeRequest = { kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5", "revolve.sweepAngle": "sweep" } };
-
-    const created = await client(server).shapes.create("p1", request);
-
-    expect(server.calls[0]?.body).toEqual(request);
-    expect(created.expressions).toEqual({ width: "wall * 5" });
+describe("shape expression types", () => {
+  it("takes expressions on every request kind, and null only on a change", () => {
+    const box: ShapeRequest = { kind: "box", depth: 10, expressions: { width: "wall * 5" } };
+    const revolve: ShapeRequest = { kind: "revolve", profile: [[1, 0], [2, 0], [2, 1]], expressions: { "revolve.sweepAngle": "sweep" } };
+    const thread: ShapeRequest = { kind: "thread", size: "M8", expressions: { length: "wall * 4" } };
+    // @ts-expect-error A create has no binding to clear.
+    const cleared: ShapeRequest = { kind: "box", expressions: { width: null } };
+    const change: ShapePatch = { width: 3, expressions: { width: null, height: "wall" } };
+    expect([box, revolve, thread, cleared, change]).toHaveLength(5);
   });
 
-  it("clears a binding with null on update", async () => {
-    const server = fakeServer({ body: { shape: { ...boundBox, expressions: undefined }, revision: 3 } });
-    const change: ShapePatch = { expressions: { width: null } };
-
-    await client(server).shapes.update("p1", "s1", change);
-
-    expect(server.calls[0]?.body).toEqual({ expressions: { width: null } });
+  it("reads a summary's expressions as text", () => {
+    expectTypeOf<ShapeSummary["expressions"]>().toEqualTypeOf<Record<string, string> | undefined>();
   });
 
-  it("echoes a summary's expressions back, so a round trip keeps its bindings", () => {
-    const summary = boundBox as ShapeSummary;
-    const patch = shapePatchFromSummary(summary, { height: 20 });
-    expect(patch.expressions).toEqual({ width: "wall * 5" });
-    expect(patch.width).toBe(10);
-    expect(patch.height).toBe(20);
+  it("names a dimension by the API's three values, and a write's parameter as optional", () => {
+    expectTypeOf<ProjectParameter["dimension"]>().toEqualTypeOf<ParameterDimension>();
+    expectTypeOf<ParameterWriteResult["parameter"]>().toEqualTypeOf<ProjectParameter | undefined>();
+  });
+});
+
+describe("parameter validation", () => {
+  it("refuses a dimension the server does not know, before sending anything", async () => {
+    const server = fakeServer({ body: written });
+    const api = client(server);
+    const volume = "volume" as ParameterDimension;
+    await expect(api.parameters.create("p1", { name: "wall", expression: "2", dimension: volume })).rejects.toThrow(/length, angle, unitless/);
+    await expect(api.parameters.update("p1", "wall", { dimension: volume })).rejects.toThrow(/length, angle, unitless/);
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it("leaves the parameter out of a write result that has none", async () => {
+    const server = fakeServer({ body: { parameters: [], shapes: [], revision: 2 } });
+    const result = await client(server).parameters.update("p1", "wall", { expression: "3" });
+    expect(result.parameter).toBeUndefined();
   });
 });
 
@@ -187,6 +203,26 @@ describe("parameter errors", () => {
     expect(error.isProjectBusy).toBe(false);
     expect(error.dependents).toEqual(["gap"]);
     expect(error.shapeDependents).toEqual([{ shapeId: "s1", fields: ["width", "x"] }]);
+    expect(error.sketchConstraintDependents).toEqual([]);
+    expect(error.configurationDependents).toEqual([]);
+  });
+
+  it("names the sketch constraints and configurations a delete was refused for", async () => {
+    const server = fakeServer({ status: 409, body: {
+      error: "In use.", code: "parameter_in_use", parameter: "wall", dependents: [], shapeDependents: [],
+      sketchConstraintDependents: [{ shapeId: "s2", constraintIds: ["c1", "c2"] }], configurationDependents: ["Large"],
+    } });
+
+    const error = await refusal(client(server).parameters.delete("p1", "wall"));
+
+    expect(error.sketchConstraintDependents).toEqual([{ shapeId: "s2", constraintIds: ["c1", "c2"] }]);
+    expect(error.configurationDependents).toEqual(["Large"]);
+  });
+
+  it("names the configuration whose table failed", async () => {
+    const server = fakeServer({ status: 422, body: { error: "Bad.", code: "invalid_expression", parameter: "wall", configuration: "Large" } });
+    const error = await refusal(client(server).parameters.update("p1", "wall", { expression: "x" }));
+    expect(error.configuration).toBe("Large");
   });
 
   it("names the shape, field and batch index a binding refusal is about", async () => {
@@ -211,6 +247,9 @@ describe("parameter errors", () => {
     expect(error.expressionError).toBeUndefined();
     expect(error.dependents).toEqual([]);
     expect(error.shapeDependents).toEqual([]);
+    expect(error.sketchConstraintDependents).toEqual([]);
+    expect(error.configurationDependents).toEqual([]);
+    expect(error.configuration).toBeUndefined();
     expect(error.fields).toEqual([]);
   });
 });

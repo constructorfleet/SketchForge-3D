@@ -1,11 +1,18 @@
 import type { Transport } from "../http.js";
-import type {
-  ParameterChange,
-  ParameterDeleteResult,
-  ParameterList,
-  ParameterRequest,
-  ParameterWriteResult,
+import {
+  PARAMETER_DIMENSIONS,
+  type ParameterChange,
+  type ParameterDeleteResult,
+  type ParameterList,
+  type ParameterRequest,
+  type ParameterWriteResult,
 } from "../types.js";
+
+function checkDimension(dimension: string) {
+  if (!(PARAMETER_DIMENSIONS as readonly string[]).includes(dimension)) {
+    throw new Error(`A parameter dimension must be one of: ${PARAMETER_DIMENSIONS.join(", ")}.`);
+  }
+}
 
 /** Owns the project parameter table. Each write rebuilds the shapes bound to what changed. */
 export class Parameters {
@@ -15,7 +22,8 @@ export class Parameters {
     return this.transport.send<ParameterList>({ method: "GET", path: "/parameters", query: { projectId } });
   }
 
-  create(projectId: string, parameter: ParameterRequest): Promise<ParameterWriteResult> {
+  async create(projectId: string, parameter: ParameterRequest): Promise<ParameterWriteResult> {
+    checkDimension(parameter.dimension);
     return this.transport.send<ParameterWriteResult>({
       method: "POST",
       path: "/parameters",
@@ -32,6 +40,7 @@ export class Parameters {
       ...(change.dimension === undefined ? {} : { dimension: change.dimension }),
     };
     if (Object.keys(body).length === 0) throw new Error("A parameter change needs an expression or a dimension.");
+    if (change.dimension !== undefined) checkDimension(change.dimension);
     return this.transport.send<ParameterWriteResult>({ method: "PATCH", path: "/parameters", query: { projectId, name }, body, retryable: true });
   }
 

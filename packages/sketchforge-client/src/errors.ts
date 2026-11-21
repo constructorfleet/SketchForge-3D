@@ -1,6 +1,6 @@
 /** Errors the API answers with, kept distinguishable so a macro can react to them. */
 
-import type { ExpressionError, ShapeDependent } from "./types.js";
+import type { ExpressionError, ShapeDependent, SketchConstraintDependent } from "./types.js";
 
 /**
  * The server's machine-readable reason, which a status code is too coarse to
@@ -187,6 +187,24 @@ export class SketchForgeApiError extends Error {
     return entries
       .filter((entry): entry is { shapeId: string; fields?: unknown } => !!entry && typeof entry === "object" && typeof (entry as { shapeId?: unknown }).shapeId === "string")
       .map((entry) => ({ shapeId: entry.shapeId, fields: strings(entry.fields) }));
+  }
+
+  get sketchConstraintDependents(): SketchConstraintDependent[] {
+    const entries = this.detailBody.sketchConstraintDependents;
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .filter((entry): entry is { shapeId: string; constraintIds?: unknown } => !!entry && typeof entry === "object" && typeof (entry as { shapeId?: unknown }).shapeId === "string")
+      .map((entry) => ({ shapeId: entry.shapeId, constraintIds: strings(entry.constraintIds) }));
+  }
+
+  /** Parameter configurations whose overrides use the one a delete was refused for. */
+  get configurationDependents(): string[] {
+    return strings(this.detailBody.configurationDependents);
+  }
+
+  /** The parameter configuration whose table failed; absent for the base table. */
+  get configuration(): string | undefined {
+    return this.text("configuration");
   }
 
   /** The shape a binding refusal is about. A batch create names its `index` instead. */

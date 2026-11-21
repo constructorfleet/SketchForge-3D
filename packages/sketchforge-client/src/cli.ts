@@ -165,7 +165,7 @@ async function executeParameterCommand(rest: readonly string[], client: SketchFo
     rejectUnknownOptions(options, ["dimension", "project"]);
     const dimension = dimensionOption(options) ?? "length";
     const written = await client.parameters.create(selectedProject(options, environment), { name: name!, expression: expression!, dimension });
-    return `Created parameter ${written.parameter.name} = ${written.parameter.value} (${shapeCount(written, "rebuilt")}).`;
+    return `Created parameter ${name} = ${written.parameter?.value ?? "-"} (${shapeCount(written, "rebuilt")}).`;
   }
   if (action === "update") {
     const { positionals: [name], options } = positionalsThenOptions(arguments_, 1, "parameters update <name> --expression <expression>");
@@ -177,13 +177,13 @@ async function executeParameterCommand(rest: readonly string[], client: SketchFo
       ...(expression === undefined ? {} : { expression }),
       ...(dimension === undefined ? {} : { dimension }),
     });
-    return `Changed parameter ${written.parameter.name} = ${written.parameter.value} (${shapeCount(written, "rebuilt")}).`;
+    return `Changed parameter ${name} = ${written.parameter?.value ?? "-"} (${shapeCount(written, "rebuilt")}).`;
   }
   if (action === "rename") {
     const { positionals: [name, newName], options } = positionalsThenOptions(arguments_, 2, "parameters rename <name> <new-name>");
     rejectUnknownOptions(options, ["project"]);
     const written = await client.parameters.rename(selectedProject(options, environment), name!, newName!);
-    return `Renamed parameter ${name} to ${written.parameter.name} (${shapeCount(written, "rewritten")}).`;
+    return `Renamed parameter ${name} to ${newName} (${shapeCount(written, "rewritten")}).`;
   }
   if (action === "delete") {
     const { positionals: [name], options } = positionalsThenOptions(arguments_, 1, "parameters delete <name>");
@@ -290,8 +290,18 @@ export async function main(argv: readonly string[], environment: Environment = p
   return 0;
 }
 
-/** A failure a macro author can act on, rather than a stack trace through fetch. */
-function explain(error: unknown) {
+/** Lists what still uses a parameter a delete was refused for. */
+function parameterUsers(error: SketchForgeApiError) {
+  return [
+    ...error.dependents.map((name) => `parameter ${name}`),
+    ...error.shapeDependents.map(({ shapeId, fields }) => `shape ${shapeId} (${fields.join(", ")})`),
+    ...error.sketchConstraintDependents.map(({ shapeId, constraintIds }) => `sketch ${shapeId} (constraints ${constraintIds.join(", ")})`),
+    ...error.configurationDependents.map((name) => `configuration ${name}`),
+  ];
+}
+
+/** Explains a failure a macro author can act on, rather than a stack trace through fetch. */
+export function explainFailure(error: unknown) {
   if (error instanceof MissingConfigurationError) return error.message;
   if (error instanceof SketchForgeTransportError) {
     return `${error.message}\nIs the server running, and is SKETCHFORGE_URL pointing at it?`;
@@ -300,8 +310,9 @@ function explain(error: unknown) {
     if (error.looksDisabled) return "The server has no SKETCHFORGE_API_TOKEN set, so its REST API is switched off.";
     if (error.needsStorage) return "The server has no SKETCHFORGE_PROJECTS_DIR set, so it has nowhere to store projects.";
     if (error.isParameterInUse) {
-      const users = [...error.dependents, ...error.shapeDependents.map(({ shapeId, fields }) => `${shapeId} (${fields.join(", ")})`)];
-      return `${error.detail ?? error.message}\nStill used by: ${users.join(", ")}.`;
+      const users = parameterUsers(error);
+      const detail = error.detail ?? error.message;
+      return users.length ? `${detail}\nStill used by: ${users.join(", ")}.` : detail;
     }
     return error.message;
   }
@@ -315,7 +326,7 @@ if (invokedDirectly) {
       process.exitCode = code;
     })
     .catch((error: unknown) => {
-      process.stderr.write(`${explain(error)}\n`);
+      process.stderr.write(`${explainFailure(error)}\n`);
       process.exitCode = 1;
     });
 }

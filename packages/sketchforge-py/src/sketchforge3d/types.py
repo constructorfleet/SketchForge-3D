@@ -1287,7 +1287,7 @@ class ProjectParameter:
 
     name: str
     expression: str
-    dimension: str
+    dimension: ParameterDimension
     #: A stale entry keeps its last value, or ``None`` when it never had one.
     value: Optional[float]
     #: Set when the stored entry no longer resolves.
@@ -1299,7 +1299,7 @@ class ProjectParameter:
         return cls(
             name=_text(payload, "name"),
             expression=_text(payload, "expression"),
-            dimension=_text(payload, "dimension"),
+            dimension=cast(ParameterDimension, _text(payload, "dimension")),
             value=_optional_number(payload, "value"),
             error=ParameterIssue.from_payload(error) if isinstance(error, Mapping) else None,
         )
@@ -1351,9 +1351,10 @@ class ParameterList:
 
 @dataclass(frozen=True)
 class ParameterWriteResult:
-    """The written entry, the whole table, and the top-level shapes the write rebuilt or rewrote."""
+    """Holds the written entry, the whole table, and the top-level shapes the write rebuilt or rewrote."""
 
-    parameter: ProjectParameter
+    #: ``None`` when the reply has no entry.
+    parameter: Optional[ProjectParameter]
     parameters: List[ProjectParameter]
     shapes: List[ShapeSummary]
     revision: int
@@ -1362,7 +1363,7 @@ class ParameterWriteResult:
     def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterWriteResult":
         parameter = payload.get("parameter")
         return cls(
-            parameter=ProjectParameter.from_payload(parameter if isinstance(parameter, Mapping) else {}),
+            parameter=ProjectParameter.from_payload(parameter) if isinstance(parameter, Mapping) else None,
             parameters=_parameters(payload),
             shapes=_shapes(payload),
             revision=int(_number(payload, "revision")),
@@ -1394,3 +1395,11 @@ class ShapeDependent:
 
     shape_id: str
     fields: List[str]
+
+
+@dataclass(frozen=True)
+class SketchConstraintDependent:
+    """A sketch whose constraints a refused parameter delete still binds."""
+
+    shape_id: str
+    constraint_ids: List[str]

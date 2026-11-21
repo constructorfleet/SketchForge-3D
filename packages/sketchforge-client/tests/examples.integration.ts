@@ -22,6 +22,7 @@ import filletedBox from "../examples/filleted-box.macro.mjs";
 import tapDrillPlate from "../examples/tap-drill-plate.macro.mjs";
 import parametricBox from "../examples/parametric-box.macro.mjs";
 import { SketchForgeApiError } from "../src/errors.js";
+import { shapePatchFromSummary } from "../src/resources/shapes.js";
 
 let client: SketchForgeClient;
 const createdProjects: string[] = [];
@@ -230,5 +231,38 @@ describe("parametric box", () => {
 
     await expect(project.deleteParameter("shell")).resolves.toMatchObject({ deleted: true, name: "shell" });
     await expect(project.parameters()).resolves.toMatchObject({ parameters: [], bindingIssues: [] });
+  });
+
+  it("guards a stale summary round trip with If-Match, and unbinds without it", async () => {
+    const { id: projectId } = await client.projects.create("Stale parameter round trip");
+    createdProjects.push(projectId);
+    const project = client.project(projectId);
+    await project.addParameter({ name: "wall", expression: "2 mm", dimension: "length" });
+    const { shapes: [box], revision: readAt } = await project.addMany([
+      { kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5" } },
+    ]);
+    const stale = shapePatchFromSummary(box!);
+    const changed = await project.updateParameter("wall", { expression: "3 mm" });
+    expect(changed.revision).toBeGreaterThan(readAt);
+
+    const guarded = clientFromEnvironment(process.env, { expectedRevision: readAt });
+    for (const write of [
+      () => guarded.shapes.update(projectId, box!.id, stale),
+      () => guarded.parameters.update(projectId, "wall", { expression: "4 mm" }),
+    ]) {
+      const refused = await write().catch((error: unknown) => error);
+      expect((refused as SketchForgeApiError).isRevisionMismatch).toBe(true);
+      expect((refused as SketchForgeApiError).currentRevision).toBe(changed.revision);
+    }
+    expect((await project.propertiesOf(box!.id)).volume).toBeCloseTo(1500, 3);
+
+    // The stale width counts as an edit, so the number replaces the binding.
+    const unguarded = await project.update(box!.id, stale);
+    expect(unguarded.shape.expressions).toBeUndefined();
+    expect(unguarded.shape.width).toBe(10);
+    expect((await project.propertiesOf(box!.id)).volume).toBeCloseTo(1000, 3);
+
+    const current = clientFromEnvironment(process.env, { expectedRevision: unguarded.revision });
+    await expect(current.parameters.update(projectId, "wall", { expression: "4 mm" })).resolves.toMatchObject({ parameter: { value: 4 } });
   });
 });

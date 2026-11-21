@@ -14,6 +14,7 @@ from sketchforge3d import (
     ParameterWriteResult,
     ProjectParameter,
     ShapeDependent,
+    SketchConstraintDependent,
     SketchForgeApiError,
     SketchForgeClient,
 )
@@ -106,6 +107,7 @@ class ParametersTests(unittest.TestCase):
         self.assertEqual(opener.calls[0].method, "PATCH")
         self.assertEqual(query(opener.calls[0].url), {"projectId": "p1", "name": "wall"})
         self.assertEqual(opener.calls[0].body, {"name": "shell"})
+        assert result.parameter is not None
         self.assertEqual(result.parameter.name, "shell")
 
     def test_deletes_a_parameter_by_name(self) -> None:
@@ -153,6 +155,11 @@ class ParametersTests(unittest.TestCase):
             ],
         )
         self.assertEqual(opener.calls[5].body, {"expressions": {"width": "wall * 5", "height": None}})
+
+    def test_leaves_the_parameter_out_of_a_write_result_that_has_none(self) -> None:
+        opener = FakeOpener({"parameters": [], "shapes": [], "revision": 2})
+        result = client(opener).parameters.update("p1", "wall", expression="3")
+        self.assertIsNone(result.parameter)
 
     def test_names_the_dimensions_the_api_contract_does(self) -> None:
         self.assertEqual(PARAMETER_DIMENSIONS, ("length", "angle", "unitless"))
@@ -238,6 +245,29 @@ class ParameterErrorTests(unittest.TestCase):
         self.assertFalse(error.is_project_busy)
         self.assertEqual(error.dependents, ["gap"])
         self.assertEqual(error.shape_dependents, [ShapeDependent(shape_id="s1", fields=["width", "x"])])
+        self.assertEqual(error.sketch_constraint_dependents, [])
+        self.assertEqual(error.configuration_dependents, [])
+
+    def test_names_the_sketch_constraints_and_configurations_a_delete_was_refused_for(self) -> None:
+        opener = FakeOpener((409, {
+            "error": "In use.",
+            "code": "parameter_in_use",
+            "parameter": "wall",
+            "dependents": [],
+            "shapeDependents": [],
+            "sketchConstraintDependents": [{"shapeId": "s2", "constraintIds": ["c1", "c2"]}],
+            "configurationDependents": ["Large"],
+        }))
+
+        error = self.refusal(opener, lambda api: api.parameters.delete("p1", "wall"))
+
+        self.assertEqual(error.sketch_constraint_dependents, [SketchConstraintDependent(shape_id="s2", constraint_ids=["c1", "c2"])])
+        self.assertEqual(error.configuration_dependents, ["Large"])
+
+    def test_names_the_configuration_whose_table_failed(self) -> None:
+        opener = FakeOpener((422, {"error": "Bad.", "code": "invalid_expression", "parameter": "wall", "configuration": "Large"}))
+        error = self.refusal(opener, lambda api: api.parameters.update("p1", "wall", expression="x"))
+        self.assertEqual(error.configuration, "Large")
 
     def test_names_the_shape_field_and_batch_index_of_a_binding_refusal(self) -> None:
         contradiction = self.refusal(
@@ -272,6 +302,9 @@ class ParameterErrorTests(unittest.TestCase):
         self.assertIsNone(error.expression_error)
         self.assertEqual(error.dependents, [])
         self.assertEqual(error.shape_dependents, [])
+        self.assertEqual(error.sketch_constraint_dependents, [])
+        self.assertEqual(error.configuration_dependents, [])
+        self.assertIsNone(error.configuration)
         self.assertEqual(error.fields, [])
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from .types import ExpressionError, ShapeDependent
+from .types import ExpressionError, ShapeDependent, SketchConstraintDependent
 
 #: The server's machine-readable reason, which a status code is too coarse to
 #: carry: ``404`` is a missing project, a missing shape or an API that is
@@ -190,6 +190,27 @@ class SketchForgeApiError(SketchForgeError):
             for entry in entries
             if isinstance(entry, dict) and isinstance(entry.get("shapeId"), str)
         ]
+
+    @property
+    def sketch_constraint_dependents(self) -> List[SketchConstraintDependent]:
+        entries = self._detail.get("sketchConstraintDependents")
+        if not isinstance(entries, list):
+            return []
+        return [
+            SketchConstraintDependent(shape_id=entry["shapeId"], constraint_ids=_strings(entry.get("constraintIds")))
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("shapeId"), str)
+        ]
+
+    @property
+    def configuration_dependents(self) -> List[str]:
+        """Parameter configurations whose overrides use the one a delete was refused for."""
+        return _strings(self._detail.get("configurationDependents"))
+
+    @property
+    def configuration(self) -> Optional[str]:
+        """The parameter configuration whose table failed; ``None`` for the base table."""
+        return self._text("configuration")
 
     @property
     def shape_id(self) -> Optional[str]:

@@ -166,6 +166,40 @@ class ExampleMacroTests(unittest.TestCase):
         listed = project.parameters()
         self.assertEqual((listed.parameters, listed.binding_issues), ([], []))
 
+    def test_if_match_guards_a_stale_summary_round_trip_and_its_absence_unbinds(self) -> None:
+        project_id = self.client.projects.create("Stale parameter round trip (python)").id
+        type(self).created.append(project_id)
+        project = self.client.project(project_id)
+        project.add_parameter("wall", "2 mm", "length")
+        written = project.add_many([{"kind": "box", "depth": 10, "height": 10, "expressions": {"width": "wall * 5"}}])
+        box, read_at = written.shapes[0], written.revision
+        stale = box.as_patch()
+        changed = project.update_parameter("wall", expression="3 mm")
+        self.assertGreater(changed.revision, read_at)
+
+        guarded = client_from_environment(expected_revision=read_at)
+        for write in (
+            lambda: guarded.shapes.update(project_id, box.id, stale),
+            lambda: guarded.parameters.update(project_id, "wall", expression="4 mm"),
+        ):
+            with self.assertRaises(SketchForgeApiError) as refused:
+                write()
+            self.assertTrue(refused.exception.is_revision_mismatch)
+            self.assertEqual(refused.exception.current_revision, changed.revision)
+        self.assertAlmostEqual(project.properties_of(box.id).volume, 1500, places=3)
+
+        # The stale width counts as an edit, so the number replaces the binding.
+        unguarded = project.update(box.id, stale)
+        self.assertEqual(unguarded.expressions, {})
+        self.assertEqual(unguarded.width, 10)
+        self.assertAlmostEqual(project.properties_of(box.id).volume, 1000, places=3)
+
+        latest = next(entry.revision for entry in self.client.projects.list() if entry.id == project_id)
+        current = client_from_environment(expected_revision=latest)
+        result = current.parameters.update(project_id, "wall", expression="4 mm")
+        assert result.parameter is not None
+        self.assertEqual(result.parameter.value, 4)
+
 
 if __name__ == "__main__":
     unittest.main()

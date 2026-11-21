@@ -862,10 +862,13 @@ export type ParameterRequest = { name: string; expression: string; dimension: Pa
 
 export type ParameterChange = { expression?: string; dimension?: ParameterDimension };
 
-/** `shapes` holds the top-level shapes the write rebuilt or rewrote. */
-export type ParameterWriteResult = { parameter: ProjectParameter; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
+/** `shapes` holds the top-level shapes the write rebuilt or rewrote. `parameter` is absent when the reply has none. */
+export type ParameterWriteResult = { parameter?: ProjectParameter; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
 
 export type ParameterDeleteResult = { deleted: true; name: string; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
 
 /** A shape that a refused parameter delete still binds, and which fields. */
 export type ShapeDependent = { shapeId: string; fields: string[] };
+
+/** A sketch whose constraints a refused parameter delete still binds. */
+export type SketchConstraintDependent = { shapeId: string; constraintIds: string[] };

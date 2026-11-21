@@ -32,7 +32,8 @@ def build(context: MacroContext) -> Dict[str, Any]:
 
     changed = project.update_parameter("wall", expression=f"{params['resized']} mm")
     rebuilt: Optional[ShapeSummary] = next((shape for shape in changed.shapes if shape.id == box.id), None)
-    context.log(f"wall {params['wall']} -> {changed.parameter.value} mm rebuilt {len(changed.shapes)} shape(s)")
+    value = changed.parameter.value if changed.parameter else None
+    context.log(f"wall {params['wall']} -> {value} mm rebuilt {len(changed.shapes)} shape(s)")
     after = project.properties_of(box.id)
 
     return {

@@ -114,7 +114,7 @@ changed.shapes  # the rebuilt box, now 15 mm wide
 project.bind_expressions(box.id, {"width": None})  # unbinds; the width stays 15
 ```
 
-Every parameter write returns the whole table and the top-level `shapes` it rebuilt or rewrote. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter` and `bind_expressions`.
+Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter` and `bind_expressions`.
 
 `as_patch` keeps `expressions`, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `None` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expected_revision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
 
@@ -244,7 +244,7 @@ client.shapes.update(project_id, shape.sketch_source_id, {
 
 Face drafts cannot yet be combined with prism drafts or edge treatments. Missing or ambiguous face matches and ineffective dependent booleans leave the project unchanged.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. Parameter failures add `is_invalid_expression`, `is_parameter_missing`, `is_parameter_duplicate` and `is_parameter_in_use`, with the details `parameter`, `reason`, `expression_error` (`code`, `message`, `span`, `cycle`), `dependents`, `shape_dependents`, and, for a refused binding, `shape_id` or a batch `index`, `field` and `fields`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. Parameter failures add `is_invalid_expression`, `is_parameter_missing`, `is_parameter_duplicate` and `is_parameter_in_use`, with the details `parameter`, `reason`, `configuration`, `expression_error` (`code`, `message`, `span`, `cycle`), `dependents`, `shape_dependents`, `sketch_constraint_dependents`, `configuration_dependents`, and, for a refused binding, `shape_id` or a batch `index`, `field` and `fields`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 `sketchforge3d.layout` has the arithmetic a parameterised part repeats: `row`, `grid`, `ring`, `centered_offsets`, `angle_of`, `mm`.
 
