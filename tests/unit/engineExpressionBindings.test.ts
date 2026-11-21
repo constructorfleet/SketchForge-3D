@@ -569,4 +569,36 @@ describe("expression-bound fields and parameter recompute", () => {
     const refused = await unchanged("snapshot", () => engine.deleteParameter("snapshot", "offset"));
     expect(refused).toMatchObject({ ok: false, failure: { reason: "parameter_invalid", error: { code: "parameterInUse", shapeDependents: [{ shapeId: id, fields: ["x"] }] } } });
   }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps bindings through a revolve rebuild, dropping only those whose value the rebuild changed", async () => {
+    const turned = await revolve("revolve-rebuild");
+    value(await engine.addParameter("revolve-rebuild", { name: "wall", expression: "3", dimension: "length" }));
+    value(await engine.bindShapeField("revolve-rebuild", turned.id, "x", "wall"));
+    value(await engine.bindShapeField("revolve-rebuild", turned.id, "height", "wall * 4"));
+    const before = (await document("revolve-rebuild")).shapes[0]!;
+
+    const rebuilt = value(await engine.changeShape("revolve-rebuild", turned.id, { pitch: 2, turns: 3 })).shape;
+
+    expect(rebuilt.height).not.toBeCloseTo(before.height, 3);
+    expect(rebuilt.expressions).toEqual({ x: "wall" });
+    value(await engine.updateParameter("revolve-rebuild", "wall", { expression: "7" }));
+    expect((await document("revolve-rebuild")).shapes[0]).toMatchObject({ x: 7, expressions: { x: "wall" } });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a group's own binding when a source edit rebuilds the group around its child", async () => {
+    await project("group-rebuild");
+    const created = value(await engine.addShapes("group-rebuild", [
+      { kind: "box", width: 2, depth: 2, height: 3 },
+      { kind: "box", width: 0.5, depth: 0.5, height: 1, elevation: 2.5, hole: true },
+    ])).shapes;
+    await asSketchExtrusion("group-rebuild", "sketch/group-rebuild");
+    value(await engine.draftPrism("group-rebuild", created[0]!.id, 5));
+    const cut = value(await engine.cut("group-rebuild", { solidIds: [created[0]!.id], holeIds: [created[1]!.id] })).shape;
+    value(await engine.addParameter("group-rebuild", { name: "offset", expression: "10", dimension: "length" }));
+    value(await engine.bindShapeField("group-rebuild", cut.id, "x", "offset"));
+
+    value(await engine.changeShape("group-rebuild", "sketch/group-rebuild", { draftPrismAngle: 12 }));
+
+    expect((await document("group-rebuild")).shapes[0]!.expressions).toEqual({ x: "offset" });
+  }, CAD_TEST_TIMEOUT_MS);
 });

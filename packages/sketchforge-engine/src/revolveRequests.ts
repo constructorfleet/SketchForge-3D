@@ -426,6 +426,7 @@ export function rebuiltRevolveShape(
     rotationZ: shape.rotationZ,
     locked: shape.locked,
     hidden: shape.hidden,
+    ...(shape.expressions ? { expressions: shape.expressions } : {}),
   }), axis);
 }
 

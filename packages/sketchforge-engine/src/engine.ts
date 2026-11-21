@@ -1703,8 +1703,11 @@ export function createEngine(store: ProjectStore): Engine {
     changeShape: (projectId, shapeId, changes) => mutating(projectId, async (document) => {
       const changed = await changeShapeIn(document, shapeId, changes);
       if (!changed.ok) return changed;
-      // A literal value replaces the expression bound to that field.
-      const literal = boundFieldsNamedBy(changes);
+      // A literal value replaces the expression bound to that field, named or changed by a rebuild.
+      const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
+      const drifted = Object.keys(changed.value.shape.expressions ?? {})
+        .filter((field) => previous && boundFieldValue(previous, field) !== boundFieldValue(changed.value.shape, field));
+      const literal = [...boundFieldsNamedBy(changes), ...drifted];
       const unbound = withoutBindings(changed.value.shape, literal);
       const shapes = unbound === changed.value.shape
         ? changed.value.shapes
