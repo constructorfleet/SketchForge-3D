@@ -98,7 +98,7 @@ describe("/api/v1/parameters", () => {
 
   it("creates, lists, changes, renames and deletes parameters", async () => {
     const projectId = await makeProject();
-    expect((await list(projectId)).body).toMatchObject({ parameters: [], bindingIssues: [] });
+    expect((await list(projectId)).body).toMatchObject({ parameters: [], activeConfiguration: null, bindingIssues: [] });
 
     const created = await post(projectId, { name: "wall", expression: "2 mm", dimension: "length" });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
@@ -385,7 +385,6 @@ describe("shape requests carrying expressions", () => {
   });
 
   it("reads values under the active configuration and reports configuration refusals", async () => {
-    // No configuration route exists yet (#618 follow-up), so the engine sets one up.
     const projectId = await makeProject();
     expect((await post(projectId, { name: "wall", expression: "2", dimension: "length" })).status).toBe(201);
     expect((await post(projectId, { name: "lip", expression: "1", dimension: "length" })).status).toBe(201);
@@ -393,6 +392,7 @@ describe("shape requests carrying expressions", () => {
     expect((await engine.addConfiguration(projectId, "Large", { wall: "4", lip: "wall / 2" })).ok).toBe(true);
     expect((await engine.activateConfiguration(projectId, "Large")).ok).toBe(true);
 
+    expect((await list(projectId)).body.activeConfiguration).toBe("Large");
     expect((await list(projectId)).body.parameters).toEqual([
       { name: "wall", expression: "2", dimension: "length", value: 4 },
       { name: "lip", expression: "1", dimension: "length", value: 2 },

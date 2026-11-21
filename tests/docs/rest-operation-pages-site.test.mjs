@@ -16,7 +16,7 @@ test("built REST operation references are linked and included in local search", 
     .filter(([method]) => method !== "options")
     .map(([method, operation]) => ({ method: method.toUpperCase(), route, ...operation })));
 
-  assert.equal(operations.length, 33);
+  assert.equal(operations.length, 38);
   assert.ok(restGuide.includes('href="/SketchForge-3D/docs/rest-api/"'), "REST API guide links to the operation reference index");
   assert.ok(restIndex.includes('href="/SketchForge-3D/openapi-v1.json"'), "operation index links to the downloadable OpenAPI source");
   for (const operation of operations) {

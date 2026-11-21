@@ -70,4 +70,9 @@ export const MCP_UNSUPPORTED_OPERATIONS = {
   groupShapes: "Grouping uses the local engine/editor bridge, not POST /groups.",
   ungroupShape: "Ungrouping uses the local engine/editor bridge, not DELETE /groups.",
   splitParts: "Part separation uses the local engine/editor bridge, not POST /parts.",
+  listParameterConfigurations: "MCP parameter configuration tools are tracked in #618.",
+  createParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
+  updateParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
+  deleteParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
+  activateParameterConfiguration: "MCP parameter configuration tools are tracked in #618.",
 };

@@ -290,17 +290,28 @@ export {
   type ApiFailureWording,
 } from "./apiErrors.js";
 export {
+  API_CONFIGURATION_MESSAGES,
+  API_CONFIGURATION_NAME_MAX_LENGTH,
   API_PARAMETER_DIMENSIONS,
   API_PARAMETER_EXPRESSION_LIMIT,
   API_PARAMETER_EXPRESSION_MAX_LENGTH,
   API_PARAMETER_MESSAGES,
   API_PARAMETER_NAME_MAX_LENGTH,
+  apiConfiguration,
+  apiConfigurationList,
+  apiConfigurationName,
+  apiConfigurationState,
+  apiConfigurationsWritten,
   apiParameter,
   apiParameterList,
   apiParameterName,
   apiParametersWritten,
+  isApiConfigurationActivateRequest,
+  isApiConfigurationChangeRequest,
+  isApiConfigurationCreateRequest,
   isApiParameterChangeRequest,
   isApiParameterCreateRequest,
+  type ApiConfigurationChange,
   type ApiParameterChange,
 } from "./apiParameters.js";
 export { apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";

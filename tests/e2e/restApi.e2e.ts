@@ -714,4 +714,44 @@ describe("the REST API over HTTP", () => {
     expect(changed.status, JSON.stringify(changed.body)).toBe(200);
     expect(await volume()).toBeCloseTo(160, 2);
   });
+
+  it("activates a parameter configuration and rebuilds the bound box under it", async () => {
+    const project = await api("/projects", { method: "POST", body: JSON.stringify({ name: "E2E configurations" }) });
+    const id = (project.body.project as Record<string, string>).id;
+    await api(`/parameters?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "wall", expression: "2", dimension: "length" }) });
+    const created = await api(`/shapes?projectId=${id}`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "box", depth: 10, height: 10, expressions: { width: "wall * 5", x: "wall * 10" } }),
+    });
+    const box = (created.body.shapes as Array<Record<string, any>>)[0];
+    const measure = async () => {
+      const read = await api(`/properties?projectId=${id}&shapeId=${box.id}`);
+      expect(read.status, JSON.stringify(read.body)).toBe(200);
+      return read.body.properties as { volume: number; centerOfMass: { x: number; y: number; z: number } };
+    };
+
+    const large = await api(`/parameter-configurations?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "Large", overrides: { wall: "4" } }) });
+    expect(large.status, JSON.stringify(large.body)).toBe(201);
+    expect(large.body).toMatchObject({ activeConfiguration: null, shapes: [] });
+
+    const activated = await api(`/parameter-configurations/activate?projectId=${id}`, {
+      method: "POST", body: JSON.stringify({ name: "Large" }), headers: { "If-Match": `"${large.body.revision}"` },
+    });
+    expect(activated.status, JSON.stringify(activated.body)).toBe(200);
+    expect(activated.body.shapes).toEqual([expect.objectContaining({ id: box.id, width: 20, x: 40 })]);
+    const under = await measure();
+    expect(under.volume).toBeCloseTo(2000, 3);
+    expect(under.centerOfMass.x).toBeCloseTo(40, 6);
+    expect(under.centerOfMass.y).toBeCloseTo(5, 6);
+    expect((await api(`/parameters?projectId=${id}`)).body).toMatchObject({ activeConfiguration: "Large", parameters: [{ name: "wall", expression: "2", value: 4 }] });
+
+    const missing = await api(`/parameter-configurations/activate?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "Huge" }) });
+    expect(missing).toMatchObject({ status: 404, body: { code: "configuration_not_found", configuration: "Huge" } });
+
+    const baseTable = await api(`/parameter-configurations/activate?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: null }) });
+    expect(baseTable.status, JSON.stringify(baseTable.body)).toBe(200);
+    const back = await measure();
+    expect(back.volume).toBeCloseTo(1000, 3);
+    expect(back.centerOfMass.x).toBeCloseTo(20, 6);
+  });
 });

@@ -7,22 +7,32 @@
 
 import { apiShapeSummary } from "./apiShapeSummary.js";
 import { wireExpressionError } from "./apiErrors.js";
-import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
+import type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
 import type { ParametersWritten } from "./engine.js";
 import { shapeBindingIssues } from "./expressionBindings.js";
 import { sketchConstraintBindingIssues } from "./sketchConstraintBindings.js";
 import type { ExpressionError } from "./parameterExpressions.js";
+import { configurationIssues } from "./projectParameters.js";
 
 export const API_PARAMETER_NAME_MAX_LENGTH = 64;
 export const API_PARAMETER_EXPRESSION_MAX_LENGTH = 10_000;
 /** The limit as refusals word it. */
 export const API_PARAMETER_EXPRESSION_LIMIT = `${API_PARAMETER_EXPRESSION_MAX_LENGTH.toLocaleString("en-US")} characters`;
+/** Matches the engine's configuration name limit. */
+export const API_CONFIGURATION_NAME_MAX_LENGTH = 100;
 export const API_PARAMETER_DIMENSIONS: readonly ProjectParameterDimension[] = ["length", "angle", "unitless"];
 
 export const API_PARAMETER_MESSAGES = {
   create: `A parameter needs a name, an expression of at most ${API_PARAMETER_EXPRESSION_LIMIT}, and a dimension of length, angle, or unitless.`,
   change: `Send name alone to rename, or expression (at most ${API_PARAMETER_EXPRESSION_LIMIT}) and dimension to change the value.`,
   nameRequired: "A parameter name is required.",
+} as const;
+
+export const API_CONFIGURATION_MESSAGES = {
+  create: "A configuration needs a name, and overrides that map parameter names to expressions.",
+  change: "Send name alone to rename, or parameter and expression (null to clear) to change an override.",
+  activate: "Send the configuration name to activate, or null for the base table.",
+  nameRequired: `A configuration name of 1 to ${API_CONFIGURATION_NAME_MAX_LENGTH} characters is required.`,
 } as const;
 
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -49,6 +59,34 @@ export function isApiParameterChangeRequest(body: unknown): body is ApiParameter
     && (!("dimension" in body) || isDimension(body.dimension));
 }
 
+const isConfigurationName = (value: unknown) => typeof value === "string" && value.length >= 1 && value.length <= API_CONFIGURATION_NAME_MAX_LENGTH;
+
+/** Accepts `{ name, overrides? }`, where overrides maps names to expressions. */
+export function isApiConfigurationCreateRequest(body: unknown): body is { name: string; overrides?: Record<string, string> } {
+  return isObject(body) && onlyKeys(body, ["name", "overrides"]) && isConfigurationName(body.name)
+    && (!("overrides" in body) || (isObject(body.overrides) && Object.values(body.overrides).every(isExpression)));
+}
+
+/** A rename carries `name` alone; an override change carries `parameter` and `expression`, null to clear. */
+export type ApiConfigurationChange = { name: string } | { parameter: string; expression: string | null };
+
+export function isApiConfigurationChangeRequest(body: unknown): body is ApiConfigurationChange {
+  if (!isObject(body)) return false;
+  if ("name" in body) return onlyKeys(body, ["name"]) && isConfigurationName(body.name);
+  return onlyKeys(body, ["parameter", "expression"]) && isName(body.parameter)
+    && "expression" in body && (body.expression === null || isExpression(body.expression));
+}
+
+/** Accepts `{ name }`, where null names the base table. */
+export function isApiConfigurationActivateRequest(body: unknown): body is { name: string | null } {
+  return isObject(body) && onlyKeys(body, ["name"]) && "name" in body && (body.name === null || isConfigurationName(body.name));
+}
+
+/** Returns the `?name=` value untrimmed, since a stored name has no surrounding whitespace. */
+export function apiConfigurationName(value: unknown): string | undefined {
+  return isConfigurationName(value) ? value as string : undefined;
+}
+
 /** Returns the trimmed `?name=` value, or undefined when it is missing or out of bounds. */
 export function apiParameterName(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -72,9 +110,15 @@ export function apiParameter(parameter: ProjectParameter) {
 }
 
 /** The `GET /parameters` reply. */
-export function apiParameterList(project: { parameters: readonly ProjectParameter[]; shapes: readonly WorkplaneShape[]; revision: number }) {
+export function apiParameterList(project: {
+  parameters: readonly ProjectParameter[];
+  activeConfiguration?: string | null;
+  shapes: readonly WorkplaneShape[];
+  revision: number;
+}) {
   return {
     parameters: project.parameters.map(apiParameter),
+    activeConfiguration: project.activeConfiguration ?? null,
     bindingIssues: shapeBindingIssues(project.shapes, project.parameters)
       .map((issue) => ({ shapeId: issue.shapeId, field: issue.field, ...apiIssue(issue) })),
     constraintBindingIssues: sketchConstraintBindingIssues(project.shapes, project.parameters).map((issue) => ({
@@ -93,6 +137,42 @@ export function apiParametersWritten(value: ParametersWritten, name: string) {
   return {
     ...(parameter ? { parameter: apiParameter(parameter) } : {}),
     parameters: value.parameters.map(apiParameter),
+    shapes: value.shapes.map(apiShapeSummary),
+    revision: value.revision,
+  };
+}
+
+export function apiConfiguration({ name, overrides }: ProjectConfiguration) {
+  return { name, overrides: { ...overrides } };
+}
+
+type ConfiguredProject = {
+  parameters: readonly ProjectParameter[];
+  configurations: readonly ProjectConfiguration[];
+  activeConfiguration: string | null;
+};
+
+/** The configurations, the active name, the resolved table, and overrides that no longer resolve. */
+export function apiConfigurationState(project: ConfiguredProject) {
+  return {
+    configurations: project.configurations.map(apiConfiguration),
+    activeConfiguration: project.activeConfiguration,
+    parameters: project.parameters.map(apiParameter),
+    issues: configurationIssues(project).map(({ configuration, parameter, error }) => ({ configuration, parameter, ...apiIssue(error) })),
+  };
+}
+
+/** The `GET /parameter-configurations` reply. */
+export function apiConfigurationList(project: ConfiguredProject & { revision: number }) {
+  return { ...apiConfigurationState(project), revision: project.revision };
+}
+
+/** A configuration write's reply; `configuration` is the one now called `name`, when given and still present. */
+export function apiConfigurationsWritten(value: ParametersWritten, name?: string) {
+  const configuration = name === undefined ? undefined : value.configurations.find((entry) => entry.name === name);
+  return {
+    ...(configuration ? { configuration: apiConfiguration(configuration) } : {}),
+    ...apiConfigurationState(value),
     shapes: value.shapes.map(apiShapeSummary),
     revision: value.revision,
   };

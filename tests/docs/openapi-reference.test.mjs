@@ -259,7 +259,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 33);
+  assert.equal(documentedOperationCount, 38);
   assert.equal(spec["x-sketchforge-omitted-operations"].length, 4);
   assert.ok(spec["x-sketchforge-omitted-operations"].every(({ method, reason }) => method === "OPTIONS" && /preflight/i.test(reason)));
 });

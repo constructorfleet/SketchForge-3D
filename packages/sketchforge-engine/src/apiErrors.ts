@@ -37,6 +37,8 @@ export const API_ERROR_CODES = [
   "parameter_not_found",
   "parameter_exists",
   "parameter_in_use",
+  "configuration_not_found",
+  "configuration_exists",
   "invalid_expression",
   "unsupported_kind",
   "unsupported_format",
@@ -170,11 +172,10 @@ const PARAMETER_ERROR_STATUS: Record<ProjectParameterError["code"], readonly [nu
   parameterInUse: [409, "parameter_in_use"],
   invalidExpression: [422, "invalid_expression"],
   tooManyParameters: [413, "limit_exceeded"],
-  // No route edits configurations yet (#618); `reason` keeps the finer code.
   invalidConfiguration: [400, "invalid_request"],
   invalidConfigurationName: [400, "invalid_request"],
-  duplicateConfigurationName: [400, "invalid_request"],
-  unknownConfiguration: [400, "invalid_request"],
+  duplicateConfigurationName: [409, "configuration_exists"],
+  unknownConfiguration: [404, "configuration_not_found"],
   tooManyConfigurations: [413, "limit_exceeded"],
 };
 
