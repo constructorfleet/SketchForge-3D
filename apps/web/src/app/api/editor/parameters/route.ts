@@ -72,6 +72,44 @@ function memoryStore(
   return { store, current: () => document };
 }
 
+// Configuration operations (#618) are parsed and run apart from table edits.
+type ConfigurationEdit =
+  | { kind: "addConfiguration"; configuration: string; overrides?: Record<string, string> }
+  | { kind: "renameConfiguration"; configuration: string; newName: string }
+  | { kind: "deleteConfiguration"; configuration: string }
+  | { kind: "activateConfiguration"; configuration: string | null }
+  | { kind: "setOverride"; configuration: string; name: string; expression: string }
+  | { kind: "clearOverride"; configuration: string; name: string };
+
+function readConfigurationEdit(value: unknown): ConfigurationEdit | null {
+  if (!isRecord(value)) return null;
+  const named = typeof value.configuration === "string";
+  if (value.kind === "activateConfiguration" && (named || value.configuration === null)) return value as ConfigurationEdit;
+  if (!named) return null;
+  const overrides = value.overrides;
+  if (value.kind === "addConfiguration"
+    && (overrides === undefined || (isRecord(overrides) && Object.values(overrides).every((expression) => typeof expression === "string")))) {
+    return value as ConfigurationEdit;
+  }
+  if (value.kind === "renameConfiguration" && typeof value.newName === "string") return value as ConfigurationEdit;
+  if (value.kind === "deleteConfiguration") return value as ConfigurationEdit;
+  if (value.kind === "setOverride" && typeof value.name === "string" && typeof value.expression === "string") return value as ConfigurationEdit;
+  if (value.kind === "clearOverride" && typeof value.name === "string") return value as ConfigurationEdit;
+  return null;
+}
+
+function runConfiguration(engine: Engine, edit: ConfigurationEdit) {
+  const id = "editor";
+  switch (edit.kind) {
+    case "addConfiguration": return engine.addConfiguration(id, edit.configuration, edit.overrides ?? {});
+    case "renameConfiguration": return engine.renameConfiguration(id, edit.configuration, edit.newName);
+    case "deleteConfiguration": return engine.deleteConfiguration(id, edit.configuration);
+    case "activateConfiguration": return engine.activateConfiguration(id, edit.configuration);
+    case "setOverride": return engine.setConfigurationOverride(id, edit.configuration, edit.name, edit.expression);
+    case "clearOverride": return engine.clearConfigurationOverride(id, edit.configuration, edit.name);
+  }
+}
+
 function run(engine: Engine, edit: Edit) {
   const id = "editor";
   if (edit.kind === "add") return engine.addParameter(id, { name: edit.name, expression: edit.expression, dimension: edit.dimension });
@@ -108,7 +146,8 @@ export async function POST(request: Request) {
   }
   if (!Array.isArray(body.parameters)) return json({ error: "A parameter table is required." }, 400);
   const edit = readEdit(body.edit);
-  if (!edit) return json({ error: "A parameter edit is required." }, 400);
+  const configurationEdit = edit ? null : readConfigurationEdit(body.edit);
+  if (!edit && !configurationEdit) return json({ error: "A parameter edit is required." }, 400);
 
   if (body.configurations !== undefined && !Array.isArray(body.configurations)) return json({ error: "Configurations must be a list." }, 400);
   if (body.activeConfiguration !== undefined && body.activeConfiguration !== null && typeof body.activeConfiguration !== "string") {
@@ -122,7 +161,8 @@ export async function POST(request: Request) {
     (body.activeConfiguration ?? null) as string | null,
   );
   try {
-    const result = await run(createEngine(memory.store), edit);
+    const engine = createEngine(memory.store);
+    const result = await (configurationEdit ? runConfiguration(engine, configurationEdit) : run(engine, edit!));
     if (!result.ok) return json({ failure: result.failure }, 422);
     const { shapes, parameters, configurations, activeConfiguration } = memory.current();
     return json({ shapes, parameters: parameters ?? [], configurations: configurations ?? [], activeConfiguration: activeConfiguration ?? null });

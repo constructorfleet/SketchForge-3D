@@ -909,6 +909,30 @@
         "serverError": "Serwer zawiódł podczas aktualizacji powiązanych kształtów. Model się nie zmienił.",
         "busy": "Najpierw zakończ bieżącą edycję.",
         "projectChanged": "Projekt zmienił się podczas aktualizacji kształtów. Spróbuj ponownie."
+      },
+      "configurations": {
+        "heading": "Konfiguracja",
+        "active": "Aktywna konfiguracja",
+        "base": "Tabela bazowa",
+        "hint": "Konfiguracja zastępuje niektóre wyrażenia bazowe, gdy jest aktywna. Zostaw nadpisanie puste, aby użyć wyrażenia bazowego.",
+        "newName": "Nazwa nowej konfiguracji",
+        "create": "Dodaj konfigurację",
+        "renameLabel": "Nazwa konfiguracji {name}",
+        "rename": "Zmień nazwę",
+        "delete": "Usuń konfigurację {name}",
+        "override": "Nadpisanie w {name}",
+        "overrideOf": "Nadpisanie {parameter} w {name}",
+        "overridePlaceholder": "Baza",
+        "inConfiguration": "W {configuration}: {message}",
+        "notice": {
+          "activated": "Aktywowano konfigurację {name}",
+          "activatedBase": "Przełączono na tabelę bazową",
+          "added": "Dodano konfigurację {name}",
+          "renamed": "Zmieniono nazwę konfiguracji na {name}",
+          "deleted": "Usunięto konfigurację {name}",
+          "overrideSet": "Ustawiono {parameter} w {name}",
+          "overrideCleared": "Usunięto nadpisanie {parameter} w {name}"
+        }
       }
     },
     "expressionField": {

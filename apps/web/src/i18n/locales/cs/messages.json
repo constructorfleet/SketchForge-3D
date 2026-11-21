@@ -909,6 +909,30 @@
         "serverError": "Server při aktualizaci navázaných tvarů selhal. Model zůstal beze změny.",
         "busy": "Nejprve dokončete aktuální úpravu.",
         "projectChanged": "Projekt se během aktualizace tvarů změnil. Zkuste to znovu."
+      },
+      "configurations": {
+        "heading": "Konfigurace",
+        "active": "Aktivní konfigurace",
+        "base": "Základní tabulka",
+        "hint": "Konfigurace nahrazuje některé základní výrazy, dokud je aktivní. Ponechte přepis prázdný, chcete-li použít základní výraz.",
+        "newName": "Název nové konfigurace",
+        "create": "Přidat konfiguraci",
+        "renameLabel": "Název konfigurace {name}",
+        "rename": "Přejmenovat",
+        "delete": "Smazat konfiguraci {name}",
+        "override": "Přepis v {name}",
+        "overrideOf": "Přepis {parameter} v {name}",
+        "overridePlaceholder": "Základ",
+        "inConfiguration": "V {configuration}: {message}",
+        "notice": {
+          "activated": "Konfigurace {name} aktivována",
+          "activatedBase": "Přepnuto na základní tabulku",
+          "added": "Konfigurace {name} přidána",
+          "renamed": "Konfigurace přejmenována na {name}",
+          "deleted": "Konfigurace {name} smazána",
+          "overrideSet": "{parameter} nastaven v {name}",
+          "overrideCleared": "Přepis {parameter} v {name} odebrán"
+        }
       }
     },
     "expressionField": {

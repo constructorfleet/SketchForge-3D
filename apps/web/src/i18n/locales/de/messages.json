@@ -909,6 +909,30 @@
         "serverError": "Beim Aktualisieren gebundener Formen ist auf dem Server ein Fehler aufgetreten. Das Modell ist unverändert.",
         "busy": "Schließen Sie zuerst die aktuelle Bearbeitung ab.",
         "projectChanged": "Das Projekt hat sich während der Aktualisierung geändert. Versuchen Sie es erneut."
+      },
+      "configurations": {
+        "heading": "Konfiguration",
+        "active": "Aktive Konfiguration",
+        "base": "Basistabelle",
+        "hint": "Eine Konfiguration ersetzt einige Basisausdrücke, solange sie aktiv ist. Lassen Sie eine Überschreibung leer, um den Basisausdruck zu verwenden.",
+        "newName": "Name der neuen Konfiguration",
+        "create": "Konfiguration hinzufügen",
+        "renameLabel": "Name der Konfiguration {name}",
+        "rename": "Umbenennen",
+        "delete": "Konfiguration {name} löschen",
+        "override": "Überschreibung in {name}",
+        "overrideOf": "Überschreibung von {parameter} in {name}",
+        "overridePlaceholder": "Basis",
+        "inConfiguration": "In {configuration}: {message}",
+        "notice": {
+          "activated": "Konfiguration {name} aktiviert",
+          "activatedBase": "Zur Basistabelle gewechselt",
+          "added": "Konfiguration {name} hinzugefügt",
+          "renamed": "Konfiguration in {name} umbenannt",
+          "deleted": "Konfiguration {name} gelöscht",
+          "overrideSet": "{parameter} in {name} gesetzt",
+          "overrideCleared": "Überschreibung von {parameter} in {name} entfernt"
+        }
       }
     },
     "expressionField": {

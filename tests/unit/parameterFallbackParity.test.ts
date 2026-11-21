@@ -77,4 +77,20 @@ describe("static-build binding fallback parity with the engine", () => {
     const outcomes = await Promise.all(cases.map(([, shapes, edit]) => engineOutcome(shapes, edit)));
     expect(outcomes.map((outcome) => outcome.ok)).toEqual([false, true, true, false, false, false, true]);
   });
+
+  it.each([
+    ["activating a configuration", "30", { kind: "activateConfiguration", configuration: "Large" } as ParameterEdit],
+    ["activating one the bound field refuses", "-5", { kind: "activateConfiguration", configuration: "Large" } as ParameterEdit],
+  ])("%s (#618)", async (_name, override, edit) => {
+    const configuration = { configurations: [{ name: "Large", overrides: { w: override } }], activeConfiguration: null };
+    const shapes = [shape({ kind: "box", width: 40, depth: 10, height: 10 }, { expressions: { width: "w" } })];
+    const request = editorParameterRequest("parity", shapes, parameters, edit, configuration);
+    const response = await POST(new Request(`http://localhost${request.url}`, { method: "POST", body: JSON.stringify(request.body) }));
+    const body = await response.json();
+    const engine = response.ok ? { ok: true, shapes: body.shapes } : { ok: false, failure: body.failure };
+    const planned = planParameterEdit({ parameters, shapes, ...configuration }, edit);
+    if (!planned.ok) throw new Error(planned.error.message);
+    const local = applyBindingsLocally(planned.project.shapes, parameters, planned.project.parameters);
+    expect(local && (local.ok ? { ok: true, shapes: JSON.parse(JSON.stringify(local.shapes)) } : { ok: false, failure: local.failure })).toEqual(engine);
+  });
 });

@@ -909,6 +909,30 @@
         "serverError": "O servidor falhou ao atualizar as formas vinculadas. O modelo não mudou.",
         "busy": "Conclua primeiro a edição atual.",
         "projectChanged": "O projeto mudou enquanto as formas eram atualizadas. Tente novamente."
+      },
+      "configurations": {
+        "heading": "Configuração",
+        "active": "Configuração ativa",
+        "base": "Tabela base",
+        "hint": "Uma configuração substitui algumas expressões base enquanto está ativa. Deixe uma substituição vazia para usar a expressão base.",
+        "newName": "Nome da nova configuração",
+        "create": "Adicionar configuração",
+        "renameLabel": "Nome da configuração {name}",
+        "rename": "Renomear",
+        "delete": "Excluir a configuração {name}",
+        "override": "Substituição em {name}",
+        "overrideOf": "Substituição de {parameter} em {name}",
+        "overridePlaceholder": "Base",
+        "inConfiguration": "Em {configuration}: {message}",
+        "notice": {
+          "activated": "Configuração {name} ativada",
+          "activatedBase": "Mudou para a tabela base",
+          "added": "Configuração {name} adicionada",
+          "renamed": "Configuração renomeada para {name}",
+          "deleted": "Configuração {name} excluída",
+          "overrideSet": "{parameter} definido em {name}",
+          "overrideCleared": "Substituição de {parameter} removida em {name}"
+        }
       }
     },
     "expressionField": {

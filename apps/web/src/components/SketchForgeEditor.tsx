@@ -175,7 +175,7 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
 import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
@@ -5571,6 +5571,11 @@ export function SketchForgeEditor({
     projectParametersRef.current = parameters;
     setProjectParameters(parameters);
   }, []);
+  const [projectConfiguration, setProjectConfiguration] = useState(initialConfiguration);
+  const adoptProjectConfiguration = useCallback((configuration: ProjectConfigurationState) => {
+    projectConfigurationRef.current = configuration;
+    setProjectConfiguration(configuration);
+  }, []);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
   const snapGridRef = useRef(snapGrid);
@@ -7290,7 +7295,7 @@ export function SketchForgeEditor({
     if (sync.adoptTable) {
       hostParametersKeyRef.current = hostParametersKey;
       adoptProjectParameters(initialParameters);
-      projectConfigurationRef.current = initialConfiguration;
+      adoptProjectConfiguration(initialConfiguration);
     }
     // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
     if (sync.action === "echo") {
@@ -7321,7 +7326,7 @@ export function SketchForgeEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice(null);
-  }, [adoptProjectParameters, initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
 
   useEffect(() => {
     if (!projectId || !onProjectShapesChange) {
@@ -7685,13 +7690,13 @@ export function SketchForgeEditor({
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
     adoptProjectParameters(entry?.parameters ?? projectParametersRef.current); // Absent: an entry from before tables were in history.
-    projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
+    adoptProjectConfiguration(entryConfiguration(entry) ?? projectConfigurationRef.current);
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
     syncProjectShapes(nextShapes, true); // Forced: a table-only step leaves the shapes fingerprint unchanged.
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.undone")}` : t("editor.notice.undone")));
-  }, [adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
 
   const redo = useCallback(() => {
     if (projectInteractionActiveRef.current) {
@@ -7713,13 +7718,13 @@ export function SketchForgeEditor({
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
     adoptProjectParameters(entry?.parameters ?? projectParametersRef.current); // Absent: an entry from before tables were in history.
-    projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
+    adoptProjectConfiguration(entryConfiguration(entry) ?? projectConfigurationRef.current);
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
     syncProjectShapes(nextShapes, true);
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.redone")}` : t("editor.notice.redone")));
-  }, [adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
 
   /** Commits a table edit and its geometry recompute as one history entry. Resolves to the refusal, if any. */
   const applyParameterEdit = useCallback(async (edit: ParameterEdit): Promise<ParameterMessage | null> => {
@@ -7772,10 +7777,10 @@ export function SketchForgeEditor({
     invalidateCadModifierSession();
     adoptProjectParameters(next.parameters);
     // A rename or delete also rewrites configuration rows.
-    projectConfigurationRef.current = {
+    adoptProjectConfiguration({
       configurations: next.configurations ?? startConfiguration.configurations,
       activeConfiguration: next.activeConfiguration === undefined ? startConfiguration.activeConfiguration : next.activeConfiguration,
-    };
+    });
     const nextShapes = next.shapes.map(canonicalizeShape);
     const nextSelection = selectedIdsRef.current.filter((id) => nextShapes.some((shape) => shape.id === id));
     shapesRef.current = nextShapes;
@@ -7784,11 +7789,10 @@ export function SketchForgeEditor({
     setSelectedIds(nextSelection);
     // Forced: a table-only edit leaves the shapes fingerprint unchanged.
     if (appendHistorySnapshot(nextShapes, nextSelection)) syncProjectShapes(nextShapes, true, true);
-    const name = edit.kind === "rename" ? edit.newName : edit.name;
-    const noticeKey = ({ add: "added", update: "updated", rename: "renamed", delete: "deleted" } as const)[edit.kind];
-    setNotice(notice((t) => t(`editor.parameters.notice.${noticeKey}`, { name })));
+    const committed = parameterEditNotice(edit);
+    setNotice(notice((t) => t(committed.key, committed.values)));
     return null;
-  }, [adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
 
   /**
    * Binds or unbinds one shape field as one history entry, through the engine on the server.
@@ -10953,7 +10957,7 @@ export function SketchForgeEditor({
       {topPanel === "parameters" ? (
         <ProjectParametersPanel
           parameters={projectParameters}
-          configurations={projectConfigurationRef.current.configurations}
+          configuration={projectConfiguration}
           shapes={shapes}
           busy={parameterEditPending}
           onEdit={applyParameterEdit}

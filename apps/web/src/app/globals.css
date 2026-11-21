@@ -11125,4 +11125,54 @@ html[data-theme="dark"] .expression-input-error {
 
 .range-property-header:has(.expression-input.is-invalid) {
   align-items: flex-start;
+
+/* Issue #618: configuration picker and override column in the parameter panel. */
+.parameters-configurations {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e5ebf0;
+  border-radius: 8px;
+}
+
+.parameters-configurations > strong {
+  color: #20384d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.parameters-configuration-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.parameters-configuration-row .parameters-input {
+  flex: 1 1 140px;
+  width: auto;
+}
+
+.parameters-override-input::placeholder {
+  color: #6b7f91;
+  font-style: italic;
+}
+
+html[data-theme="dark"] .parameters-configurations {
+  background: #182630;
+  border-color: #344854;
+}
+
+html[data-theme="dark"] .parameters-configurations > strong {
+  color: #dceaf3;
+}
+
+html[data-theme="dark"] .parameters-override-input::placeholder {
+  color: #a9bbc9;
+}
+
+.top-action-panel.parameters-action-panel {
+  width: min(760px, calc(100vw - 28px));
 }

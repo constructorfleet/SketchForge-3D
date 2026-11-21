@@ -7,7 +7,7 @@ import { useTranslations } from "@/i18n";
 import {
   parameterDeleteWarning,
   parameterRows,
-  parameterTableKey,
+  parameterStateKey,
   type ParameterDeleteWarning,
   type ParameterEdit,
   type ParameterMessage,
@@ -16,7 +16,10 @@ import type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension,
 
 const DIMENSIONS: readonly ProjectParameterDimension[] = ["length", "angle", "unitless"];
 
-type Field = "name" | "expression" | "dimension";
+type Field = "name" | "expression" | "dimension" | "override";
+type DraftField = "name" | "expression" | "override";
+type ConfigurationState = { configurations: readonly ProjectConfiguration[]; activeConfiguration: string | null };
+const NO_CONFIGURATION: ConfigurationState = { configurations: [], activeConfiguration: null };
 type RowError = { field: Field; message: ParameterMessage };
 
 /** Resolves to the refusal, or null once the edit is committed. */
@@ -24,15 +27,15 @@ export type ParameterEditHandler = (edit: ParameterEdit) => Promise<ParameterMes
 
 export function ProjectParametersPanel({
   parameters,
-  configurations = [],
+  configuration = NO_CONFIGURATION,
   shapes,
   busy,
   onEdit,
   onClose,
 }: {
   parameters: readonly ProjectParameter[];
-  /** Read for the delete warning: an override that uses a parameter blocks deleting it. */
-  configurations?: readonly ProjectConfiguration[];
+  /** Configurations (#618): the picker, the override column and the delete warning read them. */
+  configuration?: ConfigurationState;
   shapes: readonly WorkplaneShape[];
   busy: boolean;
   onEdit: ParameterEditHandler;
@@ -41,7 +44,8 @@ export function ProjectParametersPanel({
   const t = useTranslations();
   const dialogRef = useDialogFocus<HTMLDivElement>({ onEscape: onClose });
   const idPrefix = useId();
-  const [drafts, setDrafts] = useState<Record<string, Partial<Record<"name" | "expression", string>>>>({});
+  const { configurations, activeConfiguration } = configuration;
+  const [drafts, setDrafts] = useState<Record<string, Partial<Record<DraftField, string>>>>({});
   const [errors, setErrors] = useState<Record<string, RowError>>({});
   const [pendingDelete, setPendingDelete] = useState<{ name: string; warning: ParameterDeleteWarning } | null>(null);
   const [newName, setNewName] = useState("");
@@ -50,9 +54,10 @@ export function ProjectParametersPanel({
   const [addError, setAddError] = useState<ParameterMessage | null>(null);
   // Escape reverts a draft; the blur that follows must not commit it.
   const skipBlurCommitRef = useRef(false);
-  const rows = parameterRows(parameters);
+  const rows = parameterRows(parameters, configuration);
+  const columns = activeConfiguration ? 6 : 5;
   // Undo, redo or a commit replaces the table; drafts and errors about the old one are stale.
-  const tableKey = parameterTableKey(parameters);
+  const tableKey = parameterStateKey(parameters, configuration);
   const tableKeyRef = useRef(tableKey);
   tableKeyRef.current = tableKey;
   // Reset during render, so a stale error is never committed and announced.
@@ -63,7 +68,10 @@ export function ProjectParametersPanel({
     setErrors({});
     setPendingDelete(null);
   }
-  const text = (message: ParameterMessage) => t(message.key, message.values);
+  const text = (message: ParameterMessage) => {
+    const body = t(message.key, message.values);
+    return message.configuration ? t("editor.parameters.configurations.inConfiguration", { configuration: message.configuration, message: body }) : body;
+  };
 
   const clearRow = (name: string) => {
     setDrafts(({ [name]: _draft, ...rest }) => rest);
@@ -83,13 +91,22 @@ export function ProjectParametersPanel({
     if (edit.kind === "rename") clearRow(edit.newName);
   };
 
-  const commitDraft = (rowName: string, field: "name" | "expression") => {
+  const commitDraft = (rowName: string, field: DraftField) => {
     if (skipBlurCommitRef.current) {
       skipBlurCommitRef.current = false;
       return;
     }
     const draft = drafts[rowName]?.[field];
     const row = parameters.find((parameter) => parameter.name === rowName);
+    if (field === "override") {
+      const current = rows.find((entry) => entry.name === rowName)?.override;
+      if (draft === undefined || !row || !activeConfiguration || draft.trim() === (current ?? "")) return;
+      // An empty override falls back to the base expression.
+      void submit(rowName, "override", draft.trim()
+        ? { kind: "setOverride", configuration: activeConfiguration, name: rowName, expression: draft }
+        : { kind: "clearOverride", configuration: activeConfiguration, name: rowName });
+      return;
+    }
     if (draft === undefined || !row || draft === row[field]) return;
     void submit(rowName, field, field === "name"
       ? { kind: "rename", name: rowName, newName: draft.trim() }
@@ -107,7 +124,7 @@ export function ProjectParametersPanel({
   };
 
   const requestDelete = (name: string) => {
-    const warning = parameterDeleteWarning({ parameters: [...parameters], shapes: [...shapes], configurations }, name);
+    const warning = parameterDeleteWarning({ parameters: [...parameters], shapes: [...shapes], configurations: [...configurations] }, name);
     if (!warning) {
       void submit(name, "name", { kind: "delete", name });
       return;
@@ -145,12 +162,14 @@ export function ProjectParametersPanel({
       </header>
       <div className="parameters-panel-body">
         <p className="parameters-panel-intro">{t("editor.parameters.intro")}</p>
+        <ConfigurationPicker configuration={configuration} busy={busy} onEdit={onEdit} text={text} />
         {rows.length === 0 ? <p className="parameters-panel-empty">{t("editor.parameters.empty")}</p> : (
           <table className="parameters-table" aria-label={t("editor.parameters.tableLabel")}>
             <thead>
               <tr>
                 <th scope="col">{t("editor.parameters.name")}</th>
                 <th scope="col">{t("editor.parameters.expression")}</th>
+                {activeConfiguration ? <th scope="col">{t("editor.parameters.configurations.override", { name: activeConfiguration })}</th> : null}
                 <th scope="col">{t("editor.parameters.value")}</th>
                 <th scope="col">{t("editor.parameters.dimension")}</th>
                 <th scope="col" aria-label={t("editor.parameters.delete")} />
@@ -197,6 +216,24 @@ export function ProjectParametersPanel({
                         onKeyDown={draftKeys(row.name)}
                       />
                     </td>
+                    {activeConfiguration ? (
+                      <td>
+                        <input
+                          className="parameters-input parameters-expression-input parameters-override-input"
+                          aria-label={t("editor.parameters.configurations.overrideOf", { parameter: row.name, name: activeConfiguration })}
+                          aria-invalid={invalid("override") || undefined}
+                          aria-describedby={invalid("override") ? describedBy : undefined}
+                          placeholder={t("editor.parameters.configurations.overridePlaceholder")}
+                          value={draft.override ?? row.override ?? ""}
+                          spellCheck={false}
+                          autoComplete="off"
+                          disabled={busy}
+                          onChange={(event) => { const override = event.target.value; setDrafts((current) => ({ ...current, [row.name]: { ...current[row.name], override } })); }}
+                          onBlur={() => commitDraft(row.name, "override")}
+                          onKeyDown={draftKeys(row.name)}
+                        />
+                      </td>
+                    ) : null}
                     <td className="parameters-value">
                       <output aria-label={`${row.name} = ${row.value} ${row.unit}`.trim()}>
                         {row.value}{row.unit ? <span className="parameters-unit">{row.unit === "°" ? row.unit : ` ${row.unit}`}</span> : null}
@@ -231,14 +268,14 @@ export function ProjectParametersPanel({
                   </tr>,
                   message ? (
                     <tr key={`error-${index}`} className="parameters-row-note">
-                      <td colSpan={5}>
+                      <td colSpan={columns}>
                         <p id={errorId(index)} className="parameters-error" role={editError ? "alert" : undefined}>{text(message)}</p>
                       </td>
                     </tr>
                   ) : null,
                   warning ? (
                     <tr key={`warning-${index}`} className="parameters-row-note">
-                      <td colSpan={5}>
+                      <td colSpan={columns}>
                         <DeleteWarning
                           name={row.name}
                           warning={warning}
@@ -308,6 +345,111 @@ export function ProjectParametersPanel({
         {busy ? <p className="parameters-panel-status" role="status">{t("editor.parameters.updating")}</p> : null}
       </div>
     </div>
+  );
+}
+
+/** Picks the active configuration and creates, renames or deletes configurations. */
+function ConfigurationPicker({
+  configuration,
+  busy,
+  onEdit,
+  text,
+}: {
+  configuration: ConfigurationState;
+  busy: boolean;
+  onEdit: ParameterEditHandler;
+  text: (message: ParameterMessage) => string;
+}) {
+  const t = useTranslations();
+  const id = useId();
+  const { configurations, activeConfiguration } = configuration;
+  const [newName, setNewName] = useState("");
+  const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  const [error, setError] = useState<ParameterMessage | null>(null);
+  const run = async (edit: ParameterEdit) => {
+    const refusal = await onEdit(edit);
+    setError(refusal);
+    return !refusal;
+  };
+  const commitRename = async () => {
+    if (renameDraft === null || !activeConfiguration) return;
+    const next = renameDraft.trim();
+    setRenameDraft(null);
+    if (next && next !== activeConfiguration) await run({ kind: "renameConfiguration", configuration: activeConfiguration, newName: next });
+  };
+  const errorId = `${id}-configuration-error`;
+  return (
+    <section className="parameters-configurations" aria-labelledby={`${id}-heading`}>
+      <strong id={`${id}-heading`}>{t("editor.parameters.configurations.heading")}</strong>
+      <div className="parameters-configuration-row">
+        <select
+          className="parameters-input"
+          aria-label={t("editor.parameters.configurations.active")}
+          aria-describedby={error ? errorId : undefined}
+          value={activeConfiguration ?? ""}
+          disabled={busy}
+          onChange={(event) => void run({ kind: "activateConfiguration", configuration: event.target.value || null })}
+        >
+          <option value="">{t("editor.parameters.configurations.base")}</option>
+          {configurations.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
+        </select>
+        {activeConfiguration ? (
+          <>
+            <input
+              className="parameters-input"
+              aria-label={t("editor.parameters.configurations.renameLabel", { name: activeConfiguration })}
+              value={renameDraft ?? activeConfiguration}
+              spellCheck={false}
+              autoComplete="off"
+              disabled={busy}
+              onChange={(event) => setRenameDraft(event.target.value)}
+              onBlur={() => void commitRename()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape" && renameDraft !== null) {
+                  event.preventDefault();
+                  setRenameDraft(null);
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="parameters-delete"
+              aria-label={t("editor.parameters.configurations.delete", { name: activeConfiguration })}
+              title={t("editor.parameters.configurations.delete", { name: activeConfiguration })}
+              disabled={busy}
+              onClick={() => void run({ kind: "deleteConfiguration", configuration: activeConfiguration })}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+            </button>
+          </>
+        ) : null}
+      </div>
+      <form
+        className="parameters-configuration-row"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const name = newName.trim();
+          if (name && await run({ kind: "addConfiguration", configuration: name })) setNewName("");
+        }}
+      >
+        <input
+          className="parameters-input"
+          aria-label={t("editor.parameters.configurations.newName")}
+          placeholder={t("editor.parameters.configurations.newName")}
+          value={newName}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(event) => setNewName(event.target.value)}
+        />
+        <button type="submit" className="parameters-add-button" disabled={busy || !newName.trim()}>
+          <Plus size={15} aria-hidden="true" />
+          <span>{t("editor.parameters.configurations.create")}</span>
+        </button>
+      </form>
+      {error ? <p id={errorId} className="parameters-error" role="alert">{text(error)}</p> : null}
+      <p className="parameters-panel-intro">{t("editor.parameters.configurations.hint")}</p>
+    </section>
   );
 }
 

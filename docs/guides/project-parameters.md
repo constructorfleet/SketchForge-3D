@@ -26,13 +26,6 @@ row shows the name, the expression, the resolved value with its unit, and the
 dimension: **Length** (mm), **Angle** (degrees) or **Unitless**. A bare number
 takes the dimension's unit, so `3` in a length parameter is 3 mm.
 
-When the project has an active configuration, the panel edits each parameter's
-base expression, and the value column shows the value under the active
-configuration. A configuration that overrides a parameter keeps its override. A
-rename or delete also updates the configurations.
-
-![The Parameters panel with four parameters. Changing plate_width also changed post_d and moved the bound shapes.](../screenshots/parameter-panel.png)
-
 ## Add, edit, rename and delete
 
 - **Add**: type a name and an expression under **New parameter**, choose the
@@ -92,6 +85,40 @@ placement and size fields on plain primitive shapes, such as a box's width or
 position, update in the browser. A change that would rebuild a sketch, a
 treatment, a group or an imported shape is refused with a message, and the
 model is unchanged.
+
+## Configurations
+
+A configuration is a named set of overrides, such as `Large` with
+`plate_width = 70 mm`. A parameter without an override in the active
+configuration keeps its base expression.
+
+![The Large configuration active: the override column shows 70 mm and 8 mm, and post_d follows the new plate width.](../screenshots/parameter-configurations.png)
+
+- **Activate**: choose a configuration, or **Base table**, under
+  **Active configuration**. Bound shapes update. This is one undo step.
+- **Add**: type a name under **New configuration name** and select
+  **Add configuration**. It starts with no overrides.
+- **Rename** or **delete** the active configuration with the name field and the
+  bin button next to the picker. Deleting the active configuration switches to
+  the base table.
+- **Override**: while a configuration is active, the table has an
+  **Override in** column. Type an expression to override the parameter, or
+  clear the field to use the base expression. The **Expression** column still
+  edits the base expression.
+
+An override that does not resolve, or that a bound field cannot take, is refused
+inline with the configuration's name, and the model is unchanged. Every edit is
+checked against every configuration, so a change that breaks a configuration
+that is not active is refused too.
+
+![An override with the wrong unit is refused under its row.](../screenshots/parameter-configurations-error.png)
+
+![The configuration picker in the dark theme.](../screenshots/parameter-configurations-dark.png)
+
+A rename or delete of a parameter also updates the configurations. Exports use
+the active configuration.
+
+![The Parameters panel with four parameters. Changing plate_width also changed post_d and moved the bound shapes.](../screenshots/parameter-panel.png)
 
 ## Delete a parameter that is in use
 
@@ -202,6 +229,9 @@ the remote change.
 
 ## Verified workflow
 
+`tests/browser/parameter-configurations.test.mjs` activates a configuration,
+sets and clears an override, and adds, renames and deletes configurations,
+with undo after each.
 `tests/browser/parameter-panel.test.mjs` opens a project with a bound box and
 checks the inline errors, the recompute, undo and redo, adding, and the delete
 warning. `tests/unit/projectParameterEdits.test.ts` and
