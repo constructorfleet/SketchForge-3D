@@ -112,6 +112,8 @@ A state's \`parameters\` (V3 only) is the table of an undo or redo state; an emp
 
 A shape definition may carry \`expressions\`, a record from a bindable field name to a parameter expression. The field itself keeps the resolved number, so a reader that ignores \`expressions\` still gets the right geometry. Readers refuse a record that is not an object of non-empty strings, and keep a binding that no longer resolves together with its stored number.
 
+A \`distance\`, \`radius\`, \`diameter\` or \`angle\` constraint in a definition's \`sketchProfile.constraints\` may carry \`expression\`, a parameter expression for its value. \`valueMm\` or \`valueDeg\` keeps the resolved number, so a reader that ignores \`expression\` still gets the solved sketch. Readers refuse an \`expression\` that is not a non-empty string or that sits on any other constraint kind, and keep one that no longer resolves together with its stored value.
+
 ### \`SkfFeatureV1\`
 
 | Field | Serialized type |

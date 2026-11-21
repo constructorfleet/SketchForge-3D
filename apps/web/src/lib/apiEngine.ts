@@ -18,6 +18,7 @@ import { apiError, apiErrors, apiExpectedRevision, type ApiErrorCode } from "@/l
 // its module graph -- importing the barrel here would put it in all seven.
 import { createEngine, type Engine, type EngineFailure } from "@/lib/engine/engine";
 import type { ShapeBindingError } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import type { SketchConstraintBindingError } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import type { ExpressionError } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { ProjectParameterError } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { directoryProjectStore } from "@/lib/engine/projectStore";
@@ -134,6 +135,8 @@ function parameterError(error: ProjectParameterError) {
     ...(error.code === "parameterInUse" ? {
       dependents: [...(error.dependents ?? [])],
       shapeDependents: (error.shapeDependents ?? []).map(({ shapeId, fields }) => ({ shapeId, fields: [...fields] })),
+      sketchConstraintDependents: (error.sketchConstraintDependents ?? [])
+        .map(({ shapeId, constraintIds }) => ({ shapeId, constraintIds: [...constraintIds] })),
     } : {}),
   });
 }
@@ -154,6 +157,22 @@ function bindingError(error: ShapeBindingError, index: number | undefined) {
   if (error.code === "shapeNotFound") return apiError(message, 404, "shape_not_found", detail);
   if (error.code === "fieldNotBindable") return apiError(message, 422, "unapplicable_fields", { ...detail, fields: [error.field] });
   return apiError(message, 422, "invalid_expression", detail);
+}
+
+/** Maps a sketch constraint binding refusal, in the shape `bindingError` uses for fields. */
+function constraintBindingError(error: SketchConstraintBindingError, index: number | undefined) {
+  const detail = {
+    ...(index === undefined ? { shapeId: error.shapeId } : { index }),
+    constraintId: error.constraintId,
+    reason: error.code,
+    ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
+  };
+  const message = atIndex(error.message, index);
+  if (error.code === "constraintNotBindable" || error.code === "sketchNotRebuildable") {
+    return apiError(message, 422, "unapplicable_fields", detail);
+  }
+  if (error.code === "invalidExpression" || error.code === "outOfRange") return apiError(message, 422, "invalid_expression", detail);
+  return apiError(message, 422, "invalid_request", detail);
 }
 
 /** `detail` adds fields to every refusal; a wrapped binding failure uses it to name the bound shape. */
@@ -230,11 +249,19 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
       return parameterError(failure.error);
     case "binding_invalid":
       return bindingError(failure.error, failure.index);
+    case "constraint_binding_invalid":
+      return constraintBindingError(failure.error, failure.index);
+    case "sketch_unsolvable":
+      return fail(atIndex(failure.message, failure.index), 422, "geometry_failed", {
+        ...(failure.index === undefined ? { shapeId: failure.shapeId } : { index: failure.index }),
+        constraintIds: [...failure.constraintIds],
+      });
     case "binding_failed":
       return apiEngineError(failure.failure, wording, {
         ...detail,
         ...(failure.index === undefined ? { shapeId: failure.shapeId } : { index: failure.index }),
         fields: [...failure.fields],
+        ...(failure.constraintIds ? { constraintIds: [...failure.constraintIds] } : {}),
       });
     default:
       return fail(

@@ -12,6 +12,11 @@ import { normalizeSnapGrid, normalizeWorkspaceSettings } from "./workplaneSettin
 import { cadSketchRegions, cadSketchSweepPaths } from "./sketchCadProfile.js";
 import { PROJECT_PARAMETER_DIMENSIONS, resolveProjectParameters, type ProjectParameterInput } from "./projectParameters.js";
 import { EXPRESSION_BINDABLE_FIELDS, shapeBindingIssues, type ShapeBindingIssue } from "./expressionBindings.js";
+import {
+  SKETCH_CONSTRAINT_BINDABLE_KINDS,
+  sketchConstraintBindingIssues,
+  type SketchConstraintBindingIssue,
+} from "./sketchConstraintBindings.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
@@ -190,6 +195,8 @@ export type SkfRestoredProject = {
   parameters: ProjectParameter[];
   /** Scene bindings that do not resolve. Kept with their stored numbers; see `shapeBindingIssues`. */
   bindingIssues: ShapeBindingIssue[];
+  /** Scene constraint bindings that do not resolve. Kept with their stored values. */
+  constraintBindingIssues: SketchConstraintBindingIssue[];
   migratedFromVersion?: number;
 };
 
@@ -1125,6 +1132,11 @@ function validateSketchProfile(value: unknown, label: string) {
       if (constraintIds.has(id)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.id` });
       constraintIds.add(id);
       const kind = stringValue(constraint.kind, `${constraintLabel}.kind`);
+      // Structure only. An expression that no longer resolves is kept and reported.
+      if (constraint.expression !== undefined && (typeof constraint.expression !== "string" || !constraint.expression.trim()
+        || !SKETCH_CONSTRAINT_BINDABLE_KINDS.some((entry) => entry.kind === kind))) {
+        throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.expression` });
+      }
       if (kind === "fixed") {
         const pointId = stringValue(constraint.pointId, `${constraintLabel}.pointId`);
         if (!pointIds.has(pointId)) throw new LocalizedError("errors.skf.fieldInvalid", { label: `${constraintLabel}.pointId` });
@@ -1958,6 +1970,7 @@ async function restoreV1(
     sketchPlacementWorkplane: normalizePlacementWorkplane(document.editor.sketchPlacementWorkplane),
     parameters,
     bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, parameters),
+    constraintBindingIssues: sketchConstraintBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, parameters),
   } satisfies SkfRestoredProject;
 }
 
@@ -1989,6 +2002,7 @@ function migrateV0(raw: Record<string, unknown>): SkfRestoredProject {
     sketchPlacementWorkplane: normalizePlacementWorkplane(raw.sketchPlacementWorkplane),
     parameters: [],
     bindingIssues: shapeBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, []),
+    constraintBindingIssues: sketchConstraintBindingIssues(hydrated.entries[hydrated.index]?.shapes ?? shapes, []),
     migratedFromVersion: 0,
   };
 }

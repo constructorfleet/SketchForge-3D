@@ -166,6 +166,9 @@ export type SketchSegment = {
   kind?: "line" | "bezier" | "smooth";
 };
 
+/**
+ * Dimensional kinds may carry `expression` (#612). The value field keeps the resolved number.
+ */
 export type SketchConstraint =
   | { id: string; kind: "fixed"; pointId: string; xMm: number; zMm: number }
   | { id: string; kind: "coincident"; pointIds: [string, string] }
@@ -175,11 +178,11 @@ export type SketchConstraint =
   | { id: string; kind: "perpendicular"; segmentIds: [string, string] }
   | { id: string; kind: "tangent"; segmentIds: [string, string] }
   | { id: string; kind: "equalLength"; segmentIds: [string, string] }
-  | { id: string; kind: "angle"; segmentIds: [string, string]; valueDeg: number }
+  | { id: string; kind: "angle"; segmentIds: [string, string]; valueDeg: number; expression?: string }
   | { id: string; kind: "symmetry"; pointIds: [string, string]; segmentId: string }
-  | { id: string; kind: "distance"; pointIds: [string, string]; valueMm: number }
-  | { id: string; kind: "radius"; pointIds: [string, string]; valueMm: number }
-  | { id: string; kind: "diameter"; pointIds: [string, string]; valueMm: number };
+  | { id: string; kind: "distance"; pointIds: [string, string]; valueMm: number; expression?: string }
+  | { id: string; kind: "radius"; pointIds: [string, string]; valueMm: number; expression?: string }
+  | { id: string; kind: "diameter"; pointIds: [string, string]; valueMm: number; expression?: string };
 
 export type SketchImage = {
   id: string;
