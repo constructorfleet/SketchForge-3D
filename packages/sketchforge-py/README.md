@@ -100,6 +100,9 @@ client.parameters.create(project_id, name, expression, dimension) -> ParameterWr
 client.parameters.update(project_id, name, expression=None, dimension=None) -> ParameterWriteResult
 client.parameters.rename(project_id, name, new_name) -> ParameterWriteResult
 client.parameters.delete(project_id, name) -> ParameterDeleteResult
+
+client.sketch_constraints.bind(project_id, shape_id, constraint_id, expression) -> SketchConstraintBindResult
+client.sketch_constraints.unbind(project_id, shape_id, constraint_id) -> SketchConstraintBindResult
 ```
 
 ### Parameters and expressions
@@ -114,7 +117,9 @@ changed.shapes  # the rebuilt box, now 15 mm wide
 project.bind_expressions(box.id, {"width": None})  # unbinds; the width stays 15
 ```
 
-Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter` and `bind_expressions`.
+Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve, and `constraint_binding_issues`, the sketch constraint bindings that no longer resolve or that conflict with a bound size field. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter`, `bind_expressions` and `bind_sketch_constraint`.
+
+`sketch_constraints.bind` binds a sketch output's `distance`, `radius`, `diameter` or `angle` constraint to an expression, re-solves the sketch and rebuilds the solid. `shape_id` is the output or its `sketchSourceId`, and `None` removes the binding and keeps the value. `ShapeSummary.sketch_constraints` lists each dimensional constraint as a `SketchConstraintSummary` (`id`, `kind`, `value`, `expression`). It is read-only; change constraints in `sketchProfile` or through `bind`.
 
 `as_patch` keeps `expressions`, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `None` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expected_revision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
 

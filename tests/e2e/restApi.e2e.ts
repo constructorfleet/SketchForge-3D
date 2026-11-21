@@ -666,4 +666,52 @@ describe("the REST API over HTTP", () => {
     const cycle = await api(`/parameters?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "loop", expression: "loop + 1", dimension: "length" }) });
     expect(cycle).toMatchObject({ status: 422, body: { code: "invalid_expression", expressionError: { code: "cycle" } } });
   });
+
+  it("binds sketch constraints over HTTP, by route and by profile, and re-solves them on a parameter change", async () => {
+    const project = await api("/projects", { method: "POST", body: JSON.stringify({ name: "E2E sketch constraints" }) });
+    const id = (project.body.project as Record<string, string>).id;
+    const side = await api(`/parameters?projectId=${id}`, { method: "POST", body: JSON.stringify({ name: "side", expression: "3", dimension: "length" }) });
+    expect(side.status, JSON.stringify(side.body)).toBe(201);
+    const section = [["a", -1, -1], ["b", 1, -1], ["c", 1, 1], ["d", -1, 1]].map(([pointId, x, z]) => ({ id: pointId, x, z, sweepRole: "section" }));
+    const profile = {
+      points: [...section, { id: "p0", x: 0, z: 0, sweepRole: "spine" }, { id: "p1", x: 10, z: 0, sweepRole: "spine" }],
+      segments: [["ab", "a", "b"], ["bc", "b", "c"], ["cd", "c", "d"], ["da", "d", "a"], ["spine", "p0", "p1"]].map(([segmentId, startId, endId]) => ({ id: segmentId, startId, endId })),
+      constraints: [
+        { id: "fix-a", kind: "fixed", pointId: "a", xMm: -1, zMm: -1 },
+        { id: "h-ab", kind: "horizontal", segmentId: "ab" }, { id: "v-bc", kind: "vertical", segmentId: "bc" },
+        { id: "h-cd", kind: "horizontal", segmentId: "cd" }, { id: "v-da", kind: "vertical", segmentId: "da" },
+        { id: "width", kind: "distance", pointIds: ["a", "b"], valueMm: 2 },
+        { id: "depth", kind: "distance", pointIds: ["b", "c"], valueMm: 2 },
+      ],
+    };
+    const created = await api(`/shapes?projectId=${id}`, { method: "POST", body: JSON.stringify({ kind: "sketchSweep", name: "Bar", profile }) });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const bar = (created.body.shapes as Array<Record<string, any>>)[0];
+    const volume = async () => ((await api(`/properties?projectId=${id}&shapeId=${bar.id}`)).body.properties as Record<string, number>).volume;
+    expect(await volume()).toBeCloseTo(40, 2);
+
+    const stale = await api(`/sketch-constraints?projectId=${id}&shapeId=${bar.id}&constraintId=width`, {
+      method: "PATCH", body: JSON.stringify({ expression: "side" }), headers: { "If-Match": `"${side.body.revision}"` },
+    });
+    expect(stale).toMatchObject({ status: 409, body: { code: "revision_mismatch" } });
+    const bound = await api(`/sketch-constraints?projectId=${id}&shapeId=${bar.id}&constraintId=width`, { method: "PATCH", body: JSON.stringify({ expression: "side" }) });
+    expect(bound.status, JSON.stringify(bound.body)).toBe(200);
+    expect(bound.body.constraint).toEqual({ id: "width", kind: "distance", value: 3, expression: "side" });
+    expect(await volume()).toBeCloseTo(60, 2);
+
+    // A new expression in a PATCH /shapes profile binds rather than being dropped.
+    const shape = bound.body.shape as Record<string, any>;
+    const sketchProfile = { ...shape.sketchProfile, constraints: shape.sketchProfile.constraints.map((constraint: Record<string, unknown>) => (constraint.id === "depth" ? { ...constraint, expression: "side" } : constraint)) };
+    const patched = await api(`/shapes?projectId=${id}&shapeId=${bar.id}`, { method: "PATCH", body: JSON.stringify({ sketchProfile }) });
+    expect(patched.status, JSON.stringify(patched.body)).toBe(200);
+    expect((patched.body.shape as Record<string, any>).sketchConstraints).toEqual([
+      { id: "width", kind: "distance", value: 3, expression: "side" },
+      { id: "depth", kind: "distance", value: 3, expression: "side" },
+    ]);
+    expect(await volume()).toBeCloseTo(90, 2);
+
+    const changed = await api(`/parameters?projectId=${id}&name=side`, { method: "PATCH", body: JSON.stringify({ expression: "4" }) });
+    expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    expect(await volume()).toBeCloseTo(160, 2);
+  });
 });

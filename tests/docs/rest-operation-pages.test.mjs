@@ -26,8 +26,8 @@ test("REST operation reference generator publishes every OpenAPI operation with 
       .map(([method, operation]) => ({ route, method, ...operation })));
     const pages = readdirSync(output).filter((entry) => entry.endsWith(".md") && entry !== "index.md");
 
-    assert.equal(operations.length, 32);
-    assert.equal(pages.length, 32);
+    assert.equal(operations.length, 33);
+    assert.equal(pages.length, 33);
     const firstOutput = readOutput(output);
     for (const operation of operations) {
       const markdown = readFileSync(path.join(output, `${operation.operationId}.md`), "utf8");
@@ -47,7 +47,7 @@ test("REST operation reference generator publishes every OpenAPI operation with 
     }
 
     const index = readFileSync(path.join(output, "index.md"), "utf8");
-    assert.equal((index.match(/\]\(\.\/[^)]+\.md\)/g) ?? []).length, 32);
+    assert.equal((index.match(/\]\(\.\/[^)]+\.md\)/g) ?? []).length, 33);
     assert.match(index, /OpenAPI contract/);
     execFileSync(process.execPath, [operationPagesScript, "--output-dir", output], { cwd: root });
     assert.deepEqual(readOutput(output), firstOutput, "generation from the same OpenAPI input is deterministic");

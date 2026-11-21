@@ -80,6 +80,7 @@ const CALL_ARGUMENTS: Record<string, unknown[]> = {
   createParameter: [PROJECT_ID, { name: "wall", expression: "2 mm", dimension: "length" }],
   updateParameter: [PROJECT_ID, "wall", { expression: "3 mm" }],
   deleteParameter: [PROJECT_ID, "wall"],
+  bindSketchConstraint: [PROJECT_ID, SHAPE_ID, "width", "wall * 2"],
 };
 const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   ...CALL_ARGUMENTS,
@@ -109,6 +110,7 @@ const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "patterns.row": [PROJECT_ID, [SHAPE_ID], 2, 1],
   "patterns.ring": [PROJECT_ID, [SHAPE_ID], 2, { x: 0, z: 0 }],
   "parameters.rename": [PROJECT_ID, "wall", "shell"],
+  "sketchConstraints.unbind": [PROJECT_ID, SHAPE_ID, "width"],
 };
 const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "projects.get": [PROJECT_ID],
@@ -134,6 +136,7 @@ const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "imports.apply": [PROJECT_ID, "mesh.stl", "fixture", "model/stl"],
   "exports.file": [PROJECT_ID, "stl"],
   "parameters.rename": [PROJECT_ID, "wall", "shell"],
+  "sketch_constraints.unbind": [PROJECT_ID, SHAPE_ID, "width"],
 };
 
 type CapturedRequest = { method: string; pathname: string; query?: string; body?: string | null };

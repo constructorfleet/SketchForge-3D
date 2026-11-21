@@ -22,6 +22,7 @@ import { Interference } from "./resources/interference.js";
 import { Measurements } from "./resources/measurements.js";
 import { Mirrors } from "./resources/mirrors.js";
 import { Parameters } from "./resources/parameters.js";
+import { SketchConstraints } from "./resources/sketch-constraints.js";
 import { Parts } from "./resources/parts.js";
 import { Projects } from "./resources/projects.js";
 import { Properties } from "./resources/properties.js";
@@ -41,6 +42,7 @@ import type {
   ParameterList,
   ParameterRequest,
   ParameterWriteResult,
+  SketchConstraintBindResult,
   ShapeExpressionChanges,
   ShapePatchResult,
   AlignResult,
@@ -103,6 +105,7 @@ export const CLIENT_RESOURCE_OPERATIONS = {
   groups: { groupShapes: ["group"], ungroupShape: ["ungroup"] },
   parts: { splitParts: ["separate"] },
   parameters: { listParameters: ["list"], createParameter: ["create"], updateParameter: ["update", "rename"], deleteParameter: ["delete"] },
+  sketchConstraints: { bindSketchConstraint: ["bind", "unbind"] },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, readonly string[]>> | readonly []>>;
 
 /** Convenience methods that emit a sequence of REST operations rather than one route. */
@@ -134,6 +137,7 @@ export class SketchForgeClient {
   readonly groups: Groups;
   readonly parts: Parts;
   readonly parameters: Parameters;
+  readonly sketchConstraints: SketchConstraints;
   private readonly transport: Transport;
 
   constructor(options: SketchForgeClientOptions) {
@@ -161,6 +165,7 @@ export class SketchForgeClient {
     this.groups = new Groups(this.transport);
     this.parts = new Parts(this.transport);
     this.parameters = new Parameters(this.transport);
+    this.sketchConstraints = new SketchConstraints(this.transport);
   }
 
   get apiRoot() {
@@ -250,6 +255,11 @@ export class ProjectHandle {
 
   deleteParameter(name: string): Promise<ParameterDeleteResult> {
     return this.client.parameters.delete(this.id, name);
+  }
+
+  /** Binds a sketch dimensional constraint; `null` clears the binding and keeps the value. */
+  bindSketchConstraint(shapeId: string, constraintId: string, expression: string | null): Promise<SketchConstraintBindResult> {
+    return this.client.sketchConstraints.bind(this.id, shapeId, constraintId, expression);
   }
 
   remove(shapeId: string) {

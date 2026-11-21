@@ -120,7 +120,8 @@ import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectP
 import {
   boundSketchConstraints,
   conflictingConstraintBinding,
-  literalSketchProfile,
+  echoesSketchConstraints,
+  requestedSketchProfile,
   profileSizeFields,
   rebuildableSketch,
   resolveSketchConstraintBinding,
@@ -260,7 +261,7 @@ export type EngineFailure =
   /** The `kind` asked for is not one that can be built from parameters. */
   | { reason: "unsupported_kind"; index: number; kinds: string[] }
   /** The request is malformed in a way only the request itself can explain. */
-  | { reason: "invalid_shape_request"; message: string; index?: number; shapeId?: string; field?: string }
+  | { reason: "invalid_shape_request"; message: string; index?: number; shapeId?: string; field?: string; constraintId?: string }
   /** A revolve or a thread was described but could not be swept. */
   | { reason: "sweep_failed"; message: string; index?: number }
   /**
@@ -1940,14 +1941,71 @@ export function createEngine(store: ProjectStore): Engine {
         const conflict = conflictingLiteral(before, changes, expressions, document.parameters ?? [], before);
         if (conflict) return failed({ reason: "invalid_shape_request", shapeId, ...conflict });
       }
-      // A supplied profile's constraint values are literals; see `literalSketchProfile`.
-      const request = changes.sketchProfile && typeof changes.sketchProfile === "object" ? {
-        ...changes,
-        sketchProfile: literalSketchProfile(
-          findSketchOutputShape(document.shapes, shapeId)?.shape.sketchProfile,
+      // A summary's sketchConstraints is read-only: an echo is ignored, an edit is refused rather than dropped.
+      if (Object.hasOwn(changes, "sketchConstraints")
+        && !echoesSketchConstraints(findSketchOutputShape(document.shapes, shapeId)?.shape.sketchProfile, changes.sketchConstraints)) {
+        return failed({
+          reason: "invalid_shape_request",
+          shapeId,
+          field: "sketchConstraints",
+          message: "sketchConstraints is read-only. Change a constraint in sketchProfile, or bind it with the sketch-constraints operation.",
+        });
+      }
+      // Constraint expressions in a sent profile follow the field rules; see `requestedSketchProfile`.
+      let request = changes;
+      if (changes.sketchProfile && typeof changes.sketchProfile === "object") {
+        const target = findSketchOutputShape(document.shapes, shapeId);
+        // Refused before any planning or solve, as bindSketchConstraint refuses it.
+        if (target?.locked && !(target.locked === target.shape.id && changes.locked === false)) {
+          return failed({ reason: "shape_locked", ids: [target.locked] });
+        }
+        const planned = requestedSketchProfile(
+          target?.shape.id ?? shapeId,
+          target?.shape.sketchProfile,
           changes.sketchProfile as SketchProfile,
-        ),
-      } : changes;
+          document.parameters ?? [],
+        );
+        if (!planned.ok) {
+          return "error" in planned
+            ? failed({ reason: "constraint_binding_invalid", error: planned.error })
+            : failed({ reason: "invalid_shape_request", shapeId, ...planned.contradiction });
+        }
+        let sketchProfile = planned.profile;
+        if (target && planned.bound.length) {
+          const constraintId = planned.bound[0]!;
+          // A literal resize would unbind the constraint this request binds.
+          const resized = profileSizeFields(target.shape).find((field) => {
+            const requested = requestedBindingValue(changes, field);
+            return requested !== undefined && requested !== boundFieldValue(target.shape, field);
+          });
+          if (resized) {
+            return failed({
+              reason: "invalid_shape_request",
+              shapeId,
+              field: resized,
+              constraintId,
+              message: `${resized} resizes the sketch, which unbinds ${constraintId}. Send the size or the binding, not both.`,
+            });
+          }
+          if (!rebuildableSketch(target.shape, target.topLevel)) {
+            return failed({ reason: "constraint_binding_invalid", error: sketchNotRebuildable(target.shape.id, constraintId) });
+          }
+          const cleared = Object.keys(expressions).filter((field) => expressions[field] === null);
+          const conflict = conflictingConstraintBinding(withoutBindings(target.shape, cleared), constraintId);
+          if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
+        }
+        if (target && Object.keys(planned.values).length) {
+          const solved = solvedSketchProfile({ ...target.shape, sketchProfile }, planned.values);
+          if (!solved.ok) return solved;
+          sketchProfile = solved.value;
+        }
+        // A size equal to the stored one is an echo. Applied after the rebuild, it would undo the new profile.
+        // An echoed position still applies, so a whole summary keeps the shape where the caller read it.
+        const echoedSizes: readonly string[] = target
+          ? (["width", "depth", "height"] as const).filter((field) => changes[field] !== undefined && changes[field] === target.shape[field])
+          : [];
+        request = { ...Object.fromEntries(Object.entries(changes).filter(([field]) => !echoedSizes.includes(field))), sketchProfile };
+      }
       const changed = await changeShapeIn(document, shapeId, request);
       if (!changed.ok) return refused(changed.failure);
       const named = boundFieldsNamedBy(changes);

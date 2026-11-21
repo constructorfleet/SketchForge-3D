@@ -410,7 +410,22 @@ export type ShapeSummary = {
   groupedCount?: number;
   /** Bound fields' expressions. Each bound field still carries its resolved number. */
   expressions?: Record<string, string>;
+  /** A sketch output's dimensional constraints. Read-only: change them in `sketchProfile` or with `sketchConstraints.bind`. */
+  sketchConstraints?: SketchConstraintSummary[];
 } & TaperFields;
+
+/** One dimensional constraint: its resolved value in mm or degrees, and its expression when bound. */
+export type SketchConstraintSummary = {
+  id: string;
+  kind: "distance" | "radius" | "diameter" | "angle";
+  value: number;
+  expression?: string;
+};
+
+export type SketchConstraintBindResult = { shape: ShapeSummary; constraint: SketchConstraintSummary; revision: number };
+
+/** A constraint binding that no longer resolves, or that conflicts with a bound size field (`fields`). */
+export type ConstraintBindingIssue = { shapeId: string; constraintId: string; fields?: string[] } & ParameterIssue;
 
 export type ProjectSummary = {
   id: string;
@@ -856,7 +871,12 @@ export type ProjectParameter = {
 /** A shape binding that no longer resolves. */
 export type BindingIssue = { shapeId: string; field: string } & ParameterIssue;
 
-export type ParameterList = { parameters: ProjectParameter[]; bindingIssues: BindingIssue[]; revision: number };
+export type ParameterList = {
+  parameters: ProjectParameter[];
+  bindingIssues: BindingIssue[];
+  constraintBindingIssues: ConstraintBindingIssue[];
+  revision: number;
+};
 
 export type ParameterRequest = { name: string; expression: string; dimension: ParameterDimension };
 

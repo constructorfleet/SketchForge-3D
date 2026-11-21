@@ -82,8 +82,8 @@ so stale tracked output alone does not fail the docs check.
 ## REST API coverage
 
 [`apps/web/src/lib/apiV1OperationContract.ts`](../apps/web/src/lib/apiV1OperationContract.ts)
-registers all 36 public route operations, and route tests check parity between
-the registry and handlers. 32 operations have runtime-backed request and
+registers all 37 public route operations, and route tests check parity between
+the registry and handlers. 33 operations have runtime-backed request and
 response contracts and appear in generated OpenAPI. The four `OPTIONS`
 preflights are intentionally omitted; all resource route coverage is complete.
 `POST /mirrors` validates normalized IDs, axis selection, response shape,
@@ -104,7 +104,7 @@ See the [REST API guide](./REST_API.md#sketch-sweeps) and the
 ## Durable gaps
 
 - **REST contracts and generated operation pages — met for resource operations:**
-  all 32 non-OPTIONS resource operations have runtime-backed OpenAPI contracts
+  all 33 non-OPTIONS resource operations have runtime-backed OpenAPI contracts
   and generated Pages references with authentication, parameters, request and
   response schemas, errors, and source links. The four omitted operations are
   preflight-only `OPTIONS` handlers. The REST API guide links to the generated

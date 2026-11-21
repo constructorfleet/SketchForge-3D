@@ -139,6 +139,12 @@ function stepAssemblyNodeSchema(remainingDepth: number): ApiV1FieldSchema {
     additionalProperties: false,
   };
 }
+const sketchConstraintSummary = {
+  type: "object",
+  required: ["id", "kind", "value"],
+  properties: { id: str, kind: { type: "string", enum: ["distance", "radius", "diameter", "angle"] }, value: num, expression: str },
+  additionalProperties: false,
+} as const;
 const shapeSummary = {
   type: "object",
   required: ["id", "name", "kind", "color", "hole", "locked", "hidden", "x", "z", "elevation", "width", "depth", "rotation", "rotationX", "rotationZ"],
@@ -216,6 +222,11 @@ const shapeSummary = {
       description: "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
       additionalProperties: str,
     },
+    sketchConstraints: {
+      type: "array",
+      description: "The sketch's dimensional constraints: resolved value in mm or degrees, and the bound expression if any.",
+      items: sketchConstraintSummary,
+    },
     revolve: { type: "object", additionalProperties: true },
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
@@ -243,6 +254,8 @@ const withBindingDetail = (schema: ApiV1FieldSchema): ApiV1FieldSchema => ({
     shapeId: str,
     field: str,
     fields: { type: "array", items: str },
+    constraintId: str,
+    constraintIds: { type: "array", items: str },
     index: int,
     reason: str,
   },
@@ -563,6 +576,12 @@ const bindingIssueSchema = {
   properties: { shapeId: str, field: str, code: str, message: str, expressionError: expressionErrorSchema },
   additionalProperties: false,
 } as const;
+const constraintBindingIssueSchema = {
+  type: "object",
+  required: ["shapeId", "constraintId", "code", "message"],
+  properties: { shapeId: str, constraintId: str, code: str, message: str, expressionError: expressionErrorSchema, fields: { type: "array", items: str } },
+  additionalProperties: false,
+} as const;
 /** The error body, with the fields a parameter or binding refusal adds. */
 const parameterErrorSchema = {
   ...errorSchema,
@@ -611,8 +630,13 @@ const parameterOperations = [
     responseSchemas: {
       200: {
         type: "object",
-        required: ["parameters", "bindingIssues", "revision"],
-        properties: { parameters: { type: "array", items: parameterSchema }, bindingIssues: { type: "array", items: bindingIssueSchema }, revision: num },
+        required: ["parameters", "bindingIssues", "constraintBindingIssues", "revision"],
+        properties: {
+          parameters: { type: "array", items: parameterSchema },
+          bindingIssues: { type: "array", items: bindingIssueSchema },
+          constraintBindingIssues: { type: "array", items: constraintBindingIssueSchema },
+          revision: num,
+        },
         additionalProperties: false,
       },
       ...parameterReadErrors,
@@ -661,6 +685,37 @@ const parameterOperations = [
     },
   },
 ] as const satisfies readonly ApiV1Operation[];
+
+const constraintErrorSchema = {
+  ...parameterErrorSchema,
+  properties: {
+    ...parameterErrorSchema.properties,
+    constraintId: str,
+    constraintIds: { type: "array", description: "Constraints the sketch could not satisfy, or the bound ones a size binding conflicts with.", items: str },
+  },
+} as const;
+const sketchConstraintOperation = {
+  ...operation("PATCH", "/api/v1/sketch-constraints", "bindSketchConstraint", [200, 400, 401, 404, 409, 422, 500, 503], json({
+    type: "object",
+    required: ["expression"],
+    properties: { expression: { ...parameterExpression, nullable: true, description: "A parameter expression, or null to remove the binding and keep the value." } },
+    additionalProperties: false,
+  })),
+  description: "Binds a dimensional sketch constraint to an expression, re-solves the sketch and rebuilds its output, or unbinds it with null. shapeId is the output or its sketchSourceId.",
+  query: {
+    required: ["projectId", "shapeId", "constraintId"],
+    properties: { ...shapeQuery.properties, constraintId: { type: "string", trim: true, minLength: 1, maxLength: 200 } },
+  },
+  responseSchemas: {
+    200: {
+      type: "object",
+      required: ["shape", "constraint", "revision"],
+      properties: { shape: shapeSummary, constraint: sketchConstraintSummary, revision: num },
+      additionalProperties: false,
+    },
+    400: constraintErrorSchema, 401: errorSchema, 404: constraintErrorSchema, 409: constraintErrorSchema, 422: constraintErrorSchema, 500: errorSchema, 503: errorSchema,
+  },
+} as const satisfies ApiV1Operation;
 
 const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
 const patternRequest = {
@@ -1100,6 +1155,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
   { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
   shapeOperations[3],
   ...parameterOperations,
+  sketchConstraintOperation,
   ...featureOperations.slice(2, 3),
   {
     ...operation("GET", "/api/v1/thickness", "estimateThickness", [200, 400, 401, 404, 413, 422, 500, 503]),
