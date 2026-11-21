@@ -5,7 +5,9 @@ import {
   applyBindingsLocally,
   hostProjectSync,
   mergeRecomputedShapes,
+  parameterDeleteWarning,
   parameterRecomputeResponseMessage,
+  planParameterEdit,
   recomputeScope,
 } from "@/lib/projectParameterEdits";
 import type { WorkplaneShape } from "@/types/sketchforge";
@@ -106,5 +108,37 @@ describe("hostProjectSync", () => {
     expect(hostProjectSync({ ...base, echoShapesKey: null })).toEqual({ adoptTable: false, action: "unchanged" });
     expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" })).toEqual({ adoptTable: false, action: "hydrate" });
     expect(hostProjectSync({ ...base, projectChanged: true })).toEqual({ adoptTable: true, action: "hydrate" });
+  });
+});
+
+describe("sketch constraint bindings (#612)", () => {
+  function sketch(id: string, expression?: string): WorkplaneShape {
+    return box(id, {
+      name: "Sketch",
+      sketchOperation: "extrude",
+      sketchProfile: {
+        points: [{ id: "a", x: 0, z: 0 }, { id: "b", x: 10, z: 0 }],
+        segments: [{ id: "ab", startId: "a", endId: "b" }],
+        constraints: [{ id: "c1", kind: "distance", pointIds: ["a", "b"], valueMm: 10, ...(expression ? { expression } : {}) }],
+      } as never,
+    });
+  }
+
+  it("count as dependents for recompute, scope and the local fallback", () => {
+    const planned = planParameterEdit({ parameters: before, shapes: [sketch("s", "w")] }, { kind: "update", name: "w", expression: "20" });
+    expect(planned.ok && planned.recompute).toBe(true);
+    expect(recomputeScope([box("other"), sketch("s", "h")], before, after).map((shape) => shape.id)).toEqual(["s"]);
+    expect(applyBindingsLocally([sketch("s", "w")], before, after)).toBeNull();
+  });
+
+  it("are listed before delete and released with the shapes, keeping the value", () => {
+    const project = { parameters: before, shapes: [sketch("s", "free")] };
+    expect(parameterDeleteWarning(project, "free")).toEqual({ parameters: [], shapes: [{ shapeId: "s", name: "Sketch", fields: [], constraints: ["c1"] }] });
+    const released = planParameterEdit(project, { kind: "delete", name: "free", releaseShapes: true });
+    expect(released.ok).toBe(true);
+    if (!released.ok) return;
+    const constraint = released.project.shapes[0]!.sketchProfile!.constraints![0] as { valueMm: number; expression?: string };
+    expect(constraint.valueMm).toBe(10);
+    expect(constraint.expression).toBeUndefined();
   });
 });

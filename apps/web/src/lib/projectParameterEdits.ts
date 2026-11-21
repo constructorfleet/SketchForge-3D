@@ -17,6 +17,7 @@ import {
 } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { bindableField, boundFieldValue, parameterShapeDependents, resolveShapeBindings, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
 import { REQUESTABLE_SHAPE_KINDS, shapeWithRequestedChanges } from "@constructorfleet/sketchforge-engine/shapeRequests";
+import { boundSketchConstraints, parameterSketchConstraintDependents, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import { expressionDependencies, type ExpressionErrorCode } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { MessageKey } from "@/i18n/locales";
 import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
@@ -53,6 +54,11 @@ function releaseShapeBindings(shapes: readonly WorkplaneShape[], name: string): 
       .filter(([, expression]) => expressionDependencies(expression).includes(name))
       .map(([field]) => field);
     let next = withoutBindings(shape, fields);
+    const constraints = boundSketchConstraints(shape).filter(({ expression }) => expressionDependencies(expression).includes(name));
+    if (constraints.length && next.sketchProfile) {
+      // The constraint keeps its solved value; only the expression goes.
+      next = { ...next, sketchProfile: withSketchConstraintValues(next.sketchProfile, {}, Object.fromEntries(constraints.map(({ constraint }) => [constraint.id, null]))) };
+    }
     if (shape.groupedShapes) {
       const children = shape.groupedShapes.map(release);
       if (children.some((child, index) => child !== shape.groupedShapes![index])) next = { ...next, groupedShapes: children };
@@ -83,7 +89,9 @@ function runEdit(project: ParameterProject, edit: ParameterEdit): ProjectParamet
       return renameParameter(project, edit.name, edit.newName);
     case "delete": {
       const dependents = projectParameterDependents(project, edit.name);
-      if (!edit.releaseShapes || dependents.parameters.length || !dependents.shapes.length) return deleteParameter(project, edit.name);
+      if (!edit.releaseShapes || dependents.parameters.length || (!dependents.shapes.length && !dependents.sketchConstraints.length)) {
+        return deleteParameter(project, edit.name);
+      }
       return deleteParameter({ ...project, shapes: releaseShapeBindings(project.shapes, edit.name) }, edit.name);
     }
   }
@@ -95,9 +103,11 @@ export function planParameterEdit(project: ParameterProject, edit: ParameterEdit
   if (!result.ok) return result;
   const next = { parameters: result.project.parameters, shapes: result.project.shapes };
   // A renamed binding keeps its value; only a stale one naming the new name can move.
+  const bound = (shapes: readonly WorkplaneShape[], name: string) =>
+    parameterShapeDependents(shapes, name).length > 0 || parameterSketchConstraintDependents(shapes, name).length > 0;
   const recompute = edit.kind === "rename"
-    ? edit.newName !== edit.name && parameterShapeDependents(project.shapes, edit.newName).length > 0
-    : changedNames(project.parameters, next.parameters).some((name) => parameterShapeDependents(next.shapes, name).length > 0);
+    ? edit.newName !== edit.name && bound(project.shapes, edit.newName)
+    : changedNames(project.parameters, next.parameters).some((name) => bound(next.shapes, name));
   return { ok: true, project: next, recompute };
 }
 
@@ -113,18 +123,24 @@ function shapeNameIndex(shapes: readonly WorkplaneShape[]) {
 
 export type ParameterDeleteWarning = {
   parameters: string[];
-  shapes: Array<{ shapeId: string; name: string; fields: readonly string[] }>;
+  /** `fields` are bound shape fields; `constraints` are bound sketch constraint IDs. */
+  shapes: Array<{ shapeId: string; name: string; fields: readonly string[]; constraints: readonly string[] }>;
 };
 
 /** Lists what still references `name`, or null when it can be deleted outright. */
 export function parameterDeleteWarning(project: ParameterProject, name: string): ParameterDeleteWarning | null {
   const dependents = projectParameterDependents(project, name);
-  if (!dependents.parameters.length && !dependents.shapes.length) return null;
+  if (!dependents.parameters.length && !dependents.shapes.length && !dependents.sketchConstraints.length) return null;
   const names = shapeNameIndex(project.shapes);
-  return {
-    parameters: dependents.parameters,
-    shapes: dependents.shapes.map(({ shapeId, fields }) => ({ shapeId, name: names.get(shapeId) ?? shapeId, fields })),
+  const byShape = new Map<string, { shapeId: string; name: string; fields: readonly string[]; constraints: readonly string[] }>();
+  const entry = (shapeId: string) => {
+    const found = byShape.get(shapeId) ?? { shapeId, name: names.get(shapeId) ?? shapeId, fields: [], constraints: [] };
+    byShape.set(shapeId, found);
+    return found;
   };
+  dependents.shapes.forEach(({ shapeId, fields }) => { entry(shapeId).fields = fields; });
+  dependents.sketchConstraints.forEach(({ shapeId, constraintIds }) => { entry(shapeId).constraints = constraintIds; });
+  return { parameters: dependents.parameters, shapes: [...byShape.values()] };
 }
 
 const UNIT_LABELS: Record<ProjectParameterDimension, string> = { length: "mm", angle: "°", unitless: "" };
@@ -240,6 +256,12 @@ export function parameterEditFailureMessage(failure: ParameterEditFailure | null
     if (code === "notAnInteger") return { key: "editor.parameters.error.notAnInteger", values: { shape, field } };
     return shape ? { key: "editor.parameters.error.recomputeFailed", values: { shape, field } } : { key: "editor.parameters.error.recomputeFailedGeneric", values: {} };
   }
+  if (failure.reason === "constraint_binding_invalid" && failure.error) {
+    const shape = shapeName(failure.error.shapeId);
+    const field = String(failure.error.constraintId ?? "");
+    return shape ? { key: "editor.parameters.error.recomputeFailed", values: { shape, field } } : { key: "editor.parameters.error.recomputeFailedGeneric", values: {} };
+  }
+  if (failure.reason === "sketch_unsolvable") return { key: "editor.parameters.error.sketchUnsolvable", values: { shape: shapeName(failure.shapeId) } };
   if (failure.reason === "binding_failed") {
     const shape = shapeName(failure.shapeId);
     if (failure.failure?.reason === "shape_locked") return { key: "editor.parameters.error.shapeLocked", values: { shape } };
@@ -249,7 +271,8 @@ export function parameterEditFailureMessage(failure: ParameterEditFailure | null
 }
 
 function dependsOn(shape: WorkplaneShape, names: ReadonlySet<string>) {
-  return Object.values(shape.expressions ?? {}).some((expression) => expressionDependencies(expression).some((name) => names.has(name)));
+  const reads = (expression: string) => expressionDependencies(expression).some((name) => names.has(name));
+  return Object.values(shape.expressions ?? {}).some(reads) || boundSketchConstraints(shape).some(({ expression }) => reads(expression));
 }
 
 function treeDependsOn(shape: WorkplaneShape, names: ReadonlySet<string>): boolean {

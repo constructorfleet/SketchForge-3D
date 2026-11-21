@@ -332,7 +332,10 @@ function DeleteWarning({
           <p>{t("editor.parameters.usedByShapes")}</p>
           <ul>
             {warning.shapes.map((shape) => (
-              <li key={shape.shapeId}>{t("editor.parameters.shapeFields", { shape: shape.name, fields: shape.fields.join(", ") })}</li>
+              <li key={shape.shapeId}>{t("editor.parameters.shapeFields", {
+                shape: shape.name,
+                fields: [...shape.fields, ...shape.constraints.map((id) => t("editor.parameters.constraintLabel", { id }))].join(", "),
+              })}</li>
             ))}
           </ul>
         </>

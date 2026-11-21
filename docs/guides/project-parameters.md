@@ -92,7 +92,7 @@ model is unchanged.
 ## Delete a parameter that is in use
 
 When other parameters or shapes use a parameter, **Delete** shows a warning that
-lists them, with the bound fields of each shape.
+lists them, with the bound fields and sketch constraints of each shape.
 
 ![The delete warning for post_d lists the Post shape and its bound fields.](../screenshots/parameter-panel-delete-warning.png)
 
@@ -100,7 +100,7 @@ lists them, with the bound fields of each shape.
 
 - If a parameter uses it, the delete is blocked. Change that parameter first.
 - If only shapes use it, **Delete and keep shape values** removes the parameter
-  and the bindings that use it. Each shape keeps its current size and stops
+  and the field and constraint bindings that use it. Each shape keeps its current size and stops
   following the parameter. Undo restores the parameter and the bindings.
 
 ## Changes from REST or MCP
