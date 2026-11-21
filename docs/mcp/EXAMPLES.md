@@ -39,7 +39,7 @@ The [example source](./examples/local-stl-import.mjs) validates each call agains
 
 ## Drive a shape from parameters
 
-Six tools manage a project's named parameters and bind shape fields and sketch dimensions to them. They work in local mode, against a server when a tool call passes `url` (through REST v1 [parameters and expressions](../REST_API.md#parameters-and-expressions) and [sketch constraint bindings](../REST_API.md#binding-sketch-constraints), which need `SKETCHFORGE_API_TOKEN`), and on a server's `/mcp` endpoint.
+Six tools manage a project's named parameters and bind shape fields and sketch dimensions to them, and six more manage [configurations](#configurations). They work in local mode, against a server when a tool call passes `url` (through REST v1 [parameters and expressions](../REST_API.md#parameters-and-expressions) and [sketch constraint bindings](../REST_API.md#binding-sketch-constraints), which need `SKETCHFORGE_API_TOKEN`), and on a server's `/mcp` endpoint.
 
 | Tool | Does |
 | --- | --- |
@@ -62,6 +62,18 @@ The last call answers `created: false` and lists the box with `width: 15`. A bar
 
 With `url`, these tools write the server's stored project through REST, while `sketchforge_create_shape`, `sketchforge_update_object` and the other editor tools act on an open editor tab through its bridge. The parameter tools therefore bind the shapes stored under `projectId`, and an open editor tab, which keeps its own copy, need not show the change.
 
+### Configurations
+
+A configuration is a named set of parameter overrides, such as a `large` variant where `wall` is `3`. Six tools manage them: `sketchforge_list_parameter_configurations`, `sketchforge_create_parameter_configuration`, `sketchforge_rename_parameter_configuration`, `sketchforge_set_configuration_override`, `sketchforge_delete_parameter_configuration` and `sketchforge_activate_parameter_configuration`. They call `/api/v1/parameter-configurations` in remote mode.
+
+```json
+{ "name": "sketchforge_create_parameter_configuration", "arguments": { "projectId": "bracket", "name": "large", "overrides": { "wall": "3" } } }
+{ "name": "sketchforge_activate_parameter_configuration", "arguments": { "projectId": "bracket", "name": "large" } }
+{ "name": "sketchforge_activate_parameter_configuration", "arguments": { "projectId": "bracket", "name": null } }
+```
+
+Creating a configuration does not activate it. Activating one, or changing an override of the active one, rebuilds every bound shape in the same write and lists the rebuilt shapes in `shapes`; `name: null` returns to the base table. Every write replies with `configurations`, `activeConfiguration` and the table as the active configuration resolves it. A refused activation, for example one whose override would make a bound width negative (`invalid_expression` with `reason: "outOfRange"`), leaves the project, the active configuration and the geometry as they were. Deleting the active configuration returns the project to the base table. Unknown and duplicate names answer `configuration_not_found` and `configuration_exists`.
+
 ### Refusals
 
 A refusal is an MCP tool error. Its first line ends with the REST error code in brackets; a second line, when present, holds the detail as JSON. Local mode builds both from the engine's REST error mapping and request checks, so it answers exactly as remote mode does:
@@ -83,6 +95,7 @@ Parameter "wall" is used by lip, shape <box id>. [parameter_in_use]
 | `invalid_request` | A bad name or dimension, an empty expression or one over 10,000 characters (the sentence says so), or a set with neither field. | `parameter`, `reason` when the engine refused it |
 | `invalid_project_id`, `invalid_shape_id` | `projectId` or `shapeId` is missing, blank or malformed. | |
 | `limit_exceeded` | The table is full. | |
+| `configuration_not_found`, `configuration_exists` | A configuration name that does not exist, or one already taken. | `configuration` |
 | `shape_not_found`, `project_not_found` | The id is not in the project or store. | |
 
 A sketch-constraint binding answers with the same codes, naming `constraintId`: `invalid_expression` (including `reason: "outOfRange"`), `unapplicable_fields` for a constraint that cannot bind, or `reason: "conflictingBinding"` when a bound size of the same shape drives that dimension (and the reverse, from `sketchforge_set_shape_expression`), `invalid_request` for a missing or unknown `constraintId`, and `geometry_failed` with `constraintIds` when the sketch cannot be solved.

@@ -37,7 +37,9 @@ Six tools manage named parameters and bind shape fields and sketch dimensions
 to expressions over them, in local mode and against a server:
 `sketchforge_list_parameters`, `sketchforge_set_parameter`,
 `sketchforge_rename_parameter`, `sketchforge_delete_parameter`,
-`sketchforge_set_shape_expression` and `sketchforge_bind_sketch_constraint`. See
+`sketchforge_set_shape_expression` and `sketchforge_bind_sketch_constraint`.
+Six more manage named parameter configurations: list, create, rename, set or
+clear an override, delete, and activate one. See
 [Drive a shape from parameters](https://github.com/constructorfleet/SketchForge-3D/blob/main/docs/mcp/EXAMPLES.md#drive-a-shape-from-parameters)
 for the error codes they return.
 

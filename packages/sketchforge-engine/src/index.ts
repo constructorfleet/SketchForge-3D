@@ -299,6 +299,7 @@ export {
   API_PARAMETER_NAME_MAX_LENGTH,
   apiConfiguration,
   apiConfigurationList,
+  apiConfigurationName,
   apiConfigurationState,
   apiConfigurationsWritten,
   apiParameter,

@@ -89,6 +89,11 @@ export function apiParameterName(value: unknown): string | undefined {
   return trimmed.length >= 1 && trimmed.length <= API_PARAMETER_NAME_MAX_LENGTH ? trimmed : undefined;
 }
 
+/** Returns a configuration `?name=` value as the contract reads it: not trimmed, 1 to 100 characters. */
+export function apiConfigurationName(value: unknown): string | undefined {
+  return typeof value === "string" && value.length >= 1 && value.length <= API_CONFIGURATION_NAME_MAX_LENGTH ? value : undefined;
+}
+
 function apiIssue({ code, message, expressionError }: { code: string; message: string; expressionError?: ExpressionError }) {
   return { code, message, ...(expressionError ? { expressionError: wireExpressionError(expressionError) } : {}) };
 }
