@@ -235,6 +235,7 @@ export {
   rebuildableSketch,
   renameSketchConstraintReferences,
   resolveSketchConstraintBinding,
+  resolveSketchConstraintBindings,
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
   sketchConstraintBindingIssues,
   sketchConstraintValue,

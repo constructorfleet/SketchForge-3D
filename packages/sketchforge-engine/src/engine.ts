@@ -122,6 +122,7 @@ import {
   literalSketchProfile,
   rebuildableSketch,
   resolveSketchConstraintBinding,
+  resolveSketchConstraintBindings,
   sketchNotRebuildable,
   sketchConstraintValue,
   withSketchConstraintValues,
@@ -1761,31 +1762,39 @@ export function createEngine(store: ProjectStore): Engine {
       const locked = shape.locked ? shape.id : lockedAncestor;
       shape.groupedShapes?.forEach((child) => visit(child, false, locked));
       const values: Record<string, number> = {};
+      const touches = (expression: string) => expressionDependencies(expression).some((name) => changed.has(name));
       const expressions = Object.entries(shape.expressions ?? {});
-      if (invalid || !expressions.some(([, expression]) => expressionDependencies(expression).some((name) => changed.has(name)))) return;
-      // Every binding on a touched shape is rechecked, since one field's limit can depend on another's value.
-      const after = resolveShapeBindings(shape, next);
-      const before = resolveShapeBindings(shape, previous);
-      for (const [field] of expressions) {
-        // A misplaced shape binding stays stale, as on load.
-        if (invalid || bindableField(shape, field)?.target === "shape" && !topLevel) continue;
-        const resolved = after.get(field)!;
-        if (resolved.ok) {
-          if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
-        } else if (before.get(field)!.ok) {
-          // Refuses only a binding this change breaks; one already stale stays stale.
-          invalid = resolved.error;
+      if (!invalid && expressions.some(([, expression]) => touches(expression))) {
+        // Every binding on a touched shape is rechecked, since one field's limit can depend on another's value.
+        const after = resolveShapeBindings(shape, next);
+        const before = resolveShapeBindings(shape, previous);
+        for (const [field] of expressions) {
+          // A misplaced shape binding stays stale, as on load.
+          if (invalid || bindableField(shape, field)?.target === "shape" && !topLevel) continue;
+          const resolved = after.get(field)!;
+          if (resolved.ok) {
+            if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
+          } else if (before.get(field)!.ok) {
+            // Refuses only a binding this change breaks; one already stale stays stale.
+            invalid = resolved.error;
+          }
         }
       }
       const constraintValues: Record<string, number> = {};
       // A binding on a sketch no edit can rebuild stays stale, as on load.
-      for (const { constraint, expression } of rebuildableSketch(shape, topLevel) ? boundSketchConstraints(shape) : []) {
-        if (invalidConstraint || !expressionDependencies(expression).some((name) => changed.has(name))) continue;
-        const resolved = resolveSketchConstraintBinding(shape.id, constraint, expression, next);
-        if (resolved.ok) {
-          if (sketchConstraintValue(constraint) !== resolved.value) constraintValues[constraint.id] = resolved.value;
-        } else if (resolveSketchConstraintBinding(shape.id, constraint, expression, previous).ok) {
-          invalidConstraint = resolved.error;
+      const bound = rebuildableSketch(shape, topLevel) ? boundSketchConstraints(shape) : [];
+      if (!invalidConstraint && bound.some(({ expression }) => touches(expression))) {
+        // As for shapes, every binding on a touched sketch is rechecked against the whole change.
+        const after = resolveSketchConstraintBindings(shape, next);
+        const before = resolveSketchConstraintBindings(shape, previous);
+        for (const { constraint } of bound) {
+          if (invalidConstraint) break;
+          const resolved = after.get(constraint.id)!;
+          if (resolved.ok) {
+            if (sketchConstraintValue(constraint) !== resolved.value) constraintValues[constraint.id] = resolved.value;
+          } else if (before.get(constraint.id)!.ok) {
+            invalidConstraint = resolved.error;
+          }
         }
       }
       const constraintIds = Object.keys(constraintValues);

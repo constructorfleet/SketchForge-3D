@@ -97,6 +97,16 @@ export function resolveSketchConstraintBinding(
   return { ok: true, value: result.value };
 }
 
+/** Resolves every constraint binding on `shape` against one table, keyed by constraint ID. */
+export function resolveSketchConstraintBindings(
+  shape: WorkplaneShape,
+  parameters: readonly ProjectParameter[],
+): Map<string, SketchConstraintBindingResult> {
+  const scope = parameterScope(parameters);
+  return new Map(boundSketchConstraints(shape).map(({ constraint, expression }) =>
+    [constraint.id, resolveSketchConstraintBinding(shape.id, constraint, expression, scope)]));
+}
+
 /** Sets resolved values, and the expressions when given, on the named constraints. */
 export function withSketchConstraintValues(
   profile: SketchProfile,
