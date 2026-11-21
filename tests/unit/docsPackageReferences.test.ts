@@ -57,8 +57,10 @@ describe("package documentation contract", () => {
     expect(examples).toContain("npm run client:test:py:integration");
 
     const sourcePaths = [...examples.matchAll(/!!!include\(([^)]+)\)!!!/g)].map((match) => `docs/guides/${match[1]}`);
-    expect(sourcePaths).toHaveLength(7);
+    expect(sourcePaths).toHaveLength(9);
     expect(examples).toContain("!!!include(../../packages/sketchforge-client/examples/tap-drill-plate.macro.mjs)!!!");
+    expect(examples).toContain("!!!include(../../packages/sketchforge-client/examples/parametric-box.macro.mjs)!!!");
+    expect(examples).toContain("!!!include(../../packages/sketchforge-py/examples/parametric_box.py)!!!");
     for (const sourcePath of sourcePaths) expect(existsSync(sourcePath), `${sourcePath} should exist`).toBe(true);
   });
 });

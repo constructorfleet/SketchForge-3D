@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from .types import ExpressionError, ShapeDependent, SketchConstraintDependent
 
 #: The server's machine-readable reason, which a status code is too coarse to
 #: carry: ``404`` is a missing project, a missing shape or an API that is
@@ -22,6 +24,10 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "revision_mismatch",
     "shape_not_found",
     "shape_locked",
+    "parameter_not_found",
+    "parameter_exists",
+    "parameter_in_use",
+    "invalid_expression",
     "unsupported_kind",
     "unsupported_format",
     "unapplicable_fields",
@@ -29,6 +35,7 @@ API_ERROR_CODES: Tuple[str, ...] = (
     "limit_exceeded",
     "geometry_failed",
     "cad_failed",
+    "internal_error",
 )
 
 
@@ -122,10 +129,122 @@ class SketchForgeApiError(SketchForgeError):
         return self._is("unapplicable_fields", 422, "cannot take")
 
     @property
-    def unapplicable_fields(self) -> list:
+    def unapplicable_fields(self) -> List[str]:
         """Which fields those were, which is why this is an error and not a no-op."""
-        fields = self.body.get("fields") if isinstance(self.body, dict) else None
-        return [field for field in fields if isinstance(field, str)] if isinstance(fields, list) else []
+        return self.fields
+
+    @property
+    def is_invalid_expression(self) -> bool:
+        """A parameter or bound field does not evaluate; ``expression_error`` says where."""
+        return self.code == "invalid_expression"
+
+    @property
+    def is_parameter_missing(self) -> bool:
+        return self.code == "parameter_not_found"
+
+    @property
+    def is_parameter_duplicate(self) -> bool:
+        """The table already has a parameter with that name."""
+        return self.code == "parameter_exists"
+
+    @property
+    def is_parameter_in_use(self) -> bool:
+        """A delete was refused; ``dependents`` and ``shape_dependents`` name what still uses it."""
+        return self.code == "parameter_in_use"
+
+    @property
+    def _detail(self) -> Dict[str, Any]:
+        return self.body if isinstance(self.body, dict) else {}
+
+    def _text(self, key: str) -> Optional[str]:
+        value = self._detail.get(key)
+        return value if isinstance(value, str) else None
+
+    @property
+    def parameter(self) -> Optional[str]:
+        """The parameter that failed, which can be a dependent of the one changed."""
+        return self._text("parameter")
+
+    @property
+    def reason(self) -> Optional[str]:
+        """The engine's finer code, such as ``outOfRange`` or ``duplicateName``."""
+        return self._text("reason")
+
+    @property
+    def expression_error(self) -> Optional[ExpressionError]:
+        detail = self._detail.get("expressionError")
+        return ExpressionError.from_payload(detail) if isinstance(detail, dict) else None
+
+    @property
+    def dependents(self) -> List[str]:
+        """Parameters whose expressions use the one a delete was refused for."""
+        return _strings(self._detail.get("dependents"))
+
+    @property
+    def shape_dependents(self) -> List[ShapeDependent]:
+        entries = self._detail.get("shapeDependents")
+        if not isinstance(entries, list):
+            return []
+        return [
+            ShapeDependent(shape_id=entry["shapeId"], fields=_strings(entry.get("fields")))
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("shapeId"), str)
+        ]
+
+    @property
+    def sketch_constraint_dependents(self) -> List[SketchConstraintDependent]:
+        entries = self._detail.get("sketchConstraintDependents")
+        if not isinstance(entries, list):
+            return []
+        return [
+            SketchConstraintDependent(shape_id=entry["shapeId"], constraint_ids=_strings(entry.get("constraintIds")))
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("shapeId"), str)
+        ]
+
+    @property
+    def configuration_dependents(self) -> List[str]:
+        """Parameter configurations whose overrides use the one a delete was refused for."""
+        return _strings(self._detail.get("configurationDependents"))
+
+    @property
+    def configuration(self) -> Optional[str]:
+        """The parameter configuration whose table failed; ``None`` for the base table."""
+        return self._text("configuration")
+
+    @property
+    def shape_id(self) -> Optional[str]:
+        """The shape a binding refusal is about. A batch create names its ``index`` instead."""
+        return self._text("shapeId")
+
+    @property
+    def field(self) -> Optional[str]:
+        return self._text("field")
+
+    @property
+    def fields(self) -> List[str]:
+        """Fields named by ``unapplicable_fields``, or the bound fields of a refused rebuild."""
+        return _strings(self._detail.get("fields"))
+
+    @property
+    def constraint_id(self) -> Optional[str]:
+        """The sketch constraint a constraint-binding refusal is about."""
+        return self._text("constraintId")
+
+    @property
+    def constraint_ids(self) -> List[str]:
+        """Sketch constraints that conflict with a refused binding, or that an unsolvable sketch could not satisfy."""
+        return _strings(self._detail.get("constraintIds"))
+
+    @property
+    def index(self) -> Optional[int]:
+        """Position in a batch ``POST /shapes``, whose new shape has no id yet."""
+        index = self._detail.get("index")
+        return index if isinstance(index, int) and not isinstance(index, bool) else None
+
+
+def _strings(value: Any) -> List[str]:
+    return [entry for entry in value if isinstance(entry, str)] if isinstance(value, list) else []
 
 
 class SketchForgeTransportError(SketchForgeError):

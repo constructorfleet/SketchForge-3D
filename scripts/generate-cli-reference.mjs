@@ -101,15 +101,15 @@ Run a macro file against the SketchForge REST API. Use \`SKETCHFORGE_API_TOKEN\`
 ${npmMacroHelp()}
 \`\`\`
 
-### Direct project and file commands
+### Direct project, parameter, and file commands
 
-The same executable can list, create, and delete projects, export a selected project, and import an STL, OBJ, or SVG file:
+The same executable can list, create, and delete projects, export a selected project, import an STL, OBJ, or SVG file, and manage a project's parameter table:
 
 \`\`\`text
 ${npmDirectHelp()}
 \`\`\`
 
-Export uses \`--project\` or \`SKETCHFORGE_PROJECT_ID\`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file.
+Export and the parameter commands use \`--project\` or \`SKETCHFORGE_PROJECT_ID\`. Import writes to the selected project when supplied; otherwise it creates a project named after the input file. \`parameters create\` defaults \`--dimension\` to \`length\`; \`parameters list\` also prints the shape bindings that no longer resolve. See [Parameters and expressions](./REST_API.md#parameters-and-expressions) for what each write rebuilds.
 
 ### \`${npmMcp[0]}\`
 

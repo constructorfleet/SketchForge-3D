@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { API_ERROR_CODES as SERVER_API_ERROR_CODES } from "@/lib/apiV1";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
+import { API_ERROR_CODES as CLIENT_API_ERROR_CODES } from "../../packages/sketchforge-client/src/errors.js";
 import { CLIENT_COMPOSITE_RESOURCE_OPERATIONS, CLIENT_RESOURCE_OPERATIONS, SketchForgeClient } from "../../packages/sketchforge-client/src/client.js";
 import {
   MCP_NON_REST_TOOL_REASONS,
@@ -13,14 +15,6 @@ import {
 } from "../../packages/sketchforge-client/mcp/operation-parity.mjs";
 
 const root = process.cwd();
-
-/** REST operations the TypeScript and Python clients do not wrap yet. Each names its tracking issue. */
-const CLIENT_PENDING_OPERATIONS: Record<string, string> = {
-  listParameters: "#615",
-  createParameter: "#615",
-  updateParameter: "#615",
-  deleteParameter: "#615",
-};
 
 function pythonResources(): {
   resources: string[];
@@ -82,12 +76,18 @@ const CALL_ARGUMENTS: Record<string, unknown[]> = {
   groupShapes: [PROJECT_ID, [SHAPE_ID, "other-shape"]],
   ungroupShape: [PROJECT_ID, SHAPE_ID],
   splitParts: [PROJECT_ID, SHAPE_ID],
+  listParameters: [PROJECT_ID],
+  createParameter: [PROJECT_ID, { name: "wall", expression: "2 mm", dimension: "length" }],
+  updateParameter: [PROJECT_ID, "wall", { expression: "3 mm" }],
+  deleteParameter: [PROJECT_ID, "wall"],
 };
 const PYTHON_CALL_ARGUMENTS: Record<string, unknown[]> = {
   ...CALL_ARGUMENTS,
   treatShape: [PROJECT_ID, SHAPE_ID, "fillet", 1],
   alignShapes: [PROJECT_ID, [SHAPE_ID, "other-shape"], "x", "max"],
   booleanShapes: [PROJECT_ID, [SHAPE_ID], ["cutter"]],
+  createParameter: [PROJECT_ID, "wall", "2 mm", "length"],
+  updateParameter: [PROJECT_ID, "wall", "3 mm"],
 };
 const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "drawings.section": [PROJECT_ID, { plane: "xy", offset: 0 }],
@@ -108,6 +108,7 @@ const TS_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "distribute.pitch": [PROJECT_ID, [SHAPE_ID, "other-shape", "third-shape"]],
   "patterns.row": [PROJECT_ID, [SHAPE_ID], 2, 1],
   "patterns.ring": [PROJECT_ID, [SHAPE_ID], 2, { x: 0, z: 0 }],
+  "parameters.rename": [PROJECT_ID, "wall", "shell"],
 };
 const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "projects.get": [PROJECT_ID],
@@ -132,6 +133,7 @@ const PY_METHOD_ARGUMENTS: Record<string, unknown[]> = {
   "imports.file": [PROJECT_ID],
   "imports.apply": [PROJECT_ID, "mesh.stl", "fixture", "model/stl"],
   "exports.file": [PROJECT_ID, "stl"],
+  "parameters.rename": [PROJECT_ID, "wall", "shell"],
 };
 
 type CapturedRequest = { method: string; pathname: string; query?: string; body?: string | null };
@@ -291,6 +293,19 @@ function listRuntimeMcpTools(): string[] {
   return response.result.tools.map(({ name }) => name);
 }
 
+describe("REST client error code parity", () => {
+  it("knows every code the server can answer with, in both clients", () => {
+    const python = process.platform === "win32" ? "python" : "python3";
+    const pythonCodes = JSON.parse(execFileSync(python, ["-c", "import json; from sketchforge3d.errors import API_ERROR_CODES; print(json.dumps(list(API_ERROR_CODES)))"], {
+      cwd: path.join(root, "packages/sketchforge-py"),
+      env: { ...process.env, PYTHONPATH: "src" },
+      encoding: "utf8",
+    })) as string[];
+    expect([...CLIENT_API_ERROR_CODES]).toEqual([...SERVER_API_ERROR_CODES]);
+    expect(pythonCodes).toEqual([...SERVER_API_ERROR_CODES]);
+  });
+});
+
 describe("REST client operation parity", () => {
   it("derives the client matrix from the REST registry and each client's resource list", async () => {
     const operations = API_V1_OPERATIONS.filter(({ method }) => method !== "OPTIONS");
@@ -315,8 +330,8 @@ describe("REST client operation parity", () => {
     expect(py.compositeOperations.shapes.delete_all).toEqual(["listShapes", "updateShape", "deleteShape"]);
     expect(py.methods.shapes).toContain("delete_all");
     const expectedSecondaryMethods = {
-      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"] },
-      python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"] },
+      typescript: { projects: ["listPage", "get", "findByName"], shapes: ["listPage", "createMany"], edges: ["filletableIndexes"], faces: ["facing"], measurements: ["withRadius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], drawings: ["section", "dxf"], parameters: ["rename"] },
+      python: { projects: ["list_page", "get", "find_by_name"], shapes: ["list_page", "create_many"], edges: ["filletable_indexes"], faces: ["facing", "ids_facing"], measurements: ["with_radius"], treatments: ["fillet", "chamfer"], shell: ["hollow", "tray"], align: ["tops", "bottoms", "centers"], distribute: ["gaps", "pitch"], patterns: ["row", "ring"], imports: ["file"], exports: ["file"], parameters: ["rename"] },
     } as const;
     for (const [resourceName, methods] of Object.entries(expectedSecondaryMethods.typescript)) {
       const mapped = Object.values(CLIENT_RESOURCE_OPERATIONS[resourceName as keyof typeof CLIENT_RESOURCE_OPERATIONS]).flat();
@@ -469,9 +484,7 @@ describe("REST client operation parity", () => {
       const implemented = new Set(matrices[client]);
       expect([...implemented].filter((operationId) => !registered.has(operationId)), `${client} declares unknown REST operations`).toEqual([]);
       const missing = [...registered].filter((operationId) => !implemented.has(operationId)).sort();
-      const documentedGaps = (client === "mcp"
-        ? Object.keys(MCP_UNSUPPORTED_OPERATIONS)
-        : Object.keys(CLIENT_PENDING_OPERATIONS)).sort();
+      const documentedGaps = client === "mcp" ? Object.keys(MCP_UNSUPPORTED_OPERATIONS).sort() : [];
       expect(missing, `${client} operations missing from its resources`).toEqual(documentedGaps);
     }
   });

@@ -28,7 +28,7 @@ Prefer the environment: the token is a password for every project on the server 
 ## The client
 
 ```python
-SketchForgeClient(base_url, token, timeout=60.0, retry_on_busy=4, headers=None, opener=None)
+SketchForgeClient(base_url, token, timeout=60.0, retry_on_busy=4, headers=None, opener=None, expected_revision=None)
 
 client.api_root -> str
 client.check() -> dict
@@ -94,7 +94,29 @@ client.thickness.estimate(project_id, shape_id) -> WallThicknessEstimate
 
 client.exports.export(project_id, format, shape_ids=None, name=None, view=None, section=None) -> ExportResult
 client.exports.file(project_id, format, path, shape_ids=None, name=None, view=None, section=None) -> ExportResult
+
+client.parameters.list(project_id) -> ParameterList
+client.parameters.create(project_id, name, expression, dimension) -> ParameterWriteResult
+client.parameters.update(project_id, name, expression=None, dimension=None) -> ParameterWriteResult
+client.parameters.rename(project_id, name, new_name) -> ParameterWriteResult
+client.parameters.delete(project_id, name) -> ParameterDeleteResult
 ```
+
+### Parameters and expressions
+
+A project parameter has a `name`, an `expression` and a `dimension` from `PARAMETER_DIMENSIONS` (`"length"`, `"angle"` or `"unitless"`). Shape fields bind to expressions through `"expressions"`, beside the numbers; feature settings use dotted keys such as `"revolve.sweepAngle"`. `ShapeSummary.expressions` holds the bound text, and each bound field keeps its resolved number:
+
+```python
+project.add_parameter("wall", "2 mm", "length")
+box = project.add({"kind": "box", "depth": 10, "height": 10, "expressions": {"width": "wall * 5"}})
+changed = project.update_parameter("wall", expression="3 mm")
+changed.shapes  # the rebuilt box, now 15 mm wide
+project.bind_expressions(box.id, {"width": None})  # unbinds; the width stays 15
+```
+
+Every parameter write returns the whole table, the written `parameter` (or `None` when the reply has none), and the top-level `shapes` it rebuilt or rewrote. A dimension outside `PARAMETER_DIMENSIONS` raises `ValueError` before anything is sent. `rename` rewrites every expression and binding that uses the old name. `parameters.list` also returns `binding_issues`, the bindings that no longer resolve. The handle has `parameters()`, `add_parameter`, `update_parameter`, `rename_parameter`, `delete_parameter` and `bind_expressions`.
+
+`as_patch` keeps `expressions`, and the server treats an echoed number or expression as no change, so a read-modify-write keeps its bindings. Change a bound number and the number replaces the binding; send `None` to clear it. A summary read before someone else changed a parameter carries old numbers, which count as edits, so set `expected_revision` for that round trip. See [Parameters and expressions](../../docs/REST_API.md#parameters-and-expressions).
 
 For an SVG or DXF section drawing, set `section={"plane": "xy", "offset": 3}` instead
 of `view`. The supported planes are `xy`, `xz`, and `yz` in drawing coordinates;
@@ -222,7 +244,7 @@ client.shapes.update(project_id, shape.sketch_source_id, {
 
 Face drafts cannot yet be combined with prism drafts or edge treatments. Missing or ambiguous face matches and ineffective dependent booleans leave the project unchanged.
 
-Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
+Failures are `SketchForgeApiError` (`status`, `detail`, plus `looks_disabled`, `needs_storage`, `is_project_busy`, and `is_limit_exceeded`) or `SketchForgeTransportError`, both subclasses of `SketchForgeError`. `is_limit_exceeded` recognises `413 limit_exceeded` and the legacy `too_many_shapes` code. Parameter failures add `is_invalid_expression`, `is_parameter_missing`, `is_parameter_duplicate` and `is_parameter_in_use`, with the details `parameter`, `reason`, `configuration`, `expression_error` (`code`, `message`, `span`, `cycle`), `dependents`, `shape_dependents`, `sketch_constraint_dependents`, `configuration_dependents`, and, for a refused binding, `shape_id` or a batch `index`, `field`, `fields`, `constraint_id` and `constraint_ids`. A write that lost the project's lock is retried; a *locked shape*, which answers 409 for an unrelated reason, is not.
 
 `sketchforge3d.layout` has the arithmetic a parameterised part repeats: `row`, `grid`, `ring`, `centered_offsets`, `angle_of`, `mm`.
 
@@ -313,7 +335,7 @@ A module with a bare `run(context)` function instead of a `MACRO` runs in a `fre
 
 ## Examples
 
-`examples/` holds the four worked macros, which double as the integration tests:
+`examples/` holds the five worked macros, which double as the integration tests:
 
 | Macro | Builds |
 | --- | --- |
@@ -321,6 +343,7 @@ A module with a bare `run(context)` function instead of a `MACRO` runs in a `fre
 | `bolt_circle.py` | A flange with N tapped holes on a ring of radius R |
 | `filleted_box.py` | A box from three numbers, with every roundable edge filleted on the server |
 | `face_colors.py` | A box coloured by face, then filleted, reporting which colours survived |
+| `parametric_box.py` | A box bound to a `wall` parameter, rebuilt when the parameter changes |
 
 A face colour is keyed by the face's `id` from `project.faces(...)`, not by its
 position in the listing: the kernel reorders faces after any operation, so an

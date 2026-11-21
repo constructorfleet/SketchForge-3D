@@ -166,8 +166,17 @@ export type AnyKindFields = {
 type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends
   (value: infer Intersection) => void ? Intersection : never;
 
+/** Field expressions sent on create, keyed by field name; feature settings use dotted keys such as `revolve.sweepAngle`. */
+export type ShapeExpressions = Readonly<Record<string, string>>;
+
+/** Field expressions sent on update. `null` clears a binding and keeps the field's current number. */
+export type ShapeExpressionChanges = Readonly<Record<string, string | null>>;
+
+/** Binds fields to project parameter expressions in the same write as the shape. */
+export type ShapeBindings = { expressions?: ShapeExpressions };
+
 export type ParametricShapeRequest = {
-  [Kind in ParametricShapeKind]: { kind: Kind } & ShapePlacement &
+  [Kind in ParametricShapeKind]: { kind: Kind } & ShapePlacement & ShapeBindings &
     ShapeDimensions &
     (KindFields[Kind] extends object ? KindFields[Kind] : Record<never, never>) &
     (Kind extends "gear" ? Record<never, never> : TaperFields);
@@ -194,7 +203,8 @@ export type RevolveSettings = {
 
 export type RevolveShapeRequest = { kind: "revolve"; profile: readonly ProfilePoint[] } &
   RevolveSettings &
-  ShapePlacement;
+  ShapePlacement &
+  ShapeBindings;
 
 export type ThreadShapeRequest = {
   kind: "thread";
@@ -217,7 +227,8 @@ export type ThreadShapeRequest = {
   quality?: number;
   /** Overrides the catalog's 60-degree V. */
   profile?: readonly ProfilePoint[];
-} & ShapePlacement;
+} & ShapePlacement &
+  ShapeBindings;
 
 export type SketchSweepPoint = {
   id: string;
@@ -250,7 +261,7 @@ export type SketchSweepProfile = {
 };
 
 /** A retained OCCT sweep made from closed section loops and one open spine. */
-export type SketchSweepShapeRequest = { kind: "sketchSweep"; profile: SketchSweepProfile } & ShapePlacement;
+export type SketchSweepShapeRequest = { kind: "sketchSweep"; profile: SketchSweepProfile } & ShapePlacement & ShapeBindings;
 
 export type ShapeRequest = ParametricShapeRequest | RevolveShapeRequest | ThreadShapeRequest | SketchSweepShapeRequest;
 
@@ -281,6 +292,8 @@ export type ShapePatch = ShapePlacement &
     faceDraft?: SketchFaceDraft | null;
     /** The sweep's settings as one object, for a caller that keeps them together. */
     revolve?: RevolveSettings;
+    /** Binds or clears field expressions. An echoed side changes nothing; the changed side wins. */
+    expressions?: ShapeExpressionChanges;
   };
 
 /** How far round a sweep goes, and how fast it rises, as the server reports it. */
@@ -395,6 +408,8 @@ export type ShapeSummary = {
    */
   profile?: ProfilePoint[];
   groupedCount?: number;
+  /** Bound fields' expressions. Each bound field still carries its resolved number. */
+  expressions?: Record<string, string>;
 } & TaperFields;
 
 export type ProjectSummary = {
@@ -810,3 +825,50 @@ export type BooleanCutResult = TreatmentResult;
 /** The new group, which replaces its members; members marked `hole` are subtracted. */
 export type GroupResult = { shape: ShapeSummary; revision: number };
 export type DeleteResult = { deleted: true; id: string; revision?: number };
+
+export const PARAMETER_DIMENSIONS = ["length", "angle", "unitless"] as const;
+/** Values are in millimetres, degrees, or plain units respectively. */
+export type ParameterDimension = (typeof PARAMETER_DIMENSIONS)[number];
+
+/** Half-open character range in an expression. */
+export type ExpressionSpan = { start: number; end: number };
+
+export type ExpressionError = {
+  code: string;
+  message: string;
+  span: ExpressionSpan;
+  /** Set for a cycle: the parameters around it, back to the first. */
+  cycle?: string[];
+};
+
+export type ParameterIssue = { code: string; message: string; expressionError?: ExpressionError };
+
+export type ProjectParameter = {
+  name: string;
+  expression: string;
+  dimension: ParameterDimension;
+  /** A stale entry keeps its last value, or `null` when it never had one. */
+  value: number | null;
+  /** Set when the stored entry no longer resolves. */
+  error?: ParameterIssue;
+};
+
+/** A shape binding that no longer resolves. */
+export type BindingIssue = { shapeId: string; field: string } & ParameterIssue;
+
+export type ParameterList = { parameters: ProjectParameter[]; bindingIssues: BindingIssue[]; revision: number };
+
+export type ParameterRequest = { name: string; expression: string; dimension: ParameterDimension };
+
+export type ParameterChange = { expression?: string; dimension?: ParameterDimension };
+
+/** `shapes` holds the top-level shapes the write rebuilt or rewrote. `parameter` is absent when the reply has none. */
+export type ParameterWriteResult = { parameter?: ProjectParameter; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
+
+export type ParameterDeleteResult = { deleted: true; name: string; parameters: ProjectParameter[]; shapes: ShapeSummary[]; revision: number };
+
+/** A shape that a refused parameter delete still binds, and which fields. */
+export type ShapeDependent = { shapeId: string; fields: string[] };
+
+/** A sketch whose constraints a refused parameter delete still binds. */
+export type SketchConstraintDependent = { shapeId: string; constraintIds: string[] };
