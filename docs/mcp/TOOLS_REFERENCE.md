@@ -2149,7 +2149,7 @@ List the project's named parameters: name, expression, dimension, resolved value
 
 ### Description
 
-Create a parameter, or change the expression or dimension of an existing one. Send expression and dimension to create; a name that exists is changed instead. Either one alone changes an existing parameter. A bare number takes the dimension's unit, so 3 in a length parameter is 3 mm. The reply has created, the parameter, the whole table, and the shapes the change rebuilt. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension or a cycle; expressionError has the span and any cycle path), parameter_not_found (a change to a name that does not exist), invalid_request (a bad name or dimension), limit_exceeded (the table is full), shape_locked (a bound shape is locked; detail names shapeId and fields). Works offline or against a server when url is supplied.
+Create a parameter, or change the expression or dimension of an existing one. Send expression and dimension to create. An existing name is overwritten, not refused; created says which happened. Either one alone changes an existing parameter. A bare number takes the dimension's unit, so 3 in a length parameter is 3 mm. The reply has created, the parameter, the whole table, and the shapes the change rebuilt. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: invalid_expression (bad syntax, an unknown name, the wrong dimension or a cycle; expressionError has the span and any cycle path), parameter_not_found (a change to a name that does not exist), invalid_request (a bad name or dimension, or an empty or over-long expression), limit_exceeded (the table is full), shape_locked (a bound shape is locked; detail names shapeId and fields), geometry_failed (a bound sketch cannot be solved; detail names shapeId and constraintIds). Works offline or against a server when url is supplied.
 
 ### Input schema
 
@@ -2229,7 +2229,7 @@ Rename a parameter, rewriting every parameter expression and shape binding that 
 
 ### Description
 
-Delete a parameter that nothing uses. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names) and shapeDependents (shapeId and fields) to change or clear first. Works offline or against a server when url is supplied.
+Delete a parameter that nothing uses. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: parameter_not_found; parameter_in_use while anything references it, with dependents (parameter names), shapeDependents (shapeId and fields) and sketchConstraintDependents (shapeId and constraintIds) to change or clear first. Works offline or against a server when url is supplied.
 
 ### Input schema
 
@@ -2260,7 +2260,7 @@ Delete a parameter that nothing uses. A refusal ends its first line with [code];
 
 ### Description
 
-Bind one field of a stored shape to a parameter expression and apply its value, or pass expression null to clear the binding and keep the current number. A changed parameter then rebuilds the shape. Bindable fields: x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, kind parameters such as sides or bevel, revolve.startAngle, revolve.sweepAngle and the other revolve settings, draftPrismAngle and faceDraft.angle. The reply has the shape, with expressions, and the revision. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: unapplicable_fields (this shape cannot bind the field), invalid_expression (detail names shapeId and field, with expressionError, or value, min and max for a result out of range), shape_not_found, shape_locked. Works offline or against a server when url is supplied.
+Bind one field of a stored shape to a parameter expression and apply its value, or pass expression null to clear the binding and keep the current number. A changed parameter then rebuilds the shape. Bindable fields: x, z, elevation, width, depth, height, rotation, rotationX, rotationZ, kind parameters such as sides or bevel, revolve.startAngle, revolve.sweepAngle and the other revolve settings, draftPrismAngle and faceDraft.angle. The reply has the shape, as GET /api/v1/shapes reports it, and the revision. Repeating the stored expression writes nothing. A refusal ends its first line with [code]; a second line, when present, is JSON detail. Codes: unapplicable_fields (this shape cannot bind the field), invalid_expression (detail names shapeId and field, with expressionError, or value, min and max for a result out of range), shape_not_found, shape_locked (detail names shapeId and fields). Works offline or against a server when url is supplied.
 
 ### Input schema
 

@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
-import { callLocalParameterTool, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
+import { callParameterTool, localParameterRequest, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
 
 // SKETCHFORGE_MCP_FILES_DIR is resolved by the shared MCP filesystem path policy.
 
@@ -364,10 +364,9 @@ async function callLocalEngineToolRaw(name, args = {}) {
     }
     return { projectId: id, name: projectName, shapeCount: imported.shapes.length, revision: 1 };
   }
+  // Checks its own projectId, as REST does, so a missing one is refused the same way.
+  if (PARAMETER_TOOL_NAMES.has(name)) return callParameterTool(name, args, localParameterRequest(engine, enginePackage));
   const id = requireProjectId(args);
-  if (PARAMETER_TOOL_NAMES.has(name)) {
-    return callLocalParameterTool(name, args, { engine, enginePackage, projectId: id, summarize: objectSummary });
-  }
   switch (name) {
     case "sketchforge_read_scene":
     case "sketchforge_list_objects":

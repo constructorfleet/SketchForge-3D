@@ -3,7 +3,7 @@ import path from "node:path";
 import { resolveMcpReadPath, resolveMcpWritePath } from "./filesystemPaths.mjs";
 import { listMacros, macroTools, runMacroByName } from "./macroTools.mjs";
 import { callLocalEngineTool } from "./localEngine.mjs";
-import { callRemoteParameterTool, McpToolError, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
+import { callParameterTool, McpToolError, PARAMETER_TOOL_NAMES } from "./parameterTools.mjs";
 import { engineTools } from "./toolCatalog.mjs";
 
 const MCP_ROUTE = "/api/sketchforge-mcp";
@@ -99,7 +99,7 @@ async function bridgeCommand(action, args = {}, defaultTimeoutMs = 15000, baseUr
 
 async function callRemoteTool(name, args, baseUrl) {
   if (PARAMETER_TOOL_NAMES.has(name)) {
-    return callRemoteParameterTool(name, args, (method, route, options) => restRequest(method, route, { ...options, baseUrl, withDetail: true }));
+    return callParameterTool(name, args, (method, route, options) => restRequest(method, route, { ...options, baseUrl, withDetail: true }));
   }
   switch (name) {
     case "sketchforge_list_editors":
