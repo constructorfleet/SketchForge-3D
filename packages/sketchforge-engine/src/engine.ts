@@ -2023,9 +2023,18 @@ export function createEngine(store: ProjectStore): Engine {
       // An entry repeating the stored expression is an echo: not re-resolved, so a stale one survives.
       const expressions = Object.fromEntries(Object.entries(parsed.expressions)
         .filter(([field, expression]) => expression === null || before?.expressions?.[field] !== expression));
-      // Only echoed expressions and nothing else: no change, so no write and no new revision.
+      // A lock refusal names the requested fields this shape can bind, as a refused parameter change does.
+      const refused = <T>(failure: EngineFailure): EngineResult<T> => {
+        const fields = before && failure.reason === "shape_locked"
+          ? Object.keys(parsed.expressions).filter((field) => bindableField(before, field))
+          : [];
+        return failed(fields.length ? { reason: "binding_failed", shapeId, fields, failure } : failure);
+      };
+      // Only echoed expressions: no write and no new revision, after the checks any change gets.
       if (!Object.keys(expressions).length && Object.keys(parsed.expressions).length && !Object.keys(changes).length) {
         if (!before) return failed({ reason: "shapes_not_found", ids: [shapeId] });
+        const unchanged = await changeShapeIn(document, shapeId, {});
+        if (!unchanged.ok) return refused(unchanged.failure);
         return ok({ shape: before, revision: documentRevision(document) });
       }
       if (Object.keys(expressions).length) {
@@ -2042,7 +2051,7 @@ export function createEngine(store: ProjectStore): Engine {
         ),
       } : changes;
       const changed = await changeShapeIn(document, shapeId, request);
-      if (!changed.ok) return changed;
+      if (!changed.ok) return refused(changed.failure);
       const named = boundFieldsNamedBy(changes);
       const previous = findShapeInTree(document.shapes, changed.value.shape.id)?.shape;
       let rebuilt = changed.value;

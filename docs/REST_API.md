@@ -179,7 +179,7 @@ The MCP server offers the same operations as tools; see [Drive a shape from para
 }
 ```
 
-`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `field`, and its `shapeId` or, in `POST /shapes`, its batch `index`, because the new shape has no stored id. A parameter change refused because a bound shape could not be rebuilt, for example `409 shape_locked`, names that `shapeId` and its bound `fields`; one refused because a bound sketch cannot be solved answers `422 geometry_failed` with `shapeId` and `constraintIds`. A `PATCH /shapes` refused by a lock names the `shapeId`, and the `fields` its `expressions` would bind. While a sketch constraint uses a parameter, `parameter_in_use` also lists `sketchConstraintDependents` as `{ shapeId, constraintIds }`.
+`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `field`, and its `shapeId` or, in `POST /shapes`, its batch `index`, because the new shape has no stored id. A parameter change refused because a bound shape could not be rebuilt, for example `409 shape_locked`, names that `shapeId` and its bound `fields`; one refused because a bound sketch cannot be solved answers `422 geometry_failed` with `shapeId` and `constraintIds`. A `PATCH /shapes` refused by a lock names the `shapeId`, and the `fields` its `expressions` would bind on that shape. While a sketch constraint uses a parameter, `parameter_in_use` also lists `sketchConstraintDependents` as `{ shapeId, constraintIds }`.
 
 ### Binding shape fields
 
@@ -202,7 +202,7 @@ A `PATCH` compares each side of a bound field with the shape's current state. A 
 | A different number and a different expression that disagree | `400 invalid_request` naming `shapeId` and `field` (or `index` in a batch `POST`), with nothing written. |
 | `expressions: { field: null }` | The binding is removed and the field keeps its current number. |
 
-Comparisons are exact, which a JSON round trip of the server's own number preserves. A `PATCH` whose only content is echoed expressions changes nothing, so it writes nothing and returns the current revision.
+Comparisons are exact, which a JSON round trip of the server's own number preserves. A `PATCH` whose only content is echoed expressions changes nothing, so it writes nothing and returns the current revision; a locked shape still refuses it.
 
 **Send `If-Match` with a whole summary.** A summary read before someone else changed a parameter carries the old numbers, and against the current shape they count as edits. Without `If-Match`, such a `PATCH` removes those bindings and puts the old values back. With `If-Match` set to the revision you read, the same request answers `409 revision_mismatch` and changes nothing.
 

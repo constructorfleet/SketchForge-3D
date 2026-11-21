@@ -102,7 +102,7 @@ async function patchHandler(request: Request) {
 
   const changed = await apiEngine(context.root, request).changeShape(projectId, shapeId, parsed.body);
   if (!changed.ok) {
-    const refusal = shapeChangeApiError(changed.failure, shapeId, parsed.body);
+    const refusal = shapeChangeApiError(changed.failure, shapeId);
     return apiError(refusal.message, refusal.status, refusal.code, refusal.detail);
   }
   return apiJson({ shape: apiShapeSummary(changed.value.shape), revision: changed.value.revision });

@@ -132,6 +132,21 @@ describe("shape requests with expressions", () => {
     expect(again.shape).toMatchObject({ id: shape!.id, width: 15, expressions: { width: "wall * 3" } });
     expect(await document("repeat")).toEqual(stored);
     expect(await engine.changeShape("repeat", "missing", { expressions: { width: "wall" } })).toMatchObject({ ok: false, failure: { reason: "shapes_not_found" } });
+
+    // A lock refuses an echo as it refuses any change, rather than answering as if it applied.
+    value(await engine.changeShape("repeat", shape!.id, { locked: true }));
+    const locked = await engine.changeShape("repeat", shape!.id, { expressions: { width: "wall * 3" } });
+    expect(locked).toMatchObject({ ok: false, failure: { reason: "binding_failed", shapeId: shape!.id, fields: ["width"], failure: { reason: "shape_locked" } } });
+  });
+
+  it("names only the bindable fields when a lock refuses a binding", async () => {
+    await project("locked-cube");
+    const [cube] = value(await engine.addShapes("locked-cube", [{ kind: "cube", size: 10 }])).shapes;
+    value(await engine.changeShape("locked-cube", cube!.id, { locked: true }));
+    const refused = await engine.changeShape("locked-cube", cube!.id, { expressions: { size: "wall", width: "wall" } });
+    expect(refused).toMatchObject({ ok: false, failure: { reason: "binding_failed", shapeId: cube!.id, fields: ["width"], failure: { reason: "shape_locked" } } });
+    const nothingBindable = await engine.changeShape("locked-cube", cube!.id, { expressions: { size: "wall" } });
+    expect(nothingBindable).toMatchObject({ ok: false, failure: { reason: "shape_locked", ids: [cube!.id] } });
   });
 
   it("refuses a change whose number and expression disagree, and writes nothing", async () => {

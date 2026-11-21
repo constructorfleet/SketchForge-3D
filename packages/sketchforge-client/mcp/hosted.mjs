@@ -23,8 +23,9 @@ export const hostedTools = engineTools.filter(({ name }) => !WITHHELD_TOOLS.has(
 
 const hostedToolNames = new Set(hostedTools.map(({ name }) => name));
 
-// Same rule as `/api/v1`: the id becomes a file name in the project directory.
-const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/;
+// Same rule as the engine's `apiProjectId`, untrimmed; this module loads before the engine.
+// `apiProjectIdRule.test.ts` keeps the two in step.
+export const HOSTED_PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/;
 const PATH_ARGUMENTS = ["filePath", "outputPath"];
 
 /** Resolves symlinks in the deepest ancestor that exists; the rest may not exist yet. */
@@ -63,7 +64,7 @@ export async function callHostedTool(name, args = {}) {
   if (!hostedToolNames.has(name)) throw new Error(`Unknown tool: ${name}`);
   const input = args ?? {};
   if (input.url !== undefined) throw new Error("url is not accepted here: this endpoint works on its own server's projects.");
-  if (input.projectId !== undefined && !(typeof input.projectId === "string" && PROJECT_ID.test(input.projectId))) {
+  if (input.projectId !== undefined && !(typeof input.projectId === "string" && HOSTED_PROJECT_ID.test(input.projectId))) {
     throw new Error("projectId must be a project id from sketchforge_list_projects: letters, digits, hyphens and underscores.");
   }
   if (PATH_ARGUMENTS.some((key) => input[key] !== undefined)) requireSeparateFilesRoot();

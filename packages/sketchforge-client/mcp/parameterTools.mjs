@@ -153,7 +153,7 @@ export function localParameterRequest(engine, api) {
         if (!shapeId) throw new McpToolError(api.API_ERROR_MESSAGES.shapeIdRequired, "invalid_shape_id");
         const changed = await unwrap(
           await engine.changeShape(projectId, shapeId, sent),
-          (failure) => api.shapeChangeApiError(failure, shapeId, sent),
+          (failure) => api.shapeChangeApiError(failure, shapeId),
         );
         return { shape: api.apiShapeSummary(changed.shape), revision: changed.revision };
       }
