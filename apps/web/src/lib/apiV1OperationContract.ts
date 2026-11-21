@@ -211,11 +211,16 @@ const shapeSummary = {
     rotationX: num,
     rotationZ: num,
     groupedCount: int,
+    expressions: {
+      type: "object",
+      description: "Parameter expressions bound to numeric fields, keyed by field name. Each bound field also carries its resolved number.",
+      additionalProperties: str,
+    },
     revolve: { type: "object", additionalProperties: true },
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
 } as const;
-const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "parameter_not_found", "parameter_exists", "parameter_in_use", "invalid_expression", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
 const limitErrorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["limit_exceeded"] }, limit: int, given: int }, additionalProperties: false } as const;
 const faceError = (...codes: string[]): ApiV1FieldSchema => {
   const conditionalWriteError = codes.includes("project_busy") || codes.includes("shape_locked");
@@ -495,12 +500,152 @@ export function withApiV1Contract(key: string, handler: (request: Request) => Pr
 }
 const sketchSweepProfileRequest = { type: "object", required: ["points", "segments"], properties: { points: { type: "array", items: { type: "object", additionalProperties: true } }, segments: { type: "array", items: { type: "object", additionalProperties: true } }, sweepFrames: { type: "object", additionalProperties: true } }, additionalProperties: true } as const;
 const revolveProfileRequest = { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } } as const;
-const shapeRequest = { type: "object", required: ["kind"], properties: { kind: str, profile: { oneOf: [sketchSweepProfileRequest, revolveProfileRequest] } }, additionalProperties: true } as const;
+const expressionSource = { type: "string", pattern: "\\S", maximumLength: 1000 } as const;
+const createExpressions = {
+  type: "object",
+  description: "Binds numeric fields to parameter expressions, keyed by field name (dotted for retained features, e.g. revolve.sweepAngle). A number sent for the same field must equal the expression's value.",
+  additionalProperties: expressionSource,
+} as const;
+const changeExpressions = {
+  type: "object",
+  description: "Binds fields to expressions, or clears a binding with null. A bound field sent with its current value keeps its binding; a different number replaces it.",
+  additionalProperties: { ...expressionSource, nullable: true },
+} as const;
+const shapeRequest = { type: "object", required: ["kind"], properties: { kind: str, profile: { oneOf: [sketchSweepProfileRequest, revolveProfileRequest] }, expressions: createExpressions }, additionalProperties: true } as const;
 const shapeOperations = [
   { ...operation("GET", "/api/v1/shapes", "listShapes", [200, ...commonErrors]), query: { ...projectQuery, properties: { ...projectQuery.properties, limit: { type: "string", pattern: "^\\d{1,4}$", maxLength: 4 }, cursor: { type: "string", pattern: "^[A-Za-z0-9_-]+$", maxLength: 128 } } }, responseSchemas: { 200: shapesList, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/shapes", "createShapes", [201, ...commonErrors, 413, 422]), query: projectQuery, requestBody: json({ type: "object", oneOf: [shapeRequest, { type: "object", required: ["shapes"], properties: { shapes: { type: "array", minItems: 1, maxItems: 200, items: shapeRequest } }, additionalProperties: false }] }), responseSchemas: { 201: { type: "object", required: ["shapes", "revision"], properties: { shapes: { type: "array", items: shapeSummary }, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 413: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } },
-  { ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]), query: shapeQuery, requestBody: json({ type: "object", properties: { faceColors: { type: "object", patternProperties: { "^(?:[0-9]+|face_[^\\s]+)$": { type: "string", pattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } }, additionalProperties: false } }, additionalProperties: true }), responseSchemas: { 200: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num } }, 400: faceError("invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"), 401: faceError("unauthorized"), 404: faceError("api_disabled", "project_not_found", "shape_not_found"), 409: faceError("project_busy", "shape_locked"), 422: { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["unapplicable_fields", "geometry_failed", "cad_failed"] }, fields: { type: "array", items: str } }, additionalProperties: true }, 500: faceError("geometry_failed", "cad_failed", "internal_error"), 503: faceError("storage_unconfigured") } },
+  { ...operation("PATCH", "/api/v1/shapes", "updateShape", [200, 400, 401, 404, 409, 422, 500, 503]), query: shapeQuery, requestBody: json({ type: "object", properties: { expressions: changeExpressions, faceColors: { type: "object", patternProperties: { "^(?:[0-9]+|face_[^\\s]+)$": { type: "string", pattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } }, additionalProperties: false } }, additionalProperties: true }), responseSchemas: { 200: { type: "object", required: ["shape", "revision"], properties: { shape: shapeSummary, revision: num } }, 400: faceError("invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"), 401: faceError("unauthorized"), 404: faceError("api_disabled", "project_not_found", "shape_not_found"), 409: faceError("project_busy", "shape_locked"), 422: { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["unapplicable_fields", "invalid_expression", "geometry_failed", "cad_failed"] }, fields: { type: "array", items: str } }, additionalProperties: true }, 500: faceError("geometry_failed", "cad_failed", "internal_error"), 503: faceError("storage_unconfigured") } },
   { ...operation("DELETE", "/api/v1/shapes", "deleteShape", [200, ...commonErrors]), query: shapeQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+] as const satisfies readonly ApiV1Operation[];
+
+const parameterName = { type: "string", minimumLength: 1, maximumLength: 64, description: "An ASCII identifier that is not a unit or function name, such as wall_thickness." } as const;
+const parameterExpression = { type: "string", pattern: "\\S", maximumLength: 10_000 } as const;
+const parameterDimension = { type: "string", enum: ["length", "angle", "unitless"] } as const;
+const expressionErrorSchema = {
+  type: "object",
+  required: ["code", "message", "span"],
+  properties: {
+    code: str,
+    message: str,
+    span: { type: "object", description: "Half-open character range in the expression.", required: ["start", "end"], properties: { start: int, end: int }, additionalProperties: false },
+    cycle: { type: "array", description: "Set for a cycle: the parameters around it, back to the first.", items: str },
+  },
+  additionalProperties: false,
+} as const;
+const parameterSchema = {
+  type: "object",
+  required: ["name", "expression", "dimension", "value"],
+  properties: {
+    name: str,
+    expression: str,
+    dimension: parameterDimension,
+    value: { type: "number", nullable: true, description: "Resolved value in mm, degrees, or plain units. A stale entry keeps its last value, or null." },
+    error: { type: "object", description: "Set when the stored entry no longer resolves.", required: ["code", "message"], properties: { code: str, message: str, expressionError: expressionErrorSchema }, additionalProperties: false },
+  },
+  additionalProperties: false,
+} as const;
+const bindingIssueSchema = {
+  type: "object",
+  required: ["shapeId", "field", "code", "message"],
+  properties: { shapeId: str, field: str, code: str, message: str, expressionError: expressionErrorSchema },
+  additionalProperties: false,
+} as const;
+/** The error body, with the fields a parameter or binding refusal adds. */
+const parameterErrorSchema = {
+  ...errorSchema,
+  properties: {
+    ...errorSchema.properties,
+    parameter: { type: "string", description: "The parameter that failed; it can be a dependent of the one changed." },
+    reason: { type: "string", description: "The engine's finer code, such as invalidName, invalidExpression, or notAnInteger." },
+    expressionError: expressionErrorSchema,
+    dependents: { type: "array", description: "Parameters that reference the one being deleted.", items: str },
+    shapeDependents: { type: "array", items: { type: "object", required: ["shapeId", "fields"], properties: { shapeId: str, fields: { type: "array", items: str } }, additionalProperties: false } },
+    shapeId: str,
+    field: str,
+    fields: { type: "array", items: str },
+    index: int,
+    limit: int,
+    value: { type: "number", description: "Set for outOfRange: the expression's value." },
+    min: { type: "number", description: "Set for outOfRange where the field has a static lower bound." },
+    max: { type: "number", description: "Set for outOfRange where the field has a static upper bound." },
+    stored: { type: "number", description: "Set for outOfRange: the value the field would have stored instead." },
+  },
+} as const;
+const parameterQuery = {
+  required: ["projectId", "name"],
+  properties: { ...projectQuery.properties, name: { type: "string", trim: true, minLength: 1, maxLength: 64, description: "The parameter to change or delete." } },
+} as const;
+const parameterReadErrors = { 400: parameterErrorSchema, 401: errorSchema, 404: parameterErrorSchema, 409: parameterErrorSchema, 500: errorSchema, 503: errorSchema } as const;
+const parameterErrors = { ...parameterReadErrors, 422: parameterErrorSchema } as const;
+const parameterWrite = {
+  type: "object",
+  required: ["parameter", "parameters", "shapes", "revision"],
+  properties: {
+    parameter: parameterSchema,
+    parameters: { type: "array", items: parameterSchema },
+    shapes: { type: "array", description: "Top-level shapes this write rebuilt or rewrote, as GET /shapes now reports them.", items: shapeSummary },
+    revision: num,
+  },
+  additionalProperties: false,
+} as const;
+const parameterOperations = [
+  {
+    ...operation("GET", "/api/v1/parameters", "listParameters", [200, ...commonErrors]),
+    description: "Lists the project's parameter table with resolved values, and the shape bindings that no longer resolve.",
+    query: projectQuery,
+    responseSchemas: {
+      200: {
+        type: "object",
+        required: ["parameters", "bindingIssues", "revision"],
+        properties: { parameters: { type: "array", items: parameterSchema }, bindingIssues: { type: "array", items: bindingIssueSchema }, revision: num },
+        additionalProperties: false,
+      },
+      ...parameterReadErrors,
+    },
+  },
+  {
+    ...operation("POST", "/api/v1/parameters", "createParameter", [201, 400, 401, 404, 409, 413, 422, 500, 503], json({
+      type: "object",
+      required: ["name", "expression", "dimension"],
+      properties: { name: parameterName, expression: parameterExpression, dimension: parameterDimension },
+      additionalProperties: false,
+    })),
+    description: "Appends a parameter. Evaluation errors return 422 invalid_expression with the expression error's code, span, and cycle.",
+    query: projectQuery,
+    responseSchemas: { 201: parameterWrite, ...parameterErrors },
+  },
+  {
+    ...operation("PATCH", "/api/v1/parameters", "updateParameter", [200, 400, 401, 404, 409, 422, 500, 503], json({
+      type: "object",
+      oneOf: [
+        { type: "object", required: ["name"], properties: { name: parameterName }, additionalProperties: false },
+        {
+          type: "object",
+          anyOf: [{ type: "object", required: ["expression"] }, { type: "object", required: ["dimension"] }],
+          properties: { expression: parameterExpression, dimension: parameterDimension },
+          additionalProperties: false,
+        },
+      ],
+    })),
+    description: "Renames a parameter (send name alone) or changes its expression or dimension. Every bound shape is rebuilt in the same write and returned in shapes.",
+    query: parameterQuery,
+    responseSchemas: { 200: parameterWrite, ...parameterErrors },
+  },
+  {
+    ...operation("DELETE", "/api/v1/parameters", "deleteParameter", [200, ...commonErrors]),
+    description: "Deletes a parameter that nothing references. One still in use returns 409 parameter_in_use with its dependents.",
+    query: parameterQuery,
+    responseSchemas: {
+      200: {
+        type: "object",
+        required: ["deleted", "name", "parameters", "shapes", "revision"],
+        properties: { deleted: { type: "boolean" }, name: str, parameters: { type: "array", items: parameterSchema }, shapes: { type: "array", items: shapeSummary }, revision: num },
+        additionalProperties: false,
+      },
+      ...parameterReadErrors,
+    },
+  },
 ] as const satisfies readonly ApiV1Operation[];
 
 const arrangementErrors = { 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 500: errorSchema, 503: errorSchema } as const;
@@ -940,6 +1085,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
   ...shapeOperations.slice(0, 2),
   { ...shapeOperations[2], requestBody: { ...shapeOperations[2].requestBody!, faceColors: { type: "object", keyKinds: ["stable-face-id", "legacy-numeric-index"], keyPattern: "^(?:[0-9]+|face_[^\\s]+)$", colorPattern: "^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$" } } } as ApiV1Operation,
   shapeOperations[3],
+  ...parameterOperations,
   ...featureOperations.slice(2, 3),
   {
     ...operation("GET", "/api/v1/thickness", "estimateThickness", [200, 400, 401, 404, 413, 422, 500, 503]),

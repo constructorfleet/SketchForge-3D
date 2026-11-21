@@ -104,7 +104,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
   assert.ok(patchShape.responses["409"].content["application/json"].schema.properties.code.enum.includes("revision_mismatch"));
   assert.equal(patchShape.responses["409"].content["application/json"].schema.properties.revision.type, "number");
   assert.deepEqual(patchShape.responses["400"].content["application/json"].schema.properties.code.enum, ["invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request"]);
-  assert.deepEqual(patchShape.responses["422"].content["application/json"].schema.properties.code.enum, ["unapplicable_fields", "geometry_failed", "cad_failed"]);
+  assert.deepEqual(patchShape.responses["422"].content["application/json"].schema.properties.code.enum, ["unapplicable_fields", "invalid_expression", "geometry_failed", "cad_failed"]);
   assert.equal(spec["x-sketchforge-omitted-operations"].some(({ operationId }) => operationId === "updateShape"), false);
 
   const listMeasurements = spec.paths["/api/v1/measurements"].get;
@@ -259,7 +259,7 @@ test("generated OpenAPI is a source-backed subset and calls out omitted operatio
     assert.ok(spec.paths[pathName][method].responses["200"] || spec.paths[pathName][method].responses["201"]);
   }
   const documentedOperationCount = Object.values(spec.paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
-  assert.equal(documentedOperationCount, 28);
+  assert.equal(documentedOperationCount, 32);
   assert.equal(spec["x-sketchforge-omitted-operations"].length, 4);
   assert.ok(spec["x-sketchforge-omitted-operations"].every(({ method, reason }) => method === "OPTIONS" && /preflight/i.test(reason)));
 });

@@ -17,6 +17,9 @@ import { apiError, apiErrors, apiExpectedRevision, type ApiErrorCode } from "@/l
 // exporter, which reaches the browser's OCCT loader, and no route needs that in
 // its module graph -- importing the barrel here would put it in all seven.
 import { createEngine, type Engine, type EngineFailure } from "@/lib/engine/engine";
+import type { ShapeBindingError } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import type { ExpressionError } from "@constructorfleet/sketchforge-engine/parameterExpressions";
+import type { ProjectParameterError } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { directoryProjectStore } from "@/lib/engine/projectStore";
 
 /** The engine over a request's project directory. */
@@ -100,6 +103,59 @@ function unapplicableFields(failure: Extract<EngineFailure, { reason: "unapplica
   return apiError(message, 422, "unapplicable_fields", { fields: failure.fields });
 }
 
+/** Serializes an evaluation error: code, message, span and, for a cycle, its path. */
+export function wireExpressionError(error: ExpressionError) {
+  return {
+    code: error.code,
+    message: error.message,
+    span: { start: error.span.start, end: error.span.end },
+    ...(error.cycle ? { cycle: [...error.cycle] } : {}),
+  };
+}
+
+const PARAMETER_ERROR_STATUS: Record<ProjectParameterError["code"], readonly [number, ApiErrorCode]> = {
+  invalidParameter: [400, "invalid_request"],
+  invalidName: [400, "invalid_request"],
+  invalidDimension: [400, "invalid_request"],
+  duplicateName: [409, "parameter_exists"],
+  unknownParameter: [404, "parameter_not_found"],
+  parameterInUse: [409, "parameter_in_use"],
+  invalidExpression: [422, "invalid_expression"],
+  tooManyParameters: [413, "limit_exceeded"],
+};
+
+/** Maps a table refusal. `reason` carries the engine's finer code. */
+function parameterError(error: ProjectParameterError) {
+  const [status, code] = PARAMETER_ERROR_STATUS[error.code];
+  return apiError(error.message, status, code, {
+    parameter: error.parameter,
+    reason: error.code,
+    ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
+    ...(error.code === "parameterInUse" ? {
+      dependents: [...(error.dependents ?? [])],
+      shapeDependents: (error.shapeDependents ?? []).map(({ shapeId, fields }) => ({ shapeId, fields: [...fields] })),
+    } : {}),
+  });
+}
+
+/** Maps a binding refusal. An unbindable field reads as `unapplicable_fields`, as an unknown literal does. */
+function bindingError(error: ShapeBindingError, index: number | undefined) {
+  const detail = {
+    shapeId: error.shapeId,
+    field: error.field,
+    reason: error.code,
+    ...(index === undefined ? {} : { index }),
+    ...(error.expressionError ? { expressionError: wireExpressionError(error.expressionError) } : {}),
+    ...Object.fromEntries((["value", "min", "max", "stored"] as const)
+      .filter((key) => typeof error[key] === "number")
+      .map((key) => [key, error[key]])),
+  };
+  const message = atIndex(error.message, index);
+  if (error.code === "shapeNotFound") return apiError(message, 404, "shape_not_found", detail);
+  if (error.code === "fieldNotBindable") return apiError(message, 422, "unapplicable_fields", { ...detail, fields: [error.field] });
+  return apiError(message, 422, "invalid_expression", detail);
+}
+
 export function apiEngineError(failure: EngineFailure, wording: ApiFailureWording = {}) {
   switch (failure.reason) {
     case "project_busy":
@@ -164,8 +220,9 @@ export function apiEngineError(failure: EngineFailure, wording: ApiFailureWordin
     case "import_failed":
       return apiError(`${failure.fileName}: ${failure.message}`, 422, "geometry_failed");
     case "parameter_invalid":
+      return parameterError(failure.error);
     case "binding_invalid":
-      return apiError(failure.error.message, 422, "invalid_request");
+      return bindingError(failure.error, failure.index);
     case "binding_failed":
       return apiEngineError(failure.failure, wording);
     default:

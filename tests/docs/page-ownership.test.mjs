@@ -34,7 +34,7 @@ test("documentation suite status records REST and runnable-fence coverage accura
   const total = documented + omitted.length;
   const currentCoverage = changelog.match(/^Current OpenAPI coverage is (\d+) of (\d+) registered operations; the four omitted handlers are `OPTIONS` preflights\.$/m);
 
-  assert.match(spec, /Current status is 28 of 32; the four omitted operations are `OPTIONS` preflights/i);
+  assert.match(spec, /Current status is 32 of 36; the four omitted operations are `OPTIONS` preflights/i);
   assert.ok(currentCoverage, "changelog has one explicit current OpenAPI coverage claim");
   assert.equal(Number(currentCoverage[1]), documented);
   assert.equal(Number(currentCoverage[2]), total);

@@ -56,20 +56,20 @@ JSON request bodies are limited to 16 MiB; `POST /imports` accepts a raw request
 
 Project write routes accept an optional `If-Match: "<revision>"` header. The server checks it while holding the project write lock; a stale revision returns `409 revision_mismatch` with the current `revision`, and leaves the project unchanged. Successful writes return the new revision in both the JSON body and `ETag: "<revision>"`. Omitting `If-Match` preserves unconditional write behavior.
 
-For the current method and path inventory, accepted parameters and bodies, response schemas, authentication, and handler source, use the [generated REST operation references](/docs/rest-api/). Those 28 pages are generated from the same OpenAPI 3.1 contract as the [OpenAPI document](./openapi-v1.json), available as a [downloadable OpenAPI JSON](/openapi-v1.json); the four preflight-only OPTIONS handlers are omitted. Export references distinguish JSON/base64 responses from `download=1` binary responses and document the metadata header. For accepted per-kind shape fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`. This guide retains deployment, client, error-handling, and workflow walkthroughs; the generated pages are the source for the endpoint listing.
+For the current method and path inventory, accepted parameters and bodies, response schemas, authentication, and handler source, use the [generated REST operation references](/docs/rest-api/). Those 32 pages are generated from the same OpenAPI 3.1 contract as the [OpenAPI document](./openapi-v1.json), available as a [downloadable OpenAPI JSON](/openapi-v1.json); the four preflight-only OPTIONS handlers are omitted. Export references distinguish JSON/base64 responses from `download=1` binary responses and document the metadata header. For accepted per-kind shape fields, see the [parameterized shape reference](./SHAPE_REQUEST_REFERENCE.md). Regenerate the contract with `node scripts/generate-openapi.mjs` and check it with `node scripts/generate-openapi.mjs --check`. This guide retains deployment, client, error-handling, and workflow walkthroughs; the generated pages are the source for the endpoint listing.
 
 `GET /projects` and `GET /shapes?projectId=...` accept optional `limit` (1–1000) and opaque `cursor` query parameters. Responses include `nextCursor`, which is `null` after the last page. Pass a returned cursor with the same limit to fetch the next page. Omitting both parameters returns the full listing, preserving the existing default behavior.
 The PATCH schema describes stable face IDs and legacy numeric indexes as `faceColors` keys, six or eight digit hex values, and leaves other engine-supported patch fields extensible. The route still applies its runtime parser before forwarding the patch to the engine, including the documented [sketch sweep updates](#sketch-sweeps) and retained face drafts.
 
 ### Contract validation
 
-The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, `POST /explode`, `POST /imports`, and `POST /exports` carry request metadata and status-specific response schemas. Body-writing operations declare `maxRequestBytes` and a `413` response in that registry. Their handlers validate successful and error responses against those contracts; shape patches also validate `faceColors` against the pattern-key and color constraints while passing other engine-supported fields through. Export downloads validate their media type and URI-encoded metadata header, and unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, STEP assembly summaries, revision, and reachable engine errors. All 28 non-OPTIONS operations have route-backed request and response schemas and are runtime-validated. The four read-only OPTIONS preflights remain inventory-only and are omitted from generated OpenAPI.
+The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, `POST /explode`, `POST /imports`, and `POST /exports` carry request metadata and status-specific response schemas. Body-writing operations declare `maxRequestBytes` and a `413` response in that registry. Their handlers validate successful and error responses against those contracts; shape patches also validate `faceColors` against the pattern-key and color constraints while passing other engine-supported fields through. Export downloads validate their media type and URI-encoded metadata header, and unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, STEP assembly summaries, revision, and reachable engine errors. All 32 non-OPTIONS operations have route-backed request and response schemas and are runtime-validated. The four read-only OPTIONS preflights remain inventory-only and are omitted from generated OpenAPI.
 
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
 ### Contract coverage
 
-The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` registers every currently exported `/api/v1` route method. A test compares that inventory with the route handlers so adding a public method without registering it fails CI. The inventory records method, path, operation ID, and auth mode; the four read-only `OPTIONS` methods are unauthenticated 204 responses, while API operations require bearer authentication. All 28 non-OPTIONS resource operations have verified request/response schemas and status sets in generated OpenAPI. The four preflight-only OPTIONS methods remain listed in the inventory and are omitted from the specification.
+The typed operation inventory in `apps/web/src/lib/apiV1OperationContract.ts` registers every currently exported `/api/v1` route method. A test compares that inventory with the route handlers so adding a public method without registering it fails CI. The inventory records method, path, operation ID, and auth mode; the four read-only `OPTIONS` methods are unauthenticated 204 responses, while API operations require bearer authentication. All 32 non-OPTIONS resource operations have verified request/response schemas and status sets in generated OpenAPI. The four preflight-only OPTIONS methods remain listed in the inventory and are omitted from the specification.
 
 ## Describing a shape
 
@@ -152,6 +152,58 @@ A locked shape answers `409` with `code: "shape_locked"`; send `locked: false` t
 
 **A sketch extrusion is not a kind you can ask for here**: its profile is drawn, not described. Operations whose geometry comes out of the CAD kernel -- fillets, chamfers, and boolean cuts -- have endpoints of their own, below; `POST /shapes` builds only what can be built from parameters alone, and answers `422` naming the kinds it can build rather than quietly substituting something else.
 
+## Parameters and expressions
+
+A project can hold a table of named parameters, and any numeric shape field in the engine's `EXPRESSION_BINDABLE_FIELDS` catalog can be bound to an expression over them. Change `wall` once and every shape that uses it is rebuilt in the same write.
+
+| Request | Body | Answer |
+| --- | --- | --- |
+| `GET /parameters?projectId=` | none | `200 { parameters, bindingIssues, revision }` |
+| `POST /parameters?projectId=` | `{ name, expression, dimension }` | `201 { parameter, parameters, shapes, revision }` |
+| `PATCH /parameters?projectId=&name=` | `{ expression?, dimension? }`, or `{ name }` alone to rename | `200 { parameter, parameters, shapes, revision }` |
+| `DELETE /parameters?projectId=&name=` | none | `200 { deleted: true, name, parameters, shapes, revision }` |
+
+`dimension` is `length`, `angle` or `unitless`. A parameter reads as `{ name, expression, dimension, value }`, where `value` is in millimetres, degrees or plain units. A stored entry that no longer evaluates keeps its last `value` (or `null`) and carries an `error`. `bindingIssues` lists the shape bindings that no longer resolve, as `{ shapeId, field, code, message }`.
+
+`shapes` holds the top-level shapes the write rebuilt or rewrote, in the same form `GET /shapes` now returns them. A rename rewrites every expression and binding that uses the old name. A delete is refused with `409 parameter_in_use` while anything uses the parameter. All three writes honour `If-Match`. A change that does not evaluate (a parse error, a cycle, a wrong dimension, or a bound field it would break) answers `422 invalid_expression` and writes nothing. A change that would rebuild a locked shape answers `409 shape_locked`, also with nothing written:
+
+```json
+{
+  "error": "Parameter \"a\": Reference cycle: a → b → a.",
+  "code": "invalid_expression",
+  "parameter": "a",
+  "reason": "invalidExpression",
+  "expressionError": { "code": "cycle", "message": "Reference cycle: a → b → a.", "span": { "start": 0, "end": 1 }, "cycle": ["a", "b", "a"] }
+}
+```
+
+`reason` is the engine's finer code (`invalidName`, `duplicateName`, `invalidExpression`, `notAnInteger`, `outOfRange`, `fieldNotBindable` and so on). An `outOfRange` value, one the field would clamp, also carries `value` and, where the field has them, `min`, `max` or the `stored` value it would become. A refusal about a bound field also names its `shapeId` and `field`, and in a batch `POST /shapes` its `index`.
+
+### Binding shape fields
+
+`POST /shapes` and `PATCH /shapes` take an `expressions` object keyed by field name. Feature settings use dotted keys, such as `revolve.sweepAngle`:
+
+```json
+{ "kind": "box", "depth": 10, "height": 10, "expressions": { "width": "wall * 5", "x": "wall * 10" } }
+```
+
+A bare number takes the field's unit, so `wall + 3` in a length field adds 3 mm. Count fields such as `sides` must evaluate to a whole number. A summary reports each bound field as its resolved number, and the expression under `expressions`. A field that cannot be bound on that shape answers `422 unapplicable_fields`.
+
+A `PATCH` decides what happens to a binding from what it sends for that field:
+
+| Sent for a bound field | Result |
+| --- | --- |
+| Nothing | The binding stays. |
+| The field's current number | The binding stays. Sending a whole summary back does not unbind anything. |
+| A different number | The number replaces the binding. |
+| `expressions: { field: "…" }` | The field is bound, or rebound, to that expression. |
+| `expressions: { field: null }` | The binding is removed and the field keeps its current number. |
+| A number and an expression that disagree | `400 invalid_request`, with nothing written. |
+
+Comparisons are exact, which a JSON round trip of the server's own number preserves. A client that read the shape before someone else changed a parameter can send a stale number, and that number counts as an edit. Send `If-Match` with the revision you read to turn that case into `409 revision_mismatch`.
+
+Sketch constraint values are not bound through REST yet. They will be added to these routes once the engine supports them (#612).
+
 ## Errors
 
 Every error carries a `code` beside its sentence, because the status alone is ambiguous in both directions a client cares about. `404` is a missing project, a missing shape, *or* an API with no token set; `409` is a busy project, a locked shape, or a stale revision. Decide on the code; the sentence is for a human reading a log.
@@ -169,6 +221,10 @@ Every error carries a `code` beside its sentence, because the status alone is am
 | `project_busy` | 409 | Another write holds the project's lock. **Retry.** |
 | `revision_mismatch` | 409 | The project no longer has the revision in `If-Match`; the response includes the current `revision`. Reload before writing again. |
 | `shape_locked` | 409 | The shape is locked. Unlock it; retrying will not help. |
+| `parameter_not_found` | 404 | No parameter has that name. |
+| `parameter_exists` | 409 | A parameter with that name is already in the table. |
+| `parameter_in_use` | 409 | A delete was refused because something still uses the parameter. `dependents` lists parameters, `shapeDependents` lists `{ shapeId, fields }`. |
+| `invalid_expression` | 422 | A parameter or bound field does not evaluate. `expressionError` has the evaluator's `code`, `message`, `span` and, for a cycle, `cycle`. |
 | `unsupported_kind` | 422 | `POST /shapes` cannot build that kind; the message lists the ones it can. |
 | `unsupported_format` | 415 | `POST /imports` cannot read that file format; the message lists the ones it can. |
 | `unapplicable_fields` | 422 | A change named fields the shape cannot take. `fields` lists them. |
@@ -254,6 +310,7 @@ are identified by their status in the route description above or below.
 | `MAX_PATTERN_COUNT` | 200 | `POST /patterns`; the requested count is normalized to the supported range. |
 | `MAX_PROFILE_POINTS` | 2,000 | Revolve outlines in `POST /shapes`; excess returns `400 invalid_request`. |
 | `MAX_REQUESTED_DIMENSION` | 10,000 mm | Parameterized shape dimensions in `POST /shapes`; values are clamped. |
+| `MAX_REQUEST_EXPRESSION_LENGTH` | 1,000 characters | Each `expressions` entry in `POST` and `PATCH /shapes`; longer returns `400 invalid_request`. |
 | `MAX_REVOLVE_TURNS` | 20 | Helical revolve settings; values are clamped. |
 | `MAX_REVOLVE_PITCH` | 200 mm | Helical revolve settings; values are clamped. |
 | `MAX_REVOLVE_RINGS` | 2,400 | Upper bound on generated helical revolve rings. |
