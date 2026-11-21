@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Circle as CircleIcon, CloudUpload, Download, Eye, FolderOpen, Hexagon as HexagonIcon, Settings as SettingsIcon, Square as SquareIcon, Triangle as TriangleIcon, Upload, X } from "lucide-react";
+import { Check, Circle as CircleIcon, CloudUpload, Download, Eye, FolderOpen, Hexagon as HexagonIcon, Settings as SettingsIcon, Square as SquareIcon, Triangle as TriangleIcon, Upload, Variable, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -174,7 +174,9 @@ import { exportMeshesToStl } from "@/lib/stlExport";
 import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
-import { editorExportRequest, editorMeasureRequest, type EditorSection } from "@/lib/editorCadRequests";
+import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
+import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
 import {
@@ -226,7 +228,7 @@ import type { AlignAxis, AlignHandleStatus, AlignTarget, EdgeTreatmentFeature, E
 
 export { importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg };
 
-type TopPanel = "import" | "export" | "profile" | "settings" | null;
+type TopPanel = "import" | "export" | "profile" | "settings" | "parameters" | null;
 type ExportFormat = "stl" | "3mf" | "obj" | "step" | "svg" | "dxf" | "skf";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
@@ -5551,9 +5553,18 @@ export function SketchForgeEditor({
   const lastProjectSnapshotRef = useRef<ProjectThumbnailSceneKey | null>(null);
   const shapesRef = useRef(shapes);
   const projectAssetsRef = useRef(projectAssets);
-  // No editor UI changes the table yet; held so saves keep it.
+  // The ref serves saves and history; the state re-renders the parameters panel.
   const projectParametersRef = useRef(initialParameters);
   const projectConfigurationRef = useRef(initialConfiguration);
+  const [projectParameters, setProjectParameters] = useState(initialParameters);
+  // The table and configurations the host last passed or was sent. An equal host prop is not a remote change.
+  const hostParametersKeyRef = useRef(parameterStateKey(initialParameters, initialConfiguration));
+  const [parameterEditPending, setParameterEditPending] = useState(false);
+  const parameterEditPendingRef = useRef(false);
+  const adoptProjectParameters = useCallback((parameters: ProjectParameter[]) => {
+    projectParametersRef.current = parameters;
+    setProjectParameters(parameters);
+  }, []);
   const selectedIdsRef = useRef(selectedIds);
   const workspaceSettingsRef = useRef(workspaceSettings);
   const snapGridRef = useRef(snapGrid);
@@ -6168,6 +6179,7 @@ export function SketchForgeEditor({
         projectSyncTimerRef.current = null;
         lastProjectShapesSyncRef.current = serialized;
         lastProjectShapesEchoRef.current = serialized;
+        hostParametersKeyRef.current = parameterStateKey(projectParametersRef.current, projectConfigurationRef.current);
         onProjectShapesChange({
           projectId,
           shapes: canonicalNext,
@@ -7228,9 +7240,6 @@ export function SketchForgeEditor({
     if (projectInteractionActiveRef.current) {
       return;
     }
-    // The host owns the table, so a newer entry for the same project replaces it.
-    projectParametersRef.current = initialParameters;
-    projectConfigurationRef.current = initialConfiguration;
     const projectChanged = lastProjectIdRef.current !== projectId;
     if (projectChanged) {
       lastProjectIdRef.current = projectId;
@@ -7245,8 +7254,22 @@ export function SketchForgeEditor({
     }
     const incoming = initialShapes.map(canonicalizeShape);
     const incomingSerialized = projectShapesFingerprint(incoming);
+    const hostParametersKey = parameterStateKey(initialParameters, initialConfiguration);
+    const sync = hostProjectSync({
+      projectChanged,
+      hostTableKey: hostParametersKey,
+      knownTableKey: hostParametersKeyRef.current,
+      incomingShapesKey: incomingSerialized,
+      echoShapesKey: lastProjectShapesEchoRef.current,
+      currentShapesKey: projectShapesFingerprint(shapes),
+    });
+    if (sync.adoptTable) {
+      hostParametersKeyRef.current = hostParametersKey;
+      adoptProjectParameters(initialParameters);
+      projectConfigurationRef.current = initialConfiguration;
+    }
     // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
-    if (!projectChanged && lastProjectShapesEchoRef.current !== null && incomingSerialized === lastProjectShapesEchoRef.current) {
+    if (sync.action === "echo") {
       lastProjectShapesSyncRef.current = incomingSerialized;
       return;
     }
@@ -7255,9 +7278,7 @@ export function SketchForgeEditor({
       window.clearTimeout(projectSyncTimerRef.current);
       projectSyncTimerRef.current = null;
     }
-    if (!projectChanged && incomingSerialized === projectShapesFingerprint(shapes)) {
-      return;
-    }
+    if (sync.action === "unchanged") return;
     const hydratedHistory = hydrateEditorHistoryState(
       incoming,
       initialHistory,
@@ -7276,7 +7297,7 @@ export function SketchForgeEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice(null);
-  }, [initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+  }, [adoptProjectParameters, initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
 
   useEffect(() => {
     if (!projectId || !onProjectShapesChange) {
@@ -7614,14 +7635,14 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
-    projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
+    adoptProjectParameters(entry?.parameters ?? projectParametersRef.current); // Absent: an entry from before tables were in history.
     projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
     syncProjectShapes(nextShapes, true); // Forced: a table-only step leaves the shapes fingerprint unchanged.
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.undone")}` : t("editor.notice.undone")));
-  }, [invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
 
   const redo = useCallback(() => {
     if (projectInteractionActiveRef.current) {
@@ -7642,14 +7663,83 @@ export function SketchForgeEditor({
     historyIndexRef.current = nextIndex;
     shapesRef.current = nextShapes;
     selectedIdsRef.current = nextSelection;
-    projectParametersRef.current = entry?.parameters ?? projectParametersRef.current; // Absent: an entry from before tables were in history.
+    adoptProjectParameters(entry?.parameters ?? projectParametersRef.current); // Absent: an entry from before tables were in history.
     projectConfigurationRef.current = entryConfiguration(entry) ?? projectConfigurationRef.current;
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
     syncProjectShapes(nextShapes, true);
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.redone")}` : t("editor.notice.redone")));
-  }, [invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
+
+  /** Commits a table edit and its geometry recompute as one history entry. Resolves to the refusal, if any. */
+  const applyParameterEdit = useCallback(async (edit: ParameterEdit): Promise<ParameterMessage | null> => {
+    if (projectInteractionActiveRef.current || parameterEditPendingRef.current) return { key: "editor.parameters.error.busy", values: {} };
+    const startShapes = shapesRef.current;
+    const startParameters = projectParametersRef.current;
+    const startConfiguration = projectConfigurationRef.current;
+    const planned = planParameterEdit({ parameters: startParameters, shapes: startShapes, ...startConfiguration }, edit);
+    if (!planned.ok) return parameterErrorMessage(planned.error);
+    let next = planned.project;
+    // Also shown in the status line: the panel may have closed while a recompute ran.
+    const refuse = (message: ParameterMessage) => {
+      setNotice(notice((t) => t(message.key, message.values)));
+      return message;
+    };
+    if (planned.recompute && STATIC_EXPORT_BUILD) {
+      // No server: only plain primitive fields can follow, which needs no kernel.
+      const local = applyBindingsLocally(planned.project.shapes, startParameters, planned.project.parameters);
+      if (!local) return refuse(parameterEditFailureMessage(null, startShapes));
+      if (!local.ok) return refuse(parameterEditFailureMessage(local.failure, startShapes));
+      next = { ...planned.project, shapes: local.shapes };
+    } else if (planned.recompute) {
+      // Bound geometry moves through the engine's CAD paths on the server. Only affected trees are sent.
+      const scope = recomputeScope(startShapes, startParameters, planned.project.parameters);
+      parameterEditPendingRef.current = true;
+      setParameterEditPending(true);
+      try {
+        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", scope, startParameters, edit, startConfiguration);
+        const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
+        const body = await response.json().catch(() => null) as {
+          shapes?: WorkplaneShape[];
+          parameters?: ProjectParameter[];
+          configurations?: ProjectConfigurationState["configurations"];
+          activeConfiguration?: string | null;
+          failure?: ParameterEditFailure;
+        } | null;
+        const merged = response.ok && body?.shapes && body.parameters ? mergeRecomputedShapes(planned.project.shapes, scope, body.shapes) : null;
+        if (!merged || !body?.parameters) return refuse(parameterRecomputeResponseMessage(response.ok ? 200 : response.status, body, startShapes));
+        next = { shapes: merged, parameters: body.parameters, configurations: body.configurations ?? [], activeConfiguration: body.activeConfiguration ?? null };
+      } catch {
+        return refuse(parameterEditFailureMessage(null, startShapes));
+      } finally {
+        parameterEditPendingRef.current = false;
+        setParameterEditPending(false);
+      }
+      if (shapesRef.current !== startShapes || projectParametersRef.current !== startParameters) {
+        return refuse({ key: "editor.parameters.error.projectChanged", values: {} });
+      }
+    }
+    invalidateCadModifierSession();
+    adoptProjectParameters(next.parameters);
+    // A rename or delete also rewrites configuration rows.
+    projectConfigurationRef.current = {
+      configurations: next.configurations ?? startConfiguration.configurations,
+      activeConfiguration: next.activeConfiguration === undefined ? startConfiguration.activeConfiguration : next.activeConfiguration,
+    };
+    const nextShapes = next.shapes.map(canonicalizeShape);
+    const nextSelection = selectedIdsRef.current.filter((id) => nextShapes.some((shape) => shape.id === id));
+    shapesRef.current = nextShapes;
+    selectedIdsRef.current = nextSelection;
+    setShapes(nextShapes);
+    setSelectedIds(nextSelection);
+    // Forced: a table-only edit leaves the shapes fingerprint unchanged.
+    if (appendHistorySnapshot(nextShapes, nextSelection)) syncProjectShapes(nextShapes, true, true);
+    const name = edit.kind === "rename" ? edit.newName : edit.name;
+    const noticeKey = ({ add: "added", update: "updated", rename: "renamed", delete: "deleted" } as const)[edit.kind];
+    setNotice(notice((t) => t(`editor.parameters.notice.${noticeKey}`, { name })));
+    return null;
+  }, [adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
 
   const toggleAlignMode = useCallback(() => {
     if (selectedShapes.length < 2) {
@@ -10719,7 +10809,16 @@ export function SketchForgeEditor({
           onCancel={cancelEdgeModifier}
         />
       ) : null}
-      {topPanel ? (
+      {topPanel === "parameters" ? (
+        <ProjectParametersPanel
+          parameters={projectParameters}
+          configurations={projectConfigurationRef.current.configurations}
+          shapes={shapes}
+          busy={parameterEditPending}
+          onEdit={applyParameterEdit}
+          onClose={() => setTopPanel(null)}
+        />
+      ) : topPanel ? (
         <TopActionPanel
           panel={topPanel}
           projectName={projectName}
@@ -11999,6 +12098,16 @@ function SecondaryToolbar({
             {toolbarLayout.showActionLabels ? <span>{t("editor.toolbar.export")}</span> : null}
           </button>
           <button
+            className="toolbar-title-action"
+            type="button"
+            aria-label={t("editor.parameters.open")}
+            title={t("editor.parameters.open")}
+            onClick={() => onTopPanel("parameters")}
+          >
+            <Variable size={15} aria-hidden="true" />
+            {toolbarLayout.showActionLabels ? <span>{t("editor.parameters.title")}</span> : null}
+          </button>
+          <button
             className="toolbar-title-action toolbar-title-action-icon"
             type="button"
             aria-label={t("editor.toolbar.workspaceSettings")}
@@ -12030,7 +12139,7 @@ function TopActionPanel({
   onPickProjectFile,
   onNotice,
 }: {
-  panel: Exclude<TopPanel, null>;
+  panel: Exclude<TopPanel, null | "parameters">;
   projectName: string;
   shapeCount: number;
   scopeLabel: "selected" | "total";

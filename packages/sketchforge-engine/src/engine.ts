@@ -124,25 +124,22 @@ import {
   profileSizeFields,
   rebuildableSketch,
   resolveSketchConstraintBinding,
-  resolveSketchConstraintBindings,
   sketchNotRebuildable,
   sketchConstraintValue,
   withSketchConstraintValues,
   type BindableSketchConstraint,
   type SketchConstraintBindingError,
 } from "./sketchConstraintBindings.js";
-import { solveSketchConstraints } from "./sketchConstraints.js";
+import { planParameterBindings, solvedSketchProfile as solveSharedSketchProfile } from "./parameterBindingPlan.js";
 import {
   bindableField,
   boundFieldsNamedBy,
   boundFieldValue,
   resolveShapeBinding,
-  resolveShapeBindings,
   withoutBindings,
   withoutShapeBindings,
   type ShapeBindingError,
 } from "./expressionBindings.js";
-import { expressionDependencies } from "./parameterExpressions.js";
 import { echoedBindings, parseRequestExpressions, requestedBindingValue, type RequestExpressions } from "./shapeRequestExpressions.js";
 import {
   activateConfiguration as activateTableConfiguration,
@@ -694,19 +691,6 @@ function findShapeInTree(
   return undefined;
 }
 
-function changedParameterNames(previous: readonly ProjectParameter[], next: readonly ProjectParameter[]) {
-  const before = new Map(previous.map((parameter) => [parameter.name, parameter]));
-  const after = new Map(next.map((parameter) => [parameter.name, parameter]));
-  const changed = new Set<string>();
-  for (const name of new Set([...before.keys(), ...after.keys()])) {
-    const left = before.get(name);
-    const right = after.get(name);
-    // Object.is: an unresolved entry keeps NaN, which must not count as a change.
-    if (!left || !right || !Object.is(left.value, right.value) || left.dimension !== right.dimension) changed.add(name);
-  }
-  return changed;
-}
-
 /** Separated and exploded parts are new bodies; no binding on the source describes them. */
 function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
   return withoutBindings(shape, Object.keys(shape.expressions ?? {}));
@@ -759,24 +743,9 @@ function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): Re
   return outputs.length === 1 ? findShapeInTree(roots, outputs[0]!.id) : undefined;
 }
 
-/**
- * Sets resolved constraint values on `shape`'s profile and solves it. Refuses only constraints
- * the change breaks: the editor saves profiles with constraints it could not satisfy.
- */
 function solvedSketchProfile(shape: WorkplaneShape, values: Readonly<Record<string, number>>): EngineResult<SketchProfile> {
-  const solved = solveSketchConstraints(withSketchConstraintValues(shape.sketchProfile!, values));
-  if (!solved.unsatisfiedConstraintIds.length) return ok(solved.profile);
-  const already = new Set(solveSketchConstraints(shape.sketchProfile!).unsatisfiedConstraintIds);
-  const broken = solved.unsatisfiedConstraintIds.filter((id) => Object.hasOwn(values, id) || !already.has(id));
-  if (broken.length) {
-    return failed({
-      reason: "sketch_unsolvable",
-      shapeId: shape.id,
-      constraintIds: broken,
-      message: `The sketch on ${shape.id} cannot satisfy ${broken.join(", ")} with the new values.`,
-    });
-  }
-  return ok(solved.profile);
+  const solved = solveSharedSketchProfile(shape, values);
+  return solved.ok ? ok(solved.profile) : failed(solved.failure);
 }
 
 export function createEngine(store: ProjectStore): Engine {
@@ -1836,80 +1805,9 @@ export function createEngine(store: ProjectStore): Engine {
     previous: readonly ProjectParameter[],
     next: readonly ProjectParameter[],
   ): Promise<EngineResult<WorkplaneShape[]>> {
-    const changed = changedParameterNames(previous, next);
-    if (!changed.size) return ok(shapes);
-    const pending: Array<{
-      id: string; values: Record<string, number>; locked: string | undefined; sketchProfile?: SketchProfile; constraintIds?: string[];
-    }> = [];
-    let invalid: ShapeBindingError | undefined;
-    let invalidConstraint: SketchConstraintBindingError | undefined;
-    let unsolvable: EngineResult<never> | undefined;
-    const visit = (shape: WorkplaneShape, topLevel: boolean, lockedAncestor: string | undefined) => {
-      const locked = shape.locked ? shape.id : lockedAncestor;
-      shape.groupedShapes?.forEach((child) => visit(child, false, locked));
-      const values: Record<string, number> = {};
-      const touches = (expression: string) => expressionDependencies(expression).some((name) => changed.has(name));
-      const expressions = Object.entries(shape.expressions ?? {});
-      if (!invalid && expressions.some(([, expression]) => touches(expression))) {
-        // Every binding on a touched shape is rechecked, since one field's limit can depend on another's value.
-        const after = resolveShapeBindings(shape, next);
-        const before = resolveShapeBindings(shape, previous);
-        for (const [field] of expressions) {
-          // A misplaced shape binding stays stale, as on load.
-          if (invalid || bindableField(shape, field)?.target === "shape" && !topLevel) continue;
-          const resolved = after.get(field)!;
-          if (resolved.ok) {
-            if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
-          } else if (before.get(field)!.ok) {
-            // Refuses only a binding this change breaks; one already stale stays stale.
-            invalid = resolved.error;
-          }
-        }
-      }
-      const constraintValues: Record<string, number> = {};
-      // A binding on a sketch no edit can rebuild stays stale, as on load.
-      const bound = rebuildableSketch(shape, topLevel) ? boundSketchConstraints(shape) : [];
-      if (!invalidConstraint && bound.some(({ expression }) => touches(expression))) {
-        // As for shapes, every binding on a touched sketch is rechecked against the whole change.
-        const after = resolveSketchConstraintBindings(shape, next);
-        const before = resolveSketchConstraintBindings(shape, previous);
-        for (const { constraint } of bound) {
-          if (invalidConstraint) break;
-          const resolved = after.get(constraint.id)!;
-          if (resolved.ok) {
-            if (sketchConstraintValue(constraint) !== resolved.value) constraintValues[constraint.id] = resolved.value;
-          } else if (before.get(constraint.id)!.ok) {
-            invalidConstraint = resolved.error;
-          }
-        }
-      }
-      const constraintIds = Object.keys(constraintValues);
-      let sketchProfile: SketchProfile | undefined;
-      if (constraintIds.length && !unsolvable) {
-        // Solved before any rebuild, so an unsolvable sketch costs no CAD work.
-        const solved = solvedSketchProfile(shape, constraintValues);
-        if (solved.ok) sketchProfile = solved.value;
-        else unsolvable = solved as EngineResult<never>;
-      }
-      if (Object.keys(values).length || sketchProfile) {
-        pending.push({ id: shape.id, values, locked, ...(sketchProfile ? { sketchProfile, constraintIds } : {}) });
-      }
-    };
-    shapes.forEach((shape) => visit(shape, true, undefined));
-    if (invalid) return failed({ reason: "binding_invalid", error: invalid });
-    if (invalidConstraint) return failed({ reason: "constraint_binding_invalid", error: invalidConstraint });
-    if (unsolvable) return unsolvable;
-    // A change that would alter a locked shape, or rebuild a locked group around one, is refused as a manual edit is.
-    const blocked = pending.find((entry) => entry.locked);
-    if (blocked) {
-      return failed({
-        reason: "binding_failed",
-        shapeId: blocked.id,
-        fields: Object.keys(blocked.values),
-        ...(blocked.constraintIds ? { constraintIds: blocked.constraintIds } : {}),
-        failure: { reason: "shape_locked", ids: [blocked.locked!] },
-      });
-    }
+    const plan = planParameterBindings(shapes, previous, next);
+    if (!plan.ok) return failed(plan.failure);
+    const { pending } = plan;
     let current = shapes;
     for (const { id, values, sketchProfile, constraintIds } of pending) {
       const applied = await applyBindingValues({ ...document, shapes: current }, id, values, sketchProfile);
