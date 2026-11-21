@@ -938,7 +938,11 @@
         "activateLabel": "Activate {name}",
         "useBase": "Use base table",
         "activeOption": "{name} (active)",
-        "issues": "{name} has overrides that do not resolve:"
+        "issues": "{name} has overrides that do not resolve:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "The override uses {identifier}, which is not a parameter.",
+        "clearIssue": "Clear the {parameter} override",
+        "valueIn": "Value in {name}"
       }
     },
     "expressionField": {

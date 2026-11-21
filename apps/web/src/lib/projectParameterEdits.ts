@@ -140,9 +140,19 @@ export function configurationIssueMessages(
   configuration: string | null,
 ): Array<{ parameter: string; message: ParameterMessage }> {
   if (!configuration) return [];
+  const overrides = project.configurations?.find((entry) => entry.name === configuration)?.overrides ?? {};
   return configurationIssues(project)
     .filter((issue) => issue.configuration === configuration)
-    .map((issue) => ({ parameter: issue.parameter, message: baseErrorMessage(issue.error) }));
+    .map((issue) => {
+      const { expressionError } = issue.error;
+      const expression = overrides[issue.parameter];
+      // Names the identifier that does not resolve, read from the override by its span.
+      if (expressionError?.code === "unknownName" && typeof expression === "string") {
+        const identifier = expression.slice(expressionError.span.start, expressionError.span.end);
+        if (identifier) return { parameter: issue.parameter, message: { key: "editor.parameters.configurations.issueUnknownName" as const, values: { identifier } } };
+      }
+      return { parameter: issue.parameter, message: baseErrorMessage(issue.error) };
+    });
 }
 
 /** Names a committed edit for the status line. */

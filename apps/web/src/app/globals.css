@@ -11125,6 +11125,7 @@ html[data-theme="dark"] .expression-input-error {
 
 .range-property-header:has(.expression-input.is-invalid) {
   align-items: flex-start;
+}
 
 /* Issue #618: configuration picker and override column in the parameter panel. */
 .parameters-configurations {

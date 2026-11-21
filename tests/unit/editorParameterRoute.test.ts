@@ -185,6 +185,8 @@ describe("editor parameter route", () => {
     const missing = await post([boundBox()], { kind: "bindShape", shapeId: "other", field: "width", expression: "w" });
     expect(missing.status).toBe(422);
     expect(missing.body.failure).toMatchObject({ reason: "shapes_not_found" });
+  });
+
   it("activates a configuration and sets an override through the engine, recomputing bound geometry", async () => {
     const parameters = table([{ name: "w", expression: "10", dimension: "length" }]);
     const send = async (shapes: WorkplaneShape[], table: typeof parameters, configuration: { configurations: ProjectConfiguration[]; activeConfiguration: string | null }, edit: ParameterEdit) => {

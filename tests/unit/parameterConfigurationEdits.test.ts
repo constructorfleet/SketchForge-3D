@@ -125,9 +125,27 @@ describe("configuration edits", () => {
     expect(rows(null).every((row) => row.override === undefined)).toBe(true);
   });
 
+  it("lists an override of a missing parameter, and clearing it removes the issue", () => {
+    const stale = project([{ name: "Z", overrides: { zz: "3" } }]);
+    expect(configurationIssueMessages(stale, "Z")).toEqual([
+      { parameter: "zz", message: { key: "editor.parameters.error.unknownParameter", values: { name: "zz" } } },
+    ]);
+    const cleared = planned(stale, { kind: "clearOverride", configuration: "Z", name: "zz" });
+    expect(cleared.recompute).toBe(false);
+    expect(cleared.project.configurations).toEqual([{ name: "Z", overrides: {} }]);
+    expect(configurationIssueMessages(cleared.project, "Z")).toEqual([]);
+    expect(typeof message("editor.parameters.configurations.issueItem")).toBe("string");
+    expect(typeof message("editor.parameters.configurations.issueUnknownName")).toBe("string");
+    expect(typeof message("editor.parameters.configurations.clearIssue")).toBe("string");
+    expect(typeof message("editor.parameters.configurations.valueIn")).toBe("string");
+  });
+
   it("lists the issues of a stale configuration so it can be fixed", () => {
     const stale = project([{ name: "Old", overrides: { w: "missing * 2" } }]);
-    expect(configurationIssueMessages(stale, "Old")).toEqual([{ parameter: "w", message: { key: "editor.parameters.error.unknownName", values: { name: "w" } } }]);
+    // The message names the identifier that does not resolve.
+    expect(configurationIssueMessages(stale, "Old")).toEqual([
+      { parameter: "w", message: { key: "editor.parameters.configurations.issueUnknownName", values: { identifier: "missing" } } },
+    ]);
     expect(configurationIssueMessages(stale, null)).toEqual([]);
     // A stale configuration can still be renamed, edited and deleted while it is not active.
     const fixed = planned(stale, { kind: "setOverride", configuration: "Old", name: "w", expression: "12" });

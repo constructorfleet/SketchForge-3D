@@ -938,7 +938,11 @@
         "activateLabel": "Activar {name}",
         "useBase": "Usar la tabla base",
         "activeOption": "{name} (activa)",
-        "issues": "{name} tiene sustituciones que no se resuelven:"
+        "issues": "{name} tiene sustituciones que no se resuelven:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "La sustitución usa {identifier}, que no es un parámetro.",
+        "clearIssue": "Quitar la sustitución de {parameter}",
+        "valueIn": "Valor en {name}"
       }
     },
     "expressionField": {

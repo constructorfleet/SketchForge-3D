@@ -938,7 +938,11 @@
         "activateLabel": "Aktivovat {name}",
         "useBase": "Použít základní tabulku",
         "activeOption": "{name} (aktivní)",
-        "issues": "{name} má přepisy, které nelze vyhodnotit:"
+        "issues": "{name} má přepisy, které nelze vyhodnotit:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Přepis používá {identifier}, což není parametr.",
+        "clearIssue": "Odebrat přepis {parameter}",
+        "valueIn": "Hodnota v {name}"
       }
     },
     "expressionField": {

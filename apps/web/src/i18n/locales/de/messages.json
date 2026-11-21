@@ -938,7 +938,11 @@
         "activateLabel": "{name} aktivieren",
         "useBase": "Basistabelle verwenden",
         "activeOption": "{name} (aktiv)",
-        "issues": "{name} hat Überschreibungen, die sich nicht auflösen lassen:"
+        "issues": "{name} hat Überschreibungen, die sich nicht auflösen lassen:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Die Überschreibung verwendet {identifier}, das kein Parameter ist.",
+        "clearIssue": "Überschreibung von {parameter} entfernen",
+        "valueIn": "Wert in {name}"
       }
     },
     "expressionField": {

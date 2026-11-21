@@ -115,11 +115,20 @@ which configuration is active.
   table.
 
 A configuration with overrides that do not resolve lists them when you select
-it, so you can fix them. A switch or override that does not resolve, or that a
-bound field cannot take, is refused inline, names the configuration, adds no
-undo step, and leaves the model unchanged. Every edit is checked against every
-configuration, so a change that breaks a configuration that is not active is
-refused too.
+it, naming the identifier that does not resolve, so you can fix them. An
+override of a parameter that no longer exists has no row in the table; clear it
+with its **Clear** button in that list.
+
+A switch or override that does not resolve, or that a bound field cannot take,
+is refused inline, adds no undo step, and leaves the model unchanged. An
+expression error found in a configuration names that configuration; a bound
+field's refusal names the shape and the field instead. Every edit is checked
+against every configuration, so a change that breaks a configuration that is
+not active is refused too.
+
+While you edit a configuration that is not active, the value column is headed
+**Value in** and the active configuration's name, because values always follow
+the active configuration.
 
 ![An override with the wrong unit is refused under its row.](../screenshots/parameter-configurations-error.png)
 

@@ -938,7 +938,11 @@
         "activateLabel": "Активировать {name}",
         "useBase": "Использовать базовую таблицу",
         "activeOption": "{name} (активна)",
-        "issues": "У {name} есть переопределения, которые не вычисляются:"
+        "issues": "У {name} есть переопределения, которые не вычисляются:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Переопределение использует {identifier}, которое не является параметром.",
+        "clearIssue": "Удалить переопределение {parameter}",
+        "valueIn": "Значение в {name}"
       }
     },
     "expressionField": {

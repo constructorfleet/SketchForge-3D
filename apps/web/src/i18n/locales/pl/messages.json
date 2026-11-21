@@ -938,7 +938,11 @@
         "activateLabel": "Aktywuj {name}",
         "useBase": "Użyj tabeli bazowej",
         "activeOption": "{name} (aktywna)",
-        "issues": "{name} ma nadpisania, których nie da się rozwiązać:"
+        "issues": "{name} ma nadpisania, których nie da się rozwiązać:",
+        "issueItem": "{parameter}: {message}",
+        "issueUnknownName": "Nadpisanie używa {identifier}, który nie jest parametrem.",
+        "clearIssue": "Usuń nadpisanie {parameter}",
+        "valueIn": "Wartość w {name}"
       }
     },
     "expressionField": {

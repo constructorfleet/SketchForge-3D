@@ -183,7 +183,12 @@ export function ProjectParametersPanel({
                 <th scope="col">{t("editor.parameters.name")}</th>
                 <th scope="col">{t("editor.parameters.expression")}</th>
                 {editing ? <th scope="col">{t("editor.parameters.configurations.override", { name: editing })}</th> : null}
-                <th scope="col">{t("editor.parameters.value")}</th>
+                {/* Values are always the active configuration's; say so while another is being edited. */}
+                <th scope="col">
+                  {editing && editing !== activeConfiguration
+                    ? t("editor.parameters.configurations.valueIn", { name: activeConfiguration ?? t("editor.parameters.configurations.base") })
+                    : t("editor.parameters.value")}
+                </th>
                 <th scope="col">{t("editor.parameters.dimension")}</th>
                 <th scope="col" aria-label={t("editor.parameters.delete")} />
               </tr>
@@ -511,7 +516,20 @@ function ConfigurationPicker({
         <div className="parameters-configuration-issues">
           <p>{t("editor.parameters.configurations.issues", { name: editing ?? "" })}</p>
           <ul>
-            {issues.map((issue) => <li key={issue.parameter}>{t("editor.parameters.shapeFields", { shape: issue.parameter, fields: text(issue.message) })}</li>)}
+            {issues.map((issue) => (
+              <li key={issue.parameter}>
+                <span>{t("editor.parameters.configurations.issueItem", { parameter: issue.parameter, message: text(issue.message) })}</span>
+                {/* An override of a parameter that no longer exists has no row to clear it from. */}
+                <button
+                  type="button"
+                  className="parameters-activate-button"
+                  disabled={busy || !editing}
+                  onClick={() => editing && void run("editing", { kind: "clearOverride", configuration: editing, name: issue.parameter })}
+                >
+                  {t("editor.parameters.configurations.clearIssue", { parameter: issue.parameter })}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       ) : null}

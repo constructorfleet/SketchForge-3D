@@ -74,7 +74,7 @@ test("configurations are edited apart from activation, and undo with the panel o
       // A bound width cannot take -5, so activating Broken is refused until it is fixed.
       { name: "Broken", overrides: { w: "-5" } },
       // Stale on load: the override names nothing.
-      { name: "Stale", overrides: { w: "missing * 2" } },
+      { name: "Stale", overrides: { w: "missing * 2", zz: "3" } },
     ],
   }));
   const { baseURL, stop } = await startNextServer();
@@ -116,6 +116,7 @@ test("configurations are edited apart from activation, and undo with the panel o
     assert.equal(await override("Large").inputValue(), "30");
     await panel.locator("output[aria-label=\"w = 10 mm\"]").waitFor();
     assert.equal((await shape()).width, 10, "editing a configuration moves nothing");
+    await panel.getByRole("columnheader", { name: "Value in Base table" }).waitFor();
 
     // Activation is explicit, one undo step, and the panel follows undo and redo while open.
     await activate("Large").click();
@@ -152,7 +153,14 @@ test("configurations are edited apart from activation, and undo with the panel o
 
     // A stale configuration lists its issue and can be renamed and deleted.
     await editing.selectOption("Stale");
-    await panel.locator(".parameters-configuration-issues", { hasText: "w" }).waitFor();
+    const issues = panel.locator(".parameters-configuration-issues");
+    await issues.waitFor();
+    assert.match(await issues.textContent(), /uses missing, which is not a parameter/, "the issue names the bad identifier");
+    assert.match(await issues.textContent(), /There is no parameter named zz/);
+    // An override of a parameter that no longer exists can only be cleared here.
+    await panel.getByRole("button", { name: "Clear the zz override" }).click();
+    await panel.getByRole("button", { name: "Clear the zz override" }).waitFor({ state: "detached" });
+    assert.match(await issues.textContent(), /missing/, "the other issue stays");
     const rename = panel.getByRole("textbox", { name: "Name of configuration Stale" });
     await rename.fill("Older");
     await rename.press("Enter");
