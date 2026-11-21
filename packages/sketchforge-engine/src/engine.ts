@@ -122,6 +122,7 @@ import {
   boundFieldsNamedBy,
   boundFieldValue,
   resolveShapeBinding,
+  resolveShapeBindings,
   withoutBindings,
   withoutShapeBindings,
   type ShapeBindingError,
@@ -1625,14 +1626,18 @@ export function createEngine(store: ProjectStore): Engine {
       const locked = shape.locked ? shape.id : lockedAncestor;
       shape.groupedShapes?.forEach((child) => visit(child, false, locked));
       const values: Record<string, number> = {};
-      for (const [field, expression] of Object.entries(shape.expressions ?? {})) {
-        if (invalid || !expressionDependencies(expression).some((name) => changed.has(name))) continue;
+      const expressions = Object.entries(shape.expressions ?? {});
+      if (invalid || !expressions.some(([, expression]) => expressionDependencies(expression).some((name) => changed.has(name)))) return;
+      // Every binding on a touched shape is rechecked, since one field's limit can depend on another's value.
+      const after = resolveShapeBindings(shape, next);
+      const before = resolveShapeBindings(shape, previous);
+      for (const [field] of expressions) {
         // A misplaced shape binding stays stale, as on load.
-        if (bindableField(shape, field)?.target === "shape" && !topLevel) continue;
-        const resolved = resolveShapeBinding(shape, field, expression, next);
+        if (invalid || bindableField(shape, field)?.target === "shape" && !topLevel) continue;
+        const resolved = after.get(field)!;
         if (resolved.ok) {
           if (boundFieldValue(shape, field) !== resolved.value) values[field] = resolved.value;
-        } else if (resolveShapeBinding(shape, field, expression, previous).ok) {
+        } else if (before.get(field)!.ok) {
           // Refuses only a binding this change breaks; one already stale stays stale.
           invalid = resolved.error;
         }

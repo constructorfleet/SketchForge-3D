@@ -482,47 +482,60 @@ describe("expression-bound fields and parameter recompute", () => {
   }, CAD_TEST_TIMEOUT_MS);
 
   it("rebuilds revolve settings, a face draft angle, a chamfer angle and a rotation from their bindings", async () => {
+    // Volume and the full centre of mass, against a directly built reference.
+    const sameMass = (actual: { volume: number; centerOfMass: { x: number; y: number; z: number } },
+      expected: typeof actual, digits = 6) => {
+      expect(actual.volume).toBeCloseTo(expected.volume, digits);
+      expect(actual.centerOfMass.x).toBeCloseTo(expected.centerOfMass.x, digits);
+      expect(actual.centerOfMass.y).toBeCloseTo(expected.centerOfMass.y, digits);
+      expect(actual.centerOfMass.z).toBeCloseTo(expected.centerOfMass.z, digits);
+    };
+
     const turned = await revolve("revolve-bound");
-    const full = value(await engine.properties("revolve-bound", turned.id));
     value(await engine.addParameter("revolve-bound", { name: "sweep", expression: "360", dimension: "angle" }));
     value(await engine.bindShapeField("revolve-bound", turned.id, "revolve.sweepAngle", "sweep"));
     value(await engine.bindShapeField("revolve-bound", turned.id, "revolve.startAngle", "-90"));
     value(await engine.updateParameter("revolve-bound", "sweep", { expression: "180" }));
-    const half = (await document("revolve-bound")).shapes[0]!;
-    expect(half.sketchRevolve).toMatchObject({ sweepAngle: 180, startAngle: 270 });
-    expect(value(await engine.properties("revolve-bound", turned.id)).volume).toBeCloseTo(full.volume / 2, 0);
+    expect((await document("revolve-bound")).shapes[0]!.sketchRevolve).toMatchObject({ sweepAngle: 180, startAngle: 270 });
+    await project("revolve-reference");
+    const halfTurn = value(await engine.addShapes("revolve-reference", [{
+      kind: "revolve", profile: [[1, -5], [2, -5], [2, 5], [1, 5]], sides: 48, startAngle: 270, sweepAngle: 180,
+    }])).shapes[0]!;
+    const revolveBound = value(await engine.properties("revolve-bound", turned.id));
+    sameMass(revolveBound, value(await engine.properties("revolve-reference", halfTurn.id)));
+    expect(Math.abs(revolveBound.centerOfMass.x) + Math.abs(revolveBound.centerOfMass.z)).toBeGreaterThan(0.1);
 
     const bound = await faceDrafted("draft-bound");
-    const manual = await faceDrafted("draft-manual");
+    const manual = await faceDrafted("draft-manual", 8);
     value(await engine.addParameter("draft-bound", { name: "taper", expression: "5", dimension: "angle" }));
     value(await engine.bindShapeField("draft-bound", bound.id, "faceDraft.angle", "taper"));
     value(await engine.updateParameter("draft-bound", "taper", { expression: "8" }));
-    const manualShape = (await document("draft-manual")).shapes[0]!;
-    value(await engine.changeShape("draft-manual", manual.id, { faceDraft: { ...manualShape.faceDraft!, angle: 8 } }));
-    const draftBound = value(await engine.properties("draft-bound", bound.id));
-    const draftManual = value(await engine.properties("draft-manual", manual.id));
     expect((await document("draft-bound")).shapes[0]!.faceDraft?.angle).toBe(8);
-    expect(draftBound.volume).toBeCloseTo(draftManual.volume, 6);
-    expect(draftBound.centerOfMass.x).toBeCloseTo(draftManual.centerOfMass.x, 6);
+    sameMass(value(await engine.properties("draft-bound", bound.id)), value(await engine.properties("draft-manual", manual.id)));
 
     const chamfered = await filletedExtrusion("chamfer-bound", "chamfer", 45);
     const reference = await filletedExtrusion("chamfer-reference", "chamfer", 60);
     value(await engine.addParameter("chamfer-bound", { name: "bevel", expression: "45", dimension: "angle" }));
     value(await engine.bindShapeField("chamfer-bound", chamfered, "edgeTreatments.0.chamferAngle", "bevel"));
     value(await engine.updateParameter("chamfer-bound", "bevel", { expression: "60" }));
+    // A manual source edit replays a non-45° chamfer with a 4e-4 mm offset in x and z
+    // against a direct treatment, so the binding is held to the manual replay exactly.
+    const replayed = await filletedExtrusion("chamfer-replayed", "chamfer", 60);
+    value(await engine.changeShape("chamfer-replayed", "sketch/chamfer-replayed", { sketchProfile: extrusionProfile() }));
     const chamferBound = value(await engine.properties("chamfer-bound", chamfered));
-    const chamferReference = value(await engine.properties("chamfer-reference", reference));
-    expect(chamferBound.volume).toBeCloseTo(chamferReference.volume, 5);
-    expect(chamferBound.centerOfMass.y).toBeCloseTo(chamferReference.centerOfMass.y, 5);
+    sameMass(chamferBound, value(await engine.properties("chamfer-replayed", replayed)));
+    sameMass(chamferBound, value(await engine.properties("chamfer-reference", reference)), 3);
 
     const [wedge] = await boundBoxes("rotation-bound", 1, { kind: "wedge", x: 0 });
     value(await engine.bindShapeField("rotation-bound", wedge!.id, "rotation", "tilt"));
-    const at30 = value(await engine.properties("rotation-bound", wedge!.id));
     value(await engine.updateParameter("rotation-bound", "tilt", { expression: "120 deg" }));
-    const at120 = value(await engine.properties("rotation-bound", wedge!.id));
     expect((await document("rotation-bound")).shapes[0]!.rotation).toBe(120);
-    expect(at120.volume).toBeCloseTo(at30.volume, 6);
-    expect(Math.hypot(at120.centerOfMass.x - at30.centerOfMass.x, at120.centerOfMass.z - at30.centerOfMass.z)).toBeGreaterThan(0.1);
+    await project("rotation-reference");
+    const turnedWedge = value(await engine.addShapes("rotation-reference", [{ kind: "wedge", width: 4, depth: 4, height: 4, rotation: 120 }])).shapes[0]!;
+    const rotationBound = value(await engine.properties("rotation-bound", wedge!.id));
+    sameMass(rotationBound, value(await engine.properties("rotation-reference", turnedWedge.id)));
+    const unturned = value(await engine.properties("rotation-reference", value(await engine.addShapes("rotation-reference", [{ kind: "wedge", width: 4, depth: 4, height: 4, x: 0 }])).shapes[0]!.id));
+    expect(Math.hypot(rotationBound.centerOfMass.x - unturned.centerOfMass.x, rotationBound.centerOfMass.z - unturned.centerOfMass.z)).toBeGreaterThan(0.1);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("replays a bound treatment on a sketch output inside a cut", async () => {
@@ -600,5 +613,29 @@ describe("expression-bound fields and parameter recompute", () => {
     value(await engine.changeShape("group-rebuild", "sketch/group-rebuild", { draftPrismAngle: 12 }));
 
     expect((await document("group-rebuild")).shapes[0]!.expressions).toEqual({ x: "offset" });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("checks dependent ranges against the shape as the whole change leaves it", async () => {
+    const gear = async (projectId: string) => {
+      await project(projectId);
+      const [shape] = value(await engine.addShapes(projectId, [{ kind: "gear", width: 20, depth: 20, height: 5, toothSize: 4 }])).shapes;
+      value(await engine.addParameter(projectId, { name: "W", expression: "20", dimension: "length" }));
+      value(await engine.bindShapeField(projectId, shape!.id, "width", "W"));
+      value(await engine.bindShapeField(projectId, shape!.id, "depth", "W"));
+      return shape!;
+    };
+
+    // Grows with its blank: legal once width and depth are 40, so not refused against the old 20.
+    const growing = await gear("gear-grow");
+    value(await engine.bindShapeField("gear-grow", growing.id, "toothSize", "W * 0.2"));
+    value(await engine.updateParameter("gear-grow", "W", { expression: "40" }));
+    expect((await document("gear-grow")).shapes[0]).toMatchObject({ width: 40, depth: 40, toothSize: 8 });
+
+    // A fixed tooth the shrunken blank cannot hold: refused, though its own parameter did not change.
+    const fixed = await gear("gear-shrink");
+    value(await engine.addParameter("gear-shrink", { name: "T", expression: "4", dimension: "length" }));
+    value(await engine.bindShapeField("gear-shrink", fixed.id, "toothSize", "T"));
+    const refused = await unchanged("gear-shrink", () => engine.updateParameter("gear-shrink", "W", { expression: "10" }));
+    expect(refused).toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { code: "outOfRange", field: "toothSize", value: 4 } } });
   }, CAD_TEST_TIMEOUT_MS);
 });

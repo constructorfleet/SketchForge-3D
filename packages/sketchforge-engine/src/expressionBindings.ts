@@ -213,63 +213,105 @@ function insideBounds(found: BindableFieldSpec, value: number) {
 }
 
 /**
- * Returns what the shape would store for `value`, via the same normalizers a manual edit uses.
- * NaN means a value no edit accepts.
+ * Returns what the shape would store for each value when all are applied in one change,
+ * via the normalizers a manual edit uses. Dependent limits, such as a gear's tooth size
+ * against its width, are read against the shape as the change leaves it. NaN means refused.
  */
-export function storedBindingValue(shape: WorkplaneShape, field: string, value: number): number {
-  const found = bindableField(shape, field);
-  if (!found) return Number.NaN;
-  if (!insideBounds(found, value) && !found.periodic) return Number.NaN;
-  if (field.startsWith("revolve.")) {
-    const name = field.slice("revolve.".length) as keyof NonNullable<WorkplaneShape["sketchRevolve"]>;
-    return normalizeSketchRevolveSettings({ ...shape.sketchRevolve, [name]: value })[name];
+export function storedBindingValues(shape: WorkplaneShape, values: Readonly<Record<string, number>>): Record<string, number> {
+  const stored: Record<string, number> = {};
+  const own: Record<string, number> = {};
+  const revolve: Record<string, number> = {};
+  for (const [field, value] of Object.entries(values)) {
+    const found = bindableField(shape, field);
+    if (!found || (!found.periodic && !insideBounds(found, value))) stored[field] = Number.NaN;
+    else if (field.startsWith("revolve.")) revolve[field.slice("revolve.".length)] = value;
+    else if (found.target === "feature") stored[field] = value;
+    else own[field] = value;
   }
-  if (found.target === "feature") return value;
-  const changed = shapeWithRequestedChanges(shape, { [field]: value });
-  return changed.ok ? boundFieldValue(changed.shape, field) ?? Number.NaN : Number.NaN;
+  if (Object.keys(revolve).length) {
+    const settings = normalizeSketchRevolveSettings({ ...shape.sketchRevolve, ...revolve }) as unknown as Record<string, number>;
+    for (const name of Object.keys(revolve)) stored[`revolve.${name}`] = settings[name]!;
+  }
+  if (Object.keys(own).length) {
+    const changed = shapeWithRequestedChanges(shape, own);
+    for (const field of Object.keys(own)) {
+      stored[field] = changed.ok ? boundFieldValue(changed.shape, field) ?? Number.NaN : Number.NaN;
+    }
+  }
+  return stored;
 }
 
-/** Evaluates `expression` for `field` on `shape`. A bare number takes the field's unit. Never throws. */
+/** Returns what the shape would store for `value` on its own. NaN means refused. */
+export function storedBindingValue(shape: WorkplaneShape, field: string, value: number): number {
+  return storedBindingValues(shape, { [field]: value })[field] ?? Number.NaN;
+}
+
+function evaluateBinding(
+  shape: WorkplaneShape,
+  field: string,
+  expression: string,
+  scope: ReadonlyMap<string, ExpressionQuantity>,
+): ShapeBindingResult {
+  const found = bindableField(shape, field);
+  if (!found) return bindingFailure("fieldNotBindable", shape.id, field, `Shape ${shape.id} has no bindable field "${field}".`);
+  const result = evaluateExpression(expression, scope, found.dimension);
+  if (!result.ok) {
+    return bindingFailure("invalidExpression", shape.id, field, `${field}: ${result.error.message}`, result.error);
+  }
+  if (!found.integer) return { ok: true, value: result.value };
+  const rounded = Math.round(result.value);
+  if (Math.abs(result.value - rounded) > 1e-9) {
+    return bindingFailure("notAnInteger", shape.id, field, `${field} needs a whole number, got ${result.value}.`);
+  }
+  return { ok: true, value: rounded };
+}
+
+function checkedRange(shape: WorkplaneShape, field: string, value: number, stored: number): ShapeBindingResult {
+  const found = bindableField(shape, field)!;
+  if (found.periodic && Number.isFinite(stored)) return { ok: true, value: stored };
+  // Refused, not clamped: a clamped binding would differ from its expression forever.
+  if (Number.isFinite(stored) && Math.abs(stored - value) <= 1e-9 * Math.max(1, Math.abs(value))) return { ok: true, value };
+  const bounds = found.min !== undefined || found.max !== undefined
+    ? ` It must be ${found.exclusive ? "strictly " : ""}between ${found.min ?? "-∞"} and ${found.max ?? "∞"}.`
+    : Number.isFinite(stored) ? ` The shape would store ${stored}.` : "";
+  return {
+    ok: false,
+    error: {
+      code: "outOfRange", shapeId: shape.id, field, value,
+      message: `${field} cannot be ${value}.${bounds}`,
+      ...(found.min !== undefined ? { min: found.min } : {}),
+      ...(found.max !== undefined ? { max: found.max } : {}),
+      ...(Number.isFinite(stored) ? { stored } : {}),
+    },
+  };
+}
+
+/**
+ * Resolves every binding on `shape`, plus `overrides`, as one change, so each is range-checked
+ * against the others' new values. Never throws.
+ */
+export function resolveShapeBindings(
+  shape: WorkplaneShape,
+  parameters: readonly ProjectParameter[] | ReadonlyMap<string, ExpressionQuantity>,
+  overrides: Readonly<Record<string, string>> = {},
+): Map<string, ShapeBindingResult> {
+  const scope = parameters instanceof Map ? parameters : parameterScope(parameters as readonly ProjectParameter[]);
+  const evaluated = new Map(Object.entries({ ...shape.expressions, ...overrides })
+    .filter(([, expression]) => typeof expression === "string")
+    .map(([field, expression]) => [field, evaluateBinding(shape, field, expression, scope)]));
+  const values = Object.fromEntries([...evaluated].flatMap(([field, result]) => (result.ok ? [[field, result.value]] : [])));
+  const stored = storedBindingValues(shape, values);
+  return new Map([...evaluated].map(([field, result]) => [field, result.ok ? checkedRange(shape, field, result.value, stored[field]!) : result]));
+}
+
+/** Evaluates `expression` for `field` on `shape`, together with its other bindings. A bare number takes the field's unit. */
 export function resolveShapeBinding(
   shape: WorkplaneShape,
   field: string,
   expression: string,
   parameters: readonly ProjectParameter[] | ReadonlyMap<string, ExpressionQuantity>,
 ): ShapeBindingResult {
-  const found = bindableField(shape, field);
-  if (!found) return bindingFailure("fieldNotBindable", shape.id, field, `Shape ${shape.id} has no bindable field "${field}".`);
-  const scope = parameters instanceof Map ? parameters : parameterScope(parameters as readonly ProjectParameter[]);
-  const result = evaluateExpression(expression, scope, found.dimension);
-  if (!result.ok) {
-    return bindingFailure("invalidExpression", shape.id, field, `${field}: ${result.error.message}`, result.error);
-  }
-  let value = result.value;
-  if (found.integer) {
-    const rounded = Math.round(value);
-    if (Math.abs(value - rounded) > 1e-9) {
-      return bindingFailure("notAnInteger", shape.id, field, `${field} needs a whole number, got ${value}.`);
-    }
-    value = rounded;
-  }
-  const stored = storedBindingValue(shape, field, value);
-  if (found.periodic && Number.isFinite(stored)) return { ok: true, value: stored };
-  // Refused, not clamped: a clamped binding would differ from its expression forever.
-  if (!Number.isFinite(stored) || Math.abs(stored - value) > 1e-9 * Math.max(1, Math.abs(value))) {
-    const bounds = found.min !== undefined || found.max !== undefined
-      ? ` It must be ${found.exclusive ? "strictly " : ""}between ${found.min ?? "-∞"} and ${found.max ?? "∞"}.`
-      : "";
-    return {
-      ok: false,
-      error: {
-        code: "outOfRange", shapeId: shape.id, field, value,
-        message: `${field} cannot be ${value}.${bounds}`,
-        ...(found.min !== undefined ? { min: found.min } : {}),
-        ...(found.max !== undefined ? { max: found.max } : {}),
-        ...(Number.isFinite(stored) ? { stored } : {}),
-      },
-    };
-  }
-  return { ok: true, value };
+  return resolveShapeBindings(shape, parameters, { [field]: expression }).get(field)!;
 }
 
 /** Visits active shapes pre-order, skipping treatment `before` snapshots. */
@@ -292,14 +334,16 @@ export function shapeBindingIssues(shapes: readonly WorkplaneShape[], parameters
   const scope = parameterScope(parameters);
   const issues: ShapeBindingIssue[] = [];
   visitBoundShapes(shapes, (shape, topLevel) => {
-    for (const [field, expression] of Object.entries(shape.expressions ?? {})) {
+    if (!shape.expressions) return;
+    const results = resolveShapeBindings(shape, scope);
+    for (const field of Object.keys(shape.expressions)) {
       const found = bindableField(shape, field);
       if (found && found.target === "shape" && !topLevel) {
         issues.push({ code: "fieldNotBindable", shapeId: shape.id, field, message: `${field} binds on top-level shapes only.` });
         continue;
       }
-      const result = resolveShapeBinding(shape, field, expression, scope);
-      if (!result.ok) issues.push(result.error);
+      const result = results.get(field);
+      if (result && !result.ok) issues.push(result.error);
     }
   });
   return issues;
