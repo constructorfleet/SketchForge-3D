@@ -17,6 +17,7 @@ import {
 } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { bindableField, boundFieldValue, parameterShapeDependents, resolveShapeBindings, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
 import { REQUESTABLE_SHAPE_KINDS, shapeWithRequestedChanges } from "@constructorfleet/sketchforge-engine/shapeRequests";
+import { planParameterBindings } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import { boundSketchConstraints, parameterSketchConstraintDependents, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import { expressionDependencies, type ExpressionErrorCode } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { MessageKey } from "@/i18n/locales";
@@ -327,9 +328,12 @@ export function parameterRecomputeResponseMessage(status: number, body: unknown,
 const KERNEL_FIELDS = [
   "importedMesh", "imagePlate", "sketchProfile", "sketchSourceId", "sketchRevolve", "draftPrismAngle", "faceDraft",
   "edgeTreatments", "edgeTreatmentHistory", "shell", "cadBrep", "cadDisplayEdges", "groupedShapes", "stepAssembly", "stepComponent",
+  // A size change on these re-matches faces through the kernel.
+  "faceIds", "faceColors",
 ] as const;
 
-function plainPrimitive(shape: WorkplaneShape) {
+/** Reports whether a shape's geometry follows from its own fields alone, with no kernel work. */
+export function plainPrimitive(shape: WorkplaneShape) {
   return (REQUESTABLE_SHAPE_KINDS as readonly string[]).includes(shape.kind)
     && KERNEL_FIELDS.every((field) => shape[field] === undefined);
 }
@@ -339,49 +343,36 @@ export type LocalBindingResult =
   | { ok: false; failure: ParameterEditFailure };
 
 /**
- * Applies a table change to bound plain primitives without the kernel, with the engine's
- * range, lock and stale rules. Null when any dependent needs the engine's CAD paths.
+ * Applies a table change without the kernel when every shape it moves is a plain top-level
+ * primitive. Plans with the engine's own planner, so refusals match. Null when kernel work is needed.
  */
 export function applyBindingsLocally(
   shapes: readonly WorkplaneShape[],
   previous: readonly ProjectParameter[],
   next: readonly ProjectParameter[],
 ): LocalBindingResult | null {
-  const changed = new Set(changedNames(previous, next));
-  const result: WorkplaneShape[] = [];
-  for (const shape of shapes) {
-    if (!treeDependsOn(shape, changed)) {
-      result.push(shape);
-      continue;
+  const plan = planParameterBindings(shapes, previous, next);
+  if (!plan.ok) return { ok: false, failure: plan.failure };
+  let result = [...shapes];
+  for (const entry of plan.pending) {
+    const shape = result.find((candidate) => candidate.id === entry.id);
+    if (!entry.topLevel || !shape || entry.sketchProfile || !plainPrimitive(shape)) return null;
+    const fields = Object.keys(entry.values);
+    if (fields.some((field) => bindableField(shape, field)?.target !== "shape")) return null;
+    // The engine's own-field step for a plain primitive, refused the same way.
+    const changed = shapeWithRequestedChanges(shape, entry.values);
+    if (!changed.ok) {
+      return {
+        ok: false,
+        failure: {
+          reason: "binding_failed",
+          shapeId: entry.id,
+          fields,
+          failure: { reason: "unapplicable_fields", kind: shape.kind, fields: changed.unapplicable, because: "not_this_kind" },
+        },
+      };
     }
-    if (!plainPrimitive(shape)) return null;
-    const fields = Object.entries(shape.expressions ?? {})
-      .filter(([, expression]) => expressionDependencies(expression).some((name) => changed.has(name)))
-      .map(([field]) => field);
-    if (fields.some((field) => bindableField(shape, field)?.target === "feature")) return null;
-    const resolved = resolveShapeBindings(shape, next);
-    const earlier = resolveShapeBindings(shape, previous);
-    const values: Record<string, number> = {};
-    for (const field of fields) {
-      const outcome = resolved.get(field);
-      if (!outcome) continue;
-      if (!outcome.ok) {
-        // Refuses only a binding this change breaks; one already stale stays stale.
-        if (earlier.get(field)?.ok) return { ok: false, failure: { reason: "binding_invalid", error: outcome.error } };
-        continue;
-      }
-      if (boundFieldValue(shape, field) !== outcome.value) values[field] = outcome.value;
-    }
-    if (!Object.keys(values).length) {
-      result.push(shape);
-      continue;
-    }
-    if (shape.locked) {
-      return { ok: false, failure: { reason: "binding_failed", shapeId: shape.id, fields: Object.keys(values), failure: { reason: "shape_locked", ids: [shape.id] } } };
-    }
-    const changedShape = shapeWithRequestedChanges(shape, values);
-    if (!changedShape.ok) return null;
-    result.push(changedShape.shape);
+    result = result.map((candidate) => (candidate.id === entry.id ? changed.shape : candidate));
   }
   return { ok: true, shapes: result };
 }

@@ -88,7 +88,10 @@ describe("applyBindingsLocally", () => {
   it("returns null when any dependent needs kernel work", () => {
     expect(applyBindingsLocally([box("a", { expressions: { width: "w" }, edgeTreatments: [{} as never] })], before, after)).toBeNull();
     expect(applyBindingsLocally([box("a", { sketchSourceId: "s", expressions: { width: "w" } })], before, after)).toBeNull();
-    expect(applyBindingsLocally([box("g", { groupedShapes: [box("c", { sketchSourceId: "s", expressions: { "revolve.sweepAngle": "h" } as never })] })], before, after)).toBeNull();
+    expect(applyBindingsLocally([box("a", { faceIds: ["f1"], expressions: { width: "w" } })], before, after)).toBeNull();
+    // A shape-field binding inside a group is stale to the engine, so nothing moves.
+    const group = box("g", { groupedShapes: [box("c", { expressions: { width: "h" } })] });
+    expect(applyBindingsLocally([group], before, after)).toEqual({ ok: true, shapes: [group] });
   });
 });
 
