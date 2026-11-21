@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveProjectParameters, type ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
+import { activateConfiguration, addConfiguration, resolveProjectParameters, type ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 import {
   applyBindingsLocally,
@@ -143,5 +143,32 @@ describe("sketch constraint bindings (#612)", () => {
     const constraint = released.project.shapes[0]!.sketchProfile!.constraints![0] as { valueMm: number; expression?: string };
     expect(constraint.valueMm).toBe(10);
     expect(constraint.expression).toBeUndefined();
+  });
+});
+
+describe("configurations (#618)", () => {
+  function configured() {
+    const added = addConfiguration({ parameters: before, shapes: [box("a", { expressions: { width: "w" } })] }, { name: "Large", overrides: { w: "30" } });
+    if (!added.ok) throw new Error(added.error.message);
+    const active = activateConfiguration(added.project, "Large");
+    if (!active.ok) throw new Error(active.error.message);
+    return active.project;
+  }
+
+  it("edits base expressions, resolving values under the active configuration", () => {
+    const project = configured();
+    expect(project.parameters.find((parameter) => parameter.name === "w")?.value).toBe(30);
+    // The override wins, so a base edit moves no bound value.
+    const planned = planParameterEdit(project, { kind: "update", name: "w", expression: "12" });
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+    expect(planned.recompute).toBe(false);
+    expect(planned.project.parameters.find((parameter) => parameter.name === "w")).toMatchObject({ expression: "12", value: 30 });
+    expect(planned.project.activeConfiguration).toBe("Large");
+  });
+
+  it("carries renames into configuration rows", () => {
+    const planned = planParameterEdit(configured(), { kind: "rename", name: "w", newName: "width" });
+    expect(planned.ok && planned.project.configurations).toEqual([{ name: "Large", overrides: { width: "30" } }]);
   });
 });

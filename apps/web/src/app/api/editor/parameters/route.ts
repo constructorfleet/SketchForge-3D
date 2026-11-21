@@ -3,7 +3,7 @@ import { apiRequestBodyBytes } from "@/lib/apiV1";
 import { createEngine, type Engine, type ProjectDocument, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE } from "@constructorfleet/sketchforge-engine/workplaneSettings";
 import { horizontalPlacementWorkplane } from "@constructorfleet/sketchforge-engine/placementWorkplane";
-import type { ProjectParameter, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
+import type { ProjectConfiguration, ProjectParameter, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 
 export const runtime = "nodejs";
 export const revalidate = false;
@@ -30,7 +30,12 @@ function readEdit(value: unknown): Edit | null {
 }
 
 /** Holds one in-memory project, so an edit runs through the engine without touching storage. */
-function memoryStore(shapes: WorkplaneShape[], parameters: ProjectParameter[]) {
+function memoryStore(
+  shapes: WorkplaneShape[],
+  parameters: ProjectParameter[],
+  configurations: ProjectConfiguration[],
+  activeConfiguration: string | null,
+) {
   const workplane = horizontalPlacementWorkplane(0);
   let document: ProjectDocument = {
     metadata: { revision: 0 },
@@ -46,6 +51,8 @@ function memoryStore(shapes: WorkplaneShape[], parameters: ProjectParameter[]) {
     placementWorkplane: workplane,
     sketchPlacementWorkplane: workplane,
     parameters,
+    configurations,
+    activeConfiguration,
   };
   const store: ProjectStore = {
     read: async () => document,
@@ -96,12 +103,22 @@ export async function POST(request: Request) {
   const edit = readEdit(body.edit);
   if (!edit) return json({ error: "A parameter edit is required." }, 400);
 
-  const memory = memoryStore(body.shapes as WorkplaneShape[], body.parameters as ProjectParameter[]);
+  if (body.configurations !== undefined && !Array.isArray(body.configurations)) return json({ error: "Configurations must be a list." }, 400);
+  if (body.activeConfiguration !== undefined && body.activeConfiguration !== null && typeof body.activeConfiguration !== "string") {
+    return json({ error: "The active configuration must be a name or null." }, 400);
+  }
+  // Values resolve under the active configuration (#618), so the engine needs the rows too.
+  const memory = memoryStore(
+    body.shapes as WorkplaneShape[],
+    body.parameters as ProjectParameter[],
+    (body.configurations ?? []) as ProjectConfiguration[],
+    (body.activeConfiguration ?? null) as string | null,
+  );
   try {
     const result = await run(createEngine(memory.store), edit);
     if (!result.ok) return json({ failure: result.failure }, 422);
-    const { shapes, parameters } = memory.current();
-    return json({ shapes, parameters: parameters ?? [] });
+    const { shapes, parameters, configurations, activeConfiguration } = memory.current();
+    return json({ shapes, parameters: parameters ?? [], configurations: configurations ?? [], activeConfiguration: activeConfiguration ?? null });
   } catch {
     // Kernel exception text can carry server paths; the editor shows its own message.
     return json({ error: "The parameter edit could not be applied." }, 422);

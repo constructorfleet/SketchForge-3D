@@ -7678,7 +7678,8 @@ export function SketchForgeEditor({
     if (projectInteractionActiveRef.current || parameterEditPendingRef.current) return { key: "editor.parameters.error.busy", values: {} };
     const startShapes = shapesRef.current;
     const startParameters = projectParametersRef.current;
-    const planned = planParameterEdit({ parameters: startParameters, shapes: startShapes }, edit);
+    const startConfiguration = projectConfigurationRef.current;
+    const planned = planParameterEdit({ parameters: startParameters, shapes: startShapes, ...startConfiguration }, edit);
     if (!planned.ok) return parameterErrorMessage(planned.error);
     let next = planned.project;
     // Also shown in the status line: the panel may have closed while a recompute ran.
@@ -7698,12 +7699,18 @@ export function SketchForgeEditor({
       parameterEditPendingRef.current = true;
       setParameterEditPending(true);
       try {
-        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", scope, startParameters, edit);
+        const request = editorParameterRequest(projectInfoRef.current.projectId ?? "editor", scope, startParameters, edit, startConfiguration);
         const response = await fetch(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
-        const body = await response.json().catch(() => null) as { shapes?: WorkplaneShape[]; parameters?: ProjectParameter[]; failure?: ParameterEditFailure } | null;
+        const body = await response.json().catch(() => null) as {
+          shapes?: WorkplaneShape[];
+          parameters?: ProjectParameter[];
+          configurations?: ProjectConfigurationState["configurations"];
+          activeConfiguration?: string | null;
+          failure?: ParameterEditFailure;
+        } | null;
         const merged = response.ok && body?.shapes && body.parameters ? mergeRecomputedShapes(planned.project.shapes, scope, body.shapes) : null;
         if (!merged || !body?.parameters) return refuse(parameterRecomputeResponseMessage(response.ok ? 200 : response.status, body, startShapes));
-        next = { shapes: merged, parameters: body.parameters };
+        next = { shapes: merged, parameters: body.parameters, configurations: body.configurations ?? [], activeConfiguration: body.activeConfiguration ?? null };
       } catch {
         return refuse(parameterEditFailureMessage(null, startShapes));
       } finally {
@@ -7716,6 +7723,11 @@ export function SketchForgeEditor({
     }
     invalidateCadModifierSession();
     adoptProjectParameters(next.parameters);
+    // A rename or delete also rewrites configuration rows.
+    projectConfigurationRef.current = {
+      configurations: next.configurations ?? startConfiguration.configurations,
+      activeConfiguration: next.activeConfiguration === undefined ? startConfiguration.activeConfiguration : next.activeConfiguration,
+    };
     const nextShapes = next.shapes.map(canonicalizeShape);
     const nextSelection = selectedIdsRef.current.filter((id) => nextShapes.some((shape) => shape.id === id));
     shapesRef.current = nextShapes;

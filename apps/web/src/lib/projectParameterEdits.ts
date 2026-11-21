@@ -21,9 +21,15 @@ import { planParameterBindings } from "@constructorfleet/sketchforge-engine/para
 import { boundSketchConstraints, parameterSketchConstraintDependents, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import { expressionDependencies, type ExpressionErrorCode } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { MessageKey } from "@/i18n/locales";
-import type { ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
+import type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "@/types/sketchforge";
 
-export type ParameterProject = { parameters: ProjectParameter[]; shapes: WorkplaneShape[] };
+/** Values are resolved under `activeConfiguration`; edits change base expressions (#618). */
+export type ParameterProject = {
+  parameters: ProjectParameter[];
+  shapes: WorkplaneShape[];
+  configurations?: readonly ProjectConfiguration[];
+  activeConfiguration?: string | null;
+};
 
 export type ParameterEdit =
   | { kind: "add"; name: string; expression: string; dimension: ProjectParameterDimension }
@@ -102,7 +108,8 @@ function runEdit(project: ParameterProject, edit: ParameterEdit): ProjectParamet
 export function planParameterEdit(project: ParameterProject, edit: ParameterEdit): PlannedParameterEdit {
   const result = runEdit(project, edit);
   if (!result.ok) return result;
-  const next = { parameters: result.project.parameters, shapes: result.project.shapes };
+  // Carries configuration rows too: a rename or delete reaches into them.
+  const next: ParameterProject = result.project;
   // A renamed binding keeps its value; only a stale one naming the new name can move.
   const bound = (shapes: readonly WorkplaneShape[], name: string) =>
     parameterShapeDependents(shapes, name).length > 0 || parameterSketchConstraintDependents(shapes, name).length > 0;
@@ -207,6 +214,11 @@ const TABLE_ERROR_KEYS: Record<Exclude<ProjectParameterError["code"], "invalidEx
   unknownParameter: "editor.parameters.error.unknownParameter",
   parameterInUse: "editor.parameters.error.parameterInUse",
   tooManyParameters: "editor.parameters.error.tooManyParameters",
+  duplicateConfigurationName: "editor.parameters.error.duplicateConfigurationName",
+  invalidConfiguration: "editor.parameters.error.invalidConfiguration",
+  invalidConfigurationName: "editor.parameters.error.invalidConfigurationName",
+  tooManyConfigurations: "editor.parameters.error.tooManyConfigurations",
+  unknownConfiguration: "editor.parameters.error.unknownConfiguration",
 };
 
 const EXPRESSION_ERROR_KEYS: Record<ExpressionErrorCode, MessageKey> = {

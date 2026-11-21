@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { exportProjectScene, shapeFromRequest } from "@constructorfleet/sketchforge-engine";
-import { resolveProjectParameters } from "@constructorfleet/sketchforge-engine/projectParameters";
+import { activateConfiguration, addConfiguration, resolveProjectParameters } from "@constructorfleet/sketchforge-engine/projectParameters";
 import type { ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
-import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
+import type { ProjectConfiguration, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { POST } from "@/app/api/editor/parameters/route";
 import { editorParameterRequest } from "@/lib/editorCadRequests";
 import type { ParameterEdit } from "@/lib/projectParameterEdits";
@@ -86,6 +86,23 @@ describe("editor parameter route", () => {
     const response = await POST(new Request("http://localhost/api/editor/parameters", { method: "POST", body, duplex: "half" } as RequestInit));
     expect(response.status).toBe(413);
     expect(pulled).toBeLessThan(4);
+  });
+
+  it("resolves under the active configuration and returns the rows", async () => {
+    const added = addConfiguration({ parameters: table([{ name: "w", expression: "10", dimension: "length" }]), configurations: [] as ProjectConfiguration[], activeConfiguration: null as string | null }, { name: "Large", overrides: { w: "30" } });
+    if (!added.ok) throw new Error(added.error.message);
+    const active = activateConfiguration(added.project, "Large");
+    if (!active.ok) throw new Error(active.error.message);
+    const { configurations } = active.project;
+    const configuration = { configurations, activeConfiguration: "Large" };
+    const request = editorParameterRequest("project-1", [boundBox({ width: 30, x: 15 })], active.project.parameters, { kind: "rename", name: "w", newName: "size" }, configuration);
+    const response = await POST(new Request(`http://localhost${request.url}`, { method: "POST", body: JSON.stringify(request.body) }));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.parameters).toEqual([{ name: "size", expression: "10", dimension: "length", value: 30 }]);
+    expect(body.configurations).toEqual([{ name: "Large", overrides: { size: "30" } }]);
+    expect(body.activeConfiguration).toBe("Large");
+    expect(body.shapes[0]).toMatchObject({ width: 30, expressions: { width: "size", x: "size / 2" } });
   });
 
   it("rejects malformed requests", async () => {

@@ -27,6 +27,11 @@ row shows the name, the expression, the resolved value with its unit, and the
 dimension: **Length** (mm), **Angle** (degrees) or **Unitless**. A bare number
 takes the dimension's unit, so `3` in a length parameter is 3 mm.
 
+When the project has an active configuration, the panel edits each parameter's
+base expression, and the value column shows the value under the active
+configuration. A configuration that overrides a parameter keeps its override. A
+rename or delete also updates the configurations.
+
 ![The Parameters panel with four parameters. Changing plate_width also changed post_d and moved the bound shapes.](../screenshots/parameter-panel.png)
 
 ## Add, edit, rename and delete

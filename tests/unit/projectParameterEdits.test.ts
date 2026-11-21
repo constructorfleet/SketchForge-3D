@@ -183,7 +183,8 @@ describe("parameter error messages", () => {
     const cycleMessage = parameterErrorMessage(cycle.error);
     expect(cycleMessage).toEqual({ key: "editor.parameters.error.cycle", values: { cycle: "wall → depth → wall" } });
 
-    const codes = ["invalidParameter", "invalidName", "duplicateName", "invalidDimension", "unknownParameter", "parameterInUse", "tooManyParameters"] as const;
+    const codes = ["invalidParameter", "invalidName", "duplicateName", "invalidDimension", "unknownParameter", "parameterInUse", "tooManyParameters",
+      "duplicateConfigurationName", "invalidConfiguration", "invalidConfigurationName", "tooManyConfigurations", "unknownConfiguration"] as const;
     for (const code of codes) {
       const { key } = parameterErrorMessage({ code, message: "", parameter: "wall" });
       expect(typeof message(key), key).toBe("string");
