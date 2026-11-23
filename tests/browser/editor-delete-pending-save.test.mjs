@@ -94,7 +94,8 @@ async function addBox(page) {
 // Adds a box, then deletes the project before that edit's save publishes.
 async function editThenDelete(page) {
   await page.clock.install();
-  await page.clock.pauseAt(Date.now() + 50);
+  // From the page's clock: a target already past throws "Cannot fast-forward to the past".
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
   await addBox(page);
   await page.getByRole("button", { name: "Home dashboard" }).click();
   await page.getByRole("button", { name: /^Project options for / }).first().click();

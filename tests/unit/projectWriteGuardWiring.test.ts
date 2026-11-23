@@ -76,4 +76,8 @@ describe("dashboard package writes", () => {
     expect(body).toContain("projectWriteGuard.forget(projectId);");
     expect(body).not.toContain("projectWriteGuard.release(projectId);");
   });
+
+  it("lifts the delete mark for every project the list holds again", () => {
+    expect(page).toMatch(/useEffect\(\(\) => \{\s*for \(const project of projects\) projectWriteGuard\.restore\(project\.id\);\s*\}, \[projects\]\);/);
+  });
 });

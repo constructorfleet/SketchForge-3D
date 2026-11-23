@@ -346,3 +346,31 @@ test("a client coming back into view shows a rename another client made", { time
   await clientA.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await clientA.locator(".project-card").filter({ hasText: "Renamed by B" }).waitFor({ state: "visible", timeout: 15_000 });
 });
+
+// Issue #665: a delete refuses late saves, but another client can store the project
+// again. This tab must save it once it is back in the list.
+test("a project another client saves after this tab deleted it can be edited and saved here again", { timeout: 300_000 }, async (t) => {
+  const { clientA, clientB, packagePath } = await twoClients(t);
+
+  await clientA.getByRole("button", { name: "Home dashboard" }).click();
+  await clientA.getByRole("button", { name: "Project options for square" }).click();
+  await clientA.getByRole("menuitem", { name: "Delete" }).click();
+  await clientA.locator(".dashboard-confirm-delete").click();
+  const deadline = Date.now() + 30_000;
+  while (fs.existsSync(packagePath) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(fs.existsSync(packagePath), false, "client A deleted the package");
+
+  // Client B still has it open, so its next edit stores it again.
+  await addBox(clientB);
+  const fromB = await waitForFile(packagePath);
+  assert.equal(rootNodeCount(fromB), 2, "client B stored the square and its box");
+
+  await clientA.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  const card = clientA.locator(".project-card").filter({ hasText: "square" });
+  await card.waitFor({ state: "visible", timeout: 15_000 });
+  await card.locator(".project-card-open").click();
+  await clientA.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+  await addBox(clientA);
+  const fromA = await nextSave(packagePath, fromB);
+  assert.equal(rootNodeCount(fromA), 3, "client A saved its box on top of B's copy");
+});

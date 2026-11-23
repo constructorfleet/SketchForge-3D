@@ -59,6 +59,20 @@ describe("project write guard", () => {
     expect(guard.canWrite("other")).toBe(true);
   });
 
+  it("writes a deleted project again once another client brings it back into the list", async () => {
+    const guard = createProjectWriteGuard();
+    const write = vi.fn(async (_projectId: string) => "written");
+    const save = guardProjectWrites(guard, write, () => new Error("refused"));
+    guard.forget("gone");
+    guard.restore("gone");
+    expect(guard.canWrite("gone")).toBe(true);
+    await expect(save("gone")).resolves.toBe("written");
+    // A load failure still blocks a restored project.
+    guard.block("gone");
+    guard.restore("gone");
+    expect(guard.canWrite("gone")).toBe(false);
+  });
+
   it("keeps a newer cached entry over an older editor snapshot", () => {
     const guard = createProjectWriteGuard();
     const current = { project: { revision: 5 } };

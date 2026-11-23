@@ -6,8 +6,10 @@ export type ProjectWriteGuard = {
   block(projectId: string): void;
   /** Allows writes again, after a good read or a confirmed replacement. */
   release(projectId: string): void;
-  /** Refuses writes for good, so a late save cannot recreate a deleted project (#665). */
+  /** Refuses writes until `restore`, so a late save cannot recreate a deleted project (#665). */
   forget(projectId: string): void;
+  /** Lifts `forget` once the project is listed again, for example after another client saved it. */
+  restore(projectId: string): void;
   canWrite(projectId: string): boolean;
 };
 
@@ -24,6 +26,9 @@ export function createProjectWriteGuard(): ProjectWriteGuard {
     forget: (projectId) => {
       blocked.delete(projectId);
       deleted.add(projectId);
+    },
+    restore: (projectId) => {
+      deleted.delete(projectId);
     },
     canWrite: (projectId) => !blocked.has(projectId) && !deleted.has(projectId),
   };
