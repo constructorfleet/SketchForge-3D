@@ -7298,6 +7298,7 @@ export function SketchForgeEditor({
       knownTableKey: hostParametersKeyRef.current,
       incomingShapesKey: incomingSerialized,
       echoShapesKey: lastProjectShapesEchoRef.current,
+      syncedShapesKey: lastProjectShapesSyncRef.current,
       currentShapesKey: projectShapesFingerprint(shapes),
     });
     if (sync.adoptTable) {
