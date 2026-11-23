@@ -8,7 +8,7 @@ import { POST as groupShapes } from "@/app/api/v1/groups/route";
 import { POST as createParameter } from "@/app/api/v1/parameters/route";
 import { PATCH as patchConstraint } from "@/app/api/v1/sketch-constraints/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
-import { validateApiV1Response } from "@/lib/apiV1OperationContract";
+import { API_V1_OPERATIONS, validateApiV1Response } from "@/lib/apiV1OperationContract";
 import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
 import { directoryProjectStore } from "@/lib/engine/projectStore";
 
@@ -90,6 +90,15 @@ describe("PATCH /api/v1/shapes on a nested sketch source (#654)", () => {
     expect(changed.status, JSON.stringify(changed.body)).toBe(200);
     expect(changed.body.droppedBindings).toEqual([{ shapeId: groupId, fields: ["width"] }]);
     expect(validateApiV1Response("PATCH /api/v1/shapes", 200, changed.body)).toBe(true);
+    // Declared in the contract, so the OpenAPI reference documents it.
+    const patch = API_V1_OPERATIONS.find((operation) => `${operation.method} ${operation.path}` === "PATCH /api/v1/shapes")!;
+    const reply = (patch.responseSchemas as Record<number, { properties: Record<string, unknown> }>)[200]!;
+    expect(reply.properties.droppedBindings).toMatchObject({ type: "array", items: { required: ["shapeId", "fields"] } });
+
+    // Re-sending the profile now changes nothing, so nothing is reported.
+    const resent = await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=sketch%2Fdropped`, "PATCH", { sketchProfile: rectangle(4) });
+    expect(resent.status, JSON.stringify(resent.body)).toBe(200);
+    expect(resent.body).not.toHaveProperty("droppedBindings");
 
     const renamed = await call(patchShape, `/api/v1/shapes?projectId=${projectId}&shapeId=${groupId}`, "PATCH", { name: "Renamed" });
     expect(renamed.status).toBe(200);

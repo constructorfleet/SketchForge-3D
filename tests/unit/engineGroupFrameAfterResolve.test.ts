@@ -367,6 +367,30 @@ describe("a group's frame after a nested sketch output is re-solved (#637)", () 
     expect(renamed).not.toHaveProperty("droppedBindings");
   }, CAD_TEST_TIMEOUT_MS);
 
+  it("reports nothing from a nested source edit that leaves a bound group size alone (#654)", async () => {
+    const group = await groupedSketch("unchanged", "group", false);
+    value(await engine.addParameter("unchanged", { name: "gw", expression: "37/3", dimension: "length" }));
+    value(await engine.bindShapeField("unchanged", group.id, "width", "gw"));
+    const child = outputIn((await document("unchanged")).shapes[0]!);
+
+    const changed = value(await engine.changeShape("unchanged", "sketch/unchanged", { sketchProfile: child.sketchProfile }));
+
+    expect(changed).not.toHaveProperty("droppedBindings");
+    expect((await document("unchanged")).shapes[0]!.expressions).toMatchObject({ width: "gw" });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("names a bound group size that widening a nested profile drops, in a project the refusal allows (#654)", async () => {
+    const group = await groupedSketch("widened", "group", false);
+    value(await engine.addParameter("widened", { name: "gw", expression: "12", dimension: "length" }));
+    value(await engine.bindShapeField("widened", group.id, "width", "gw"));
+    const child = outputIn((await document("widened")).shapes[0]!);
+
+    const changed = value(await engine.changeShape("widened", "sketch/widened", { sketchProfile: widerProfile(child.sketchProfile!) }));
+
+    expect(changed.droppedBindings).toEqual([{ shapeId: group.id, fields: ["width"] }]);
+    expect((await document("widened")).shapes[0]!.width).toBe(14);
+  }, CAD_TEST_TIMEOUT_MS);
+
   it("keeps a stored group size binding when a re-solve leaves the children's bounds alone", async () => {
     await groupedSketch("same-size", "group");
     value(await engine.addParameter("same-size", { name: "gw", expression: "37/3", dimension: "length" }));
