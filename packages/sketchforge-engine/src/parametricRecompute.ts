@@ -1,5 +1,5 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
-import { groupChildFrame } from "./serverShapeGroups.js";
+import { groupChildFrame, refittedGroupRecord } from "./serverShapeGroups.js";
 import { resizedShapeSize, shapeDepth, shapeWidth } from "./workplaneShapes.js";
 import {
   allEdgeTreatmentEdgeCount,
@@ -659,7 +659,10 @@ export async function recompute(
             };
           }),
         });
+      } else if (children.length && !shape.cadBrep && !shape.importedMesh) {
+        rebuilt.set(id, refittedGroupRecord(shape, children));
       } else {
+        // A baked mesh is the group's geometry; its children only serve ungroup.
         rebuilt.set(id, { ...shape, ...(children.length ? { groupedShapes: children } : {}) });
       }
     } catch (error) {

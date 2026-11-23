@@ -1654,6 +1654,21 @@ export function createEngine(store: ProjectStore): Engine {
     return ok({ shape: updatedShape, shapes });
   }
 
+  /** Re-applies bound placement on the group around nested `shapeId` after a rebuild refit it. */
+  async function restoreRootPlacement(
+    document: ProjectDocument,
+    previous: readonly WorkplaneShape[],
+    shapes: WorkplaneShape[],
+    shapeId: string,
+  ): Promise<EngineResult<WorkplaneShape[]>> {
+    const before = previous.find((root) => root.id !== shapeId && findShapeInTree([root], shapeId));
+    const after = before && shapes.find((root) => root.id === before.id);
+    const drift = after ? driftedPlacement(before, after) : {};
+    if (!Object.keys(drift).length) return ok(shapes);
+    const placed = await changeShapeIn({ ...document, shapes }, after!.id, drift);
+    return placed.ok ? ok(placed.value.shapes) : placed;
+  }
+
   /** Rebuilds a sketch output with new treatment settings through the recompute graph. */
   async function retreatSketchOutput(document: ProjectDocument, shape: WorkplaneShape, values: Record<string, number>): Promise<EngineResult<ShapeChanged>> {
     const sourceId = shape.sketchSourceId!;
@@ -1737,7 +1752,7 @@ export function createEngine(store: ProjectStore): Engine {
       const result = await step((shape) => changeShapeIn({ ...document, shapes }, shape.id, own));
       if (!result.ok) return result;
     }
-    return ok(shapes);
+    return restoreRootPlacement(document, document.shapes, shapes, shapeId);
   }
 
   /**
@@ -2039,6 +2054,10 @@ export function createEngine(store: ProjectStore): Engine {
         rebuilt = locked
           ? { shape: { ...placed.value.shape, locked }, shapes: replaceShapeInTree(placed.value.shapes, { ...placed.value.shape, locked }) }
           : placed.value;
+      } else {
+        const restored = await restoreRootPlacement(document, document.shapes, rebuilt.shapes, rebuilt.shape.id);
+        if (!restored.ok) return restored;
+        rebuilt = { ...rebuilt, shapes: restored.value };
       }
       // A literal replaces the field's binding unless it repeats the current value.
       // A rebuild that moves a bound value also drops that binding.

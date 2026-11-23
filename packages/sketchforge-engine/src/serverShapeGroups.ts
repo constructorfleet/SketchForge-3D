@@ -341,6 +341,44 @@ export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] 
 }
 
 /**
+ * Refits a record group's box around changed children, as grouping them again would.
+ * Keeps the group's scale, turn, mirror and where its children sit in the parent frame.
+ */
+export function refittedGroupRecord(group: WorkplaneShape, children: WorkplaneShape[]): WorkplaneShape {
+  if (!children.length) return group;
+  const frame = groupChildFrame(group);
+  const bounds = boundsForShapes(children);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+  const baseWidth = cleanModelDimension(bounds.maxX - bounds.minX);
+  const baseDepth = cleanModelDimension(bounds.maxZ - bounds.minZ);
+  const baseHeight = cleanModelDimension(bounds.maxY - bounds.minY);
+  const width = cleanModelDimension(baseWidth * frame.scale.x);
+  const depth = cleanModelDimension(baseDepth * frame.scale.z);
+  const height = cleanModelDimension(baseHeight * frame.scale.y);
+  const center = frame.toParent(centerX, (bounds.minY + bounds.maxY) / 2, centerZ);
+  return {
+    ...group,
+    x: center.x,
+    z: center.z,
+    elevation: center.y - height / 2,
+    width,
+    depth,
+    height,
+    size: Math.max(width, depth),
+    groupedBaseWidth: baseWidth,
+    groupedBaseDepth: baseDepth,
+    groupedBaseHeight: baseHeight,
+    groupedShapes: children.map((child) => ({
+      ...child,
+      x: child.x - centerX,
+      z: child.z - centerZ,
+      elevation: (child.elevation ?? 0) - bounds.minY,
+    })),
+  };
+}
+
+/**
  * The operands a boolean actually works on.
  *
  * A group that is only a record is taken apart first, so cutting a hole out of
