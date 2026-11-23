@@ -516,3 +516,8 @@ export function hostProjectSync({
   // Host re-render with shapes it already had: an unpublished local edit is newer (#657).
   return { adoptTable, action: incomingShapesKey === syncedShapesKey ? "echo" : "hydrate" };
 }
+
+/** Cancels a pending publish only for a hydrate; it may hold a table-only undo (#663). */
+export function hostSyncCancelsPendingPublish(sync: HostProjectSync) {
+  return sync.action === "hydrate";
+}

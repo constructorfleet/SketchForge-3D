@@ -4,6 +4,7 @@ import { shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 import {
   applyBindingsLocally,
   hostProjectSync,
+  hostSyncCancelsPendingPublish,
   mergeRecomputedShapes,
   parameterDeleteWarning,
   parameterRecomputeResponseMessage,
@@ -119,6 +120,14 @@ describe("hostProjectSync", () => {
     expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" })).toEqual({ adoptTable: false, action: "hydrate" });
     expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2", currentShapesKey: "s3" })).toEqual({ adoptTable: false, action: "hydrate" });
     expect(hostProjectSync({ ...base, projectChanged: true })).toEqual({ adoptTable: true, action: "hydrate" });
+  });
+
+  it("cancels a pending publish only when the host state replaces the editor's (#663)", () => {
+    // An undone table waits 120 ms to publish; a host re-render with the old table is not newer.
+    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, echoShapesKey: null }))).toBe(false);
+    expect(hostSyncCancelsPendingPublish(hostProjectSync(base))).toBe(false);
+    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" }))).toBe(true);
+    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, hostTableKey: "t2" }))).toBe(true);
   });
 });
 

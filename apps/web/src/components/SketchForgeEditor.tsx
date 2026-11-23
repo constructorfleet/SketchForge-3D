@@ -176,7 +176,7 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { applyBindingsLocally, hostProjectSync, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { applyBindingsLocally, hostProjectSync, hostSyncCancelsPendingPublish, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
 import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
@@ -7312,7 +7312,7 @@ export function SketchForgeEditor({
       return;
     }
     lastProjectShapesSyncRef.current = incomingSerialized;
-    if (projectSyncTimerRef.current !== null) {
+    if (hostSyncCancelsPendingPublish(sync) && projectSyncTimerRef.current !== null) {
       window.clearTimeout(projectSyncTimerRef.current);
       projectSyncTimerRef.current = null;
     }
