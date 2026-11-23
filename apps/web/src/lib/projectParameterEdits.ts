@@ -497,6 +497,7 @@ export function hostProjectSync({
   knownTableKey,
   incomingShapesKey,
   echoShapesKey,
+  syncedShapesKey,
   currentShapesKey,
 }: {
   projectChanged: boolean;
@@ -504,10 +505,14 @@ export function hostProjectSync({
   knownTableKey: string;
   incomingShapesKey: string;
   echoShapesKey: string | null;
+  /** Shapes last published to or hydrated from the host. */
+  syncedShapesKey: string;
   currentShapesKey: string;
 }): HostProjectSync {
   const adoptTable = projectChanged || hostTableKey !== knownTableKey;
   if (adoptTable) return { adoptTable, action: "hydrate" };
   if (echoShapesKey !== null && incomingShapesKey === echoShapesKey) return { adoptTable, action: "echo" };
-  return { adoptTable, action: incomingShapesKey === currentShapesKey ? "unchanged" : "hydrate" };
+  if (incomingShapesKey === currentShapesKey) return { adoptTable, action: "unchanged" };
+  // Host re-render with shapes it already had: an unpublished local edit is newer (#657).
+  return { adoptTable, action: incomingShapesKey === syncedShapesKey ? "echo" : "hydrate" };
 }

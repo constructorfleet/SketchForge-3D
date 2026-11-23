@@ -100,7 +100,6 @@ test("a user can enable face editing on a plain box, then colour and draft a fac
     await waitForServer(baseURL, server, () => logs);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    await page.route("**/api/projects", async (route) => { if (route.request().method() === "GET") await new Promise((r) => setTimeout(r, Number(process.env.PROBE_DELAY))); await route.continue(); });
     await page.goto(baseURL);
     await page.getByRole("button", { name: "Create new 3D design" }).click();
     await page.getByRole("button", { name: "Add shape" }).click();

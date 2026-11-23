@@ -97,7 +97,13 @@ describe("applyBindingsLocally", () => {
 });
 
 describe("hostProjectSync", () => {
-  const base = { projectChanged: false, hostTableKey: "t1", knownTableKey: "t1", incomingShapesKey: "s1", echoShapesKey: "s1", currentShapesKey: "s1" };
+  const base = { projectChanged: false, hostTableKey: "t1", knownTableKey: "t1", incomingShapesKey: "s1", echoShapesKey: "s1", syncedShapesKey: "s1", currentShapesKey: "s1" };
+
+  it("keeps an unpublished local edit when the host re-sends the shapes it already had (#657)", () => {
+    // A box added 120 ms before its save publishes; a host re-render repeats the empty scene.
+    expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "empty", syncedShapesKey: "empty", currentShapesKey: "box" }))
+      .toEqual({ adoptTable: false, action: "echo" });
+  });
 
   it("ignores the echo of the editor's own save", () => {
     expect(hostProjectSync(base)).toEqual({ adoptTable: false, action: "echo" });
@@ -111,6 +117,7 @@ describe("hostProjectSync", () => {
   it("skips unchanged shapes and hydrates changed ones or a new project", () => {
     expect(hostProjectSync({ ...base, echoShapesKey: null })).toEqual({ adoptTable: false, action: "unchanged" });
     expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" })).toEqual({ adoptTable: false, action: "hydrate" });
+    expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2", currentShapesKey: "s3" })).toEqual({ adoptTable: false, action: "hydrate" });
     expect(hostProjectSync({ ...base, projectChanged: true })).toEqual({ adoptTable: true, action: "hydrate" });
   });
 });
