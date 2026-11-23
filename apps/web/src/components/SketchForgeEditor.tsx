@@ -7272,6 +7272,12 @@ export function SketchForgeEditor({
       lastProjectIdRef.current = null;
       lastProjectShapesSyncRef.current = "";
       lastProjectShapesEchoRef.current = null;
+      // The publish names the old project, which may be deleted (#665).
+      if (projectSyncTimerRef.current !== null) {
+        window.clearTimeout(projectSyncTimerRef.current);
+        projectSyncTimerRef.current = null;
+      }
+      pendingProjectShapesRef.current = null;
       return;
     }
     if (projectInteractionActiveRef.current) {

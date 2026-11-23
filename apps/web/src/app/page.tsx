@@ -1917,7 +1917,7 @@ export default function Home() {
 
   const deleteProject = (projectId: string) => {
     clearProjectLoadFailure(projectId);
-    projectWriteGuard.release(projectId);
+    projectWriteGuard.forget(projectId);
     serverBaseRevisions.delete(projectId);
     servedRevisions.delete(projectId);
     conflictedCopiesRef.current.delete(projectId);

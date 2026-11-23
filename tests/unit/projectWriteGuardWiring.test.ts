@@ -69,4 +69,11 @@ describe("dashboard package writes", () => {
   it("blocks writes when a load fails", () => {
     expect(page).toMatch(/\.catch\(\(error\) => \{\s*if \(canceled\) return;[\s\S]{0,600}projectWriteGuard\.block\(activeProjectId\);/);
   });
+
+  // Issue #665: a late save must not recreate a deleted project.
+  it("refuses writes to a project for good once it is deleted", () => {
+    const body = page.slice(page.indexOf("const deleteProject = (projectId: string) => {"), page.indexOf("const renameProject = "));
+    expect(body).toContain("projectWriteGuard.forget(projectId);");
+    expect(body).not.toContain("projectWriteGuard.release(projectId);");
+  });
 });
