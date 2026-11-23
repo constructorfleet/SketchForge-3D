@@ -1057,18 +1057,23 @@ export default function Home() {
             serverBaseRevisions.delete(projectId);
             changedAny = true;
           }
-          for (const project of readStoredProjects().projects) {
+          // The browser list only discovers projects created during the wait: another tab's
+          // switch removes it, and the moved projects are known without it.
+          const browserList = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
+          for (const project of browserList.values()) {
             if (canceled) return;
-            if (projectsDeletedInBrowser.has(project.id) || conflicts.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
-            if (!serverProjectIds.has(project.id)) {
-              // Created during the wait: not in the listing, so it would vanish at the switch.
-              await migrateProject(project);
-              migratedCount += 1;
-              serverProjectIds.add(project.id);
-              migratedProjectIds.add(project.id);
-              changedAny = true;
-              continue;
-            }
+            if (serverProjectIds.has(project.id) || projectsDeletedInBrowser.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
+            // Created during the wait: not in the listing, so it would vanish at the switch.
+            await migrateProject(project);
+            migratedCount += 1;
+            serverProjectIds.add(project.id);
+            migratedProjectIds.add(project.id);
+            changedAny = true;
+          }
+          for (const projectId of migratedProjectIds) {
+            if (canceled) return;
+            const project = browserList.get(projectId) ?? migratedEntries.get(projectId);
+            if (!project || projectsDeletedInBrowser.has(projectId) || conflicts.has(projectId) || !projectWriteGuard.canWrite(project.id)) continue;
             const upload = migrated.get(project.id);
             if (!upload) continue;
             const record = await loadProjectShapes(project.id);
@@ -1077,8 +1082,11 @@ export default function Home() {
               await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
             } catch (error) {
               if (!(error instanceof ServerProjectConflictError)) throw error;
-              conflicts.set(project.id, { project, record, error });
-              continue;
+              // Another tab sharing this IndexedDB already uploaded this very record.
+              if (error.storedRevision !== record.revision) {
+                conflicts.set(project.id, { project, record, error });
+                continue;
+              }
             }
             migrated.set(project.id, { recordRevision: record.revision, serverRevision: record.revision });
             migratedEntries.set(project.id, project);

@@ -261,7 +261,7 @@ test("a project deleted while projects move does not come back", { timeout: 180_
 
 test("a project moved by two tabs at once stays on the server", { timeout: 180_000 }, async (t) => {
   let other;
-  const { projectsDir, projectId, listing, switchToServer } = await migratingSession(t, {
+  const { page, projectsDir, projectId, api, listing, savedAfter, addBox, switchToServer } = await migratingSession(t, {
     // A second tab reads the same browser list and moves the same project.
     // Its uploads wait until the first tab has moved it too, so both see an empty server.
     beforeUpload: async ({ context, baseURL }) => {
@@ -275,6 +275,11 @@ test("a project moved by two tabs at once stays on the server", { timeout: 180_0
   other.held.uploadsAllowed.open();
   await until(() => other.held.uploads >= 2 && other.held.listings >= 2, "the second tab never moved the project");
 
+  // A late edit both tabs find in the shared IndexedDB.
+  const revisionAtUpload = await browserRevision(page, projectId);
+  await addBox();
+  await savedAfter(revisionAtUpload, "the new box");
+
   // The first tab switches and removes the browser list the second tab still reads.
   await switchToServer();
   other.held.adoption.open();
@@ -283,14 +288,23 @@ test("a project moved by two tabs at once stays on the server", { timeout: 180_0
 
   assert.ok((await listing()).some((record) => record.projectId === projectId), "the project stays on the server");
   assert.ok(readdirSync(projectsDir).includes(`${projectId}.skf`), "the project's package stays on disk");
+  await until(async () => (await api(`/shapes?projectId=${projectId}`)).shapes?.length === 1, "the late box must reach the server", 20_000);
   await other.page.getByText("Untitled design 1", { exact: true }).first().waitFor({ state: "visible", timeout: 10_000 });
+  for (const tab of [page, other.page]) {
+    assert.equal(await tab.getByRole("alert").filter({ hasText: "was changed elsewhere" }).count(), 0, "one tab's catch-up is not a conflict for the other");
+  }
 });
 
 test("a missing browser project list during the move keeps every project", { timeout: 180_000 }, async (t) => {
-  const { page, projectsDir, projectId, listing, switchToServer } = await migratingSession(t);
+  const { page, projectsDir, projectId, api, listing, savedAfter, addBox, switchToServer } = await migratingSession(t);
+  const revisionAtUpload = await browserRevision(page, projectId);
+  await addBox();
+  await savedAfter(revisionAtUpload, "the new box");
+  // After the box's list update, so nothing writes the list again.
+  await page.waitForTimeout(1_000);
   await page.evaluate(() => window.localStorage.removeItem("sketchForge.projects"));
-  await switchToServer().catch(() => undefined);
-  await page.waitForTimeout(2_000);
+  await switchToServer();
+  await until(async () => (await api(`/shapes?projectId=${projectId}`)).shapes?.length === 1, "the late box must reach the server", 20_000);
 
   assert.ok((await listing()).some((record) => record.projectId === projectId), "the project stays on the server");
   assert.ok(readdirSync(projectsDir).includes(`${projectId}.skf`), "the project's package stays on disk");
