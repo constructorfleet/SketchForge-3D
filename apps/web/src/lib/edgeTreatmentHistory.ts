@@ -97,20 +97,24 @@ export type RemovableEdgeTreatment = {
   removesNewerCount: number;
 };
 
-/** Lists the history entries a removal may restore. A locked child, and all it holds, stays as it is. */
+/**
+ * Lists the history entries a removal may restore. Restoring an entry replaces
+ * its shape's whole snapshot, children included, so a shape holding a locked part keeps its own.
+ */
 export function removableEdgeTreatments(shape: WorkplaneShape, path: number[] = [], chain: WorkplaneShape[] = [shape]): RemovableEdgeTreatment[] {
-  const history = shape.edgeTreatmentHistory ?? [];
+  const history = holdsLockedShape(shape) ? [] : shape.edgeTreatmentHistory ?? [];
   const own = history.map((entry, index) => ({ path, chain, entry, removesNewerCount: Math.max(0, history.length - index - 1) }));
   const children = (shape.groupedShapes ?? []).flatMap((child, index) =>
     child.locked ? [] : removableEdgeTreatments(child, [...path, index], [...chain, child]));
   return [...own, ...children];
 }
 
-/** Reports whether the shape at `path`, or any group holding it, is locked. */
+/** Reports whether a removal at `path` would change a locked shape: one on the path, or one the target holds. */
 export function edgeTreatmentPathLocked(shape: WorkplaneShape, path: readonly number[]): boolean {
-  if (shape.locked) return true;
   const [index, ...rest] = path;
-  const child = index === undefined ? undefined : shape.groupedShapes?.[index];
+  if (index === undefined) return holdsLockedShape(shape);
+  if (shape.locked) return true;
+  const child = shape.groupedShapes?.[index];
   return child ? edgeTreatmentPathLocked(child, rest) : false;
 }
 

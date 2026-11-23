@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments } from "@/lib/edgeTreatmentHistory";
-import { sketchEditRefusal } from "@/lib/sketchEditTarget";
+import { sketchEditRefusal, sketchEditTargetLocked } from "@/lib/sketchEditTarget";
 import type { EdgeTreatmentHistoryEntry, WorkplaneShape } from "@/types/sketchforge";
 
 function box(id: string, overrides: Partial<WorkplaneShape> = {}): WorkplaneShape {
@@ -38,6 +38,17 @@ describe("sketch edit refusal", () => {
   });
 });
 
+describe("finishing a sketch edit", () => {
+  it("refuses when the edited shape is locked in the shapes it would commit into", () => {
+    const shapes = [box("other"), sketched()];
+
+    expect(sketchEditTargetLocked(shapes, "sketch")).toBe(false);
+    expect(sketchEditTargetLocked([box("other"), sketched({ locked: true })], "sketch")).toBe(true);
+    expect(sketchEditTargetLocked(shapes, null)).toBe(false);
+    expect(sketchEditTargetLocked(shapes, "gone")).toBe(false);
+  });
+});
+
 describe("edge treatment removal under a lock", () => {
   it("lists the treatments of unlocked children by path", () => {
     const group = box("group", { kind: "mesh", groupedShapes: [treated("a"), treated("b")] });
@@ -53,6 +64,16 @@ describe("edge treatment removal under a lock", () => {
     const group = box("group", { kind: "mesh", groupedShapes: [treated("locked", { locked: true }), treated("free"), inner] });
 
     expect(removableEdgeTreatments(group).map(({ entry }) => entry.id)).toEqual(["free-fillet"]);
+  });
+
+  it("leaves out a group's own treatments while it holds a locked part, since restoring one changes that part", () => {
+    const inner = box("inner", { kind: "mesh", edgeTreatmentHistory: treated("inner").edgeTreatmentHistory, groupedShapes: [treated("deep", { locked: true })] });
+    const group = box("group", { kind: "mesh", edgeTreatmentHistory: treated("group").edgeTreatmentHistory, groupedShapes: [treated("free"), inner] });
+
+    expect(removableEdgeTreatments(group).map(({ entry }) => entry.id)).toEqual(["free-fillet"]);
+    expect(edgeTreatmentPathLocked(group, [])).toBe(true);
+    expect(edgeTreatmentPathLocked(group, [1])).toBe(true);
+    expect(edgeTreatmentPathLocked(group, [0])).toBe(false);
   });
 
   it("names each treatment's shape chain and the newer entries it also removes", () => {

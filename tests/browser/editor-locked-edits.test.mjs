@@ -20,7 +20,7 @@ async function unusedPort() {
   return address.port;
 }
 
-async function withEditor(run) {
+async function withEditor(run, { beforeLoad } = {}) {
   const port = await unusedPort();
   const baseURL = `http://127.0.0.1:${port}`;
   const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
@@ -41,6 +41,7 @@ async function withEditor(run) {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
     const page = await context.newPage();
+    if (beforeLoad) await page.addInitScript(beforeLoad);
     // A newer upstream release can open a modal that intercepts clicks.
     await page.route("**/api/app-update**", (route) => route.abort());
     await page.goto(baseURL);
@@ -87,6 +88,93 @@ test("a locked sketch extrusion cannot be reopened from the toolbar or the objec
     await status(page, "Selection unlocked");
     assert.equal(await toolbarEdit.isDisabled(), false, "unlocking restores the toolbar button");
   });
+});
+
+async function sketchExtrusion(page) {
+  await page.getByRole("tab", { name: "Sketch" }).click();
+  await page.getByRole("button", { name: "Sketch to 3D options" }).click();
+  await page.getByRole("menuitem", { name: /Extrude sketch/ }).click();
+  await page.getByRole("button", { name: "Add sketch shape" }).click();
+  await page.getByRole("menuitem", { name: "Rectangle" }).click();
+  await page.getByRole("button", { name: "Finish sketch" }).click();
+  await page.getByText("Sketch extrusion").first().waitFor({ state: "visible", timeout: 30_000 });
+}
+
+/** Locks the selection from the Geometry tab while its sketch stays open, then returns to the sketch. */
+async function lockFromGeometryTab(page) {
+  await page.getByRole("tab", { name: "Geometry" }).click();
+  await page.keyboard.press("Shift+L");
+  await status(page, "Selection locked");
+  await page.getByRole("tab", { name: "Sketch" }).click();
+}
+
+/** Reads the lock from the inspector, so a sketch still open is cancelled first. */
+async function isLocked(page) {
+  const cancel = page.getByRole("button", { name: "Cancel", exact: true });
+  if (await page.getByRole("button", { name: "Finish sketch", exact: true }).isVisible()) await cancel.first().click();
+  const lockButton = page.getByRole("button", { name: /^(Lock|Unlock) shape$/ });
+  await lockButton.waitFor({ state: "visible", timeout: 30_000 });
+  return (await lockButton.getAttribute("aria-label")) === "Unlock shape";
+}
+
+/**
+ * Holds every worker reply while `window.__sfHoldWorkerReplies` is set, so a
+ * test can act while a CAD rebuild is still pending. Releases them in order.
+ */
+function holdWorkerReplies() {
+  const Native = window.Worker;
+  const held = [];
+  window.__sfReleaseWorkerReplies = () => {
+    window.__sfHoldWorkerReplies = false;
+    held.splice(0).forEach((deliver) => deliver());
+  };
+  window.Worker = class extends Native {
+    set onmessage(handler) {
+      super.onmessage = handler && ((event) => {
+        if (window.__sfHoldWorkerReplies) held.push(() => handler.call(this, event));
+        else handler.call(this, event);
+      });
+    }
+    get onmessage() {
+      return super.onmessage;
+    }
+  };
+}
+
+test("a sketch whose shape is locked while it is open refuses to finish, and stays open", { timeout: 240_000 }, async () => {
+  await withEditor(async (page) => {
+    await sketchExtrusion(page);
+    await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
+    const finish = page.getByRole("button", { name: "Finish sketch", exact: true });
+    await finish.waitFor({ state: "visible" });
+
+    await lockFromGeometryTab(page);
+    await finish.click();
+
+    await status(page, "Unlock the shape before editing its sketch");
+    assert.equal(await finish.isVisible(), true, "the sketch stays open to cancel");
+    assert.equal(await isLocked(page), true, "the shape keeps its lock");
+  });
+});
+
+test("a lock set while a finished sketch rebuilds holds, and the rebuild is not committed", { timeout: 240_000 }, async () => {
+  await withEditor(async (page) => {
+    await sketchExtrusion(page);
+    await page.getByRole("button", { name: "Edit sketch", exact: true }).click();
+    const finish = page.getByRole("button", { name: "Finish sketch", exact: true });
+    await finish.waitFor({ state: "visible" });
+
+    await page.evaluate(() => { window.__sfHoldWorkerReplies = true; });
+    await finish.click();
+    await status(page, "Building exact sketch geometry…");
+    await page.getByRole("tab", { name: "Geometry" }).click();
+    await page.keyboard.press("Shift+L");
+    await status(page, "Selection locked");
+    await page.evaluate(() => window.__sfReleaseWorkerReplies());
+
+    await status(page, "Unlock the shape before editing its sketch");
+    assert.equal(await isLocked(page), true, "the lock set during the rebuild holds");
+  }, { beforeLoad: holdWorkerReplies });
 });
 
 /** Rewrites `project.json` in an `.skf`, locking the first child of the first top-level group. */
@@ -151,6 +239,11 @@ test("a group holding a locked part refuses a fillet or chamfer, which would rew
       await page.locator(".scene-inspector-list > li.scene-row.selected").first().waitFor({ state: "visible" });
       assert.equal(await fillet.isDisabled(), true, "the toolbar refuses to fillet a group holding a locked part");
       assert.equal(await chamfer.isDisabled(), true, "or to chamfer it");
+      const separate = page.getByRole("button", { name: "Separate Parts", exact: true });
+      assert.ok((await separate.count()) === 0 || await separate.isDisabled(), "separating the parts would rewrite the locked one");
+      const shell = page.getByRole("region", { name: "Shell" });
+      await shell.getByRole("button", { name: "Shell", exact: true }).click();
+      assert.equal(await shell.getByRole("button", { name: "Hollow shape" }).isDisabled(), true, "nor can the group be hollowed");
       await page.screenshot({ path: "docs/screenshots/editor-locked-group-fillet.png" });
     });
   } finally {

@@ -123,7 +123,7 @@ import {
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
 import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
-import { sketchEditRefusal } from "@/lib/sketchEditTarget";
+import { sketchEditRefusal, sketchEditTargetLocked } from "@/lib/sketchEditTarget";
 import { edgeTreatmentFeatureWithLineage, edgeTreatmentLineageTarget, selectedEdgeTreatmentReplay } from "@/lib/edgeTreatmentLineage";
 import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, entryConfiguration, hydrateEditorHistoryState, NO_CONFIGURATIONS, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
@@ -3210,14 +3210,14 @@ function cadModifierSourceParts(shape: WorkplaneShape) {
 }
 
 function separablePartCount(shape: WorkplaneShape) {
-  if (shape.locked || shape.hole) return 0;
+  if (holdsLockedShape(shape) || shape.hole) return 0;
   if (shape.groupedShapes?.length && !shape.importedMesh) return shape.groupedShapes.length;
   const mesh = meshForShape(shape);
   return meshFaceComponents(mesh).length;
 }
 
 function separateShapeParts(shape: WorkplaneShape) {
-  if (shape.locked || shape.hole) return [];
+  if (holdsLockedShape(shape) || shape.hole) return [];
   if (shape.groupedShapes?.length && !shape.importedMesh) {
     const restored = restoreGroupedChildren(shape);
     return restored.length > 1 ? restored : [];
@@ -7165,7 +7165,7 @@ export function SketchForgeEditor({
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
     // A lock set while the sketch was open; the sketch stays open to cancel.
-    if (existing?.locked) {
+    if (sketchEditTargetLocked(shapes, editingSketchShapeId)) {
       setNotice(notice((t) => t("editor.sketch.unlockToEdit")));
       return;
     }
@@ -7233,7 +7233,13 @@ export function SketchForgeEditor({
     }
     // A rebuild starts from a fresh shape; bindings it leaves unchanged must survive it.
     if (existing) resolved = withRebuiltBindings(existing, resolved);
-    const nextShapes = existing ? shapes.map((shape) => (shape.id === existing.id ? resolved : shape)) : [...shapes, resolved];
+    // The rebuild awaited CAD workers; commit into the scene as it is now, so a lock set meanwhile holds.
+    const currentShapes = shapesRef.current;
+    if (existing && sketchEditTargetLocked(currentShapes, existing.id)) {
+      setNotice(notice((t) => t("editor.sketch.unlockToEdit")));
+      return;
+    }
+    const nextShapes = existing ? currentShapes.map((shape) => (shape.id === existing.id ? resolved : shape)) : [...currentShapes, resolved];
     const operationName = sketchOperation;
     commitShapes(
       nextShapes,
@@ -8048,7 +8054,7 @@ export function SketchForgeEditor({
   const applyDraftPrismToSelection = useCallback(async (angle: number) => {
     const source = selectedShape;
     const request = source && draftPrismRequestForShape(source, angle);
-    if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    if (!source || !request || holdsLockedShape(source) || source.hole || selectedShapes.length !== 1) return;
     // A prism draft would replace the face draft this shape keeps; the REST
     // API refuses the combination, and so does the editor.
     if (source.faceDraft) {
@@ -8129,7 +8135,7 @@ export function SketchForgeEditor({
   const applyDraftFaceToSelection = useCallback(async (faceIndex: number, angle: number, pullDirection: DraftFacePullAxis) => {
     const source = selectedShape;
     const request = source && draftFaceRequestForShape(source, faceIndex, angle, pullDirection);
-    if (!source || !request || source.locked || source.hole || selectedShapes.length !== 1) return;
+    if (!source || !request || holdsLockedShape(source) || source.hole || selectedShapes.length !== 1) return;
     const unavailable = retainedFaceDraftUnavailable(source);
     // One kept draft per shape, as on the REST path: a second one would have
     // to bake over the first and lose it.
@@ -8196,7 +8202,7 @@ export function SketchForgeEditor({
   // other edit.
   const applyShellToSelection = useCallback(async (thickness: number, openFaces: ShellOpenFace[]) => {
     const source = selectedShape;
-    if (!source || source.locked || selectedShapes.length !== 1) return;
+    if (!source || holdsLockedShape(source) || selectedShapes.length !== 1) return;
     const unavailable = shellUnavailable(source);
     if (unavailable) {
       setNotice(notice((translate) => translate(unavailable)));
@@ -8240,7 +8246,7 @@ export function SketchForgeEditor({
   // as the REST API's angle edit does. Undoable like any other edit.
   const updateRetainedFaceDraftOnSelection = useCallback(async (angle: number, pullDirection: DraftFacePullAxis) => {
     const source = selectedShape;
-    if (!source?.faceDraft || !source.sketchProfile || source.locked || source.hole || selectedShapes.length !== 1) return;
+    if (!source?.faceDraft || !source.sketchProfile || holdsLockedShape(source) || source.hole || selectedShapes.length !== 1) return;
     if (!retainedFaceDraftEditable(source)) {
       setNotice(notice((translate) => translate("errors.cadModifier.draftNotReplayable")));
       return;
@@ -9104,7 +9110,7 @@ export function SketchForgeEditor({
       setNotice(notice((t) => t("editor.separate.selectOne")));
       return;
     }
-    if (selectedShape.locked) {
+    if (holdsLockedShape(selectedShape)) {
       setNotice(notice((t) => t("editor.separate.unlock")));
       return;
     }
@@ -9720,7 +9726,7 @@ export function SketchForgeEditor({
       if (command.action === "separate_parts") {
         const target = findShape(params.id) ?? (selectedIdsRef.current.length === 1 ? findShape(selectedIdsRef.current[0]) : null);
         if (!target) throw new Error("Select one object to separate");
-        if (target.locked) throw new Error("Unlock the object before separating parts");
+        if (holdsLockedShape(target)) throw new Error("Unlock the object before separating parts");
         const parts = separateShapeParts(target);
         if (parts.length <= 1) throw new Error("The selected object has only one connected part");
         commitShapes([...currentShapes().filter((shape) => shape.id !== target.id), ...parts], parts.map((shape) => shape.id), notice((t) => t("editor.mcp.separated", { count: parts.length })));
@@ -10880,9 +10886,9 @@ export function SketchForgeEditor({
           onCameraOrientationChange={rememberCameraOrientation}
           onCameraViewChange={rememberCameraView}
           onEditSketch={beginSketchEdit}
-          onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
-          onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
-          onUpdateRetainedFaceDraft={selectedShapes.length === 1 && selectedShape && !selectedShape.locked && !selectedShape.hole ? updateRetainedFaceDraftOnSelection : undefined}
+          onApplyDraftPrism={selectedShapes.length === 1 && selectedShape && !holdsLockedShape(selectedShape) && !selectedShape.hole ? applyDraftPrismToSelection : undefined}
+          onApplyDraftFace={selectedShapes.length === 1 && selectedShape && !holdsLockedShape(selectedShape) && !selectedShape.hole ? applyDraftFaceToSelection : undefined}
+          onUpdateRetainedFaceDraft={selectedShapes.length === 1 && selectedShape && !holdsLockedShape(selectedShape) && !selectedShape.hole ? updateRetainedFaceDraftOnSelection : undefined}
           onEnableFaceEditing={selectedShapes.length === 1 && selectedShape && faceEditingCanBeEnabled(selectedShape) ? enableFaceEditingOnSelection : undefined}
           onApplyShell={selectedShapes.length === 1 && selectedShape && !selectedShape.hole ? applyShellToSelection : undefined}
           canSeparateParts={canSeparateSelectedParts}
