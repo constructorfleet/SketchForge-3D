@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEngine, directoryProjectStore, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { shapeChangeApiError } from "@constructorfleet/sketchforge-engine/apiErrors";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
-import type { SketchProfile } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
+import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 
 function value<T>(result: EngineResult<T>): T {
@@ -81,6 +81,79 @@ describe("a locked group refuses edits to the sketch outputs it holds", () => {
 
     expect(changed).toEqual({ ok: false, failure: { reason: "shape_locked", ids: [groupId] } });
     expect(await stored("locked")).toBe(before);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses a revolve setting sent to a nested revolve's source id, and writes nothing", async () => {
+    await writeProjectMetadata(root, "revolve", { id: "revolve", name: "revolve", createdAt: 1, revision: 1 });
+    const created = value(await engine.addShapes("revolve", [
+      { kind: "revolve", profile: [[0, -5], [2, -5], [2, 5], [0, 5]], sides: 48 },
+      { kind: "box", width: 1, depth: 1, height: 12, elevation: -1, hole: true },
+    ])).shapes;
+    const sourceId = created[0]!.sketchSourceId!;
+    const group = value(await engine.cut("revolve", { solidIds: [created[0]!.id], holeIds: [created[1]!.id] })).shape;
+    value(await engine.changeShape("revolve", group.id, { locked: true }));
+    const before = await stored("revolve");
+
+    const changed = await engine.changeShape("revolve", sourceId, { startAngle: 10 });
+
+    expect(changed).toEqual({ ok: false, failure: { reason: "shape_locked", ids: [group.id] } });
+    expect(await stored("revolve")).toBe(before);
+    value(await engine.changeShape("revolve", group.id, { locked: false }));
+    expect((await engine.changeShape("revolve", sourceId, { startAngle: 10 })).ok).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  /** Locks the shape `id` inside the stored tree, which no engine call can reach. */
+  async function lockNested(projectId: string, id: string) {
+    const current = (await store.read(projectId))!;
+    const lock = (shape: WorkplaneShape): WorkplaneShape => ({
+      ...shape,
+      ...(shape.id === id ? { locked: true } : {}),
+      ...(shape.groupedShapes ? { groupedShapes: shape.groupedShapes.map(lock) } : {}),
+    });
+    await store.write(projectId, current, current.shapes.map(lock));
+  }
+
+  it("names a locked output inside a locked group, and advises ungrouping rather than an unlock no request can send", async () => {
+    const groupId = await lockedCut("both");
+    const outputId = (await store.read("both"))!.shapes[0]!.groupedShapes!.find((child) => child.sketchSourceId === "sketch/x")!.id;
+    await lockNested("both", outputId);
+    const before = await stored("both");
+
+    const changed = await engine.changeShape("both", "sketch/x", { draftPrismAngle: 5 });
+    if (changed.ok) throw new Error("expected a refusal");
+
+    expect(changed.failure).toEqual({ reason: "shape_locked", ids: [outputId], topLevelId: groupId });
+    expect(await stored("both")).toBe(before);
+    const reply = shapeChangeApiError(changed.failure, "sketch/x");
+    expect(reply).toMatchObject({ status: 409, code: "shape_locked", detail: { shapeId: outputId } });
+    expect(reply.message).toBe(`Shape ${outputId} is locked inside top-level group ${groupId}, and only a top-level shape can be unlocked. Ungroup ${groupId}, unlocking it first if it is locked, until that shape is top-level, under a new ID; then send it locked: false.`);
+
+    // The advice works: unlock and ungroup the group, then unlock the output.
+    value(await engine.changeShape("both", groupId, { locked: false }));
+    const output = value(await engine.ungroup("both", groupId)).shapes.find((shape) => shape.sketchSourceId === "sketch/x")!;
+    expect(output.locked).toBe(true);
+    expect(value(await engine.changeShape("both", output.id, { locked: false })).shape.locked).toBeFalsy();
+    expect((await engine.changeShape("both", "sketch/x", { draftPrismAngle: 5 })).ok).toBe(true);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("names a locked inner group inside an unlocked outer group, and the outer group to ungroup", async () => {
+    const innerId = await lockedCut("inner", false);
+    const box = value(await engine.addShapes("inner", [{ kind: "box", x: 20 }])).shapes[0]!;
+    const outerId = value(await engine.group("inner", [innerId, box.id])).shape.id;
+    const nestedInnerId = (await store.read("inner"))!.shapes.find((shape) => shape.id === outerId)!.groupedShapes!
+      .find((child) => child.groupedShapes?.length)!.id;
+    await lockNested("inner", nestedInnerId);
+    const before = await stored("inner");
+
+    const changed = await engine.changeShape("inner", "sketch/x", { draftPrismAngle: 5 });
+    if (changed.ok) throw new Error("expected a refusal");
+
+    expect(changed.failure).toEqual({ reason: "shape_locked", ids: [nestedInnerId], topLevelId: outerId });
+    expect(await stored("inner")).toBe(before);
+    const reply = shapeChangeApiError(changed.failure, "sketch/x");
+    expect(reply).toMatchObject({ detail: { shapeId: nestedInnerId } });
+    expect(reply.message).toContain(`Ungroup ${outerId}`);
+    expect(reply.message).not.toContain(`Send it locked: false first`);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("applies the same edit once the group is unlocked", async () => {

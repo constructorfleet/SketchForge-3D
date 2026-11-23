@@ -245,7 +245,8 @@ export type EngineFailure =
   | { reason: "project_busy" }
   | { reason: "project_not_found" }
   | { reason: "shapes_not_found"; ids: string[] }
-  | { reason: "shape_locked"; ids: string[] }
+  /** `topLevelId` is the top-level group holding a nested locked shape, which no request can unlock. */
+  | { reason: "shape_locked"; ids: string[]; topLevelId?: string }
   | { reason: "not_a_group" }
   | { reason: "single_body" }
   | { reason: "hole_has_no_parts" }
@@ -740,9 +741,16 @@ function conflictingLiteral(
 }
 
 /** Returns the lock refusal naming the nearest locked shape. `locked: false` lifts only the shape's own lock. */
-function lockRefusal(found: { shape: WorkplaneShape; locked?: string } | undefined, changes: ShapeRequest): EngineFailure | undefined {
-  if (!found?.locked || (found.locked === found.shape.id && changes.locked === false)) return undefined;
-  return { reason: "shape_locked", ids: [found.locked] };
+function lockRefusal(
+  roots: readonly WorkplaneShape[],
+  found: { shape: WorkplaneShape; locked?: string } | undefined,
+  changes: ShapeRequest,
+): EngineFailure | undefined {
+  const locked = found?.locked;
+  if (!locked || (locked === found.shape.id && changes.locked === false)) return undefined;
+  if (roots.some((root) => root.id === locked)) return { reason: "shape_locked", ids: [locked] };
+  const topLevelId = roots.find((root) => findShapeInTree([root], locked))?.id;
+  return { reason: "shape_locked", ids: [locked], ...(topLevelId ? { topLevelId } : {}) };
 }
 
 /** Finds a sketch output by its own ID, or by a sketch source ID that names exactly one output. */
@@ -969,7 +977,7 @@ export function createEngine(store: ProjectStore): Engine {
     const existing = found.value;
     // `locked: false` may unlock in the same request as other changes.
     // A source ID reaches nested outputs, so a locked group refuses first.
-    const locked = lockRefusal(findShapeInTree(document.shapes, existing.id), changes);
+    const locked = lockRefusal(document.shapes, findShapeInTree(document.shapes, existing.id), changes);
     if (locked) return failed(locked);
     if (sourceSketchTarget) {
       const isRevolveSource = isRevolveShape(existing);
@@ -1967,7 +1975,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (changes.sketchProfile && typeof changes.sketchProfile === "object") {
         const target = findSketchOutputShape(document.shapes, shapeId);
         // Refused before any planning or solve, as bindSketchConstraint refuses it.
-        const locked = lockRefusal(target, changes);
+        const locked = lockRefusal(document.shapes, target, changes);
         if (locked) return failed(locked);
         const planned = requestedSketchProfile(
           target?.shape.id ?? shapeId,
