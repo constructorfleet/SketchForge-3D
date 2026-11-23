@@ -148,6 +148,19 @@ describe("server project writes while another write holds the project", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("does not send again a write refused for any other reason", async () => {
+    for (const body of [
+      { error: "changed", errorKey: "errors.projects.changedBeforeSave", conflict: "newerRevision", storedRevision: 77 },
+      { error: "changed", errorKey: "errors.projects.changedBeforeSave", conflict: "newerMetadata" },
+      { error: "nope", errorKey: "errors.projects.saveFailed" },
+    ]) {
+      const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(body), { status: 409 }));
+      vi.stubGlobal("fetch", fetch);
+      await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch(() => undefined);
+      expect(fetch, body.errorKey).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("gives up on a project that stays busy", async () => {
     const fetch = busyThenSaved(Number.POSITIVE_INFINITY);
     const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);

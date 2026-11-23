@@ -541,29 +541,6 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
   }
 }
 
-/**
- * Uploads browser saves made after a project's migration upload and before the switch (#662).
- * Based on the migrated revision, so a newer server save wins.
- */
-async function uploadEditsMadeDuringMigration(migrated: Map<string, { recordRevision: number; serverRevision: number }>) {
-  await Promise.allSettled([...pendingBrowserWrites]);
-  for (const [projectId, upload] of migrated) {
-    const database = await openProjectShapesDb();
-    let record: ProjectShapeRecord | null;
-    try {
-      record = await readProjectShapeRecord(database, projectId);
-    } finally {
-      database.close();
-    }
-    if (!record?.skfPackage || record.revision <= upload.recordRevision || !projectWriteGuard.canWrite(projectId)) continue;
-    try {
-      await saveServerProjectPackage(projectId, record.skfPackage, record.revision, upload.serverRevision);
-    } catch (error) {
-      if (!(error instanceof ServerProjectConflictError)) throw error;
-    }
-  }
-}
-
 function saveProjectShapesWhenIdle(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
   return new Promise<void>((resolve, reject) => {
     const save = () => {
@@ -1022,6 +999,8 @@ export default function Home() {
           const serverRevision = project.revision ?? record.revision;
           await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
           migrated.set(project.id, { recordRevision: record.revision, serverRevision });
+          // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
+          serverBaseRevisions.set(project.id, serverRevision);
         }
         await saveServerProjectMetadata(project.id, projectForStorage(project));
       };
@@ -1053,28 +1032,86 @@ export default function Home() {
 
       const adopted = migratedCount > 0 ? await probeServerProjects().catch(() => listing) : listing;
       if (canceled || !adopted.enabled) return;
-      // The browser list holds edits made after the upload (#662).
-      const browserProjects = new Map(readStoredProjects().projects
-        .filter((project) => migratedProjectIds.has(project.id))
-        .map((project) => [project.id, project]));
+
+      // The browser stayed in charge while the listing was read (#662). Upload what it saved
+      // meanwhile, still in browser storage, until a pass finds nothing new.
+      const caughtUp = new Set<string>();
+      const conflicts = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>>; error: ServerProjectConflictError }>();
+      for (let pass = 0; pass < 10; pass += 1) {
+        await Promise.allSettled([...pendingBrowserWrites]);
+        if (canceled) return;
+        let uploadedAny = false;
+        for (const project of readStoredProjects().projects) {
+          if (canceled) return;
+          if (conflicts.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
+          try {
+            if (!serverProjectIds.has(project.id)) {
+              // Created during the wait: not in the listing, so it would vanish at the switch.
+              await migrateProject(project);
+              migratedCount += 1;
+              serverProjectIds.add(project.id);
+              migratedProjectIds.add(project.id);
+              uploadedAny = true;
+              continue;
+            }
+            const upload = migrated.get(project.id);
+            if (!upload) continue;
+            const record = await loadProjectShapes(project.id);
+            if (!record?.skfPackage || record.revision <= upload.recordRevision) continue;
+            try {
+              await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
+            } catch (error) {
+              if (!(error instanceof ServerProjectConflictError)) throw error;
+              conflicts.set(project.id, { project, record, error });
+              continue;
+            }
+            migrated.set(project.id, { recordRevision: record.revision, serverRevision: record.revision });
+            serverBaseRevisions.set(project.id, record.revision);
+            caughtUp.add(project.id);
+            uploadedAny = true;
+          } catch (error) {
+            if (canceled) return;
+            setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
+            return;
+          }
+        }
+        if (canceled) return;
+        if (!uploadedAny && pendingBrowserWrites.size === 0) break;
+      }
+      // A project deleted during the wait keeps no copy on the server.
+      const deleted = [...migratedProjectIds].filter((id) => !readStoredProjects().projects.some((project) => project.id === id));
+      for (const projectId of deleted) {
+        try {
+          await deleteServerProject(projectId);
+        } catch (error) {
+          if (canceled) return;
+          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
+          return;
+        }
+        serverBaseRevisions.delete(projectId);
+        if (canceled) return;
+      }
+
+      // Read in the same tick as the switch, so no browser edit lands in between.
+      const browserProjects = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
       serverProjectStorageActive = true;
-      const serverProjects = dashboardProjectsFromServer(adopted.projects);
-      const adoptedJson = new Map(serverProjects.map((project) => [project.id, JSON.stringify(projectForStorage(project))]));
-      projectsJsonRef.current = JSON.stringify(serverProjects.map(projectForStorage));
+      const adoptedProjects = dashboardProjectsFromServer(adopted.projects)
+        .filter((project) => !migratedProjectIds.has(project.id) || browserProjects.has(project.id));
+      projectsJsonRef.current = JSON.stringify(adoptedProjects.map(projectForStorage));
+      const lateProjects = [...browserProjects.values()]
+        .filter((project) => migratedProjectIds.has(project.id) && !adoptedProjects.some((candidate) => candidate.id === project.id));
+      // Entries that differ from the listing are re-sent by the list sync.
+      const serverProjects = [
+        ...adoptedProjects.map((project) => (caughtUp.has(project.id) ? browserProjects.get(project.id) ?? project : project)),
+        ...lateProjects,
+      ];
       setProjects(serverProjects);
       setProjectStorageMode("server");
-      void uploadEditsMadeDuringMigration(migrated)
-        .catch((error) => {
-          setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
-        })
-        .then(() => {
-          if (canceled) return;
-          // After the package, so the two writes do not overlap; the list sync re-sends what differs.
-          setProjects((current) => current.map((project) => {
-            const browser = browserProjects.get(project.id);
-            return browser && JSON.stringify(projectForStorage(project)) === adoptedJson.get(project.id) ? browser : project;
-          }));
-        });
+      conflicts.forEach(({ project, record, error }, projectId) => {
+        projectWriteGuard.block(projectId);
+        const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
+        projectConflictRef.current?.(projectId, { entry, context: projectShapeSaveContext(project), revision: record.revision, shapeCount: entry.shapes.length }, error);
+      });
       try {
         const browserList = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
         if (browserList && browserList !== "[]") {

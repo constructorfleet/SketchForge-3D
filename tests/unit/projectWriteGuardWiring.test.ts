@@ -36,8 +36,7 @@ describe("dashboard package writes", () => {
     expect(count(/\bsaveServerProjectPackage\(/)).toBe(3);
     expect(write).toContain("saveServerProjectPackage(");
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
-    const catchUp = topLevelFunction("uploadEditsMadeDuringMigration");
-    expect(catchUp).toMatch(/!projectWriteGuard\.canWrite\(projectId\)\) continue;[\s\S]*saveServerProjectPackage\(projectId, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
+    expect(page).toMatch(/!projectWriteGuard\.canWrite\(project\.id\)\) continue;[\s\S]{0,1200}saveServerProjectPackage\(project\.id, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
   });
 
   // Issue #650: a server package write is conditional on the copy it started from.
