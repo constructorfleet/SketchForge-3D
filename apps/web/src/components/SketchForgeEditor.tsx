@@ -7373,6 +7373,8 @@ export function SketchForgeEditor({
     return () => {
       if (projectSyncTimerRef.current !== null) {
         window.clearTimeout(projectSyncTimerRef.current);
+        // The host unmounts the editor while it loads an uncached project (#668).
+        pendingPublishRef.current?.publish();
       }
       if (interactionHistoryTimerRef.current !== null) {
         window.clearTimeout(interactionHistoryTimerRef.current);

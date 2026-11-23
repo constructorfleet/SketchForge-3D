@@ -106,7 +106,8 @@ async function open(page, name) {
   await page.locator(".project-card").filter({ hasText: name }).locator(".project-card-open").click();
 }
 
-test("an edit made just before opening another project is saved to the project it was made in", { timeout: 180_000 }, async () => {
+/** Edits Alpha, then opens Beta before that edit's save publishes. */
+async function editAlphaThenOpenBeta({ betaLoaded }) {
   const { baseURL, stop } = await startNextServer();
   let browser;
   try {
@@ -126,6 +127,15 @@ test("an edit made just before opening another project is saved to the project i
 
     await open(page, "Alpha");
     await page.locator(".scene-inspector-list > li.scene-row").first().waitFor({ timeout: 60_000 });
+    if (!betaLoaded) {
+      // After a reload only Alpha is loaded, so opening Beta unmounts the editor while Beta loads.
+      await page.reload();
+      const home = page.getByRole("button", { name: "Home dashboard" });
+      const card = page.locator(".project-card").filter({ hasText: "Alpha" });
+      await home.or(card).first().waitFor({ state: "visible", timeout: 60_000 });
+      if (!(await home.isVisible())) await open(page, "Alpha");
+      await page.locator(".scene-inspector-list > li.scene-row").first().waitFor({ timeout: 60_000 });
+    }
     await page.clock.install();
     // From the page's clock: a target already past throws "Cannot fast-forward to the past".
     await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
@@ -142,4 +152,12 @@ test("an edit made just before opening another project is saved to the project i
     await browser?.close();
     stop();
   }
+}
+
+test("an edit made just before opening another project is saved to the project it was made in", { timeout: 180_000 }, async () => {
+  await editAlphaThenOpenBeta({ betaLoaded: true });
+});
+
+test("an edit made just before opening a project not loaded yet is saved to the project it was made in", { timeout: 180_000 }, async () => {
+  await editAlphaThenOpenBeta({ betaLoaded: false });
 });
