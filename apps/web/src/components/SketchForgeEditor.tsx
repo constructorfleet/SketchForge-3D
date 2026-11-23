@@ -3,7 +3,7 @@
 import { Check, Circle as CircleIcon, CloudUpload, Download, Eye, FolderOpen, Hexagon as HexagonIcon, Settings as SettingsIcon, Square as SquareIcon, Triangle as TriangleIcon, Upload, Variable, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { zipSync } from "fflate";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
 import * as THREE from "three";
@@ -5548,6 +5548,8 @@ export function SketchForgeEditor({
   const projectInteractionActiveRef = useRef(false);
   const pendingProjectShapesRef = useRef<WorkplaneShape[] | null>(null);
   const projectSyncTimerRef = useRef<number | null>(null);
+  // The publish the timer holds, kept so a project switch can send it early.
+  const pendingPublishRef = useRef<{ projectId: string; publish: () => void } | null>(null);
   const lastProjectShapesSyncRef = useRef("");
   const lastProjectShapesEchoRef = useRef<string | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
@@ -6184,6 +6186,7 @@ export function SketchForgeEditor({
       }
       const publish = () => {
         projectSyncTimerRef.current = null;
+        pendingPublishRef.current = null;
         lastProjectShapesSyncRef.current = serialized;
         lastProjectShapesEchoRef.current = serialized;
         hostParametersKeyRef.current = parameterStateKey(projectParametersRef.current, projectConfigurationRef.current);
@@ -6205,10 +6208,22 @@ export function SketchForgeEditor({
         });
       };
       if (immediate) publish();
-      else projectSyncTimerRef.current = window.setTimeout(publish, 120);
+      else {
+        projectSyncTimerRef.current = window.setTimeout(publish, 120);
+        pendingPublishRef.current = { projectId, publish };
+      }
     },
     [onProjectShapesChange, projectId],
   );
+
+  // A layout effect runs before the passive effects that load the next project into these refs.
+  useLayoutEffect(() => {
+    const pending = pendingPublishRef.current;
+    if (!projectId || !pending || pending.projectId === projectId || projectSyncTimerRef.current === null) return;
+    // Saves the project being left under its own id; the host refuses it if deleted (#668).
+    window.clearTimeout(projectSyncTimerRef.current);
+    pending.publish();
+  }, [projectId]);
 
   useEffect(() => {
     const limitChanged = historyLimitRef.current !== workspaceSettings.historyLimit;
@@ -7358,6 +7373,8 @@ export function SketchForgeEditor({
     return () => {
       if (projectSyncTimerRef.current !== null) {
         window.clearTimeout(projectSyncTimerRef.current);
+        // The host unmounts the editor while it loads an uncached project (#668).
+        pendingPublishRef.current?.publish();
       }
       if (interactionHistoryTimerRef.current !== null) {
         window.clearTimeout(interactionHistoryTimerRef.current);
