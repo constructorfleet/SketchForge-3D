@@ -16,7 +16,10 @@ import {
 } from "@/lib/engine/serverProjectFiles";
 import {
   SERVER_PROJECTS_ENV,
+  SERVER_PROJECT_REVISION_HEADER,
   safeServerProjectId,
+  serverPackageBaseIsStale,
+  serverProjectRevision,
   serverProjectWriteIsStale,
 } from "@/lib/serverProjectStore";
 import { SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
@@ -53,6 +56,8 @@ export async function GET(request: Request) {
           "Cache-Control": "no-store",
           "Content-Length": String(bytes.byteLength),
           "Content-Type": SKF_MEDIA_TYPE,
+          // The base a client sends back with its next package write.
+          [SERVER_PROJECT_REVISION_HEADER]: String(serverProjectRevision(await readProjectMetadata(root, projectId))),
         },
       });
     }
@@ -109,15 +114,27 @@ export async function POST(request: Request) {
 
     const revisionField = formData.get("revision");
     const writtenRevision = metadata ?? (typeof revisionField === "string" ? { revision: Number(revisionField) } : null);
+    const baseField = formData.get("baseRevision");
+    const baseRevision = typeof baseField === "string" ? Number(baseField) : undefined;
 
     const locked = await withProjectLock(root, projectId, async () => {
       const stored = await readProjectMetadata(root, projectId);
+      const conflict = { conflict: "newerRevision", storedRevision: serverProjectRevision(stored) };
       if (serverProjectWriteIsStale(stored, writtenRevision)) {
-        return errorResponse("errors.projects.changedBeforeSave", 409);
+        return errorResponse("errors.projects.changedBeforeSave", 409, packageBytes ? conflict : undefined);
+      }
+      // A later clock is not a later copy: another client may have saved since this one loaded.
+      if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {
+        return errorResponse("errors.projects.changedBeforeSave", 409, conflict);
       }
 
       if (packageBytes) await writeProjectPackage(root, projectId, packageBytes);
       if (metadata) await writeProjectMetadata(root, projectId, metadata);
+      // The sidecar revision is the package's, as REST v1 keeps it, so the next writer's base can be checked.
+      else if (packageBytes && stored && writtenRevision) {
+        const revision = serverProjectRevision(writtenRevision);
+        if (revision > serverProjectRevision(stored)) await writeProjectMetadata(root, projectId, { ...stored, revision });
+      }
 
       const savedMetadata = metadata ?? stored;
       return NextResponse.json(

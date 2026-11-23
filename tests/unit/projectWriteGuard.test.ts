@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  StoredProjectMissingError,
   StoredProjectUnreadableError,
   cacheWithEditorChange,
   createProjectWriteGuard,
   guardProjectWrites,
   indexedDbReadIsPermanent,
+  mergeNewerServerProjects,
   projectLoadFailureCause,
   projectLoadFailureKind,
 } from "@/lib/projectWriteGuard";
@@ -89,5 +91,40 @@ describe("IndexedDB read errors", () => {
     expect(indexedDbReadIsPermanent(named("UnknownError", "Internal error opening backing store"))).toBe(false);
     expect(indexedDbReadIsPermanent(new TypeError("Failed to fetch"))).toBe(false);
     expect(indexedDbReadIsPermanent(undefined)).toBe(false);
+  });
+});
+
+// Issue #650: server storage shared by several clients.
+describe("missing server package", () => {
+  it("calls a project whose metadata exists but whose package does not missing", () => {
+    expect(projectLoadFailureKind(new StoredProjectMissingError())).toBe("missing");
+  });
+});
+
+describe("merging a newer server listing", () => {
+  const local = [
+    { id: "a", name: "A", revision: 10 },
+    { id: "b", name: "B", revision: 20 },
+  ];
+
+  it("takes the server's copy of a project only when its revision is newer", () => {
+    const merged = mergeNewerServerProjects(local, [
+      { id: "a", name: "A renamed", revision: 15 },
+      { id: "b", name: "B older", revision: 5 },
+    ]);
+    expect(merged.projects).toEqual([{ id: "a", name: "A renamed", revision: 15 }, { id: "b", name: "B", revision: 20 }]);
+    expect(merged.changedIds).toEqual(["a"]);
+  });
+
+  it("adds projects another client created", () => {
+    const merged = mergeNewerServerProjects(local, [{ id: "c", name: "C", revision: 1 }]);
+    expect(merged.projects.map((project) => project.id)).toEqual(["a", "b", "c"]);
+    expect(merged.changedIds).toEqual(["c"]);
+  });
+
+  it("returns the same list when nothing is newer", () => {
+    const merged = mergeNewerServerProjects(local, [{ id: "a", name: "A", revision: 10 }]);
+    expect(merged.projects).toBe(local);
+    expect(merged.changedIds).toEqual([]);
   });
 });

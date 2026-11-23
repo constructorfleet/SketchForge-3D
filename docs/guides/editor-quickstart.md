@@ -63,7 +63,24 @@ flowchart LR
 
 Sometimes SketchForge cannot open a project's stored copy. The `.skf` package may be damaged or come from a newer release, or the browser storage or server that holds it may be unavailable. In either case the editor stays closed, the dashboard names the project and shows the error, and the stored copy is left untouched. Autosave does not write to the project until it loads again or you start it over. This applies to projects in the browser, in a server directory, and in the desktop app.
 
-In browser storage, another tab may save a newer copy that this tab cannot read. When that happens, this tab closes its editor instead of saving its older copy over the newer one. Clients that share a server project directory do not check this, and the last save wins.
+In browser storage, another tab may save a newer copy that this tab cannot read. When that happens, this tab closes its editor instead of saving its older copy over the newer one.
+
+### When another client changed the project
+
+Several browsers, or the desktop app, can share one server project directory. Each save says which revision of the project it started from, and the server refuses a save when another client has saved a newer revision since. The editor then closes and the dashboard says the project was changed elsewhere:
+
+- **Open the newer copy** loads what the other client saved. Changes this client made since it opened the project are not kept.
+- **Download my copy** saves this client's unsaved copy as `<name> (my copy).skf`, so you can compare the two or open it as a separate project.
+
+![The dashboard reporting a project another client changed.](../screenshots/server-storage-conflict.png)
+
+When a browser window comes back into view, it checks the server for newer copies and loads them, so you usually see the other client's work before you edit. REST API writes count as saves from another client.
+
+### When the server has no package for a project
+
+If the server holds a project's details but not its `.skf` package, or the package is a symlink or another file that is not a regular file, the project does not open as an empty project. The dashboard says the project has no stored package and offers **Try again** and **Start over**. **Start over** replaces the missing package, or the symlink itself, with an empty project; it does not write through a symlink.
+
+![The dashboard reporting a server project with no stored package.](../screenshots/server-storage-missing-package.png)
 
 ![The dashboard reporting a project whose stored copy could not be read.](../screenshots/project-load-failure.png)
 

@@ -38,6 +38,14 @@ describe("dashboard package writes", () => {
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
   });
 
+  // Issue #650: a server package write is conditional on the copy it started from.
+  it("sends the base revision with every autosaved server package and blocks on a conflict", () => {
+    const write = topLevelFunction("writeProjectShapes");
+    expect(write).toMatch(/saveServerProjectPackage\(projectId, skfPackage, entry\.revision, serverBaseRevisions\.get\(projectId\)\)/);
+    expect(write).toMatch(/if \(error instanceof ServerProjectConflictError\) projectWriteGuard\.block\(projectId\);/);
+    expect(write).toContain("serverBaseRevisions.set(projectId, entry.revision);");
+  });
+
   it("drops a late editor snapshot for a blocked project before it touches the cache", () => {
     expect(page).toMatch(/const updateProjectShapes = useCallback\(\(snapshot: \{[\s\S]*?\}\) => \{\s*(?:\/\/[^\n]*\n\s*)*if \(!projectWriteGuard\.canWrite\(snapshot\.projectId\)\) return;/);
     expect(page).toMatch(/setProjectShapesById\(\(current\) => cacheWithEditorChange\(current, snapshot\.projectId, entry, projectWriteGuard\)\)/);

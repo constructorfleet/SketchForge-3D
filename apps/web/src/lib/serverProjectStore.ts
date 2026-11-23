@@ -54,6 +54,15 @@ export function serverProjectWriteIsStale(storedMetadata: unknown, incomingMetad
   return serverProjectRevision(storedMetadata) > incoming;
 }
 
+/** Carries the sidecar revision a package was served at. */
+export const SERVER_PROJECT_REVISION_HEADER = "X-SketchForge-Revision";
+
+/** Returns true when a package write's base revision is older than the stored one. */
+export function serverPackageBaseIsStale(storedMetadata: unknown, baseRevision: number | undefined) {
+  if (baseRevision === undefined || !Number.isFinite(baseRevision)) return false;
+  return serverProjectRevision(storedMetadata) > baseRevision;
+}
+
 export type ServerProjectRecord = {
   projectId: string;
   updatedAt: number;
@@ -110,6 +119,17 @@ export class ServerPackageRequestError extends Error {
   }
 }
 
+/** Says another client saved a newer package than the one this write is based on. */
+export class ServerProjectConflictError extends Error {
+  readonly storedRevision: number;
+
+  constructor(storedRevision: number) {
+    super(`Project was changed elsewhere (stored revision ${storedRevision})`);
+    this.name = "ServerProjectConflictError";
+    this.storedRevision = storedRevision;
+  }
+}
+
 export async function fetchServerProjectPackage(projectId: string) {
   let response: Response;
   try {
@@ -122,7 +142,11 @@ export async function fetchServerProjectPackage(projectId: string) {
   // A proxy or sign-in page can answer 200 with HTML; parsing that would call the project unreadable.
   const contentType = response.headers.get("content-type") ?? "";
   if (!PACKAGE_CONTENT_TYPE.test(contentType)) throw new ServerPackageRequestError("notPackage", contentType || "none");
-  return new Uint8Array(await response.arrayBuffer());
+  const revision = Number(response.headers.get(SERVER_PROJECT_REVISION_HEADER) ?? Number.NaN);
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    revision: Number.isFinite(revision) ? revision : undefined,
+  };
 }
 
 const PACKAGE_CONTENT_TYPE = /^application\/(?:zip|octet-stream|[\w.-]+\+zip)\s*(?:;|$)/i;
@@ -135,10 +159,11 @@ export async function saveServerProjectMetadata(projectId: string, metadata: unk
 }
 
 /** Write autosave's half of a project: the packed `.skf`, leaving the metadata sidecar alone. */
-export async function saveServerProjectPackage(projectId: string, packageBytes: Uint8Array, revision: number) {
+export async function saveServerProjectPackage(projectId: string, packageBytes: Uint8Array, revision: number, baseRevision?: number) {
   return postServerProject(projectId, (formData) => {
     formData.append("project", new Blob([new Uint8Array(packageBytes)], { type: "application/vnd.sketchforge.project+zip" }));
     formData.append("revision", String(revision));
+    if (baseRevision !== undefined) formData.append("baseRevision", String(baseRevision));
   });
 }
 
@@ -146,7 +171,13 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
   const formData = new FormData();
   fill(formData);
   const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData });
-  if (!response.ok) throw await serverProjectError(response, "errors.projects.saveFailed");
+  if (!response.ok) {
+    const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown };
+    if (response.status === 409 && payload.conflict === "newerRevision") {
+      throw new ServerProjectConflictError(typeof payload.storedRevision === "number" ? payload.storedRevision : 0);
+    }
+    throw await serverProjectError(response, "errors.projects.saveFailed");
+  }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };
   return payload.project ?? null;
 }
