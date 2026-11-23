@@ -242,6 +242,9 @@ let serverProjectStorageActive = false;
 const projectWriteGuard = createProjectWriteGuard();
 // Browser writes still in flight, so the switch to the server can wait for them (#662).
 const pendingBrowserWrites = new Set<Promise<void>>();
+// Projects deleted while the browser held them. A migration removes their uploaded copies;
+// absence from the browser list proves nothing, since another tab may have removed the list.
+const projectsDeletedInBrowser = new Set<string>();
 // The sidecar revision each server project's copy is based on (#650). The server
 // refuses a package write whose base is older than what it holds. No entry means
 // an unconditional write: a new project, or a confirmed start over.
@@ -993,7 +996,9 @@ export default function Home() {
       // means a half-migrated project is simply not there yet and is tried
       // again, rather than appearing on the server with no geometry behind it.
       const migrated = new Map<string, { recordRevision: number; serverRevision: number }>();
+      const migratedEntries = new Map<string, DashboardProject>();
       const migrateProject = async (project: DashboardProject) => {
+        migratedEntries.set(project.id, project);
         const record = await loadProjectShapes(project.id);
         if (record?.skfPackage) {
           const serverRevision = project.revision ?? record.revision;
@@ -1033,25 +1038,35 @@ export default function Home() {
       const adopted = migratedCount > 0 ? await probeServerProjects().catch(() => listing) : listing;
       if (canceled || !adopted.enabled) return;
 
-      // The browser stayed in charge while the listing was read (#662). Upload what it saved
-      // meanwhile, still in browser storage, until a pass finds nothing new.
+      // The browser stayed in charge while the listing was read (#662). Remove what it deleted
+      // and upload what it saved meanwhile, still in browser storage, until a pass finds nothing.
+      // No pass limit: switching with a browser write unsent would strand it in IndexedDB.
       const caughtUp = new Set<string>();
+      const removedFromServer = new Set<string>();
       const conflicts = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>>; error: ServerProjectConflictError }>();
-      for (let pass = 0; pass < 10; pass += 1) {
+      for (;;) {
         await Promise.allSettled([...pendingBrowserWrites]);
         if (canceled) return;
-        let uploadedAny = false;
-        for (const project of readStoredProjects().projects) {
-          if (canceled) return;
-          if (conflicts.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
-          try {
+        let changedAny = false;
+        try {
+          for (const projectId of migratedProjectIds) {
+            if (!projectsDeletedInBrowser.has(projectId) || removedFromServer.has(projectId)) continue;
+            await deleteServerProject(projectId);
+            if (canceled) return;
+            removedFromServer.add(projectId);
+            serverBaseRevisions.delete(projectId);
+            changedAny = true;
+          }
+          for (const project of readStoredProjects().projects) {
+            if (canceled) return;
+            if (projectsDeletedInBrowser.has(project.id) || conflicts.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
             if (!serverProjectIds.has(project.id)) {
               // Created during the wait: not in the listing, so it would vanish at the switch.
               await migrateProject(project);
               migratedCount += 1;
               serverProjectIds.add(project.id);
               migratedProjectIds.add(project.id);
-              uploadedAny = true;
+              changedAny = true;
               continue;
             }
             const upload = migrated.get(project.id);
@@ -1066,40 +1081,33 @@ export default function Home() {
               continue;
             }
             migrated.set(project.id, { recordRevision: record.revision, serverRevision: record.revision });
+            migratedEntries.set(project.id, project);
             serverBaseRevisions.set(project.id, record.revision);
             caughtUp.add(project.id);
-            uploadedAny = true;
-          } catch (error) {
-            if (canceled) return;
-            setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
-            return;
+            changedAny = true;
           }
-        }
-        if (canceled) return;
-        if (!uploadedAny && pendingBrowserWrites.size === 0) break;
-      }
-      // A project deleted during the wait keeps no copy on the server.
-      const deleted = [...migratedProjectIds].filter((id) => !readStoredProjects().projects.some((project) => project.id === id));
-      for (const projectId of deleted) {
-        try {
-          await deleteServerProject(projectId);
         } catch (error) {
           if (canceled) return;
           setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
           return;
         }
-        serverBaseRevisions.delete(projectId);
         if (canceled) return;
+        const deletionPending = [...migratedProjectIds].some((id) => projectsDeletedInBrowser.has(id) && !removedFromServer.has(id));
+        if (!changedAny && !deletionPending && pendingBrowserWrites.size === 0) break;
       }
 
       // Read in the same tick as the switch, so no browser edit lands in between.
       const browserProjects = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
       serverProjectStorageActive = true;
       const adoptedProjects = dashboardProjectsFromServer(adopted.projects)
-        .filter((project) => !migratedProjectIds.has(project.id) || browserProjects.has(project.id));
+        .filter((project) => !projectsDeletedInBrowser.has(project.id));
       projectsJsonRef.current = JSON.stringify(adoptedProjects.map(projectForStorage));
-      const lateProjects = [...browserProjects.values()]
-        .filter((project) => migratedProjectIds.has(project.id) && !adoptedProjects.some((candidate) => candidate.id === project.id));
+      const lateProjects = [...migratedProjectIds]
+        .filter((id) => !projectsDeletedInBrowser.has(id) && !adoptedProjects.some((candidate) => candidate.id === id))
+        .flatMap((id) => {
+          const entry = browserProjects.get(id) ?? migratedEntries.get(id);
+          return entry ? [entry] : [];
+        });
       // Entries that differ from the listing are re-sent by the list sync.
       const serverProjects = [
         ...adoptedProjects.map((project) => (caughtUp.has(project.id) ? browserProjects.get(project.id) ?? project : project)),
@@ -2014,6 +2022,7 @@ export default function Home() {
   };
 
   const deleteProject = (projectId: string) => {
+    if (!serverProjectStorageActive) projectsDeletedInBrowser.add(projectId);
     clearProjectLoadFailure(projectId);
     projectWriteGuard.forget(projectId);
     serverBaseRevisions.delete(projectId);

@@ -64,11 +64,36 @@ function browserRevision(page, projectId) {
   }), projectId);
 }
 
+/** Holds a page's first listing until `probe.open()` and its second until `adoption.open()`. */
+async function holdListings(page, { holdUploads = false } = {}) {
+  const held = { probe: gate(), adoption: gate(), uploadsAllowed: gate(), listings: 0, answered: 0, uploads: 0 };
+  if (!holdUploads) held.uploadsAllowed.open();
+  await page.route("**/api/projects?*", async (route) => {
+    if (route.request().method() === "POST") await held.uploadsAllowed.opened;
+    await route.continue();
+  });
+  await page.route("**/api/projects", async (route) => {
+    if (route.request().method() === "GET") {
+      held.listings += 1;
+      if (held.listings === 1) await held.probe.opened;
+      if (held.listings === 2) await held.adoption.opened;
+    }
+    await route.continue();
+  });
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname !== "/api/projects") return;
+    if (response.request().method() === "POST") held.uploads += 1;
+    if (response.request().method() === "GET" && !new URL(response.url()).search) held.answered += 1;
+  });
+  return held;
+}
+
 /**
  * Opens a new design, lets the page upload it, and holds the listing that would
  * switch the page to server storage until `switchToServer` is called.
+ * `beforeUpload` runs with the browser context before the page's first listing is answered.
  */
-async function migratingSession(t) {
+async function migratingSession(t, { beforeUpload } = {}) {
   const port = await unusedPort();
   const baseURL = `http://127.0.0.1:${port}`;
   const token = "late-switch-token";
@@ -99,32 +124,19 @@ async function migratingSession(t) {
 
   await waitForServer(baseURL, server, () => logs);
   browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await page.route("**/api/app-update**", (route) => route.abort());
-
-  const probe = gate();
-  const adoption = gate();
-  let listings = 0;
-  let uploads = 0;
-  await page.route("**/api/projects", async (route) => {
-    if (route.request().method() === "GET") {
-      listings += 1;
-      if (listings === 1) await probe.opened;
-      if (listings === 2) await adoption.opened;
-    }
-    await route.continue();
-  });
-  page.on("response", (response) => {
-    if (response.request().method() === "POST" && new URL(response.url()).pathname === "/api/projects") uploads += 1;
-  });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.route("**/api/app-update**", (route) => route.abort());
+  const page = await context.newPage();
+  const held = await holdListings(page);
 
   await page.goto(baseURL);
   await page.getByRole("button", { name: "Create new 3D design" }).click();
   await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
   const projectId = new URL(page.url()).searchParams.get("project");
   assert.ok(projectId, "the editor URL names the new project");
-  probe.open();
-  await until(() => uploads >= 2 && listings >= 2, "the page never uploaded the new project");
+  await beforeUpload?.({ context, baseURL });
+  held.probe.open();
+  await until(() => held.uploads >= 2 && held.listings >= 2, "the page never uploaded the new project");
 
   const api = async (route) => {
     const response = await fetch(`${baseURL}/api/v1${route}`, { headers: { authorization: `Bearer ${token}` } });
@@ -157,7 +169,7 @@ async function migratingSession(t) {
     await page.getByText("Box", { exact: true }).first().click();
   };
   const switchToServer = async () => {
-    adoption.open();
+    held.adoption.open();
     await until(() => page.evaluate(() => window.localStorage.getItem("sketchForge.projects") === null), "the page never switched to server project storage");
   };
   return { page, baseURL, projectsDir, projectId, api, listing, storedRevision, saveAsAnotherClient, savedAfter, addBox, switchToServer };
@@ -245,4 +257,56 @@ test("a project deleted while projects move does not come back", { timeout: 180_
   await page.waitForTimeout(1_000);
   assert.equal(await page.getByText("Untitled design 1", { exact: true }).count(), 0, "the deleted project does not reappear");
   assert.deepEqual(readdirSync(projectsDir).filter((name) => name.startsWith(projectId)), [], "no file of the deleted project is left");
+});
+
+test("a project moved by two tabs at once stays on the server", { timeout: 180_000 }, async (t) => {
+  let other;
+  const { projectsDir, projectId, listing, switchToServer } = await migratingSession(t, {
+    // A second tab reads the same browser list and moves the same project.
+    // Its uploads wait until the first tab has moved it too, so both see an empty server.
+    beforeUpload: async ({ context, baseURL }) => {
+      const page = await context.newPage();
+      other = { page, held: await holdListings(page, { holdUploads: true }) };
+      await page.goto(baseURL);
+      other.held.probe.open();
+      await until(() => other.held.answered >= 1, "the second tab never read the server's list");
+    },
+  });
+  other.held.uploadsAllowed.open();
+  await until(() => other.held.uploads >= 2 && other.held.listings >= 2, "the second tab never moved the project");
+
+  // The first tab switches and removes the browser list the second tab still reads.
+  await switchToServer();
+  other.held.adoption.open();
+  await until(() => other.held.answered >= 2, "the second tab never read the server's list");
+  await other.page.waitForTimeout(2_000);
+
+  assert.ok((await listing()).some((record) => record.projectId === projectId), "the project stays on the server");
+  assert.ok(readdirSync(projectsDir).includes(`${projectId}.skf`), "the project's package stays on disk");
+  await other.page.getByText("Untitled design 1", { exact: true }).first().waitFor({ state: "visible", timeout: 10_000 });
+});
+
+test("a missing browser project list during the move keeps every project", { timeout: 180_000 }, async (t) => {
+  const { page, projectsDir, projectId, listing, switchToServer } = await migratingSession(t);
+  await page.evaluate(() => window.localStorage.removeItem("sketchForge.projects"));
+  await switchToServer().catch(() => undefined);
+  await page.waitForTimeout(2_000);
+
+  assert.ok((await listing()).some((record) => record.projectId === projectId), "the project stays on the server");
+  assert.ok(readdirSync(projectsDir).includes(`${projectId}.skf`), "the project's package stays on disk");
+  assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 1, "the open project stays open");
+});
+
+test("edits made while the page catches up still reach the server", { timeout: 180_000 }, async (t) => {
+  const { page, projectId, api, savedAfter, addBox, switchToServer } = await migratingSession(t);
+  const revisionAtUpload = await browserRevision(page, projectId);
+  await addBox();
+  await savedAfter(revisionAtUpload, "the first box");
+
+  // The second box is added while the catch-up is uploading the first.
+  const switched = switchToServer();
+  await addBox();
+  await switched;
+  await until(async () => (await api(`/shapes?projectId=${projectId}`)).shapes?.length === 2, "both boxes must reach the server", 20_000);
+  assert.equal(await page.getByRole("alert").filter({ hasText: "was changed elsewhere" }).count(), 0, "the client's own saves do not conflict");
 });
