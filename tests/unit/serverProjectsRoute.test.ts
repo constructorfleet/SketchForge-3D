@@ -113,13 +113,52 @@ describe("server project storage", () => {
     expect(response.headers.get("X-SketchForge-Revision")).toBe("25");
   });
 
-  it("refuses a write from a tab holding older state", async () => {
+  it("refuses a package write whose clock revision is older than the stored one, without calling it a conflict", async () => {
     await POST(saveRequest("project-1", { metadata: metadata({ revision: 20 }) }));
 
-    const response = await POST(saveRequest("project-1", { metadata: metadata({ revision: 10, name: "Stale" }) }));
+    const response = await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 10 }));
 
     expect(response.status).toBe(409);
-    expect((await listing()).projects[0].metadata.name).toBe("Bracket");
+    expect(await response.json()).not.toHaveProperty("conflict");
+  });
+
+  it("reports a stale base as a conflict even when the clock revision is stale too", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 20 }) }));
+
+    const response = await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 10, baseRevision: 5 }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ conflict: "newerRevision", storedRevision: 20 });
+  });
+
+  // The sidecar revision follows package writes, so a list write sent while a save
+  // was in flight can carry an older one. It must still land, and not move the revision.
+  it("accepts a metadata write with an older revision and keeps the stored revision", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+    await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 20, baseRevision: 10 }));
+
+    const response = await POST(saveRequest("project-1", { metadata: metadata({ revision: 10, name: "Renamed", thumbnailVersion: 3 }) }));
+
+    expect(response.status).toBe(200);
+    const stored = (await listing()).projects[0].metadata;
+    expect(stored).toMatchObject({ name: "Renamed", thumbnailVersion: 3, revision: 20 });
+  });
+
+  it("does not let a metadata write move the revision ahead of the package", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 99 }) }));
+
+    expect((await listing()).projects[0].metadata.revision).toBe(10);
+  });
+
+  it("labels a missing package's 404 with the sidecar revision", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+
+    const response = await GET(new Request("http://localhost/api/projects?projectId=project-1"));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("X-SketchForge-Revision")).toBe("10");
   });
 
   it("accepts a save that repeats the revision it already stored", async () => {

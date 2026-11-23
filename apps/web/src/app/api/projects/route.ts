@@ -49,15 +49,23 @@ export async function GET(request: Request) {
     if (requestedId !== null) {
       const projectId = safeServerProjectId(requestedId);
       if (!projectId) return errorResponse("errors.projects.invalidId", 400);
+      // Read the sidecar first. Writers write the package and then the sidecar, so these
+      // bytes are at least as new as this label. The other order could label old bytes
+      // with a newer revision, and a save based on that label would pass the base check.
+      const revision = String(serverProjectRevision(await readProjectMetadata(root, projectId)));
       const bytes = await readProjectPackage(root, projectId);
-      if (!bytes) return errorResponse("errors.projects.notFound", 404);
+      if (!bytes) {
+        const missing = errorResponse("errors.projects.notFound", 404);
+        missing.headers.set(SERVER_PROJECT_REVISION_HEADER, revision);
+        return missing;
+      }
       return new Response(bytes, {
         headers: {
           "Cache-Control": "no-store",
           "Content-Length": String(bytes.byteLength),
           "Content-Type": SKF_MEDIA_TYPE,
           // The base a client sends back with its next package write.
-          [SERVER_PROJECT_REVISION_HEADER]: String(serverProjectRevision(await readProjectMetadata(root, projectId))),
+          [SERVER_PROJECT_REVISION_HEADER]: revision,
         },
       });
     }
@@ -119,24 +127,28 @@ export async function POST(request: Request) {
 
     const locked = await withProjectLock(root, projectId, async () => {
       const stored = await readProjectMetadata(root, projectId);
-      const conflict = { conflict: "newerRevision", storedRevision: serverProjectRevision(stored) };
-      if (serverProjectWriteIsStale(stored, writtenRevision)) {
-        return errorResponse("errors.projects.changedBeforeSave", 409, packageBytes ? conflict : undefined);
-      }
+      const storedRevision = serverProjectRevision(stored);
       // A later clock is not a later copy: another client may have saved since this one loaded.
+      // Only this check is a conflict; the client offers the newer copy for it.
       if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {
-        return errorResponse("errors.projects.changedBeforeSave", 409, conflict);
+        return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerRevision", storedRevision });
+      }
+      if (packageBytes && serverProjectWriteIsStale(stored, writtenRevision)) {
+        return errorResponse("errors.projects.changedBeforeSave", 409);
       }
 
       if (packageBytes) await writeProjectPackage(root, projectId, packageBytes);
-      if (metadata) await writeProjectMetadata(root, projectId, metadata);
+      // The revision belongs to the package. A list write sent while a save was in flight
+      // carries an older one, and one sent before its save lands a newer one; neither may move it.
+      const writtenMetadata = metadata && !packageBytes && storedRevision > 0 ? { ...metadata, revision: storedRevision } : metadata;
+      if (writtenMetadata) await writeProjectMetadata(root, projectId, writtenMetadata);
       // The sidecar revision is the package's, as REST v1 keeps it, so the next writer's base can be checked.
       else if (packageBytes && stored && writtenRevision) {
         const revision = serverProjectRevision(writtenRevision);
         if (revision > serverProjectRevision(stored)) await writeProjectMetadata(root, projectId, { ...stored, revision });
       }
 
-      const savedMetadata = metadata ?? stored;
+      const savedMetadata = writtenMetadata ?? stored;
       return NextResponse.json(
         { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
         { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
