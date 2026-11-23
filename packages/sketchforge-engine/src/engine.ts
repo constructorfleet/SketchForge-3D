@@ -739,6 +739,12 @@ function conflictingLiteral(
   return undefined;
 }
 
+/** Returns the lock refusal naming the nearest locked shape. `locked: false` lifts only the shape's own lock. */
+function lockRefusal(found: { shape: WorkplaneShape; locked?: string } | undefined, changes: ShapeRequest): EngineFailure | undefined {
+  if (!found?.locked || (found.locked === found.shape.id && changes.locked === false)) return undefined;
+  return { reason: "shape_locked", ids: [found.locked] };
+}
+
 /** Finds a sketch output by its own ID, or by a sketch source ID that names exactly one output. */
 function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): ReturnType<typeof findShapeInTree> {
   const byId = findShapeInTree(roots, id);
@@ -961,6 +967,10 @@ export function createEngine(store: ProjectStore): Engine {
         : byOutputId;
     if (!found.ok) return found;
     const existing = found.value;
+    // `locked: false` may unlock in the same request as other changes.
+    // A source ID reaches nested outputs, so a locked group refuses first.
+    const locked = lockRefusal(findShapeInTree(document.shapes, existing.id), changes);
+    if (locked) return failed(locked);
     if (sourceSketchTarget) {
       const isRevolveSource = isRevolveShape(existing);
       const outputFields = Object.keys(changes).filter((field) =>
@@ -971,10 +981,6 @@ export function createEngine(store: ProjectStore): Engine {
         return failed({ reason: "unapplicable_fields", kind: existing.kind, fields: outputFields, because: "not_this_kind" });
       }
     }
-    // A locked shape refuses every change but the one that unlocks it, which
-    // may arrive in the same request as the rest: `locked: false` alongside a
-    // new width is one call rather than two.
-    if (existing.locked && changes.locked !== false) return failed({ reason: "shape_locked", ids: [shapeId] });
 
     const replacingSketchProfile = changes.sketchProfile !== undefined;
     const faceDraftChanged = Object.hasOwn(changes, "faceDraft");
@@ -1961,9 +1967,8 @@ export function createEngine(store: ProjectStore): Engine {
       if (changes.sketchProfile && typeof changes.sketchProfile === "object") {
         const target = findSketchOutputShape(document.shapes, shapeId);
         // Refused before any planning or solve, as bindSketchConstraint refuses it.
-        if (target?.locked && !(target.locked === target.shape.id && changes.locked === false)) {
-          return failed({ reason: "shape_locked", ids: [target.locked] });
-        }
+        const locked = lockRefusal(target, changes);
+        if (locked) return failed(locked);
         const planned = requestedSketchProfile(
           target?.shape.id ?? shapeId,
           target?.shape.sketchProfile,

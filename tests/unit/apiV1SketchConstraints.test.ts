@@ -216,6 +216,10 @@ describe("/api/v1/sketch-constraints", () => {
     const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
     expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
     expect(locked.body.error).toContain(groupId);
+
+    const edited = await patchProfile(projectId, shape.sketchSourceId as string, { sketchProfile: withConstraint(shape, "width", { valueMm: 3 }) });
+    expect(edited).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
+    expect(edited.body.error).toContain(groupId);
   });
 
   it("binds a new constraint expression sent in a PATCH /shapes profile, and refuses one that disagrees with its value", async () => {

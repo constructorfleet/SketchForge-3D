@@ -334,10 +334,19 @@ export function engineFailureToApiError(failure: EngineFailure, wording: ApiFail
   }
 }
 
+/** A sketch source ID can reach an output whose lock, or whose group's lock, is not the addressed ID. */
+const LOCKED_HOLDER_WORDING: ApiFailureWording = {
+  ...SHAPE_CHANGE_WORDING,
+  locked: (ids) => `Shape ${ids.join(", ")} is locked, so this change cannot apply. Send it locked: false first.`,
+};
+
 /**
- * Maps a `PATCH /shapes` refusal. A locked shape names itself; when the request
- * binds fields, the engine reports it as `binding_failed`, which adds them.
+ * Maps a `PATCH /shapes` refusal. A lock names the locked shape or group as `shapeId`;
+ * when the request binds fields, the engine reports it as `binding_failed`, which adds them.
  */
 export function shapeChangeApiError(failure: EngineFailure, shapeId: string): ApiErrorReply {
-  return engineFailureToApiError(failure, SHAPE_CHANGE_WORDING, failure.reason === "shape_locked" ? { shapeId } : {});
+  if (failure.reason !== "shape_locked") return engineFailureToApiError(failure, SHAPE_CHANGE_WORDING);
+  const lockedId = failure.ids[0] ?? shapeId;
+  const wording = lockedId === shapeId ? SHAPE_CHANGE_WORDING : LOCKED_HOLDER_WORDING;
+  return engineFailureToApiError(failure, wording, { shapeId: lockedId });
 }
