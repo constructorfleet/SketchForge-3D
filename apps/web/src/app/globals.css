@@ -11257,3 +11257,92 @@ html[data-theme="dark"] .parameters-configuration-issues {
   background: #3a2a12;
   border-color: #7a5520;
 }
+
+/* Issue #622: a project whose stored copy could not be read. */
+.dashboard-load-failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: -12px 0 20px;
+  padding: 12px 14px;
+  color: #7a1520;
+  background: #fff0f1;
+  border: 1px solid #f0a7ae;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.dashboard-load-failure-text {
+  display: grid;
+  flex: 1 1 360px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dashboard-load-failure-text strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dashboard-load-failure-text p {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.dashboard-load-failure-detail {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.dashboard-load-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-load-failure-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  color: #ffffff;
+  background: #0e69f1;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.dashboard-load-failure-actions .dashboard-load-failure-start-over {
+  color: #a3101e;
+  background: #ffffff;
+  border: 1px solid #c82031;
+}
+
+.dashboard-load-failure-actions .dashboard-load-failure-dismiss {
+  padding: 7px;
+  color: #7a1520;
+  background: transparent;
+}
+
+html[data-theme="dark"] .dashboard-load-failure {
+  color: #ffc9ce;
+  background: #3a1418;
+  border-color: #84303a;
+}
+
+html[data-theme="dark"] .dashboard-load-failure-actions .dashboard-load-failure-start-over {
+  color: #ffc9ce;
+  background: transparent;
+  border-color: #e0606d;
+}
+
+html[data-theme="dark"] .dashboard-load-failure-actions .dashboard-load-failure-dismiss {
+  color: #ffc9ce;
+}

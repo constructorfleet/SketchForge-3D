@@ -96,6 +96,21 @@
       "skipped": "Could not include: {names}.",
       "failed": "Could not export your projects."
     },
+    "loadFailure": {
+      "title": "{name} could not be read",
+      "kept": "Its stored copy is unchanged, so a newer release or a repair can still recover it. Editing stays off until it loads or you start over.",
+      "retry": "Try again",
+      "download": "Download stored copy",
+      "startOver": "Start over",
+      "dismiss": "Dismiss the error for {name}",
+      "startOverTitle": "Start {name} over?",
+      "startOverClose": "Cancel start over",
+      "startOverConfirm": "This replaces the stored copy of <b>{name}</b> with an empty project. The stored copy cannot be recovered afterwards. Download it first if you may want to repair it.",
+      "startOverAction": "Replace with empty project",
+      "nothingStored": "There is no stored package to download for this project.",
+      "downloaded": "Downloaded the stored copy as {fileName}.",
+      "downloadFailed": "Could not download the stored copy."
+    },
     "storageWarning": {
       "message": "This browser has used {percent} of the space it allows for your projects. Export a backup before it runs out."
     },
@@ -173,7 +188,8 @@
       "prepareFailed": "Could not prepare project shape storage",
       "migrateFailed": "Could not migrate project shapes to larger storage",
       "deleteFailed": "Could not delete project shapes from local storage",
-      "saveListFailed": "Could not save project list"
+      "saveListFailed": "Could not save project list",
+      "unreadableWriteRefused": "This project's stored copy could not be read, so it is not overwritten"
     },
     "updates": {
       "promptTitle": "SketchForge {version} is available",

@@ -163,7 +163,8 @@
       "prepareFailed": "Impossible de préparer l’espace d’enregistrement du projet",
       "migrateFailed": "Impossible de transférer les formes des projets vers un stockage plus grand",
       "deleteFailed": "Impossible de supprimer les formes du projet de ce navigateur",
-      "saveListFailed": "Impossible d’enregistrer la liste des projets"
+      "saveListFailed": "Impossible d’enregistrer la liste des projets",
+      "unreadableWriteRefused": "La copie enregistrée de ce projet est illisible ; elle n’est donc pas écrasée"
     },
     "updates": {
       "promptTitle": "SketchForge {version} est disponible",
@@ -244,6 +245,21 @@
       "exported": "{count, plural, one {{count} projet exporté vers {fileName}} many {{count} de projets exportés vers {fileName}} other {{count} projets exportés vers {fileName}}}",
       "skipped": "Impossible d’inclure : {names}",
       "failed": "Impossible d’exporter vos projets"
+    },
+    "loadFailure": {
+      "title": "Impossible de lire {name}",
+      "kept": "Sa copie enregistrée reste inchangée : une version plus récente ou une réparation peut encore la récupérer. La modification reste désactivée jusqu’à ce qu’elle se charge ou que vous recommenciez.",
+      "retry": "Réessayer",
+      "download": "Télécharger la copie enregistrée",
+      "startOver": "Recommencer",
+      "dismiss": "Masquer l’erreur pour {name}",
+      "startOverTitle": "Recommencer {name} ?",
+      "startOverClose": "Annuler le recommencement",
+      "startOverConfirm": "Cette action remplace la copie enregistrée de <b>{name}</b> par un projet vide. La copie enregistrée ne pourra plus être récupérée. Téléchargez-la d’abord si vous souhaitez peut-être la réparer.",
+      "startOverAction": "Remplacer par un projet vide",
+      "nothingStored": "Aucun paquet enregistré à télécharger pour ce projet.",
+      "downloaded": "Copie enregistrée téléchargée sous le nom {fileName}.",
+      "downloadFailed": "Impossible de télécharger la copie enregistrée."
     },
     "storageWarning": {
       "message": "Ce navigateur utilise {percent} de l’espace qu’il autorise pour vos projets. Exportez une sauvegarde avant qu’il ne soit plein."

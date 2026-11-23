@@ -163,7 +163,8 @@
       "prepareFailed": "Nie udało się przygotować miejsca na zapis projektu",
       "migrateFailed": "Nie udało się przenieść kształtów projektów do większego magazynu",
       "deleteFailed": "Nie udało się usunąć kształtów projektu z przeglądarki",
-      "saveListFailed": "Nie udało się zapisać listy projektów"
+      "saveListFailed": "Nie udało się zapisać listy projektów",
+      "unreadableWriteRefused": "Nie można odczytać zapisanej kopii tego projektu, więc nie zostanie nadpisana"
     },
     "updates": {
       "promptTitle": "Dostępna jest wersja SketchForge {version}",
@@ -244,6 +245,21 @@
       "exported": "{count, plural, one {Wyeksportowano {count} projekt do pliku {fileName}.} few {Wyeksportowano {count} projekty do pliku {fileName}.} many {Wyeksportowano {count} projektów do pliku {fileName}.} other {Wyeksportowano {count} projektu do pliku {fileName}.}}",
       "skipped": "Nie udało się dołączyć: {names}.",
       "failed": "Nie udało się wyeksportować projektów."
+    },
+    "loadFailure": {
+      "title": "Nie można odczytać projektu {name}",
+      "kept": "Jego zapisana kopia pozostała bez zmian, więc nowsza wersja lub naprawa nadal może ją odzyskać. Edycja jest wyłączona, dopóki projekt się nie wczyta albo nie zaczniesz od nowa.",
+      "retry": "Spróbuj ponownie",
+      "download": "Pobierz zapisaną kopię",
+      "startOver": "Zacznij od nowa",
+      "dismiss": "Zamknij błąd projektu {name}",
+      "startOverTitle": "Zacząć projekt {name} od nowa?",
+      "startOverClose": "Anuluj zaczynanie od nowa",
+      "startOverConfirm": "To zastąpi zapisaną kopię projektu <b>{name}</b> pustym projektem. Zapisanej kopii nie będzie można potem odzyskać. Jeśli możesz chcieć ją naprawić, najpierw ją pobierz.",
+      "startOverAction": "Zastąp pustym projektem",
+      "nothingStored": "Dla tego projektu nie ma zapisanego pakietu do pobrania.",
+      "downloaded": "Pobrano zapisaną kopię jako {fileName}.",
+      "downloadFailed": "Nie można pobrać zapisanej kopii."
     },
     "storageWarning": {
       "message": "Ta przeglądarka wykorzystała {percent} miejsca dozwolonego na projekty. Wyeksportuj kopię zapasową, zanim miejsce się skończy."

@@ -59,6 +59,18 @@ flowchart LR
   C -->|Open SKF or import geometry| D[Restored project]
 ```
 
+## When a project cannot be read
+
+Sometimes SketchForge cannot read a project's stored copy. The `.skf` package may be damaged, it may come from a newer release, or the server that stores it may be down. In that case the editor stays closed. The dashboard names the project, shows the error, and leaves the stored copy untouched. Autosave does not write to that project until it loads again or you start it over. This applies to projects in the browser, in a server directory, and in the desktop app.
+
+![The dashboard reporting a project whose stored copy could not be read.](../screenshots/project-load-failure.png)
+
+- **Try again** reads the stored copy again, for example after the server is back.
+- **Download stored copy** saves the stored `.skf` exactly as it is, so you can repair it or open it in a newer release.
+- **Start over** replaces the stored copy with an empty project. It asks you to confirm first, because the old copy cannot be recovered after that.
+
+**Export all projects** leaves out a project it cannot read and names it in the result.
+
 ## Keyboard shortcuts
 
 Press **?** in the editor to open the keyboard-shortcuts list. Press **Escape** to close it. The list includes the common edit shortcuts; selection visibility and locking use bindings that do not collide with macOS or browser-reserved keys:
