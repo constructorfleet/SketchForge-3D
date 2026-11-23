@@ -114,7 +114,10 @@
       "startOverAction": "Replace with empty project",
       "nothingStored": "There is no stored package to download for this project.",
       "downloaded": "Downloaded the stored copy as {fileName}.",
-      "downloadFailed": "Could not download the stored copy."
+      "downloadFailed": "Could not download the stored copy.",
+      "packageNetwork": "The request for this project's package did not reach the server ({detail}).",
+      "packageStatus": "The server answered the request for this project's package with HTTP {detail}.",
+      "packageNotPackage": "The server answered the request for this project's package with {detail}, not a project package."
     },
     "storageWarning": {
       "message": "This browser has used {percent} of the space it allows for your projects. Export a backup before it runs out."

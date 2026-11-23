@@ -41,7 +41,16 @@ import {
 } from "@/lib/engine/placementWorkplane";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
-import { StoredProjectUnreadableError, cacheWithEditorChange, createProjectWriteGuard, guardProjectWrites, projectLoadFailureCause, projectLoadFailureKind, type ProjectLoadFailureKind } from "@/lib/projectWriteGuard";
+import {
+  StoredProjectUnreadableError,
+  cacheWithEditorChange,
+  createProjectWriteGuard,
+  guardProjectWrites,
+  indexedDbReadIsPermanent,
+  projectLoadFailureCause,
+  projectLoadFailureKind,
+  type ProjectLoadFailureKind,
+} from "@/lib/projectWriteGuard";
 import { storedRecordJson } from "@/lib/storedProjectCopy";
 import {
   projectShapeCacheEntry,
@@ -57,6 +66,7 @@ import {
   probeServerProjects,
   saveServerProjectMetadata,
   saveServerProjectPackage,
+  ServerPackageRequestError,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
 import { importSkfProject, SKF_CREATED_WITH_VERSION, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
@@ -293,6 +303,16 @@ function readAvailableProjectResources(database: IDBDatabase, projectId: string,
   });
 }
 
+/** Describes a failed read of one project's stored copy. */
+function loadFailureDetail(t: Translator, error: unknown, fallbackKey: Parameters<typeof errorText>[2]) {
+  const cause = projectLoadFailureCause(error);
+  if (!(cause instanceof ServerPackageRequestError)) return errorText(t, cause, fallbackKey);
+  const params = { detail: cause.detail };
+  if (cause.reason === "network") return t("dashboard.loadFailure.packageNetwork", params);
+  if (cause.reason === "status") return t("dashboard.loadFailure.packageStatus", params);
+  return t("dashboard.loadFailure.packageNotPackage", params);
+}
+
 /** Parses a stored package, marking a failure as the copy's fault rather than storage's. */
 async function readStoredPackage(bytes: Uint8Array) {
   try {
@@ -303,6 +323,16 @@ async function readStoredPackage(bytes: Uint8Array) {
 }
 
 async function loadProjectShapes(projectId: string) {
+  try {
+    return await readProjectShapes(projectId);
+  } catch (error) {
+    // A newer schema or an undecodable value fails the same way on every retry.
+    if (!serverProjectStorageActive && indexedDbReadIsPermanent(error)) throw new StoredProjectUnreadableError(error);
+    throw error;
+  }
+}
+
+async function readProjectShapes(projectId: string) {
   if (serverProjectStorageActive) {
     const packageBytes = await fetchServerProjectPackage(projectId);
     if (!packageBytes) return null;
@@ -1028,7 +1058,7 @@ export default function Home() {
         if (canceled) return;
         const failure: ProjectLoadFailure = {
           kind: projectLoadFailureKind(error),
-          message: errorText(currentTranslator(), projectLoadFailureCause(error), "dashboard.storage.loadFailed"),
+          message: loadFailureDetail(currentTranslator(), error, "dashboard.storage.loadFailed"),
         };
         // A read runs only when the stored revision is newer than `cached`, so `cached` is stale.
         // Close the editor so nothing autosaves over the stored bytes.
@@ -1661,7 +1691,7 @@ export default function Home() {
       });
       setDashboardNotice(t("dashboard.loadFailure.downloaded", { fileName: result.mode === "folder" ? result.path : fileName }));
     } catch (error) {
-      setDashboardNotice(errorText(t, error, "dashboard.loadFailure.downloadFailed"));
+      setDashboardNotice(loadFailureDetail(t, error, "dashboard.loadFailure.downloadFailed"));
     }
   };
 
@@ -2603,9 +2633,23 @@ function Dashboard({
           aria-modal="true"
           aria-labelledby="start-over-project-title"
           onKeyDown={(event) => {
-            if (event.key !== "Escape") return;
-            event.stopPropagation();
-            closeStartOver();
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              closeStartOver();
+              return;
+            }
+            if (event.key !== "Tab") return;
+            // Keeps Tab inside the modal dialog.
+            const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
           }}
         >
           <div className="dashboard-confirm-dialog">

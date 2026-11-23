@@ -264,7 +264,10 @@
       "startOverAction": "Sustituir por un proyecto vacío",
       "nothingStored": "No hay ningún paquete guardado que descargar para este proyecto.",
       "downloaded": "Copia guardada descargada como {fileName}.",
-      "downloadFailed": "No se pudo descargar la copia guardada."
+      "downloadFailed": "No se pudo descargar la copia guardada.",
+      "packageNetwork": "La solicitud del paquete de este proyecto no llegó al servidor ({detail}).",
+      "packageStatus": "El servidor respondió a la solicitud del paquete de este proyecto con HTTP {detail}.",
+      "packageNotPackage": "El servidor respondió a la solicitud del paquete de este proyecto con {detail}, no con un paquete de proyecto."
     },
     "storageWarning": {
       "message": "Este navegador ha usado el {percent} del espacio disponible para tus proyectos. Exporta una copia de seguridad antes de que se agote."

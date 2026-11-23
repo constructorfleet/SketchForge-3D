@@ -264,7 +264,10 @@
       "startOverAction": "Remplacer par un projet vide",
       "nothingStored": "Aucun paquet enregistré à télécharger pour ce projet.",
       "downloaded": "Copie enregistrée téléchargée sous le nom {fileName}.",
-      "downloadFailed": "Impossible de télécharger la copie enregistrée."
+      "downloadFailed": "Impossible de télécharger la copie enregistrée.",
+      "packageNetwork": "La demande du paquet de ce projet n’a pas atteint le serveur ({detail}).",
+      "packageStatus": "Le serveur a répondu à la demande du paquet de ce projet par HTTP {detail}.",
+      "packageNotPackage": "Le serveur a répondu à la demande du paquet de ce projet par {detail}, et non par un paquet de projet."
     },
     "storageWarning": {
       "message": "Ce navigateur utilise {percent} de l’espace qu’il autorise pour vos projets. Exportez une sauvegarde avant qu’il ne soit plein."

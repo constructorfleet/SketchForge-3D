@@ -233,6 +233,12 @@ test("browser storage keeps an unreadable project's stored package and offers re
     await dialog.waitFor({ state: "visible" });
     assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Cancel", "focus starts on Cancel inside the dialog");
     await screenshot(page, "project-load-failure-start-over.png");
+    // Tab past the last button wraps to the first, the dialog's close button.
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Cancel start over", "Tab stays inside the dialog");
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Replace with empty project", "Shift+Tab wraps back to the last button");
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached" });
     assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), `Start over: ${brokenName}`, "Escape closes it and returns focus");
@@ -353,11 +359,10 @@ test("server storage that cannot be reached reports it, offers only a retry, and
     const original = new Uint8Array(fs.readFileSync(packagePath));
     await page.reload();
 
-    // The package request fails as an overloaded server would.
+    // The package request fails as an overloaded server would, then as a proxy's sign-in page.
     const packageRequest = (url) => url.pathname === "/api/projects" && url.searchParams.has("projectId");
-    await page.route(packageRequest, (route) => route.request().method() === "GET"
-      ? route.fulfill({ status: 503, contentType: "application/json", body: "{}" })
-      : route.continue());
+    let answer = { status: 503, contentType: "application/json", body: "{}" };
+    await page.route(packageRequest, (route) => route.request().method() === "GET" ? route.fulfill(answer) : route.continue());
     const failure = page.getByRole("alert").filter({ hasText: "could not be loaded" });
     await openAndTryToEdit(page, () => page.locator(".project-card-open").first().click()).catch(() => undefined);
     await failure.waitFor({ state: "visible" });
@@ -365,7 +370,14 @@ test("server storage that cannot be reached reports it, offers only a retry, and
     assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 0, "the editor stays closed");
     assert.equal(await failure.getByRole("button", { name: "Start over" }).count(), 0, "nothing offers to replace a copy that was never read");
     assert.equal(await failure.getByRole("button", { name: "Download stored copy" }).count(), 0, "there is nothing to download");
+    await failure.getByText("The server answered the request for this project's package with HTTP 503.").waitFor({ state: "visible" });
     await screenshot(page, "project-load-unavailable.png");
+
+    answer = { status: 200, contentType: "text/html; charset=utf-8", body: "<html>Sign in</html>" };
+    await failure.getByRole("button", { name: "Try again: square", exact: true }).click();
+    await failure.getByText("with text/html; charset=utf-8, not a project package").waitFor({ state: "visible", timeout: 30_000 });
+    assert.equal(await failure.getByRole("button", { name: "Start over" }).count(), 0, "an HTML answer is not an unreadable copy");
+    assertSameBytes(new Uint8Array(fs.readFileSync(packagePath)), original, "the server package is still unchanged");
 
     // The server recovers; a retry opens the project and autosave writes again.
     await page.unroute(packageRequest);
@@ -383,5 +395,36 @@ test("server storage that cannot be reached reports it, offers only a retry, and
     if (browser) await browser.close();
     stop();
     fs.rmSync(projectsDir, { recursive: true, force: true });
+  }
+});
+
+test("an IndexedDB read that cannot succeed on retry is reported as unreadable", { timeout: 300_000 }, async () => {
+  const { baseURL, stop } = await startNextServer();
+  let browser;
+
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await context.newPage();
+    await page.goto(baseURL);
+    await importFixture(page, "tests/fixtures/svg/square.svg");
+
+    // A newer release's schema: this build's open now fails with VersionError every time.
+    await page.evaluate(() => new Promise((resolve, reject) => {
+      const open = indexedDB.open("sketchForge.projectShapes", 99);
+      open.onerror = () => reject(open.error);
+      open.onblocked = () => reject(new Error("upgrade blocked"));
+      open.onsuccess = () => { open.result.close(); resolve(); };
+    }));
+    await page.reload();
+
+    const failure = await openAndTryToEdit(page, () => page.locator(".project-card-open").first().click());
+    await failure.waitFor({ state: "visible" });
+    assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 0, "the editor stays closed");
+    await failure.getByRole("button", { name: "Start over: square", exact: true }).waitFor({ state: "visible" });
+    await failure.getByRole("button", { name: "Download stored copy: square", exact: true }).waitFor({ state: "visible" });
+  } finally {
+    if (browser) await browser.close();
+    stop();
   }
 });

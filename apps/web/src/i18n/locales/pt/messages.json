@@ -264,7 +264,10 @@
       "startOverAction": "Substituir por projeto vazio",
       "nothingStored": "Não há nenhum pacote guardado para transferir deste projeto.",
       "downloaded": "Cópia guardada transferida como {fileName}.",
-      "downloadFailed": "Não foi possível transferir a cópia guardada."
+      "downloadFailed": "Não foi possível transferir a cópia guardada.",
+      "packageNetwork": "O pedido do pacote deste projeto não chegou ao servidor ({detail}).",
+      "packageStatus": "O servidor respondeu ao pedido do pacote deste projeto com HTTP {detail}.",
+      "packageNotPackage": "O servidor respondeu ao pedido do pacote deste projeto com {detail}, e não com um pacote de projeto."
     },
     "storageWarning": {
       "message": "Este navegador já usou {percent} do espaço permitido para seus projetos. Exporte uma cópia de segurança antes que ele acabe."

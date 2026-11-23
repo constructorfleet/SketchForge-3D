@@ -68,3 +68,17 @@ export function projectLoadFailureKind(error: unknown): ProjectLoadFailureKind {
 export function projectLoadFailureCause(error: unknown): unknown {
   return error instanceof StoredProjectUnreadableError ? error.reason : error;
 }
+
+/** Tells an IndexedDB read error that a retry cannot fix from a passing one. */
+export function indexedDbReadIsPermanent(error: unknown): boolean {
+  // DOMException is not an Error subclass in every runtime, so match by shape.
+  if (!error || typeof error !== "object") return false;
+  const { name, message } = error as { name?: unknown; message?: unknown };
+  if (typeof name !== "string") return false;
+  if (PERMANENT_INDEXEDDB_ERRORS.has(name)) return true;
+  // Chromium reports a large value whose blob file is gone as a generic UnknownError.
+  return name === "UnknownError" && typeof message === "string" && /failed to read large indexeddb value/i.test(message);
+}
+
+// A newer schema, or a value that cannot be decoded, reads the same way every time.
+const PERMANENT_INDEXEDDB_ERRORS = new Set(["VersionError", "DataError", "NotReadableError", "DataCloneError"]);

@@ -264,7 +264,10 @@
       "startOverAction": "Zastąp pustym projektem",
       "nothingStored": "Dla tego projektu nie ma zapisanego pakietu do pobrania.",
       "downloaded": "Pobrano zapisaną kopię jako {fileName}.",
-      "downloadFailed": "Nie można pobrać zapisanej kopii."
+      "downloadFailed": "Nie można pobrać zapisanej kopii.",
+      "packageNetwork": "Żądanie pakietu tego projektu nie dotarło do serwera ({detail}).",
+      "packageStatus": "Serwer odpowiedział na żądanie pakietu tego projektu kodem HTTP {detail}.",
+      "packageNotPackage": "Serwer odpowiedział na żądanie pakietu tego projektu typem {detail}, a nie pakietem projektu."
     },
     "storageWarning": {
       "message": "Ta przeglądarka wykorzystała {percent} miejsca dozwolonego na projekty. Wyeksportuj kopię zapasową, zanim miejsce się skończy."

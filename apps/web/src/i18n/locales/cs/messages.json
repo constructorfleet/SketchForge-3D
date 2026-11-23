@@ -264,7 +264,10 @@
       "startOverAction": "Nahradit prázdným projektem",
       "nothingStored": "Pro tento projekt není uložený balíček ke stažení.",
       "downloaded": "Uložená kopie byla stažena jako {fileName}.",
-      "downloadFailed": "Uloženou kopii nelze stáhnout."
+      "downloadFailed": "Uloženou kopii nelze stáhnout.",
+      "packageNetwork": "Požadavek na balíček tohoto projektu nedorazil na server ({detail}).",
+      "packageStatus": "Server odpověděl na požadavek na balíček tohoto projektu kódem HTTP {detail}.",
+      "packageNotPackage": "Server odpověděl na požadavek na balíček tohoto projektu typem {detail}, nikoli balíčkem projektu."
     },
     "storageWarning": {
       "message": "Tento prohlížeč už využil {percent} místa, které pro vaše projekty povoluje. Než se zaplní, exportujte zálohu."

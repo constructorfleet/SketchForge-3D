@@ -264,7 +264,10 @@
       "startOverAction": "Durch leeres Projekt ersetzen",
       "nothingStored": "Für dieses Projekt gibt es kein gespeichertes Paket zum Herunterladen.",
       "downloaded": "Die gespeicherte Kopie wurde als {fileName} heruntergeladen.",
-      "downloadFailed": "Die gespeicherte Kopie konnte nicht heruntergeladen werden."
+      "downloadFailed": "Die gespeicherte Kopie konnte nicht heruntergeladen werden.",
+      "packageNetwork": "Die Anfrage nach dem Paket dieses Projekts hat den Server nicht erreicht ({detail}).",
+      "packageStatus": "Der Server hat die Anfrage nach dem Paket dieses Projekts mit HTTP {detail} beantwortet.",
+      "packageNotPackage": "Der Server hat die Anfrage nach dem Paket dieses Projekts mit {detail} beantwortet, nicht mit einem Projektpaket."
     },
     "storageWarning": {
       "message": "Dieser Browser hat {percent} des für Ihre Projekte erlaubten Speicherplatzes belegt. Exportieren Sie eine Sicherung, bevor der Platz ausgeht."

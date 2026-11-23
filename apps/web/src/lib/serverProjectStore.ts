@@ -97,12 +97,35 @@ export async function probeServerProjects(
   };
 }
 
+/** Says why a project package request did not return a package. */
+export class ServerPackageRequestError extends Error {
+  readonly reason: "network" | "status" | "notPackage";
+  readonly detail: string;
+
+  constructor(reason: ServerPackageRequestError["reason"], detail: string) {
+    super(`Project package request failed (${reason}: ${detail})`);
+    this.name = "ServerPackageRequestError";
+    this.reason = reason;
+    this.detail = detail;
+  }
+}
+
 export async function fetchServerProjectPackage(projectId: string) {
-  const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
+  } catch (error) {
+    throw new ServerPackageRequestError("network", error instanceof Error ? error.message : String(error));
+  }
   if (response.status === 404) return null;
-  if (!response.ok) throw await serverProjectError(response, "errors.projects.loadFailed");
+  if (!response.ok) throw new ServerPackageRequestError("status", String(response.status));
+  // A proxy or sign-in page can answer 200 with HTML; parsing that would call the project unreadable.
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!PACKAGE_CONTENT_TYPE.test(contentType)) throw new ServerPackageRequestError("notPackage", contentType || "none");
   return new Uint8Array(await response.arrayBuffer());
 }
+
+const PACKAGE_CONTENT_TYPE = /^application\/(?:zip|octet-stream|[\w.-]+\+zip)\s*(?:;|$)/i;
 
 /** Write the project list's half of a project: its metadata sidecar, leaving the packed `.skf` alone. */
 export async function saveServerProjectMetadata(projectId: string, metadata: unknown) {

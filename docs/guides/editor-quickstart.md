@@ -75,7 +75,7 @@ When the stored copy was read but could not be opened:
 
 ![The confirmation shown before Start over replaces the stored copy.](../screenshots/project-load-failure-start-over.png)
 
-When the storage or server could not be reached, the dashboard says the project could not be loaded and offers only **Try again**, because nothing was read that could be downloaded or replaced.
+When the storage or server could not be reached, the dashboard says the project could not be loaded and offers only **Try again**, because nothing was read that could be downloaded or replaced. The detail names the failed request for the project package: the HTTP status, a request that never reached the server, or an answer that was not a project package, such as a proxy's sign-in page. A browser storage error that a retry cannot fix, such as a database left by a newer release, counts as a copy that cannot be read, so **Start over** is offered.
 
 ![The dashboard reporting a project whose server could not be reached.](../screenshots/project-load-unavailable.png)
 

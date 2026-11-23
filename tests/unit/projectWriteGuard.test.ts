@@ -4,6 +4,7 @@ import {
   cacheWithEditorChange,
   createProjectWriteGuard,
   guardProjectWrites,
+  indexedDbReadIsPermanent,
   projectLoadFailureCause,
   projectLoadFailureKind,
 } from "@/lib/projectWriteGuard";
@@ -60,5 +61,26 @@ describe("project load failure kind", () => {
     expect(projectLoadFailureCause(new StoredProjectUnreadableError(parse))).toBe(parse);
     const network = new TypeError("Failed to fetch");
     expect(projectLoadFailureCause(network)).toBe(network);
+  });
+});
+
+describe("IndexedDB read errors", () => {
+  const named = (name: string, message = "") => Object.assign(new Error(message), { name });
+
+  it("calls errors a retry cannot fix permanent", () => {
+    expect(indexedDbReadIsPermanent(named("VersionError"))).toBe(true);
+    expect(indexedDbReadIsPermanent(named("DataError"))).toBe(true);
+    expect(indexedDbReadIsPermanent(named("NotReadableError"))).toBe(true);
+    expect(indexedDbReadIsPermanent(named("DataCloneError"))).toBe(true);
+    expect(indexedDbReadIsPermanent(named("UnknownError", "Failed to read large IndexedDB value"))).toBe(true);
+  });
+
+  it("leaves passing failures to a retry", () => {
+    expect(indexedDbReadIsPermanent(named("AbortError"))).toBe(false);
+    expect(indexedDbReadIsPermanent(named("InvalidStateError"))).toBe(false);
+    expect(indexedDbReadIsPermanent(named("TimeoutError"))).toBe(false);
+    expect(indexedDbReadIsPermanent(named("UnknownError", "Internal error opening backing store"))).toBe(false);
+    expect(indexedDbReadIsPermanent(new TypeError("Failed to fetch"))).toBe(false);
+    expect(indexedDbReadIsPermanent(undefined)).toBe(false);
   });
 });
