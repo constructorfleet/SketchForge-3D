@@ -294,3 +294,55 @@ test("a client whose clock is behind the last writer's saves on top of the copy 
   assert.equal(rootNodeCount(fromA), 3, "client A's save lands despite its earlier clock");
   assert.equal(await clientA.getByRole("alert").filter({ hasText: "was changed elsewhere" }).count(), 0, "no conflict is reported");
 });
+
+test("a client whose list is stale does not revert a rename another client made", { timeout: 300_000 }, async (t) => {
+  const { clientA, clientB, packagePath, imported } = await twoClients(t);
+  const metadataPath = packagePath.replace(/\.skf$/, ".json");
+  const sidecar = () => JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+
+  // Client B renames the project from the dashboard.
+  await clientB.getByRole("button", { name: "Home dashboard" }).click();
+  await clientB.getByRole("button", { name: "Project options for square" }).click();
+  await clientB.getByRole("menuitem", { name: "Rename" }).click();
+  await clientB.getByRole("textbox", { name: "Project name" }).fill("Renamed by B");
+  await clientB.getByRole("button", { name: "Save" }).click();
+  const deadline = Date.now() + 30_000;
+  while (sidecar().name !== "Renamed by B" && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(sidecar().name, "Renamed by B");
+
+  // Client A, whose list still says "square", saves an edit, which also writes the list.
+  await addBox(clientA);
+  await nextSave(packagePath, imported);
+  await clientA.waitForTimeout(5_000);
+  assert.equal(sidecar().name, "Renamed by B", "client A's list write keeps B's rename");
+  assert.equal(sidecar().shapes, 2, "and records A's new shape count");
+
+  await clientA.getByRole("button", { name: "Home dashboard" }).click();
+  await clientA.locator(".project-card").filter({ hasText: "Renamed by B" }).waitFor({ state: "visible", timeout: 15_000 });
+});
+
+test("a client coming back into view shows a rename another client made", { timeout: 300_000 }, async (t) => {
+  const { clientA, clientB, packagePath } = await twoClients(t);
+  const metadataPath = packagePath.replace(/\.skf$/, ".json");
+
+  await clientB.getByRole("button", { name: "Home dashboard" }).click();
+  await clientB.getByRole("button", { name: "Project options for square" }).click();
+  await clientB.getByRole("menuitem", { name: "Rename" }).click();
+  await clientB.getByRole("textbox", { name: "Project name" }).fill("Renamed by B");
+  await clientB.getByRole("button", { name: "Save" }).click();
+  const deadline = Date.now() + 30_000;
+  while (JSON.parse(fs.readFileSync(metadataPath, "utf8")).name !== "Renamed by B" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  // The package revision did not move; only the metadata did. Client A's own list writes
+  // would also pick the rename up through their conflict, so they are held back here.
+  await clientA.route("**/api/projects?projectId=*", (route) => (
+    route.request().method() === "POST" && (route.request().postData() ?? "").includes('name="metadata"') ? route.abort() : route.continue()
+  ));
+  await clientA.getByRole("button", { name: "Home dashboard" }).click();
+  await clientA.waitForTimeout(2_000);
+  assert.equal(await clientA.locator(".project-card").filter({ hasText: "Renamed by B" }).count(), 0, "nothing else has shown the rename yet");
+  await clientA.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await clientA.locator(".project-card").filter({ hasText: "Renamed by B" }).waitFor({ state: "visible", timeout: 15_000 });
+});

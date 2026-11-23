@@ -49,6 +49,8 @@ describe("dashboard package writes", () => {
   it("bases a start over on the revision that was served, and raises the clock past a loaded revision", () => {
     expect(page).toMatch(/const seen = servedRevisions\.get\(project\.id\);\s*if \(seen === undefined\) serverBaseRevisions\.delete\(project\.id\);\s*else serverBaseRevisions\.set\(project\.id, seen\);/);
     expect(page).toMatch(/nextProjectRevisionRef\.current = Math\.max\(nextProjectRevisionRef\.current, loadedRevision, serverRevision \?\? 0\);/);
+    // A failed load raises it too, so Start over outranks the served revision on a clock that is behind.
+    expect(page).toMatch(/projectWriteGuard\.block\(activeProjectId\);[\s\S]{0,200}nextProjectRevisionRef\.current = Math\.max\(nextProjectRevisionRef\.current, servedRevisions\.get\(activeProjectId\) \?\? 0\);/);
   });
 
   it("drops a late editor snapshot for a blocked project before it touches the cache or the queue", () => {

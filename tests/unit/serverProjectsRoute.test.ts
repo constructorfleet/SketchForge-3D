@@ -16,7 +16,7 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 function saveRequest(
   projectId: string,
-  fields: { metadata?: unknown; project?: Uint8Array<ArrayBuffer>; revision?: number; baseRevision?: number },
+  fields: { metadata?: unknown; project?: Uint8Array<ArrayBuffer>; revision?: number; baseRevision?: number; baseMetadataRevision?: number },
   origin = "http://localhost",
 ) {
   const formData = new FormData();
@@ -24,6 +24,7 @@ function saveRequest(
   if (fields.project) formData.append("project", new Blob([fields.project]));
   if (fields.revision !== undefined) formData.append("revision", String(fields.revision));
   if (fields.baseRevision !== undefined) formData.append("baseRevision", String(fields.baseRevision));
+  if (fields.baseMetadataRevision !== undefined) formData.append("baseMetadataRevision", String(fields.baseMetadataRevision));
   return new Request(`http://localhost/api/projects?projectId=${encodeURIComponent(projectId)}`, {
     method: "POST",
     headers: { Origin: origin },
@@ -142,6 +143,29 @@ describe("server project storage", () => {
     expect(response.status).toBe(200);
     const stored = (await listing()).projects[0].metadata;
     expect(stored).toMatchObject({ name: "Renamed", thumbnailVersion: 3, revision: 20 });
+  });
+
+  // A rename or settings change does not move the package revision, so metadata has its own counter.
+  it("counts metadata writes, and keeps the count across package writes", async () => {
+    const first = await (await POST(saveRequest("project-1", { metadata: metadata() }))).json() as { project: { metadata: Record<string, unknown> } };
+    expect(first.project.metadata.metadataRevision).toBe(1);
+    await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed" }), baseMetadataRevision: 1 }));
+    await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 20, baseRevision: 10 }));
+
+    expect((await listing()).projects[0].metadata).toMatchObject({ metadataRevision: 2, revision: 20, name: "Renamed" });
+  });
+
+  it("refuses a write from a tab holding older state", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata() }));
+    // Another client renames it.
+    await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed elsewhere" }), baseMetadataRevision: 1 }));
+
+    // This client's list still holds the first state.
+    const response = await POST(saveRequest("project-1", { metadata: metadata({ thumbnailVersion: 4 }), baseMetadataRevision: 1 }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ conflict: "newerMetadata", storedMetadataRevision: 2 });
+    expect((await listing()).projects[0].metadata.name).toBe("Renamed elsewhere");
   });
 
   it("does not let a metadata write move the revision ahead of the package", async () => {

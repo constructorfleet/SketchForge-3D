@@ -55,6 +55,7 @@ import {
   type ProjectLoadFailureKind,
 } from "@/lib/projectWriteGuard";
 import { storedRecordJson } from "@/lib/storedProjectCopy";
+import { mergeMetadataFields } from "@/lib/serverMetadataMerge";
 import {
   projectShapeCacheEntry,
   projectShapeCacheEntryFromEditor,
@@ -70,7 +71,9 @@ import {
   saveServerProjectMetadata,
   saveServerProjectPackage,
   ServerPackageRequestError,
+  ServerMetadataConflictError,
   ServerProjectConflictError,
+  serverMetadataRevision,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
 import { importSkfProject, SKF_CREATED_WITH_VERSION, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
@@ -129,6 +132,9 @@ type ProjectSaveJob = {
 };
 
 type ProjectLoadFailure = { kind: ProjectLoadFailureKind; message: string };
+
+/** A list write, with the metadata as last synced when it was queued. */
+type MetadataSaveJob = { metadata: Record<string, unknown>; synced: Record<string, unknown> | undefined };
 
 const LOAD_FAILURE_TEXT = {
   unreadable: { title: "dashboard.loadFailure.title", body: "dashboard.loadFailure.kept" },
@@ -240,6 +246,16 @@ const projectWriteGuard = createProjectWriteGuard();
 const serverBaseRevisions = new Map<string, number>();
 // The sidecar revision each server project was last served at, readable or not.
 const servedRevisions = new Map<string, number>();
+// Each server project's metadata as this client last synced it, and its metadata
+// revision. A rename or settings change does not move the package revision, so list
+// writes are checked against this counter and merged field by field on a conflict.
+const syncedServerMetadata = new Map<string, Record<string, unknown>>();
+const serverMetadataRevisions = new Map<string, number>();
+
+function rememberServerMetadata(projectId: string, metadata: unknown, synced: Record<string, unknown>) {
+  serverMetadataRevisions.set(projectId, serverMetadataRevision(metadata));
+  syncedServerMetadata.set(projectId, synced);
+}
 
 function openProjectShapesDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -763,6 +779,43 @@ export default function Home() {
   // serializes the scene as it is when it runs. Only the newest one is worth
   // keeping, so a burst now costs the write in flight plus one.
   const projectSaveQueueRef = useRef<CoalescingSaveQueue<ProjectSaveJob> | null>(null);
+  // One list write per project at a time, so each is based on the metadata revision the last returned.
+  const metadataSaveQueueRef = useRef<CoalescingSaveQueue<MetadataSaveJob> | null>(null);
+  if (metadataSaveQueueRef.current === null) {
+    const post = async (projectId: string, job: MetadataSaveJob, server: Record<string, unknown> | undefined) => {
+      const metadata = mergeMetadataFields(job.synced, job.metadata, server ?? job.synced ?? job.metadata);
+      const record = await saveServerProjectMetadata(projectId, metadata, serverMetadataRevisions.get(projectId));
+      rememberServerMetadata(projectId, record?.metadata ?? metadata, metadata);
+      return metadata;
+    };
+    metadataSaveQueueRef.current = createCoalescingSaveQueue<MetadataSaveJob>({
+      run: async (projectId, job) => {
+        let written: Record<string, unknown>;
+        try {
+          written = await post(projectId, job, syncedServerMetadata.get(projectId));
+        } catch (error) {
+          if (!(error instanceof ServerMetadataConflictError)) throw error;
+          // Another client changed it since this list was read: keep both sides' changes.
+          const listing = await probeServerProjects();
+          const record = listing.projects.find((candidate) => candidate.projectId === projectId);
+          if (!record) throw error;
+          const current = projectForStorage(normalizeStoredProject(record.metadata as StoredDashboardProject, 0)) as unknown as Record<string, unknown>;
+          rememberServerMetadata(projectId, record.metadata, current);
+          written = await post(projectId, job, current);
+        }
+        const writtenJson = JSON.stringify(written);
+        if (writtenJson === JSON.stringify(job.metadata)) return;
+        // Show what was stored, and do not post it back.
+        const adopted = normalizeStoredProject(written as StoredDashboardProject, 0);
+        serverProjectMetadataRef.current.set(projectId, JSON.stringify(projectForStorage(adopted)));
+        setProjects((projects) => projects.map((project) => (project.id === projectId ? { ...adopted, accent: project.accent } : project)));
+      },
+      onError: (projectId, _job, error) => {
+        serverProjectMetadataRef.current.delete(projectId);
+        setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
+      },
+    });
+  }
   // Set every render, so the queue created once still sees current state.
   const projectConflictRef = useRef<((projectId: string, job: ProjectSaveJob, error: ServerProjectConflictError) => void) | null>(null);
   // Copies a conflict kept from saving, so the user can still download them.
@@ -894,12 +947,11 @@ export default function Home() {
   }, [mounted, refreshSharedProjects]);
 
   const dashboardProjectsFromServer = useCallback((records: ServerProjectRecord[]) => {
-    const projects = records
-      .map((record) => record.metadata as StoredDashboardProject)
-      .filter(storedProjectIsUsable)
-      .map((project, index) => normalizeStoredProject(project, index));
-    serverProjectMetadataRef.current = new Map(projects.map((project) => {
+    const usable = records.filter((record) => storedProjectIsUsable(record.metadata as StoredDashboardProject));
+    const projects = usable.map((record, index) => normalizeStoredProject(record.metadata as StoredDashboardProject, index));
+    serverProjectMetadataRef.current = new Map(projects.map((project, index) => {
       const stored = projectForStorage(project);
+      rememberServerMetadata(stored.id, usable[index].metadata, stored);
       return [stored.id, JSON.stringify(stored)];
     }));
     return projects;
@@ -1009,9 +1061,9 @@ export default function Home() {
         const projectJson = JSON.stringify(project);
         if (serverProjectMetadataRef.current.get(project.id) === projectJson) return;
         serverProjectMetadataRef.current.set(project.id, projectJson);
-        void saveServerProjectMetadata(project.id, project).catch((error) => {
-          serverProjectMetadataRef.current.delete(project.id);
-          setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
+        metadataSaveQueueRef.current?.enqueue(project.id, {
+          metadata: project as unknown as Record<string, unknown>,
+          synced: syncedServerMetadata.get(project.id),
         });
       });
     } else {
@@ -1048,16 +1100,21 @@ export default function Home() {
       if (document.visibilityState !== "visible") return;
       void probeServerProjects().then((listing) => {
         if (!listing.enabled) return;
-        const server = listing.projects
-          .map((record) => record.metadata as StoredDashboardProject)
-          .filter(storedProjectIsUsable)
-          .map((project, index) => normalizeStoredProject(project, index));
+        const usable = listing.projects.filter((record) => storedProjectIsUsable(record.metadata as StoredDashboardProject));
+        const recordsById = new Map(usable.map((record) => [record.projectId, record]));
+        const server = usable.map((record, index) => normalizeStoredProject(record.metadata as StoredDashboardProject, index));
+        // A rename or settings change elsewhere moves only the metadata revision.
+        const metadataIsNewer = (_mine: DashboardProject, theirs: DashboardProject) =>
+          serverMetadataRevision(recordsById.get(theirs.id)?.metadata) > (serverMetadataRevisions.get(theirs.id) ?? 0);
         setProjects((current) => {
-          const merged = mergeNewerServerProjects(current, server);
+          const merged = mergeNewerServerProjects(current, server, metadataIsNewer);
           // Already on the server, so the list effect need not post them back.
           for (const id of merged.changedIds) {
             const project = merged.projects.find((candidate) => candidate.id === id);
-            if (project) serverProjectMetadataRef.current.set(id, JSON.stringify(projectForStorage(project)));
+            if (!project) continue;
+            const stored = projectForStorage(project);
+            serverProjectMetadataRef.current.set(id, JSON.stringify(stored));
+            rememberServerMetadata(id, recordsById.get(id)?.metadata, stored as unknown as Record<string, unknown>);
           }
           return merged.projects;
         });
@@ -1146,6 +1203,8 @@ export default function Home() {
         // A read runs only when the stored revision is newer than `cached`, so `cached` is stale.
         // Close the editor so nothing autosaves over the stored bytes.
         projectWriteGuard.block(activeProjectId);
+        // Start over must still outrank the served revision when this clock is behind it.
+        nextProjectRevisionRef.current = Math.max(nextProjectRevisionRef.current, servedRevisions.get(activeProjectId) ?? 0);
         if (cached) {
           setProjectShapesById((current) => {
             const next = { ...current };

@@ -104,7 +104,11 @@ export class StoredProjectMissingError extends Error {
 }
 
 /** Merges a server listing into the local list, taking only projects that are newer or new. */
-export function mergeNewerServerProjects<T extends { id: string; revision?: number }>(local: T[], server: T[]): { projects: T[]; changedIds: string[] } {
+export function mergeNewerServerProjects<T extends { id: string; revision?: number }>(
+  local: T[],
+  server: T[],
+  isNewer: (mine: T, theirs: T) => boolean = () => false,
+): { projects: T[]; changedIds: string[] } {
   const byId = new Map(local.map((project, index) => [project.id, index]));
   const projects = [...local];
   const changedIds: string[] = [];
@@ -113,7 +117,7 @@ export function mergeNewerServerProjects<T extends { id: string; revision?: numb
     if (index === undefined) {
       projects.push(candidate);
       changedIds.push(candidate.id);
-    } else if ((candidate.revision ?? 0) > (local[index].revision ?? 0)) {
+    } else if ((candidate.revision ?? 0) > (local[index].revision ?? 0) || isNewer(local[index], candidate)) {
       projects[index] = candidate;
       changedIds.push(candidate.id);
     }

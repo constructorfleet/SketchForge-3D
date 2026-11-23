@@ -122,6 +122,12 @@ describe("merging a newer server listing", () => {
     expect(merged.changedIds).toEqual(["c"]);
   });
 
+  it("takes a project the caller calls newer even at the same revision, such as one renamed elsewhere", () => {
+    const merged = mergeNewerServerProjects(local, [{ id: "a", name: "A renamed", revision: 10 }], (_mine, theirs) => theirs.name === "A renamed");
+    expect(merged.projects[0]).toEqual({ id: "a", name: "A renamed", revision: 10 });
+    expect(merged.changedIds).toEqual(["a"]);
+  });
+
   it("returns the same list when nothing is newer", () => {
     const merged = mergeNewerServerProjects(local, [{ id: "a", name: "A", revision: 10 }]);
     expect(merged.projects).toBe(local);

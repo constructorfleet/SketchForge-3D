@@ -18,6 +18,7 @@ import {
   SERVER_PROJECTS_ENV,
   SERVER_PROJECT_REVISION_HEADER,
   safeServerProjectId,
+  serverMetadataRevision,
   serverPackageBaseIsStale,
   serverProjectRevision,
   serverProjectWriteIsStale,
@@ -124,6 +125,8 @@ export async function POST(request: Request) {
     const writtenRevision = metadata ?? (typeof revisionField === "string" ? { revision: Number(revisionField) } : null);
     const baseField = formData.get("baseRevision");
     const baseRevision = typeof baseField === "string" ? Number(baseField) : undefined;
+    const baseMetadataField = formData.get("baseMetadataRevision");
+    const baseMetadataRevision = typeof baseMetadataField === "string" ? Number(baseMetadataField) : undefined;
 
     const locked = await withProjectLock(root, projectId, async () => {
       const stored = await readProjectMetadata(root, projectId);
@@ -136,11 +139,18 @@ export async function POST(request: Request) {
       if (packageBytes && serverProjectWriteIsStale(stored, writtenRevision)) {
         return errorResponse("errors.projects.changedBeforeSave", 409);
       }
+      // A list read before another client's rename or settings change would revert it.
+      const storedMetadataRevision = serverMetadataRevision(stored);
+      if (metadata && baseMetadataRevision !== undefined && Number.isFinite(baseMetadataRevision) && storedMetadataRevision > baseMetadataRevision) {
+        return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerMetadata", storedMetadataRevision });
+      }
 
       if (packageBytes) await writeProjectPackage(root, projectId, packageBytes);
       // The revision belongs to the package. A list write sent while a save was in flight
       // carries an older one, and one sent before its save lands a newer one; neither may move it.
-      const writtenMetadata = metadata && !packageBytes && storedRevision > 0 ? { ...metadata, revision: storedRevision } : metadata;
+      const writtenMetadata = metadata
+        ? { ...metadata, ...(!packageBytes && storedRevision > 0 ? { revision: storedRevision } : {}), metadataRevision: storedMetadataRevision + 1 }
+        : null;
       if (writtenMetadata) await writeProjectMetadata(root, projectId, writtenMetadata);
       // The sidecar revision is the package's, as REST v1 keeps it, so the next writer's base can be checked.
       else if (packageBytes && stored && writtenRevision) {

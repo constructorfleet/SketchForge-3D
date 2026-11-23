@@ -33,6 +33,13 @@ export function serverProjectPackageFileName(projectId: string) {
   return `${projectId}.skf`;
 }
 
+/** Counts metadata writes, which do not move the package revision. */
+export function serverMetadataRevision(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") return 0;
+  const revision = (metadata as { metadataRevision?: unknown }).metadataRevision;
+  return typeof revision === "number" && Number.isFinite(revision) ? revision : 0;
+}
+
 /** The dashboard's own revision counter, as stored in the metadata sidecar. */
 export function serverProjectRevision(metadata: unknown) {
   if (!metadata || typeof metadata !== "object") return 0;
@@ -119,6 +126,14 @@ export class ServerPackageRequestError extends Error {
   }
 }
 
+/** Says another client changed a project's metadata after this client's list read it. */
+export class ServerMetadataConflictError extends Error {
+  constructor() {
+    super("Project details were changed elsewhere");
+    this.name = "ServerMetadataConflictError";
+  }
+}
+
 /** Says another client saved a newer package than the one this write is based on. */
 export class ServerProjectConflictError extends Error {
   readonly storedRevision: number;
@@ -155,9 +170,10 @@ function servedRevision(response: Response) {
 const PACKAGE_CONTENT_TYPE = /^application\/(?:zip|octet-stream|[\w.-]+\+zip)\s*(?:;|$)/i;
 
 /** Write the project list's half of a project: its metadata sidecar, leaving the packed `.skf` alone. */
-export async function saveServerProjectMetadata(projectId: string, metadata: unknown) {
+export async function saveServerProjectMetadata(projectId: string, metadata: unknown, baseMetadataRevision?: number) {
   return postServerProject(projectId, (formData) => {
     formData.append("metadata", JSON.stringify(metadata));
+    if (baseMetadataRevision !== undefined) formData.append("baseMetadataRevision", String(baseMetadataRevision));
   });
 }
 
@@ -179,6 +195,7 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
     if (response.status === 409 && payload.conflict === "newerRevision") {
       throw new ServerProjectConflictError(typeof payload.storedRevision === "number" ? payload.storedRevision : 0);
     }
+    if (response.status === 409 && payload.conflict === "newerMetadata") throw new ServerMetadataConflictError();
     throw await serverProjectError(response, "errors.projects.saveFailed");
   }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };

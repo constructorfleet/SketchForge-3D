@@ -78,6 +78,8 @@ The message stays until you open the newer copy, so the unsaved copy can always 
 
 When a browser window comes back into view, it checks the server for newer copies and loads them, so you usually see the other client's work before you edit. REST API writes count as saves from another client.
 
+A project's name and settings are merged instead. When two clients change them at once, each keeps the fields it changed. A rename in one browser is not undone by another browser that still shows the old name, and it appears there when that window comes back into view.
+
 ### When the server has no package for a project
 
 If the server holds a project's details but not its `.skf` package, or the package is a symlink or another file that is not a regular file, the project does not open as an empty project. The dashboard says the project has no stored package and offers **Try again** and **Start over**. **Start over** replaces the missing package, or the symlink itself, with an empty project; it does not write through a symlink. If another client saves the project after this one read it, **Start over** is refused, and **Try again** opens that client's copy.

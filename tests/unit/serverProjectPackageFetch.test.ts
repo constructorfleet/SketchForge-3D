@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ServerPackageRequestError, ServerProjectConflictError, fetchServerProjectPackage, saveServerProjectPackage } from "@/lib/serverProjectStore";
+import {
+  ServerMetadataConflictError,
+  ServerPackageRequestError,
+  ServerProjectConflictError,
+  fetchServerProjectPackage,
+  saveServerProjectMetadata,
+  saveServerProjectPackage,
+} from "@/lib/serverProjectStore";
 
 // Issue #622: a package request that returns no package is storage trouble, not an unreadable copy.
 afterEach(() => {
@@ -94,6 +101,22 @@ describe("server project package revisions", () => {
   it("does not call a busy server a conflict", async () => {
     answer(new Response(JSON.stringify({ error: "busy", errorKey: "errors.projects.busySaving" }), { status: 409 }));
     const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
+    expect(error).not.toBeInstanceOf(ServerProjectConflictError);
+  });
+});
+
+describe("server project metadata writes", () => {
+  it("sends the metadata revision the list was read at", async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await saveServerProjectMetadata("project-1", { name: "Bracket" }, 3);
+    expect((fetch.mock.calls[0][1]?.body as FormData).get("baseMetadataRevision")).toBe("3");
+  });
+
+  it("turns a refusal for newer metadata into a metadata conflict", async () => {
+    answer(new Response(JSON.stringify({ errorKey: "errors.projects.changedBeforeSave", conflict: "newerMetadata", storedMetadataRevision: 5 }), { status: 409 }));
+    const error = await saveServerProjectMetadata("project-1", { name: "Bracket" }, 3).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ServerMetadataConflictError);
     expect(error).not.toBeInstanceOf(ServerProjectConflictError);
   });
 });
