@@ -19,7 +19,7 @@
     "export": "node scripts/build-static.mjs",
     "verify:static-worker-assets": "node scripts/verify-static-worker-assets.mjs",
     "start": "next start apps/web",
-    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit",
+    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit --incremental false",
     "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run --config tests/vitest.config.ts",
     "test:watch": "vitest --config tests/vitest.config.ts",

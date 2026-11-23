@@ -446,6 +446,8 @@ Run TypeScript checks:
 npm run typecheck
 ```
 
+This checks every file on each run. It does not use a `tsconfig.tsbuildinfo` cache, because TypeScript 7's incremental check can keep results after a re-exported module resolves to a different file.
+
 Run tests:
 
 ```bash
