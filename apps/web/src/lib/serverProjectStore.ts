@@ -186,10 +186,19 @@ export async function saveServerProjectPackage(projectId: string, packageBytes: 
   });
 }
 
+/** Attempts at a write the server refuses as busy: its per-project lock is held by another write. */
+const BUSY_WRITE_ATTEMPTS = 8;
+
 async function postServerProject(projectId: string, fill: (formData: FormData) => void) {
   const formData = new FormData();
   fill(formData);
-  const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData });
+  const post = () => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData });
+  let response = await post();
+  // This client's own package and metadata writes can overlap; the lock is held for milliseconds (#662).
+  for (let attempt = 1; attempt < BUSY_WRITE_ATTEMPTS && await isBusyRefusal(response); attempt += 1) {
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 50 * attempt));
+    response = await post();
+  }
   if (!response.ok) {
     const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown };
     if (response.status === 409 && payload.conflict === "newerRevision") {
@@ -200,6 +209,12 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
   }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };
   return payload.project ?? null;
+}
+
+async function isBusyRefusal(response: Response) {
+  if (response.status !== 409) return false;
+  const payload = await response.clone().json().catch(() => ({})) as Partial<ErrorResponseFields>;
+  return payload.errorKey === "errors.projects.busySaving";
 }
 
 export async function deleteServerProject(projectId: string) {

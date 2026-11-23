@@ -240,6 +240,11 @@ function projectShapeSaveContext(project: Pick<DashboardProject, "name" | "creat
 let serverProjectStorageActive = false;
 // Module scope for the same reason: every write goes through `saveProjectShapes`.
 const projectWriteGuard = createProjectWriteGuard();
+// Browser writes still in flight, so the switch to the server can wait for them (#662).
+const pendingBrowserWrites = new Set<Promise<void>>();
+// Projects deleted while the browser held them. A migration removes their uploaded copies;
+// absence from the browser list proves nothing, since another tab may have removed the list.
+const projectsDeletedInBrowser = new Set<string>();
 // The sidecar revision each server project's copy is based on (#650). The server
 // refuses a package write whose base is older than what it holds. No entry means
 // an unconditional write: a new project, or a confirmed start over.
@@ -495,39 +500,48 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
     serverBaseRevisions.set(projectId, entry.revision);
     return;
   }
-  const database = await openProjectShapesDb();
-  return new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
-    const store = transaction.objectStore(PROJECT_SHAPES_STORE_NAME);
-    const existingRequest = store.get(projectId);
-    existingRequest.onerror = () => {
-      transaction.abort();
-    };
-    existingRequest.onsuccess = () => {
-      const existing = existingRequest.result as ProjectShapeRecord | undefined;
-      if (existing && existing.revision > entry.revision) {
-        return;
-      }
-      store.put({
-        id: projectId,
-        revision: entry.revision,
-        skfPackage,
-        updatedAt: Date.now(),
-      } satisfies ProjectShapeRecord);
-    };
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error ?? new Error(translate("dashboard.storage.saveFailed")));
-    };
-    transaction.onabort = () => {
-      database.close();
-      reject(transaction.error ?? new Error(translate("dashboard.storage.saveFailed")));
-    };
-  });
+  // Registered in the same tick as the storage check, before any await.
+  let settle = () => {};
+  const pending = new Promise<void>((resolve) => { settle = resolve; });
+  pendingBrowserWrites.add(pending);
+  try {
+    const database = await openProjectShapesDb();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(PROJECT_SHAPES_STORE_NAME, "readwrite");
+      const store = transaction.objectStore(PROJECT_SHAPES_STORE_NAME);
+      const existingRequest = store.get(projectId);
+      existingRequest.onerror = () => {
+        transaction.abort();
+      };
+      existingRequest.onsuccess = () => {
+        const existing = existingRequest.result as ProjectShapeRecord | undefined;
+        if (existing && existing.revision > entry.revision) {
+          return;
+        }
+        store.put({
+          id: projectId,
+          revision: entry.revision,
+          skfPackage,
+          updatedAt: Date.now(),
+        } satisfies ProjectShapeRecord);
+      };
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        database.close();
+        reject(transaction.error ?? new Error(translate("dashboard.storage.saveFailed")));
+      };
+      transaction.onabort = () => {
+        database.close();
+        reject(transaction.error ?? new Error(translate("dashboard.storage.saveFailed")));
+      };
+    });
+  } finally {
+    pendingBrowserWrites.delete(pending);
+    settle();
+  }
 }
 
 function saveProjectShapesWhenIdle(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
@@ -981,15 +995,23 @@ export default function Home() {
       // migrated once its sidecar exists. Writing the package first therefore
       // means a half-migrated project is simply not there yet and is tried
       // again, rather than appearing on the server with no geometry behind it.
+      const migrated = new Map<string, { recordRevision: number; serverRevision: number }>();
+      const migratedEntries = new Map<string, DashboardProject>();
       const migrateProject = async (project: DashboardProject) => {
+        migratedEntries.set(project.id, project);
         const record = await loadProjectShapes(project.id);
         if (record?.skfPackage) {
-          await saveServerProjectPackage(project.id, record.skfPackage, project.revision ?? record.revision);
+          const serverRevision = project.revision ?? record.revision;
+          await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
+          migrated.set(project.id, { recordRevision: record.revision, serverRevision });
+          // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
+          serverBaseRevisions.set(project.id, serverRevision);
         }
         await saveServerProjectMetadata(project.id, projectForStorage(project));
       };
 
       let migratedCount = 0;
+      const migratedProjectIds = new Set<string>();
       const serverProjectIds = new Set(listing.projects.map((record) => record.projectId));
       // Re-reading the browser list between passes picks up a project created
       // while an earlier pass was still uploading, which would otherwise be
@@ -1008,17 +1030,104 @@ export default function Home() {
           if (canceled) return;
           migratedCount += 1;
           serverProjectIds.add(project.id);
+          migratedProjectIds.add(project.id);
         }
       }
       if (canceled) return;
 
       const adopted = migratedCount > 0 ? await probeServerProjects().catch(() => listing) : listing;
       if (canceled || !adopted.enabled) return;
+
+      // The browser stayed in charge while the listing was read (#662). Remove what it deleted
+      // and upload what it saved meanwhile, still in browser storage, until a pass finds nothing.
+      // No pass limit: switching with a browser write unsent would strand it in IndexedDB.
+      const caughtUp = new Set<string>();
+      const removedFromServer = new Set<string>();
+      const conflicts = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>>; error: ServerProjectConflictError }>();
+      for (;;) {
+        await Promise.allSettled([...pendingBrowserWrites]);
+        if (canceled) return;
+        let changedAny = false;
+        try {
+          for (const projectId of migratedProjectIds) {
+            if (!projectsDeletedInBrowser.has(projectId) || removedFromServer.has(projectId)) continue;
+            await deleteServerProject(projectId);
+            if (canceled) return;
+            removedFromServer.add(projectId);
+            serverBaseRevisions.delete(projectId);
+            changedAny = true;
+          }
+          // The browser list only discovers projects created during the wait: another tab's
+          // switch removes it, and the moved projects are known without it.
+          const browserList = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
+          for (const project of browserList.values()) {
+            if (canceled) return;
+            if (serverProjectIds.has(project.id) || projectsDeletedInBrowser.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
+            // Created during the wait: not in the listing, so it would vanish at the switch.
+            await migrateProject(project);
+            migratedCount += 1;
+            serverProjectIds.add(project.id);
+            migratedProjectIds.add(project.id);
+            changedAny = true;
+          }
+          for (const projectId of migratedProjectIds) {
+            if (canceled) return;
+            const project = browserList.get(projectId) ?? migratedEntries.get(projectId);
+            if (!project || projectsDeletedInBrowser.has(projectId) || conflicts.has(projectId) || !projectWriteGuard.canWrite(project.id)) continue;
+            const upload = migrated.get(project.id);
+            if (!upload) continue;
+            const record = await loadProjectShapes(project.id);
+            if (!record?.skfPackage || record.revision <= upload.recordRevision) continue;
+            try {
+              await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
+            } catch (error) {
+              if (!(error instanceof ServerProjectConflictError)) throw error;
+              // Another tab sharing this IndexedDB already uploaded this very record.
+              if (error.storedRevision !== record.revision) {
+                conflicts.set(project.id, { project, record, error });
+                continue;
+              }
+            }
+            migrated.set(project.id, { recordRevision: record.revision, serverRevision: record.revision });
+            migratedEntries.set(project.id, project);
+            serverBaseRevisions.set(project.id, record.revision);
+            caughtUp.add(project.id);
+            changedAny = true;
+          }
+        } catch (error) {
+          if (canceled) return;
+          setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
+          return;
+        }
+        if (canceled) return;
+        const deletionPending = [...migratedProjectIds].some((id) => projectsDeletedInBrowser.has(id) && !removedFromServer.has(id));
+        if (!changedAny && !deletionPending && pendingBrowserWrites.size === 0) break;
+      }
+
+      // Read in the same tick as the switch, so no browser edit lands in between.
+      const browserProjects = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
       serverProjectStorageActive = true;
-      const serverProjects = dashboardProjectsFromServer(adopted.projects);
-      projectsJsonRef.current = JSON.stringify(serverProjects.map(projectForStorage));
+      const adoptedProjects = dashboardProjectsFromServer(adopted.projects)
+        .filter((project) => !projectsDeletedInBrowser.has(project.id));
+      projectsJsonRef.current = JSON.stringify(adoptedProjects.map(projectForStorage));
+      const lateProjects = [...migratedProjectIds]
+        .filter((id) => !projectsDeletedInBrowser.has(id) && !adoptedProjects.some((candidate) => candidate.id === id))
+        .flatMap((id) => {
+          const entry = browserProjects.get(id) ?? migratedEntries.get(id);
+          return entry ? [entry] : [];
+        });
+      // Entries that differ from the listing are re-sent by the list sync.
+      const serverProjects = [
+        ...adoptedProjects.map((project) => (caughtUp.has(project.id) ? browserProjects.get(project.id) ?? project : project)),
+        ...lateProjects,
+      ];
       setProjects(serverProjects);
       setProjectStorageMode("server");
+      conflicts.forEach(({ project, record, error }, projectId) => {
+        projectWriteGuard.block(projectId);
+        const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
+        projectConflictRef.current?.(projectId, { entry, context: projectShapeSaveContext(project), revision: record.revision, shapeCount: entry.shapes.length }, error);
+      });
       try {
         const browserList = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
         if (browserList && browserList !== "[]") {
@@ -1921,6 +2030,7 @@ export default function Home() {
   };
 
   const deleteProject = (projectId: string) => {
+    if (!serverProjectStorageActive) projectsDeletedInBrowser.add(projectId);
     clearProjectLoadFailure(projectId);
     projectWriteGuard.forget(projectId);
     serverBaseRevisions.delete(projectId);

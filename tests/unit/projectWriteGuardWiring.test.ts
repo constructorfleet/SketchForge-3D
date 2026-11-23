@@ -32,10 +32,15 @@ describe("dashboard package writes", () => {
     const write = topLevelFunction("writeProjectShapes");
     expect(count(/\.put\(/)).toBe(1);
     expect(write).toContain(".put(");
-    // Migration copies the stored bytes up unchanged, so it may write directly.
-    expect(count(/\bsaveServerProjectPackage\(/)).toBe(2);
+    // Migration and its catch-up (#662) copy the stored bytes up unchanged, so they may write directly.
+    expect(count(/\bsaveServerProjectPackage\(/)).toBe(3);
     expect(write).toContain("saveServerProjectPackage(");
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
+    expect(page).toMatch(/!projectWriteGuard\.canWrite\(project\.id\)\) continue;[\s\S]{0,1200}saveServerProjectPackage\(project\.id, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
+    // A migration deletes only what the user deleted, never what the browser list lacks (#662).
+    expect(count(/\bdeleteServerProject\(/)).toBe(2);
+    expect(page).toMatch(/if \(!projectsDeletedInBrowser\.has\(projectId\) \|\| removedFromServer\.has\(projectId\)\) continue;\s*await deleteServerProject\(projectId\);/);
+    expect(page).toMatch(/const deleteProject = \(projectId: string\) => \{\s*if \(!serverProjectStorageActive\) projectsDeletedInBrowser\.add\(projectId\);/);
   });
 
   // Issue #650: a server package write is conditional on the copy it started from.
