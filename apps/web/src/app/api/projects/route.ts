@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
@@ -32,6 +33,11 @@ export const revalidate = false;
 
 const MAX_METADATA_BYTES = 256 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+
+/** Names a package's content, so a delete can require the bytes a write left (#672). */
+function packageDigest(bytes: Uint8Array | null) {
+  return bytes ? createHash("sha256").update(bytes).digest("hex") : "none";
+}
 
 function disabledResponse() {
   return NextResponse.json(
@@ -167,8 +173,14 @@ export async function POST(request: Request) {
       }
 
       const savedMetadata = writtenMetadata ?? stored;
+      const sidecar = await readProjectMetadata(root, projectId);
+      // Hashing the stored package costs a read; only a create's re-delete needs it.
+      const packageState = packageBytes
+        ? packageDigest(packageBytes)
+        : basedMetadataOnly ? undefined : packageDigest(await readProjectPackage(root, projectId));
+      const storedState = { revision: serverProjectRevision(sidecar), metadataRevision: serverMetadataRevision(sidecar), ...(packageState ? { package: packageState } : {}) };
       return NextResponse.json(
-        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
+        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null, stored: storedState },
         { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
       );
     });
@@ -184,10 +196,22 @@ export async function DELETE(request: Request) {
   try {
     const root = await ensureProjectsDirectory();
     if (!root) return errorResponse("errors.projects.disabled", 404);
-    const projectId = safeServerProjectId(new URL(request.url).searchParams.get("projectId") ?? "");
+    const params = new URL(request.url).searchParams;
+    const projectId = safeServerProjectId(params.get("projectId") ?? "");
     if (!projectId) return errorResponse("errors.projects.invalidId", 400);
+    const expectedRevision = params.get("expectedRevision");
+    const expectedMetadataRevision = params.get("expectedMetadataRevision");
+    const expectedPackage = params.get("expectedPackage");
 
     const locked = await withProjectLock(root, projectId, async () => {
+      // A conditional delete undoes one write; it spares a copy another client saved since (#672).
+      if (expectedRevision !== null || expectedMetadataRevision !== null || expectedPackage !== null) {
+        const stored = await readProjectMetadata(root, projectId);
+        const changed = (expectedRevision !== null && String(serverProjectRevision(stored)) !== expectedRevision)
+          || (expectedMetadataRevision !== null && String(serverMetadataRevision(stored)) !== expectedMetadataRevision)
+          || (expectedPackage !== null && packageDigest(await readProjectPackage(root, projectId)) !== expectedPackage);
+        if (changed) return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "changed" });
+      }
       const existed = await deleteProjectFiles(root, projectId);
       return existed
         ? NextResponse.json({ deleted: true, projectId }, { headers: { "Cache-Control": "no-store" } })

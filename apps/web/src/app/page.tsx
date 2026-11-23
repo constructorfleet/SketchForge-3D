@@ -83,6 +83,7 @@ import {
   ServerProjectDeletedError,
   serverMetadataRevision,
   type ServerProjectRecord,
+  type ServerProjectState,
 } from "@/lib/serverProjectStore";
 import { importSkfProject, SKF_CREATED_WITH_VERSION, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
@@ -498,8 +499,9 @@ const saveProjectShapes = guardProjectWrites(
 async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
   const skfPackage = await projectSkfPackage(projectId, entry, context);
   if (serverProjectStorageActive) {
+    let stored: ServerProjectState | null;
     try {
-      await saveServerProjectPackage(projectId, skfPackage, entry.revision, serverBaseRevisions.get(projectId));
+      ({ stored } = await saveServerProjectPackage(projectId, skfPackage, entry.revision, serverBaseRevisions.get(projectId)));
     } catch (error) {
       // Later writes would be based on the same stale copy.
       if (error instanceof ServerProjectConflictError) projectWriteGuard.block(projectId);
@@ -508,7 +510,7 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
     // Sent before this browser deleted it and landed after (#672). The server must accept
     // package writes for deleted projects: another client may save one back (#665).
     if (browserTombstones().has(projectId)) {
-      await deleteServerProject(projectId);
+      await undoLateWrite(projectId, stored);
       return;
     }
     serverBaseRevisions.set(projectId, entry.revision);
@@ -643,6 +645,12 @@ function storedProjectIsUsable(project: StoredDashboardProject) {
 /** Projects deleted in any tab of this browser (#670). */
 function browserTombstones() {
   return typeof window === "undefined" ? new Set<string>() : readProjectTombstones(window.localStorage);
+}
+
+/** Deletes what a late write stored, unless another client saved the project since (#672). */
+async function undoLateWrite(projectId: string, stored: ServerProjectState | null) {
+  // Without the stored state the delete cannot spare a newer copy, so it is not sent.
+  if (stored) await deleteServerProject(projectId, stored);
 }
 
 function readStoredProjects() {
@@ -822,16 +830,16 @@ export default function Home() {
   if (metadataSaveQueueRef.current === null) {
     const post = async (projectId: string, job: MetadataSaveJob, server: Record<string, unknown> | undefined) => {
       const metadata = mergeMetadataFields(job.synced, job.metadata, server ?? job.synced ?? job.metadata);
-      const record = await saveServerProjectMetadata(projectId, metadata, serverMetadataRevisions.get(projectId));
+      const { project: record, stored } = await saveServerProjectMetadata(projectId, metadata, serverMetadataRevisions.get(projectId));
       rememberServerMetadata(projectId, record?.metadata ?? metadata, metadata);
-      return metadata;
+      return { metadata, stored };
     };
     metadataSaveQueueRef.current = createCoalescingSaveQueue<MetadataSaveJob>({
       run: async (projectId, job) => {
         // Deleted while this job waited (#672).
         if (browserTombstones().has(projectId)) return;
         const creates = !serverMetadataRevisions.has(projectId);
-        let written: Record<string, unknown>;
+        let written: Awaited<ReturnType<typeof post>>;
         try {
           written = await post(projectId, job, syncedServerMetadata.get(projectId));
         } catch (error) {
@@ -846,13 +854,13 @@ export default function Home() {
         }
         // Sent before the delete and landed after it; the server cannot refuse a create (#672).
         if (creates && browserTombstones().has(projectId)) {
-          await deleteServerProject(projectId);
+          await undoLateWrite(projectId, written.stored);
           return;
         }
-        const writtenJson = JSON.stringify(written);
+        const writtenJson = JSON.stringify(written.metadata);
         if (writtenJson === JSON.stringify(job.metadata)) return;
         // Show what was stored, and do not post it back.
-        const adopted = normalizeStoredProject(written as StoredDashboardProject, 0);
+        const adopted = normalizeStoredProject(written.metadata as StoredDashboardProject, 0);
         serverProjectMetadataRef.current.set(projectId, JSON.stringify(projectForStorage(adopted)));
         setProjects((projects) => projects.map((project) => (project.id === projectId ? { ...adopted, accent: project.accent } : project)));
       },

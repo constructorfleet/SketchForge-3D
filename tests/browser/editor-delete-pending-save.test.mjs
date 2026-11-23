@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -163,7 +163,7 @@ async function holdNextPost(page, field) {
     const body = request.method() === "POST" ? request.postDataBuffer()?.toString("latin1") ?? "" : "";
     if (armed && body.includes(`name="${field}"`)) {
       armed = false;
-      markHeld();
+      markHeld(new URL(request.url()).searchParams.get("projectId"));
       await released;
     }
     await route.continue();
@@ -202,7 +202,7 @@ async function withServerProject(run) {
       assert.equal((await pollUntil(stored, (names) => names.length === 2)).length, 2, "the first edit was never stored on the server");
       // Let the edit's own writes finish, so only the next one is held.
       await page.waitForTimeout(2_000);
-      await run({ page, listed, stored });
+      await run({ page, listed, stored, baseURL, projectsDir });
     });
   } finally {
     rmSync(projectsDir, { recursive: true, force: true });
@@ -260,5 +260,59 @@ test("a new project's first save held past its delete does not bring it back", {
 
     assert.deepEqual(await listed(), kept, "the held first save recreated the deleted project");
     assert.deepEqual(stored().filter((name) => !name.startsWith(kept[0])), [], "a file of the deleted project is back on disk");
+  });
+});
+
+// Holds the next DELETE until released; other requests go on to earlier handlers.
+async function holdNextDelete(page) {
+  let release = () => {};
+  const released = new Promise((resolve) => { release = resolve; });
+  let markHeld = () => {};
+  const held = new Promise((resolve) => { markHeld = resolve; });
+  let armed = true;
+  await page.route("**/api/projects?*", async (route) => {
+    if (!armed || route.request().method() !== "DELETE") return route.fallback();
+    armed = false;
+    markHeld();
+    await released;
+    await route.fallback();
+  });
+  return { held, release };
+}
+
+test("undoing a late save spares a copy another client saved in between", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, baseURL, projectsDir }) => {
+    const packagePost = await holdNextPost(page, "project");
+    await addBox(page);
+    const projectId = await packagePost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    await deleteFromDashboard(page);
+
+    // The late save lands; hold this tab's undo of it while another client saves the project back (#665).
+    const undo = await holdNextDelete(page);
+    packagePost.release();
+    await undo.held;
+    const otherCopy = new Uint8Array([9, 9, 9, 9]);
+    const save = (fill) => {
+      const body = new FormData();
+      fill(body);
+      return fetch(`${baseURL}/api/projects?projectId=${projectId}`, { method: "POST", headers: { Origin: baseURL }, body });
+    };
+    assert.ok((await save((body) => {
+      body.append("project", new Blob([otherCopy]));
+      body.append("revision", String(Date.now()));
+      body.append("baseRevision", "1");
+    })).ok, "the other client's package save must succeed");
+    assert.ok((await save((body) => {
+      body.append("metadata", JSON.stringify({ id: projectId, name: "Saved elsewhere", revision: Date.now(), updatedAt: Date.now() }));
+      body.append("baseMetadataRevision", "0");
+    })).ok, "the other client's entry save must succeed");
+
+    const undone = page.waitForResponse((response) => response.request().method() === "DELETE" && response.url().includes("/api/projects?"));
+    undo.release();
+    assert.equal((await undone).status(), 409, "the undo must be refused once the project changed");
+
+    assert.deepEqual(await listed(), [projectId], "the other client's copy was deleted");
+    assert.deepEqual([...readFileSync(join(projectsDir, `${projectId}.skf`))], [...otherCopy], "the other client's package was replaced");
   });
 });

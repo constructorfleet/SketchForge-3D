@@ -197,16 +197,25 @@ export async function saveServerProjectPackage(projectId: string, packageBytes: 
 /** Attempts at a write the server refuses as busy: its per-project lock is held by another write. */
 const BUSY_WRITE_ATTEMPTS = 8;
 
-async function postServerProject(projectId: string, fill: (formData: FormData) => void) {
-  const formData = new FormData();
-  fill(formData);
-  const post = () => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData });
-  let response = await post();
-  // This client's own package and metadata writes can overlap; the lock is held for milliseconds (#662).
+/** What the server holds after a write; `package` is a digest, or "none", when the server reports it. */
+export type ServerProjectState = { revision: number; metadataRevision: number; package?: string };
+
+export type ServerProjectWrite = { project: ServerProjectRecord | null; stored: ServerProjectState | null };
+
+// This client's own writes and deletes can overlap; the lock is held for milliseconds (#662).
+async function sendUntilFree(send: () => Promise<Response>) {
+  let response = await send();
   for (let attempt = 1; attempt < BUSY_WRITE_ATTEMPTS && await isBusyRefusal(response); attempt += 1) {
     await new Promise((resolve) => globalThis.setTimeout(resolve, 50 * attempt));
-    response = await post();
+    response = await send();
   }
+  return response;
+}
+
+async function postServerProject(projectId: string, fill: (formData: FormData) => void): Promise<ServerProjectWrite> {
+  const formData = new FormData();
+  fill(formData);
+  const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData }));
   if (!response.ok) {
     const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown };
     if (response.status === 409 && payload.conflict === "newerRevision") {
@@ -216,8 +225,8 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
     if (response.status === 410 && payload.conflict === "deleted") throw new ServerProjectDeletedError();
     throw await serverProjectError(response, "errors.projects.saveFailed");
   }
-  const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };
-  return payload.project ?? null;
+  const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord; stored?: ServerProjectState };
+  return { project: payload.project ?? null, stored: payload.stored ?? null };
 }
 
 async function isBusyRefusal(response: Response) {
@@ -226,9 +235,22 @@ async function isBusyRefusal(response: Response) {
   return payload.errorKey === "errors.projects.busySaving";
 }
 
-export async function deleteServerProject(projectId: string) {
-  const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
-  if (!response.ok && response.status !== 404) throw await serverProjectError(response, "errors.projects.deleteFailed");
+/**
+ * Deletes a project. With `expected`, deletes only while the server holds that state,
+ * and returns false when another write changed it since.
+ */
+export async function deleteServerProject(projectId: string, expected?: ServerProjectState) {
+  const query = new URLSearchParams({ projectId });
+  if (expected) {
+    query.set("expectedRevision", String(expected.revision));
+    query.set("expectedMetadataRevision", String(expected.metadataRevision));
+    if (expected.package !== undefined) query.set("expectedPackage", expected.package);
+  }
+  const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?${query}`, { method: "DELETE" }));
+  if (response.ok || response.status === 404) return true;
+  const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown };
+  if (response.status === 409 && payload.conflict === "changed") return false;
+  throw await serverProjectError(response, "errors.projects.deleteFailed");
 }
 
 /**

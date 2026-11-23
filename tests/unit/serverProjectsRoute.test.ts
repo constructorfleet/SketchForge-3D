@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -272,6 +273,54 @@ describe("server project storage", () => {
       await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11 }));
 
       expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }))).status).toBe(201);
+    });
+  });
+
+  // Issue #672: a client re-deletes a project its own late write put back, but not one another client saved since.
+  describe("deletes conditional on what a write stored", () => {
+    type Stored = { revision: number; metadataRevision: number; package?: string };
+    const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+
+    function conditionalDelete(expected: Stored) {
+      const query = new URLSearchParams({
+        projectId: "project-1",
+        expectedRevision: String(expected.revision),
+        expectedMetadataRevision: String(expected.metadataRevision),
+        ...(expected.package ? { expectedPackage: expected.package } : {}),
+      });
+      return DELETE(new Request(`http://localhost/api/projects?${query}`, { method: "DELETE", headers: { Origin: "http://localhost" } }));
+    }
+
+    it("reports what a package write stored, and deletes when nothing changed since", async () => {
+      const bytes = new Uint8Array([1, 2, 3]);
+      const { stored } = await (await POST(saveRequest("project-1", { project: bytes, revision: 11, baseRevision: 10 }))).json() as { stored: Stored };
+      expect(stored).toEqual({ revision: 0, metadataRevision: 0, package: digest(bytes) });
+
+      expect((await conditionalDelete(stored)).status).toBe(200);
+      expect(await fs.readdir(projectsRoot)).toEqual([]);
+    });
+
+    it("keeps a project another client saved after the write the delete is based on", async () => {
+      const { stored } = await (await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11, baseRevision: 10 }))).json() as { stored: Stored };
+      // Another client that kept the project open saves it back (#665).
+      await POST(saveRequest("project-1", { project: new Uint8Array([2, 2]), revision: 12, baseRevision: 10 }));
+      await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }));
+
+      const response = await conditionalDelete(stored);
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ conflict: "changed" });
+      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-1"]);
+      expect((await fs.readdir(projectsRoot)).sort()).toEqual(["project-1.json", "project-1.skf"]);
+    });
+
+    it("reports the stored package with a create, so its delete sees a package saved since", async () => {
+      const { stored } = await (await POST(saveRequest("project-1", { metadata: metadata() }))).json() as { stored: Stored };
+      expect(stored).toEqual({ revision: 10, metadataRevision: 1, package: "none" });
+      await POST(saveRequest("project-1", { project: new Uint8Array([2]), revision: 10, baseRevision: 10 }));
+
+      expect((await conditionalDelete(stored)).status).toBe(409);
+      expect((await listing()).projects).toHaveLength(1);
     });
   });
 
