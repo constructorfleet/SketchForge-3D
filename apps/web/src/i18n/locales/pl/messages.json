@@ -268,7 +268,19 @@
       "downloadFailed": "Nie można pobrać zapisanej kopii.",
       "packageNetwork": "Żądanie pakietu tego projektu nie dotarło do serwera ({detail}).",
       "packageStatus": "Serwer odpowiedział na żądanie pakietu tego projektu kodem HTTP {detail}.",
-      "packageNotPackage": "Serwer odpowiedział na żądanie pakietu tego projektu typem {detail}, a nie pakietem projektu."
+      "packageNotPackage": "Serwer odpowiedział na żądanie pakietu tego projektu typem {detail}, a nie pakietem projektu.",
+      "missingTitle": "Projekt {name} nie ma zapisanego pakietu",
+      "missingKept": "Serwer ma dane tego projektu, ale nie ma pliku pakietu albo pakiet nie jest zwykłym plikiem. Nic nie zostało zmienione. Autozapis jest wyłączony, dopóki projekt się nie wczyta albo nie zaczniesz od nowa.",
+      "conflictTitle": "Projekt {name} został zmieniony gdzie indziej",
+      "conflictKept": "Inny klient zapisał nowszą kopię, więc ta nie została zapisana na niej. Zmiany od otwarcia projektu nie są zapisane. Pobierz swoją kopię, aby je zachować, albo otwórz nowszą kopię.",
+      "reloadNewer": "Otwórz nowszą kopię",
+      "downloadMine": "Pobierz moją kopię",
+      "myCopyName": "{name} (moja kopia)",
+      "conflictDetail": "Serwer ma kopię zapisaną {time}.",
+      "packageMissing": "Żądanie pakietu tego projektu nie znalazło pliku pakietu.",
+      "reloadNewerFor": "Otwórz nowszą kopię: {name}",
+      "downloadMineFor": "Pobierz moją kopię: {name}",
+      "startOverRefused": "Ktoś inny zapisał projekt {name} po tym, jak ten klient go odczytał, więc nie został zastąpiony. Spróbuj ponownie, aby otworzyć jego kopię."
     },
     "storageWarning": {
       "message": "Ta przeglądarka wykorzystała {percent} miejsca dozwolonego na projekty. Wyeksportuj kopię zapasową, zanim miejsce się skończy."

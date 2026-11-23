@@ -14,11 +14,17 @@ function metadata(overrides: Record<string, unknown> = {}) {
   return { id: "project-1", name: "Bracket", revision: 10, updatedAt: 10, ...overrides };
 }
 
-function saveRequest(projectId: string, fields: { metadata?: unknown; project?: Uint8Array<ArrayBuffer>; revision?: number }, origin = "http://localhost") {
+function saveRequest(
+  projectId: string,
+  fields: { metadata?: unknown; project?: Uint8Array<ArrayBuffer>; revision?: number; baseRevision?: number; baseMetadataRevision?: number },
+  origin = "http://localhost",
+) {
   const formData = new FormData();
   if (fields.metadata !== undefined) formData.append("metadata", JSON.stringify(fields.metadata));
   if (fields.project) formData.append("project", new Blob([fields.project]));
   if (fields.revision !== undefined) formData.append("revision", String(fields.revision));
+  if (fields.baseRevision !== undefined) formData.append("baseRevision", String(fields.baseRevision));
+  if (fields.baseMetadataRevision !== undefined) formData.append("baseMetadataRevision", String(fields.baseMetadataRevision));
   return new Request(`http://localhost/api/projects?projectId=${encodeURIComponent(projectId)}`, {
     method: "POST",
     headers: { Origin: origin },
@@ -76,13 +82,107 @@ describe("server project storage", () => {
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
   });
 
-  it("refuses a write from a tab holding older state", async () => {
+  // Issue #650: two clients on one directory must not overwrite each other's newer package.
+  it("records a package write's revision in the sidecar, so the next writer's base can be checked", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+    expect((await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 30, baseRevision: 10 }))).status).toBe(200);
+
+    expect((await listing()).projects[0].metadata.revision).toBe(30);
+    expect((await listing()).projects[0].metadata.name).toBe("Bracket");
+  });
+
+  it("refuses a package write whose base is older than the stored revision, even with a newer clock", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+    // Client B saves over the revision both clients loaded.
+    await POST(saveRequest("project-1", { project: new Uint8Array([2, 2]), revision: 20, baseRevision: 10 }));
+
+    // Client A's clock is later, but its copy is still based on revision 10.
+    const response = await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 40, baseRevision: 10 }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ errorKey: "errors.projects.changedBeforeSave", conflict: "newerRevision", storedRevision: 20 });
+
+    const stored = await GET(new Request("http://localhost/api/projects?projectId=project-1"));
+    expect(new Uint8Array(await stored.arrayBuffer())).toEqual(new Uint8Array([2, 2]));
+    expect((await listing()).projects[0].metadata.revision).toBe(20);
+  });
+
+  it("serves a package with the sidecar revision it was stored at", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+    await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 25, baseRevision: 10 }));
+
+    const response = await GET(new Request("http://localhost/api/projects?projectId=project-1"));
+    expect(response.headers.get("X-SketchForge-Revision")).toBe("25");
+  });
+
+  it("refuses a package write whose clock revision is older than the stored one, without calling it a conflict", async () => {
     await POST(saveRequest("project-1", { metadata: metadata({ revision: 20 }) }));
 
-    const response = await POST(saveRequest("project-1", { metadata: metadata({ revision: 10, name: "Stale" }) }));
+    const response = await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 10 }));
 
     expect(response.status).toBe(409);
-    expect((await listing()).projects[0].metadata.name).toBe("Bracket");
+    expect(await response.json()).not.toHaveProperty("conflict");
+  });
+
+  it("reports a stale base as a conflict even when the clock revision is stale too", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 20 }) }));
+
+    const response = await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 10, baseRevision: 5 }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ conflict: "newerRevision", storedRevision: 20 });
+  });
+
+  // The sidecar revision follows package writes, so a list write sent while a save
+  // was in flight can carry an older one. It must still land, and not move the revision.
+  it("accepts a metadata write with an older revision and keeps the stored revision", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+    await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 20, baseRevision: 10 }));
+
+    const response = await POST(saveRequest("project-1", { metadata: metadata({ revision: 10, name: "Renamed", thumbnailVersion: 3 }) }));
+
+    expect(response.status).toBe(200);
+    const stored = (await listing()).projects[0].metadata;
+    expect(stored).toMatchObject({ name: "Renamed", thumbnailVersion: 3, revision: 20 });
+  });
+
+  // A rename or settings change does not move the package revision, so metadata has its own counter.
+  it("counts metadata writes, and keeps the count across package writes", async () => {
+    const first = await (await POST(saveRequest("project-1", { metadata: metadata() }))).json() as { project: { metadata: Record<string, unknown> } };
+    expect(first.project.metadata.metadataRevision).toBe(1);
+    await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed" }), baseMetadataRevision: 1 }));
+    await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 20, baseRevision: 10 }));
+
+    expect((await listing()).projects[0].metadata).toMatchObject({ metadataRevision: 2, revision: 20, name: "Renamed" });
+  });
+
+  it("refuses a write from a tab holding older state", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata() }));
+    // Another client renames it.
+    await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed elsewhere" }), baseMetadataRevision: 1 }));
+
+    // This client's list still holds the first state.
+    const response = await POST(saveRequest("project-1", { metadata: metadata({ thumbnailVersion: 4 }), baseMetadataRevision: 1 }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ conflict: "newerMetadata", storedMetadataRevision: 2 });
+    expect((await listing()).projects[0].metadata.name).toBe("Renamed elsewhere");
+  });
+
+  it("does not let a metadata write move the revision ahead of the package", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 99 }) }));
+
+    expect((await listing()).projects[0].metadata.revision).toBe(10);
+  });
+
+  it("labels a missing package's 404 with the sidecar revision", async () => {
+    await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+
+    const response = await GET(new Request("http://localhost/api/projects?projectId=project-1"));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("X-SketchForge-Revision")).toBe("10");
   });
 
   it("accepts a save that repeats the revision it already stored", async () => {

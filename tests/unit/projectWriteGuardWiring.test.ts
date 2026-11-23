@@ -38,9 +38,32 @@ describe("dashboard package writes", () => {
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
   });
 
-  it("drops a late editor snapshot for a blocked project before it touches the cache", () => {
-    expect(page).toMatch(/const updateProjectShapes = useCallback\(\(snapshot: \{[\s\S]*?\}\) => \{\s*(?:\/\/[^\n]*\n\s*)*if \(!projectWriteGuard\.canWrite\(snapshot\.projectId\)\) return;/);
-    expect(page).toMatch(/setProjectShapesById\(\(current\) => cacheWithEditorChange\(current, snapshot\.projectId, entry, projectWriteGuard\)\)/);
+  // Issue #650: a server package write is conditional on the copy it started from.
+  it("sends the base revision with every autosaved server package and blocks on a conflict", () => {
+    const write = topLevelFunction("writeProjectShapes");
+    expect(write).toMatch(/saveServerProjectPackage\(projectId, skfPackage, entry\.revision, serverBaseRevisions\.get\(projectId\)\)/);
+    expect(write).toMatch(/if \(error instanceof ServerProjectConflictError\) projectWriteGuard\.block\(projectId\);/);
+    expect(write).toContain("serverBaseRevisions.set(projectId, entry.revision);");
+  });
+
+  it("bases a start over on the revision that was served, and raises the clock past a loaded revision", () => {
+    expect(page).toMatch(/const seen = servedRevisions\.get\(project\.id\);\s*if \(seen === undefined\) serverBaseRevisions\.delete\(project\.id\);\s*else serverBaseRevisions\.set\(project\.id, seen\);/);
+    expect(page).toMatch(/nextProjectRevisionRef\.current = Math\.max\(nextProjectRevisionRef\.current, loadedRevision, serverRevision \?\? 0\);/);
+    // A failed load raises it too, so Start over outranks the served revision on a clock that is behind.
+    expect(page).toMatch(/projectWriteGuard\.block\(activeProjectId\);[\s\S]{0,200}nextProjectRevisionRef\.current = Math\.max\(nextProjectRevisionRef\.current, servedRevisions\.get\(activeProjectId\) \?\? 0\);/);
+  });
+
+  it("drops a late editor snapshot for a blocked project before it touches the cache or the queue", () => {
+    const body = page.slice(page.indexOf("const updateProjectShapes = useCallback("), page.indexOf("const updateProjectWorkspace = useCallback("));
+    const guard = body.indexOf("if (!projectWriteGuard.canWrite(snapshot.projectId)) {");
+    expect(guard).toBeGreaterThan(-1);
+    expect(body.slice(guard)).toMatch(/^if \(!projectWriteGuard\.canWrite\(snapshot\.projectId\)\) \{[^}]*return;\s*\}/);
+    expect(body.indexOf("setProjectShapesById(")).toBeGreaterThan(guard);
+    expect(body.indexOf(".enqueue(")).toBeGreaterThan(guard);
+    expect(body).toMatch(/setProjectShapesById\(\(current\) => cacheWithEditorChange\(current, snapshot\.projectId, entry, projectWriteGuard\)\)/);
+    // Recorded before the guard, so a refused save can still be downloaded with every edit.
+    expect(body.indexOf("latestEditorCopiesRef.current.set(snapshot.projectId, job)")).toBeGreaterThan(-1);
+    expect(body.indexOf("latestEditorCopiesRef.current.set(snapshot.projectId, job)")).toBeLessThan(guard);
   });
 
   it("blocks writes when a load fails", () => {

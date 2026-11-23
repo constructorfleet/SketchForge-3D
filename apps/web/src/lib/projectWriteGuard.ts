@@ -22,6 +22,14 @@ export function createProjectWriteGuard(): ProjectWriteGuard {
   };
 }
 
+/** Marks a write the guard refused, which the banner that blocked the project already reports. */
+export class ProjectWriteRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectWriteRefusedError";
+  }
+}
+
 /** Wraps a project write so it is refused, before any packing, while the project is blocked. */
 export function guardProjectWrites<A extends unknown[], R>(
   guard: ProjectWriteGuard,
@@ -48,7 +56,7 @@ export function cacheWithEditorChange<T extends { revision: number }>(
 }
 
 /** `storageNewer`: a newer release upgraded the browser database, so this build can neither read nor replace it. */
-export type ProjectLoadFailureKind = "unreadable" | "unavailable" | "storageNewer";
+export type ProjectLoadFailureKind = "unreadable" | "unavailable" | "storageNewer" | "missing" | "conflict";
 
 /** Marks a load error raised by the stored copy's contents, not by reaching storage. */
 export class StoredProjectUnreadableError extends Error {
@@ -62,6 +70,7 @@ export class StoredProjectUnreadableError extends Error {
 }
 
 export function projectLoadFailureKind(error: unknown): ProjectLoadFailureKind {
+  if (error instanceof StoredProjectMissingError) return "missing";
   if (!(error instanceof StoredProjectUnreadableError)) return "unavailable";
   const { reason } = error;
   return reason && typeof reason === "object" && (reason as { name?: unknown }).name === "VersionError" ? "storageNewer" : "unreadable";
@@ -85,3 +94,33 @@ export function indexedDbReadIsPermanent(error: unknown): boolean {
 
 // A newer schema, or a value that cannot be decoded, reads the same way every time.
 const PERMANENT_INDEXEDDB_ERRORS = new Set(["VersionError", "DataError", "NotReadableError", "DataCloneError"]);
+
+/** Marks a server project whose metadata exists but whose package file does not. */
+export class StoredProjectMissingError extends Error {
+  constructor() {
+    super("The stored project package is missing");
+    this.name = "StoredProjectMissingError";
+  }
+}
+
+/** Merges a server listing into the local list, taking only projects that are newer or new. */
+export function mergeNewerServerProjects<T extends { id: string; revision?: number }>(
+  local: T[],
+  server: T[],
+  isNewer: (mine: T, theirs: T) => boolean = () => false,
+): { projects: T[]; changedIds: string[] } {
+  const byId = new Map(local.map((project, index) => [project.id, index]));
+  const projects = [...local];
+  const changedIds: string[] = [];
+  for (const candidate of server) {
+    const index = byId.get(candidate.id);
+    if (index === undefined) {
+      projects.push(candidate);
+      changedIds.push(candidate.id);
+    } else if ((candidate.revision ?? 0) > (local[index].revision ?? 0) || isNewer(local[index], candidate)) {
+      projects[index] = candidate;
+      changedIds.push(candidate.id);
+    }
+  }
+  return { projects: changedIds.length ? projects : local, changedIds };
+}

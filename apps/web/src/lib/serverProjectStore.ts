@@ -33,6 +33,13 @@ export function serverProjectPackageFileName(projectId: string) {
   return `${projectId}.skf`;
 }
 
+/** Counts metadata writes, which do not move the package revision. */
+export function serverMetadataRevision(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") return 0;
+  const revision = (metadata as { metadataRevision?: unknown }).metadataRevision;
+  return typeof revision === "number" && Number.isFinite(revision) ? revision : 0;
+}
+
 /** The dashboard's own revision counter, as stored in the metadata sidecar. */
 export function serverProjectRevision(metadata: unknown) {
   if (!metadata || typeof metadata !== "object") return 0;
@@ -52,6 +59,15 @@ export function serverProjectWriteIsStale(storedMetadata: unknown, incomingMetad
   const incoming = serverProjectRevision(incomingMetadata);
   if (incoming === 0) return false;
   return serverProjectRevision(storedMetadata) > incoming;
+}
+
+/** Carries the sidecar revision a package was served at. */
+export const SERVER_PROJECT_REVISION_HEADER = "X-SketchForge-Revision";
+
+/** Returns true when a package write's base revision is older than the stored one. */
+export function serverPackageBaseIsStale(storedMetadata: unknown, baseRevision: number | undefined) {
+  if (baseRevision === undefined || !Number.isFinite(baseRevision)) return false;
+  return serverProjectRevision(storedMetadata) > baseRevision;
 }
 
 export type ServerProjectRecord = {
@@ -110,35 +126,63 @@ export class ServerPackageRequestError extends Error {
   }
 }
 
-export async function fetchServerProjectPackage(projectId: string) {
+/** Says another client changed a project's metadata after this client's list read it. */
+export class ServerMetadataConflictError extends Error {
+  constructor() {
+    super("Project details were changed elsewhere");
+    this.name = "ServerMetadataConflictError";
+  }
+}
+
+/** Says another client saved a newer package than the one this write is based on. */
+export class ServerProjectConflictError extends Error {
+  readonly storedRevision: number;
+
+  constructor(storedRevision: number) {
+    super(`Project was changed elsewhere (stored revision ${storedRevision})`);
+    this.name = "ServerProjectConflictError";
+    this.storedRevision = storedRevision;
+  }
+}
+
+export async function fetchServerProjectPackage(projectId: string): Promise<{ bytes: Uint8Array | null; revision: number | undefined }> {
   let response: Response;
   try {
     response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
   } catch (error) {
     throw new ServerPackageRequestError("network", error instanceof Error ? error.message : String(error));
   }
-  if (response.status === 404) return null;
+  const revision = servedRevision(response);
+  // No bytes, but the sidecar may exist; its revision is the base for replacing the package.
+  if (response.status === 404) return { bytes: null, revision };
   if (!response.ok) throw new ServerPackageRequestError("status", String(response.status));
   // A proxy or sign-in page can answer 200 with HTML; parsing that would call the project unreadable.
   const contentType = response.headers.get("content-type") ?? "";
   if (!PACKAGE_CONTENT_TYPE.test(contentType)) throw new ServerPackageRequestError("notPackage", contentType || "none");
-  return new Uint8Array(await response.arrayBuffer());
+  return { bytes: new Uint8Array(await response.arrayBuffer()), revision };
+}
+
+function servedRevision(response: Response) {
+  const revision = Number(response.headers.get(SERVER_PROJECT_REVISION_HEADER) ?? Number.NaN);
+  return Number.isFinite(revision) ? revision : undefined;
 }
 
 const PACKAGE_CONTENT_TYPE = /^application\/(?:zip|octet-stream|[\w.-]+\+zip)\s*(?:;|$)/i;
 
 /** Write the project list's half of a project: its metadata sidecar, leaving the packed `.skf` alone. */
-export async function saveServerProjectMetadata(projectId: string, metadata: unknown) {
+export async function saveServerProjectMetadata(projectId: string, metadata: unknown, baseMetadataRevision?: number) {
   return postServerProject(projectId, (formData) => {
     formData.append("metadata", JSON.stringify(metadata));
+    if (baseMetadataRevision !== undefined) formData.append("baseMetadataRevision", String(baseMetadataRevision));
   });
 }
 
 /** Write autosave's half of a project: the packed `.skf`, leaving the metadata sidecar alone. */
-export async function saveServerProjectPackage(projectId: string, packageBytes: Uint8Array, revision: number) {
+export async function saveServerProjectPackage(projectId: string, packageBytes: Uint8Array, revision: number, baseRevision?: number) {
   return postServerProject(projectId, (formData) => {
     formData.append("project", new Blob([new Uint8Array(packageBytes)], { type: "application/vnd.sketchforge.project+zip" }));
     formData.append("revision", String(revision));
+    if (baseRevision !== undefined) formData.append("baseRevision", String(baseRevision));
   });
 }
 
@@ -146,7 +190,14 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
   const formData = new FormData();
   fill(formData);
   const response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData });
-  if (!response.ok) throw await serverProjectError(response, "errors.projects.saveFailed");
+  if (!response.ok) {
+    const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown };
+    if (response.status === 409 && payload.conflict === "newerRevision") {
+      throw new ServerProjectConflictError(typeof payload.storedRevision === "number" ? payload.storedRevision : 0);
+    }
+    if (response.status === 409 && payload.conflict === "newerMetadata") throw new ServerMetadataConflictError();
+    throw await serverProjectError(response, "errors.projects.saveFailed");
+  }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };
   return payload.project ?? null;
 }

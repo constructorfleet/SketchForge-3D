@@ -268,7 +268,19 @@
       "downloadFailed": "No se pudo descargar la copia guardada.",
       "packageNetwork": "La solicitud del paquete de este proyecto no llegó al servidor ({detail}).",
       "packageStatus": "El servidor respondió a la solicitud del paquete de este proyecto con HTTP {detail}.",
-      "packageNotPackage": "El servidor respondió a la solicitud del paquete de este proyecto con {detail}, no con un paquete de proyecto."
+      "packageNotPackage": "El servidor respondió a la solicitud del paquete de este proyecto con {detail}, no con un paquete de proyecto.",
+      "missingTitle": "{name} no tiene paquete guardado",
+      "missingKept": "El servidor tiene los datos de este proyecto, pero no su archivo de paquete, o el paquete no es un archivo normal. No se ha cambiado nada. El guardado automático sigue desactivado hasta que se cargue o empieces de nuevo.",
+      "conflictTitle": "{name} se ha cambiado en otro lugar",
+      "conflictKept": "Otro cliente guardó una copia más reciente, así que esta no se guardó encima. Los cambios que hiciste desde que abriste el proyecto no están guardados. Descarga tu copia para conservarlos o abre la copia más reciente.",
+      "reloadNewer": "Abrir la copia más reciente",
+      "downloadMine": "Descargar mi copia",
+      "myCopyName": "{name} (mi copia)",
+      "conflictDetail": "El servidor tiene una copia guardada el {time}.",
+      "packageMissing": "La solicitud del paquete de este proyecto no encontró ningún archivo de paquete.",
+      "reloadNewerFor": "Abrir la copia más reciente: {name}",
+      "downloadMineFor": "Descargar mi copia: {name}",
+      "startOverRefused": "Otra persona guardó {name} después de que este cliente lo leyera, así que no se ha sustituido. Reinténtalo para abrir su copia."
     },
     "storageWarning": {
       "message": "Este navegador ha usado el {percent} del espacio disponible para tus proyectos. Exporta una copia de seguridad antes de que se agote."

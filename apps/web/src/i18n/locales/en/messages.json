@@ -118,7 +118,19 @@
       "downloadFailed": "Could not download the stored copy.",
       "packageNetwork": "The request for this project's package did not reach the server ({detail}).",
       "packageStatus": "The server answered the request for this project's package with HTTP {detail}.",
-      "packageNotPackage": "The server answered the request for this project's package with {detail}, not a project package."
+      "packageNotPackage": "The server answered the request for this project's package with {detail}, not a project package.",
+      "missingTitle": "{name} has no stored package",
+      "missingKept": "The server has this project's details but no package file, or the package is not a regular file. Nothing was changed. Autosave stays off until it loads or you start over.",
+      "conflictTitle": "{name} was changed elsewhere",
+      "conflictKept": "Another client saved a newer copy, so this one was not saved over it. Changes you made since you opened the project are not saved. Download your copy to keep them, or open the newer copy.",
+      "reloadNewer": "Open the newer copy",
+      "downloadMine": "Download my copy",
+      "myCopyName": "{name} (my copy)",
+      "conflictDetail": "The server holds a copy saved at {time}.",
+      "packageMissing": "The request for this project's package found no package file.",
+      "reloadNewerFor": "Open the newer copy: {name}",
+      "downloadMineFor": "Download my copy: {name}",
+      "startOverRefused": "Someone else saved {name} after this client read it, so it was not replaced. Try again to open their copy."
     },
     "storageWarning": {
       "message": "This browser has used {percent} of the space it allows for your projects. Export a backup before it runs out."

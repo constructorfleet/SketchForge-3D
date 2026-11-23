@@ -268,7 +268,19 @@
       "downloadFailed": "Impossible de télécharger la copie enregistrée.",
       "packageNetwork": "La demande du paquet de ce projet n’a pas atteint le serveur ({detail}).",
       "packageStatus": "Le serveur a répondu à la demande du paquet de ce projet par HTTP {detail}.",
-      "packageNotPackage": "Le serveur a répondu à la demande du paquet de ce projet par {detail}, et non par un paquet de projet."
+      "packageNotPackage": "Le serveur a répondu à la demande du paquet de ce projet par {detail}, et non par un paquet de projet.",
+      "missingTitle": "{name} n’a pas de paquet enregistré",
+      "missingKept": "Le serveur a les informations de ce projet mais pas de fichier de paquet, ou le paquet n’est pas un fichier ordinaire. Rien n’a été modifié. L’enregistrement automatique reste désactivé jusqu’à son chargement ou jusqu’à ce que vous recommenciez.",
+      "conflictTitle": "{name} a été modifié ailleurs",
+      "conflictKept": "Un autre client a enregistré une copie plus récente ; celle-ci n’a donc pas été enregistrée par-dessus. Les modifications faites depuis l’ouverture du projet ne sont pas enregistrées. Téléchargez votre copie pour les garder, ou ouvrez la copie plus récente.",
+      "reloadNewer": "Ouvrir la copie plus récente",
+      "downloadMine": "Télécharger ma copie",
+      "myCopyName": "{name} (ma copie)",
+      "conflictDetail": "Le serveur détient une copie enregistrée le {time}.",
+      "packageMissing": "La demande du paquet de ce projet n’a trouvé aucun fichier de paquet.",
+      "reloadNewerFor": "Ouvrir la copie plus récente: {name}",
+      "downloadMineFor": "Télécharger ma copie: {name}",
+      "startOverRefused": "Quelqu’un d’autre a enregistré {name} après sa lecture par ce client ; il n’a donc pas été remplacé. Réessayez pour ouvrir sa copie."
     },
     "storageWarning": {
       "message": "Ce navigateur utilise {percent} de l’espace qu’il autorise pour vos projets. Exportez une sauvegarde avant qu’il ne soit plein."

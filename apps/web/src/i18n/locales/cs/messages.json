@@ -268,7 +268,19 @@
       "downloadFailed": "Uloženou kopii nelze stáhnout.",
       "packageNetwork": "Požadavek na balíček tohoto projektu nedorazil na server ({detail}).",
       "packageStatus": "Server odpověděl na požadavek na balíček tohoto projektu kódem HTTP {detail}.",
-      "packageNotPackage": "Server odpověděl na požadavek na balíček tohoto projektu typem {detail}, nikoli balíčkem projektu."
+      "packageNotPackage": "Server odpověděl na požadavek na balíček tohoto projektu typem {detail}, nikoli balíčkem projektu.",
+      "missingTitle": "Projekt {name} nemá uložený balíček",
+      "missingKept": "Server má údaje o tomto projektu, ale žádný soubor balíčku, nebo balíček není běžný soubor. Nic se nezměnilo. Automatické ukládání je vypnuté, dokud se projekt nenačte nebo nezačnete znovu.",
+      "conflictTitle": "Projekt {name} byl změněn jinde",
+      "conflictKept": "Jiný klient uložil novější kopii, proto se přes ni tato neuložila. Změny od otevření projektu nejsou uložené. Stáhněte si svou kopii, abyste o ně nepřišli, nebo otevřete novější kopii.",
+      "reloadNewer": "Otevřít novější kopii",
+      "downloadMine": "Stáhnout mou kopii",
+      "myCopyName": "{name} (moje kopie)",
+      "conflictDetail": "Server má kopii uloženou {time}.",
+      "packageMissing": "Požadavek na balíček tohoto projektu nenašel žádný soubor balíčku.",
+      "reloadNewerFor": "Otevřít novější kopii: {name}",
+      "downloadMineFor": "Stáhnout mou kopii: {name}",
+      "startOverRefused": "Někdo jiný uložil projekt {name} poté, co ho tento klient načetl, proto nebyl nahrazen. Zkuste to znovu a otevřete jeho kopii."
     },
     "storageWarning": {
       "message": "Tento prohlížeč už využil {percent} místa, které pro vaše projekty povoluje. Než se zaplní, exportujte zálohu."

@@ -163,6 +163,8 @@ export async function writeProjectDocument(root: string, projectId: string, docu
     shapes: shapes.length,
     revision,
     updatedAt: revision,
+    // The shape count and time are list fields, so a dashboard list read before this is stale (#650).
+    metadataRevision: metadataNumber(document.metadata, "metadataRevision", 0) + 1,
   };
   await writeProjectMetadata(root, projectId, metadata);
   return { metadata, record: await projectRecord(root, projectId, metadata), revision };

@@ -268,7 +268,19 @@
       "downloadFailed": "Não foi possível transferir a cópia guardada.",
       "packageNetwork": "O pedido do pacote deste projeto não chegou ao servidor ({detail}).",
       "packageStatus": "O servidor respondeu ao pedido do pacote deste projeto com HTTP {detail}.",
-      "packageNotPackage": "O servidor respondeu ao pedido do pacote deste projeto com {detail}, e não com um pacote de projeto."
+      "packageNotPackage": "O servidor respondeu ao pedido do pacote deste projeto com {detail}, e não com um pacote de projeto.",
+      "missingTitle": "{name} não tem pacote guardado",
+      "missingKept": "O servidor tem os dados deste projeto, mas não o ficheiro do pacote, ou o pacote não é um ficheiro normal. Nada foi alterado. O guardar automático fica desativado até que carregue ou recomece.",
+      "conflictTitle": "{name} foi alterado noutro local",
+      "conflictKept": "Outro cliente guardou uma cópia mais recente, por isso esta não foi guardada por cima. As alterações feitas desde que abriu o projeto não estão guardadas. Transfira a sua cópia para as manter ou abra a cópia mais recente.",
+      "reloadNewer": "Abrir a cópia mais recente",
+      "downloadMine": "Transferir a minha cópia",
+      "myCopyName": "{name} (a minha cópia)",
+      "conflictDetail": "O servidor tem uma cópia guardada em {time}.",
+      "packageMissing": "O pedido do pacote deste projeto não encontrou nenhum ficheiro de pacote.",
+      "reloadNewerFor": "Abrir a cópia mais recente: {name}",
+      "downloadMineFor": "Transferir a minha cópia: {name}",
+      "startOverRefused": "Outra pessoa guardou {name} depois de este cliente o ler, por isso não foi substituído. Tente novamente para abrir a cópia dela."
     },
     "storageWarning": {
       "message": "Este navegador já usou {percent} do espaço permitido para seus projetos. Exporte uma cópia de segurança antes que ele acabe."
