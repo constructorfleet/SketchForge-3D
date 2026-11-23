@@ -164,7 +164,8 @@
       "migrateFailed": "Nepodařilo se přesunout tvary projektu do většího úložiště",
       "deleteFailed": "Nepodařilo se odstranit tvary projektu z prohlížeče",
       "saveListFailed": "Nepodařilo se uložit seznam projektů",
-      "unreadableWriteRefused": "Uloženou kopii tohoto projektu nelze načíst, proto se nepřepisuje"
+      "unreadableWriteRefused": "Uloženou kopii tohoto projektu nelze načíst, proto se nepřepisuje",
+      "deletedWriteRefused": "Tento projekt byl smazán v jiné kartě, proto se znovu neukládá"
     },
     "updates": {
       "promptTitle": "Je k dispozici SketchForge {version}",
