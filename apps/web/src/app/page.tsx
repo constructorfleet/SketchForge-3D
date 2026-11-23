@@ -41,7 +41,8 @@ import {
 } from "@/lib/engine/placementWorkplane";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { hydrateProjectShapeState, reconcileLoadedProjectShapeCacheEntry, type ImportedMeshResource } from "@/lib/projectShapePersistence";
-import { createProjectWriteGuard } from "@/lib/projectWriteGuard";
+import { StoredProjectUnreadableError, cacheWithEditorChange, createProjectWriteGuard, guardProjectWrites, projectLoadFailureCause, projectLoadFailureKind, type ProjectLoadFailureKind } from "@/lib/projectWriteGuard";
+import { storedRecordJson } from "@/lib/storedProjectCopy";
 import {
   projectShapeCacheEntry,
   projectShapeCacheEntryFromEditor,
@@ -112,6 +113,8 @@ type ProjectSaveJob = {
   revision: number;
   shapeCount: number;
 };
+
+type ProjectLoadFailure = { kind: ProjectLoadFailureKind; message: string };
 
 type ProjectShapeRecord = {
   id: string;
@@ -265,7 +268,7 @@ async function readStoredProjectCopy(projectId: string): Promise<{ bytes: Uint8A
     if (!record) return null;
     if (record.skfPackage) return { bytes: new Uint8Array(record.skfPackage), format: "skf" };
     const resources = await readAvailableProjectResources(database, projectId, record);
-    return { bytes: new TextEncoder().encode(JSON.stringify({ record, resources })), format: "json" };
+    return { bytes: new TextEncoder().encode(storedRecordJson({ record, resources })), format: "json" };
   } finally {
     database.close();
   }
@@ -290,11 +293,20 @@ function readAvailableProjectResources(database: IDBDatabase, projectId: string,
   });
 }
 
+/** Parses a stored package, marking a failure as the copy's fault rather than storage's. */
+async function readStoredPackage(bytes: Uint8Array) {
+  try {
+    return await importSkfProject(bytes);
+  } catch (error) {
+    throw new StoredProjectUnreadableError(error);
+  }
+}
+
 async function loadProjectShapes(projectId: string) {
   if (serverProjectStorageActive) {
     const packageBytes = await fetchServerProjectPackage(projectId);
     if (!packageBytes) return null;
-    const restored = await importSkfProject(packageBytes);
+    const restored = await readStoredPackage(packageBytes);
     return {
       id: projectId,
       // Carried so the caller reads this as an already-packed record and does
@@ -321,7 +333,7 @@ async function loadProjectShapes(projectId: string) {
   }
   if (record.skfPackage) {
     database.close();
-    const restored = await importSkfProject(record.skfPackage);
+    const restored = await readStoredPackage(record.skfPackage);
     return {
       ...record,
       shapes: restored.shapes,
@@ -372,13 +384,18 @@ async function loadProjectShapes(projectId: string) {
     else assets.push(resource.asset);
   });
   if (meshResources.size !== meshResourceIds.length || assets.length !== assetResourceIds.length) {
-    throw new Error(translate("dashboard.storage.resourcesIncomplete"));
+    throw new StoredProjectUnreadableError(new Error(translate("dashboard.storage.resourcesIncomplete")));
   }
   knownProjectResourceKeys.set(projectId, new Set([
     ...meshResourceIds.map((resourceId) => projectResourceKey("mesh", resourceId)),
     ...assetResourceIds.map((resourceId) => projectResourceKey("asset", resourceId)),
   ]));
-  const hydrated = hydrateProjectShapeState(record.shapes ?? [], record.history, meshResources);
+  let hydrated: ReturnType<typeof hydrateProjectShapeState>;
+  try {
+    hydrated = hydrateProjectShapeState(record.shapes ?? [], record.history, meshResources);
+  } catch (error) {
+    throw new StoredProjectUnreadableError(error);
+  }
   return {
     ...record,
     shapes: hydrated.shapes,
@@ -387,8 +404,13 @@ async function loadProjectShapes(projectId: string) {
   };
 }
 
-async function saveProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
-  if (!projectWriteGuard.canWrite(projectId)) throw new Error(translate("dashboard.storage.unreadableWriteRefused"));
+const saveProjectShapes = guardProjectWrites(
+  projectWriteGuard,
+  writeProjectShapes,
+  () => new Error(translate("dashboard.storage.unreadableWriteRefused")),
+);
+
+async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
   const skfPackage = await projectSkfPackage(projectId, entry, context);
   if (serverProjectStorageActive) {
     await saveServerProjectPackage(projectId, skfPackage, entry.revision);
@@ -664,7 +686,7 @@ export default function Home() {
   const [activeChallengeTutorial, setActiveChallengeTutorial] = useState<ChallengeTutorialId | null>(null);
   const [projectShapesById, setProjectShapesById] = useState<Record<string, ProjectShapeCacheEntry>>({});
   // Project id to load error, for projects whose stored copy could not be read.
-  const [projectLoadFailures, setProjectLoadFailures] = useState<Record<string, string>>({});
+  const [projectLoadFailures, setProjectLoadFailures] = useState<Record<string, ProjectLoadFailure>>({});
   const projectsJsonRef = useRef("");
   // The last list this effect rewrote, so it cannot rewrite the same one twice.
   const projectsRewriteRef = useRef<string | null>(null);
@@ -1004,14 +1026,13 @@ export default function Home() {
       })
       .catch((error) => {
         if (canceled) return;
-        const message = errorText(currentTranslator(), error, "dashboard.storage.loadFailed");
-        // Any change to the cache cancels this read, so `cached` is current.
-        if (projectWriteGuard.loadFailed(activeProjectId, cached, activeProject.revision ?? 0)) {
-          setDashboardNotice(message);
-          return;
-        }
-        // No copy is safe to edit: none, or one older than the unreadable stored copy.
+        const failure: ProjectLoadFailure = {
+          kind: projectLoadFailureKind(error),
+          message: errorText(currentTranslator(), projectLoadFailureCause(error), "dashboard.storage.loadFailed"),
+        };
+        // A read runs only when the stored revision is newer than `cached`, so `cached` is stale.
         // Close the editor so nothing autosaves over the stored bytes.
+        projectWriteGuard.block(activeProjectId);
         if (cached) {
           setProjectShapesById((current) => {
             const next = { ...current };
@@ -1019,7 +1040,7 @@ export default function Home() {
             return next;
           });
         }
-        setProjectLoadFailures((current) => ({ ...current, [activeProjectId]: message }));
+        setProjectLoadFailures((current) => ({ ...current, [activeProjectId]: failure }));
         setDashboardNotice("");
         setDashboardSection("home");
         setEditorLoading(false);
@@ -1195,19 +1216,12 @@ export default function Home() {
     placementWorkplane: PlacementWorkplane;
     sketchPlacementWorkplane: PlacementWorkplane;
   }) => {
+    // The editor publishes after a delay, so a snapshot can arrive after its load failed.
+    if (!projectWriteGuard.canWrite(snapshot.projectId)) return;
     const revision = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
     nextProjectRevisionRef.current = revision;
     const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets, snapshot.parameters, snapshot.configuration);
-    setProjectShapesById((current) => {
-      const existing = current[snapshot.projectId];
-      if (existing && existing.revision > revision) {
-        return current;
-      }
-      return {
-        ...current,
-        [snapshot.projectId]: entry,
-      };
-    });
+    setProjectShapesById((current) => cacheWithEditorChange(current, snapshot.projectId, entry, projectWriteGuard));
 
     const saveContext: ProjectShapeSaveContext = {
       projectName: snapshot.projectName,
@@ -1660,7 +1674,7 @@ export default function Home() {
     try {
       await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
     } catch (error) {
-      projectWriteGuard.loadFailed(project.id, undefined, Number.POSITIVE_INFINITY);
+      projectWriteGuard.block(project.id);
       setDashboardNotice(errorText(t, error, "dashboard.storage.saveFailed"));
       return;
     }
@@ -1756,7 +1770,7 @@ export default function Home() {
             ? storageUsageFraction(storageStatus)
             : null}
           onExportAllProjects={() => void exportAllProjects()}
-          loadFailures={projects.flatMap((project) => (projectLoadFailures[project.id] ? [{ project, message: projectLoadFailures[project.id] }] : []))}
+          loadFailures={projects.flatMap((project) => (projectLoadFailures[project.id] ? [{ project, ...projectLoadFailures[project.id] }] : []))}
           onRetryLoad={(project) => openEditor(project.id)}
           onDownloadStoredProject={(project) => void downloadStoredProject(project)}
           onStartProjectOver={(project) => void startProjectOver(project)}
@@ -1986,7 +2000,7 @@ function Dashboard({
   /** Used share of the browser quota once it passes the warning threshold; null hides the warning. */
   storageWarningPercent: number | null;
   onExportAllProjects: () => void;
-  loadFailures: Array<{ project: DashboardProject; message: string }>;
+  loadFailures: Array<{ project: DashboardProject; kind: ProjectLoadFailureKind; message: string }>;
   onRetryLoad: (project: DashboardProject) => void;
   onDownloadStoredProject: (project: DashboardProject) => void;
   onStartProjectOver: (project: DashboardProject) => void;
@@ -2033,6 +2047,11 @@ function Dashboard({
   const [openSharedProjectMenuFileName, setOpenSharedProjectMenuFileName] = useState<string | null>(null);
   const [projectPendingDeleteId, setProjectPendingDeleteId] = useState<string | null>(null);
   const [projectPendingStartOverId, setProjectPendingStartOverId] = useState<string | null>(null);
+  const startOverTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeStartOver = () => {
+    setProjectPendingStartOverId(null);
+    startOverTriggerRef.current?.focus();
+  };
   const [sharedProjectPendingDeleteFileName, setSharedProjectPendingDeleteFileName] = useState<string | null>(null);
   const [projectPendingRenameId, setProjectPendingRenameId] = useState<string | null>(null);
   const [projectNameDraft, setProjectNameDraft] = useState("");
@@ -2424,25 +2443,40 @@ function Dashboard({
                   </button>
                 </div>
               ) : null}
-              {loadFailures.map(({ project, message }) => (
+              {loadFailures.map(({ project, kind, message }) => (
                 <section className="dashboard-load-failure" role="alert" aria-labelledby={`load-failure-${project.id}`} key={project.id}>
                   <div className="dashboard-load-failure-text">
-                    <strong id={`load-failure-${project.id}`}>{t("dashboard.loadFailure.title", { name: project.name })}</strong>
-                    <p>{t("dashboard.loadFailure.kept")}</p>
+                    <strong id={`load-failure-${project.id}`}>
+                      {t(kind === "unreadable" ? "dashboard.loadFailure.title" : "dashboard.loadFailure.unavailableTitle", { name: project.name })}
+                    </strong>
+                    <p>{t(kind === "unreadable" ? "dashboard.loadFailure.kept" : "dashboard.loadFailure.unavailableKept")}</p>
                     <p className="dashboard-load-failure-detail">{message}</p>
                   </div>
                   <div className="dashboard-load-failure-actions">
-                    <button type="button" onClick={() => onRetryLoad(project)}>
+                    <button type="button" aria-label={t("dashboard.loadFailure.retryFor", { name: project.name })} onClick={() => onRetryLoad(project)}>
                       <RefreshCw size={16} />
                       {t("dashboard.loadFailure.retry")}
                     </button>
-                    <button type="button" onClick={() => onDownloadStoredProject(project)}>
-                      <Download size={16} />
-                      {t("dashboard.loadFailure.download")}
-                    </button>
-                    <button className="dashboard-load-failure-start-over" type="button" onClick={() => setProjectPendingStartOverId(project.id)}>
-                      {t("dashboard.loadFailure.startOver")}
-                    </button>
+                    {/* Storage that cannot be reached has nothing to download, and nothing to replace yet. */}
+                    {kind === "unreadable" ? (
+                      <>
+                        <button type="button" aria-label={t("dashboard.loadFailure.downloadFor", { name: project.name })} onClick={() => onDownloadStoredProject(project)}>
+                          <Download size={16} />
+                          {t("dashboard.loadFailure.download")}
+                        </button>
+                        <button
+                          className="dashboard-load-failure-start-over"
+                          type="button"
+                          aria-label={t("dashboard.loadFailure.startOverFor", { name: project.name })}
+                          onClick={(event) => {
+                            startOverTriggerRef.current = event.currentTarget;
+                            setProjectPendingStartOverId(project.id);
+                          }}
+                        >
+                          {t("dashboard.loadFailure.startOver")}
+                        </button>
+                      </>
+                    ) : null}
                     <button className="dashboard-load-failure-dismiss" type="button" aria-label={t("dashboard.loadFailure.dismiss", { name: project.name })} onClick={() => onDismissLoadFailure(project)}>
                       <X size={16} />
                     </button>
@@ -2563,17 +2597,28 @@ function Dashboard({
       ) : null}
 
       {projectPendingStartOver ? (
-        <section className="dashboard-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="start-over-project-title">
+        <section
+          className="dashboard-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="start-over-project-title"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.stopPropagation();
+            closeStartOver();
+          }}
+        >
           <div className="dashboard-confirm-dialog">
             <header>
               <strong id="start-over-project-title">{t("dashboard.loadFailure.startOverTitle", { name: projectPendingStartOver.name })}</strong>
-              <button type="button" aria-label={t("dashboard.loadFailure.startOverClose")} onClick={() => setProjectPendingStartOverId(null)}>
+              <button type="button" aria-label={t("dashboard.loadFailure.startOverClose")} onClick={closeStartOver}>
                 <X size={18} />
               </button>
             </header>
             <p>{t.rich("dashboard.loadFailure.startOverConfirm", { name: projectPendingStartOver.name, b: (chunks) => <span>{chunks}</span> })}</p>
             <div className="dashboard-confirm-actions">
-              <button className="dashboard-confirm-cancel" type="button" onClick={() => setProjectPendingStartOverId(null)}>
+              {/* Focus starts on the safe choice. */}
+              <button className="dashboard-confirm-cancel" type="button" autoFocus onClick={closeStartOver}>
                 {t("dashboard.button.cancel")}
               </button>
               <button

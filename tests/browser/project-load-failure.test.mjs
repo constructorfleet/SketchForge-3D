@@ -183,7 +183,16 @@ test("browser storage keeps an unreadable project's stored package and offers re
     await failure.waitFor({ state: "visible" });
     assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 0, "the editor stays closed");
     await failure.getByText(BROKEN_KIND, { exact: false }).waitFor({ state: "visible" });
+    for (const name of [`Try again: ${brokenName}`, `Download stored copy: ${brokenName}`, `Start over: ${brokenName}`]) {
+      await failure.getByRole("button", { name, exact: true }).waitFor({ state: "visible" });
+    }
     await screenshot(page, "project-load-failure.png");
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+    // Let colour transitions finish before the capture.
+    await page.waitForTimeout(1_000);
+    await screenshot(page, "project-load-failure-dark.png");
+    await page.emulateMedia({ colorScheme: "light" });
 
     // A reload straight into the editor takes the same path.
     await openAndTryToEdit(page, () => page.goto(`${baseURL}/?editor=1&project=${encodeURIComponent(projectId)}`));
@@ -222,7 +231,12 @@ test("browser storage keeps an unreadable project's stored package and offers re
     await failure.getByRole("button", { name: "Start over" }).click();
     const dialog = page.getByRole("dialog", { name: `Start ${brokenName} over?` });
     await dialog.waitFor({ state: "visible" });
+    assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Cancel", "focus starts on Cancel inside the dialog");
     await screenshot(page, "project-load-failure-start-over.png");
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), `Start over: ${brokenName}`, "Escape closes it and returns focus");
+    await failure.getByRole("button", { name: "Start over" }).click();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await dialog.waitFor({ state: "detached" });
     assertSameBytes((await readIndexedDbPackage(page, projectId))?.bytes, corrupt, "cancelling start over leaves it unchanged");
@@ -317,5 +331,57 @@ test("an open editor does not save its older copy over a newer stored package it
   } finally {
     if (browser) await browser.close();
     stop();
+  }
+});
+
+test("server storage that cannot be reached reports it, offers only a retry, and saves again after a good retry", { timeout: 300_000 }, async () => {
+  const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-load-unavailable-test-"));
+  const { baseURL, stop } = await startNextServer({ SKETCHFORGE_PROJECTS_DIR: projectsDir });
+  let browser;
+
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await context.newPage();
+    await page.goto(baseURL);
+    await page.getByText("On server", { exact: false }).first().waitFor({ state: "visible", timeout: 60_000 });
+    await importFixture(page, "tests/fixtures/svg/square.svg");
+    const [{ id: projectId }] = await projectSummary(page);
+    const packagePath = path.join(projectsDir, `${projectId}.skf`);
+    const deadline = Date.now() + 30_000;
+    while (!fs.existsSync(packagePath) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+    const original = new Uint8Array(fs.readFileSync(packagePath));
+    await page.reload();
+
+    // The package request fails as an overloaded server would.
+    const packageRequest = (url) => url.pathname === "/api/projects" && url.searchParams.has("projectId");
+    await page.route(packageRequest, (route) => route.request().method() === "GET"
+      ? route.fulfill({ status: 503, contentType: "application/json", body: "{}" })
+      : route.continue());
+    const failure = page.getByRole("alert").filter({ hasText: "could not be loaded" });
+    await openAndTryToEdit(page, () => page.locator(".project-card-open").first().click()).catch(() => undefined);
+    await failure.waitFor({ state: "visible" });
+    assertSameBytes(new Uint8Array(fs.readFileSync(packagePath)), original, "the server package is unchanged");
+    assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 0, "the editor stays closed");
+    assert.equal(await failure.getByRole("button", { name: "Start over" }).count(), 0, "nothing offers to replace a copy that was never read");
+    assert.equal(await failure.getByRole("button", { name: "Download stored copy" }).count(), 0, "there is nothing to download");
+    await screenshot(page, "project-load-unavailable.png");
+
+    // The server recovers; a retry opens the project and autosave writes again.
+    await page.unroute(packageRequest);
+    await failure.getByRole("button", { name: "Try again: square", exact: true }).click();
+    await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+    assert.ok(await page.locator(".scene-inspector-list > li.scene-row").count() > 0, "the project opens with its shapes");
+    await page.getByRole("button", { name: "Add shape" }).click();
+    await page.getByText("Box", { exact: true }).first().click();
+    const saveDeadline = Date.now() + 30_000;
+    while (Buffer.from(fs.readFileSync(packagePath)).equals(Buffer.from(original)) && Date.now() < saveDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    assert.ok(!Buffer.from(fs.readFileSync(packagePath)).equals(Buffer.from(original)), "the edit after a good retry is saved");
+  } finally {
+    if (browser) await browser.close();
+    stop();
+    fs.rmSync(projectsDir, { recursive: true, force: true });
   }
 });
