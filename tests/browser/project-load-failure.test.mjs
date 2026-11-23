@@ -173,7 +173,7 @@ test("browser storage keeps an unreadable project's stored package and offers re
 
     const stored = await readIndexedDbPackage(page, projectId);
     assert.ok(stored, "the imported project has a stored package");
-    const corrupt = corruptPackage(stored.bytes);
+    let corrupt = corruptPackage(stored.bytes);
     await writeIndexedDbPackage(page, projectId, stored.revision, corrupt);
     await page.reload();
 
@@ -193,6 +193,20 @@ test("browser storage keeps an unreadable project's stored package and offers re
     // Retrying reads it again and fails again.
     await openAndTryToEdit(page, () => failure.getByRole("button", { name: "Try again" }).click());
     await failure.waitFor({ state: "visible" });
+
+    // Once the stored copy is repaired, Try again opens it with its geometry.
+    await writeIndexedDbPackage(page, projectId, stored.revision, stored.bytes);
+    await failure.getByRole("button", { name: "Try again" }).click();
+    await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+    assert.ok(await page.locator(".scene-inspector-list > li.scene-row").count() > 0, "the repaired project opens with its shapes");
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    const repaired = await readIndexedDbPackage(page, projectId);
+    const brokenAgain = corruptPackage(repaired.bytes);
+    await writeIndexedDbPackage(page, projectId, repaired.revision, brokenAgain);
+    await page.reload();
+    await openAndTryToEdit(page, () => card.locator(".project-card-open").click());
+    await failure.waitFor({ state: "visible" });
+    corrupt = brokenAgain;
 
     // The stored bytes download as they are, for repair.
     const [download] = await Promise.all([page.waitForEvent("download"), failure.getByRole("button", { name: "Download stored copy" }).click()]);
@@ -252,9 +266,56 @@ test("server storage keeps an unreadable project's package file untouched", { ti
 
     const [download] = await Promise.all([page.waitForEvent("download"), failure.getByRole("button", { name: "Download stored copy" }).click()]);
     assertSameBytes(new Uint8Array(fs.readFileSync(await download.path())), corrupt, "the download is the server's package byte for byte");
+
+    await failure.getByRole("button", { name: "Start over" }).click();
+    await page.getByRole("dialog", { name: "Start square over?" }).getByRole("button", { name: "Replace with empty project" }).click();
+    await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+    const replaced = new Uint8Array(fs.readFileSync(packagePath));
+    assert.ok(!Buffer.from(replaced).equals(Buffer.from(corrupt)), "confirming start over replaces the server package");
+    assert.ok(!strFromU8(unzipSync(replaced)["project.json"]).includes(BROKEN_KIND), "the server replacement is readable");
   } finally {
     if (browser) await browser.close();
     stop();
     fs.rmSync(projectsDir, { recursive: true, force: true });
+  }
+});
+
+test("an open editor does not save its older copy over a newer stored package it cannot read", { timeout: 300_000 }, async () => {
+  const { baseURL, stop } = await startNextServer();
+  let browser;
+
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const editorTab = await context.newPage();
+    await editorTab.goto(baseURL);
+    await importFixture(editorTab, "tests/fixtures/svg/square.svg");
+    const [{ id: projectId }] = await projectSummary(editorTab);
+    await editorTab.locator(".project-card-open").first().click();
+    await editorTab.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+
+    // Another tab, say on a newer release, stores a revision this one cannot read.
+    const otherTab = await context.newPage();
+    await otherTab.goto(baseURL);
+    const stored = await readIndexedDbPackage(otherTab, projectId);
+    const newerRevision = Math.max(Date.now(), stored.revision + 1);
+    const corrupt = corruptPackage(stored.bytes);
+    await writeIndexedDbPackage(otherTab, projectId, newerRevision, corrupt);
+    await otherTab.evaluate(({ id, revision }) => {
+      const list = JSON.parse(window.localStorage.getItem("sketchForge.projects") ?? "[]");
+      window.localStorage.setItem("sketchForge.projects", JSON.stringify(list.map((project) => (
+        project.id === id ? { ...project, revision, updatedAt: revision } : project
+      ))));
+    }, { id: projectId, revision: newerRevision });
+    // Let the editor tab see the change and try to read the new revision.
+    await editorTab.waitForTimeout(1_500);
+
+    const failure = await openAndTryToEdit(editorTab, async () => undefined);
+    assertSameBytes((await readIndexedDbPackage(otherTab, projectId))?.bytes, corrupt, "the newer stored package is unchanged");
+    await failure.waitFor({ state: "visible" });
+    assert.equal(await editorTab.getByRole("button", { name: "Add shape" }).count(), 0, "the stale editor closes");
+  } finally {
+    if (browser) await browser.close();
+    stop();
   }
 });

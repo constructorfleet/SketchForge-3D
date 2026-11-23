@@ -250,16 +250,44 @@ function readProjectShapeRecord(database: IDBDatabase, projectId: string) {
   });
 }
 
-/** Returns the stored `.skf` bytes unparsed, for repair of a package that will not load. */
-async function readStoredProjectPackage(projectId: string): Promise<Uint8Array | null> {
-  if (serverProjectStorageActive) return fetchServerProjectPackage(projectId);
+/**
+ * Returns the stored copy unparsed, for repair of a project that will not load.
+ * A pre-`.skf` record comes back as JSON with whatever resources remain.
+ */
+async function readStoredProjectCopy(projectId: string): Promise<{ bytes: Uint8Array; format: "skf" | "json" } | null> {
+  if (serverProjectStorageActive) {
+    const bytes = await fetchServerProjectPackage(projectId);
+    return bytes ? { bytes, format: "skf" } : null;
+  }
   const database = await openProjectShapesDb();
   try {
     const record = await readProjectShapeRecord(database, projectId);
-    return record?.skfPackage ? new Uint8Array(record.skfPackage) : null;
+    if (!record) return null;
+    if (record.skfPackage) return { bytes: new Uint8Array(record.skfPackage), format: "skf" };
+    const resources = await readAvailableProjectResources(database, projectId, record);
+    return { bytes: new TextEncoder().encode(JSON.stringify({ record, resources })), format: "json" };
   } finally {
     database.close();
   }
+}
+
+function readAvailableProjectResources(database: IDBDatabase, projectId: string, record: ProjectShapeRecord) {
+  return new Promise<ProjectShapeResourceRecord[]>((resolve, reject) => {
+    const transaction = database.transaction(PROJECT_SHAPE_RESOURCES_STORE_NAME, "readonly");
+    const store = transaction.objectStore(PROJECT_SHAPE_RESOURCES_STORE_NAME);
+    const found: ProjectShapeResourceRecord[] = [];
+    [
+      ...(record.meshResourceIds ?? []).map((resourceId) => projectResourceRecordId(projectId, "mesh", resourceId)),
+      ...(record.assetResourceIds ?? []).map((resourceId) => projectResourceRecordId(projectId, "asset", resourceId)),
+    ].forEach((id) => {
+      const request = store.get(id);
+      request.onsuccess = () => {
+        if (request.result) found.push(request.result as ProjectShapeResourceRecord);
+      };
+    });
+    transaction.oncomplete = () => resolve(found);
+    transaction.onerror = () => reject(transaction.error ?? new Error(translate("dashboard.storage.resourcesLoadFailed")));
+  });
 }
 
 async function loadProjectShapes(projectId: string) {
@@ -978,11 +1006,19 @@ export default function Home() {
         if (canceled) return;
         const message = errorText(currentTranslator(), error, "dashboard.storage.loadFailed");
         // Any change to the cache cancels this read, so `cached` is current.
-        if (projectWriteGuard.loadFailed(activeProjectId, cached)) {
+        if (projectWriteGuard.loadFailed(activeProjectId, cached, activeProject.revision ?? 0)) {
           setDashboardNotice(message);
           return;
         }
-        // No copy is safe to edit. Keep the editor closed so nothing autosaves over the stored bytes.
+        // No copy is safe to edit: none, or one older than the unreadable stored copy.
+        // Close the editor so nothing autosaves over the stored bytes.
+        if (cached) {
+          setProjectShapesById((current) => {
+            const next = { ...current };
+            delete next[activeProjectId];
+            return next;
+          });
+        }
         setProjectLoadFailures((current) => ({ ...current, [activeProjectId]: message }));
         setDashboardNotice("");
         setDashboardSection("home");
@@ -1596,14 +1632,15 @@ export default function Home() {
 
   const downloadStoredProject = async (project: DashboardProject) => {
     try {
-      const bytes = await readStoredProjectPackage(project.id);
-      if (!bytes) {
+      const stored = await readStoredProjectCopy(project.id);
+      if (!stored) {
         setDashboardNotice(t("dashboard.loadFailure.nothingStored"));
         return;
       }
-      const fileName = projectExportFileName(project.name, "skf");
+      const { bytes, format } = stored;
+      const fileName = projectExportFileName(project.name, "skf").replace(/\.skf$/, `.${format}`);
       const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-      const result = await downloadBlob(fileName, new Blob([body], { type: SKF_MEDIA_TYPE }), {
+      const result = await downloadBlob(fileName, new Blob([body], { type: format === "skf" ? SKF_MEDIA_TYPE : "application/json" }), {
         mode: downloadMode,
         folder: downloadFolder,
         localDownloadAvailable: !STATIC_EXPORT_BUILD && localDownloadEnabled,
@@ -1623,8 +1660,8 @@ export default function Home() {
     try {
       await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
     } catch (error) {
-      projectWriteGuard.loadFailed(project.id, undefined);
-      setProjectLoadFailures((current) => ({ ...current, [project.id]: errorText(t, error, "dashboard.storage.saveFailed") }));
+      projectWriteGuard.loadFailed(project.id, undefined, Number.POSITIVE_INFINITY);
+      setDashboardNotice(errorText(t, error, "dashboard.storage.saveFailed"));
       return;
     }
     setProjectShapesById((current) => ({ ...current, [project.id]: entry }));
