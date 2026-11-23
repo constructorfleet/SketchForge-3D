@@ -474,6 +474,7 @@
       "editingExtrude": "Editing extrude sketch profile",
       "editingRevolve": "Editing revolve sketch profile",
       "selectToEdit": "Select one shape created from a sketch to edit it",
+      "unlockToEdit": "Unlock the shape before editing its sketch",
       "cancelled": "Sketch cancelled",
       "nothingToUndo": "Nothing to undo in this sketch",
       "undone": "Sketch undo",

@@ -45,6 +45,7 @@ import {
 } from "@/lib/shapeProperties";
 import type { BindableFieldSpec } from "@constructorfleet/sketchforge-engine/expressionBindings";
 import { ExpressionInput } from "@/components/ExpressionInput";
+import { holdsLockedShape, separatePartsBlockedByLock } from "@/lib/edgeTreatmentHistory";
 import { isLiteralNumberEntry, propertyBindingField } from "@/lib/expressionFields";
 import type { ParameterMessage } from "@/lib/projectParameterEdits";
 import type { GearType, GridSize, MeasurementAccuracy, ProjectParameter, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
@@ -171,6 +172,8 @@ export function ShapeInspector({
   const solidColor = shape.color;
   const surfaceAppearance = resolveShapeAppearance(shape);
   const locked = Boolean(shape.locked);
+  // Draft and shell edits rewrite a group's parts, so a locked part blocks them.
+  const partLocked = holdsLockedShape(shape);
   const properties = getShapeProperties(shape, onUpdate, workspace);
   const draftControl = draftPrismControlForShape(shape);
   const gearType = shape.kind === "gear" ? normalizeGearType(shape.gearType) : null;
@@ -401,6 +404,7 @@ export function ShapeInspector({
           key={shape.id}
           shape={shape}
           locked={locked}
+          draftLocked={partLocked}
           fallbackColor={solidColor}
           onUpdateFaceColors={(faceColors) => onUpdate({ faceColors })}
           onEnableFaceEditing={onEnableFaceEditing}
@@ -415,7 +419,7 @@ export function ShapeInspector({
         <RetainedFaceDraftCard
           key={`${shape.id}-face-draft`}
           shape={shape as WorkplaneShape & { faceDraft: NonNullable<WorkplaneShape["faceDraft"]> }}
-          locked={locked}
+          locked={partLocked}
           onUpdate={onUpdateRetainedFaceDraft}
           onInteractionActiveChange={onInteractionActiveChange}
         />
@@ -474,7 +478,7 @@ export function ShapeInspector({
         <ShapeShellCard
           key={`${shape.id}-shell`}
           shape={shape}
-          locked={locked}
+          locked={partLocked}
           workspace={workspace}
           pickedFace={pickedFace}
           onApply={onApplyShell}
@@ -483,7 +487,7 @@ export function ShapeInspector({
       ) : null}
 
       {canSeparateParts && onSeparateParts ? (
-        <button className="inspector-action-button" type="button" disabled={locked} onClick={onSeparateParts}>
+        <button className="inspector-action-button" type="button" disabled={separatePartsBlockedByLock(shape)} onClick={onSeparateParts}>
           <Split size={17} strokeWidth={2.5} />
           <span>{t("panels.inspector.separateParts")}</span>
         </button>

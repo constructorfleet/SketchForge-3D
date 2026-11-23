@@ -460,6 +460,7 @@
       "editingExtrude": "Editando el perfil del boceto de extrusión",
       "editingRevolve": "Editando el perfil del boceto de revolución",
       "selectToEdit": "Selecciona una forma creada a partir de un boceto para editar su boceto",
+      "unlockToEdit": "Desbloquea la forma antes de editar su boceto",
       "cancelled": "Boceto cancelado",
       "nothingToUndo": "No hay nada que deshacer en este boceto",
       "undone": "Se deshizo una acción del boceto",

@@ -460,6 +460,7 @@
       "editingExtrude": "Profil der Skizze für die Extrusion wird bearbeitet",
       "editingRevolve": "Profil der Skizze für die Rotation wird bearbeitet",
       "selectToEdit": "Wählen Sie eine Form aus, die aus einer Skizze erstellt wurde, um sie zu bearbeiten",
+      "unlockToEdit": "Entsperren Sie die Form, bevor Sie ihre Skizze bearbeiten",
       "cancelled": "Skizze abgebrochen",
       "nothingToUndo": "In dieser Skizze gibt es nichts rückgängig zu machen",
       "undone": "In der Skizze rückgängig gemacht",

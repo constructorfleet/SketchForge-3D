@@ -460,6 +460,7 @@
       "editingExtrude": "Úprava profilu náčrtu pro vysunutí",
       "editingRevolve": "Úprava profilu náčrtu pro rotaci",
       "selectToEdit": "Vyberte jeden tvar vytvořený z náčrtu, který chcete upravit",
+      "unlockToEdit": "Před úpravou náčrtu tvar odemkněte",
       "cancelled": "Náčrt zrušen",
       "nothingToUndo": "V náčrtu není co vrátit zpět",
       "undone": "Akce v náčrtu vrácena zpět",
