@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEngine, directoryProjectStore, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import { boundsForShapes, groupedShapeFromSelection, refittedGroupRecord, restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
+import { sketchConstraintBindingIssues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 
@@ -199,27 +200,217 @@ describe("a group's frame after a nested sketch output is re-solved (#637)", () 
     expect(solid.centerOfMass.x).toBeCloseTo((24 * 0 - hole * -1) / (24 - hole), 4);
     expect(after.history).toHaveLength(before.history.length + 1);
   }, CAD_TEST_TIMEOUT_MS);
+  const outputIn = (group: WorkplaneShape) => group.groupedShapes!.find((shape) => shape.sketchSourceId)!;
+  const widerProfile = (profile: SketchProfile): SketchProfile => ({
+    ...profile,
+    points: profile.points.map((point) => (point.id === "b" || point.id === "c" ? { ...point, x: point.x + 2 } : point)),
+    constraints: profile.constraints!.map((constraint) => (constraint.id === "width" ? { ...constraint, valueMm: 4 } : constraint)),
+  });
+
+  it.each(["group", "cut"] as const)("returns the nested output from changeShape as the %s stores it after the refit", async (combine) => {
+    const group = await groupedSketch(`returned-${combine}`, combine, false);
+    const child = outputIn((await document(`returned-${combine}`)).shapes[0]!);
+
+    const changed = value(await engine.changeShape(`returned-${combine}`, `sketch/returned-${combine}`, { sketchProfile: widerProfile(child.sketchProfile!) }));
+
+    const stored = (await document(`returned-${combine}`)).shapes.find((shape) => shape.id === group.id)!;
+    expect(stored.width).toBeCloseTo(combine === "cut" ? 4 : 14, 4);
+    const frame = ({ id, x, z, elevation, width, depth, height, size, rotation, sketchProfile }: WorkplaneShape) =>
+      ({ id, x, z, elevation, width, depth, height, size, rotation, sketchProfile });
+    expect(frame(changed.shape)).toEqual(frame(outputIn(stored)));
+  }, CAD_TEST_TIMEOUT_MS);
+
+  /** Edits a grouped output with `field` bound and the same output unbound; both groups must match. */
+  async function expectUnboundEditMatches(
+    name: string,
+    create: (projectId: string) => Promise<string[]>,
+    field: string,
+    expression: string,
+    edit: (child: WorkplaneShape) => Record<string, unknown>,
+  ) {
+    const run = async (projectId: string, bind: boolean) => {
+      await writeProjectMetadata(root, projectId, { id: projectId, name: projectId, createdAt: 1, revision: 1 });
+      const group = value(await engine.group(projectId, await create(projectId))).shape;
+      const child = outputIn((await document(projectId)).shapes[0]!);
+      if (bind) {
+        value(await engine.addParameter(projectId, { name: "k", expression, dimension: "angle" }));
+        value(await engine.bindShapeField(projectId, child.id, field, "k"));
+      }
+      value(await engine.changeShape(projectId, child.sketchSourceId!, edit(child)));
+      const stored = (await document(projectId)).shapes[0]!;
+      expect(outputIn(stored).expressions?.[field]).toBeUndefined();
+      expectFrameFitsChildren(stored);
+      return { stored, solid: value(await engine.properties(projectId, group.id)) };
+    };
+    const bound = await run(`${name}-bound`, true);
+    const plain = await run(`${name}-plain`, false);
+    expect(bound.solid.volume).toBeCloseTo(plain.solid.volume, 3);
+    for (const axis of ["x", "y", "z"] as const) expect(bound.solid.centerOfMass[axis]).toBeCloseTo(plain.solid.centerOfMass[axis], 3);
+    expect(outputIn(bound.stored).x).toBeCloseTo(outputIn(plain.stored).x, 6);
+  }
+
+  it("keeps a nested draft extrusion in place when a literal replaces its bound angle during a profile edit", async () => {
+    await expectUnboundEditMatches("draft", async (projectId) => {
+      const created = value(await engine.addShapes(projectId, [
+        { kind: "box", width: 2, depth: 2, height: 3 },
+        { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+      ])).shapes;
+      const current = await document(projectId);
+      await store.write(projectId, current, current.shapes.map((shape, index) => (index === 0 ? {
+        ...shape, sketchOperation: "extrude" as const, sketchProfile: rectangle(), sketchSourceId: `sketch/${projectId}`,
+        cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+      } : shape)));
+      value(await engine.draftPrism(projectId, created[0]!.id, 5));
+      return created.map((shape) => shape.id);
+    }, "draftPrismAngle", "5 deg", (child) => ({ sketchProfile: widerProfile(child.sketchProfile!), draftPrismAngle: 8 }));
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a nested revolve in place when a literal replaces its bound sweep angle", async () => {
+    await expectUnboundEditMatches("revolve", async (projectId) => value(await engine.addShapes(projectId, [
+      { kind: "revolve", name: "Revolve", profile: [[0, -2], [2, -2], [2, 2], [0, 2]], sides: 32 },
+      { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+    ])).shapes.map((shape) => shape.id), "revolve.sweepAngle", "360 deg", () => ({ sweepAngle: 180 }));
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses a group size binding and a nested constraint binding together, either way round", async () => {
+    const group = await groupedSketch("size-conflict", "group");
+    value(await engine.addParameter("size-conflict", { name: "gw", expression: "12", dimension: "length" }));
+    const before = JSON.stringify(await document("size-conflict"));
+
+    expect(await engine.bindShapeField("size-conflict", group.id, "width", "gw")).toMatchObject({
+      ok: false,
+      failure: { reason: "binding_invalid", error: { code: "conflictingBinding", shapeId: group.id, field: "width", constraintIds: ["width"] } },
+    });
+    expect(JSON.stringify(await document("size-conflict"))).toBe(before);
+
+    value(await engine.bindSketchConstraint("size-conflict", "sketch/size-conflict", "width", null));
+    value(await engine.bindShapeField("size-conflict", group.id, "width", "gw"));
+    const bound = JSON.stringify(await document("size-conflict"));
+    expect(await engine.bindSketchConstraint("size-conflict", "sketch/size-conflict", "width", "w")).toMatchObject({
+      ok: false,
+      failure: { reason: "constraint_binding_invalid", error: { code: "conflictingBinding", constraintId: "width", fields: ["width"] } },
+    });
+    const child = outputIn((await document("size-conflict")).shapes[0]!);
+    const tagged = {
+      ...child.sketchProfile!,
+      constraints: child.sketchProfile!.constraints!.map((constraint) => (constraint.id === "depth" ? { ...constraint, expression: "w" } : constraint)),
+    };
+    expect(await engine.changeShape("size-conflict", "sketch/size-conflict", { sketchProfile: tagged })).toMatchObject({
+      ok: false,
+      failure: { reason: "constraint_binding_invalid", error: { code: "conflictingBinding", constraintId: "depth", fields: ["width"] } },
+    });
+    expect(JSON.stringify(await document("size-conflict"))).toBe(bound);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refuses a group size binding and a nested feature binding together, either way round", async () => {
+    await writeProjectMetadata(root, "feature-conflict", { id: "feature-conflict", name: "feature-conflict", createdAt: 1, revision: 1 });
+    const ids = value(await engine.addShapes("feature-conflict", [
+      { kind: "revolve", name: "Revolve", profile: [[0, -2], [2, -2], [2, 2], [0, 2]], sides: 32 },
+      { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+    ])).shapes.map((shape) => shape.id);
+    const group = value(await engine.group("feature-conflict", ids)).shape;
+    const child = outputIn((await document("feature-conflict")).shapes[0]!);
+    value(await engine.addParameter("feature-conflict", { name: "sweep", expression: "360 deg", dimension: "angle" }));
+    value(await engine.addParameter("feature-conflict", { name: "gh", expression: "4", dimension: "length" }));
+    value(await engine.bindShapeField("feature-conflict", child.id, "revolve.sweepAngle", "sweep"));
+
+    expect(await engine.bindShapeField("feature-conflict", group.id, "height", "gh")).toMatchObject({
+      ok: false, failure: { reason: "binding_invalid", error: { code: "conflictingBinding", shapeId: group.id, field: "height" } },
+    });
+    value(await engine.bindShapeField("feature-conflict", child.id, "revolve.sweepAngle", null));
+    value(await engine.bindShapeField("feature-conflict", group.id, "height", "gh"));
+    expect(await engine.bindShapeField("feature-conflict", child.id, "revolve.sweepAngle", "sweep")).toMatchObject({
+      ok: false, failure: { reason: "binding_invalid", error: { code: "conflictingBinding", shapeId: child.id, field: "revolve.sweepAngle" } },
+    });
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("drops a stored group size binding that a refit moves, and reports the conflict on load", async () => {
+    await groupedSketch("stale-size", "group");
+    value(await engine.addParameter("stale-size", { name: "gw", expression: "12", dimension: "length" }));
+    const current = await document("stale-size");
+    // As a project written before the refusal existed could hold it.
+    await store.write("stale-size", current, [{ ...current.shapes[0]!, expressions: { width: "gw" } }]);
+    const loaded = await document("stale-size");
+    expect(sketchConstraintBindingIssues(loaded.shapes, loaded.parameters ?? [])).toEqual([
+      expect.objectContaining({ code: "conflictingBinding", constraintId: "width", fields: ["width"], shapeId: outputIn(loaded.shapes[0]!).id }),
+    ]);
+
+    value(await engine.updateParameter("stale-size", "w", { expression: "4" }));
+
+    const stored = (await document("stale-size")).shapes[0]!;
+    expect(stored.expressions?.width).toBeUndefined();
+    expect(stored).toMatchObject({ x: -4, width: 14 });
+    expectFrameFitsChildren(stored);
+    // gw no longer drives the group, so changing it leaves the solid alone.
+    value(await engine.updateParameter("stale-size", "gw", { expression: "13" }));
+    expect((await document("stale-size")).shapes[0]!.width).toBe(14);
+    expect(value(await engine.properties("stale-size", stored.id)).volume).toBeCloseTo(36, 3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("refits a group inside a mirrored, resized group, in one undo step", async () => {
+    const inner = await groupedSketch("nested", "group", false);
+    const [box] = value(await engine.addShapes("nested", [{ kind: "box", width: 2, depth: 2, height: 2, z: 10 }])).shapes;
+    const outer = value(await engine.group("nested", [inner.id, box!.id])).shape;
+    const current = await document("nested");
+    await store.write("nested", current, current.shapes.map((shape) => (shape.id === outer.id ? { ...shape, width: shape.width! * 2, mirrorX: true } : shape)));
+    value(await engine.addParameter("nested", { name: "w", expression: "2", dimension: "length" }));
+    value(await engine.bindSketchConstraint("nested", "sketch/nested", "width", "w"));
+    const before = await document("nested");
+
+    value(await engine.updateParameter("nested", "w", { expression: "4" }));
+
+    const after = await document("nested");
+    const stored = after.shapes[0]!;
+    expectFrameFitsChildren(stored);
+    expectFrameFitsChildren(stored.groupedShapes!.find((shape) => shape.groupedShapes)!);
+    expect(stored.mirrorX).toBe(true);
+    expect(stored.width! / stored.groupedBaseWidth!).toBeCloseTo(2, 6);
+    // Doubled in x and mirrored about the outer centre: the sketch, inner box and outer box centre at -17, 5 and -15.
+    const solid = value(await engine.properties("nested", outer.id));
+    expect(solid.volume).toBeCloseTo(48 + 24 + 16, 2);
+    expect(solid.centerOfMass.x).toBeCloseTo((48 * -17 + 24 * 5 + 16 * -15) / 88, 3);
+    expect(solid.centerOfMass.y).toBeCloseTo((48 * 1.5 + 24 * 1.5 + 16 * 1) / 88, 3);
+    expect(solid.centerOfMass.z).toBeCloseTo((16 * 10) / 88, 3);
+    expect(after.history).toHaveLength(before.history.length + 1);
+  }, CAD_TEST_TIMEOUT_MS);
 });
 
 describe("refittedGroupRecord", () => {
-  it("leaves every child where it was in the parent frame under a turned, mirrored, resized group", () => {
-    const box = (id: string, x: number, width: number): WorkplaneShape => ({
-      id, name: id, kind: "box", color: "#888888", x, z: 1, elevation: 2, size: width, width, depth: 2, height: 3, rotation: 0,
-    });
-    const built = groupedShapeFromSelection([box("a", 0, 2), box("b", -10, 2)])!;
-    const group: WorkplaneShape = { ...built, width: built.width! * 2, height: built.height * 1.5, rotation: 30, rotationX: 10, mirrorZ: true, x: 7, elevation: 4 };
-    // `a` grows 3 mm in +x inside the group, as a re-solved sketch would.
-    const children = group.groupedShapes!.map((child) => (child.name === "a" ? { ...child, width: 5, size: 5, x: child.x + 1.5 } : child));
+  const box = (id: string, x: number, width: number): WorkplaneShape => ({
+    id, name: id, kind: "box", color: "#888888", x, z: 1, elevation: 2, size: width, width, depth: 2, height: 3, rotation: 0,
+  });
+  const placed = (shape: WorkplaneShape) => restoreGroupedChildren(shape).map((child) => ({
+    numbers: [child.x, child.z, child.elevation ?? 0, child.width!, child.depth!, child.height, child.rotation, child.rotationX ?? 0, child.rotationZ ?? 0],
+    mirrors: [Boolean(child.mirrorX), Boolean(child.mirrorY), Boolean(child.mirrorZ)],
+  }));
+
+  it.each([
+    ["mirrored in Z", { mirrorZ: true }],
+    ["mirrored in X", { mirrorX: true }],
+    ["mirrored in Y", { mirrorY: true }],
+    ["mirrored in X and Y", { mirrorX: true, mirrorY: true }],
+  ] as const)("leaves every child where it was under a turned, resized group %s", (_label, mirrors) => {
+    const built = groupedShapeFromSelection([box("a", 0, 2), { ...box("b", -10, 2), mirrorX: true }])!;
+    const group: WorkplaneShape = { ...built, ...mirrors, width: built.width! * 2, height: built.height * 1.5, depth: built.depth! * 0.5, rotation: 30, rotationX: 10, x: 7, elevation: 4 };
+    // `a` grows 3 mm in +x, 2 mm up and 1 mm in +z inside the group, as a re-solved sketch would.
+    const children = group.groupedShapes!.map((child) => (child.name === "a"
+      ? { ...child, width: 5, size: 5, x: child.x + 1.5, height: 5, depth: 3, z: child.z + 0.5 }
+      : child));
     const stale = { ...group, groupedShapes: children };
 
     const refitted = refittedGroupRecord(group, children);
 
-    const placed = (shape: WorkplaneShape) => restoreGroupedChildren(shape).map(({ x, z, elevation, width, depth, height, rotation, rotationX, rotationZ }) =>
-      [x, z, elevation ?? 0, width, depth, height, rotation, rotationX ?? 0, rotationZ ?? 0]);
-    placed(refitted).forEach((fields, index) => fields.forEach((field, axis) => expect(field).toBeCloseTo(placed(stale)[index]![axis]!, 6)));
+    const expected = placed(stale);
+    placed(refitted).forEach((child, index) => {
+      child.numbers.forEach((field, axis) => expect(field).toBeCloseTo(expected[index]!.numbers[axis]!, 6));
+      expect(child.mirrors).toEqual(expected[index]!.mirrors);
+    });
     expect(refitted.groupedBaseWidth).toBeCloseTo(15, 6);
+    expect(refitted.groupedBaseHeight).toBeCloseTo(5, 6);
+    expect(refitted.groupedBaseDepth).toBeCloseTo(3, 6);
     expect(refitted.width).toBeCloseTo(30, 6);
-    expect(refitted.height).toBeCloseTo(4.5, 6);
-    expect(refitted).toMatchObject({ rotation: 30, rotationX: 10, mirrorZ: true });
+    expect(refitted.height).toBeCloseTo(7.5, 6);
+    expect(refitted.depth).toBeCloseTo(1.5, 6);
+    expect(refitted).toMatchObject({ rotation: 30, rotationX: 10, ...mirrors });
   });
 });

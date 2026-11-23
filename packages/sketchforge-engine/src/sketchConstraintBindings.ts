@@ -142,14 +142,17 @@ export function rebuildableSketch(shape: WorkplaneShape, topLevel: boolean): boo
  * Visits every shape with a sketch profile, pre-order, then its treatment `before` snapshots,
  * since reverting a treatment restores one. Rename walks the same set.
  */
-function visitSketches(shapes: readonly WorkplaneShape[], visit: (shape: WorkplaneShape, topLevel: boolean) => void) {
-  const walk = (shape: WorkplaneShape, topLevel: boolean) => {
+function visitSketches(
+  shapes: readonly WorkplaneShape[],
+  visit: (shape: WorkplaneShape, topLevel: boolean, ancestors: readonly WorkplaneShape[]) => void,
+) {
+  const walk = (shape: WorkplaneShape, ancestors: readonly WorkplaneShape[]) => {
     if (!shape || typeof shape !== "object") return;
-    if (shape.sketchProfile) visit(shape, topLevel);
-    shape.edgeTreatmentHistory?.forEach((entry) => walk(entry.before, topLevel));
-    shape.groupedShapes?.forEach((child) => walk(child, false));
+    if (shape.sketchProfile) visit(shape, !ancestors.length, ancestors);
+    shape.edgeTreatmentHistory?.forEach((entry) => walk(entry.before, ancestors));
+    shape.groupedShapes?.forEach((child) => walk(child, [...ancestors, shape]));
   };
-  shapes.forEach((shape) => walk(shape, true));
+  shapes.forEach((shape) => walk(shape, []));
 }
 
 /** Refuses a binding whose sketch no profile edit can rebuild. */
@@ -184,6 +187,57 @@ export function conflictingConstraintBinding(shape: WorkplaneShape, constraintId
   };
 }
 
+export const GROUP_SIZE_FIELDS: readonly string[] = ["width", "depth", "height"];
+
+/** Lists bound size fields on a group. A refit around its children rewrites them. */
+export function boundGroupSizeFields(shape: WorkplaneShape): string[] {
+  if (!shape.groupedShapes?.length) return [];
+  return GROUP_SIZE_FIELDS.filter((field) => typeof shape.expressions?.[field] === "string");
+}
+
+/** Reports whether a binding on a nested shape can rebuild it. Treatment amounts keep its bounds. */
+export function refitsParent(field: string): boolean {
+  return !field.startsWith("edgeTreatments.");
+}
+
+/** Lists the bindings below `group` that rebuild a child, and so refit the group. */
+export function groupRefitBindings(group: WorkplaneShape): { constraintIds: string[]; fields: string[] } {
+  const constraintIds: string[] = [];
+  const fields: string[] = [];
+  const walk = (shape: WorkplaneShape) => {
+    boundSketchConstraints(shape).forEach(({ constraint }) => constraintIds.push(constraint.id));
+    Object.keys(shape.expressions ?? {}).filter(refitsParent).forEach((field) => fields.push(`${shape.id}.${field}`));
+    shape.groupedShapes?.forEach(walk);
+  };
+  group.groupedShapes?.forEach(walk);
+  return { constraintIds, fields };
+}
+
+/** Lists bound size fields on the groups that hold `shapeId`. */
+export function boundAncestorSizeFields(roots: readonly WorkplaneShape[], shapeId: string): string[] {
+  const search = (shapes: readonly WorkplaneShape[], ancestors: readonly WorkplaneShape[]): readonly WorkplaneShape[] | undefined => {
+    for (const shape of shapes) {
+      if (shape.id === shapeId) return ancestors;
+      const found = search(shape.groupedShapes ?? [], [...ancestors, shape]);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  return [...new Set((search(roots, []) ?? []).flatMap(boundGroupSizeFields))];
+}
+
+/** Refuses a constraint binding inside a group whose size is bound: the re-solve would refit that size. */
+export function conflictingGroupSizeBinding(shapeId: string, constraintId: string, fields: readonly string[]): SketchConstraintBindingError | undefined {
+  if (!fields.length) return undefined;
+  return {
+    code: "conflictingBinding",
+    shapeId,
+    constraintId,
+    fields,
+    message: `${constraintId} cannot bind: ${fields.join(", ")} is bound on a group that holds ${shapeId}, and a re-solve would refit that group. Clear one binding first.`,
+  };
+}
+
 /** Yields each bound constraint of `shape`'s profile. */
 export function boundSketchConstraints(shape: WorkplaneShape): Array<{ constraint: BindableSketchConstraint; expression: string }> {
   return (shape.sketchProfile?.constraints ?? []).flatMap((constraint) => {
@@ -200,7 +254,8 @@ export function sketchConstraintBindingIssues(
   const scope = parameterScope(parameters);
   const issues: SketchConstraintBindingIssue[] = [];
   const seen = new Set<string>();
-  visitSketches(shapes, (shape, topLevel) => {
+  visitSketches(shapes, (shape, topLevel, ancestors) => {
+    const groupSizes = [...new Set(ancestors.flatMap(boundGroupSizeFields))];
     for (const { constraint, expression } of boundSketchConstraints(shape)) {
       // A snapshot shares its owner's ID, so one binding is reported once.
       const key = JSON.stringify([shape.id, constraint.id, expression]);
@@ -210,7 +265,7 @@ export function sketchConstraintBindingIssues(
         issues.push(sketchNotRebuildable(shape.id, constraint.id));
         continue;
       }
-      const conflict = conflictingConstraintBinding(shape, constraint.id);
+      const conflict = conflictingConstraintBinding(shape, constraint.id) ?? conflictingGroupSizeBinding(shape.id, constraint.id, groupSizes);
       if (conflict) {
         issues.push(conflict);
         continue;

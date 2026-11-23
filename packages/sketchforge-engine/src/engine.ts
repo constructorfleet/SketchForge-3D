@@ -118,8 +118,13 @@ import {
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import {
+  boundAncestorSizeFields,
   boundSketchConstraints,
   conflictingConstraintBinding,
+  conflictingGroupSizeBinding,
+  GROUP_SIZE_FIELDS,
+  groupRefitBindings,
+  refitsParent,
   echoesSketchConstraints,
   requestedSketchProfile,
   profileSizeFields,
@@ -699,6 +704,31 @@ function findShapeInTree(
 /** Separated and exploded parts are new bodies; no binding on the source describes them. */
 function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
   return withoutBindings(shape, Object.keys(shape.expressions ?? {}));
+}
+
+/** Refuses a group size binding next to a nested binding that refits the group, either way round. */
+function groupSizeConflict(roots: readonly WorkplaneShape[], shape: WorkplaneShape, field: string, topLevel: boolean): ShapeBindingError | undefined {
+  if (shape.groupedShapes?.length && GROUP_SIZE_FIELDS.includes(field)) {
+    const { constraintIds, fields } = groupRefitBindings(shape);
+    if (constraintIds.length || fields.length) {
+      return {
+        code: "conflictingBinding",
+        shapeId: shape.id,
+        field,
+        ...(constraintIds.length ? { constraintIds } : {}),
+        message: `${field} cannot bind: ${[...constraintIds, ...fields].join(", ")} inside ${shape.id} is bound, and its rebuild refits the group. Clear one binding first.`,
+      };
+    }
+  }
+  if (topLevel || !refitsParent(field)) return undefined;
+  const sizes = boundAncestorSizeFields(roots, shape.id);
+  if (!sizes.length) return undefined;
+  return {
+    code: "conflictingBinding",
+    shapeId: shape.id,
+    field,
+    message: `${field} cannot bind: ${sizes.join(", ")} is bound on a group that holds ${shape.id}, and a rebuild would refit that group. Clear one binding first.`,
+  };
 }
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
@@ -1794,6 +1824,8 @@ export function createEngine(store: ProjectStore): Engine {
           },
         });
       }
+      const groupConflict = groupSizeConflict(document.shapes, found.shape, field, found.topLevel);
+      if (groupConflict) return failed({ reason: "binding_invalid", error: groupConflict });
       shape = { ...shape, expressions: { ...shape.expressions, [field]: expression } };
       if (boundFieldValue(found.shape, field) !== resolved.value) values[field] = resolved.value;
     }
@@ -2024,7 +2056,8 @@ export function createEngine(store: ProjectStore): Engine {
             return failed({ reason: "constraint_binding_invalid", error: sketchNotRebuildable(target.shape.id, constraintId) });
           }
           const cleared = Object.keys(expressions).filter((field) => expressions[field] === null);
-          const conflict = conflictingConstraintBinding(withoutBindings(target.shape, cleared), constraintId);
+          const conflict = conflictingConstraintBinding(withoutBindings(target.shape, cleared), constraintId)
+            ?? conflictingGroupSizeBinding(target.shape.id, constraintId, boundAncestorSizeFields(document.shapes, target.shape.id));
           if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
         }
         if (target && Object.keys(planned.values).length) {
@@ -2477,7 +2510,8 @@ export function createEngine(store: ProjectStore): Engine {
       }
       const resolved = resolveSketchConstraintBinding(output.id, constraint, expression, document.parameters ?? []);
       if (!resolved.ok) return failed({ reason: "constraint_binding_invalid", error: resolved.error });
-      const conflict = conflictingConstraintBinding(output, constraintId);
+      const conflict = conflictingConstraintBinding(output, constraintId)
+        ?? conflictingGroupSizeBinding(output.id, constraintId, boundAncestorSizeFields(document.shapes, output.id));
       if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
       const tagged = { ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: expression }) };
       if (sketchConstraintValue(constraint as BindableSketchConstraint) === resolved.value) return write(tagged);

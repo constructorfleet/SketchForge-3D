@@ -1,5 +1,7 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
 import { groupChildFrame, refittedGroupRecord } from "./serverShapeGroups.js";
+import { boundFieldValue, withoutBindings } from "./expressionBindings.js";
+import { boundGroupSizeFields } from "./sketchConstraintBindings.js";
 import { resizedShapeSize, shapeDepth, shapeWidth } from "./workplaneShapes.js";
 import {
   allEdgeTreatmentEdgeCount,
@@ -669,10 +671,22 @@ export async function recompute(
       const detail = error instanceof Error ? error.message : "an unexpected recompute error occurred";
       return { ok: false, reason: "recompute_failed", message: `Dependent boolean node ${id} could not be recomputed: ${detail}` };
     }
+    // A refit wins over a stored size binding it moves, as a rebuild wins in a manual edit.
+    const refit = rebuilt.get(id)!;
+    const moved = boundGroupSizeFields(shape).filter((field) => boundFieldValue(shape, field) !== boundFieldValue(refit, field));
+    if (moved.length) rebuilt.set(id, withoutBindings(refit, moved));
   }
 
   const shapes = project.shapes.map((shape) => rebuilt.get(shape.id) ?? shape);
-  const updated = rebuilt.get(changedNodeIds[0]!)!;
+  // Read back from the tree: a parent refit re-centres the output in its own frame.
+  const stored = (roots: readonly WorkplaneShape[]): WorkplaneShape | undefined => {
+    for (const root of roots) {
+      const found = root.id === changedNodeIds[0] ? root : stored(root.groupedShapes ?? []);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  const updated = stored(shapes) ?? rebuilt.get(changedNodeIds[0]!)!;
   return { ok: true, shapes, updated, matchCount: changedNodeIds.length };
 }
 

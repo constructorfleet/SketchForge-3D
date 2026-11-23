@@ -1990,10 +1990,20 @@ describe("retained boolean group placement across a source recompute", () => {
     const persisted = value(await engine.project("recompute")).shapes.find((shape) => shape.id === cut.id)!;
     expect(persisted).toMatchObject(placement);
 
+    // The edit comes back as stored, re-centred on the rebuilt group. The unmoved pocket
+    // gives that shift, which puts the part back in the frame as it stood before the edit.
+    const pocketBefore = framed.groupedShapes!.find((child) => child.hole)!;
+    const pocketAfter = persisted.groupedShapes!.find((child) => child.hole)!;
+    const editedInOldFrame = {
+      ...edited,
+      x: edited.x + pocketBefore.x - pocketAfter.x,
+      z: edited.z + pocketBefore.z - pocketAfter.z,
+      elevation: (edited.elevation ?? 0) + (pocketBefore.elevation ?? 0) - (pocketAfter.elevation ?? 0),
+    };
     // The children ungrouped through the group's frame as it stood before the edit.
     const ungroupedChildren = restoreGroupedChildren({
       ...framed,
-      groupedShapes: framed.groupedShapes!.map((child) => child.id === edited.id ? edited : child),
+      groupedShapes: framed.groupedShapes!.map((child) => child.id === edited.id ? editedInOldFrame : child),
     });
 
     // The group's world box is the box of the rebuilt solid it now holds.
@@ -2006,7 +2016,7 @@ describe("retained boolean group placement across a source recompute", () => {
     // shares no placement code with the engine beyond an identity ungroup.
     const unframed = await buildGroupFromSelection(restoreGroupedChildren({
       ...cut,
-      groupedShapes: cut.groupedShapes!.map((child) => child.id === edited.id ? edited : child),
+      groupedShapes: cut.groupedShapes!.map((child) => child.id === edited.id ? editedInOldFrame : child),
     }));
     if ("error" in unframed) throw new Error(unframed.error);
     const natural = worldMeasure(unframed.group);
