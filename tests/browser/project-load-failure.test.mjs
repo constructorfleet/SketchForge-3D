@@ -398,7 +398,7 @@ test("server storage that cannot be reached reports it, offers only a retry, and
   }
 });
 
-test("an IndexedDB read that cannot succeed on retry is reported as unreadable", { timeout: 300_000 }, async () => {
+test("a browser database upgraded by a newer release is reported as such, with no actions that cannot work", { timeout: 300_000 }, async () => {
   const { baseURL, stop } = await startNextServer();
   let browser;
 
@@ -421,8 +421,12 @@ test("an IndexedDB read that cannot succeed on retry is reported as unreadable",
     const failure = await openAndTryToEdit(page, () => page.locator(".project-card-open").first().click());
     await failure.waitFor({ state: "visible" });
     assert.equal(await page.getByRole("button", { name: "Add shape" }).count(), 0, "the editor stays closed");
-    await failure.getByRole("button", { name: "Start over: square", exact: true }).waitFor({ state: "visible" });
-    await failure.getByRole("button", { name: "Download stored copy: square", exact: true }).waitFor({ state: "visible" });
+    await failure.getByText("A newer SketchForge release has upgraded this browser's project storage", { exact: false }).waitFor({ state: "visible" });
+    // Opening, downloading and replacing all need a database this build cannot open.
+    for (const name of ["Try again", "Download stored copy", "Start over"]) {
+      assert.equal(await failure.getByRole("button", { name }).count(), 0, `${name} is not offered`);
+    }
+    await screenshot(page, "project-load-storage-newer.png");
   } finally {
     if (browser) await browser.close();
     stop();

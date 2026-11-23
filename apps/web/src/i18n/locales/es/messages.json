@@ -251,6 +251,7 @@
       "kept": "Su copia guardada no ha cambiado, así que una versión más reciente o una reparación aún pueden recuperarla. La edición sigue desactivada hasta que se cargue o empieces de nuevo.",
       "unavailableTitle": "No se pudo cargar {name}",
       "unavailableKept": "SketchForge no pudo acceder a su copia guardada, así que no se ha cambiado nada. La edición sigue desactivada hasta que se cargue. Reinténtalo cuando el almacenamiento o el servidor estén disponibles.",
+      "storageNewerKept": "Una versión más reciente de SketchForge ha actualizado el almacenamiento de proyectos de este navegador y esta versión no puede abrirlo. No se ha cambiado nada. Abre el proyecto en la versión más reciente.",
       "retry": "Reintentar",
       "retryFor": "Reintentar: {name}",
       "download": "Descargar copia guardada",

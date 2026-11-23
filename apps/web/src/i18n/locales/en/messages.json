@@ -101,6 +101,7 @@
       "kept": "Its stored copy is unchanged, so a newer release or a repair can still recover it. Editing stays off until it loads or you start over.",
       "unavailableTitle": "{name} could not be loaded",
       "unavailableKept": "SketchForge could not reach its stored copy, so nothing was changed. Editing stays off until it loads. Try again when the storage or server is available.",
+      "storageNewerKept": "A newer SketchForge release has upgraded this browser's project storage, and this version cannot open it. Nothing was changed. Open the project in the newer release.",
       "retry": "Try again",
       "retryFor": "Try again: {name}",
       "download": "Download stored copy",

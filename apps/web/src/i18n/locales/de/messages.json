@@ -251,6 +251,7 @@
       "kept": "Die gespeicherte Kopie bleibt unverändert, damit eine neuere Version oder eine Reparatur sie noch wiederherstellen kann. Bearbeiten bleibt gesperrt, bis sie geladen wird oder Sie neu beginnen.",
       "unavailableTitle": "{name} konnte nicht geladen werden",
       "unavailableKept": "SketchForge hat die gespeicherte Kopie nicht erreicht, daher wurde nichts geändert. Bearbeiten bleibt gesperrt, bis sie geladen wird. Versuchen Sie es erneut, wenn Speicher oder Server verfügbar sind.",
+      "storageNewerKept": "Eine neuere SketchForge-Version hat den Projektspeicher dieses Browsers aktualisiert, und diese Version kann ihn nicht öffnen. Es wurde nichts geändert. Öffnen Sie das Projekt in der neueren Version.",
       "retry": "Erneut versuchen",
       "retryFor": "Erneut versuchen: {name}",
       "download": "Gespeicherte Kopie herunterladen",

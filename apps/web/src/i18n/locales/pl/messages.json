@@ -251,6 +251,7 @@
       "kept": "Jego zapisana kopia pozostała bez zmian, więc nowsza wersja lub naprawa nadal może ją odzyskać. Edycja jest wyłączona, dopóki projekt się nie wczyta albo nie zaczniesz od nowa.",
       "unavailableTitle": "Nie można wczytać projektu {name}",
       "unavailableKept": "SketchForge nie mógł dotrzeć do jego zapisanej kopii, więc nic nie zostało zmienione. Edycja jest wyłączona, dopóki projekt się nie wczyta. Spróbuj ponownie, gdy pamięć lub serwer będą dostępne.",
+      "storageNewerKept": "Nowsza wersja SketchForge zaktualizowała pamięć projektów w tej przeglądarce i ta wersja nie może jej otworzyć. Nic nie zostało zmienione. Otwórz projekt w nowszej wersji.",
       "retry": "Spróbuj ponownie",
       "retryFor": "Spróbuj ponownie: {name}",
       "download": "Pobierz zapisaną kopię",

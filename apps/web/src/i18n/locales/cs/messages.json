@@ -251,6 +251,7 @@
       "kept": "Jeho uložená kopie zůstala beze změny, takže ji novější verze nebo oprava ještě může obnovit. Úpravy jsou vypnuté, dokud se nenačte nebo nezačnete znovu.",
       "unavailableTitle": "Projekt {name} nelze načíst z úložiště",
       "unavailableKept": "SketchForge se nedostal k jeho uložené kopii, takže se nic nezměnilo. Úpravy jsou vypnuté, dokud se nenačte. Zkuste to znovu, až bude úložiště nebo server dostupný.",
+      "storageNewerKept": "Novější verze SketchForge aktualizovala úložiště projektů v tomto prohlížeči a tato verze ho nedokáže otevřít. Nic se nezměnilo. Otevřete projekt v novější verzi.",
       "retry": "Zkusit znovu",
       "retryFor": "Zkusit znovu: {name}",
       "download": "Stáhnout uloženou kopii",

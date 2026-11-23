@@ -251,6 +251,7 @@
       "kept": "Sa copie enregistrée reste inchangée : une version plus récente ou une réparation peut encore la récupérer. La modification reste désactivée jusqu’à ce qu’elle se charge ou que vous recommenciez.",
       "unavailableTitle": "Impossible de charger {name}",
       "unavailableKept": "SketchForge n’a pas pu accéder à sa copie enregistrée ; rien n’a donc été modifié. La modification reste désactivée jusqu’à son chargement. Réessayez lorsque le stockage ou le serveur est disponible.",
+      "storageNewerKept": "Une version plus récente de SketchForge a mis à niveau le stockage des projets de ce navigateur, et cette version ne peut pas l’ouvrir. Rien n’a été modifié. Ouvrez le projet dans la version plus récente.",
       "retry": "Réessayer",
       "retryFor": "Réessayer: {name}",
       "download": "Télécharger la copie enregistrée",

@@ -56,6 +56,13 @@ describe("project load failure kind", () => {
     expect(projectLoadFailureKind(new Error("Could not load projects from the server"))).toBe("unavailable");
   });
 
+  it("calls a database a newer release upgraded storageNewer, since nothing here can read or replace it", () => {
+    const version = Object.assign(new Error("The requested version (3) is less than the existing version (99)."), { name: "VersionError" });
+    expect(projectLoadFailureKind(new StoredProjectUnreadableError(version))).toBe("storageNewer");
+    const data = Object.assign(new Error("bad value"), { name: "DataError" });
+    expect(projectLoadFailureKind(new StoredProjectUnreadableError(data))).toBe("unreadable");
+  });
+
   it("shows the parse error itself, not the marker", () => {
     const parse = new Error("unknown shape kind");
     expect(projectLoadFailureCause(new StoredProjectUnreadableError(parse))).toBe(parse);

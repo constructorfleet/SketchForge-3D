@@ -251,6 +251,7 @@
       "kept": "A cópia guardada permanece inalterada, para que uma versão mais recente ou uma reparação ainda a possam recuperar. A edição fica desativada até que carregue ou recomece.",
       "unavailableTitle": "Não foi possível carregar {name}",
       "unavailableKept": "O SketchForge não conseguiu aceder à cópia guardada, por isso nada foi alterado. A edição fica desativada até que carregue. Tente novamente quando o armazenamento ou o servidor estiverem disponíveis.",
+      "storageNewerKept": "Uma versão mais recente do SketchForge atualizou o armazenamento de projetos deste navegador e esta versão não o consegue abrir. Nada foi alterado. Abra o projeto na versão mais recente.",
       "retry": "Tentar novamente",
       "retryFor": "Tentar novamente: {name}",
       "download": "Transferir cópia guardada",

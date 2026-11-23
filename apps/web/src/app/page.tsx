@@ -2477,17 +2477,24 @@ function Dashboard({
                 <section className="dashboard-load-failure" role="alert" aria-labelledby={`load-failure-${project.id}`} key={project.id}>
                   <div className="dashboard-load-failure-text">
                     <strong id={`load-failure-${project.id}`}>
-                      {t(kind === "unreadable" ? "dashboard.loadFailure.title" : "dashboard.loadFailure.unavailableTitle", { name: project.name })}
+                      {t(kind === "unavailable" ? "dashboard.loadFailure.unavailableTitle" : "dashboard.loadFailure.title", { name: project.name })}
                     </strong>
-                    <p>{t(kind === "unreadable" ? "dashboard.loadFailure.kept" : "dashboard.loadFailure.unavailableKept")}</p>
+                    <p>
+                      {t(kind === "unreadable"
+                        ? "dashboard.loadFailure.kept"
+                        : kind === "storageNewer" ? "dashboard.loadFailure.storageNewerKept" : "dashboard.loadFailure.unavailableKept")}
+                    </p>
                     <p className="dashboard-load-failure-detail">{message}</p>
                   </div>
                   <div className="dashboard-load-failure-actions">
-                    <button type="button" aria-label={t("dashboard.loadFailure.retryFor", { name: project.name })} onClick={() => onRetryLoad(project)}>
-                      <RefreshCw size={16} />
-                      {t("dashboard.loadFailure.retry")}
-                    </button>
-                    {/* Storage that cannot be reached has nothing to download, and nothing to replace yet. */}
+                    {/* A database from a newer release opens the same way every time. */}
+                    {kind !== "storageNewer" ? (
+                      <button type="button" aria-label={t("dashboard.loadFailure.retryFor", { name: project.name })} onClick={() => onRetryLoad(project)}>
+                        <RefreshCw size={16} />
+                        {t("dashboard.loadFailure.retry")}
+                      </button>
+                    ) : null}
+                    {/* Unreachable or upgraded storage has nothing this build can download or replace. */}
                     {kind === "unreadable" ? (
                       <>
                         <button type="button" aria-label={t("dashboard.loadFailure.downloadFor", { name: project.name })} onClick={() => onDownloadStoredProject(project)}>

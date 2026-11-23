@@ -47,7 +47,8 @@ export function cacheWithEditorChange<T extends { revision: number }>(
   return { ...current, [projectId]: entry };
 }
 
-export type ProjectLoadFailureKind = "unreadable" | "unavailable";
+/** `storageNewer`: a newer release upgraded the browser database, so this build can neither read nor replace it. */
+export type ProjectLoadFailureKind = "unreadable" | "unavailable" | "storageNewer";
 
 /** Marks a load error raised by the stored copy's contents, not by reaching storage. */
 export class StoredProjectUnreadableError extends Error {
@@ -61,7 +62,9 @@ export class StoredProjectUnreadableError extends Error {
 }
 
 export function projectLoadFailureKind(error: unknown): ProjectLoadFailureKind {
-  return error instanceof StoredProjectUnreadableError ? "unreadable" : "unavailable";
+  if (!(error instanceof StoredProjectUnreadableError)) return "unavailable";
+  const { reason } = error;
+  return reason && typeof reason === "object" && (reason as { name?: unknown }).name === "VersionError" ? "storageNewer" : "unreadable";
 }
 
 /** Returns the error to show: the parse error inside an unreadable-copy marker. */
