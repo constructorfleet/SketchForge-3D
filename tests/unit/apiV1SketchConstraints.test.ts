@@ -198,7 +198,10 @@ describe("/api/v1/sketch-constraints", () => {
     expect(JSON.stringify((await store.read(projectId))!.shapes)).toBe(before);
 
     expect((await patchProfile(projectId, shape.id, { locked: true })).status).toBe(200);
-    expect(await bind(projectId, shape.id, "depth", { expression: "w" })).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: shape.id } });
+    const locked = await bind(projectId, shape.id, "depth", { expression: "w" });
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: shape.id } });
+    // A top-level lock can be lifted by ID, so it keeps the unlock advice.
+    expect(locked.body.error).toBe(`Shape ${shape.id} is locked, so the sketch it holds cannot change. Send it locked: false first.`);
   });
 
   it("names a locked group that holds the sketch, so the caller knows what to unlock", async () => {
@@ -215,7 +218,7 @@ describe("/api/v1/sketch-constraints", () => {
     expect(shape.sketchSourceId).toEqual(expect.any(String));
     const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
     expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
-    expect(locked.body.error).toContain(groupId);
+    expect(locked.body.error).toBe(`Shape ${groupId} is locked, so the sketch it holds cannot change. Send it locked: false first.`);
 
     const edited = await patchProfile(projectId, shape.sketchSourceId as string, { sketchProfile: withConstraint(shape, "width", { valueMm: 3 }) });
     expect(edited).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
