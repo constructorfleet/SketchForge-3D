@@ -149,3 +149,116 @@ test("a project deleted just after an edit stays deleted in server storage", { t
     rmSync(projectsDir, { recursive: true, force: true });
   }
 });
+
+// Issue #672: a save sent before a delete can reach the server after it.
+// Holds the next project POST that carries `field` until released.
+async function holdNextPost(page, field) {
+  let release = () => {};
+  const released = new Promise((resolve) => { release = resolve; });
+  let markHeld = () => {};
+  const held = new Promise((resolve) => { markHeld = resolve; });
+  let armed = true;
+  await page.route("**/api/projects?*", async (route) => {
+    const request = route.request();
+    const body = request.method() === "POST" ? request.postDataBuffer()?.toString("latin1") ?? "" : "";
+    if (armed && body.includes(`name="${field}"`)) {
+      armed = false;
+      markHeld();
+      await released;
+    }
+    await route.continue();
+  });
+  return { held, release };
+}
+
+async function deleteFromDashboard(page, options = /^Project options for /) {
+  const deleted = page.waitForResponse((response) => response.request().method() === "DELETE" && response.url().includes("/api/projects?"));
+  await page.getByRole("button", { name: options }).first().click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.locator(".dashboard-confirm-delete").click();
+  assert.equal((await deleted).status(), 200, "the delete must reach the server");
+}
+
+async function releaseAfterDelete(page, post, options) {
+  await deleteFromDashboard(page, options);
+  const late = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
+  post.release();
+  await late;
+  // Room for any write the late answer sets off.
+  await page.waitForTimeout(1_500);
+  // The user deleted it: a refused late save is expected, not a failure to report.
+  assert.equal(await page.getByText(/deleted before this save|not on the server|could not save/i).count(), 0, "a refused late save was reported as an error");
+}
+
+async function withServerProject(run) {
+  const projectsDir = mkdtempSync(join(tmpdir(), "sketchforge-delete-held-"));
+  try {
+    await withEditor({ SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "delete-held-token" }, async ({ page, baseURL }) => {
+      const listed = async () => (await (await fetch(`${baseURL}/api/projects`)).json()).projects?.map((record) => record.projectId) ?? [];
+      const stored = () => readdirSync(projectsDir).filter((name) => name.endsWith(".skf") || name.endsWith(".json"));
+      await openNewDesign(page, baseURL);
+      await pollUntil(() => page.evaluate(() => window.localStorage.getItem("sketchForge.projects") === null), Boolean, 30_000);
+      await addBox(page);
+      assert.equal((await pollUntil(stored, (names) => names.length === 2)).length, 2, "the first edit was never stored on the server");
+      // Let the edit's own writes finish, so only the next one is held.
+      await page.waitForTimeout(2_000);
+      await run({ page, listed, stored });
+    });
+  } finally {
+    rmSync(projectsDir, { recursive: true, force: true });
+  }
+}
+
+test("a dashboard entry save held past a delete does not bring the project back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    const metadataPost = await holdNextPost(page, "metadata");
+    await page.getByRole("button", { name: /^Project options for / }).first().click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
+    await page.locator(".dashboard-confirm-save").click();
+    await metadataPost.held;
+
+    await releaseAfterDelete(page, metadataPost);
+
+    assert.deepEqual(await listed(), [], "the held metadata save recreated the deleted project");
+    assert.deepEqual(stored(), [], "a project file is back on disk");
+  });
+});
+
+test("a package save held past a delete does not bring the project back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    const packagePost = await holdNextPost(page, "project");
+    await addBox(page);
+    await packagePost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+
+    await releaseAfterDelete(page, packagePost);
+
+    assert.deepEqual(await listed(), [], "the held package save recreated the deleted project");
+    assert.deepEqual(stored(), [], "a project file is back on disk");
+  });
+});
+
+test("a new project's first save held past its delete does not bring it back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    await page.getByRole("button", { name: /^Project options for / }).first().click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill("Kept project");
+    await page.locator(".dashboard-confirm-save").click();
+    const kept = await pollUntil(listed, (ids) => ids.length === 1);
+    await page.waitForTimeout(1_000);
+
+    // A create carries no base, so the server cannot tell it from a late one.
+    const createPost = await holdNextPost(page, "metadata");
+    await page.getByRole("button", { name: "Create new 3D design" }).click();
+    await createPost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+
+    await releaseAfterDelete(page, createPost, /^Project options for (?!Kept project)/);
+
+    assert.deepEqual(await listed(), kept, "the held first save recreated the deleted project");
+    assert.deepEqual(stored().filter((name) => !name.startsWith(kept[0])), [], "a file of the deleted project is back on disk");
+  });
+});

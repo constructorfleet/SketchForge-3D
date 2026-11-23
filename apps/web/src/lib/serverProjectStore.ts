@@ -145,6 +145,14 @@ export class ServerProjectConflictError extends Error {
   }
 }
 
+/** Says the server deleted a project after this client's write was based on it (#672). */
+export class ServerProjectDeletedError extends LocalizedError {
+  constructor() {
+    super("errors.projects.notFound");
+    this.name = "ServerProjectDeletedError";
+  }
+}
+
 export async function fetchServerProjectPackage(projectId: string): Promise<{ bytes: Uint8Array | null; revision: number | undefined }> {
   let response: Response;
   try {
@@ -205,6 +213,7 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
       throw new ServerProjectConflictError(typeof payload.storedRevision === "number" ? payload.storedRevision : 0);
     }
     if (response.status === 409 && payload.conflict === "newerMetadata") throw new ServerMetadataConflictError();
+    if (response.status === 410 && payload.conflict === "deleted") throw new ServerProjectDeletedError();
     throw await serverProjectError(response, "errors.projects.saveFailed");
   }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };

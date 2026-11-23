@@ -80,6 +80,7 @@ import {
   ServerPackageRequestError,
   ServerMetadataConflictError,
   ServerProjectConflictError,
+  ServerProjectDeletedError,
   serverMetadataRevision,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
@@ -504,6 +505,12 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
       if (error instanceof ServerProjectConflictError) projectWriteGuard.block(projectId);
       throw error;
     }
+    // Sent before this browser deleted it and landed after (#672). The server must accept
+    // package writes for deleted projects: another client may save one back (#665).
+    if (browserTombstones().has(projectId)) {
+      await deleteServerProject(projectId);
+      return;
+    }
     serverBaseRevisions.set(projectId, entry.revision);
     return;
   }
@@ -821,6 +828,9 @@ export default function Home() {
     };
     metadataSaveQueueRef.current = createCoalescingSaveQueue<MetadataSaveJob>({
       run: async (projectId, job) => {
+        // Deleted while this job waited (#672).
+        if (browserTombstones().has(projectId)) return;
+        const creates = !serverMetadataRevisions.has(projectId);
         let written: Record<string, unknown>;
         try {
           written = await post(projectId, job, syncedServerMetadata.get(projectId));
@@ -834,6 +844,11 @@ export default function Home() {
           rememberServerMetadata(projectId, record.metadata, current);
           written = await post(projectId, job, current);
         }
+        // Sent before the delete and landed after it; the server cannot refuse a create (#672).
+        if (creates && browserTombstones().has(projectId)) {
+          await deleteServerProject(projectId);
+          return;
+        }
         const writtenJson = JSON.stringify(written);
         if (writtenJson === JSON.stringify(job.metadata)) return;
         // Show what was stored, and do not post it back.
@@ -842,6 +857,8 @@ export default function Home() {
         setProjects((projects) => projects.map((project) => (project.id === projectId ? { ...adopted, accent: project.accent } : project)));
       },
       onError: (projectId, _job, error) => {
+        // This browser deleted it; the refusal is the expected outcome.
+        if (error instanceof ServerProjectDeletedError && browserTombstones().has(projectId)) return;
         serverProjectMetadataRef.current.delete(projectId);
         setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
       },

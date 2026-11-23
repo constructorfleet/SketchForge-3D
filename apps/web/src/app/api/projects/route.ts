@@ -6,9 +6,11 @@ import {
   deleteProjectFiles,
   ensureProjectsDirectory,
   listProjectRecords,
+  projectPackagePath,
   projectRecord,
   readProjectMetadata,
   readProjectPackage,
+  regularFileStat,
   withProjectLock,
   writeProjectMetadata,
   writeProjectPackage,
@@ -131,6 +133,12 @@ export async function POST(request: Request) {
     const locked = await withProjectLock(root, projectId, async () => {
       const stored = await readProjectMetadata(root, projectId);
       const storedRevision = serverProjectRevision(stored);
+      // A based metadata write saw a stored copy; with none left, a delete overtook it (#672).
+      // Package writes stay allowed: a client with the project open may save it back (#665).
+      const basedMetadataOnly = metadata && !packageBytes && Number.isFinite(baseMetadataRevision);
+      if (basedMetadataOnly && !stored && !(await regularFileStat(projectPackagePath(root, projectId)))) {
+        return errorResponse("errors.projects.notFound", 410, { conflict: "deleted" });
+      }
       // A later clock is not a later copy: another client may have saved since this one loaded.
       // Only this check is a conflict; the client offers the newer copy for it.
       if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {

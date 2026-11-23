@@ -229,6 +229,52 @@ describe("server project storage", () => {
     expect(missing.status).toBe(404);
   });
 
+  // Issue #672: a write sent before a delete can land after it.
+  describe("writes based on a copy that was since deleted", () => {
+    async function deleteProject() {
+      await DELETE(new Request("http://localhost/api/projects?projectId=project-1", { method: "DELETE", headers: { Origin: "http://localhost" } }));
+    }
+
+    it("refuses a metadata write based on a deleted project", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await POST(saveRequest("project-1", { project: new Uint8Array([1, 2]), revision: 11, baseRevision: 10 }));
+      await deleteProject();
+
+      const response = await POST(saveRequest("project-1", { metadata: metadata({ name: "Late" }), baseMetadataRevision: 1 }));
+
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ conflict: "deleted", errorKey: "errors.projects.notFound" });
+      expect((await listing()).projects).toEqual([]);
+      expect(await fs.readdir(projectsRoot)).toEqual([]);
+    });
+
+    it("lets a client that kept a deleted project open store it again, package first", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await deleteProject();
+
+      // Another client that kept the project open may store it again (#665), then send its entry.
+      expect((await POST(saveRequest("project-1", { project: new Uint8Array([1, 2]), revision: 11, baseRevision: 10 }))).status).toBe(201);
+      expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).status).toBe(201);
+      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-1"]);
+    });
+
+    it("still creates a project from a first write that names no base", async () => {
+      expect((await POST(saveRequest("project-1", { metadata: metadata() }))).status).toBe(201);
+      await deleteProject();
+
+      // A new project and a migration upload both send their first write without a base.
+      expect((await POST(saveRequest("project-2", { project: new Uint8Array([1]), revision: 11 }))).status).toBe(201);
+      expect((await POST(saveRequest("project-2", { metadata: metadata({ id: "project-2" }) }))).status).toBe(201);
+      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-2"]);
+    });
+
+    it("accepts a based metadata write while only the package is stored", async () => {
+      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11 }));
+
+      expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }))).status).toBe(201);
+    });
+  });
+
   it("does not list a project whose package arrived without its metadata", async () => {
     // Migration writes the package first and the metadata second, so a run
     // that fails in between leaves a project the listing does not show -- and

@@ -38,7 +38,10 @@ describe("dashboard package writes", () => {
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
     expect(page).toMatch(/!projectWriteGuard\.canWrite\(project\.id\)\) continue;[\s\S]{0,1200}saveServerProjectPackage\(project\.id, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
     // A migration deletes only what the user deleted, never what the browser list lacks (#662).
-    expect(count(/\bdeleteServerProject\(/)).toBe(2);
+    // A first save that lands after its project's delete deletes it again (#672).
+    expect(count(/\bdeleteServerProject\(/)).toBe(4);
+    expect(write).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) \{\s*await deleteServerProject\(projectId\);/);
+    expect(page).toMatch(/if \(creates && browserTombstones\(\)\.has\(projectId\)\) \{\s*await deleteServerProject\(projectId\);/);
     expect(page).toMatch(/if \(!projectsDeletedInBrowser\.has\(projectId\) \|\| removedFromServer\.has\(projectId\)\) continue;\s*await deleteServerProject\(projectId\);/);
     expect(page).toMatch(/const deleteProject = \(projectId: string\) => \{\s*if \(!serverProjectStorageActive\) projectsDeletedInBrowser\.add\(projectId\);/);
   });

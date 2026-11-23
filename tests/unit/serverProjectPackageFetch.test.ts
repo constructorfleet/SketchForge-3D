@@ -3,6 +3,7 @@ import {
   ServerMetadataConflictError,
   ServerPackageRequestError,
   ServerProjectConflictError,
+  ServerProjectDeletedError,
   fetchServerProjectPackage,
   saveServerProjectMetadata,
   saveServerProjectPackage,
@@ -118,6 +119,16 @@ describe("server project metadata writes", () => {
     const error = await saveServerProjectMetadata("project-1", { name: "Bracket" }, 3).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ServerMetadataConflictError);
     expect(error).not.toBeInstanceOf(ServerProjectConflictError);
+  });
+});
+
+// Issue #672: the server refuses a based metadata write once the project is deleted.
+describe("server project writes after a delete", () => {
+  const deleted = () => new Response(JSON.stringify({ errorKey: "errors.projects.notFound", conflict: "deleted" }), { status: 410 });
+
+  it("turns the refusal of a metadata write into a deleted-project error", async () => {
+    answer(deleted());
+    expect(await saveServerProjectMetadata("project-1", { name: "Bracket" }, 3).catch((caught: unknown) => caught)).toBeInstanceOf(ServerProjectDeletedError);
   });
 });
 
