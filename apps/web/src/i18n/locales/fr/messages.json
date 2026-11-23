@@ -460,6 +460,7 @@
       "editingExtrude": "Modification du profil de l’esquisse d’extrusion",
       "editingRevolve": "Modification du profil de l’esquisse de révolution",
       "selectToEdit": "Sélectionnez une seule forme créée à partir d’une esquisse pour la modifier",
+      "unlockToEdit": "Déverrouillez la forme avant de modifier son esquisse",
       "cancelled": "Esquisse abandonnée",
       "nothingToUndo": "Rien à annuler dans cette esquisse",
       "undone": "Action annulée dans l’esquisse",

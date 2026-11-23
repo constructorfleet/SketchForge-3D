@@ -122,7 +122,8 @@ import {
   selectableCadModifierEdge,
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
-import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
+import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
+import { sketchEditRefusal } from "@/lib/sketchEditTarget";
 import { edgeTreatmentFeatureWithLineage, edgeTreatmentLineageTarget, selectedEdgeTreatmentReplay } from "@/lib/edgeTreatmentLineage";
 import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, entryConfiguration, hydrateEditorHistoryState, NO_CONFIGURATIONS, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { snapShapeFootprintToVisibleGrid, visibleGridStep } from "@/lib/gridSnap";
@@ -1889,21 +1890,16 @@ function reversibleEdgeTreatmentCount(shape: WorkplaneShape): number {
   return (shape.edgeTreatmentHistory?.length ?? 0) + (shape.groupedShapes?.reduce((total, child) => total + reversibleEdgeTreatmentCount(child), 0) ?? 0);
 }
 
-function edgeTreatmentHistoryOptions(t: Translator, shape: WorkplaneShape, path: number[] = [], targetName = shapeDisplayName(t, shape.name)): EdgeFeatureRevertOption[] {
-  const ownHistory = shape.edgeTreatmentHistory ?? [];
-  const ownOptions = ownHistory.map((entry, index) => ({
+function edgeTreatmentHistoryOptions(t: Translator, shape: WorkplaneShape): EdgeFeatureRevertOption[] {
+  return removableEdgeTreatments(shape).map(({ path, chain, entry, removesNewerCount }) => ({
     id: `${path.length ? path.join(".") : "root"}:${entry.id}`,
     entryId: entry.id,
     path,
     label: edgeTreatmentLabel(t, entry.feature),
-    targetName,
+    targetName: chain.map((link) => shapeDisplayName(t, link.name)).join(" / "),
     createdAt: entry.createdAt,
-    removesNewerCount: Math.max(0, ownHistory.length - index - 1),
-  }));
-  const childOptions = (shape.groupedShapes ?? []).flatMap((child, index) =>
-    edgeTreatmentHistoryOptions(t, child, [...path, index], `${targetName} / ${shapeDisplayName(t, child.name)}`),
-  );
-  return [...ownOptions, ...childOptions].sort((a, b) => b.createdAt - a.createdAt);
+    removesNewerCount,
+  })).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function restoreOwnLastEdgeTreatment(shape: WorkplaneShape, entry: NonNullable<WorkplaneShape["edgeTreatmentHistory"]>[number]) {
@@ -6448,11 +6444,11 @@ export function SketchForgeEditor({
       setNotice(notice((t) => t("editor.edgeFeature.selectShape")));
       return;
     }
-    if (selectedShape.locked) {
+    const option = selectedEdgeHistoryOptions.find((candidate) => candidate.id === optionId);
+    if (option ? edgeTreatmentPathLocked(selectedShape, option.path) : selectedShape.locked) {
       setNotice(notice((t) => t("editor.edgeFeature.unlockShape")));
       return;
     }
-    const option = selectedEdgeHistoryOptions.find((candidate) => candidate.id === optionId);
     if (!option) {
       setNotice(notice((t) => t("editor.edgeFeature.chooseFeature")));
       return;
@@ -6562,8 +6558,9 @@ export function SketchForgeEditor({
   }, [t]);
 
   const beginSketchEdit = useCallback(() => {
-    if (selectedShapes.length !== 1 || !selectedShape?.sketchProfile) {
-      setNotice(notice((t) => t("editor.sketch.selectToEdit")));
+    const refusal = sketchEditRefusal(selectedShapes);
+    if (refusal || !selectedShape?.sketchProfile) {
+      setNotice(notice((t) => t(refusal === "locked" ? "editor.sketch.unlockToEdit" : "editor.sketch.selectToEdit")));
       return;
     }
     const operation = selectedShape.sketchOperation ?? (selectedShape.sketchRevolve ? "revolve" : "extrude");
@@ -6595,7 +6592,7 @@ export function SketchForgeEditor({
       );
     }
     beginSketch(operation, selectedShape.sketchProfile, selectedShape.id, selectedShape.sketchRevolve, editWorkplane);
-  }, [beginSketch, selectedShape, selectedShapes.length, t]);
+  }, [beginSketch, selectedShape, selectedShapes, t]);
 
   const cancelSketch = useCallback(() => {
     setSketchActive(false);
@@ -7167,6 +7164,11 @@ export function SketchForgeEditor({
   const runFinishSketch = useCallback(async () => {
     const existing = editingSketchShapeId ? shapes.find((shape) => shape.id === editingSketchShapeId) ?? null : null;
     const height = existing?.height ?? 10;
+    // A lock set while the sketch was open; the sketch stays open to cancel.
+    if (existing?.locked) {
+      setNotice(notice((t) => t("editor.sketch.unlockToEdit")));
+      return;
+    }
     // Nothing can replay a shell on a rebuilt solid, so, as on the REST path,
     // the edit is refused rather than returning the solid body without its
     // cavity. The sketch stays open to cancel.
@@ -8422,7 +8424,8 @@ export function SketchForgeEditor({
   }, [invalidateCadModifierSession, t]);
 
   const startEdgeModifier = useCallback((kind: CadModifierKind) => {
-    if (selectedShapes.length !== 1 || !selectedShape || selectedShape.locked || selectedShape.hole) {
+    // A grouped fillet rewrites the children it touches, so a locked child blocks it.
+    if (selectedShapes.length !== 1 || !selectedShape || holdsLockedShape(selectedShape) || selectedShape.hole) {
       setNotice(notice((t) => t(`editor.edgeModifier.selectSolid.${kind}`)));
       return;
     }
@@ -10704,7 +10707,7 @@ export function SketchForgeEditor({
         selectionHidden={hasSelection && selectedShapes.every((shape) => shape.hidden)}
         alignMode={alignMode}
         canAlign={selectedShapes.length > 1}
-        canEdgeModify={selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole)}
+        canEdgeModify={selectedShapes.length === 1 && Boolean(selectedShape && !holdsLockedShape(selectedShape) && !selectedShape.hole)}
         edgeModifierKind={edgeModifier?.kind ?? null}
         mirrorMode={mirrorMode}
         sketchActive={sketchActive}
@@ -10713,7 +10716,7 @@ export function SketchForgeEditor({
         sketchCanUndo={sketchHistoryIndex > 0}
         sketchCanRedo={sketchHistoryIndex < sketchHistory.length - 1}
         sketchFinishDisabled={sketchOperation === "sweep" && !sweepProfileStatus(orderedSketchPaths(sketchProfile)).ready}
-        canEditSketch={selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile)}
+        canEditSketch={sketchEditRefusal(selectedShapes) === null}
         onStartSketch={(operation) => beginSketch(operation)}
         onEditSketch={beginSketchEdit}
         onSketchTool={setActiveSketchTool}

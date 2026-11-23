@@ -97,6 +97,10 @@ The `?` key may require **Shift+/** on keyboards where `?` shares the slash key.
 
 ![The editor keyboard-shortcuts dialog.](../screenshots/editor-keyboard-shortcuts.png)
 
+A locked shape cannot have its sketch reopened. **Edit Sketch to 3D** on the toolbar and **Edit sketch** in the inspector are both unavailable for it. A sketch that is still open when its shape becomes locked cannot be finished; cancel it instead. A shape that holds a locked part, such as a group from an imported project, cannot be filleted or chamfered, because the edge treatment would rewrite that part. Removing an edge feature from the history list also leaves locked parts as they are.
+
+![The toolbar's Edit Sketch to 3D button is unavailable for a locked sketch extrusion.](../screenshots/editor-locked-sketch-edit.png)
+
 ## Verified workflow
 
 The browser acceptance test starts from an empty dashboard, creates a project, adds the rectangle through the sketch toolbar, finishes the extrusion, renames and reloads the project, then downloads the `.skf` file. Run it with:

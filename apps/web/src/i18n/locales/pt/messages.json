@@ -460,6 +460,7 @@
       "editingExtrude": "Editando o perfil do esboço de extrusão",
       "editingRevolve": "Editando o perfil do esboço de revolução",
       "selectToEdit": "Selecione uma forma criada a partir de um esboço para editá-la",
+      "unlockToEdit": "Desbloqueie a forma antes de editar o esboço",
       "cancelled": "Esboço cancelado",
       "nothingToUndo": "Nada para desfazer neste esboço",
       "undone": "Ação desfeita no esboço",

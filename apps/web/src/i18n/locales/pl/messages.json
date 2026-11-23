@@ -460,6 +460,7 @@
       "editingExtrude": "Edycja profilu szkicu do wyciągnięcia",
       "editingRevolve": "Edycja profilu szkicu bryły obrotowej",
       "selectToEdit": "Zaznacz jeden kształt utworzony ze szkicu, aby go edytować",
+      "unlockToEdit": "Przed edycją szkicu odblokuj kształt",
       "cancelled": "Anulowano szkic",
       "nothingToUndo": "W szkicu nie ma czego cofnąć",
       "undone": "Cofnięto w szkicu",
