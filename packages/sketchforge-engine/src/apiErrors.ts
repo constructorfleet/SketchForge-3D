@@ -347,14 +347,17 @@ const LOCKED_HOLDER_WORDING: ApiFailureWording = {
 export function shapeChangeApiError(failure: EngineFailure, shapeId: string): ApiErrorReply {
   if (failure.reason !== "shape_locked") return engineFailureToApiError(failure, SHAPE_CHANGE_WORDING);
   const lockedId = failure.ids[0] ?? shapeId;
-  const { topLevelId } = failure;
-  // Requests reach only top-level shapes by ID, so a nested lock clears only after ungrouping.
-  const wording = topLevelId
-    ? {
-      ...SHAPE_CHANGE_WORDING,
-      locked: () => `Shape ${lockedId} is locked inside top-level group ${topLevelId}, and only a top-level shape can be unlocked. `
-        + `Ungroup ${topLevelId}, unlocking it first if it is locked, until that shape is top-level, under a new ID; then send it locked: false.`,
-    }
+  const wording = failure.topLevelId
+    ? nestedLockWording(SHAPE_CHANGE_WORDING, lockedId, failure.topLevelId)
     : lockedId === shapeId ? SHAPE_CHANGE_WORDING : LOCKED_HOLDER_WORDING;
   return engineFailureToApiError(failure, wording, { shapeId: lockedId });
+}
+
+/** Requests reach only top-level shapes by ID, so a nested lock clears only after ungrouping. */
+export function nestedLockWording(wording: ApiFailureWording, lockedId: string, topLevelId: string): ApiFailureWording {
+  return {
+    ...wording,
+    locked: () => `Shape ${lockedId} is locked inside top-level group ${topLevelId}, and only a top-level shape can be unlocked. `
+      + `Ungroup ${topLevelId}, unlocking it first if it is locked, until that shape is top-level, under a new ID; then send it locked: false.`,
+  };
 }

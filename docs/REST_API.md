@@ -263,7 +263,7 @@ Refusals name the `shapeId` and `constraintId` and carry the engine's `reason`:
 | A constraint the sketch does not have | `422 invalid_request`, `reason: "constraintNotFound"` |
 | A kind with no value (`horizontal`, `fixed` and so on), a sketch with no rebuild recipe, or a bound size field on the same output or on a group that holds it | `422 unapplicable_fields`, `reason` `constraintNotBindable`, `sketchNotRebuildable` or `conflictingBinding` (with `fields`) |
 | A sketch that cannot satisfy its constraints with the new value | `422 geometry_failed` with `constraintIds` |
-| A locked output, or one inside a locked group | `409 shape_locked`, whose `shapeId` and sentence name the locked shape or group to unlock |
+| A locked output, or one inside a locked group | `409 shape_locked`, whose `shapeId` and sentence name the nearest locked shape or group to unlock. When that shape is nested, such as a locked output in a locked group or a locked inner group, no request can unlock it by ID; the sentence then names the top-level group to ungroup, as `PATCH /shapes` does |
 
 **Binding through `PATCH /shapes`.** A `sketchProfile` sent to `PATCH /shapes` follows the same changed-side-wins rules as shape fields, compared per constraint with the stored one:
 

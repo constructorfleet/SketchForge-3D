@@ -198,7 +198,10 @@ describe("/api/v1/sketch-constraints", () => {
     expect(JSON.stringify((await store.read(projectId))!.shapes)).toBe(before);
 
     expect((await patchProfile(projectId, shape.id, { locked: true })).status).toBe(200);
-    expect(await bind(projectId, shape.id, "depth", { expression: "w" })).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: shape.id } });
+    const locked = await bind(projectId, shape.id, "depth", { expression: "w" });
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: shape.id } });
+    // A top-level lock can be lifted by ID, so it keeps the unlock advice.
+    expect(locked.body.error).toBe(`Shape ${shape.id} is locked, so the sketch it holds cannot change. Send it locked: false first.`);
   });
 
   it("names a locked group that holds the sketch, so the caller knows what to unlock", async () => {
@@ -215,11 +218,69 @@ describe("/api/v1/sketch-constraints", () => {
     expect(shape.sketchSourceId).toEqual(expect.any(String));
     const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
     expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
-    expect(locked.body.error).toContain(groupId);
+    expect(locked.body.error).toBe(`Shape ${groupId} is locked, so the sketch it holds cannot change. Send it locked: false first.`);
 
     const edited = await patchProfile(projectId, shape.sketchSourceId as string, { sketchProfile: withConstraint(shape, "width", { valueMm: 3 }) });
     expect(edited).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: groupId } });
     expect(edited.body.error).toContain(groupId);
+  });
+
+  /** Groups the sweep with a box and returns the group's id and the sweep's id inside it. */
+  async function groupedSweep(projectId: string, shapeId: string, x: number) {
+    const box = await call(createShapes, `/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ kind: "box", x }) });
+    const grouped = await call(groupShapes, `/api/v1/groups?projectId=${projectId}`, {
+      method: "POST", body: JSON.stringify({ ids: [shapeId, (box.body.shapes as Summary[])[0]!.id] }),
+    });
+    expect(grouped.status, JSON.stringify(grouped.body)).toBe(201);
+    return (grouped.body.shape as Summary).id;
+  }
+
+  /** Locks the shape `id` inside the stored tree, which no request can reach. */
+  async function lockNested(projectId: string, id: string) {
+    const store = directoryProjectStore(projectsRoot);
+    const current = (await store.read(projectId))!;
+    type Tree = { id: string; locked?: boolean; groupedShapes?: Tree[] };
+    const lock = (shape: Tree): Tree => ({
+      ...shape,
+      ...(shape.id === id ? { locked: true } : {}),
+      ...(shape.groupedShapes ? { groupedShapes: shape.groupedShapes.map(lock) } : {}),
+    });
+    await store.write(projectId, current, current.shapes.map((shape) => lock(shape as Tree)) as never);
+  }
+
+  it("names a locked output inside a locked group, and advises ungrouping as PATCH /shapes does", async () => {
+    const { projectId, shape } = await sweepProject();
+    const groupId = await groupedSweep(projectId, shape.id, 20);
+    expect((await patchProfile(projectId, groupId, { locked: true })).status).toBe(200);
+    const store = directoryProjectStore(projectsRoot);
+    const outputId = (await store.read(projectId))!.shapes[0]!.groupedShapes!.find((child) => child.sketchSourceId === shape.sketchSourceId)!.id;
+    await lockNested(projectId, outputId);
+    const before = JSON.stringify((await store.read(projectId))!.shapes);
+
+    const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
+    const edited = await patchProfile(projectId, shape.sketchSourceId as string, { sketchProfile: withConstraint(shape, "width", { valueMm: 3 }) });
+
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: outputId } });
+    expect(locked.body.error).toBe(`Shape ${outputId} is locked inside top-level group ${groupId}, and only a top-level shape can be unlocked. Ungroup ${groupId}, unlocking it first if it is locked, until that shape is top-level, under a new ID; then send it locked: false.`);
+    expect(locked.body.error).toBe(edited.body.error);
+    expect(JSON.stringify((await store.read(projectId))!.shapes)).toBe(before);
+  });
+
+  it("names a locked inner group inside an unlocked outer group, and the outer group to ungroup", async () => {
+    const { projectId, shape } = await sweepProject();
+    const innerId = await groupedSweep(projectId, shape.id, 20);
+    const outerId = await groupedSweep(projectId, innerId, 40);
+    const store = directoryProjectStore(projectsRoot);
+    const nestedInnerId = (await store.read(projectId))!.shapes.find((entry) => entry.id === outerId)!.groupedShapes!
+      .find((child) => child.groupedShapes?.length)!.id;
+    await lockNested(projectId, nestedInnerId);
+
+    const locked = await bind(projectId, shape.sketchSourceId as string, "width", { expression: "w" });
+
+    expect(locked).toMatchObject({ status: 409, body: { code: "shape_locked", shapeId: nestedInnerId } });
+    expect(locked.body.error).toContain(`inside top-level group ${outerId}`);
+    expect(locked.body.error).toContain(`Ungroup ${outerId}`);
+    expect(locked.body.error).not.toContain("Send it locked: false first");
   });
 
   it("binds a new constraint expression sent in a PATCH /shapes profile, and refuses one that disagrees with its value", async () => {

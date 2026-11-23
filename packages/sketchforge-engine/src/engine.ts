@@ -2516,7 +2516,8 @@ export function createEngine(store: ProjectStore): Engine {
       if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
       const output = found.shape;
       // A locked group refuses edits to the outputs it holds, as a manual edit is refused.
-      if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
+      const locked = lockRefusal(document.shapes, found, {});
+      if (locked) return failed(locked);
       const constraint = output.sketchProfile!.constraints?.find((candidate) => candidate.id === constraintId);
       if (!constraint) {
         return failed({

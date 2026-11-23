@@ -392,6 +392,60 @@ describe("MCP parameter tools answer the same in local and remote mode", () => {
     expect(JSON.parse(detail!)).toEqual({ shapeId: groups[0] });
   }, 60_000);
 
+  /** Locks the shape `id` inside the stored tree, which no request can reach. */
+  async function lockNested(projectId: string, id: string) {
+    const store = directoryProjectStore(projectsDir);
+    const current = (await store.read(projectId))!;
+    type Tree = { id: string; locked?: boolean; groupedShapes?: Tree[] };
+    const lock = (shape: Tree): Tree => ({
+      ...shape,
+      ...(shape.id === id ? { locked: true } : {}),
+      ...(shape.groupedShapes ? { groupedShapes: shape.groupedShapes.map(lock) } : {}),
+    });
+    await store.write(projectId, current, current.shapes.map((shape) => lock(shape as Tree)) as never);
+  }
+
+  it.each([
+    ["a locked output inside a locked group", "output"],
+    ["a locked inner group inside an unlocked outer group", "inner"],
+  ] as const)("agrees on %s, and names the top-level group to ungroup", async (_name, nested) => {
+    const BIND_CONSTRAINT = "sketchforge_bind_sketch_constraint";
+    const store = directoryProjectStore(projectsDir);
+    const tops: string[] = [];
+    const lockedIds: string[] = [];
+    const fixtures: Fixture[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      const fixture = await sketchProject({ diagonal: false, bindWidth: false });
+      const box = await rest(shapesRoute.POST, `/api/v1/shapes?projectId=${fixture.projectId}`, { kind: "box", x: 20 });
+      let top = (await rest(groupsRoute.POST, `/api/v1/groups?projectId=${fixture.projectId}`, { ids: [fixture.shapeId, box.shapes[0].id] })).shape.id;
+      if (nested === "inner") {
+        const other = await rest(shapesRoute.POST, `/api/v1/shapes?projectId=${fixture.projectId}`, { kind: "box", x: 40 });
+        top = (await rest(groupsRoute.POST, `/api/v1/groups?projectId=${fixture.projectId}`, { ids: [top, other.shapes[0].id] })).shape.id;
+      }
+      const children = (await store.read(fixture.projectId))!.shapes.find((shape) => shape.id === top)!.groupedShapes!;
+      const lockedId = nested === "inner"
+        ? children.find((child) => child.groupedShapes?.length)!.id
+        : children.find((child) => child.sketchSourceId === "sketch")!.id;
+      if (nested === "output") await lockNested(fixture.projectId, top);
+      await lockNested(fixture.projectId, lockedId);
+      tops.push(top);
+      lockedIds.push(lockedId);
+      // The locked id stands in for the shape id, so the replies normalize alike.
+      fixtures.push({ projectId: fixture.projectId, shapeId: lockedId });
+    }
+    const normalizedTop = (text: string, index: number) => text.split(tops[index]!).join("<top>");
+    const fromLocal = await local.call(BIND_CONSTRAINT, { projectId: fixtures[0]!.projectId, shapeId: "sketch", constraintId: "width", expression: "w" });
+    const fromRemote = await remote.call(BIND_CONSTRAINT, { projectId: fixtures[1]!.projectId, shapeId: "sketch", constraintId: "width", expression: "w", url: api.url });
+    expect(normalizedTop(normalized(fromLocal, fixtures[0]!).text, 0)).toBe(normalizedTop(normalized(fromRemote, fixtures[1]!).text, 1));
+
+    const [headline, detail] = fromLocal.text.split("\n");
+    expect(headline).toMatch(/\[shape_locked\]$/);
+    expect(headline).toContain(`Shape ${lockedIds[0]} is locked inside top-level group ${tops[0]}`);
+    expect(headline).toContain(`Ungroup ${tops[0]}`);
+    expect(headline).not.toContain("Send it locked: false first");
+    expect(JSON.parse(detail!)).toEqual({ shapeId: lockedIds[0] });
+  }, 60_000);
+
   it("agrees on parameter configurations, and an activation rebuilds bound geometry", async () => {
     const LIST = "sketchforge_list_parameter_configurations";
     const CREATE = "sketchforge_create_parameter_configuration";
