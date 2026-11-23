@@ -1,6 +1,6 @@
 import { apiEngine, apiEngineError } from "@/lib/apiEngine";
 import { apiContext, apiError, apiErrors, apiJson, apiJsonBody, apiTarget } from "@/lib/apiV1";
-import { apiShapeSummary } from "@/lib/apiShapes";
+import { apiShapeChanged, apiShapeSummary } from "@/lib/apiShapes";
 import { parseShapePatchRequest, validateApiV1RequestBody, withApiV1Contract } from "@/lib/apiV1OperationContract";
 import { paginateApiV1 } from "@/lib/apiV1Pagination";
 import { parseRequestExpressions } from "@constructorfleet/sketchforge-engine/shapeRequestExpressions";
@@ -105,7 +105,7 @@ async function patchHandler(request: Request) {
     const refusal = shapeChangeApiError(changed.failure, shapeId);
     return apiError(refusal.message, refusal.status, refusal.code, refusal.detail);
   }
-  return apiJson({ shape: apiShapeSummary(changed.value.shape), revision: changed.value.revision });
+  return apiJson(apiShapeChanged(changed.value));
 }
 
 async function deleteHandler(request: Request) {

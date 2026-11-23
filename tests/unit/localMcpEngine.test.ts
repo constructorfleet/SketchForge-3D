@@ -5,7 +5,9 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
+import { createEngine, directoryProjectStore } from "@constructorfleet/sketchforge-engine";
 import { editorHistoryEntry } from "@constructorfleet/sketchforge-engine/editorHistory";
+import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import { projectAssetFromBytes } from "@constructorfleet/sketchforge-engine/projectAssets";
 import { exportSkfProject } from "@constructorfleet/sketchforge-engine/skfProject";
 import { importedShapeFromStepOnKernel } from "@constructorfleet/sketchforge-engine/stepImportKernel";
@@ -710,5 +712,39 @@ describe("local MCP engine mode", () => {
     });
     expect(updated[1].result.isError).toBeUndefined();
     expect(JSON.parse(updated[1].result.content[0].text).shape).toMatchObject({ id: shapeId, width: 8 });
+  }, 60_000);
+  it("names a group's size binding that a local nested source edit drops (#654)", async () => {
+    const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-local-mcp-"));
+    temporaryDirectories.push(projectsDir);
+    await writeProjectMetadata(projectsDir, "dropped", { id: "dropped", name: "dropped", createdAt: 1, revision: 1 });
+    const store = directoryProjectStore(projectsDir);
+    const engine = createEngine(store);
+    const unwrap = <T>(result: { ok: true; value: T } | { ok: false; failure: unknown }) => {
+      if (!result.ok) throw new Error(JSON.stringify(result.failure));
+      return result.value;
+    };
+    const profile = (width: number) => ({
+      points: [{ id: "a", x: -1, z: -1 }, { id: "b", x: width - 1, z: -1 }, { id: "c", x: width - 1, z: 1 }, { id: "d", x: -1, z: 1 }],
+      segments: [{ id: "ab", startId: "a", endId: "b" }, { id: "bc", startId: "b", endId: "c" }, { id: "cd", startId: "c", endId: "d" }, { id: "da", startId: "d", endId: "a" }],
+    });
+    const ids = unwrap(await engine.addShapes("dropped", [
+      { kind: "box", width: 2, depth: 2, height: 3 },
+      { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+    ])).shapes.map((shape) => shape.id);
+    const current = (await store.read("dropped"))!;
+    await store.write("dropped", current, current.shapes.map((shape, index) => (index === 0 ? {
+      ...shape, sketchOperation: "extrude" as const, sketchProfile: profile(2), sketchSourceId: "sketch/dropped",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    } : shape)));
+    const group = unwrap(await engine.group("dropped", ids)).shape;
+    unwrap(await engine.addParameter("dropped", { name: "gw", expression: "12", dimension: "length" }));
+    const grouped = (await store.read("dropped"))!;
+    // As a project written before group size bindings were refused could hold it.
+    await store.write("dropped", grouped, [{ ...grouped.shapes[0]!, expressions: { width: "gw" } }]);
+
+    const updated = callMcp(projectsDir, 2, "sketchforge_update_object", { projectId: "dropped", id: "sketch/dropped", sketchProfile: profile(4) });
+
+    expect(updated[1].result.isError, updated[1].result.content[0].text).toBeUndefined();
+    expect(JSON.parse(updated[1].result.content[0].text).droppedBindings).toEqual([{ shapeId: group.id, fields: ["width"] }]);
   }, 60_000);
 });

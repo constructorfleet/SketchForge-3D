@@ -823,7 +823,10 @@ export type MeshImportRequest = {
 export type MeshImportResult = TreatmentResult;
 
 export type ShapeWriteResult = { shapes: ShapeSummary[]; revision: number };
-export type ShapePatchResult = { shape: ShapeSummary; revision: number };
+/** A shape other than the one changed, and the fields whose bindings the change removed. */
+export type DroppedBinding = { shapeId: string; fields: string[] };
+/** `droppedBindings` is present only when the change removed bindings elsewhere, such as a refit group's size. */
+export type ShapePatchResult = { shape: ShapeSummary; revision: number; droppedBindings?: DroppedBinding[] };
 export type TreatmentResult = { shape: ShapeSummary; triangles: number; revision: number };
 /** The same three fields a treatment answers with; hollowing is one more of them. */
 export type ShellResult = TreatmentResult;

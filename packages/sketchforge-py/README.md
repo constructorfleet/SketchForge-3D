@@ -46,6 +46,7 @@ client.shapes.list_page(project_id, limit=None, cursor=None) -> ListPage[ShapeSu
 client.shapes.create(project_id, shape) -> ShapeSummary
 client.shapes.create_many(project_id, shapes) -> ShapeWriteResult
 client.shapes.update(project_id, shape_id, changes) -> ShapeSummary
+client.shapes.update_result(project_id, shape_id, changes) -> ShapeChangeResult  # adds revision and dropped_bindings
 client.shapes.delete(project_id, shape_id) -> bool
 client.shapes.delete_all(project_id) -> int
 

@@ -24417,6 +24417,29 @@
                     },
                     "revision": {
                       "type": "number"
+                    },
+                    "droppedBindings": {
+                      "type": "array",
+                      "description": "Present only when the change removed bindings from other shapes: for example, a group whose bound width, depth or height a refit around an edited sketch changed. Each entry names the shape and the fields that are no longer bound.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "shapeId",
+                          "fields"
+                        ],
+                        "properties": {
+                          "shapeId": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      }
                     }
                   }
                 }
