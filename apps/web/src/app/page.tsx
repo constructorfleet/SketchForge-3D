@@ -1092,6 +1092,11 @@ export default function Home() {
     }
   }, [mounted, projectStorageMode, projects]);
 
+  // A deleted project another client saved again is listed again; saves for it resume (#665).
+  useEffect(() => {
+    for (const project of projects) projectWriteGuard.restore(project.id);
+  }, [projects]);
+
   // Server storage has no storage event across clients (#650). Coming back into view
   // re-reads the listing, so a newer copy another client saved is loaded before editing.
   useEffect(() => {
@@ -1917,7 +1922,7 @@ export default function Home() {
 
   const deleteProject = (projectId: string) => {
     clearProjectLoadFailure(projectId);
-    projectWriteGuard.release(projectId);
+    projectWriteGuard.forget(projectId);
     serverBaseRevisions.delete(projectId);
     servedRevisions.delete(projectId);
     conflictedCopiesRef.current.delete(projectId);

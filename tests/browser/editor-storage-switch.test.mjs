@@ -11,7 +11,8 @@ import { chromium } from "playwright";
 // Issues #657 and #663: the switch to server project storage re-renders the
 // editor in the 120 ms before a save publishes. #657 reset the scene to the
 // host's older copy; #663 dropped a table-only undo's pending save. Timers are
-// paused so the switch lands in that gap.
+// paused so the switch lands in that gap, at a time read from the page's clock:
+// a target already past throws "Cannot fast-forward to the past".
 
 async function unusedPort() {
   const listener = createServer();
@@ -135,7 +136,7 @@ test("a shape added just before projects move to server storage stays in the sce
     await boxItem.waitFor({ state: "visible" });
 
     await page.clock.install();
-    await page.clock.pauseAt(Date.now() + 50);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
     await boxItem.click();
     await switchToServerStorage(page, probe, adoption);
     await page.clock.resume();
@@ -184,7 +185,7 @@ test("a table-only undo just before projects move to server storage still saves"
     await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
 
     await page.clock.install();
-    await page.clock.pauseAt(Date.now() + 50);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await switchToServerStorage(page, probe, adoption);
     await page.clock.resume();

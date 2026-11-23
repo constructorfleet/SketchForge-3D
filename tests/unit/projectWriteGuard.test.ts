@@ -43,6 +43,36 @@ describe("project write guard", () => {
     expect(cacheWithEditorChange(current, "fine", { revision: 9 }, guard)).toEqual({ other: { revision: 1 }, fine: { revision: 9 } });
   });
 
+  // Issue #665: a save that publishes after a delete must not recreate the project.
+  it("refuses every later write to a deleted project, even after a release", async () => {
+    const guard = createProjectWriteGuard();
+    const write = vi.fn(async (_projectId: string) => "written");
+    const save = guardProjectWrites(guard, write, () => new Error("refused"));
+    guard.block("gone");
+    guard.forget("gone");
+    guard.release("gone");
+    expect(guard.canWrite("gone")).toBe(false);
+    await expect(save("gone")).rejects.toThrow("refused");
+    expect(write).not.toHaveBeenCalled();
+    const current = { other: { revision: 1 } };
+    expect(cacheWithEditorChange(current, "gone", { revision: 9 }, guard)).toBe(current);
+    expect(guard.canWrite("other")).toBe(true);
+  });
+
+  it("writes a deleted project again once another client brings it back into the list", async () => {
+    const guard = createProjectWriteGuard();
+    const write = vi.fn(async (_projectId: string) => "written");
+    const save = guardProjectWrites(guard, write, () => new Error("refused"));
+    guard.forget("gone");
+    guard.restore("gone");
+    expect(guard.canWrite("gone")).toBe(true);
+    await expect(save("gone")).resolves.toBe("written");
+    // A load failure still blocks a restored project.
+    guard.block("gone");
+    guard.restore("gone");
+    expect(guard.canWrite("gone")).toBe(false);
+  });
+
   it("keeps a newer cached entry over an older editor snapshot", () => {
     const guard = createProjectWriteGuard();
     const current = { project: { revision: 5 } };
