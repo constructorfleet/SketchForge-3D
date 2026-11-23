@@ -673,7 +673,9 @@ export async function recompute(
     }
     // A refit wins over a stored size binding it moves, as a rebuild wins in a manual edit.
     const refit = rebuilt.get(id)!;
-    const moved = boundGroupSizeFields(shape).filter((field) => boundFieldValue(shape, field) !== boundFieldValue(refit, field));
+    // Sizes are stored to 0.001 mm, so a smaller difference is rounding, not a move.
+    const moved = boundGroupSizeFields(shape)
+      .filter((field) => Math.abs((boundFieldValue(shape, field) ?? 0) - (boundFieldValue(refit, field) ?? 0)) > 0.0005);
     if (moved.length) rebuilt.set(id, withoutBindings(refit, moved));
   }
 

@@ -12,7 +12,7 @@ import {
   type ExpressionError,
   type ExpressionQuantity,
 } from "./parameterExpressions.js";
-import { parameterScope } from "./expressionBindings.js";
+import { GROUP_SIZE_FIELDS, nestedRefitFields, parameterScope } from "./expressionBindings.js";
 import type { ProjectParameter, ProjectParameterDimension, SketchConstraint, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 
 export type BindableSketchConstraint = Extract<SketchConstraint, { expression?: string }>;
@@ -187,30 +187,21 @@ export function conflictingConstraintBinding(shape: WorkplaneShape, constraintId
   };
 }
 
-export const GROUP_SIZE_FIELDS: readonly string[] = ["width", "depth", "height"];
-
 /** Lists bound size fields on a group. A refit around its children rewrites them. */
 export function boundGroupSizeFields(shape: WorkplaneShape): string[] {
   if (!shape.groupedShapes?.length) return [];
   return GROUP_SIZE_FIELDS.filter((field) => typeof shape.expressions?.[field] === "string");
 }
 
-/** Reports whether a binding on a nested shape can rebuild it. Treatment amounts keep its bounds. */
-export function refitsParent(field: string): boolean {
-  return !field.startsWith("edgeTreatments.");
-}
-
 /** Lists the bindings below `group` that rebuild a child, and so refit the group. */
 export function groupRefitBindings(group: WorkplaneShape): { constraintIds: string[]; fields: string[] } {
   const constraintIds: string[] = [];
-  const fields: string[] = [];
   const walk = (shape: WorkplaneShape) => {
     boundSketchConstraints(shape).forEach(({ constraint }) => constraintIds.push(constraint.id));
-    Object.keys(shape.expressions ?? {}).filter(refitsParent).forEach((field) => fields.push(`${shape.id}.${field}`));
     shape.groupedShapes?.forEach(walk);
   };
   group.groupedShapes?.forEach(walk);
-  return { constraintIds, fields };
+  return { constraintIds, fields: nestedRefitFields(group) };
 }
 
 /** Lists bound size fields on the groups that hold `shapeId`. */

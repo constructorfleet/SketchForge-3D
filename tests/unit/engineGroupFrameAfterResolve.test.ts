@@ -6,6 +6,7 @@ import { createEngine, directoryProjectStore, type EngineResult, type ProjectSto
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import { boundsForShapes, groupedShapeFromSelection, refittedGroupRecord, restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
 import { sketchConstraintBindingIssues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import { shapeBindingIssues } from "@constructorfleet/sketchforge-engine/expressionBindings";
 import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 
@@ -335,16 +336,91 @@ describe("a group's frame after a nested sketch output is re-solved (#637)", () 
       expect.objectContaining({ code: "conflictingBinding", constraintId: "width", fields: ["width"], shapeId: outputIn(loaded.shapes[0]!).id }),
     ]);
 
-    value(await engine.updateParameter("stale-size", "w", { expression: "4" }));
+    const written = value(await engine.updateParameter("stale-size", "w", { expression: "4" }));
 
     const stored = (await document("stale-size")).shapes[0]!;
     expect(stored.expressions?.width).toBeUndefined();
+    // The write's rebuilt shapes carry the group without the binding it dropped.
+    expect(written.shapes.find((shape) => shape.id === stored.id)?.expressions?.width).toBeUndefined();
     expect(stored).toMatchObject({ x: -4, width: 14 });
     expectFrameFitsChildren(stored);
     // gw no longer drives the group, so changing it leaves the solid alone.
     value(await engine.updateParameter("stale-size", "gw", { expression: "13" }));
     expect((await document("stale-size")).shapes[0]!.width).toBe(14);
     expect(value(await engine.properties("stale-size", stored.id)).volume).toBeCloseTo(36, 3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a stored group size binding when a re-solve leaves the children's bounds alone", async () => {
+    await groupedSketch("same-size", "group");
+    value(await engine.addParameter("same-size", { name: "gw", expression: "37/3", dimension: "length" }));
+    const current = await document("same-size");
+    const group = current.shapes[0]!;
+    // A size off the refit's 0.001 mm grid, as a project written before the refusal could hold it.
+    await store.write("same-size", current, [{ ...group, width: 37 / 3, size: 37 / 3, expressions: { width: "gw" } }]);
+    const child = outputIn((await document("same-size")).shapes[0]!);
+
+    value(await engine.changeShape("same-size", "sketch/same-size", { sketchProfile: child.sketchProfile }));
+
+    const stored = (await document("same-size")).shapes[0]!;
+    expect(stored.expressions).toMatchObject({ width: "gw" });
+    expect(stored.width).toBe(37 / 3);
+    expect(stored.x).toBeCloseTo(group.x, 9);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("keeps a bound group size when a bound fillet amount inside it changes", async () => {
+    await writeProjectMetadata(root, "fillet", { id: "fillet", name: "fillet", createdAt: 1, revision: 1 });
+    const created = value(await engine.addShapes("fillet", [
+      { kind: "box", width: 2, depth: 2, height: 3 },
+      { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+    ])).shapes;
+    const current = await document("fillet");
+    await store.write("fillet", current, current.shapes.map((shape, index) => (index === 0 ? {
+      ...shape, sketchOperation: "extrude" as const, sketchProfile: rectangle(), sketchSourceId: "sketch/fillet",
+      cadBrepFrame: { x: 0, z: 0, elevation: 0, width: 2, depth: 2, height: 3 },
+    } : shape)));
+    value(await engine.treat("fillet", created[0]!.id, { kind: "fillet", amount: 0.1 }));
+    const group = value(await engine.group("fillet", created.map((shape) => shape.id))).shape;
+    const child = outputIn((await document("fillet")).shapes[0]!);
+    value(await engine.addParameter("fillet", { name: "f", expression: "0.1", dimension: "length" }));
+    value(await engine.addParameter("fillet", { name: "gw", expression: "37/3", dimension: "length" }));
+    value(await engine.bindShapeField("fillet", child.id, "edgeTreatments.0.amount", "f"));
+    value(await engine.bindShapeField("fillet", group.id, "width", "gw"));
+    const before = value(await engine.properties("fillet", group.id));
+
+    value(await engine.updateParameter("fillet", "f", { expression: "0.2" }));
+
+    const stored = (await document("fillet")).shapes[0]!;
+    expect(stored.expressions).toMatchObject({ width: "gw" });
+    expect(stored.width).toBeCloseTo(37 / 3, 9);
+    expect(outputIn(stored).edgeTreatments?.[0]?.amount).toBe(0.2);
+    const after = value(await engine.properties("fillet", group.id));
+    expect(stored.x).toBeCloseTo(group.x, 9);
+    // The larger fillet removes material symmetrically about the filleted body's own centre.
+    const removed = before.volume - after.volume;
+    expect(removed).toBeGreaterThan(0);
+    expect(removed).toBeLessThan(0.5);
+    const body = restoreGroupedChildren(stored).find((shape) => shape.sketchSourceId)!;
+    expect(after.centerOfMass.x).toBeCloseTo((before.centerOfMass.x * before.volume - removed * body.x) / after.volume, 3);
+  }, CAD_TEST_TIMEOUT_MS);
+
+  it("reports a bound group size next to a nested bound feature field on load", async () => {
+    await writeProjectMetadata(root, "feature-issue", { id: "feature-issue", name: "feature-issue", createdAt: 1, revision: 1 });
+    const ids = value(await engine.addShapes("feature-issue", [
+      { kind: "revolve", name: "Revolve", profile: [[0, -2], [2, -2], [2, 2], [0, 2]], sides: 32 },
+      { kind: "box", width: 2, depth: 2, height: 3, x: -10 },
+    ])).shapes.map((shape) => shape.id);
+    const group = value(await engine.group("feature-issue", ids)).shape;
+    value(await engine.addParameter("feature-issue", { name: "sweep", expression: "360 deg", dimension: "angle" }));
+    value(await engine.addParameter("feature-issue", { name: "gh", expression: "4", dimension: "length" }));
+    const child = outputIn((await document("feature-issue")).shapes[0]!);
+    value(await engine.bindShapeField("feature-issue", child.id, "revolve.sweepAngle", "sweep"));
+    const current = await document("feature-issue");
+    await store.write("feature-issue", current, [{ ...current.shapes[0]!, expressions: { height: "gh" } }]);
+    const loaded = await document("feature-issue");
+
+    expect(shapeBindingIssues(loaded.shapes, loaded.parameters ?? [])).toEqual([
+      expect.objectContaining({ code: "conflictingBinding", shapeId: group.id, field: "height" }),
+    ]);
   }, CAD_TEST_TIMEOUT_MS);
 
   it("refits a group inside a mirrored, resized group, in one undo step", async () => {

@@ -122,9 +122,7 @@ import {
   boundSketchConstraints,
   conflictingConstraintBinding,
   conflictingGroupSizeBinding,
-  GROUP_SIZE_FIELDS,
   groupRefitBindings,
-  refitsParent,
   echoesSketchConstraints,
   requestedSketchProfile,
   profileSizeFields,
@@ -139,6 +137,8 @@ import {
 import { planParameterBindings, solvedSketchProfile as solveSharedSketchProfile } from "./parameterBindingPlan.js";
 import {
   bindableField,
+  GROUP_SIZE_FIELDS,
+  refitsParent,
   boundFieldsNamedBy,
   boundFieldValue,
   resolveShapeBinding,

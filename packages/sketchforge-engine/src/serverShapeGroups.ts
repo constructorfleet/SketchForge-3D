@@ -43,6 +43,8 @@ export type ShapeBounds = {
 
 const MIN_SHAPE_DIMENSION = 0.01;
 const MODEL_DIMENSION_PRECISION = 3;
+/** Half the last kept digit: spans closer than this round to the same stored size. */
+const MODEL_DIMENSION_TOLERANCE = 0.5 * 10 ** -MODEL_DIMENSION_PRECISION;
 /** How close two triangle corners must be to count as the same vertex when splitting parts. */
 const SEPARATE_PARTS_VERTEX_TOLERANCE = 0.0005;
 
@@ -350,12 +352,16 @@ export function refittedGroupRecord(group: WorkplaneShape, children: WorkplaneSh
   const bounds = boundsForShapes(children);
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerZ = (bounds.minZ + bounds.maxZ) / 2;
-  const baseWidth = cleanModelDimension(bounds.maxX - bounds.minX);
-  const baseDepth = cleanModelDimension(bounds.maxZ - bounds.minZ);
-  const baseHeight = cleanModelDimension(bounds.maxY - bounds.minY);
-  const width = cleanModelDimension(baseWidth * frame.scale.x);
-  const depth = cleanModelDimension(baseDepth * frame.scale.z);
-  const height = cleanModelDimension(baseHeight * frame.scale.y);
+  // An unchanged span keeps its stored size exactly, so rounding cannot move a bound size.
+  const fit = (span: number, size: number, scale: number) => {
+    const before = size / scale;
+    if (Math.abs(span - before) <= MODEL_DIMENSION_TOLERANCE) return [before, size] as const;
+    const base = cleanModelDimension(span);
+    return [base, cleanModelDimension(base * scale)] as const;
+  };
+  const [baseWidth, width] = fit(bounds.maxX - bounds.minX, shapeWidth(group), frame.scale.x);
+  const [baseDepth, depth] = fit(bounds.maxZ - bounds.minZ, shapeDepth(group), frame.scale.z);
+  const [baseHeight, height] = fit(bounds.maxY - bounds.minY, group.height, frame.scale.y);
   const center = frame.toParent(centerX, (bounds.minY + bounds.maxY) / 2, centerZ);
   return {
     ...group,
