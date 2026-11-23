@@ -10,7 +10,9 @@ import { POST as draftPrism } from "@/app/api/v1/draft-prism/route";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
 import { readProjectDocument, writeProjectDocument } from "@constructorfleet/sketchforge-engine/serverProjectDocument";
-import { SERVER_PROJECTS_ENV } from "@/lib/serverProjectStore";
+import { SERVER_PROJECTS_ENV, serverMetadataRevision } from "@/lib/serverProjectStore";
+import { POST as saveDashboardProject } from "@/app/api/projects/route";
+import { readProjectMetadata } from "@/lib/engine/serverProjectFiles";
 
 const TOKEN = "test-token-value";
 
@@ -185,6 +187,28 @@ describe("REST API v1", () => {
 
     expect(payload.shapes).toHaveLength(1);
     expect(payload.shapes[0]).toMatchObject({ name: "Post", kind: "cylinder", sides: 6, width: 8, height: 30, x: 12 });
+  });
+
+  // Issue #650: a dashboard list read before a REST write must not post its old shape count back.
+  it("counts a shape write as a metadata change, so a dashboard list read before it is refused", async () => {
+    const projectId = await makeProject("Shared");
+    const before = (await readProjectMetadata(projectsRoot, projectId))!;
+
+    expect((await addShape(projectId, { kind: "box", width: 10, depth: 10, height: 10 })).status).toBe(201);
+    const after = (await readProjectMetadata(projectsRoot, projectId))!;
+    expect(after.shapes).toBe(1);
+    expect(serverMetadataRevision(after)).toBeGreaterThan(serverMetadataRevision(before));
+
+    const formData = new FormData();
+    formData.append("metadata", JSON.stringify({ ...before, thumbnailVersion: 2 }));
+    formData.append("baseMetadataRevision", String(serverMetadataRevision(before)));
+    const response = await saveDashboardProject(new Request(`http://localhost/api/projects?projectId=${projectId}`, {
+      method: "POST",
+      headers: { Origin: "http://localhost" },
+      body: formData,
+    }));
+    expect(response.status).toBe(409);
+    expect((await readProjectMetadata(projectsRoot, projectId))!.shapes).toBe(1);
   });
 
   it("rejects a shape request without its required kind before engine dispatch", async () => {
