@@ -43,6 +43,8 @@ export type ShapeBounds = {
 
 const MIN_SHAPE_DIMENSION = 0.01;
 const MODEL_DIMENSION_PRECISION = 3;
+/** Half the last kept digit: spans closer than this round to the same stored size. */
+const MODEL_DIMENSION_TOLERANCE = 0.5 * 10 ** -MODEL_DIMENSION_PRECISION;
 /** How close two triangle corners must be to count as the same vertex when splitting parts. */
 const SEPARATE_PARTS_VERTEX_TOLERANCE = 0.0005;
 
@@ -338,6 +340,48 @@ export function restoreGroupedChildren(group: WorkplaneShape): WorkplaneShape[] 
     };
     return canonicalizeShape(group.hole ? withHoleMode(restored, true) : restored);
   });
+}
+
+/**
+ * Refits a record group's box around changed children, as grouping them again would.
+ * Keeps the group's scale, turn, mirror and where its children sit in the parent frame.
+ */
+export function refittedGroupRecord(group: WorkplaneShape, children: WorkplaneShape[]): WorkplaneShape {
+  if (!children.length) return group;
+  const frame = groupChildFrame(group);
+  const bounds = boundsForShapes(children);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+  // An unchanged span keeps its stored size exactly, so rounding cannot move a bound size.
+  const fit = (span: number, size: number, scale: number) => {
+    const before = size / scale;
+    if (Math.abs(span - before) <= MODEL_DIMENSION_TOLERANCE) return [before, size] as const;
+    const base = cleanModelDimension(span);
+    return [base, cleanModelDimension(base * scale)] as const;
+  };
+  const [baseWidth, width] = fit(bounds.maxX - bounds.minX, shapeWidth(group), frame.scale.x);
+  const [baseDepth, depth] = fit(bounds.maxZ - bounds.minZ, shapeDepth(group), frame.scale.z);
+  const [baseHeight, height] = fit(bounds.maxY - bounds.minY, group.height, frame.scale.y);
+  const center = frame.toParent(centerX, (bounds.minY + bounds.maxY) / 2, centerZ);
+  return {
+    ...group,
+    x: center.x,
+    z: center.z,
+    elevation: center.y - height / 2,
+    width,
+    depth,
+    height,
+    size: Math.max(width, depth),
+    groupedBaseWidth: baseWidth,
+    groupedBaseDepth: baseDepth,
+    groupedBaseHeight: baseHeight,
+    groupedShapes: children.map((child) => ({
+      ...child,
+      x: child.x - centerX,
+      z: child.z - centerZ,
+      elevation: (child.elevation ?? 0) - bounds.minY,
+    })),
+  };
 }
 
 /**
