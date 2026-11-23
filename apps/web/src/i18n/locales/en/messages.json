@@ -210,7 +210,8 @@
       "migrateFailed": "Could not migrate project shapes to larger storage",
       "deleteFailed": "Could not delete project shapes from local storage",
       "saveListFailed": "Could not save project list",
-      "unreadableWriteRefused": "This project's stored copy could not be read, so it is not overwritten"
+      "unreadableWriteRefused": "This project's stored copy could not be read, so it is not overwritten",
+      "deletedWriteRefused": "This project was deleted in another tab, so it is not saved again"
     },
     "updates": {
       "promptTitle": "SketchForge {version} is available",

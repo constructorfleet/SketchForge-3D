@@ -164,7 +164,8 @@
       "migrateFailed": "Nie udało się przenieść kształtów projektów do większego magazynu",
       "deleteFailed": "Nie udało się usunąć kształtów projektu z przeglądarki",
       "saveListFailed": "Nie udało się zapisać listy projektów",
-      "unreadableWriteRefused": "Nie można odczytać zapisanej kopii tego projektu, więc nie zostanie nadpisana"
+      "unreadableWriteRefused": "Nie można odczytać zapisanej kopii tego projektu, więc nie zostanie nadpisana",
+      "deletedWriteRefused": "Ten projekt został usunięty w innej karcie, więc nie zostanie ponownie zapisany"
     },
     "updates": {
       "promptTitle": "Dostępna jest wersja SketchForge {version}",

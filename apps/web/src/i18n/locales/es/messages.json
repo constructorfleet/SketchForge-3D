@@ -164,7 +164,8 @@
       "migrateFailed": "No se pudieron pasar las formas de los proyectos a un almacenamiento más grande",
       "deleteFailed": "No se pudieron eliminar del navegador las formas del proyecto",
       "saveListFailed": "No se pudo guardar la lista de proyectos",
-      "unreadableWriteRefused": "No se pudo leer la copia guardada de este proyecto, así que no se sobrescribe"
+      "unreadableWriteRefused": "No se pudo leer la copia guardada de este proyecto, así que no se sobrescribe",
+      "deletedWriteRefused": "Este proyecto se eliminó en otra pestaña, así que no se vuelve a guardar"
     },
     "updates": {
       "promptTitle": "SketchForge {version} está disponible",

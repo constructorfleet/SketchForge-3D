@@ -11,36 +11,49 @@ export const PROJECT_TOMBSTONES_STORAGE_KEY = "sketchForge.projects.deleted";
 export const PROJECT_TOMBSTONE_LIMIT = 500;
 
 type TombstoneStorage = Pick<Storage, "getItem" | "setItem">;
+type Tombstone = { id: string; at: number };
 
-function readIds(storage: TombstoneStorage): string[] {
+function readEntries(storage: TombstoneStorage): Tombstone[] {
   try {
     const parsed = JSON.parse(storage.getItem(PROJECT_TOMBSTONES_STORAGE_KEY) ?? "[]") as unknown;
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): Tombstone[] => {
+      // Bare ids predate timestamps; any later listing may lift them.
+      if (typeof entry === "string") return [{ id: entry, at: 0 }];
+      if (!entry || typeof entry !== "object") return [];
+      const { id, at } = entry as { id?: unknown; at?: unknown };
+      return typeof id === "string" ? [{ id, at: typeof at === "number" && Number.isFinite(at) ? at : 0 }] : [];
+    });
   } catch {
     return [];
   }
 }
 
-function writeIds(storage: TombstoneStorage, ids: string[]) {
+function writeEntries(storage: TombstoneStorage, entries: Tombstone[]) {
   try {
-    storage.setItem(PROJECT_TOMBSTONES_STORAGE_KEY, JSON.stringify(ids.slice(-PROJECT_TOMBSTONE_LIMIT)));
+    storage.setItem(PROJECT_TOMBSTONES_STORAGE_KEY, JSON.stringify(entries.slice(-PROJECT_TOMBSTONE_LIMIT)));
   } catch {
     // Full storage: this tab's own delete mark still holds.
   }
 }
 
 export function readProjectTombstones(storage: TombstoneStorage): Set<string> {
-  return new Set(readIds(storage));
+  return new Set(readEntries(storage).map((entry) => entry.id));
 }
 
-export function addProjectTombstone(storage: TombstoneStorage, projectId: string) {
-  writeIds(storage, [...readIds(storage).filter((id) => id !== projectId), projectId]);
+export function addProjectTombstone(storage: TombstoneStorage, projectId: string, at = Date.now()) {
+  writeEntries(storage, [...readEntries(storage).filter((entry) => entry.id !== projectId), { id: projectId, at }]);
 }
 
-export function removeProjectTombstones(storage: TombstoneStorage, projectIds: Iterable<string>) {
-  const lifted = new Set(projectIds);
-  const ids = readIds(storage);
-  if (ids.some((id) => lifted.has(id))) writeIds(storage, ids.filter((id) => !lifted.has(id)));
+/**
+ * Lifts tombstones for projects a server listing holds again. Only a listing
+ * requested after the delete counts: one fetched while the delete was in flight still lists it.
+ */
+export function removeProjectTombstones(storage: TombstoneStorage, projectIds: Iterable<string>, listingRequestedAt: number) {
+  const listed = new Set(projectIds);
+  const entries = readEntries(storage);
+  const kept = entries.filter((entry) => !listed.has(entry.id) || entry.at >= listingRequestedAt);
+  if (kept.length !== entries.length) writeEntries(storage, kept);
 }
 
 export function withoutDeletedProjects<T extends { id: string }>(projects: T[], tombstones: ReadonlySet<string>): T[] {

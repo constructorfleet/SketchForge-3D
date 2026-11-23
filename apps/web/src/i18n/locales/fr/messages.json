@@ -164,7 +164,8 @@
       "migrateFailed": "Impossible de transférer les formes des projets vers un stockage plus grand",
       "deleteFailed": "Impossible de supprimer les formes du projet de ce navigateur",
       "saveListFailed": "Impossible d’enregistrer la liste des projets",
-      "unreadableWriteRefused": "La copie enregistrée de ce projet est illisible ; elle n’est donc pas écrasée"
+      "unreadableWriteRefused": "La copie enregistrée de ce projet est illisible ; elle n’est donc pas écrasée",
+      "deletedWriteRefused": "Ce projet a été supprimé dans un autre onglet ; il n’est donc pas réenregistré"
     },
     "updates": {
       "promptTitle": "SketchForge {version} est disponible",

@@ -508,7 +508,7 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
     return;
   }
   // Another tab deleted it; its write mark here may not have arrived yet (#670).
-  if (browserTombstones().has(projectId)) throw new ProjectWriteRefusedError(translate("dashboard.storage.unreadableWriteRefused"));
+  if (browserTombstones().has(projectId)) throw new ProjectWriteRefusedError(translate("dashboard.storage.deletedWriteRefused"));
   // Registered in the same tick as the storage check, before any await.
   let settle = () => {};
   const pending = new Promise<void>((resolve) => { settle = resolve; });
@@ -997,6 +997,7 @@ export default function Home() {
     if (!mounted || STATIC_EXPORT_BUILD) return;
     let canceled = false;
     void (async () => {
+      const probeRequestedAt = Date.now();
       const listing = await probeServerProjects().catch(() => null);
       if (canceled) return;
       if (!listing?.enabled) {
@@ -1052,7 +1053,16 @@ export default function Home() {
       }
       if (canceled) return;
 
-      const adopted = migratedCount > 0 ? await probeServerProjects().catch(() => listing) : listing;
+      let adoptedRequestedAt = probeRequestedAt;
+      let adopted = listing;
+      if (migratedCount > 0) {
+        const requestedAt = Date.now();
+        const relisted = await probeServerProjects().catch(() => null);
+        if (relisted) {
+          adopted = relisted;
+          adoptedRequestedAt = requestedAt;
+        }
+      }
       if (canceled || !adopted.enabled) return;
 
       // The browser stayed in charge while the listing was read (#662). Remove what it deleted
@@ -1129,7 +1139,7 @@ export default function Home() {
       const deletedDuringMove = (projectId: string) => migratedProjectIds.has(projectId) && projectsDeletedInBrowser.has(projectId);
       const adoptedProjects = dashboardProjectsFromServer(adopted.projects).filter((project) => !deletedDuringMove(project.id));
       // Any other listed project is on the server, which outranks a delete made in this browser.
-      removeProjectTombstones(window.localStorage, adoptedProjects.map((project) => project.id));
+      removeProjectTombstones(window.localStorage, adoptedProjects.map((project) => project.id), adoptedRequestedAt);
       projectsJsonRef.current = JSON.stringify(adoptedProjects.map(projectForStorage));
       const lateProjects = [...migratedProjectIds]
         .filter((id) => !projectsDeletedInBrowser.has(id) && !adoptedProjects.some((candidate) => candidate.id === id))
@@ -1235,6 +1245,7 @@ export default function Home() {
     if (!mounted || projectStorageMode !== "server") return;
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
+      const listingRequestedAt = Date.now();
       void probeServerProjects().then((listing) => {
         if (!listing.enabled) return;
         const usable = listing.projects.filter((record) => storedProjectIsUsable(record.metadata as StoredDashboardProject));
@@ -1246,7 +1257,7 @@ export default function Home() {
         setProjects((current) => {
           const merged = mergeNewerServerProjects(current, server, metadataIsNewer);
           // Another client saved it after a delete here; it is genuinely back (#670).
-          removeProjectTombstones(window.localStorage, merged.changedIds);
+          removeProjectTombstones(window.localStorage, merged.changedIds, listingRequestedAt);
           // Already on the server, so the list effect need not post them back.
           for (const id of merged.changedIds) {
             const project = merged.projects.find((candidate) => candidate.id === id);

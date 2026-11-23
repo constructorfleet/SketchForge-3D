@@ -86,7 +86,11 @@ describe("dashboard package writes", () => {
   it("shares a delete with every tab and keeps browser lists from bringing it back", () => {
     const remove = page.slice(page.indexOf("const deleteProject = (projectId: string) => {"), page.indexOf("const renameProject = "));
     expect(remove).toContain("addProjectTombstone(window.localStorage, projectId);");
-    expect(topLevelFunction("writeProjectShapes")).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) throw new ProjectWriteRefusedError/);
+    expect(topLevelFunction("writeProjectShapes")).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) throw new ProjectWriteRefusedError\(translate\("dashboard\.storage\.deletedWriteRefused"\)\)/);
+    // A listing fetched while the delete was in flight must not lift it.
+    expect(page).toMatch(/const listingRequestedAt = Date\.now\(\);\s*void probeServerProjects\(\)/);
+    expect(page).toMatch(/removeProjectTombstones\(window\.localStorage, merged\.changedIds, listingRequestedAt\)/);
+    expect(page).toMatch(/removeProjectTombstones\(window\.localStorage, adoptedProjects\.map\(\(project\) => project\.id\), adoptedRequestedAt\)/);
     expect(page).toMatch(/if \(event\.key === PROJECT_TOMBSTONES_STORAGE_KEY\) \{[\s\S]{0,300}projectWriteGuard\.forget\(projectId\);/);
     expect(page).toMatch(/\.filter\(\(project\) => !tombstones\.has\(project\.id as string\)\)/);
     expect(page).toMatch(/: withoutDeletedProjects\(mergeProjectsForStorage\(projects\), browserTombstones\(\)\);/);

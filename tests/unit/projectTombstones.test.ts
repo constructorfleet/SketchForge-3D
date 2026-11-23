@@ -27,17 +27,32 @@ describe("project tombstones", () => {
     expect(withoutDeletedProjects([{ id: "p1" }, { id: "p2" }], readProjectTombstones(storage))).toEqual([{ id: "p2" }]);
   });
 
-  it("lifts a tombstone when the project genuinely returns", () => {
+  it("lifts a tombstone when a listing requested after the delete holds the project again", () => {
     const storage = memoryStorage();
-    addProjectTombstone(storage, "p1");
-    addProjectTombstone(storage, "p2");
-    removeProjectTombstones(storage, ["p1"]);
+    addProjectTombstone(storage, "p1", 100);
+    addProjectTombstone(storage, "p2", 100);
+    removeProjectTombstones(storage, ["p1"], 101);
     expect([...readProjectTombstones(storage)]).toEqual(["p2"]);
+  });
+
+  it("keeps a tombstone newer than the listing, which may predate the delete", () => {
+    const storage = memoryStorage();
+    addProjectTombstone(storage, "p1", 200);
+    removeProjectTombstones(storage, ["p1"], 150);
+    removeProjectTombstones(storage, ["p1"], 200);
+    expect([...readProjectTombstones(storage)]).toEqual(["p1"]);
+  });
+
+  it("reads tombstones written as bare ids as deleted at the epoch", () => {
+    const storage = memoryStorage({ [PROJECT_TOMBSTONES_STORAGE_KEY]: JSON.stringify(["p1"]) });
+    expect([...readProjectTombstones(storage)]).toEqual(["p1"]);
+    removeProjectTombstones(storage, ["p1"], 1);
+    expect(readProjectTombstones(storage).size).toBe(0);
   });
 
   it("keeps only the newest tombstones", () => {
     const storage = memoryStorage();
-    for (let index = 0; index <= PROJECT_TOMBSTONE_LIMIT; index += 1) addProjectTombstone(storage, `p${index}`);
+    for (let index = 0; index <= PROJECT_TOMBSTONE_LIMIT; index += 1) addProjectTombstone(storage, `p${index}`, index);
     const kept = readProjectTombstones(storage);
     expect(kept.size).toBe(PROJECT_TOMBSTONE_LIMIT);
     expect(kept.has("p0")).toBe(false);
@@ -47,7 +62,7 @@ describe("project tombstones", () => {
   it("reads an unreadable or foreign value as no tombstones", () => {
     expect(readProjectTombstones(memoryStorage({ [PROJECT_TOMBSTONES_STORAGE_KEY]: "{not json" })).size).toBe(0);
     expect(readProjectTombstones(memoryStorage({ [PROJECT_TOMBSTONES_STORAGE_KEY]: JSON.stringify({ id: 1 }) })).size).toBe(0);
-    expect(readProjectTombstones(memoryStorage({ [PROJECT_TOMBSTONES_STORAGE_KEY]: JSON.stringify(["p1", 2]) }))).toEqual(new Set(["p1"]));
+    expect(readProjectTombstones(memoryStorage({ [PROJECT_TOMBSTONES_STORAGE_KEY]: JSON.stringify(["p1", 2, { id: "p2", at: 5 }, { at: 5 }]) }))).toEqual(new Set(["p1", "p2"]));
   });
 
   it("survives storage that refuses writes", () => {
