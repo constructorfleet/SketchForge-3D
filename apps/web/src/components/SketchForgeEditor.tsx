@@ -122,7 +122,7 @@ import {
   selectableCadModifierEdge,
   type CadModifierRequestPhase,
 } from "@/lib/cadModifierRuntime";
-import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments, restoreShapeBeforeEdgeTreatment } from "@/lib/edgeTreatmentHistory";
+import { cloneWorkplaneShapeSnapshot, compactEdgeTreatmentHistory, edgeTreatmentAppliedFrame, edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments, restoreShapeBeforeEdgeTreatment, separatePartsBlockedByLock } from "@/lib/edgeTreatmentHistory";
 import { sketchEditRefusal, sketchEditTargetLocked } from "@/lib/sketchEditTarget";
 import { edgeTreatmentFeatureWithLineage, edgeTreatmentLineageTarget, selectedEdgeTreatmentReplay } from "@/lib/edgeTreatmentLineage";
 import { appendEditorHistorySnapshot, boundedEditorHistoryState, editorHistoryEntry, editorHistoryForExport, entryConfiguration, hydrateEditorHistoryState, NO_CONFIGURATIONS, projectShapesFingerprint, type EditorHistoryEntry, type EditorHistoryExportLimit, type EditorHistoryState, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
@@ -3210,14 +3210,14 @@ function cadModifierSourceParts(shape: WorkplaneShape) {
 }
 
 function separablePartCount(shape: WorkplaneShape) {
-  if (holdsLockedShape(shape) || shape.hole) return 0;
+  if (separatePartsBlockedByLock(shape) || shape.hole) return 0;
   if (shape.groupedShapes?.length && !shape.importedMesh) return shape.groupedShapes.length;
   const mesh = meshForShape(shape);
   return meshFaceComponents(mesh).length;
 }
 
 function separateShapeParts(shape: WorkplaneShape) {
-  if (holdsLockedShape(shape) || shape.hole) return [];
+  if (separatePartsBlockedByLock(shape) || shape.hole) return [];
   if (shape.groupedShapes?.length && !shape.importedMesh) {
     const restored = restoreGroupedChildren(shape);
     return restored.length > 1 ? restored : [];
@@ -9110,7 +9110,7 @@ export function SketchForgeEditor({
       setNotice(notice((t) => t("editor.separate.selectOne")));
       return;
     }
-    if (holdsLockedShape(selectedShape)) {
+    if (separatePartsBlockedByLock(selectedShape)) {
       setNotice(notice((t) => t("editor.separate.unlock")));
       return;
     }
@@ -9726,7 +9726,7 @@ export function SketchForgeEditor({
       if (command.action === "separate_parts") {
         const target = findShape(params.id) ?? (selectedIdsRef.current.length === 1 ? findShape(selectedIdsRef.current[0]) : null);
         if (!target) throw new Error("Select one object to separate");
-        if (holdsLockedShape(target)) throw new Error("Unlock the object before separating parts");
+        if (separatePartsBlockedByLock(target)) throw new Error("Unlock the object before separating parts");
         const parts = separateShapeParts(target);
         if (parts.length <= 1) throw new Error("The selected object has only one connected part");
         commitShapes([...currentShapes().filter((shape) => shape.id !== target.id), ...parts], parts.map((shape) => shape.id), notice((t) => t("editor.mcp.separated", { count: parts.length })));

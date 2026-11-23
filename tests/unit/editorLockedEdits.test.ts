@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments } from "@/lib/edgeTreatmentHistory";
+import { edgeTreatmentPathLocked, holdsLockedShape, removableEdgeTreatments, separatePartsBlockedByLock } from "@/lib/edgeTreatmentHistory";
 import { sketchEditRefusal, sketchEditTargetLocked } from "@/lib/sketchEditTarget";
 import type { EdgeTreatmentHistoryEntry, WorkplaneShape } from "@/types/sketchforge";
 
@@ -35,6 +35,26 @@ describe("sketch edit refusal", () => {
     expect(sketchEditRefusal([])).toBe("selectToEdit");
     expect(sketchEditRefusal([box("plain")])).toBe("selectToEdit");
     expect(sketchEditRefusal([sketched(), sketched({ id: "other" })])).toBe("selectToEdit");
+  });
+});
+
+describe("separating parts under a lock", () => {
+  it("lets a plain group with a locked part split, as Ungroup does, since its parts keep their locks", () => {
+    const group = box("group", { kind: "mesh", groupedShapes: [treated("locked", { locked: true }), treated("free")] });
+
+    expect(separatePartsBlockedByLock(group)).toBe(false);
+    expect(separatePartsBlockedByLock({ ...group, locked: true })).toBe(true);
+  });
+
+  it("refuses a baked result holding a locked part, whose mesh split would replace that part", () => {
+    const baked = box("baked", {
+      kind: "mesh",
+      importedMesh: { positions: [], indices: [] } as never,
+      groupedShapes: [treated("locked", { locked: true })],
+    });
+
+    expect(separatePartsBlockedByLock(baked)).toBe(true);
+    expect(separatePartsBlockedByLock(box("solo"))).toBe(false);
   });
 });
 

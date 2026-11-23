@@ -239,12 +239,18 @@ test("a group holding a locked part refuses a fillet or chamfer, which would rew
       await page.locator(".scene-inspector-list > li.scene-row.selected").first().waitFor({ state: "visible" });
       assert.equal(await fillet.isDisabled(), true, "the toolbar refuses to fillet a group holding a locked part");
       assert.equal(await chamfer.isDisabled(), true, "or to chamfer it");
-      const separate = page.getByRole("button", { name: "Separate Parts", exact: true });
-      assert.ok((await separate.count()) === 0 || await separate.isDisabled(), "separating the parts would rewrite the locked one");
       const shell = page.getByRole("region", { name: "Shell" });
       await shell.getByRole("button", { name: "Shell", exact: true }).click();
       assert.equal(await shell.getByRole("button", { name: "Hollow shape" }).isDisabled(), true, "nor can the group be hollowed");
       await page.screenshot({ path: "docs/screenshots/editor-locked-group-fillet.png" });
+
+      // Separating a plain group only restores its parts, as Ungroup and the engine do; the lock stays.
+      const separate = page.getByRole("button", { name: "Separate Parts", exact: true });
+      assert.equal(await separate.isDisabled(), false, "a plain group splits like Ungroup, locks kept");
+      await separate.click();
+      await rows.nth(1).waitFor({ state: "visible", timeout: 30_000 });
+      assert.equal(await rows.count(), 2, "the group splits into its two parts");
+      assert.equal(await page.locator(".scene-inspector-list button[aria-label^='Unlock ']").count(), 1, "the locked part keeps its lock");
     });
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

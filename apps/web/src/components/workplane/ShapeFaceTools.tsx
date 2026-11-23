@@ -30,6 +30,7 @@ const PULL_AXIS_LABELS: Record<DraftFacePullAxis, MessageKey> = {
 export function ShapeFaceTools({
   shape,
   locked,
+  draftLocked,
   fallbackColor,
   onUpdateFaceColors,
   onEnableFaceEditing,
@@ -40,6 +41,8 @@ export function ShapeFaceTools({
 }: {
   shape: WorkplaneShape;
   locked: boolean;
+  /** Blocks drafting only: a draft rewrites a group's locked part, a face colour does not. */
+  draftLocked: boolean;
   fallbackColor: string;
   onUpdateFaceColors: (faceColors: Record<string, string>) => void;
   onEnableFaceEditing?: () => Promise<void> | void;
@@ -221,7 +224,7 @@ export function ShapeFaceTools({
                   <p className="face-tools-note">{t("panels.inspector.faces.draftHint")}</p>
                   <label className="select-property">
                     <span>{t("panels.inspector.faces.direction.label")}</span>
-                    <select value={pullAxis} disabled={locked || drafting} onChange={(event) => setPullAxis(event.currentTarget.value as DraftFacePullAxis)}>
+                    <select value={pullAxis} disabled={draftLocked || drafting} onChange={(event) => setPullAxis(event.currentTarget.value as DraftFacePullAxis)}>
                       {DRAFT_FACE_PULL_AXES.map((axis) => <option key={axis} value={axis}>{t(PULL_AXIS_LABELS[axis])}</option>)}
                     </select>
                   </label>
@@ -234,14 +237,14 @@ export function ShapeFaceTools({
                       max="44.9"
                       step="0.5"
                       value={angle}
-                      disabled={locked || drafting}
+                      disabled={draftLocked || drafting}
                       onChange={(event) => setAngle(event.currentTarget.value)}
                     />
                   </label>
                   <button
                     className="inspector-action-button"
                     type="button"
-                    disabled={locked || drafting || !draftReady}
+                    disabled={draftLocked || drafting || !draftReady}
                     onClick={async () => {
                       if (!onApplyDraftFace) return;
                       setDrafting(true);

@@ -118,6 +118,14 @@ export function edgeTreatmentPathLocked(shape: WorkplaneShape, path: readonly nu
   return child ? edgeTreatmentPathLocked(child, rest) : false;
 }
 
+/**
+ * Reports whether a lock blocks Separate Parts. A plain group only restores its
+ * parts, locks kept, as Ungroup and the engine do; a baked mesh split replaces them.
+ */
+export function separatePartsBlockedByLock(shape: WorkplaneShape): boolean {
+  return shape.groupedShapes?.length && !shape.importedMesh ? Boolean(shape.locked) : holdsLockedShape(shape);
+}
+
 /** Reports whether the shape or anything it holds is locked. */
 export function holdsLockedShape(shape: WorkplaneShape): boolean {
   return Boolean(shape.locked) || (shape.groupedShapes ?? []).some(holdsLockedShape);
