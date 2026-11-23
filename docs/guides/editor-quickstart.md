@@ -59,6 +59,32 @@ flowchart LR
   C -->|Open SKF or import geometry| D[Restored project]
 ```
 
+## When a project cannot be read
+
+Sometimes SketchForge cannot open a project's stored copy. The `.skf` package may be damaged or come from a newer release, or the browser storage or server that holds it may be unavailable. In either case the editor stays closed, the dashboard names the project and shows the error, and the stored copy is left untouched. Autosave does not write to the project until it loads again or you start it over. This applies to projects in the browser, in a server directory, and in the desktop app.
+
+In browser storage, another tab may save a newer copy that this tab cannot read. When that happens, this tab closes its editor instead of saving its older copy over the newer one. Clients that share a server project directory do not check this, and the last save wins.
+
+![The dashboard reporting a project whose stored copy could not be read.](../screenshots/project-load-failure.png)
+
+When the stored copy was read but could not be opened:
+
+- **Try again** reads the stored copy again.
+- **Download stored copy** saves the stored `.skf` exactly as it is, so you can repair it or open it in a newer release. A project saved before SketchForge stored `.skf` packages in the browser downloads as a `.json` file with whatever data is left; binary data in it is base64.
+- **Start over** replaces the stored copy with an empty project. It asks you to confirm first, because the old copy cannot be recovered after that.
+
+![The confirmation shown before Start over replaces the stored copy.](../screenshots/project-load-failure-start-over.png)
+
+When the storage or server could not be reached, the dashboard says the project could not be loaded and offers only **Try again**, because nothing was read that could be downloaded or replaced. The detail names the failed request for the project package: the HTTP status, a request that never reached the server, or an answer that was not a project package, such as a proxy's sign-in page. A browser storage error that a retry cannot fix, such as a value that cannot be decoded, counts as a copy that cannot be read, so **Start over** is offered.
+
+If a newer SketchForge release has upgraded this browser's project storage, an older release cannot open any of it. The dashboard says so and offers no actions, because none of them could work. Open the project in the newer release.
+
+![The dashboard reporting browser storage upgraded by a newer release.](../screenshots/project-load-storage-newer.png)
+
+![The dashboard reporting a project whose server could not be reached.](../screenshots/project-load-unavailable.png)
+
+**Export all projects** leaves out a project it cannot read and names it in the result.
+
 ## Keyboard shortcuts
 
 Press **?** in the editor to open the keyboard-shortcuts list. Press **Escape** to close it. The list includes the common edit shortcuts; selection visibility and locking use bindings that do not collide with macOS or browser-reserved keys:

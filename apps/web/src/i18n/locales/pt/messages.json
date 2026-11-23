@@ -163,7 +163,8 @@
       "prepareFailed": "Não foi possível preparar o armazenamento do projeto",
       "migrateFailed": "Não foi possível transferir as formas do projeto para um armazenamento maior",
       "deleteFailed": "Não foi possível excluir as formas do projeto deste navegador",
-      "saveListFailed": "Não foi possível salvar a lista de projetos"
+      "saveListFailed": "Não foi possível salvar a lista de projetos",
+      "unreadableWriteRefused": "Não foi possível ler a cópia guardada deste projeto, por isso não é substituída"
     },
     "updates": {
       "promptTitle": "SketchForge {version} disponível",
@@ -244,6 +245,30 @@
       "exported": "{count, plural, one {{count} projeto exportado em {fileName}.} many {{count} de projetos exportados em {fileName}.} other {{count} projetos exportados em {fileName}.}}",
       "skipped": "Não foi possível incluir: {names}.",
       "failed": "Não foi possível exportar seus projetos."
+    },
+    "loadFailure": {
+      "title": "Não foi possível ler {name}",
+      "kept": "A cópia guardada permanece inalterada, para que uma versão mais recente ou uma reparação ainda a possam recuperar. A edição fica desativada até que carregue ou recomece.",
+      "unavailableTitle": "Não foi possível carregar {name}",
+      "unavailableKept": "O SketchForge não conseguiu aceder à cópia guardada, por isso nada foi alterado. A edição fica desativada até que carregue. Tente novamente quando o armazenamento ou o servidor estiverem disponíveis.",
+      "storageNewerKept": "Uma versão mais recente do SketchForge atualizou o armazenamento de projetos deste navegador e esta versão não o consegue abrir. Nada foi alterado. Abra o projeto na versão mais recente.",
+      "retry": "Tentar novamente",
+      "retryFor": "Tentar novamente: {name}",
+      "download": "Transferir cópia guardada",
+      "downloadFor": "Transferir cópia guardada: {name}",
+      "startOver": "Recomeçar",
+      "startOverFor": "Recomeçar: {name}",
+      "dismiss": "Dispensar o erro de {name}",
+      "startOverTitle": "Recomeçar {name}?",
+      "startOverClose": "Cancelar recomeço",
+      "startOverConfirm": "Isto substitui a cópia guardada de <b>{name}</b> por um projeto vazio. Depois, a cópia guardada não pode ser recuperada. Transfira-a primeiro se quiser repará-la.",
+      "startOverAction": "Substituir por projeto vazio",
+      "nothingStored": "Não há nenhum pacote guardado para transferir deste projeto.",
+      "downloaded": "Cópia guardada transferida como {fileName}.",
+      "downloadFailed": "Não foi possível transferir a cópia guardada.",
+      "packageNetwork": "O pedido do pacote deste projeto não chegou ao servidor ({detail}).",
+      "packageStatus": "O servidor respondeu ao pedido do pacote deste projeto com HTTP {detail}.",
+      "packageNotPackage": "O servidor respondeu ao pedido do pacote deste projeto com {detail}, e não com um pacote de projeto."
     },
     "storageWarning": {
       "message": "Este navegador já usou {percent} do espaço permitido para seus projetos. Exporte uma cópia de segurança antes que ele acabe."

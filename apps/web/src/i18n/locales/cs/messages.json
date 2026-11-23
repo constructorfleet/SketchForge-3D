@@ -163,7 +163,8 @@
       "prepareFailed": "Nepodařilo se připravit místo pro uložení projektu",
       "migrateFailed": "Nepodařilo se přesunout tvary projektu do většího úložiště",
       "deleteFailed": "Nepodařilo se odstranit tvary projektu z prohlížeče",
-      "saveListFailed": "Nepodařilo se uložit seznam projektů"
+      "saveListFailed": "Nepodařilo se uložit seznam projektů",
+      "unreadableWriteRefused": "Uloženou kopii tohoto projektu nelze načíst, proto se nepřepisuje"
     },
     "updates": {
       "promptTitle": "Je k dispozici SketchForge {version}",
@@ -244,6 +245,30 @@
       "exported": "{count, plural, one {Exportován {count} projekt do souboru {fileName}.} few {Exportovány {count} projekty do souboru {fileName}.} many {Exportováno {count} projektu do souboru {fileName}.} other {Exportováno {count} projektů do souboru {fileName}.}}",
       "skipped": "Nepodařilo se zahrnout: {names}.",
       "failed": "Projekty se nepodařilo exportovat."
+    },
+    "loadFailure": {
+      "title": "Projekt {name} nelze načíst",
+      "kept": "Jeho uložená kopie zůstala beze změny, takže ji novější verze nebo oprava ještě může obnovit. Úpravy jsou vypnuté, dokud se nenačte nebo nezačnete znovu.",
+      "unavailableTitle": "Projekt {name} nelze načíst z úložiště",
+      "unavailableKept": "SketchForge se nedostal k jeho uložené kopii, takže se nic nezměnilo. Úpravy jsou vypnuté, dokud se nenačte. Zkuste to znovu, až bude úložiště nebo server dostupný.",
+      "storageNewerKept": "Novější verze SketchForge aktualizovala úložiště projektů v tomto prohlížeči a tato verze ho nedokáže otevřít. Nic se nezměnilo. Otevřete projekt v novější verzi.",
+      "retry": "Zkusit znovu",
+      "retryFor": "Zkusit znovu: {name}",
+      "download": "Stáhnout uloženou kopii",
+      "downloadFor": "Stáhnout uloženou kopii: {name}",
+      "startOver": "Začít znovu",
+      "startOverFor": "Začít znovu: {name}",
+      "dismiss": "Zavřít chybu projektu {name}",
+      "startOverTitle": "Začít projekt {name} znovu?",
+      "startOverClose": "Zrušit začátek znovu",
+      "startOverConfirm": "Tím se uložená kopie projektu <b>{name}</b> nahradí prázdným projektem. Uloženou kopii pak už nelze obnovit. Pokud ji možná budete chtít opravit, nejprve si ji stáhněte.",
+      "startOverAction": "Nahradit prázdným projektem",
+      "nothingStored": "Pro tento projekt není uložený balíček ke stažení.",
+      "downloaded": "Uložená kopie byla stažena jako {fileName}.",
+      "downloadFailed": "Uloženou kopii nelze stáhnout.",
+      "packageNetwork": "Požadavek na balíček tohoto projektu nedorazil na server ({detail}).",
+      "packageStatus": "Server odpověděl na požadavek na balíček tohoto projektu kódem HTTP {detail}.",
+      "packageNotPackage": "Server odpověděl na požadavek na balíček tohoto projektu typem {detail}, nikoli balíčkem projektu."
     },
     "storageWarning": {
       "message": "Tento prohlížeč už využil {percent} místa, které pro vaše projekty povoluje. Než se zaplní, exportujte zálohu."

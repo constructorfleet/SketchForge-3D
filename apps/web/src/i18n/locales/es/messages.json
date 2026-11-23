@@ -163,7 +163,8 @@
       "prepareFailed": "No se pudo preparar el espacio para guardar el proyecto",
       "migrateFailed": "No se pudieron pasar las formas de los proyectos a un almacenamiento más grande",
       "deleteFailed": "No se pudieron eliminar del navegador las formas del proyecto",
-      "saveListFailed": "No se pudo guardar la lista de proyectos"
+      "saveListFailed": "No se pudo guardar la lista de proyectos",
+      "unreadableWriteRefused": "No se pudo leer la copia guardada de este proyecto, así que no se sobrescribe"
     },
     "updates": {
       "promptTitle": "SketchForge {version} está disponible",
@@ -244,6 +245,30 @@
       "exported": "{count, plural, one {Se exportó {count} proyecto a {fileName}.} many {Se exportaron {count} de proyectos a {fileName}.} other {Se exportaron {count} proyectos a {fileName}.}}",
       "skipped": "No se pudieron incluir: {names}.",
       "failed": "No se pudieron exportar tus proyectos."
+    },
+    "loadFailure": {
+      "title": "No se pudo leer {name}",
+      "kept": "Su copia guardada no ha cambiado, así que una versión más reciente o una reparación aún pueden recuperarla. La edición sigue desactivada hasta que se cargue o empieces de nuevo.",
+      "unavailableTitle": "No se pudo cargar {name}",
+      "unavailableKept": "SketchForge no pudo acceder a su copia guardada, así que no se ha cambiado nada. La edición sigue desactivada hasta que se cargue. Reinténtalo cuando el almacenamiento o el servidor estén disponibles.",
+      "storageNewerKept": "Una versión más reciente de SketchForge ha actualizado el almacenamiento de proyectos de este navegador y esta versión no puede abrirlo. No se ha cambiado nada. Abre el proyecto en la versión más reciente.",
+      "retry": "Reintentar",
+      "retryFor": "Reintentar: {name}",
+      "download": "Descargar copia guardada",
+      "downloadFor": "Descargar copia guardada: {name}",
+      "startOver": "Empezar de nuevo",
+      "startOverFor": "Empezar de nuevo: {name}",
+      "dismiss": "Descartar el error de {name}",
+      "startOverTitle": "¿Empezar {name} de nuevo?",
+      "startOverClose": "Cancelar empezar de nuevo",
+      "startOverConfirm": "Esto sustituye la copia guardada de <b>{name}</b> por un proyecto vacío. Después no se podrá recuperar la copia guardada. Descárgala antes si quizá quieras repararla.",
+      "startOverAction": "Sustituir por un proyecto vacío",
+      "nothingStored": "No hay ningún paquete guardado que descargar para este proyecto.",
+      "downloaded": "Copia guardada descargada como {fileName}.",
+      "downloadFailed": "No se pudo descargar la copia guardada.",
+      "packageNetwork": "La solicitud del paquete de este proyecto no llegó al servidor ({detail}).",
+      "packageStatus": "El servidor respondió a la solicitud del paquete de este proyecto con HTTP {detail}.",
+      "packageNotPackage": "El servidor respondió a la solicitud del paquete de este proyecto con {detail}, no con un paquete de proyecto."
     },
     "storageWarning": {
       "message": "Este navegador ha usado el {percent} del espacio disponible para tus proyectos. Exporta una copia de seguridad antes de que se agote."
