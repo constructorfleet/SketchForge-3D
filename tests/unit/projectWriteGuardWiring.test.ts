@@ -32,10 +32,12 @@ describe("dashboard package writes", () => {
     const write = topLevelFunction("writeProjectShapes");
     expect(count(/\.put\(/)).toBe(1);
     expect(write).toContain(".put(");
-    // Migration copies the stored bytes up unchanged, so it may write directly.
-    expect(count(/\bsaveServerProjectPackage\(/)).toBe(2);
+    // Migration and its catch-up (#662) copy the stored bytes up unchanged, so they may write directly.
+    expect(count(/\bsaveServerProjectPackage\(/)).toBe(3);
     expect(write).toContain("saveServerProjectPackage(");
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
+    const catchUp = topLevelFunction("uploadEditsMadeDuringMigration");
+    expect(catchUp).toMatch(/!projectWriteGuard\.canWrite\(projectId\)\) continue;[\s\S]*saveServerProjectPackage\(projectId, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
   });
 
   // Issue #650: a server package write is conditional on the copy it started from.

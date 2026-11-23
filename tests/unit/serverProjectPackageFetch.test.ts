@@ -120,3 +120,38 @@ describe("server project metadata writes", () => {
     expect(error).not.toBeInstanceOf(ServerProjectConflictError);
   });
 });
+
+// Issue #662: the server refuses one client's overlapping package and metadata writes as busy.
+describe("server project writes while another write holds the project", () => {
+  function busyThenSaved(busyCount: number) {
+    let calls = 0;
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => {
+      calls += 1;
+      return calls <= busyCount
+        ? new Response(JSON.stringify({ error: "busy", errorKey: "errors.projects.busySaving" }), { status: 409 })
+        : new Response(JSON.stringify({ project: { projectId: "project-1" } }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  }
+
+  it("sends a package again once the project is free", async () => {
+    const fetch = busyThenSaved(2);
+    await expect(saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42)).resolves.toMatchObject({ projectId: "project-1" });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((fetch.mock.calls[2][1]?.body as FormData).get("revision")).toBe("50");
+  });
+
+  it("sends metadata again once the project is free", async () => {
+    const fetch = busyThenSaved(1);
+    await expect(saveServerProjectMetadata("project-1", { name: "Bracket" }, 3)).resolves.toMatchObject({ projectId: "project-1" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up on a project that stays busy", async () => {
+    const fetch = busyThenSaved(Number.POSITIVE_INFINITY);
+    const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ key: "errors.projects.busySaving" });
+    expect(fetch.mock.calls.length).toBeGreaterThan(1);
+  });
+});
