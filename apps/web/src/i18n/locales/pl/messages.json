@@ -279,7 +279,8 @@
       "conflictDetail": "Serwer ma kopię zapisaną {time}.",
       "packageMissing": "Żądanie pakietu tego projektu nie znalazło pliku pakietu.",
       "reloadNewerFor": "Otwórz nowszą kopię: {name}",
-      "downloadMineFor": "Pobierz moją kopię: {name}"
+      "downloadMineFor": "Pobierz moją kopię: {name}",
+      "startOverRefused": "Ktoś inny zapisał projekt {name} po tym, jak ten klient go odczytał, więc nie został zastąpiony. Spróbuj ponownie, aby otworzyć jego kopię."
     },
     "storageWarning": {
       "message": "Ta przeglądarka wykorzystała {percent} miejsca dozwolonego na projekty. Wyeksportuj kopię zapasową, zanim miejsce się skończy."

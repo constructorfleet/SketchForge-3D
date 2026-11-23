@@ -279,7 +279,8 @@
       "conflictDetail": "Der Server hat eine Kopie, die am {time} gespeichert wurde.",
       "packageMissing": "Die Anfrage nach dem Paket dieses Projekts hat keine Paketdatei gefunden.",
       "reloadNewerFor": "Neuere Kopie öffnen: {name}",
-      "downloadMineFor": "Meine Kopie herunterladen: {name}"
+      "downloadMineFor": "Meine Kopie herunterladen: {name}",
+      "startOverRefused": "Jemand anderes hat {name} gespeichert, nachdem dieser Client es gelesen hat, daher wurde es nicht ersetzt. Versuchen Sie es erneut, um diese Kopie zu öffnen."
     },
     "storageWarning": {
       "message": "Dieser Browser hat {percent} des für Ihre Projekte erlaubten Speicherplatzes belegt. Exportieren Sie eine Sicherung, bevor der Platz ausgeht."

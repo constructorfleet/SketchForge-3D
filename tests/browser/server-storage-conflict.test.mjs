@@ -120,7 +120,7 @@ async function waitForFile(filePath) {
 }
 
 /** One server directory, two browser profiles, the same project open in both. */
-async function twoClients(t) {
+async function twoClients(t, { clientBClockOffset = 0 } = {}) {
   const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), "sketchforge-server-conflict-test-"));
   const { baseURL, stop } = await startNextServer({ SKETCHFORGE_PROJECTS_DIR: projectsDir });
   const browser = await chromium.launch({ headless: true });
@@ -129,8 +129,10 @@ async function twoClients(t) {
     stop();
     fs.rmSync(projectsDir, { recursive: true, force: true });
   });
-  const open = async () => {
+  const open = async (clockOffset = 0) => {
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
+    // A machine whose clock disagrees with the other's; time still runs.
+    if (clockOffset) await context.clock.install({ time: Date.now() + clockOffset });
     const page = await context.newPage();
     await page.goto(baseURL);
     await page.getByText("On server", { exact: false }).first().waitFor({ state: "visible", timeout: 60_000 });
@@ -144,7 +146,7 @@ async function twoClients(t) {
   await clientA.locator(".project-card-open").first().click();
   await clientA.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
 
-  const clientB = await open();
+  const clientB = await open(clientBClockOffset);
   await clientB.locator(".project-card-open").first().click();
   await clientB.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
   return { clientA, clientB, packagePath, imported };
@@ -166,6 +168,7 @@ test("a server-storage client does not save its copy over a newer one another cl
   await conflict.waitFor({ state: "visible" });
   assert.equal(await clientA.getByRole("button", { name: "Add shape" }).count(), 0, "client A's editor closes");
   assert.equal(await conflict.getByRole("button", { name: "Start over" }).count(), 0, "nothing offers to replace the newer copy");
+  assert.equal(await conflict.getByRole("button", { name: /^Dismiss/ }).count(), 0, "the banner cannot be dismissed while it holds an unsaved copy");
   await screenshot(clientA, "server-storage-conflict.png");
 
   // A's unsaved copy can still be downloaded.
@@ -251,4 +254,43 @@ test("a server project whose package is missing or a symlink does not open empty
     fs.rmSync(projectsDir, { recursive: true, force: true });
     fs.rmSync(outside, { recursive: true, force: true });
   }
+});
+
+test("the copy a refused save offers holds every edit, including one queued behind the refused save", { timeout: 300_000 }, async (t) => {
+  const { clientA, clientB, packagePath, imported } = await twoClients(t);
+  await addBox(clientB);
+  await nextSave(packagePath, imported);
+
+  // Hold client A's first save in flight long enough to make a second edit behind it.
+  const packagePost = (request) => request.method() === "POST" && new URL(request.url()).pathname === "/api/projects"
+    && new URL(request.url()).searchParams.has("projectId") && (request.postData() ?? "").includes('name="project"');
+  await clientA.route("**/api/projects?projectId=*", async (route) => {
+    if (packagePost(route.request())) await new Promise((resolve) => setTimeout(resolve, 3_000));
+    await route.continue();
+  });
+  const firstSave = clientA.waitForRequest(packagePost, { timeout: 30_000 });
+  await addBox(clientA);
+  await firstSave;
+  await addBox(clientA);
+
+  const conflict = clientA.getByRole("alert").filter({ hasText: "was changed elsewhere" });
+  await conflict.waitFor({ state: "visible", timeout: 30_000 });
+  const [download] = await Promise.all([
+    clientA.waitForEvent("download"),
+    conflict.getByRole("button", { name: "Download my copy: square", exact: true }).click(),
+  ]);
+  assert.equal(rootNodeCount(new Uint8Array(fs.readFileSync(await download.path()))), 3, "the download has the square and both of A's boxes");
+});
+
+test("a client whose clock is behind the last writer's saves on top of the copy it loaded", { timeout: 300_000 }, async (t) => {
+  const { clientA, clientB, packagePath, imported } = await twoClients(t, { clientBClockOffset: 3_600_000 });
+  await addBox(clientB);
+  const fromB = await nextSave(packagePath, imported);
+
+  await clientA.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await clientA.waitForFunction(() => document.querySelectorAll(".scene-inspector-list > li.scene-row").length === 2, null, { timeout: 15_000 });
+  await addBox(clientA);
+  const fromA = await nextSave(packagePath, fromB);
+  assert.equal(rootNodeCount(fromA), 3, "client A's save lands despite its earlier clock");
+  assert.equal(await clientA.getByRole("alert").filter({ hasText: "was changed elsewhere" }).count(), 0, "no conflict is reported");
 });

@@ -279,7 +279,8 @@
       "conflictDetail": "O servidor tem uma cópia guardada em {time}.",
       "packageMissing": "O pedido do pacote deste projeto não encontrou nenhum ficheiro de pacote.",
       "reloadNewerFor": "Abrir a cópia mais recente: {name}",
-      "downloadMineFor": "Transferir a minha cópia: {name}"
+      "downloadMineFor": "Transferir a minha cópia: {name}",
+      "startOverRefused": "Outra pessoa guardou {name} depois de este cliente o ler, por isso não foi substituído. Tente novamente para abrir a cópia dela."
     },
     "storageWarning": {
       "message": "Este navegador já usou {percent} do espaço permitido para seus projetos. Exporte uma cópia de segurança antes que ele acabe."

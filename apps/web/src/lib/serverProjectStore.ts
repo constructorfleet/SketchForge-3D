@@ -130,23 +130,26 @@ export class ServerProjectConflictError extends Error {
   }
 }
 
-export async function fetchServerProjectPackage(projectId: string) {
+export async function fetchServerProjectPackage(projectId: string): Promise<{ bytes: Uint8Array | null; revision: number | undefined }> {
   let response: Response;
   try {
     response = await fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
   } catch (error) {
     throw new ServerPackageRequestError("network", error instanceof Error ? error.message : String(error));
   }
-  if (response.status === 404) return null;
+  const revision = servedRevision(response);
+  // No bytes, but the sidecar may exist; its revision is the base for replacing the package.
+  if (response.status === 404) return { bytes: null, revision };
   if (!response.ok) throw new ServerPackageRequestError("status", String(response.status));
   // A proxy or sign-in page can answer 200 with HTML; parsing that would call the project unreadable.
   const contentType = response.headers.get("content-type") ?? "";
   if (!PACKAGE_CONTENT_TYPE.test(contentType)) throw new ServerPackageRequestError("notPackage", contentType || "none");
+  return { bytes: new Uint8Array(await response.arrayBuffer()), revision };
+}
+
+function servedRevision(response: Response) {
   const revision = Number(response.headers.get(SERVER_PROJECT_REVISION_HEADER) ?? Number.NaN);
-  return {
-    bytes: new Uint8Array(await response.arrayBuffer()),
-    revision: Number.isFinite(revision) ? revision : undefined,
-  };
+  return Number.isFinite(revision) ? revision : undefined;
 }
 
 const PACKAGE_CONTENT_TYPE = /^application\/(?:zip|octet-stream|[\w.-]+\+zip)\s*(?:;|$)/i;

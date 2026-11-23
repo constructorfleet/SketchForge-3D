@@ -26,13 +26,13 @@ describe("server project package request", () => {
   it("returns the bytes of a package response", async () => {
     for (const type of ["application/vnd.sketchforge.project+zip", "application/zip", "application/octet-stream"]) {
       answer(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200, headers: { "Content-Type": type } }));
-      expect(Array.from((await fetchServerProjectPackage("project-1"))?.bytes ?? [])).toEqual([80, 75, 3, 4]);
+      expect(Array.from((await fetchServerProjectPackage("project-1")).bytes ?? [])).toEqual([80, 75, 3, 4]);
     }
   });
 
-  it("returns null for a project the server does not hold", async () => {
-    answer(new Response("{}", { status: 404, headers: { "Content-Type": "application/json" } }));
-    expect(await fetchServerProjectPackage("project-1")).toBeNull();
+  it("returns no bytes, with the sidecar revision, for a project whose package the server does not hold", async () => {
+    answer(new Response("{}", { status: 404, headers: { "Content-Type": "application/json", "X-SketchForge-Revision": "12" } }));
+    expect(await fetchServerProjectPackage("project-1")).toEqual({ bytes: null, revision: 12 });
   });
 
   it("names the status of a failed package request", async () => {
@@ -60,12 +60,12 @@ describe("server project package revisions", () => {
       status: 200,
       headers: { "Content-Type": "application/vnd.sketchforge.project+zip", "X-SketchForge-Revision": "42" },
     }));
-    expect((await fetchServerProjectPackage("project-1"))?.revision).toBe(42);
+    expect((await fetchServerProjectPackage("project-1")).revision).toBe(42);
   });
 
   it("leaves the revision unknown when the server does not send one", async () => {
     answer(new Response(new Uint8Array([80, 75]), { status: 200, headers: { "Content-Type": "application/zip" } }));
-    expect((await fetchServerProjectPackage("project-1"))?.revision).toBeUndefined();
+    expect((await fetchServerProjectPackage("project-1")).revision).toBeUndefined();
   });
 
   it("sends the base revision with a package write", async () => {

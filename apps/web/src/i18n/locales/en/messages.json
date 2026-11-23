@@ -129,7 +129,8 @@
       "conflictDetail": "The server holds a copy saved at {time}.",
       "packageMissing": "The request for this project's package found no package file.",
       "reloadNewerFor": "Open the newer copy: {name}",
-      "downloadMineFor": "Download my copy: {name}"
+      "downloadMineFor": "Download my copy: {name}",
+      "startOverRefused": "Someone else saved {name} after this client read it, so it was not replaced. Try again to open their copy."
     },
     "storageWarning": {
       "message": "This browser has used {percent} of the space it allows for your projects. Export a backup before it runs out."

@@ -279,7 +279,8 @@
       "conflictDetail": "Server má kopii uloženou {time}.",
       "packageMissing": "Požadavek na balíček tohoto projektu nenašel žádný soubor balíčku.",
       "reloadNewerFor": "Otevřít novější kopii: {name}",
-      "downloadMineFor": "Stáhnout mou kopii: {name}"
+      "downloadMineFor": "Stáhnout mou kopii: {name}",
+      "startOverRefused": "Někdo jiný uložil projekt {name} poté, co ho tento klient načetl, proto nebyl nahrazen. Zkuste to znovu a otevřete jeho kopii."
     },
     "storageWarning": {
       "message": "Tento prohlížeč už využil {percent} místa, které pro vaše projekty povoluje. Než se zaplní, exportujte zálohu."

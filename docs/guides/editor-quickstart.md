@@ -70,7 +70,9 @@ In browser storage, another tab may save a newer copy that this tab cannot read.
 Several browsers, or the desktop app, can share one server project directory. Each save says which revision of the project it started from, and the server refuses a save when another client has saved a newer revision since. The editor then closes and the dashboard says the project was changed elsewhere:
 
 - **Open the newer copy** loads what the other client saved. Changes this client made since it opened the project are not kept.
-- **Download my copy** saves this client's unsaved copy as `<name> (my copy).skf`, so you can compare the two or open it as a separate project.
+- **Download my copy** saves this client's unsaved copy, with every edit made before the save was refused, as `<name> (my copy).skf`. You can compare the two, or open it as a separate project.
+
+The message stays until you open the newer copy, so the unsaved copy can always be downloaded first.
 
 ![The dashboard reporting a project another client changed.](../screenshots/server-storage-conflict.png)
 
@@ -78,7 +80,7 @@ When a browser window comes back into view, it checks the server for newer copie
 
 ### When the server has no package for a project
 
-If the server holds a project's details but not its `.skf` package, or the package is a symlink or another file that is not a regular file, the project does not open as an empty project. The dashboard says the project has no stored package and offers **Try again** and **Start over**. **Start over** replaces the missing package, or the symlink itself, with an empty project; it does not write through a symlink.
+If the server holds a project's details but not its `.skf` package, or the package is a symlink or another file that is not a regular file, the project does not open as an empty project. The dashboard says the project has no stored package and offers **Try again** and **Start over**. **Start over** replaces the missing package, or the symlink itself, with an empty project; it does not write through a symlink. If another client saves the project after this one read it, **Start over** is refused, and **Try again** opens that client's copy.
 
 ![The dashboard reporting a server project with no stored package.](../screenshots/server-storage-missing-package.png)
 

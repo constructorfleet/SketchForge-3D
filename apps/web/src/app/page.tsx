@@ -238,6 +238,8 @@ const projectWriteGuard = createProjectWriteGuard();
 // refuses a package write whose base is older than what it holds. No entry means
 // an unconditional write: a new project, or a confirmed start over.
 const serverBaseRevisions = new Map<string, number>();
+// The sidecar revision each server project was last served at, readable or not.
+const servedRevisions = new Map<string, number>();
 
 function openProjectShapesDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -286,7 +288,7 @@ function readProjectShapeRecord(database: IDBDatabase, projectId: string) {
 async function readStoredProjectCopy(projectId: string): Promise<{ bytes: Uint8Array; format: "skf" | "json" } | null> {
   if (serverProjectStorageActive) {
     const served = await fetchServerProjectPackage(projectId);
-    return served ? { bytes: served.bytes, format: "skf" } : null;
+    return served.bytes ? { bytes: served.bytes, format: "skf" } : null;
   }
   const database = await openProjectShapesDb();
   try {
@@ -352,9 +354,12 @@ async function loadProjectShapes(projectId: string) {
 async function readProjectShapes(projectId: string) {
   if (serverProjectStorageActive) {
     const served = await fetchServerProjectPackage(projectId);
+    // Kept even when the copy fails to load, so Start over replaces only what was seen.
+    if (served.revision === undefined) servedRevisions.delete(projectId);
+    else servedRevisions.set(projectId, served.revision);
     // The listing came from metadata sidecars, so this project has one. A missing or
     // symlinked package is not an empty project, and autosave must not replace it.
-    if (!served) throw new StoredProjectMissingError();
+    if (!served.bytes) throw new StoredProjectMissingError();
     const packageBytes = served.bytes;
     const restored = await readStoredPackage(packageBytes);
     return {
@@ -762,6 +767,7 @@ export default function Home() {
   const projectConflictRef = useRef<((projectId: string, job: ProjectSaveJob, error: ServerProjectConflictError) => void) | null>(null);
   // Copies a conflict kept from saving, so the user can still download them.
   const conflictedCopiesRef = useRef(new Map<string, ProjectSaveJob>());
+  const latestEditorCopiesRef = useRef(new Map<string, ProjectSaveJob>());
   if (projectSaveQueueRef.current === null) {
     projectSaveQueueRef.current = createCoalescingSaveQueue<ProjectSaveJob>({
       run: (projectId, job) => saveProjectShapesWhenIdle(projectId, job.entry, job.context),
@@ -1105,6 +1111,10 @@ export default function Home() {
           const serverRevision = record && "serverRevision" in record ? record.serverRevision : undefined;
           if (serverRevision === undefined) serverBaseRevisions.delete(activeProjectId);
           else serverBaseRevisions.set(activeProjectId, serverRevision);
+          latestEditorCopiesRef.current.delete(activeProjectId);
+          conflictedCopiesRef.current.delete(activeProjectId);
+          // Revisions come from this clock. One behind the writer's would make every save look older.
+          nextProjectRevisionRef.current = Math.max(nextProjectRevisionRef.current, loadedRevision, serverRevision ?? 0);
         }
         setProjectShapesById((current) => {
           // IndexedDB reads are asynchronous. A local edit/import can update the live
@@ -1324,13 +1334,9 @@ export default function Home() {
     placementWorkplane: PlacementWorkplane;
     sketchPlacementWorkplane: PlacementWorkplane;
   }) => {
-    // The editor publishes after a delay, so a snapshot can arrive after its load failed.
-    if (!projectWriteGuard.canWrite(snapshot.projectId)) return;
     const revision = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
     nextProjectRevisionRef.current = revision;
     const entry = projectShapeCacheEntryFromEditor(revision, snapshot.shapes, snapshot.history, snapshot.historyIndex, snapshot.assets, snapshot.parameters, snapshot.configuration);
-    setProjectShapesById((current) => cacheWithEditorChange(current, snapshot.projectId, entry, projectWriteGuard));
-
     const saveContext: ProjectShapeSaveContext = {
       projectName: snapshot.projectName,
       createdAt: snapshot.projectCreatedAt,
@@ -1340,12 +1346,16 @@ export default function Home() {
       placementWorkplane: normalizePlacementWorkplane(snapshot.placementWorkplane, snapshot.placementElevation),
       sketchPlacementWorkplane: normalizePlacementWorkplane(snapshot.sketchPlacementWorkplane),
     };
-    projectSaveQueueRef.current?.enqueue(snapshot.projectId, {
-      entry,
-      context: saveContext,
-      revision,
-      shapeCount: snapshot.shapes.length,
-    });
+    const job: ProjectSaveJob = { entry, context: saveContext, revision, shapeCount: snapshot.shapes.length };
+    // The newest edit, so a refused save can still be downloaded with everything in it.
+    latestEditorCopiesRef.current.set(snapshot.projectId, job);
+    // The editor publishes after a delay, so a snapshot can arrive after its load failed.
+    if (!projectWriteGuard.canWrite(snapshot.projectId)) {
+      if (conflictedCopiesRef.current.has(snapshot.projectId)) conflictedCopiesRef.current.set(snapshot.projectId, job);
+      return;
+    }
+    setProjectShapesById((current) => cacheWithEditorChange(current, snapshot.projectId, entry, projectWriteGuard));
+    projectSaveQueueRef.current?.enqueue(snapshot.projectId, job);
     autosaveNoticeControllerRef.current?.pending(snapshot.projectId, saveContext.projectName);
   }, []);
 
@@ -1779,12 +1789,17 @@ export default function Home() {
     nextProjectRevisionRef.current = revision;
     const entry = projectShapeCacheEntry(revision, []);
     projectWriteGuard.release(project.id);
-    serverBaseRevisions.delete(project.id);
+    // Replace only the copy that was seen; a save made since then is refused.
+    const seen = servedRevisions.get(project.id);
+    if (seen === undefined) serverBaseRevisions.delete(project.id);
+    else serverBaseRevisions.set(project.id, seen);
     try {
       await saveProjectShapes(project.id, entry, projectShapeSaveContext(project));
     } catch (error) {
       projectWriteGuard.block(project.id);
-      setDashboardNotice(errorText(t, error, "dashboard.storage.saveFailed"));
+      setDashboardNotice(error instanceof ServerProjectConflictError
+        ? t("dashboard.loadFailure.startOverRefused", { name: project.name })
+        : errorText(t, error, "dashboard.storage.saveFailed"));
       return;
     }
     setProjectShapesById((current) => ({ ...current, [project.id]: entry }));
@@ -1817,7 +1832,9 @@ export default function Home() {
   };
 
   projectConflictRef.current = (projectId, job, error) => {
-    conflictedCopiesRef.current.set(projectId, job);
+    // The refused save may not be the newest edit: one can be queued, or still being published.
+    const latest = latestEditorCopiesRef.current.get(projectId);
+    conflictedCopiesRef.current.set(projectId, latest && latest.revision > job.revision ? latest : job);
     const savedAt = new Intl.DateTimeFormat(formattingLocale(locale), { dateStyle: "medium", timeStyle: "medium" }).format(new Date(error.storedRevision));
     setProjectLoadFailures((current) => ({
       ...current,
@@ -1843,7 +1860,9 @@ export default function Home() {
     clearProjectLoadFailure(projectId);
     projectWriteGuard.release(projectId);
     serverBaseRevisions.delete(projectId);
+    servedRevisions.delete(projectId);
     conflictedCopiesRef.current.delete(projectId);
+    latestEditorCopiesRef.current.delete(projectId);
     setProjects((current) => current.filter((project) => project.id !== projectId));
     setProjectShapesById((current) => {
       const next = { ...current };
@@ -2642,9 +2661,12 @@ function Dashboard({
                         {t("dashboard.loadFailure.startOver")}
                       </button>
                     ) : null}
-                    <button className="dashboard-load-failure-dismiss" type="button" aria-label={t("dashboard.loadFailure.dismiss", { name: project.name })} onClick={() => onDismissLoadFailure(project)}>
-                      <X size={16} />
-                    </button>
+                    {/* Dismissing would leave this client's unsaved copy with no way to download it. */}
+                    {kind !== "conflict" ? (
+                      <button className="dashboard-load-failure-dismiss" type="button" aria-label={t("dashboard.loadFailure.dismiss", { name: project.name })} onClick={() => onDismissLoadFailure(project)}>
+                        <X size={16} />
+                      </button>
+                    ) : null}
                   </div>
                 </section>
               ))}

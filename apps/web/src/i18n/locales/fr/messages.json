@@ -279,7 +279,8 @@
       "conflictDetail": "Le serveur détient une copie enregistrée le {time}.",
       "packageMissing": "La demande du paquet de ce projet n’a trouvé aucun fichier de paquet.",
       "reloadNewerFor": "Ouvrir la copie plus récente: {name}",
-      "downloadMineFor": "Télécharger ma copie: {name}"
+      "downloadMineFor": "Télécharger ma copie: {name}",
+      "startOverRefused": "Quelqu’un d’autre a enregistré {name} après sa lecture par ce client ; il n’a donc pas été remplacé. Réessayez pour ouvrir sa copie."
     },
     "storageWarning": {
       "message": "Ce navigateur utilise {percent} de l’espace qu’il autorise pour vos projets. Exportez une sauvegarde avant qu’il ne soit plein."
