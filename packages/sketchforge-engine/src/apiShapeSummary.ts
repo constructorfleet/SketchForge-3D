@@ -86,3 +86,12 @@ export function apiShapeSummary(shape: WorkplaneShape) {
     ...(shape.groupedShapes ? { groupedCount: shape.groupedShapes.length } : {}),
   };
 }
+
+/** Maps a shape change to the REST reply. `droppedBindings` appears only when the change dropped one. */
+export function apiShapeChanged(changed: { shape: WorkplaneShape; revision: number; droppedBindings?: ReadonlyArray<{ shapeId: string; fields: readonly string[] }> }) {
+  return {
+    shape: apiShapeSummary(changed.shape),
+    revision: changed.revision,
+    ...(changed.droppedBindings?.length ? { droppedBindings: changed.droppedBindings.map(({ shapeId, fields }) => ({ shapeId, fields: [...fields] })) } : {}),
+  };
+}

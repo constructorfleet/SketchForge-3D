@@ -51,6 +51,8 @@ from .types import (
     ShapePatch,
     ShapeCollectionResult,
     ShapeOperationResult,
+    ShapeChangeResult,
+    DroppedBinding,
     ShapeRequest,
     ShapeSpec,
     ShapeSummary,
@@ -172,6 +174,10 @@ class Shapes:
 
     def update(self, project_id: str, shape_id: str, changes: ShapePatch) -> ShapeSummary:
         """Changes the fields given and leaves the rest. A locked shape needs ``locked=False``."""
+        return self.update_result(project_id, shape_id, changes).shape
+
+    def update_result(self, project_id: str, shape_id: str, changes: ShapePatch) -> ShapeChangeResult:
+        """Changes a shape as ``update`` does, and reports the revision and any bindings dropped elsewhere."""
         payload = self._transport.send(
             "PATCH",
             "/shapes",
@@ -179,7 +185,11 @@ class Shapes:
             dict(changes),
             retryable=True,
         ) or {}
-        return ShapeSummary.from_payload(payload.get("shape") or {})
+        return ShapeChangeResult(
+            shape=ShapeSummary.from_payload(payload.get("shape") or {}),
+            revision=int(payload.get("revision") or 0),
+            dropped_bindings=[DroppedBinding.from_payload(entry) for entry in payload.get("droppedBindings") or []],
+        )
 
     def delete(self, project_id: str, shape_id: str) -> bool:
         payload = self._transport.send(
@@ -1064,7 +1074,7 @@ class Exports:
 # compare it with the server's operation registry.
 CLIENT_RESOURCE_OPERATIONS = {
     "projects": {"listProjectsOrGetProject": ("list", "list_page", "get", "find_by_name"), "createProject": ("create",), "deleteProject": ("delete",)},
-    "shapes": {"listShapes": ("list", "list_page"), "createShapes": ("create", "create_many"), "updateShape": ("update",), "deleteShape": ("delete",)},
+    "shapes": {"listShapes": ("list", "list_page"), "createShapes": ("create", "create_many"), "updateShape": ("update", "update_result"), "deleteShape": ("delete",)},
     "edges": {"listEdges": ("list", "filletable_indexes")},
     "faces": {"listFaces": ("list", "facing", "ids_facing")},
     "measurements": {"listMeasurements": ("list", "with_radius"), "measureEntities": ("between",)},

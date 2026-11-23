@@ -21,6 +21,8 @@ export {
   type ProjectRead,
   type ShapeRemoved,
   type ShapesArranged,
+  type DroppedBinding,
+  type ShapeChangeWritten,
   type ShapeWritten,
   type ShapesWritten,
 } from "./engine.js";
@@ -314,7 +316,7 @@ export {
   type ApiConfigurationChange,
   type ApiParameterChange,
 } from "./apiParameters.js";
-export { apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";
+export { apiShapeChanged, apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";
 export {
   API_CONSTRAINT_ID_MAX_LENGTH,
   API_SKETCH_CONSTRAINT_MESSAGES,

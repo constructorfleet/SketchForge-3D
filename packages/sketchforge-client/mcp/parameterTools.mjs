@@ -203,7 +203,7 @@ export function localParameterRequest(engine, api) {
           await engine.changeShape(projectId, shapeId, sent),
           (failure) => api.shapeChangeApiError(failure, shapeId),
         );
-        return { shape: api.apiShapeSummary(changed.shape), revision: changed.revision };
+        return api.apiShapeChanged(changed);
       }
       case "PATCH /sketch-constraints": {
         const projectId = requireProject(query);

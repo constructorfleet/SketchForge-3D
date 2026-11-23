@@ -315,6 +315,10 @@ export type EngineResult<T> = { ok: true; value: T } | { ok: false; failure: Eng
 
 /** One shape written, with the revision the write landed on. */
 export type ShapeWritten = { shape: WorkplaneShape; revision: number };
+/** Bindings a change removed from shapes other than the one it targets, such as a refit group's size. */
+export type DroppedBinding = { shapeId: string; fields: string[] };
+/** A shape change, and any bindings it dropped elsewhere in the tree. */
+export type ShapeChangeWritten = ShapeWritten & { droppedBindings?: DroppedBinding[] };
 /** Several shapes written, with the revision the write landed on. */
 export type ShapesWritten = { shapes: WorkplaneShape[]; revision: number };
 
@@ -432,7 +436,7 @@ export type Engine = {
    */
   addShapes(projectId: string, requests: readonly ShapeRequest[]): Promise<EngineResult<ShapesWritten>>;
   /** Change one shape, refusing the fields its kind cannot take. */
-  changeShape(projectId: string, shapeId: string, changes: ShapeRequest): Promise<EngineResult<ShapeWritten>>;
+  changeShape(projectId: string, shapeId: string, changes: ShapeRequest): Promise<EngineResult<ShapeChangeWritten>>;
   /** Remove one shape. */
   removeShape(projectId: string, shapeId: string): Promise<EngineResult<ShapeRemoved>>;
   /** Bring shapes onto one line: an edge or a centre of each on one coordinate. */
@@ -729,6 +733,26 @@ function groupSizeConflict(roots: readonly WorkplaneShape[], shape: WorkplaneSha
     field,
     message: `${field} cannot bind: ${sizes.join(", ")} is bound on a group that holds ${shape.id}, and a rebuild would refit that group. Clear one binding first.`,
   };
+}
+
+/** Lists bindings present in `before` and gone from `after`, on every shape but `changedId`. */
+function bindingsDropped(before: readonly WorkplaneShape[], after: readonly WorkplaneShape[], changedId: string): DroppedBinding[] {
+  const kept = new Map<string, Record<string, string> | undefined>();
+  const collect = (shape: WorkplaneShape) => {
+    kept.set(shape.id, shape.expressions);
+    shape.groupedShapes?.forEach(collect);
+  };
+  after.forEach(collect);
+  const dropped: DroppedBinding[] = [];
+  const compare = (shape: WorkplaneShape) => {
+    if (shape.id !== changedId && kept.has(shape.id)) {
+      const fields = Object.keys(shape.expressions ?? {}).filter((field) => kept.get(shape.id)?.[field] === undefined);
+      if (fields.length) dropped.push({ shapeId: shape.id, fields });
+    }
+    shape.groupedShapes?.forEach(compare);
+  };
+  before.forEach(compare);
+  return dropped;
 }
 
 const TREATMENT_BINDINGS = new Set(["edgeTreatments.0.amount", "edgeTreatments.0.chamferAngle"]);
@@ -2121,7 +2145,8 @@ export function createEngine(store: ProjectStore): Engine {
         shapes = bound.value;
         shape = findShapeInTree(shapes, unbound.id)?.shape ?? unbound;
       }
-      return ok({ shape, revision: await writeShapes(projectId, document, shapes) });
+      const droppedBindings = bindingsDropped(document.shapes, shapes, shape.id);
+      return ok({ shape, revision: await writeShapes(projectId, document, shapes), ...(droppedBindings.length ? { droppedBindings } : {}) });
     }),
 
     removeShape: (projectId, shapeId) => mutating(projectId, async (document) => {

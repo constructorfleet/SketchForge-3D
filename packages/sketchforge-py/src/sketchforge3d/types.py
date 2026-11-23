@@ -1101,6 +1101,27 @@ class ShapeOperationResult:
 
 
 @dataclass(frozen=True)
+class DroppedBinding:
+    """A shape other than the one changed, and the fields whose bindings the change removed."""
+
+    shape_id: str
+    fields: List[str]
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "DroppedBinding":
+        return cls(shape_id=str(payload.get("shapeId", "")), fields=[str(field) for field in payload.get("fields", [])])
+
+
+@dataclass(frozen=True)
+class ShapeChangeResult:
+    """A shape change, and any bindings it dropped elsewhere, such as a refit group's size."""
+
+    shape: ShapeSummary
+    revision: int
+    dropped_bindings: List[DroppedBinding]
+
+
+@dataclass(frozen=True)
 class BooleanCutResult:
     shape: ShapeSummary
     triangles: int
