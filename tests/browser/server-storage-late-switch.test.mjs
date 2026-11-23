@@ -324,3 +324,32 @@ test("edits made while the page catches up still reach the server", { timeout: 1
   await until(async () => (await api(`/shapes?projectId=${projectId}`)).shapes?.length === 2, "both boxes must reach the server", 20_000);
   assert.equal(await page.getByRole("alert").filter({ hasText: "was changed elsewhere" }).count(), 0, "the client's own saves do not conflict");
 });
+
+// Issue #670: a delete in one tab is shared with a second tab that is moving the same project.
+test("a project one tab deletes while two tabs move it does not come back", { timeout: 180_000 }, async (t) => {
+  let other;
+  const { page, projectId, listing, switchToServer } = await migratingSession(t, {
+    beforeUpload: async ({ context, baseURL }) => {
+      const tab = await context.newPage();
+      other = { page: tab, held: await holdListings(tab, { holdUploads: true }) };
+      await tab.goto(baseURL);
+      other.held.probe.open();
+      await until(() => other.held.answered >= 1, "the second tab never read the server's list");
+    },
+  });
+  other.held.uploadsAllowed.open();
+  await until(() => other.held.uploads >= 2 && other.held.listings >= 2, "the second tab never moved the project");
+
+  await page.getByRole("button", { name: "Home dashboard" }).click();
+  await page.getByRole("button", { name: "Options for Untitled design 1" }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await switchToServer();
+  await until(async () => !(await listing()).some((record) => record.projectId === projectId), "the first tab removes its upload", 15_000);
+
+  other.held.adoption.open();
+  await until(() => other.held.answered >= 2, "the second tab never read the server's list");
+  await other.page.waitForTimeout(3_000);
+  assert.equal((await listing()).some((record) => record.projectId === projectId), false, "the second tab put the deleted project back on the server");
+  assert.equal(await other.page.getByText("Untitled design 1", { exact: true }).count(), 0, "the second tab lists the deleted project");
+});

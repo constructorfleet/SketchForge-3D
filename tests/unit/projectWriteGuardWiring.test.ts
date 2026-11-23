@@ -82,6 +82,18 @@ describe("dashboard package writes", () => {
     expect(body).not.toContain("projectWriteGuard.release(projectId);");
   });
 
+  // Issue #670: a delete is shared by every tab, and only a server listing lifts it.
+  it("shares a delete with every tab and keeps browser lists from bringing it back", () => {
+    const remove = page.slice(page.indexOf("const deleteProject = (projectId: string) => {"), page.indexOf("const renameProject = "));
+    expect(remove).toContain("addProjectTombstone(window.localStorage, projectId);");
+    expect(topLevelFunction("writeProjectShapes")).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) throw new ProjectWriteRefusedError/);
+    expect(page).toMatch(/if \(event\.key === PROJECT_TOMBSTONES_STORAGE_KEY\) \{[\s\S]{0,300}projectWriteGuard\.forget\(projectId\);/);
+    expect(page).toMatch(/\.filter\(\(project\) => !tombstones\.has\(project\.id as string\)\)/);
+    expect(page).toMatch(/: withoutDeletedProjects\(mergeProjectsForStorage\(projects\), browserTombstones\(\)\);/);
+    // Lifted only where a server listing holds the project.
+    expect(count(/\bremoveProjectTombstones\(/)).toBe(2);
+  });
+
   it("lifts the delete mark for every project the list holds again", () => {
     expect(page).toMatch(/useEffect\(\(\) => \{\s*for \(const project of projects\) projectWriteGuard\.restore\(project\.id\);\s*\}, \[projects\]\);/);
   });

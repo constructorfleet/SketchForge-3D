@@ -31,6 +31,13 @@ import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenge
 import { NO_CONFIGURATIONS, type EditorHistoryEntry, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { createAutosaveNoticeController, type AutosaveNotice } from "@/lib/autosaveNotice";
+import {
+  PROJECT_TOMBSTONES_STORAGE_KEY,
+  addProjectTombstone,
+  readProjectTombstones,
+  removeProjectTombstones,
+  withoutDeletedProjects,
+} from "@/lib/projectTombstones";
 import { createLocalId } from "@/lib/engine/localIds";
 import { publicAssetPath, withAppBasePath } from "@/lib/publicAssetPath";
 import {
@@ -500,6 +507,8 @@ async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEnt
     serverBaseRevisions.set(projectId, entry.revision);
     return;
   }
+  // Another tab deleted it; its write mark here may not have arrived yet (#670).
+  if (browserTombstones().has(projectId)) throw new ProjectWriteRefusedError(translate("dashboard.storage.unreadableWriteRefused"));
   // Registered in the same tick as the storage check, before any await.
   let settle = () => {};
   const pending = new Promise<void>((resolve) => { settle = resolve; });
@@ -624,13 +633,21 @@ function storedProjectIsUsable(project: StoredDashboardProject) {
   return typeof project.id === "string" && typeof project.name === "string";
 }
 
+/** Projects deleted in any tab of this browser (#670). */
+function browserTombstones() {
+  return typeof window === "undefined" ? new Set<string>() : readProjectTombstones(window.localStorage);
+}
+
 function readStoredProjects() {
   const legacyShapes: Record<string, ProjectShapeCacheEntry> = {};
   if (typeof window === "undefined") return { projects: [] as DashboardProject[], legacyShapes };
   try {
     const parsed = JSON.parse(window.localStorage.getItem(PROJECTS_STORAGE_KEY) ?? "[]") as StoredDashboardProject[];
+    // Another tab may write back a list that still holds a project deleted here.
+    const tombstones = browserTombstones();
     const projects = parsed
       .filter(storedProjectIsUsable)
+      .filter((project) => !tombstones.has(project.id as string))
       .map((project, index) => normalizeStoredProject(project, index, legacyShapes));
     return { projects, legacyShapes };
   } catch {
@@ -1047,6 +1064,8 @@ export default function Home() {
       for (;;) {
         await Promise.allSettled([...pendingBrowserWrites]);
         if (canceled) return;
+        // Deletes made in another tab count too (#670).
+        for (const projectId of browserTombstones()) projectsDeletedInBrowser.add(projectId);
         let changedAny = false;
         try {
           for (const projectId of migratedProjectIds) {
@@ -1107,8 +1126,10 @@ export default function Home() {
       // Read in the same tick as the switch, so no browser edit lands in between.
       const browserProjects = new Map(readStoredProjects().projects.map((project) => [project.id, project]));
       serverProjectStorageActive = true;
-      const adoptedProjects = dashboardProjectsFromServer(adopted.projects)
-        .filter((project) => !projectsDeletedInBrowser.has(project.id));
+      const deletedDuringMove = (projectId: string) => migratedProjectIds.has(projectId) && projectsDeletedInBrowser.has(projectId);
+      const adoptedProjects = dashboardProjectsFromServer(adopted.projects).filter((project) => !deletedDuringMove(project.id));
+      // Any other listed project is on the server, which outranks a delete made in this browser.
+      removeProjectTombstones(window.localStorage, adoptedProjects.map((project) => project.id));
       projectsJsonRef.current = JSON.stringify(adoptedProjects.map(projectForStorage));
       const lateProjects = [...migratedProjectIds]
         .filter((id) => !projectsDeletedInBrowser.has(id) && !adoptedProjects.some((candidate) => candidate.id === id))
@@ -1162,7 +1183,9 @@ export default function Home() {
     // In server mode there is no stored list to merge against: each project's
     // metadata sidecar is the record, and the server rejects a write that is
     // older than the one it holds.
-    const storageProjects = projectStorageMode === "server" ? projects.map(projectForStorage) : mergeProjectsForStorage(projects);
+    const storageProjects = projectStorageMode === "server"
+      ? projects.map(projectForStorage)
+      : withoutDeletedProjects(mergeProjectsForStorage(projects), browserTombstones());
     const serialized = JSON.stringify(storageProjects);
     if (projectsJsonRef.current === serialized) return;
     if (projectStorageMode === "server") {
@@ -1222,6 +1245,8 @@ export default function Home() {
           serverMetadataRevision(recordsById.get(theirs.id)?.metadata) > (serverMetadataRevisions.get(theirs.id) ?? 0);
         setProjects((current) => {
           const merged = mergeNewerServerProjects(current, server, metadataIsNewer);
+          // Another client saved it after a delete here; it is genuinely back (#670).
+          removeProjectTombstones(window.localStorage, merged.changedIds);
           // Already on the server, so the list effect need not post them back.
           for (const id of merged.changedIds) {
             const project = merged.projects.find((candidate) => candidate.id === id);
@@ -1241,6 +1266,13 @@ export default function Home() {
   useEffect(() => {
     if (!mounted) return;
     const onStorage = (event: StorageEvent) => {
+      if (event.key === PROJECT_TOMBSTONES_STORAGE_KEY) {
+        // Deleted in another tab: refuse its late saves here and drop it from this list.
+        const tombstones = browserTombstones();
+        for (const projectId of tombstones) projectWriteGuard.forget(projectId);
+        setProjects((current) => withoutDeletedProjects(current, tombstones));
+        return;
+      }
       if (event.key !== PROJECTS_STORAGE_KEY || projectStorageMode === "server") return;
       projectsJsonRef.current = event.newValue ?? "[]";
       setProjects(readProjects());
@@ -2031,6 +2063,7 @@ export default function Home() {
 
   const deleteProject = (projectId: string) => {
     if (!serverProjectStorageActive) projectsDeletedInBrowser.add(projectId);
+    addProjectTombstone(window.localStorage, projectId);
     clearProjectLoadFailure(projectId);
     projectWriteGuard.forget(projectId);
     serverBaseRevisions.delete(projectId);
