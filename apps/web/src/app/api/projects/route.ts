@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { LocalizedError, errorResponseFields } from "@/i18n/LocalizedError";
 import { caughtErrorResponse, errorResponse } from "@/lib/apiErrors";
@@ -11,6 +10,7 @@ import {
   projectRecord,
   readProjectMetadata,
   readProjectPackage,
+  readProjectTombstone,
   regularFileStat,
   withProjectLock,
   writeProjectMetadata,
@@ -34,11 +34,6 @@ export const revalidate = false;
 const MAX_METADATA_BYTES = 256 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 
-/** Names a package's content, so a delete can require the bytes a write left (#672). */
-function packageDigest(bytes: Uint8Array | null) {
-  return bytes ? createHash("sha256").update(bytes).digest("hex") : "none";
-}
-
 function disabledResponse() {
   return NextResponse.json(
     {
@@ -48,6 +43,10 @@ function disabledResponse() {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+function deletedResponse() {
+  return errorResponse("errors.projects.deleted", 410, { conflict: "deleted" });
 }
 
 export async function GET(request: Request) {
@@ -137,14 +136,14 @@ export async function POST(request: Request) {
     const baseMetadataRevision = typeof baseMetadataField === "string" ? Number(baseMetadataField) : undefined;
 
     const locked = await withProjectLock(root, projectId, async () => {
+      // Deletes win (#672): a save sent before the delete, or from a client that still
+      // holds the project, must not recreate it. A new project gets a new id.
+      if (await readProjectTombstone(root, projectId)) return deletedResponse();
       const stored = await readProjectMetadata(root, projectId);
       const storedRevision = serverProjectRevision(stored);
-      // A based metadata write saw a stored copy; with none left, a delete overtook it (#672).
-      // Package writes stay allowed: a client with the project open may save it back (#665).
+      // Files removed without a delete record: a based metadata write must not bring back a list entry alone.
       const basedMetadataOnly = metadata && !packageBytes && Number.isFinite(baseMetadataRevision);
-      if (basedMetadataOnly && !stored && !(await regularFileStat(projectPackagePath(root, projectId)))) {
-        return errorResponse("errors.projects.notFound", 410, { conflict: "deleted" });
-      }
+      if (basedMetadataOnly && !stored && !(await regularFileStat(projectPackagePath(root, projectId)))) return deletedResponse();
       // A later clock is not a later copy: another client may have saved since this one loaded.
       // Only this check is a conflict; the client offers the newer copy for it.
       if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {
@@ -173,14 +172,8 @@ export async function POST(request: Request) {
       }
 
       const savedMetadata = writtenMetadata ?? stored;
-      const sidecar = await readProjectMetadata(root, projectId);
-      // Hashing the stored package costs a read. Only a write that made the sidecar can be a late one to undo.
-      const packageState = packageBytes
-        ? packageDigest(packageBytes)
-        : basedMetadataOnly && stored ? undefined : packageDigest(await readProjectPackage(root, projectId));
-      const storedState = { revision: serverProjectRevision(sidecar), metadataRevision: serverMetadataRevision(sidecar), ...(packageState ? { package: packageState } : {}) };
       return NextResponse.json(
-        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null, stored: storedState },
+        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
         { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
       );
     });
@@ -196,22 +189,10 @@ export async function DELETE(request: Request) {
   try {
     const root = await ensureProjectsDirectory();
     if (!root) return errorResponse("errors.projects.disabled", 404);
-    const params = new URL(request.url).searchParams;
-    const projectId = safeServerProjectId(params.get("projectId") ?? "");
+    const projectId = safeServerProjectId(new URL(request.url).searchParams.get("projectId") ?? "");
     if (!projectId) return errorResponse("errors.projects.invalidId", 400);
-    const expectedRevision = params.get("expectedRevision");
-    const expectedMetadataRevision = params.get("expectedMetadataRevision");
-    const expectedPackage = params.get("expectedPackage");
 
     const locked = await withProjectLock(root, projectId, async () => {
-      // A conditional delete undoes one write; it spares a copy another client saved since (#672).
-      if (expectedRevision !== null || expectedMetadataRevision !== null || expectedPackage !== null) {
-        const stored = await readProjectMetadata(root, projectId);
-        const changed = (expectedRevision !== null && String(serverProjectRevision(stored)) !== expectedRevision)
-          || (expectedMetadataRevision !== null && String(serverMetadataRevision(stored)) !== expectedMetadataRevision)
-          || (expectedPackage !== null && packageDigest(await readProjectPackage(root, projectId)) !== expectedPackage);
-        if (changed) return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "changed" });
-      }
       const existed = await deleteProjectFiles(root, projectId);
       return existed
         ? NextResponse.json({ deleted: true, projectId }, { headers: { "Cache-Control": "no-store" } })

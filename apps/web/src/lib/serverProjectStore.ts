@@ -145,10 +145,10 @@ export class ServerProjectConflictError extends Error {
   }
 }
 
-/** Says the server deleted a project after this client's write was based on it (#672). */
+/** Says the server refused a write because the project was deleted; deletes win (#672). */
 export class ServerProjectDeletedError extends LocalizedError {
   constructor() {
-    super("errors.projects.notFound");
+    super("errors.projects.deleted");
     this.name = "ServerProjectDeletedError";
   }
 }
@@ -197,11 +197,6 @@ export async function saveServerProjectPackage(projectId: string, packageBytes: 
 /** Attempts at a write the server refuses as busy: its per-project lock is held by another write. */
 const BUSY_WRITE_ATTEMPTS = 8;
 
-/** What the server holds after a write; `package` is a digest, or "none", when the server reports it. */
-export type ServerProjectState = { revision: number; metadataRevision: number; package?: string };
-
-export type ServerProjectWrite = { project: ServerProjectRecord | null; stored: ServerProjectState | null };
-
 // This client's own writes and deletes can overlap; the lock is held for milliseconds (#662).
 async function sendUntilFree(send: () => Promise<Response>) {
   let response = await send();
@@ -212,7 +207,7 @@ async function sendUntilFree(send: () => Promise<Response>) {
   return response;
 }
 
-async function postServerProject(projectId: string, fill: (formData: FormData) => void): Promise<ServerProjectWrite> {
+async function postServerProject(projectId: string, fill: (formData: FormData) => void) {
   const formData = new FormData();
   fill(formData);
   const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData }));
@@ -225,8 +220,8 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
     if (response.status === 410 && payload.conflict === "deleted") throw new ServerProjectDeletedError();
     throw await serverProjectError(response, "errors.projects.saveFailed");
   }
-  const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord; stored?: ServerProjectState };
-  return { project: payload.project ?? null, stored: payload.stored ?? null };
+  const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };
+  return payload.project ?? null;
 }
 
 async function isBusyRefusal(response: Response) {
@@ -235,22 +230,9 @@ async function isBusyRefusal(response: Response) {
   return payload.errorKey === "errors.projects.busySaving";
 }
 
-/**
- * Deletes a project. With `expected`, deletes only while the server holds that state,
- * and returns false when another write changed it since.
- */
-export async function deleteServerProject(projectId: string, expected?: ServerProjectState) {
-  const query = new URLSearchParams({ projectId });
-  if (expected) {
-    query.set("expectedRevision", String(expected.revision));
-    query.set("expectedMetadataRevision", String(expected.metadataRevision));
-    if (expected.package !== undefined) query.set("expectedPackage", expected.package);
-  }
-  const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?${query}`, { method: "DELETE" }));
-  if (response.ok || response.status === 404) return true;
-  const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown };
-  if (response.status === 409 && payload.conflict === "changed") return false;
-  throw await serverProjectError(response, "errors.projects.deleteFailed");
+export async function deleteServerProject(projectId: string) {
+  const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" }));
+  if (!response.ok && response.status !== 404) throw await serverProjectError(response, "errors.projects.deleteFailed");
 }
 
 /**

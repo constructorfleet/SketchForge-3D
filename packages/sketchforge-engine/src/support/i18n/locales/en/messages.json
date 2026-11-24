@@ -1590,6 +1590,7 @@
       "disabled": "Server project storage is disabled",
       "invalidId": "Invalid project id",
       "notFound": "That project is not on the server",
+      "deleted": "This project was deleted from the server",
       "sameOrigin": "Server project storage only accepts same-origin writes",
       "busySaving": "This project is currently being saved",
       "missingMetadata": "Project upload is missing its details",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, Download, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Clock3, CopyPlus, Download, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SketchForgeEditor, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg } from "@/components/SketchForgeEditor";
 import ChallengesDashboard from "@/components/official/ChallengesDashboard";
@@ -83,7 +83,6 @@ import {
   ServerProjectDeletedError,
   serverMetadataRevision,
   type ServerProjectRecord,
-  type ServerProjectState,
 } from "@/lib/serverProjectStore";
 import { importSkfProject, SKF_CREATED_WITH_VERSION, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 import { importExtensionSupported } from "@/lib/importExtensions";
@@ -151,6 +150,7 @@ const LOAD_FAILURE_TEXT = {
   unavailable: { title: "dashboard.loadFailure.unavailableTitle", body: "dashboard.loadFailure.unavailableKept" },
   missing: { title: "dashboard.loadFailure.missingTitle", body: "dashboard.loadFailure.missingKept" },
   conflict: { title: "dashboard.loadFailure.conflictTitle", body: "dashboard.loadFailure.conflictKept" },
+  deleted: { title: "dashboard.loadFailure.deletedTitle", body: "dashboard.loadFailure.deletedKept" },
 } as const satisfies Record<ProjectLoadFailureKind, { title: string; body: string }>;
 
 type ProjectShapeRecord = {
@@ -499,19 +499,12 @@ const saveProjectShapes = guardProjectWrites(
 async function writeProjectShapes(projectId: string, entry: ProjectShapeCacheEntry, context: ProjectShapeSaveContext) {
   const skfPackage = await projectSkfPackage(projectId, entry, context);
   if (serverProjectStorageActive) {
-    let stored: ServerProjectState | null;
     try {
-      ({ stored } = await saveServerProjectPackage(projectId, skfPackage, entry.revision, serverBaseRevisions.get(projectId)));
+      await saveServerProjectPackage(projectId, skfPackage, entry.revision, serverBaseRevisions.get(projectId));
     } catch (error) {
       // Later writes would be based on the same stale copy.
       if (error instanceof ServerProjectConflictError) projectWriteGuard.block(projectId);
       throw error;
-    }
-    // Sent before this browser deleted it and landed after (#672). The server must accept
-    // package writes for deleted projects: another client may save one back (#665).
-    if (browserTombstones().has(projectId)) {
-      await undoLateWrite(projectId, stored);
-      return;
     }
     serverBaseRevisions.set(projectId, entry.revision);
     return;
@@ -645,12 +638,6 @@ function storedProjectIsUsable(project: StoredDashboardProject) {
 /** Projects deleted in any tab of this browser (#670). */
 function browserTombstones() {
   return typeof window === "undefined" ? new Set<string>() : readProjectTombstones(window.localStorage);
-}
-
-/** Deletes what a late write stored, unless another client saved the project since (#672). */
-async function undoLateWrite(projectId: string, stored: ServerProjectState | null) {
-  // Without the stored state the delete cannot spare a newer copy, so it is not sent.
-  if (stored) await deleteServerProject(projectId, stored);
 }
 
 function readStoredProjects() {
@@ -830,15 +817,15 @@ export default function Home() {
   if (metadataSaveQueueRef.current === null) {
     const post = async (projectId: string, job: MetadataSaveJob, server: Record<string, unknown> | undefined) => {
       const metadata = mergeMetadataFields(job.synced, job.metadata, server ?? job.synced ?? job.metadata);
-      const { project: record, stored } = await saveServerProjectMetadata(projectId, metadata, serverMetadataRevisions.get(projectId));
+      const record = await saveServerProjectMetadata(projectId, metadata, serverMetadataRevisions.get(projectId));
       rememberServerMetadata(projectId, record?.metadata ?? metadata, metadata);
-      return { metadata, stored };
+      return metadata;
     };
     metadataSaveQueueRef.current = createCoalescingSaveQueue<MetadataSaveJob>({
       run: async (projectId, job) => {
         // Deleted while this job waited (#672).
         if (browserTombstones().has(projectId)) return;
-        let written: Awaited<ReturnType<typeof post>>;
+        let written: Record<string, unknown>;
         try {
           written = await post(projectId, job, syncedServerMetadata.get(projectId));
         } catch (error) {
@@ -851,22 +838,19 @@ export default function Home() {
           rememberServerMetadata(projectId, record.metadata, current);
           written = await post(projectId, job, current);
         }
-        // Sent before the delete and landed after it: a create, or a based write after a late
-        // package write. Each late write undoes itself, so the last to land does (#672).
-        if (browserTombstones().has(projectId)) {
-          await undoLateWrite(projectId, written.stored);
-          return;
-        }
-        const writtenJson = JSON.stringify(written.metadata);
+        const writtenJson = JSON.stringify(written);
         if (writtenJson === JSON.stringify(job.metadata)) return;
         // Show what was stored, and do not post it back.
-        const adopted = normalizeStoredProject(written.metadata as StoredDashboardProject, 0);
+        const adopted = normalizeStoredProject(written as StoredDashboardProject, 0);
         serverProjectMetadataRef.current.set(projectId, JSON.stringify(projectForStorage(adopted)));
         setProjects((projects) => projects.map((project) => (project.id === projectId ? { ...adopted, accent: project.accent } : project)));
       },
       onError: (projectId, _job, error) => {
-        // This browser deleted it; the refusal is the expected outcome.
-        if (error instanceof ServerProjectDeletedError && browserTombstones().has(projectId)) return;
+        if (error instanceof ServerProjectDeletedError) {
+          // Deleted in this browser: the refusal is the expected outcome.
+          if (!browserTombstones().has(projectId)) projectDeletedRef.current?.(projectId);
+          return;
+        }
         serverProjectMetadataRef.current.delete(projectId);
         setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
       },
@@ -874,6 +858,7 @@ export default function Home() {
   }
   // Set every render, so the queue created once still sees current state.
   const projectConflictRef = useRef<((projectId: string, job: ProjectSaveJob, error: ServerProjectConflictError) => void) | null>(null);
+  const projectDeletedRef = useRef<((projectId: string, job?: ProjectSaveJob) => void) | null>(null);
   // Copies a conflict kept from saving, so the user can still download them.
   const conflictedCopiesRef = useRef(new Map<string, ProjectSaveJob>());
   const latestEditorCopiesRef = useRef(new Map<string, ProjectSaveJob>());
@@ -895,6 +880,10 @@ export default function Home() {
         }
         // Already reported by the banner that blocked the project.
         if (error instanceof ProjectWriteRefusedError) return;
+        if (error instanceof ServerProjectDeletedError) {
+          if (!browserTombstones().has(projectId)) projectDeletedRef.current?.(projectId, job);
+          return;
+        }
         autosaveNoticeControllerRef.current?.failed(
           projectId,
           job.context.projectName,
@@ -2091,7 +2080,75 @@ export default function Home() {
     if (activeProjectId === projectId) closeEditorForFailure();
   };
 
+  // Another client deleted it; the server refuses every write to that id (#672).
+  projectDeletedRef.current = (projectId, job) => {
+    projectWriteGuard.block(projectId);
+    const project = projects.find((candidate) => candidate.id === projectId);
+    const cached = projectShapesById[projectId];
+    const copies = [
+      job,
+      latestEditorCopiesRef.current.get(projectId),
+      cached && project ? { entry: cached, context: projectShapeSaveContext(project), revision: cached.revision, shapeCount: cached.shapes.length } : undefined,
+    ].filter((copy): copy is ProjectSaveJob => Boolean(copy));
+    const newest = copies.sort((a, b) => b.revision - a.revision)[0];
+    if (newest) conflictedCopiesRef.current.set(projectId, newest);
+    setProjectLoadFailures((current) => ({ ...current, [projectId]: { kind: "deleted", message: "" } }));
+    setProjectShapesById((current) => {
+      if (!(projectId in current)) return current;
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    if (activeProjectId === projectId) closeEditorForFailure();
+  };
+
+  // Drops a project deleted elsewhere from this list, without a delete request.
+  const forgetDeletedProject = (projectId: string) => {
+    addProjectTombstone(window.localStorage, projectId);
+    clearProjectLoadFailure(projectId);
+    projectWriteGuard.forget(projectId);
+    conflictedCopiesRef.current.delete(projectId);
+    latestEditorCopiesRef.current.delete(projectId);
+    serverBaseRevisions.delete(projectId);
+    setProjects((current) => current.filter((project) => project.id !== projectId));
+    if (activeProjectId === projectId) setActiveProjectId(null);
+  };
+
+  const saveDeletedCopyAsNewProject = async (project: DashboardProject) => {
+    const job = conflictedCopiesRef.current.get(project.id);
+    if (!job) {
+      setDashboardNotice(t("dashboard.loadFailure.nothingStored"));
+      return;
+    }
+    const now = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
+    nextProjectRevisionRef.current = now;
+    const copy: DashboardProject = {
+      ...project,
+      id: createLocalId("project"),
+      updatedAt: now,
+      revision: now,
+      shapes: job.shapeCount,
+      sharedProject: undefined,
+    };
+    const entry = { ...job.entry, revision: now };
+    try {
+      // A new id has no base and no delete record, so the server creates it.
+      await saveProjectShapes(copy.id, entry, job.context);
+    } catch (error) {
+      setDashboardNotice(errorText(t, error, "dashboard.storage.saveFailed"));
+      return;
+    }
+    setProjectShapesById((current) => ({ ...current, [copy.id]: entry }));
+    forgetDeletedProject(project.id);
+    setProjects((current) => [copy, ...current]);
+    setDashboardNotice(t("dashboard.loadFailure.savedAsNew", { name: project.name }));
+  };
+
   const dismissProjectLoadFailure = (projectId: string) => {
+    if (projectLoadFailures[projectId]?.kind === "deleted") {
+      forgetDeletedProject(projectId);
+      return;
+    }
     clearProjectLoadFailure(projectId);
     // Leaving it active would retry the read straight away.
     if (activeProjectId === projectId) setActiveProjectId(null);
@@ -2185,6 +2242,7 @@ export default function Home() {
           onRetryLoad={(project) => openEditor(project.id)}
           onDownloadStoredProject={(project) => void downloadStoredProject(project)}
           onDownloadConflictedCopy={(project) => void downloadConflictedCopy(project)}
+          onSaveDeletedCopyAsNew={(project) => void saveDeletedCopyAsNewProject(project)}
           onStartProjectOver={(project) => void startProjectOver(project)}
           onDismissLoadFailure={(project) => dismissProjectLoadFailure(project.id)}
           downloadFolder={downloadFolder}
@@ -2368,6 +2426,7 @@ function Dashboard({
   onRetryLoad,
   onDownloadStoredProject,
   onDownloadConflictedCopy,
+  onSaveDeletedCopyAsNew,
   onStartProjectOver,
   onDismissLoadFailure,
   downloadFolder,
@@ -2417,6 +2476,7 @@ function Dashboard({
   onRetryLoad: (project: DashboardProject) => void;
   onDownloadStoredProject: (project: DashboardProject) => void;
   onDownloadConflictedCopy: (project: DashboardProject) => void;
+  onSaveDeletedCopyAsNew: (project: DashboardProject) => void;
   onStartProjectOver: (project: DashboardProject) => void;
   onDismissLoadFailure: (project: DashboardProject) => void;
   downloadFolder: string;
@@ -2862,7 +2922,7 @@ function Dashboard({
                   <div className="dashboard-load-failure-text">
                     <strong id={`load-failure-${project.id}`}>{t(LOAD_FAILURE_TEXT[kind].title, { name: project.name })}</strong>
                     <p>{t(LOAD_FAILURE_TEXT[kind].body)}</p>
-                    <p className="dashboard-load-failure-detail">{message}</p>
+                    {message ? <p className="dashboard-load-failure-detail">{message}</p> : null}
                   </div>
                   <div className="dashboard-load-failure-actions">
                     {/* A database from a newer release opens the same way every time. */}
@@ -2871,16 +2931,22 @@ function Dashboard({
                         <RefreshCw size={16} />
                         {t("dashboard.loadFailure.reloadNewer")}
                       </button>
-                    ) : kind !== "storageNewer" ? (
+                    ) : kind !== "storageNewer" && kind !== "deleted" ? (
                       <button type="button" aria-label={t("dashboard.loadFailure.retryFor", { name: project.name })} onClick={() => onRetryLoad(project)}>
                         <RefreshCw size={16} />
                         {t("dashboard.loadFailure.retry")}
                       </button>
                     ) : null}
-                    {kind === "conflict" ? (
+                    {kind === "conflict" || kind === "deleted" ? (
                       <button type="button" aria-label={t("dashboard.loadFailure.downloadMineFor", { name: project.name })} onClick={() => onDownloadConflictedCopy(project)}>
                         <Download size={16} />
                         {t("dashboard.loadFailure.downloadMine")}
+                      </button>
+                    ) : null}
+                    {kind === "deleted" ? (
+                      <button type="button" aria-label={t("dashboard.loadFailure.saveAsNewFor", { name: project.name })} onClick={() => onSaveDeletedCopyAsNew(project)}>
+                        <CopyPlus size={16} />
+                        {t("dashboard.loadFailure.saveAsNew")}
                       </button>
                     ) : null}
                     {/* Only a copy that was read has bytes to download. */}
@@ -2906,7 +2972,12 @@ function Dashboard({
                     ) : null}
                     {/* Dismissing would leave this client's unsaved copy with no way to download it. */}
                     {kind !== "conflict" ? (
-                      <button className="dashboard-load-failure-dismiss" type="button" aria-label={t("dashboard.loadFailure.dismiss", { name: project.name })} onClick={() => onDismissLoadFailure(project)}>
+                      <button
+                        className="dashboard-load-failure-dismiss"
+                        type="button"
+                        aria-label={t(kind === "deleted" ? "dashboard.loadFailure.removeDeleted" : "dashboard.loadFailure.dismiss", { name: project.name })}
+                        onClick={() => onDismissLoadFailure(project)}
+                      >
                         <X size={16} />
                       </button>
                     ) : null}

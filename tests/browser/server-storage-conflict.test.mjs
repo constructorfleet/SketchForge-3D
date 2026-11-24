@@ -349,8 +349,12 @@ test("a client coming back into view shows a rename another client made", { time
 
 // Issue #665: a delete refuses late saves, but another client can store the project
 // again. This tab must save it once it is back in the list.
-test("a project another client saves after this tab deleted it can be edited and saved here again", { timeout: 300_000 }, async (t) => {
+// Issue #672: deletes win. A client that still has the project open cannot save it back
+// under the same id; it is told, and can keep its copy as a new project.
+test("a client that saves a project another client deleted is told, and can save it as a new project", { timeout: 300_000 }, async (t) => {
   const { clientA, clientB, packagePath } = await twoClients(t);
+  const projectsDir = path.dirname(packagePath);
+  const projectId = path.basename(packagePath, ".skf");
 
   await clientA.getByRole("button", { name: "Home dashboard" }).click();
   await clientA.getByRole("button", { name: "Project options for square" }).click();
@@ -360,17 +364,24 @@ test("a project another client saves after this tab deleted it can be edited and
   while (fs.existsSync(packagePath) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(fs.existsSync(packagePath), false, "client A deleted the package");
 
-  // Client B still has it open, so its next edit stores it again.
+  // Client B still has it open; its next edit is refused and it is told why.
   await addBox(clientB);
-  const fromB = await waitForFile(packagePath);
-  assert.equal(rootNodeCount(fromB), 2, "client B stored the square and its box");
+  const banner = clientB.getByRole("alert").filter({ hasText: "square was deleted elsewhere" });
+  await banner.waitFor({ state: "visible", timeout: 30_000 });
+  await screenshot(clientB, "server-storage-deleted-elsewhere.png");
+  assert.equal(fs.existsSync(packagePath), false, "client B's save did not recreate the deleted project");
 
-  await clientA.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  const card = clientA.locator(".project-card").filter({ hasText: "square" });
-  await card.waitFor({ state: "visible", timeout: 15_000 });
-  await card.locator(".project-card-open").click();
-  await clientA.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
-  await addBox(clientA);
-  const fromA = await nextSave(packagePath, fromB);
-  assert.equal(rootNodeCount(fromA), 3, "client A saved its box on top of B's copy");
+  await banner.getByRole("button", { name: "Save as a new project: square" }).click();
+  const projectFiles = () => fs.readdirSync(projectsDir).filter((name) => name.endsWith(".skf"));
+  let saved = [];
+  for (const end = Date.now() + 30_000; saved.length === 0 && Date.now() < end; await new Promise((resolve) => setTimeout(resolve, 200))) saved = projectFiles();
+  assert.equal(saved.length, 1, "client B's copy was saved as a new project");
+  assert.notEqual(saved[0], `${projectId}.skf`, "the copy has a new id");
+  assert.equal(rootNodeCount(fs.readFileSync(path.join(projectsDir, saved[0]))), 2, "the new project holds the square and B's box");
+  await banner.waitFor({ state: "detached", timeout: 15_000 });
+
+  // The original stays deleted, here and in the listing.
+  const listing = await (await fetch(`${new URL(clientB.url()).origin}/api/projects`)).json();
+  assert.ok(!listing.projects.some((record) => record.projectId === projectId), "the deleted project is listed again");
+  assert.equal(fs.existsSync(packagePath), false, "the deleted project's package is back");
 });

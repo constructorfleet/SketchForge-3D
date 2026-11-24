@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -219,7 +218,8 @@ describe("server project storage", () => {
     const response = await DELETE(new Request("http://localhost/api/projects?projectId=project-1", { method: "DELETE", headers: { Origin: "http://localhost" } }));
 
     expect(response.status).toBe(200);
-    expect(await fs.readdir(projectsRoot)).toEqual([]);
+    // Only the delete record stays (#672).
+    expect(await fs.readdir(projectsRoot)).toEqual([".deleted"]);
   });
 
   it("reports a project that is not there", async () => {
@@ -230,106 +230,75 @@ describe("server project storage", () => {
     expect(missing.status).toBe(404);
   });
 
-  // Issue #672: a write sent before a delete can land after it.
-  describe("writes based on a copy that was since deleted", () => {
-    async function deleteProject() {
-      await DELETE(new Request("http://localhost/api/projects?projectId=project-1", { method: "DELETE", headers: { Origin: "http://localhost" } }));
+  // Issue #672: a delete wins. A save sent before it can land after it, and another
+  // client may still hold the project; neither may put it back under the same id.
+  describe("deleted projects", () => {
+    async function deleteProject(projectId = "project-1") {
+      return DELETE(new Request(`http://localhost/api/projects?projectId=${projectId}`, { method: "DELETE", headers: { Origin: "http://localhost" } }));
     }
 
-    it("refuses a metadata write based on a deleted project", async () => {
+    async function refusedAsDeleted(response: Response) {
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ conflict: "deleted", errorKey: "errors.projects.deleted" });
+    }
+
+    it("refuses every later write to a deleted project, with or without a base", async () => {
       await POST(saveRequest("project-1", { metadata: metadata() }));
       await POST(saveRequest("project-1", { project: new Uint8Array([1, 2]), revision: 11, baseRevision: 10 }));
       await deleteProject();
 
-      const response = await POST(saveRequest("project-1", { metadata: metadata({ name: "Late" }), baseMetadataRevision: 1 }));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata({ name: "Late" }), baseMetadataRevision: 1 })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata({ name: "Late create" }) })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { project: new Uint8Array([3]), revision: 12, baseRevision: 11 })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { project: new Uint8Array([4]), revision: 13 })));
 
-      expect(response.status).toBe(410);
-      expect(await response.json()).toMatchObject({ conflict: "deleted", errorKey: "errors.projects.notFound" });
       expect((await listing()).projects).toEqual([]);
-      expect(await fs.readdir(projectsRoot)).toEqual([]);
+      expect(await fs.readdir(projectsRoot)).toEqual([".deleted"]);
     });
 
-    it("lets a client that kept a deleted project open store it again, package first", async () => {
+    it("refuses a create that lands after the delete of a project the server never held", async () => {
+      expect((await deleteProject()).status).toBe(404);
+
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata() })));
+      expect((await listing()).projects).toEqual([]);
+    });
+
+    it("records the revisions the deleted project had", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+      await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed" }), baseMetadataRevision: 1 }));
+      const before = Date.now();
+      await deleteProject();
+
+      const tombstone = JSON.parse(await fs.readFile(path.join(projectsRoot, ".deleted", "project-1.json"), "utf8")) as Record<string, number>;
+      expect(tombstone).toMatchObject({ revision: 10, metadataRevision: 2 });
+      expect(tombstone.deletedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it("still creates projects under new ids, package first or metadata first", async () => {
       await POST(saveRequest("project-1", { metadata: metadata() }));
       await deleteProject();
 
-      // Another client that kept the project open may store it again (#665), then send its entry.
-      expect((await POST(saveRequest("project-1", { project: new Uint8Array([1, 2]), revision: 11, baseRevision: 10 }))).status).toBe(201);
-      expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).status).toBe(201);
-      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-1"]);
-    });
-
-    it("still creates a project from a first write that names no base", async () => {
-      expect((await POST(saveRequest("project-1", { metadata: metadata() }))).status).toBe(201);
-      await deleteProject();
-
-      // A new project and a migration upload both send their first write without a base.
+      // A migration upload sends the package first; a new project usually sends metadata first.
       expect((await POST(saveRequest("project-2", { project: new Uint8Array([1]), revision: 11 }))).status).toBe(201);
       expect((await POST(saveRequest("project-2", { metadata: metadata({ id: "project-2" }) }))).status).toBe(201);
-      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-2"]);
+      expect((await POST(saveRequest("project-3", { metadata: metadata({ id: "project-3" }) }))).status).toBe(201);
+      expect((await listing()).projects.map((record) => record.projectId).sort()).toEqual(["project-2", "project-3"]);
+    });
+
+    it("refuses a based metadata write for a project whose files are gone without a delete record", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await fs.rm(path.join(projectsRoot, "project-1.json"));
+
+      const response = await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }));
+
+      expect(response.status).toBe(410);
+      expect((await listing()).projects).toEqual([]);
     });
 
     it("accepts a based metadata write while only the package is stored", async () => {
       await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11 }));
 
       expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }))).status).toBe(201);
-    });
-  });
-
-  // Issue #672: a client re-deletes a project its own late write put back, but not one another client saved since.
-  describe("deletes conditional on what a write stored", () => {
-    type Stored = { revision: number; metadataRevision: number; package?: string };
-    const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-
-    function conditionalDelete(expected: Stored) {
-      const query = new URLSearchParams({
-        projectId: "project-1",
-        expectedRevision: String(expected.revision),
-        expectedMetadataRevision: String(expected.metadataRevision),
-        ...(expected.package ? { expectedPackage: expected.package } : {}),
-      });
-      return DELETE(new Request(`http://localhost/api/projects?${query}`, { method: "DELETE", headers: { Origin: "http://localhost" } }));
-    }
-
-    it("reports what a package write stored, and deletes when nothing changed since", async () => {
-      const bytes = new Uint8Array([1, 2, 3]);
-      const { stored } = await (await POST(saveRequest("project-1", { project: bytes, revision: 11, baseRevision: 10 }))).json() as { stored: Stored };
-      expect(stored).toEqual({ revision: 0, metadataRevision: 0, package: digest(bytes) });
-
-      expect((await conditionalDelete(stored)).status).toBe(200);
-      expect(await fs.readdir(projectsRoot)).toEqual([]);
-    });
-
-    it("keeps a project another client saved after the write the delete is based on", async () => {
-      const { stored } = await (await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11, baseRevision: 10 }))).json() as { stored: Stored };
-      // Another client that kept the project open saves it back (#665).
-      await POST(saveRequest("project-1", { project: new Uint8Array([2, 2]), revision: 12, baseRevision: 10 }));
-      await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }));
-
-      const response = await conditionalDelete(stored);
-
-      expect(response.status).toBe(409);
-      expect(await response.json()).toMatchObject({ conflict: "changed" });
-      expect((await listing()).projects.map((record) => record.projectId)).toEqual(["project-1"]);
-      expect((await fs.readdir(projectsRoot)).sort()).toEqual(["project-1.json", "project-1.skf"]);
-    });
-
-    it("reports the stored package with a based entry write that made the sidecar", async () => {
-      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11, baseRevision: 10 }));
-      const { stored } = await (await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).json() as { stored: Stored };
-      expect(stored.package).toBe(digest(new Uint8Array([1])));
-      // A later entry write over an existing sidecar does not read the package.
-      const later = await (await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).json() as { stored: Stored };
-      expect(later.stored.package).toBeUndefined();
-    });
-
-    it("reports the stored package with a create, so its delete sees a package saved since", async () => {
-      const { stored } = await (await POST(saveRequest("project-1", { metadata: metadata() }))).json() as { stored: Stored };
-      expect(stored).toEqual({ revision: 10, metadataRevision: 1, package: "none" });
-      await POST(saveRequest("project-1", { project: new Uint8Array([2]), revision: 10, baseRevision: 10 }));
-
-      expect((await conditionalDelete(stored)).status).toBe(409);
-      expect((await listing()).projects).toHaveLength(1);
     });
   });
 

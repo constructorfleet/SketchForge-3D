@@ -281,6 +281,12 @@
       "packageMissing": "O pedido do pacote deste projeto não encontrou nenhum ficheiro de pacote.",
       "reloadNewerFor": "Abrir a cópia mais recente: {name}",
       "downloadMineFor": "Transferir a minha cópia: {name}",
+      "deletedTitle": "{name} foi excluído em outro lugar",
+      "deletedKept": "Outro cliente excluiu este projeto do servidor, por isso suas alterações não foram salvas lá. Baixe sua cópia ou salve-a como um novo projeto.",
+      "saveAsNew": "Salvar como novo projeto",
+      "saveAsNewFor": "Salvar como novo projeto: {name}",
+      "savedAsNew": "Sua cópia de {name} foi salva como um novo projeto.",
+      "removeDeleted": "Remover {name} da lista",
       "startOverRefused": "Outra pessoa guardou {name} depois de este cliente o ler, por isso não foi substituído. Tente novamente para abrir a cópia dela."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "O armazenamento de projetos no servidor está desativado",
       "invalidId": "Identificador de projeto inválido",
       "notFound": "Esse projeto não está no servidor",
+      "deleted": "Este projeto foi excluído do servidor",
       "sameOrigin": "O armazenamento de projetos no servidor só aceita gravações feitas pela própria página do SketchForge",
       "busySaving": "Este projeto está sendo salvo agora",
       "missingMetadata": "O projeto enviado está sem os detalhes",

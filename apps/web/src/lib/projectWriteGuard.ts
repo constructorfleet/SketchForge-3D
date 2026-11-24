@@ -68,7 +68,8 @@ export function cacheWithEditorChange<T extends { revision: number }>(
 }
 
 /** `storageNewer`: a newer release upgraded the browser database, so this build can neither read nor replace it. */
-export type ProjectLoadFailureKind = "unreadable" | "unavailable" | "storageNewer" | "missing" | "conflict";
+/** `deleted`: another client deleted the project, and the server refuses its saves (#672). */
+export type ProjectLoadFailureKind = "unreadable" | "unavailable" | "storageNewer" | "missing" | "conflict" | "deleted";
 
 /** Marks a load error raised by the stored copy's contents, not by reaching storage. */
 export class StoredProjectUnreadableError extends Error {

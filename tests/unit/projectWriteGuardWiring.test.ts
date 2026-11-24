@@ -38,11 +38,7 @@ describe("dashboard package writes", () => {
     expect(page).toMatch(/saveServerProjectPackage\(project\.id, record\.skfPackage,/);
     expect(page).toMatch(/!projectWriteGuard\.canWrite\(project\.id\)\) continue;[\s\S]{0,1200}saveServerProjectPackage\(project\.id, record\.skfPackage, record\.revision, upload\.serverRevision\)/);
     // A migration deletes only what the user deleted, never what the browser list lacks (#662).
-    // A late write is undone only while the server holds what it stored (#672).
-    expect(count(/\bdeleteServerProject\(/)).toBe(3);
-    expect(page).toMatch(/if \(stored\) await deleteServerProject\(projectId, stored\);/);
-    expect(write).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) \{\s*await undoLateWrite\(projectId, stored\);/);
-    expect(page).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) \{\s*await undoLateWrite\(projectId, written\.stored\);/);
+    expect(count(/\bdeleteServerProject\(/)).toBe(2);
     expect(page).toMatch(/if \(!projectsDeletedInBrowser\.has\(projectId\) \|\| removedFromServer\.has\(projectId\)\) continue;\s*await deleteServerProject\(projectId\);/);
     expect(page).toMatch(/const deleteProject = \(projectId: string\) => \{\s*if \(!serverProjectStorageActive\) projectsDeletedInBrowser\.add\(projectId\);/);
   });
@@ -50,7 +46,7 @@ describe("dashboard package writes", () => {
   // Issue #650: a server package write is conditional on the copy it started from.
   it("sends the base revision with every autosaved server package and blocks on a conflict", () => {
     const write = topLevelFunction("writeProjectShapes");
-    expect(write).toMatch(/saveServerProjectPackage\(projectId, skfPackage, entry\.revision, serverBaseRevisions\.get\(projectId\)\)\)/);
+    expect(write).toMatch(/saveServerProjectPackage\(projectId, skfPackage, entry\.revision, serverBaseRevisions\.get\(projectId\)\)/);
     expect(write).toMatch(/if \(error instanceof ServerProjectConflictError\) projectWriteGuard\.block\(projectId\);/);
     expect(write).toContain("serverBaseRevisions.set(projectId, entry.revision);");
   });

@@ -281,6 +281,12 @@
       "packageMissing": "Żądanie pakietu tego projektu nie znalazło pliku pakietu.",
       "reloadNewerFor": "Otwórz nowszą kopię: {name}",
       "downloadMineFor": "Pobierz moją kopię: {name}",
+      "deletedTitle": "{name} został usunięty gdzie indziej",
+      "deletedKept": "Inny klient usunął ten projekt z serwera, więc Twoje zmiany nie zostały tam zapisane. Pobierz swoją kopię lub zapisz ją jako nowy projekt.",
+      "saveAsNew": "Zapisz jako nowy projekt",
+      "saveAsNewFor": "Zapisz jako nowy projekt: {name}",
+      "savedAsNew": "Zapisano Twoją kopię projektu {name} jako nowy projekt.",
+      "removeDeleted": "Usuń {name} z listy",
       "startOverRefused": "Ktoś inny zapisał projekt {name} po tym, jak ten klient go odczytał, więc nie został zastąpiony. Spróbuj ponownie, aby otworzyć jego kopię."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "Magazyn projektów na serwerze jest wyłączony",
       "invalidId": "Nieprawidłowy identyfikator projektu",
       "notFound": "Tego projektu nie ma na serwerze",
+      "deleted": "Ten projekt został usunięty z serwera",
       "sameOrigin": "Magazyn projektów na serwerze przyjmuje zapisy tylko ze strony SketchForge",
       "busySaving": "Ten projekt jest teraz zapisywany",
       "missingMetadata": "W przesyłanym projekcie brakuje szczegółów",

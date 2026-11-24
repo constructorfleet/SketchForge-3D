@@ -123,13 +123,20 @@ describe("server project metadata writes", () => {
   });
 });
 
-// Issue #672: the server refuses a based metadata write once the project is deleted.
+// Issue #672: deletes win; the server refuses every later write to a deleted project.
 describe("server project writes after a delete", () => {
-  const deleted = () => new Response(JSON.stringify({ errorKey: "errors.projects.notFound", conflict: "deleted" }), { status: 410 });
+  const deleted = () => new Response(JSON.stringify({ error: "deleted", errorKey: "errors.projects.deleted", conflict: "deleted" }), { status: 410 });
+
+  it("turns the refusal of a package write into a deleted-project error", async () => {
+    answer(deleted());
+    const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ServerProjectDeletedError);
+    expect(error).toMatchObject({ key: "errors.projects.deleted" });
+  });
 
   it("turns the refusal of a metadata write into a deleted-project error", async () => {
     answer(deleted());
-    expect(await saveServerProjectMetadata("project-1", { name: "Bracket" }, 3).catch((caught: unknown) => caught)).toBeInstanceOf(ServerProjectDeletedError);
+    expect(await saveServerProjectMetadata("project-1", { name: "Bracket" }).catch((caught: unknown) => caught)).toBeInstanceOf(ServerProjectDeletedError);
   });
 });
 
@@ -149,14 +156,14 @@ describe("server project writes while another write holds the project", () => {
 
   it("sends a package again once the project is free", async () => {
     const fetch = busyThenSaved(2);
-    await expect(saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42)).resolves.toMatchObject({ project: { projectId: "project-1" } });
+    await expect(saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42)).resolves.toMatchObject({ projectId: "project-1" });
     expect(fetch).toHaveBeenCalledTimes(3);
     expect((fetch.mock.calls[2][1]?.body as FormData).get("revision")).toBe("50");
   });
 
   it("sends metadata again once the project is free", async () => {
     const fetch = busyThenSaved(1);
-    await expect(saveServerProjectMetadata("project-1", { name: "Bracket" }, 3)).resolves.toMatchObject({ project: { projectId: "project-1" } });
+    await expect(saveServerProjectMetadata("project-1", { name: "Bracket" }, 3)).resolves.toMatchObject({ projectId: "project-1" });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -181,33 +188,14 @@ describe("server project writes while another write holds the project", () => {
   });
 });
 
-// Issue #672: a re-delete names what the late write stored, so it spares a copy saved since.
-describe("server project deletes", () => {
-  const busy = () => new Response(JSON.stringify({ error: "busy", errorKey: "errors.projects.busySaving" }), { status: 409 });
-
-  it("reports what a write stored", async () => {
-    answer(new Response(JSON.stringify({ project: null, stored: { revision: 0, metadataRevision: 0, package: "abc" } }), { status: 201 }));
-    expect((await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42)).stored).toEqual({ revision: 0, metadataRevision: 0, package: "abc" });
-  });
-
-  it("sends the stored state a delete is conditional on", async () => {
-    const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetch);
-    expect(await deleteServerProject("project-1", { revision: 3, metadataRevision: 4, package: "abc" })).toBe(true);
-    const query = new URL(fetch.mock.calls[0][0], "http://localhost").searchParams;
-    expect([query.get("expectedRevision"), query.get("expectedMetadataRevision"), query.get("expectedPackage")]).toEqual(["3", "4", "abc"]);
-  });
-
-  it("leaves a project that changed since alone, without an error", async () => {
-    answer(new Response(JSON.stringify({ errorKey: "errors.projects.changedBeforeSave", conflict: "changed" }), { status: 409 }));
-    expect(await deleteServerProject("project-1", { revision: 3, metadataRevision: 4 })).toBe(false);
-  });
-
+describe("server project deletes while another write holds the project", () => {
   it("sends a delete again once the project is free", async () => {
     let calls = 0;
-    const fetch = vi.fn(async () => (calls++ < 2 ? busy() : new Response("{}", { status: 200 })));
+    const fetch = vi.fn(async () => (calls++ < 2
+      ? new Response(JSON.stringify({ error: "busy", errorKey: "errors.projects.busySaving" }), { status: 409 })
+      : new Response("{}", { status: 200 })));
     vi.stubGlobal("fetch", fetch);
-    expect(await deleteServerProject("project-1")).toBe(true);
+    await deleteServerProject("project-1");
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 });

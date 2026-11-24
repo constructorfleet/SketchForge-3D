@@ -80,6 +80,17 @@ When a browser window comes back into view, it checks the server for newer copie
 
 A project's name and settings are merged instead. When two clients change them at once, each keeps the fields it changed. A rename in one browser is not undone by another browser that still shows the old name, and it appears there when that window comes back into view.
 
+### When another client deleted the project
+
+A delete on the server wins over every later save. When another client deletes a project that this client still has open, the server refuses this client's next save, the editor closes, and the dashboard says the project was deleted elsewhere:
+
+- **Download my copy** saves this client's unsaved copy as `<name> (my copy).skf`.
+- **Save as a new project** saves that copy to the server under a new ID, and the deleted project leaves this list.
+
+Closing the message removes the deleted project from this list without saving the copy.
+
+![The dashboard reporting a project another client deleted.](../screenshots/server-storage-deleted-elsewhere.png)
+
 ### When the server has no package for a project
 
 If the server holds a project's details but not its `.skf` package, or the package is a symlink or another file that is not a regular file, the project does not open as an empty project. The dashboard says the project has no stored package and offers **Try again** and **Start over**. **Start over** replaces the missing package, or the symlink itself, with an empty project; it does not write through a symlink. If another client saves the project after this one read it, **Start over** is refused, and **Try again** opens that client's copy.

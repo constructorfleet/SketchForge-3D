@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -184,11 +184,11 @@ async function releaseAfterDelete(page, post, options) {
   await deleteFromDashboard(page, options);
   const late = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
   post.release();
-  await late;
+  assert.equal((await late).status(), 410, "the server must refuse a save for a deleted project");
   // Room for any write the late answer sets off.
   await page.waitForTimeout(1_500);
   // The user deleted it: a refused late save is expected, not a failure to report.
-  assert.equal(await page.getByText(/deleted before this save|not on the server|could not save/i).count(), 0, "a refused late save was reported as an error");
+  assert.equal(await page.getByText(/deleted before this save|not on the server|could not save|deleted elsewhere/i).count(), 0, "a refused late save was reported as an error");
 }
 
 async function withServerProject(run) {
@@ -203,7 +203,7 @@ async function withServerProject(run) {
       assert.equal((await pollUntil(stored, (names) => names.length === 2)).length, 2, "the first edit was never stored on the server");
       // Let the edit's own writes finish, so only the next one is held.
       await page.waitForTimeout(2_000);
-      await run({ page, listed, stored, baseURL, projectsDir });
+      await run({ page, listed, stored });
     });
   } finally {
     rmSync(projectsDir, { recursive: true, force: true });
@@ -264,85 +264,31 @@ test("a new project's first save held past its delete does not bring it back", {
   });
 });
 
-// Holds the next DELETE until released; other requests go on to earlier handlers.
-async function holdNextDelete(page) {
-  let release = () => {};
-  const released = new Promise((resolve) => { release = resolve; });
-  let markHeld = () => {};
-  const held = new Promise((resolve) => { markHeld = resolve; });
-  let armed = true;
-  await page.route("**/api/projects?*", async (route) => {
-    if (!armed || route.request().method() !== "DELETE") return route.fallback();
-    armed = false;
-    markHeld();
-    await released;
-    await route.fallback();
+for (const order of [["project", "metadata"], ["metadata", "project"]]) {
+  test(`two late saves from one tab, ${order.join(" then ")}, do not bring the project back`, { timeout: 180_000 }, async () => {
+    await withServerProject(async ({ page, listed, stored }) => {
+      const held = { project: await holdNextPost(page, "project") };
+      await addBox(page);
+      await held.project.held;
+      await page.getByRole("button", { name: "Home dashboard" }).click();
+      held.metadata = await holdNextPost(page, "metadata");
+      await page.getByRole("button", { name: /^Project options for / }).first().click();
+      await page.getByRole("menuitem", { name: "Rename" }).click();
+      await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
+      await page.locator(".dashboard-confirm-save").click();
+      await held.metadata.held;
+      await deleteFromDashboard(page);
+
+      for (const field of order) {
+        const landed = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
+        held[field].release();
+        assert.equal((await landed).status(), 410, `the late ${field} save must be refused`);
+      }
+      await page.waitForTimeout(1_500);
+
+      assert.deepEqual(await listed(), [], "a late save left the deleted project listed");
+      assert.deepEqual(stored(), [], "a project file is back on disk");
+      assert.equal(await page.getByText(/deleted before this save|not on the server|could not save|deleted elsewhere/i).count(), 0, "a refused late save was reported as an error");
+    });
   });
-  return { held, release };
 }
-
-test("undoing a late save spares a copy another client saved in between", { timeout: 180_000 }, async () => {
-  await withServerProject(async ({ page, listed, baseURL, projectsDir }) => {
-    const packagePost = await holdNextPost(page, "project");
-    await addBox(page);
-    const projectId = await packagePost.held;
-    await page.getByRole("button", { name: "Home dashboard" }).click();
-    await deleteFromDashboard(page);
-
-    // The late save lands; hold this tab's undo of it while another client saves the project back (#665).
-    const undo = await holdNextDelete(page);
-    packagePost.release();
-    await undo.held;
-    const otherCopy = new Uint8Array([9, 9, 9, 9]);
-    const save = (fill) => {
-      const body = new FormData();
-      fill(body);
-      return fetch(`${baseURL}/api/projects?projectId=${projectId}`, { method: "POST", headers: { Origin: baseURL }, body });
-    };
-    assert.ok((await save((body) => {
-      body.append("project", new Blob([otherCopy]));
-      body.append("revision", String(Date.now()));
-      body.append("baseRevision", "1");
-    })).ok, "the other client's package save must succeed");
-    assert.ok((await save((body) => {
-      body.append("metadata", JSON.stringify({ id: projectId, name: "Saved elsewhere", revision: Date.now(), updatedAt: Date.now() }));
-      body.append("baseMetadataRevision", "0");
-    })).ok, "the other client's entry save must succeed");
-
-    const undone = page.waitForResponse((response) => response.request().method() === "DELETE" && response.url().includes("/api/projects?"));
-    undo.release();
-    assert.equal((await undone).status(), 409, "the undo must be refused once the project changed");
-
-    assert.deepEqual(await listed(), [projectId], "the other client's copy was deleted");
-    assert.deepEqual([...readFileSync(join(projectsDir, `${projectId}.skf`))], [...otherCopy], "the other client's package was replaced");
-  });
-});
-
-test("two late saves from one tab, package then entry, do not bring the project back", { timeout: 180_000 }, async () => {
-  await withServerProject(async ({ page, listed, stored }) => {
-    const packagePost = await holdNextPost(page, "project");
-    await addBox(page);
-    await packagePost.held;
-    await page.getByRole("button", { name: "Home dashboard" }).click();
-    const metadataPost = await holdNextPost(page, "metadata");
-    await page.getByRole("button", { name: /^Project options for / }).first().click();
-    await page.getByRole("menuitem", { name: "Rename" }).click();
-    await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
-    await page.locator(".dashboard-confirm-save").click();
-    await metadataPost.held;
-    await deleteFromDashboard(page);
-
-    // The entry save lands after the package save but before the package save's undo.
-    const packageUndo = await holdNextDelete(page);
-    packagePost.release();
-    await packageUndo.held;
-    const metadataLanded = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
-    metadataPost.release();
-    await metadataLanded;
-    packageUndo.release();
-    await page.waitForTimeout(1_500);
-
-    assert.deepEqual(await listed(), [], "the late entry save left the deleted project listed");
-    assert.deepEqual(stored(), [], "a project file is back on disk");
-  });
-});
