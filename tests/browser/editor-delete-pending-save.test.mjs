@@ -292,3 +292,69 @@ for (const order of [["project", "metadata"], ["metadata", "project"]]) {
     });
   });
 }
+
+// Issue #672: a browser that falls back to its own storage remembers what the server held,
+// so a later move can tell its own unsynced edits from a synced copy.
+test("falling back from server storage records the revisions the server held", { timeout: 240_000 }, async () => {
+  const port = await unusedPort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const projectsDir = mkdtempSync(join(tmpdir(), "sketchforge-fallback-"));
+  const start = async (env) => {
+    const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
+      cwd: process.cwd(),
+      env: { ...process.env, ...env },
+      detached: process.platform !== "win32",
+      stdio: "ignore",
+    });
+    const deadline = Date.now() + 120_000;
+    for (;;) {
+      assert.ok(server.exitCode === null && Date.now() < deadline, "Next.js did not become ready");
+      try {
+        if ((await fetch(baseURL)).ok) break;
+      } catch {
+        // Still starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return async () => {
+      try {
+        if (process.platform === "win32") server.kill("SIGTERM");
+        else process.kill(-server.pid, "SIGTERM");
+      } catch {
+        // Already exited.
+      }
+      await new Promise((resolve) => (server.exitCode !== null ? resolve() : server.once("exit", resolve)));
+    };
+  };
+  const browser = await chromium.launch({ headless: true });
+  let stop;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/app-update**", (route) => route.abort());
+    stop = await start({});
+    await openNewDesign(page, baseURL);
+    const projectId = new URL(page.url()).searchParams.get("project");
+    await pollUntil(() => storedPackageIds(page), (ids) => ids.length === 1);
+    await stop();
+
+    stop = await start({ SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "fallback-token" });
+    await page.goto(baseURL);
+    await pollUntil(() => page.evaluate(() => window.localStorage.getItem("sketchForge.projects.beforeServerStorage") !== null), Boolean, 30_000);
+    const moved = await page.evaluate((id) => JSON.parse(window.localStorage.getItem("sketchForge.projects.beforeServerStorage")).find((project) => project.id === id)?.revision, projectId);
+    assert.equal(typeof moved, "number", "the move kept the browser list");
+    await stop();
+
+    stop = await start({});
+    await page.goto(baseURL);
+    const synced = await pollUntil(
+      () => page.evaluate(() => JSON.parse(window.localStorage.getItem("sketchForge.projects.serverSyncedRevisions") ?? "{}")),
+      (revisions) => projectId in revisions,
+      30_000,
+    );
+    assert.deepEqual(synced, { [projectId]: moved }, "the fallback did not record what the server held");
+  } finally {
+    await stop?.();
+    await browser.close();
+    rmSync(projectsDir, { recursive: true, force: true });
+  }
+});

@@ -189,6 +189,17 @@ const PROJECTS_STORAGE_KEY = "sketchForge.projects";
 // unsetting SKETCHFORGE_PROJECTS_DIR gives the projects back: IndexedDB still
 // holds their geometry, but without a list nothing would show it.
 const MIGRATED_PROJECTS_STORAGE_KEY = "sketchForge.projects.beforeServerStorage";
+/** Project id to the revision the server held when this browser fell back to its own storage (#672). */
+const SERVER_SYNCED_REVISIONS_STORAGE_KEY = "sketchForge.projects.serverSyncedRevisions";
+
+function readServerSyncedRevisions(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY) ?? "{}") as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, number> : {};
+  } catch {
+    return {};
+  }
+}
 const PROJECT_SHAPES_DB_NAME = "sketchForge.projectShapes";
 const PROJECT_SHAPES_STORE_NAME = "projectShapes";
 const PROJECT_SHAPE_RESOURCES_STORE_NAME = "projectShapeResources";
@@ -681,7 +692,12 @@ function restoreProjectsFromBeforeServerStorage() {
     }
     window.localStorage.setItem(PROJECTS_STORAGE_KEY, backup);
     window.localStorage.removeItem(MIGRATED_PROJECTS_STORAGE_KEY);
-    return readStoredProjects().projects;
+    const restored = readStoredProjects().projects;
+    // Edits past these revisions never reached the server, so a later move must not drop them.
+    window.localStorage.setItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY, JSON.stringify(Object.fromEntries(
+      restored.flatMap((project) => (typeof project.revision === "number" ? [[project.id, project.revision]] : [])),
+    )));
+    return restored;
   } catch {
     return null;
   }
@@ -1036,11 +1052,12 @@ export default function Home() {
       const deletedWithNewerCopy = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>> }>();
       const deletedOnServer = (
         projectId: string,
-        error: ServerProjectDeletedError,
-        kept?: { project: DashboardProject; record: Awaited<ReturnType<typeof loadProjectShapes>> },
+        kept: { project: DashboardProject; record: Awaited<ReturnType<typeof loadProjectShapes>> },
+        syncedRevision: number | undefined,
       ) => {
-        // Edits made while the server was out of reach would otherwise vanish with no way back.
-        if (kept?.record && kept.record.revision > (error.deletedRevision ?? 0)) {
+        // Edits this browser never sent would otherwise vanish with no way back. Revisions are
+        // compared with this browser's own record, never the deleting client's clock.
+        if (kept.record && (syncedRevision === undefined || kept.record.revision > syncedRevision)) {
           deletedWithNewerCopy.set(projectId, { project: kept.project, record: kept.record });
         }
         addProjectTombstone(window.localStorage, projectId);
@@ -1066,7 +1083,7 @@ export default function Home() {
           return true;
         } catch (error) {
           if (!(error instanceof ServerProjectDeletedError)) throw error;
-          deletedOnServer(project.id, error, { project, record });
+          deletedOnServer(project.id, { project, record }, readServerSyncedRevisions()[project.id]);
           return false;
         }
       };
@@ -1158,7 +1175,7 @@ export default function Home() {
               await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
             } catch (error) {
               if (error instanceof ServerProjectDeletedError) {
-                deletedOnServer(project.id, error, { project, record });
+                deletedOnServer(project.id, { project, record }, upload.recordRevision);
                 changedAny = true;
                 continue;
               }
@@ -1223,6 +1240,7 @@ export default function Home() {
           window.localStorage.setItem(MIGRATED_PROJECTS_STORAGE_KEY, browserList);
         }
         window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+        window.localStorage.removeItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY);
       } catch {
         // The list is on the server either way; a browser that refuses to
         // forget its copy only leaves a stale one behind.

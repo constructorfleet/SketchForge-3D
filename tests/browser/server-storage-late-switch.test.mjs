@@ -261,15 +261,19 @@ test("a project deleted while projects move does not come back", { timeout: 180_
 
 // Issue #672: deletes win, so the server refuses to take a project it deleted. The move leaves
 // that project out and goes on with the rest, instead of failing on every reload. A browser copy
-// newer than the deleted one is offered to keep; an older one is dropped.
-async function moveWithServerTombstone(t, { tombstoneRevision, editFirst = false }) {
+// with edits made since it last reached the server is offered to keep; a synced one is dropped.
+// The deleting client's clock is a day ahead, so its revision outranks every edit made here.
+async function moveWithServerTombstone(t, { editFirst = false }) {
   let otherId;
   const session = await migratingSession(t, {
     beforeUpload: async ({ page, projectsDir, projectId }) => {
+      // As a browser that moved this project before, then fell back to browser storage.
+      const synced = await until(() => browserRevision(page, projectId), "the new project was never stored in the browser");
+      await page.evaluate(([id, revision]) => window.localStorage.setItem("sketchForge.projects.serverSyncedRevisions", JSON.stringify({ [id]: revision })), [projectId, synced]);
       if (editFirst) {
         await page.getByRole("button", { name: "Add shape" }).click();
         await page.getByText("Box", { exact: true }).first().click();
-        await page.waitForTimeout(1_500);
+        await until(async () => (await browserRevision(page, projectId)) > synced, "the edit was never stored in the browser");
       }
       await page.getByRole("button", { name: "Home dashboard" }).click();
       await page.getByRole("button", { name: "Create new 3D design" }).click();
@@ -277,7 +281,7 @@ async function moveWithServerTombstone(t, { tombstoneRevision, editFirst = false
       otherId = new URL(page.url()).searchParams.get("project");
       // Another client deleted the first project from the server before this browser moved it.
       mkdirSync(join(projectsDir, ".deleted"), { recursive: true });
-      writeFileSync(join(projectsDir, ".deleted", `${projectId}.json`), JSON.stringify({ deletedAt: Date.now(), revision: tombstoneRevision, metadataRevision: 1 }));
+      writeFileSync(join(projectsDir, ".deleted", `${projectId}.json`), JSON.stringify({ deletedAt: Date.now(), revision: Date.now() + 86_400_000, metadataRevision: 1 }));
     },
   });
   assert.ok(otherId && otherId !== session.projectId, "a second project opened");
@@ -286,9 +290,8 @@ async function moveWithServerTombstone(t, { tombstoneRevision, editFirst = false
   return { ...session, otherId };
 }
 
-test("a project the server deleted is dropped from the move when this browser holds nothing newer", { timeout: 180_000 }, async (t) => {
-  // The deleted copy is later than anything this browser saved.
-  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, { tombstoneRevision: Date.now() + 86_400_000 });
+test("a project the server deleted is dropped from the move when this browser holds nothing unsynced", { timeout: 180_000 }, async (t) => {
+  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, {});
 
   assert.deepEqual((await listing()).map((record) => record.projectId), [otherId], "only the other project moved");
   assert.equal(await page.getByText("Untitled design 1", { exact: true }).count(), 0, "the deleted project left the list");
@@ -297,8 +300,8 @@ test("a project the server deleted is dropped from the move when this browser ho
   assert.ok(tombstones.includes(projectId), "this browser records the project as deleted");
 });
 
-test("a project the server deleted keeps this browser's newer copy to download or save as new", { timeout: 180_000 }, async (t) => {
-  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, { tombstoneRevision: 1, editFirst: true });
+test("a project the server deleted keeps this browser's unsynced edits to download or save as new, whatever the other clock says", { timeout: 180_000 }, async (t) => {
+  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, { editFirst: true });
 
   assert.deepEqual((await listing()).map((record) => record.projectId), [otherId], "the deleted project was not moved");
   const banner = page.getByRole("alert").filter({ hasText: "Untitled design 1 was deleted elsewhere" });

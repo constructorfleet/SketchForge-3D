@@ -89,7 +89,7 @@ A delete on the server wins over every later save. When another client deletes a
 
 Closing the message removes the deleted project from this list without saving the copy.
 
-The same message appears when a browser moves its projects to server storage and the server has already deleted one of them, if this browser's copy is newer than the deleted one. An older copy is simply dropped.
+The same message appears when a browser moves its projects to server storage and the server has already deleted one of them, if this browser holds edits to it that never reached the server. A copy with no such edits is simply dropped.
 
 ![The dashboard reporting a project another client deleted.](../screenshots/server-storage-deleted-elsewhere.png)
 
