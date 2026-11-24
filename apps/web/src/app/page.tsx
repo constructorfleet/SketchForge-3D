@@ -1028,22 +1028,39 @@ export default function Home() {
       // means a half-migrated project is simply not there yet and is tried
       // again, rather than appearing on the server with no geometry behind it.
       const migrated = new Map<string, { recordRevision: number; serverRevision: number }>();
+      const migratedProjectIds = new Set<string>();
       const migratedEntries = new Map<string, DashboardProject>();
+      // Another client deleted it on the server, which refuses it for good (#672). Recording
+      // the delete here drops it from every later pass and from the switched list.
+      const deletedOnServer = (projectId: string) => {
+        addProjectTombstone(window.localStorage, projectId);
+        projectsDeletedInBrowser.add(projectId);
+        migratedProjectIds.delete(projectId);
+        migrated.delete(projectId);
+        serverBaseRevisions.delete(projectId);
+      };
+      /** Returns false when the server refused the project as deleted. */
       const migrateProject = async (project: DashboardProject) => {
         migratedEntries.set(project.id, project);
-        const record = await loadProjectShapes(project.id);
-        if (record?.skfPackage) {
-          const serverRevision = project.revision ?? record.revision;
-          await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
-          migrated.set(project.id, { recordRevision: record.revision, serverRevision });
-          // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
-          serverBaseRevisions.set(project.id, serverRevision);
+        try {
+          const record = await loadProjectShapes(project.id);
+          if (record?.skfPackage) {
+            const serverRevision = project.revision ?? record.revision;
+            await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
+            migrated.set(project.id, { recordRevision: record.revision, serverRevision });
+            // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
+            serverBaseRevisions.set(project.id, serverRevision);
+          }
+          await saveServerProjectMetadata(project.id, projectForStorage(project));
+          return true;
+        } catch (error) {
+          if (!(error instanceof ServerProjectDeletedError)) throw error;
+          deletedOnServer(project.id);
+          return false;
         }
-        await saveServerProjectMetadata(project.id, projectForStorage(project));
       };
 
       let migratedCount = 0;
-      const migratedProjectIds = new Set<string>();
       const serverProjectIds = new Set(listing.projects.map((record) => record.projectId));
       // Re-reading the browser list between passes picks up a project created
       // while an earlier pass was still uploading, which would otherwise be
@@ -1052,14 +1069,16 @@ export default function Home() {
         const pending = readStoredProjects().projects.filter((project) => !serverProjectIds.has(project.id));
         if (pending.length === 0) break;
         for (const project of pending) {
+          let moved: boolean;
           try {
-            await migrateProject(project);
+            moved = await migrateProject(project);
           } catch (error) {
             if (canceled) return;
             setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
             return;
           }
           if (canceled) return;
+          if (!moved) continue;
           migratedCount += 1;
           serverProjectIds.add(project.id);
           migratedProjectIds.add(project.id);
@@ -1107,7 +1126,10 @@ export default function Home() {
             if (canceled) return;
             if (serverProjectIds.has(project.id) || projectsDeletedInBrowser.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
             // Created during the wait: not in the listing, so it would vanish at the switch.
-            await migrateProject(project);
+            if (!(await migrateProject(project))) {
+              changedAny = true;
+              continue;
+            }
             migratedCount += 1;
             serverProjectIds.add(project.id);
             migratedProjectIds.add(project.id);
@@ -1124,6 +1146,11 @@ export default function Home() {
             try {
               await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
             } catch (error) {
+              if (error instanceof ServerProjectDeletedError) {
+                deletedOnServer(project.id);
+                changedAny = true;
+                continue;
+              }
               if (!(error instanceof ServerProjectConflictError)) throw error;
               // Another tab sharing this IndexedDB already uploaded this very record.
               if (error.storedRevision !== record.revision) {
@@ -2128,6 +2155,8 @@ export default function Home() {
       updatedAt: now,
       revision: now,
       shapes: job.shapeCount,
+      // The old thumbnail belongs to the deleted id.
+      thumbnailUrl: null,
       sharedProject: undefined,
     };
     const entry = { ...job.entry, revision: now };

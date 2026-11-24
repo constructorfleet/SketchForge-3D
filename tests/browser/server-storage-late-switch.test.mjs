@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -134,7 +134,7 @@ async function migratingSession(t, { beforeUpload } = {}) {
   await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
   const projectId = new URL(page.url()).searchParams.get("project");
   assert.ok(projectId, "the editor URL names the new project");
-  await beforeUpload?.({ context, baseURL });
+  await beforeUpload?.({ context, baseURL, page, projectsDir, projectId });
   held.probe.open();
   await until(() => held.uploads >= 2 && held.listings >= 2, "the page never uploaded the new project");
 
@@ -257,6 +257,32 @@ test("a project deleted while projects move does not come back", { timeout: 180_
   await page.waitForTimeout(1_000);
   assert.equal(await page.getByText("Untitled design 1", { exact: true }).count(), 0, "the deleted project does not reappear");
   assert.deepEqual(readdirSync(projectsDir).filter((name) => name.startsWith(projectId)), [], "no file of the deleted project is left");
+});
+
+// Issue #672: deletes win, so the server refuses to take a project it deleted. The move drops
+// that project and goes on with the rest, instead of failing on every reload.
+test("a project the server deleted is dropped from the move, and the rest move", { timeout: 180_000 }, async (t) => {
+  let otherId;
+  const { page, projectId, listing, switchToServer } = await migratingSession(t, {
+    beforeUpload: async ({ page, projectsDir, projectId }) => {
+      await page.getByRole("button", { name: "Home dashboard" }).click();
+      await page.getByRole("button", { name: "Create new 3D design" }).click();
+      await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+      otherId = new URL(page.url()).searchParams.get("project");
+      // Another client deleted the first project from the server before this browser moved it.
+      mkdirSync(join(projectsDir, ".deleted"), { recursive: true });
+      writeFileSync(join(projectsDir, ".deleted", `${projectId}.json`), JSON.stringify({ deletedAt: Date.now(), revision: 0, metadataRevision: 0 }));
+    },
+  });
+  assert.ok(otherId && otherId !== projectId, "a second project opened");
+
+  await switchToServer();
+  assert.deepEqual((await listing()).map((record) => record.projectId), [otherId], "only the other project moved");
+  await page.getByRole("button", { name: "Home dashboard" }).click();
+  assert.equal(await page.getByText("Untitled design 1", { exact: true }).count(), 0, "the deleted project left the list");
+  assert.equal(await page.getByText(/could not move|migrate/i).count(), 0, "the move was reported as failed");
+  const tombstones = await page.evaluate(() => window.localStorage.getItem("sketchForge.projects.deleted") ?? "");
+  assert.ok(tombstones.includes(projectId), "this browser records the project as deleted");
 });
 
 test("a project moved by two tabs at once stays on the server", { timeout: 180_000 }, async (t) => {
