@@ -42,7 +42,7 @@ describe("dashboard package writes", () => {
     expect(count(/\bdeleteServerProject\(/)).toBe(3);
     expect(page).toMatch(/if \(stored\) await deleteServerProject\(projectId, stored\);/);
     expect(write).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) \{\s*await undoLateWrite\(projectId, stored\);/);
-    expect(page).toMatch(/if \(creates && browserTombstones\(\)\.has\(projectId\)\) \{\s*await undoLateWrite\(projectId, written\.stored\);/);
+    expect(page).toMatch(/if \(browserTombstones\(\)\.has\(projectId\)\) \{\s*await undoLateWrite\(projectId, written\.stored\);/);
     expect(page).toMatch(/if \(!projectsDeletedInBrowser\.has\(projectId\) \|\| removedFromServer\.has\(projectId\)\) continue;\s*await deleteServerProject\(projectId\);/);
     expect(page).toMatch(/const deleteProject = \(projectId: string\) => \{\s*if \(!serverProjectStorageActive\) projectsDeletedInBrowser\.add\(projectId\);/);
   });

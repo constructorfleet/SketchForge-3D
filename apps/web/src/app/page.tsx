@@ -838,7 +838,6 @@ export default function Home() {
       run: async (projectId, job) => {
         // Deleted while this job waited (#672).
         if (browserTombstones().has(projectId)) return;
-        const creates = !serverMetadataRevisions.has(projectId);
         let written: Awaited<ReturnType<typeof post>>;
         try {
           written = await post(projectId, job, syncedServerMetadata.get(projectId));
@@ -852,8 +851,9 @@ export default function Home() {
           rememberServerMetadata(projectId, record.metadata, current);
           written = await post(projectId, job, current);
         }
-        // Sent before the delete and landed after it; the server cannot refuse a create (#672).
-        if (creates && browserTombstones().has(projectId)) {
+        // Sent before the delete and landed after it: a create, or a based write after a late
+        // package write. Each late write undoes itself, so the last to land does (#672).
+        if (browserTombstones().has(projectId)) {
           await undoLateWrite(projectId, written.stored);
           return;
         }

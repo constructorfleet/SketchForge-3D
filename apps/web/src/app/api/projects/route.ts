@@ -174,10 +174,10 @@ export async function POST(request: Request) {
 
       const savedMetadata = writtenMetadata ?? stored;
       const sidecar = await readProjectMetadata(root, projectId);
-      // Hashing the stored package costs a read; only a create's re-delete needs it.
+      // Hashing the stored package costs a read. Only a write that made the sidecar can be a late one to undo.
       const packageState = packageBytes
         ? packageDigest(packageBytes)
-        : basedMetadataOnly ? undefined : packageDigest(await readProjectPackage(root, projectId));
+        : basedMetadataOnly && stored ? undefined : packageDigest(await readProjectPackage(root, projectId));
       const storedState = { revision: serverProjectRevision(sidecar), metadataRevision: serverMetadataRevision(sidecar), ...(packageState ? { package: packageState } : {}) };
       return NextResponse.json(
         { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null, stored: storedState },

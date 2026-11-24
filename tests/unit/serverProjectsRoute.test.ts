@@ -314,6 +314,15 @@ describe("server project storage", () => {
       expect((await fs.readdir(projectsRoot)).sort()).toEqual(["project-1.json", "project-1.skf"]);
     });
 
+    it("reports the stored package with a based entry write that made the sidecar", async () => {
+      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11, baseRevision: 10 }));
+      const { stored } = await (await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).json() as { stored: Stored };
+      expect(stored.package).toBe(digest(new Uint8Array([1])));
+      // A later entry write over an existing sidecar does not read the package.
+      const later = await (await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }))).json() as { stored: Stored };
+      expect(later.stored.package).toBeUndefined();
+    });
+
     it("reports the stored package with a create, so its delete sees a package saved since", async () => {
       const { stored } = await (await POST(saveRequest("project-1", { metadata: metadata() }))).json() as { stored: Stored };
       expect(stored).toEqual({ revision: 10, metadataRevision: 1, package: "none" });

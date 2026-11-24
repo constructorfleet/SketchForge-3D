@@ -166,7 +166,8 @@ async function holdNextPost(page, field) {
       markHeld(new URL(request.url()).searchParams.get("projectId"));
       await released;
     }
-    await route.continue();
+    // Lets other holds see the request; with none left, it goes to the network.
+    await route.fallback();
   });
   return { held, release };
 }
@@ -314,5 +315,34 @@ test("undoing a late save spares a copy another client saved in between", { time
 
     assert.deepEqual(await listed(), [projectId], "the other client's copy was deleted");
     assert.deepEqual([...readFileSync(join(projectsDir, `${projectId}.skf`))], [...otherCopy], "the other client's package was replaced");
+  });
+});
+
+test("two late saves from one tab, package then entry, do not bring the project back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    const packagePost = await holdNextPost(page, "project");
+    await addBox(page);
+    await packagePost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    const metadataPost = await holdNextPost(page, "metadata");
+    await page.getByRole("button", { name: /^Project options for / }).first().click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
+    await page.locator(".dashboard-confirm-save").click();
+    await metadataPost.held;
+    await deleteFromDashboard(page);
+
+    // The entry save lands after the package save but before the package save's undo.
+    const packageUndo = await holdNextDelete(page);
+    packagePost.release();
+    await packageUndo.held;
+    const metadataLanded = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
+    metadataPost.release();
+    await metadataLanded;
+    packageUndo.release();
+    await page.waitForTimeout(1_500);
+
+    assert.deepEqual(await listed(), [], "the late entry save left the deleted project listed");
+    assert.deepEqual(stored(), [], "a project file is back on disk");
   });
 });
