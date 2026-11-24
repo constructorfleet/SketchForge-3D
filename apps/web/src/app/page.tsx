@@ -63,6 +63,7 @@ import {
 } from "@/lib/projectWriteGuard";
 import { storedRecordJson } from "@/lib/storedProjectCopy";
 import { mergeMetadataFields } from "@/lib/serverMetadataMerge";
+import { SERVER_SYNCED_REVISIONS_STORAGE_KEY, readServerSyncedRevisions, writeServerSyncedRevisions } from "@/lib/serverSyncedRevisions";
 import {
   projectShapeCacheEntry,
   projectShapeCacheEntryFromEditor,
@@ -189,17 +190,6 @@ const PROJECTS_STORAGE_KEY = "sketchForge.projects";
 // unsetting SKETCHFORGE_PROJECTS_DIR gives the projects back: IndexedDB still
 // holds their geometry, but without a list nothing would show it.
 const MIGRATED_PROJECTS_STORAGE_KEY = "sketchForge.projects.beforeServerStorage";
-/** Project id to the revision the server held when this browser fell back to its own storage (#672). */
-const SERVER_SYNCED_REVISIONS_STORAGE_KEY = "sketchForge.projects.serverSyncedRevisions";
-
-function readServerSyncedRevisions(): Record<string, number> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY) ?? "{}") as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, number> : {};
-  } catch {
-    return {};
-  }
-}
 const PROJECT_SHAPES_DB_NAME = "sketchForge.projectShapes";
 const PROJECT_SHAPES_STORE_NAME = "projectShapes";
 const PROJECT_SHAPE_RESOURCES_STORE_NAME = "projectShapeResources";
@@ -694,9 +684,7 @@ function restoreProjectsFromBeforeServerStorage() {
     window.localStorage.removeItem(MIGRATED_PROJECTS_STORAGE_KEY);
     const restored = readStoredProjects().projects;
     // Edits past these revisions never reached the server, so a later move must not drop them.
-    window.localStorage.setItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY, JSON.stringify(Object.fromEntries(
-      restored.flatMap((project) => (typeof project.revision === "number" ? [[project.id, project.revision]] : [])),
-    )));
+    writeServerSyncedRevisions(window.localStorage, restored);
     return restored;
   } catch {
     return null;
@@ -1083,7 +1071,7 @@ export default function Home() {
           return true;
         } catch (error) {
           if (!(error instanceof ServerProjectDeletedError)) throw error;
-          deletedOnServer(project.id, { project, record }, readServerSyncedRevisions()[project.id]);
+          deletedOnServer(project.id, { project, record }, readServerSyncedRevisions(window.localStorage)[project.id]);
           return false;
         }
       };
