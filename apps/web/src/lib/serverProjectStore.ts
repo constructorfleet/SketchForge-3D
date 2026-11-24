@@ -147,9 +147,13 @@ export class ServerProjectConflictError extends Error {
 
 /** Says the server refused a write because the project was deleted; deletes win (#672). */
 export class ServerProjectDeletedError extends LocalizedError {
-  constructor() {
+  /** The package revision the deleted copy had, when the server recorded it. */
+  readonly deletedRevision: number | undefined;
+
+  constructor(deletedRevision?: number) {
     super("errors.projects.deleted");
     this.name = "ServerProjectDeletedError";
+    this.deletedRevision = deletedRevision;
   }
 }
 
@@ -212,12 +216,14 @@ async function postServerProject(projectId: string, fill: (formData: FormData) =
   fill(formData);
   const response = await sendUntilFree(() => fetch(`${SERVER_PROJECTS_ENDPOINT}?projectId=${encodeURIComponent(projectId)}`, { method: "POST", body: formData }));
   if (!response.ok) {
-    const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown };
+    const payload = await response.clone().json().catch(() => ({})) as { conflict?: unknown; storedRevision?: unknown; deletedRevision?: unknown };
     if (response.status === 409 && payload.conflict === "newerRevision") {
       throw new ServerProjectConflictError(typeof payload.storedRevision === "number" ? payload.storedRevision : 0);
     }
     if (response.status === 409 && payload.conflict === "newerMetadata") throw new ServerMetadataConflictError();
-    if (response.status === 410 && payload.conflict === "deleted") throw new ServerProjectDeletedError();
+    if (response.status === 410 && payload.conflict === "deleted") {
+      throw new ServerProjectDeletedError(typeof payload.deletedRevision === "number" ? payload.deletedRevision : undefined);
+    }
     throw await serverProjectError(response, "errors.projects.saveFailed");
   }
   const payload = await response.json().catch(() => ({})) as { project?: ServerProjectRecord };

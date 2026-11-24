@@ -263,6 +263,17 @@ describe("server project storage", () => {
       expect((await listing()).projects).toEqual([]);
     });
 
+    it("names the revision the deleted copy had, so a client can tell whether its copy is newer", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 30, baseRevision: 10 }));
+      await deleteProject();
+
+      const response = await POST(saveRequest("project-1", { project: new Uint8Array([2]), revision: 40 }));
+
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ conflict: "deleted", deletedRevision: 30 });
+    });
+
     it("records the revisions the deleted project had", async () => {
       await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
       await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed" }), baseMetadataRevision: 1 }));

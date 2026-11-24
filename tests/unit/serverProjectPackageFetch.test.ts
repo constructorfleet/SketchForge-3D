@@ -125,13 +125,13 @@ describe("server project metadata writes", () => {
 
 // Issue #672: deletes win; the server refuses every later write to a deleted project.
 describe("server project writes after a delete", () => {
-  const deleted = () => new Response(JSON.stringify({ error: "deleted", errorKey: "errors.projects.deleted", conflict: "deleted" }), { status: 410 });
+  const deleted = () => new Response(JSON.stringify({ error: "deleted", errorKey: "errors.projects.deleted", conflict: "deleted", deletedRevision: 30 }), { status: 410 });
 
   it("turns the refusal of a package write into a deleted-project error", async () => {
     answer(deleted());
     const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ServerProjectDeletedError);
-    expect(error).toMatchObject({ key: "errors.projects.deleted" });
+    expect(error).toMatchObject({ key: "errors.projects.deleted", deletedRevision: 30 });
   });
 
   it("turns the refusal of a metadata write into a deleted-project error", async () => {

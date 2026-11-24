@@ -45,8 +45,9 @@ function disabledResponse() {
   );
 }
 
-function deletedResponse() {
-  return errorResponse("errors.projects.deleted", 410, { conflict: "deleted" });
+/** `deletedRevision` lets a client tell whether the copy it holds is newer than the one deleted. */
+function deletedResponse(deletedRevision?: number) {
+  return errorResponse("errors.projects.deleted", 410, { conflict: "deleted", ...(deletedRevision !== undefined ? { deletedRevision } : {}) });
 }
 
 export async function GET(request: Request) {
@@ -138,7 +139,8 @@ export async function POST(request: Request) {
     const locked = await withProjectLock(root, projectId, async () => {
       // Deletes win (#672): a save sent before the delete, or from a client that still
       // holds the project, must not recreate it. A new project gets a new id.
-      if (await readProjectTombstone(root, projectId)) return deletedResponse();
+      const tombstone = await readProjectTombstone(root, projectId);
+      if (tombstone) return deletedResponse(tombstone.revision);
       const stored = await readProjectMetadata(root, projectId);
       const storedRevision = serverProjectRevision(stored);
       // Files removed without a delete record: a based metadata write must not bring back a list entry alone.

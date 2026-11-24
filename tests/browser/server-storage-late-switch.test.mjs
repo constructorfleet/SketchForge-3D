@@ -259,30 +259,57 @@ test("a project deleted while projects move does not come back", { timeout: 180_
   assert.deepEqual(readdirSync(projectsDir).filter((name) => name.startsWith(projectId)), [], "no file of the deleted project is left");
 });
 
-// Issue #672: deletes win, so the server refuses to take a project it deleted. The move drops
-// that project and goes on with the rest, instead of failing on every reload.
-test("a project the server deleted is dropped from the move, and the rest move", { timeout: 180_000 }, async (t) => {
+// Issue #672: deletes win, so the server refuses to take a project it deleted. The move leaves
+// that project out and goes on with the rest, instead of failing on every reload. A browser copy
+// newer than the deleted one is offered to keep; an older one is dropped.
+async function moveWithServerTombstone(t, { tombstoneRevision, editFirst = false }) {
   let otherId;
-  const { page, projectId, listing, switchToServer } = await migratingSession(t, {
+  const session = await migratingSession(t, {
     beforeUpload: async ({ page, projectsDir, projectId }) => {
+      if (editFirst) {
+        await page.getByRole("button", { name: "Add shape" }).click();
+        await page.getByText("Box", { exact: true }).first().click();
+        await page.waitForTimeout(1_500);
+      }
       await page.getByRole("button", { name: "Home dashboard" }).click();
       await page.getByRole("button", { name: "Create new 3D design" }).click();
       await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
       otherId = new URL(page.url()).searchParams.get("project");
       // Another client deleted the first project from the server before this browser moved it.
       mkdirSync(join(projectsDir, ".deleted"), { recursive: true });
-      writeFileSync(join(projectsDir, ".deleted", `${projectId}.json`), JSON.stringify({ deletedAt: Date.now(), revision: 0, metadataRevision: 0 }));
+      writeFileSync(join(projectsDir, ".deleted", `${projectId}.json`), JSON.stringify({ deletedAt: Date.now(), revision: tombstoneRevision, metadataRevision: 1 }));
     },
   });
-  assert.ok(otherId && otherId !== projectId, "a second project opened");
+  assert.ok(otherId && otherId !== session.projectId, "a second project opened");
+  await session.switchToServer();
+  await session.page.getByRole("button", { name: "Home dashboard" }).click();
+  return { ...session, otherId };
+}
 
-  await switchToServer();
+test("a project the server deleted is dropped from the move when this browser holds nothing newer", { timeout: 180_000 }, async (t) => {
+  // The deleted copy is later than anything this browser saved.
+  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, { tombstoneRevision: Date.now() + 86_400_000 });
+
   assert.deepEqual((await listing()).map((record) => record.projectId), [otherId], "only the other project moved");
-  await page.getByRole("button", { name: "Home dashboard" }).click();
   assert.equal(await page.getByText("Untitled design 1", { exact: true }).count(), 0, "the deleted project left the list");
-  assert.equal(await page.getByText(/could not move|migrate/i).count(), 0, "the move was reported as failed");
+  assert.equal(await page.getByText(/could not move|deleted elsewhere/i).count(), 0, "the drop was reported");
   const tombstones = await page.evaluate(() => window.localStorage.getItem("sketchForge.projects.deleted") ?? "");
   assert.ok(tombstones.includes(projectId), "this browser records the project as deleted");
+});
+
+test("a project the server deleted keeps this browser's newer copy to download or save as new", { timeout: 180_000 }, async (t) => {
+  const { page, projectId, otherId, listing } = await moveWithServerTombstone(t, { tombstoneRevision: 1, editFirst: true });
+
+  assert.deepEqual((await listing()).map((record) => record.projectId), [otherId], "the deleted project was not moved");
+  const banner = page.getByRole("alert").filter({ hasText: "Untitled design 1 was deleted elsewhere" });
+  await banner.waitFor({ state: "visible", timeout: 15_000 });
+  assert.equal(await page.getByText(/could not move/i).count(), 0, "the move was reported as failed");
+
+  await banner.getByRole("button", { name: "Save as a new project: Untitled design 1" }).click();
+  const copy = await until(async () => (await listing()).find((record) => ![projectId, otherId].includes(record.projectId)), "the copy never reached the server");
+  await until(async () => (await listing()).find((record) => record.projectId === copy.projectId)?.metadata?.shapes === 1, "the copy lost the browser's box");
+  assert.ok(copy.packageBytes > 0, "the copy has a package");
+  await banner.waitFor({ state: "detached", timeout: 15_000 });
 });
 
 test("a project moved by two tabs at once stays on the server", { timeout: 180_000 }, async (t) => {

@@ -1032,7 +1032,17 @@ export default function Home() {
       const migratedEntries = new Map<string, DashboardProject>();
       // Another client deleted it on the server, which refuses it for good (#672). Recording
       // the delete here drops it from every later pass and from the switched list.
-      const deletedOnServer = (projectId: string) => {
+      // Browser copies newer than the one the server deleted: offered to keep after the switch.
+      const deletedWithNewerCopy = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>> }>();
+      const deletedOnServer = (
+        projectId: string,
+        error: ServerProjectDeletedError,
+        kept?: { project: DashboardProject; record: Awaited<ReturnType<typeof loadProjectShapes>> },
+      ) => {
+        // Edits made while the server was out of reach would otherwise vanish with no way back.
+        if (kept?.record && kept.record.revision > (error.deletedRevision ?? 0)) {
+          deletedWithNewerCopy.set(projectId, { project: kept.project, record: kept.record });
+        }
         addProjectTombstone(window.localStorage, projectId);
         projectsDeletedInBrowser.add(projectId);
         migratedProjectIds.delete(projectId);
@@ -1042,8 +1052,9 @@ export default function Home() {
       /** Returns false when the server refused the project as deleted. */
       const migrateProject = async (project: DashboardProject) => {
         migratedEntries.set(project.id, project);
+        let record: Awaited<ReturnType<typeof loadProjectShapes>> = null;
         try {
-          const record = await loadProjectShapes(project.id);
+          record = await loadProjectShapes(project.id);
           if (record?.skfPackage) {
             const serverRevision = project.revision ?? record.revision;
             await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
@@ -1055,7 +1066,7 @@ export default function Home() {
           return true;
         } catch (error) {
           if (!(error instanceof ServerProjectDeletedError)) throw error;
-          deletedOnServer(project.id);
+          deletedOnServer(project.id, error, { project, record });
           return false;
         }
       };
@@ -1147,7 +1158,7 @@ export default function Home() {
               await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
             } catch (error) {
               if (error instanceof ServerProjectDeletedError) {
-                deletedOnServer(project.id);
+                deletedOnServer(project.id, error, { project, record });
                 changedAny = true;
                 continue;
               }
@@ -1192,9 +1203,15 @@ export default function Home() {
       const serverProjects = [
         ...adoptedProjects.map((project) => (caughtUp.has(project.id) ? browserProjects.get(project.id) ?? project : project)),
         ...lateProjects,
+        // Listed only so the "deleted elsewhere" banner can offer the newer browser copy.
+        ...[...deletedWithNewerCopy.values()].map(({ project }) => project),
       ];
       setProjects(serverProjects);
       setProjectStorageMode("server");
+      deletedWithNewerCopy.forEach(({ project, record }, projectId) => {
+        const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
+        projectDeletedRef.current?.(projectId, { entry, context: projectShapeSaveContext(project), revision: record.revision, shapeCount: entry.shapes.length });
+      });
       conflicts.forEach(({ project, record, error }, projectId) => {
         projectWriteGuard.block(projectId);
         const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
