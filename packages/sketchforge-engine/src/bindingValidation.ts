@@ -97,14 +97,14 @@ export function validateBinding(check: BindingCheck, change: BindingChange): Bin
     }
   }
   if (expression === null) return { ok: true };
-  if (!draft && !rebuildableSketch(shape, target.topLevel)) return invalidConstraint(sketchNotRebuildable(shape.id, constraintId));
+  if (!draft && !rebuildableSketch(shape, target.topLevel)) return invalidConstraint(notRebuildable(shape.id, constraintId));
   let value: number | undefined;
   if (parameters && constraint) {
     const resolved = resolveSketchConstraintBinding(shape.id, constraint, expression, parameters);
     if (!resolved.ok) return invalidConstraint(resolved.error);
     value = resolved.value;
   }
-  const conflict = constraintConflict(withoutBindings(shape, change.clearedFields ?? []), constraintId, boundAncestorSizeFields(roots, shape.id));
+  const conflict = constraintConflict(withoutBindings(shape, change.clearedFields ?? []), constraintId, ancestorSizeFields(roots, shape.id));
   return conflict ? invalidConstraint(conflict) : { ok: true, value };
 }
 
@@ -149,7 +149,7 @@ export function resizedProfileFields(shape: WorkplaneShape, request: ShapeReques
 /** Lists bound size fields on a group. A refit around its children rewrites them. */
 export function boundGroupSizeFields(shape: WorkplaneShape): string[] {
   if (!shape.groupedShapes?.length) return [];
-  return GROUP_SIZE_FIELDS.filter((field) => typeof shape.expressions?.[field] === "string");
+  return SIZE_FIELDS.filter((field) => typeof shape.expressions?.[field] === "string");
 }
 
 /** Lists bindings that do not resolve against `parameters`, or bind a field the shape lacks. Changes nothing. */
@@ -169,7 +169,7 @@ export function shapeBindingIssues(shapes: readonly WorkplaneShape[], parameters
       if (result && !result.ok) issues.push(result.error);
     }
     // Nested constraint bindings are reported with the constraint issues.
-    const nested = shape.groupedShapes?.length ? nestedRefitFields(shape) : [];
+    const nested = shape.groupedShapes?.length ? refitFieldsBelow(shape) : [];
     if (!nested.length) return;
     for (const field of boundGroupSizeFields(shape)) {
       issues.push({
@@ -199,7 +199,7 @@ export function sketchConstraintBindingIssues(
       if (seen.has(key)) continue;
       seen.add(key);
       if (!rebuildableSketch(shape, topLevel)) {
-        issues.push(sketchNotRebuildable(shape.id, constraint.id));
+        issues.push(notRebuildable(shape.id, constraint.id));
         continue;
       }
       const conflict = constraintConflict(shape, constraint.id, groupSizes);
@@ -214,7 +214,7 @@ export function sketchConstraintBindingIssues(
   return issues;
 }
 
-const GROUP_SIZE_FIELDS: readonly string[] = ["width", "depth", "height"];
+const SIZE_FIELDS: readonly string[] = ["width", "depth", "height"];
 
 const refused = (failure: BindingRefusal) => ({ ok: false as const, failure });
 const invalidField = (error: ShapeBindingError) => refused({ reason: "binding_invalid", error });
@@ -225,15 +225,15 @@ function holds(shape: WorkplaneShape, id: string): boolean {
 }
 
 /** Reports whether a binding on a nested shape can rebuild it. Treatment amounts keep its bounds. */
-function refitsParent(field: string): boolean {
+function rebuildsChild(field: string): boolean {
   return !field.startsWith("edgeTreatments.");
 }
 
 /** Lists bound fields below `group` that rebuild a child, as `shapeId.field`. */
-function nestedRefitFields(group: WorkplaneShape): string[] {
+function refitFieldsBelow(group: WorkplaneShape): string[] {
   const fields: string[] = [];
   const walk = (shape: WorkplaneShape) => {
-    Object.keys(shape.expressions ?? {}).filter(refitsParent).forEach((field) => fields.push(`${shape.id}.${field}`));
+    Object.keys(shape.expressions ?? {}).filter(rebuildsChild).forEach((field) => fields.push(`${shape.id}.${field}`));
     shape.groupedShapes?.forEach(walk);
   };
   group.groupedShapes?.forEach(walk);
@@ -252,7 +252,7 @@ function nestedConstraintBindings(group: WorkplaneShape): string[] {
 }
 
 /** Lists bound size fields on the groups that hold `shapeId`. */
-function boundAncestorSizeFields(roots: readonly WorkplaneShape[], shapeId: string): string[] {
+function ancestorSizeFields(roots: readonly WorkplaneShape[], shapeId: string): string[] {
   const search = (shapes: readonly WorkplaneShape[], ancestors: readonly WorkplaneShape[]): readonly WorkplaneShape[] | undefined => {
     for (const shape of shapes) {
       if (shape.id === shapeId) return ancestors;
@@ -264,7 +264,7 @@ function boundAncestorSizeFields(roots: readonly WorkplaneShape[], shapeId: stri
   return [...new Set((search(roots, []) ?? []).flatMap(boundGroupSizeFields))];
 }
 
-function sketchNotRebuildable(shapeId: string, constraintId: string): SketchConstraintBindingError {
+function notRebuildable(shapeId: string, constraintId: string): SketchConstraintBindingError {
   return { code: "sketchNotRebuildable", shapeId, constraintId, message: `The sketch on ${shapeId} has no rebuild recipe, so its constraints cannot bind.` };
 }
 
@@ -285,9 +285,9 @@ function profileFieldConflict(shape: WorkplaneShape, field: string): ShapeBindin
 /** Refuses a group size binding next to a nested binding that refits the group, either way round. */
 function groupFieldConflict(roots: readonly WorkplaneShape[], target: BindingTarget, field: string): ShapeBindingError | undefined {
   const { shape } = target;
-  if (shape.groupedShapes?.length && GROUP_SIZE_FIELDS.includes(field)) {
+  if (shape.groupedShapes?.length && SIZE_FIELDS.includes(field)) {
     const constraintIds = nestedConstraintBindings(shape);
-    const fields = nestedRefitFields(shape);
+    const fields = refitFieldsBelow(shape);
     if (constraintIds.length || fields.length) {
       return {
         code: "conflictingBinding",
@@ -298,8 +298,8 @@ function groupFieldConflict(roots: readonly WorkplaneShape[], target: BindingTar
       };
     }
   }
-  if (target.topLevel || !refitsParent(field)) return undefined;
-  const sizes = boundAncestorSizeFields(roots, shape.id);
+  if (target.topLevel || !rebuildsChild(field)) return undefined;
+  const sizes = ancestorSizeFields(roots, shape.id);
   if (!sizes.length) return undefined;
   return {
     code: "conflictingBinding",
@@ -329,4 +329,51 @@ function constraintConflict(shape: WorkplaneShape, constraintId: string, groupSi
     fields: groupSizes,
     message: `${constraintId} cannot bind: ${groupSizes.join(", ")} is bound on a group that holds ${shape.id}, and a re-solve would refit that group. Clear one binding first.`,
   };
+}
+
+// Deprecated predicates, kept so importers of the published package do not break (#681).
+// `sketchConstraintBindings` and `expressionBindings` re-export them under their old paths.
+
+/** @deprecated Use `validateBinding`. */
+export const GROUP_SIZE_FIELDS: readonly string[] = SIZE_FIELDS;
+
+/** @deprecated Use `validateBinding`. */
+export function refitsParent(field: string): boolean {
+  return rebuildsChild(field);
+}
+
+/** @deprecated Use `validateBinding`. */
+export function nestedRefitFields(group: WorkplaneShape): string[] {
+  return refitFieldsBelow(group);
+}
+
+/** @deprecated Use `validateBinding`. */
+export function sketchNotRebuildable(shapeId: string, constraintId: string): SketchConstraintBindingError {
+  return notRebuildable(shapeId, constraintId);
+}
+
+/** @deprecated Use `validateBinding`. */
+export function boundProfileSizeFields(shape: WorkplaneShape): string[] {
+  return profileSizeFields(shape).filter((field) => typeof shape.expressions?.[field] === "string");
+}
+
+/** @deprecated Use `validateBinding`, which also checks the groups that hold `shape`. */
+export function conflictingConstraintBinding(shape: WorkplaneShape, constraintId: string): SketchConstraintBindingError | undefined {
+  return constraintConflict(shape, constraintId, []);
+}
+
+/** @deprecated Use `validateBinding`. */
+export function groupRefitBindings(group: WorkplaneShape): { constraintIds: string[]; fields: string[] } {
+  return { constraintIds: nestedConstraintBindings(group), fields: refitFieldsBelow(group) };
+}
+
+/** @deprecated Use `validateBinding`. */
+export function boundAncestorSizeFields(roots: readonly WorkplaneShape[], shapeId: string): string[] {
+  return ancestorSizeFields(roots, shapeId);
+}
+
+/** @deprecated Use `validateBinding`. */
+export function conflictingGroupSizeBinding(shapeId: string, constraintId: string, fields: readonly string[]): SketchConstraintBindingError | undefined {
+  // A shape with no profile reaches only the group branch.
+  return fields.length ? constraintConflict({ id: shapeId } as WorkplaneShape, constraintId, fields) : undefined;
 }

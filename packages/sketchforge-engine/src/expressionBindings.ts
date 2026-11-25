@@ -332,6 +332,9 @@ export function visitBoundShapes(
 
 export type ShapeBindingIssue = ShapeBindingError;
 
+// Old import path for importers of the published package; the rules live in `bindingValidation`.
+export { GROUP_SIZE_FIELDS, nestedRefitFields, refitsParent, shapeBindingIssues } from "./bindingValidation.js";
+
 export type ShapeBindingDependent = { readonly shapeId: string; readonly fields: readonly string[] };
 
 /**

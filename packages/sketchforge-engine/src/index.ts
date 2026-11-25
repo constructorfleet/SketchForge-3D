@@ -271,7 +271,10 @@ export {
   type SketchConstraintDependent,
 } from "./sketchConstraintBindings.js";
 export {
+  boundProfileSizeFields,
+  conflictingConstraintBinding,
   profileSizeFields,
+  rebuildableSketch,
   shapeBindingIssues,
   sketchConstraintBindingIssues,
   validateBinding,

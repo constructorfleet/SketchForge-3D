@@ -155,6 +155,20 @@ export function boundSketchConstraints(shape: WorkplaneShape): Array<{ constrain
   });
 }
 
+// Old import path for importers of the published package; the rules live in `bindingValidation`.
+export {
+  boundAncestorSizeFields,
+  boundGroupSizeFields,
+  boundProfileSizeFields,
+  conflictingConstraintBinding,
+  conflictingGroupSizeBinding,
+  groupRefitBindings,
+  profileSizeFields,
+  rebuildableSketch,
+  sketchConstraintBindingIssues,
+  sketchNotRebuildable,
+} from "./bindingValidation.js";
+
 export type SketchConstraintDependent = { readonly shapeId: string; readonly constraintIds: readonly string[] };
 
 /** Lists sketch outputs whose constraint bindings reference `name` directly, in tree order. */

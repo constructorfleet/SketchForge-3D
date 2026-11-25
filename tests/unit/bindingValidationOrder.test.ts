@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEngine, directoryProjectStore, validateBinding, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import type { SketchConstraint, SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
+import * as engineEntry from "@constructorfleet/sketchforge-engine";
+import * as oldConstraintPath from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import * as oldFieldPath from "@constructorfleet/sketchforge-engine/expressionBindings";
 import { resolveConstraintEntry } from "@/lib/expressionFields";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 
@@ -147,5 +150,36 @@ describe("validateBinding", () => {
     const change = { constraintId: "width", constraint: widthConstraint(), expression: "w" };
     expect(validateBinding({ roots: [sized], target }, change)).toMatchObject({ ok: false, failure: { error: { code: "conflictingBinding" } } });
     expect(validateBinding({ roots: [sized], target }, { ...change, clearedFields: ["width"] })).toEqual({ ok: true, value: undefined });
+  });
+});
+
+describe("deprecated binding predicates", () => {
+  // Published importers reach these through the package entry and the old module paths.
+  it("keep their old import paths and results", () => {
+    const sized = output("sized", { expressions: { width: "w" } });
+    const nested = output("nested", { sketchProfile: rectangle("w") });
+    const group = { ...output("group", plain), expressions: { depth: "w" }, groupedShapes: [nested] };
+
+    expect(engineEntry.conflictingConstraintBinding).toBe(oldConstraintPath.conflictingConstraintBinding);
+    expect(engineEntry.boundProfileSizeFields(sized)).toEqual(["width"]);
+    expect(engineEntry.rebuildableSketch(sized, true)).toBe(true);
+    expect(oldConstraintPath.conflictingConstraintBinding(sized, "width")).toMatchObject({ code: "conflictingBinding", fields: ["width"] });
+    expect(oldConstraintPath.conflictingGroupSizeBinding("nested", "width", ["depth"])).toEqual({
+      code: "conflictingBinding",
+      shapeId: "nested",
+      constraintId: "width",
+      fields: ["depth"],
+      message: "width cannot bind: depth is bound on a group that holds nested, and a re-solve would refit that group. Clear one binding first.",
+    });
+    expect(oldConstraintPath.conflictingGroupSizeBinding("nested", "width", [])).toBeUndefined();
+    expect(oldConstraintPath.boundAncestorSizeFields([group], "nested")).toEqual(["depth"]);
+    expect(oldConstraintPath.boundGroupSizeFields(group)).toEqual(["depth"]);
+    expect(oldConstraintPath.groupRefitBindings(group)).toEqual({ constraintIds: ["width"], fields: [] });
+    expect(oldConstraintPath.sketchNotRebuildable("s", "c")).toMatchObject({ code: "sketchNotRebuildable", shapeId: "s", constraintId: "c" });
+    expect(typeof oldConstraintPath.sketchConstraintBindingIssues).toBe("function");
+    expect(oldFieldPath.GROUP_SIZE_FIELDS).toEqual(["width", "depth", "height"]);
+    expect(oldFieldPath.refitsParent("edgeTreatments.0.amount")).toBe(false);
+    expect(oldFieldPath.nestedRefitFields({ ...group, groupedShapes: [{ ...nested, expressions: { x: "w" } }] })).toEqual(["nested.x"]);
+    expect(typeof oldFieldPath.shapeBindingIssues).toBe("function");
   });
 });
