@@ -8,12 +8,11 @@
  */
 
 import { appendEditorHistorySnapshot, editorHistoryEntry, type EditorHistoryEntry, type ProjectConfigurationState } from "./editorHistory.js";
+import { commitProjectWrite, planProjectWrite } from "./projectWritePolicy.js";
 import {
   projectRecord,
   readProjectMetadata,
   readProjectPackage,
-  writeProjectMetadata,
-  writeProjectPackage,
   type ProjectMetadata,
 } from "./serverProjectFiles.js";
 import { importedShapeFromStepOnKernel } from "./stepImportKernel.js";
@@ -122,14 +121,20 @@ export async function readProjectDocument(root: string, projectId: string): Prom
 }
 
 /**
- * Store a new shape list for a project.
+ * Store a new shape list for a project. Call under the project lock.
  *
- * The revision is advanced past both the stored one and the clock, the way the
- * editor advances it, so a dashboard holding this project reloads it rather
- * than keeping a stale cache that outranks what was just written.
+ * The write policy advances the revision from `document.metadata`, not the
+ * sidecar on disk: the caller read it under the same lock.
  */
 export async function writeProjectDocument(root: string, projectId: string, document: ProjectDocument, shapes: WorkplaneShape[]) {
-  const revision = Math.max(Date.now(), metadataNumber(document.metadata, "revision", 0) + 1);
+  const plan = planProjectWrite(
+    { metadata: document.metadata },
+    { metadata: { ...document.metadata, name: document.projectName, shapes: shapes.length }, package: {}, revisionRule: { kind: "advance", now: Date.now() } },
+  );
+  // No conditions are set, so the policy cannot refuse; `If-Match` was checked when the lock was taken.
+  if (!plan.accepted) throw new Error(`Project write refused: ${plan.refusal.reason}`);
+  const { revision } = plan.next;
+  const metadata = plan.next.metadata!;
   // An API change lands as one more undo step rather than wiping the stack, so
   // whoever opens the project next can undo back past it.
   const history = appendEditorHistorySnapshot(
@@ -156,16 +161,6 @@ export async function writeProjectDocument(root: string, projectId: string, docu
     activeConfiguration: document.activeConfiguration,
     compressionLevel: 1,
   });
-  await writeProjectPackage(root, projectId, packageBytes);
-  const metadata: ProjectMetadata = {
-    ...document.metadata,
-    name: document.projectName,
-    shapes: shapes.length,
-    revision,
-    updatedAt: revision,
-    // The shape count and time are list fields, so a dashboard list read before this is stale (#650).
-    metadataRevision: metadataNumber(document.metadata, "metadataRevision", 0) + 1,
-  };
-  await writeProjectMetadata(root, projectId, metadata);
+  await commitProjectWrite(root, projectId, plan.next, packageBytes);
   return { metadata, record: await projectRecord(root, projectId, metadata), revision };
 }
