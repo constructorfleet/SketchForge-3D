@@ -35,7 +35,7 @@ export const SKF_BASE_FORMAT_VERSION = 2;
 export const SKF_PARAMETERS_FORMAT_VERSION = 3;
 // Written only when the project has configurations, so V3 readers refuse it instead of dropping them.
 export const SKF_CONFIGURATIONS_FORMAT_VERSION = 4;
-export const SKF_CREATED_WITH_VERSION = "1.33.0"; // x-release-please-version
+export const SKF_CREATED_WITH_VERSION = "1.33.1"; // x-release-please-version
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
 
 export const SKF_LIMITS = {
