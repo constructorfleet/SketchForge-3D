@@ -2171,10 +2171,14 @@ Create a parameter, or change the expression or dimension of an existing one. Se
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
       "description": "Parameter name: a letter or underscore, then letters, digits or underscores."
     },
     "expression": {
       "type": "string",
+      "maxLength": 10000,
+      "pattern": "\\S",
       "description": "For example \"2\", \"3 mm\", \"wall * 2 + 1\" or \"max(wall, 2)\". Units: mm, cm, m, in, ft, deg, rad."
     },
     "dimension": {
@@ -2216,10 +2220,14 @@ Rename a parameter, rewriting every parameter expression and shape binding that 
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
       "description": "The current name."
     },
     "newName": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
       "description": "The new name."
     }
   }
@@ -2251,6 +2259,8 @@ Delete a parameter that nothing uses. A refusal ends its first line with [code];
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
       "description": "The parameter to delete."
     }
   }
@@ -2332,6 +2342,8 @@ Bind one dimensional constraint of a stored shape's sketch (distance, radius, di
     },
     "constraintId": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
       "description": "The constraint id in the sketch profile, such as \"width\"."
     },
     "expression": {
@@ -2339,6 +2351,8 @@ Bind one dimensional constraint of a stored shape's sketch (distance, radius, di
         "string",
         "null"
       ],
+      "maxLength": 10000,
+      "pattern": "\\S",
       "description": "For example \"w * 2\". null removes the binding."
     }
   }
@@ -2396,12 +2410,16 @@ Create a parameter configuration, optionally with overrides that map parameter n
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration name, 1 to 100 characters."
     },
     "overrides": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 10000,
+        "pattern": "\\S"
       },
       "description": "Parameter name to expression, for example { \"wall\": \"3 mm\" }."
     }
@@ -2435,10 +2453,14 @@ Rename a parameter configuration; an active one stays active under its new name.
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration name, 1 to 100 characters."
     },
     "newName": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration name, 1 to 100 characters."
     }
   }
@@ -2472,10 +2494,14 @@ Set one parameter's expression in a configuration, or pass expression null to re
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration name, 1 to 100 characters."
     },
     "parameter": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
       "description": "The parameter to override."
     },
     "expression": {
@@ -2483,6 +2509,8 @@ Set one parameter's expression in a configuration, or pass expression null to re
         "string",
         "null"
       ],
+      "maxLength": 10000,
+      "pattern": "\\S",
       "description": "For example \"3 mm\". null removes the override."
     }
   }
@@ -2514,6 +2542,8 @@ Delete a parameter configuration. Deleting the active one returns the project to
     },
     "name": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration name, 1 to 100 characters."
     }
   }
@@ -2548,6 +2578,8 @@ Activate a parameter configuration, or pass name null to return to the base tabl
         "string",
         "null"
       ],
+      "minLength": 1,
+      "maxLength": 100,
       "description": "The configuration to activate, or null for the base table."
     }
   }

@@ -13,14 +13,27 @@ import { shapeBindingIssues } from "./expressionBindings.js";
 import { sketchConstraintBindingIssues } from "./sketchConstraintBindings.js";
 import type { ExpressionError } from "./parameterExpressions.js";
 import { configurationIssues } from "./projectParameters.js";
+import {
+  API_CONFIGURATION_NAME_MAX_LENGTH,
+  API_PARAMETER_DIMENSIONS,
+  API_PARAMETER_EXPRESSION_MAX_LENGTH,
+  API_QUERY_RULES,
+  API_REQUEST_BODIES,
+  matchesApiSchema,
+  readApiQueryValue,
+} from "./apiRequestDefinitions.js";
 
-export const API_PARAMETER_NAME_MAX_LENGTH = 64;
-export const API_PARAMETER_EXPRESSION_MAX_LENGTH = 10_000;
+// Compile-time check: the published dimensions are the domain's.
+API_PARAMETER_DIMENSIONS satisfies readonly ProjectParameterDimension[];
+
+export {
+  API_CONFIGURATION_NAME_MAX_LENGTH,
+  API_PARAMETER_DIMENSIONS,
+  API_PARAMETER_EXPRESSION_MAX_LENGTH,
+  API_PARAMETER_NAME_MAX_LENGTH,
+} from "./apiRequestDefinitions.js";
 /** The limit as refusals word it. */
 export const API_PARAMETER_EXPRESSION_LIMIT = `${API_PARAMETER_EXPRESSION_MAX_LENGTH.toLocaleString("en-US")} characters`;
-/** Matches the engine's configuration name limit. */
-export const API_CONFIGURATION_NAME_MAX_LENGTH = 100;
-export const API_PARAMETER_DIMENSIONS: readonly ProjectParameterDimension[] = ["length", "angle", "unitless"];
 
 export const API_PARAMETER_MESSAGES = {
   create: `A parameter needs a name, an expression of at most ${API_PARAMETER_EXPRESSION_LIMIT}, and a dimension of length, angle, or unitless.`,
@@ -35,16 +48,9 @@ export const API_CONFIGURATION_MESSAGES = {
   nameRequired: `A configuration name of 1 to ${API_CONFIGURATION_NAME_MAX_LENGTH} characters is required.`,
 } as const;
 
-const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const onlyKeys = (body: Record<string, unknown>, allowed: readonly string[]) => Object.keys(body).every((key) => allowed.includes(key));
-const isName = (value: unknown) => typeof value === "string" && value.length >= 1 && value.length <= API_PARAMETER_NAME_MAX_LENGTH;
-const isExpression = (value: unknown) => typeof value === "string" && /\S/.test(value) && value.length <= API_PARAMETER_EXPRESSION_MAX_LENGTH;
-const isDimension = (value: unknown) => API_PARAMETER_DIMENSIONS.includes(value as ProjectParameterDimension);
-
 /** Accepts `{ name, expression, dimension }` and nothing else. */
 export function isApiParameterCreateRequest(body: unknown): body is { name: string; expression: string; dimension: ProjectParameterDimension } {
-  return isObject(body) && onlyKeys(body, ["name", "expression", "dimension"])
-    && isName(body.name) && isExpression(body.expression) && isDimension(body.dimension);
+  return matchesApiSchema(body, API_REQUEST_BODIES.createParameter);
 }
 
 /** A rename carries `name` and nothing else. */
@@ -52,46 +58,34 @@ export type ApiParameterChange = { name?: string; expression?: string; dimension
 
 /** Accepts `{ name }` alone, or `expression`, `dimension` or both. */
 export function isApiParameterChangeRequest(body: unknown): body is ApiParameterChange {
-  if (!isObject(body)) return false;
-  if ("name" in body) return onlyKeys(body, ["name"]) && isName(body.name);
-  return onlyKeys(body, ["expression", "dimension"]) && ("expression" in body || "dimension" in body)
-    && (!("expression" in body) || isExpression(body.expression))
-    && (!("dimension" in body) || isDimension(body.dimension));
+  return matchesApiSchema(body, API_REQUEST_BODIES.updateParameter);
 }
-
-const isConfigurationName = (value: unknown) => typeof value === "string" && value.length >= 1 && value.length <= API_CONFIGURATION_NAME_MAX_LENGTH;
 
 /** Accepts `{ name, overrides? }`, where overrides maps names to expressions. */
 export function isApiConfigurationCreateRequest(body: unknown): body is { name: string; overrides?: Record<string, string> } {
-  return isObject(body) && onlyKeys(body, ["name", "overrides"]) && isConfigurationName(body.name)
-    && (!("overrides" in body) || (isObject(body.overrides) && Object.values(body.overrides).every(isExpression)));
+  return matchesApiSchema(body, API_REQUEST_BODIES.createParameterConfiguration);
 }
 
 /** A rename carries `name` alone; an override change carries `parameter` and `expression`, null to clear. */
 export type ApiConfigurationChange = { name: string } | { parameter: string; expression: string | null };
 
 export function isApiConfigurationChangeRequest(body: unknown): body is ApiConfigurationChange {
-  if (!isObject(body)) return false;
-  if ("name" in body) return onlyKeys(body, ["name"]) && isConfigurationName(body.name);
-  return onlyKeys(body, ["parameter", "expression"]) && isName(body.parameter)
-    && "expression" in body && (body.expression === null || isExpression(body.expression));
+  return matchesApiSchema(body, API_REQUEST_BODIES.updateParameterConfiguration);
 }
 
 /** Accepts `{ name }`, where null names the base table. */
 export function isApiConfigurationActivateRequest(body: unknown): body is { name: string | null } {
-  return isObject(body) && onlyKeys(body, ["name"]) && "name" in body && (body.name === null || isConfigurationName(body.name));
+  return matchesApiSchema(body, API_REQUEST_BODIES.activateParameterConfiguration);
 }
 
 /** Returns the trimmed `?name=` value, or undefined when it is missing or out of bounds. */
 export function apiParameterName(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length >= 1 && trimmed.length <= API_PARAMETER_NAME_MAX_LENGTH ? trimmed : undefined;
+  return readApiQueryValue(value, API_QUERY_RULES.parameterName);
 }
 
 /** Returns a configuration `?name=` value as the contract reads it: not trimmed, 1 to 100 characters. */
 export function apiConfigurationName(value: unknown): string | undefined {
-  return typeof value === "string" && value.length >= 1 && value.length <= API_CONFIGURATION_NAME_MAX_LENGTH ? value : undefined;
+  return readApiQueryValue(value, API_QUERY_RULES.configurationName);
 }
 
 function apiIssue({ code, message, expressionError }: { code: string; message: string; expressionError?: ExpressionError }) {

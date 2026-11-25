@@ -2,37 +2,26 @@
  * Runtime-facing inventory for the public REST API. This deliberately does
  * not claim to be OpenAPI: schemas and response details are added as routes
  * migrate, and the parity test prevents public handlers from being omitted.
+ *
+ * Request rules come from the engine's request definitions. That module is the
+ * only import allowed here: scripts/generate-openapi.mjs loads this file and it
+ * from source, without a bundler.
  */
 
+import {
+  API_ERROR_CODES,
+  API_QUERY_RULES,
+  API_REQUEST_BODIES,
+  API_REQUEST_FIELDS,
+  matchesApiSchema,
+  readApiQueryValue,
+  type ApiQueryRule,
+  type ApiSchema,
+} from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
 
 export type ApiV1Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "OPTIONS";
 
-export type ApiV1FieldSchema = {
-  type?: "number" | "integer" | "boolean" | "string" | "object" | "array";
-  nullable?: true;
-  required?: readonly string[];
-  enum?: readonly (string | null)[];
-  default?: string | number | boolean | null;
-  minimum?: number;
-  maximum?: number;
-  exclusiveMinimum?: number;
-  exclusiveMaximum?: number;
-  minimumLength?: number;
-  maximumLength?: number;
-  pattern?: string;
-  minItems?: number;
-  maxItems?: number;
-  uniqueItems?: boolean;
-  oneOf?: readonly ApiV1FieldSchema[];
-  anyOf?: readonly ApiV1FieldSchema[];
-  not?: ApiV1FieldSchema;
-  additionalProperties?: boolean | ApiV1FieldSchema;
-  description?: string;
-  format?: string;
-  properties?: Readonly<Record<string, ApiV1FieldSchema>>;
-  patternProperties?: Readonly<Record<string, ApiV1FieldSchema>>;
-  items?: ApiV1FieldSchema;
-};
+export type ApiV1FieldSchema = ApiSchema;
 
 export type ApiV1Operation = {
   operationId: string;
@@ -55,7 +44,7 @@ export type ApiV1Operation = {
   };
   query?: {
     required: readonly string[];
-    properties: Readonly<Record<string, { type: "string"; trim?: true; pattern?: string; minLength?: number; maxLength?: number; description?: string }>>;
+    properties: Readonly<Record<string, ApiQueryRule>>;
   };
   response?: {
     required: readonly string[];
@@ -231,7 +220,7 @@ const shapeSummary = {
     profile: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: num } },
   },
 } as const;
-const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["api_disabled", "unauthorized", "storage_unconfigured", "invalid_project_id", "invalid_shape_id", "invalid_body", "invalid_request", "project_not_found", "project_exists", "project_busy", "revision_mismatch", "shape_not_found", "shape_locked", "parameter_not_found", "parameter_exists", "parameter_in_use", "configuration_not_found", "configuration_exists", "invalid_expression", "unsupported_kind", "unsupported_format", "unapplicable_fields", "too_many_shapes", "limit_exceeded", "geometry_failed", "cad_failed", "internal_error"] }, revision: num }, additionalProperties: true } as const;
+const errorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: API_ERROR_CODES }, revision: num }, additionalProperties: true } as const;
 const limitErrorSchema = { type: "object", required: ["error", "code"], properties: { error: str, code: { type: "string", enum: ["limit_exceeded"] }, limit: int, given: int }, additionalProperties: false } as const;
 const faceError = (...codes: string[]): ApiV1FieldSchema => {
   const conditionalWriteError = codes.includes("project_busy") || codes.includes("shape_locked");
@@ -348,8 +337,8 @@ const measurementBetweenResponseSchema = {
 const projectDetail = { type: "object", required: ["project"], properties: { project: { type: "object", required: ["id", "name", "createdAt", "snapGrid", "workspace", "shapes"], properties: { id: str, name: str, createdAt: num, snapGrid: str, workspace: { type: "object", additionalProperties: true }, shapes: { type: "array", items: shapeSummary } } } } } as const;
 const projectList = { type: "object", required: ["projects", "nextCursor"], properties: { projects: { type: "array", items: projectSummary }, nextCursor: { type: "string", nullable: true } } } as const;
 const shapesList = { type: "object", required: ["shapes", "nextCursor"], properties: { shapes: { type: "array", items: shapeSummary }, nextCursor: { type: "string", nullable: true } } } as const;
-const projectQuery = { required: ["projectId"], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } } } as const;
-const shapeQuery = { required: ["projectId", "shapeId"], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 }, shapeId: { type: "string", trim: true, minLength: 1 } } } as const;
+const projectQuery = { required: ["projectId"], properties: { projectId: API_QUERY_RULES.projectId } } as const;
+const shapeQuery = { required: ["projectId", "shapeId"], properties: { projectId: API_QUERY_RULES.projectId, shapeId: API_QUERY_RULES.shapeId } } as const;
 const json = (schema: ApiV1FieldSchema) => ({ contentType: "application/json" as const, required: true as const, schema });
 const commonErrors = [400, 401, 404, 409, 500, 503] as const;
 const exportFormats = ["stl", "obj", "3mf", "step", "skf", "zip", "svg", "dxf"] as const;
@@ -411,37 +400,13 @@ const exportFormatContentTypes = {
   dxf: "application/dxf",
 } as const;
 const projectOperations = [
-  { ...operation("GET", "/api/v1/projects", "listProjectsOrGetProject", [200, ...commonErrors]), query: { required: [], properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 }, limit: { type: "string", pattern: "^\\d{1,4}$", maxLength: 4 }, cursor: { type: "string", pattern: "^[A-Za-z0-9_-]+$", maxLength: 128 } } }, responseSchemas: { 200: { type: "object", oneOf: [projectList, projectDetail] }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
+  { ...operation("GET", "/api/v1/projects", "listProjectsOrGetProject", [200, ...commonErrors]), query: { required: [], properties: { projectId: API_QUERY_RULES.projectId, limit: { type: "string", pattern: "^\\d{1,4}$", maxLength: 4 }, cursor: { type: "string", pattern: "^[A-Za-z0-9_-]+$", maxLength: 128 } } }, responseSchemas: { 200: { type: "object", oneOf: [projectList, projectDetail] }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("POST", "/api/v1/projects", "createProject", [201, ...commonErrors], createProjectRequestBody), responseSchemas: { 201: { type: "object", required: ["project"], properties: { project: projectSummary } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
   { ...operation("DELETE", "/api/v1/projects", "deleteProject", [200, ...commonErrors]), query: projectQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
 ] as const satisfies readonly ApiV1Operation[];
 
 export function validateApiV1Schema(value: unknown, schema: ApiV1FieldSchema): boolean {
-  if (schema.oneOf && schema.oneOf.filter((candidate) => validateApiV1Schema(value, candidate)).length !== 1) return false;
-  if (schema.anyOf && !schema.anyOf.some((candidate) => validateApiV1Schema(value, candidate))) return false;
-  if (schema.not && validateApiV1Schema(value, schema.not)) return false;
-  if (schema.nullable && value === null) return true;
-  if (schema.enum && !schema.enum.includes(value as string | null)) return false;
-  if (schema.type === "array") return Array.isArray(value) && (schema.minItems === undefined || value.length >= schema.minItems) && (schema.maxItems === undefined || value.length <= schema.maxItems) && (!schema.uniqueItems || new Set(value).size === value.length) && (!schema.items || value.every((item) => validateApiV1Schema(item, schema.items!)));
-  if (schema.type === "object") {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-    const object = value as Record<string, unknown>;
-    if (schema.required?.some((name) => !(name in object))) return false;
-    if (Object.entries(schema.properties ?? {}).some(([name, child]) => name in object && !validateApiV1Schema(object[name], child))) return false;
-    if (Object.entries(object).some(([name, child]) => {
-      // `in` would treat Object.prototype names such as "constructor" as declared.
-      if (Object.hasOwn(schema.properties ?? {}, name)) return false;
-      const matchingPatterns = Object.entries(schema.patternProperties ?? {}).filter(([pattern]) => new RegExp(pattern).test(name));
-      if (matchingPatterns.length) return matchingPatterns.some(([, childSchema]) => !validateApiV1Schema(child, childSchema));
-      if (schema.additionalProperties === false) return true;
-      return typeof schema.additionalProperties === "object" && !validateApiV1Schema(child, schema.additionalProperties);
-    })) return false;
-    return true;
-  }
-  if (schema.type === "string") return typeof value === "string" && (!schema.pattern || new RegExp(schema.pattern).test(value)) && (schema.minimumLength === undefined || value.length >= schema.minimumLength) && (schema.maximumLength === undefined || value.length <= schema.maximumLength);
-  if (schema.type === "boolean") return typeof value === "boolean";
-  if (schema.type === "number" || schema.type === "integer") return typeof value === "number" && Number.isFinite(value) && (schema.type !== "integer" || Number.isInteger(value)) && (schema.minimum === undefined || value >= schema.minimum) && (schema.maximum === undefined || value <= schema.maximum) && (schema.exclusiveMinimum === undefined || value > schema.exclusiveMinimum) && (schema.exclusiveMaximum === undefined || value < schema.exclusiveMaximum);
-  return schema.type === undefined;
+  return matchesApiSchema(value, schema);
 }
 
 export function validateApiV1RequestBody(key: string, value: unknown): boolean {
@@ -463,10 +428,9 @@ export function parseApiV1Query(key: string, request: Request): { ok: true; valu
   for (const name of operation.query.required) if (!params.has(name)) invalid.push(name);
   for (const [name, rule] of Object.entries(operation.query.properties)) {
     if (!params.has(name)) continue;
-    const raw = params.get(name) ?? "";
-    const normalized = rule.trim ? raw.trim() : raw;
-    if ((rule.minLength !== undefined && normalized.length < rule.minLength) || (rule.maxLength !== undefined && normalized.length > rule.maxLength) || (rule.pattern && !new RegExp(rule.pattern).test(normalized))) invalid.push(name);
-    else values[name] = normalized;
+    const read = readApiQueryValue(params.get(name) ?? "", rule);
+    if (read === undefined) invalid.push(name);
+    else values[name] = read;
   }
   return invalid.length ? { ok: false, invalid } : { ok: true, values };
 }
@@ -555,9 +519,7 @@ const shapeOperations = [
   { ...operation("DELETE", "/api/v1/shapes", "deleteShape", [200, ...commonErrors]), query: shapeQuery, responseSchemas: { 200: { type: "object", required: ["deleted", "id", "revision"], properties: { deleted: { type: "boolean" }, id: str, revision: num } }, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema, 500: errorSchema, 503: errorSchema } },
 ] as const satisfies readonly ApiV1Operation[];
 
-const parameterName = { type: "string", minimumLength: 1, maximumLength: 64, description: "An ASCII identifier that is not a unit or function name, such as wall_thickness." } as const;
-const parameterExpression = { type: "string", pattern: "\\S", maximumLength: 10_000 } as const;
-const parameterDimension = { type: "string", enum: ["length", "angle", "unitless"] } as const;
+const { parameterDimension } = API_REQUEST_FIELDS;
 const expressionErrorSchema = {
   type: "object",
   required: ["code", "message", "span"],
@@ -618,7 +580,7 @@ const parameterErrorSchema = {
 } as const;
 const parameterQuery = {
   required: ["projectId", "name"],
-  properties: { ...projectQuery.properties, name: { type: "string", trim: true, minLength: 1, maxLength: 64, description: "The parameter to change or delete." } },
+  properties: { ...projectQuery.properties, name: API_QUERY_RULES.parameterName },
 } as const;
 const parameterReadErrors = { 400: parameterErrorSchema, 401: errorSchema, 404: parameterErrorSchema, 409: parameterErrorSchema, 500: errorSchema, 503: errorSchema } as const;
 const parameterErrors = { ...parameterReadErrors, 422: parameterErrorSchema } as const;
@@ -656,29 +618,13 @@ const parameterOperations = [
     },
   },
   {
-    ...operation("POST", "/api/v1/parameters", "createParameter", [201, 400, 401, 404, 409, 413, 422, 500, 503], json({
-      type: "object",
-      required: ["name", "expression", "dimension"],
-      properties: { name: parameterName, expression: parameterExpression, dimension: parameterDimension },
-      additionalProperties: false,
-    })),
+    ...operation("POST", "/api/v1/parameters", "createParameter", [201, 400, 401, 404, 409, 413, 422, 500, 503], json(API_REQUEST_BODIES.createParameter)),
     description: "Appends a parameter. Evaluation errors return 422 invalid_expression with the expression error's code, span, and cycle.",
     query: projectQuery,
     responseSchemas: { 201: parameterWrite, ...parameterErrors },
   },
   {
-    ...operation("PATCH", "/api/v1/parameters", "updateParameter", [200, 400, 401, 404, 409, 422, 500, 503], json({
-      type: "object",
-      oneOf: [
-        { type: "object", required: ["name"], properties: { name: parameterName }, additionalProperties: false },
-        {
-          type: "object",
-          anyOf: [{ type: "object", required: ["expression"] }, { type: "object", required: ["dimension"] }],
-          properties: { expression: parameterExpression, dimension: parameterDimension },
-          additionalProperties: false,
-        },
-      ],
-    })),
+    ...operation("PATCH", "/api/v1/parameters", "updateParameter", [200, 400, 401, 404, 409, 422, 500, 503], json(API_REQUEST_BODIES.updateParameter)),
     description: "Renames a parameter (send name alone) or changes its expression or dimension. Every bound shape is rebuilt in the same write and returned in shapes.",
     query: parameterQuery,
     responseSchemas: { 200: parameterWrite, ...parameterErrors },
@@ -708,16 +654,11 @@ const constraintErrorSchema = {
   },
 } as const;
 const sketchConstraintOperation = {
-  ...operation("PATCH", "/api/v1/sketch-constraints", "bindSketchConstraint", [200, 400, 401, 404, 409, 422, 500, 503], json({
-    type: "object",
-    required: ["expression"],
-    properties: { expression: { ...parameterExpression, nullable: true, description: "A parameter expression, or null to remove the binding and keep the value." } },
-    additionalProperties: false,
-  })),
+  ...operation("PATCH", "/api/v1/sketch-constraints", "bindSketchConstraint", [200, 400, 401, 404, 409, 422, 500, 503], json(API_REQUEST_BODIES.bindSketchConstraint)),
   description: "Binds a dimensional sketch constraint to an expression, re-solves the sketch and rebuilds its output, or unbinds it with null. shapeId is the output or its sketchSourceId.",
   query: {
     required: ["projectId", "shapeId", "constraintId"],
-    properties: { ...shapeQuery.properties, constraintId: { type: "string", trim: true, minLength: 1, maxLength: 200 } },
+    properties: { ...shapeQuery.properties, constraintId: API_QUERY_RULES.constraintId },
   },
   responseSchemas: {
     200: {
@@ -729,7 +670,6 @@ const sketchConstraintOperation = {
     400: constraintErrorSchema, 401: errorSchema, 404: constraintErrorSchema, 409: constraintErrorSchema, 422: constraintErrorSchema, 500: errorSchema, 503: errorSchema,
   },
 } as const satisfies ApiV1Operation;
-const configurationName = { type: "string", minimumLength: 1, maximumLength: 100, description: "1 to 100 characters, with no control characters or surrounding whitespace." } as const;
 const configurationSchema = {
   type: "object",
   required: ["name", "overrides"],
@@ -747,7 +687,7 @@ const configurationIssueSchema = {
 } as const;
 const configurationQuery = {
   required: ["projectId", "name"],
-  properties: { ...projectQuery.properties, name: { type: "string", minLength: 1, maxLength: 100, description: "The configuration to change or delete." } },
+  properties: { ...projectQuery.properties, name: API_QUERY_RULES.configurationName },
 } as const;
 const configurationState = {
   configurations: { type: "array", items: configurationSchema },
@@ -779,29 +719,13 @@ const configurationOperations = [
     },
   },
   {
-    ...operation("POST", "/api/v1/parameter-configurations", "createParameterConfiguration", [201, 400, 401, 404, 409, 413, 422, 500, 503], json({
-      type: "object",
-      required: ["name"],
-      properties: { name: configurationName, overrides: { type: "object", additionalProperties: parameterExpression } },
-      additionalProperties: false,
-    })),
+    ...operation("POST", "/api/v1/parameter-configurations", "createParameterConfiguration", [201, 400, 401, 404, 409, 413, 422, 500, 503], json(API_REQUEST_BODIES.createParameterConfiguration)),
     description: "Appends a configuration. Every override must name a parameter and resolve. Creating one does not activate it.",
     query: projectQuery,
     responseSchemas: { 201: configurationWrite({ configuration: configurationSchema }, ["configuration"]), ...configurationWriteErrors },
   },
   {
-    ...operation("PATCH", "/api/v1/parameter-configurations", "updateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json({
-      type: "object",
-      oneOf: [
-        { type: "object", required: ["name"], properties: { name: configurationName }, additionalProperties: false },
-        {
-          type: "object",
-          required: ["parameter", "expression"],
-          properties: { parameter: parameterName, expression: { ...parameterExpression, nullable: true, description: "The override expression, or null to clear the override." } },
-          additionalProperties: false,
-        },
-      ],
-    })),
+    ...operation("PATCH", "/api/v1/parameter-configurations", "updateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json(API_REQUEST_BODIES.updateParameterConfiguration)),
     description: "Renames a configuration (send name alone), or sets or clears one parameter override. An override change to the active configuration rebuilds every bound shape in the same write.",
     query: configurationQuery,
     responseSchemas: { 200: configurationWrite({ configuration: configurationSchema }, ["configuration"]), ...configurationWriteErrors },
@@ -813,12 +737,7 @@ const configurationOperations = [
     responseSchemas: { 200: configurationWrite({ deleted: { type: "boolean" }, name: str }, ["deleted", "name"]), ...configurationWriteErrors },
   },
   {
-    ...operation("POST", "/api/v1/parameter-configurations/activate", "activateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json({
-      type: "object",
-      required: ["name"],
-      properties: { name: { ...configurationName, nullable: true, description: "The configuration to activate, or null for the base table." } },
-      additionalProperties: false,
-    })),
+    ...operation("POST", "/api/v1/parameter-configurations/activate", "activateParameterConfiguration", [200, 400, 401, 404, 409, 422, 500, 503], json(API_REQUEST_BODIES.activateParameterConfiguration)),
     description: "Switches the active configuration, or to the base table for null, and rebuilds every bound shape in the same write. A refused switch writes nothing.",
     query: projectQuery,
     responseSchemas: { 200: configurationWrite({}, []), ...configurationWriteErrors },
@@ -943,8 +862,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -979,7 +898,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
+        projectId: API_QUERY_RULES.projectId,
         download: { type: "string", description: "Set download=1 to return raw artifact bytes; omitted or any other value returns JSON with base64 content." },
       },
     },
@@ -1001,8 +920,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
         topology: { type: "string", pattern: "^(mesh|exact)$", description: "Optional. Use exact to list analytic B-rep faces on a supported plain full-turn sketch revolve; the default mesh listing keeps its existing indexes." },
       },
     },
@@ -1130,8 +1049,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -1159,7 +1078,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     }),
     query: {
       required: ["projectId"],
-      properties: { projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 } },
+      properties: { projectId: API_QUERY_RULES.projectId },
     },
     responseSchemas: {
       200: measurementBetweenResponseSchema,
@@ -1229,8 +1148,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -1272,8 +1191,8 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
     query: {
       required: ["projectId", "shapeId"],
       properties: {
-        projectId: { type: "string", trim: true, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]*$", maxLength: 120 },
-        shapeId: { type: "string", trim: true, minLength: 1 },
+        projectId: API_QUERY_RULES.projectId,
+        shapeId: API_QUERY_RULES.shapeId,
       },
     },
     responseSchemas: {
@@ -1336,11 +1255,9 @@ export function parseApiTargetQuery(request: Request):
   | { ok: true; projectId: string; shapeId: string }
   | { ok: false; error: "invalid_project_id" | "invalid_shape_id" } {
   const params = new URL(request.url).searchParams;
-  const requestedProject = params.get("projectId")?.trim() ?? "";
-  if (!requestedProject || requestedProject.length > 120 || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(requestedProject)) {
-    return { ok: false, error: "invalid_project_id" };
-  }
-  const shapeId = params.get("shapeId")?.trim();
+  const requestedProject = readApiQueryValue(params.get("projectId") ?? "", API_QUERY_RULES.projectId);
+  if (!requestedProject) return { ok: false, error: "invalid_project_id" };
+  const shapeId = readApiQueryValue(params.get("shapeId") ?? "", API_QUERY_RULES.shapeId);
   if (!shapeId) return { ok: false, error: "invalid_shape_id" };
   return { ok: true, projectId: requestedProject, shapeId };
 }

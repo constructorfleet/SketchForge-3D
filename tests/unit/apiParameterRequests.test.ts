@@ -1,127 +1,62 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { API_V1_OPERATIONS, validateApiV1Schema, type ApiV1FieldSchema } from "@/lib/apiV1OperationContract";
-import {
-  API_CONFIGURATION_NAME_MAX_LENGTH,
-  API_PARAMETER_EXPRESSION_MAX_LENGTH,
-  API_PARAMETER_NAME_MAX_LENGTH,
-  apiParameterName,
-  isApiConfigurationActivateRequest,
-  isApiConfigurationChangeRequest,
-  isApiConfigurationCreateRequest,
-  isApiParameterChangeRequest,
-  isApiParameterCreateRequest,
-} from "@constructorfleet/sketchforge-engine/apiParameters";
-import { apiConfigurationName } from "@constructorfleet/sketchforge-engine/apiParameters";
-import { API_CONSTRAINT_ID_MAX_LENGTH, apiConstraintId, isApiSketchConstraintBindRequest } from "@constructorfleet/sketchforge-engine/apiSketchConstraints";
+import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
+import { API_ERROR_CODES, API_PARAMETER_DIMENSIONS, API_QUERY_RULES, API_REQUEST_BODIES, API_REQUEST_FIELDS } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
 
-/** The routes validate with the engine's checks; the published schema has to say the same thing. */
-function schemaFor(key: string) {
-  const operation = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key);
-  const body = operation?.requestBody as { schema?: ApiV1FieldSchema } | undefined;
-  if (!body?.schema) throw new Error(`${key} has no request schema.`);
-  return body.schema;
+/** The engine checks run the request definitions; the contract has to publish those same objects. */
+function operation(operationId: string) {
+  const found = API_V1_OPERATIONS.find((item) => item.operationId === operationId);
+  if (!found) throw new Error(`No operation ${operationId}.`);
+  return found;
 }
 
-const long = "x".repeat(API_PARAMETER_EXPRESSION_MAX_LENGTH);
-const bodies: unknown[] = [
-  {},
-  { name: "wall" },
-  { name: "" },
-  { name: "x".repeat(API_PARAMETER_NAME_MAX_LENGTH) },
-  { name: "x".repeat(API_PARAMETER_NAME_MAX_LENGTH + 1) },
-  { name: 5 },
-  { name: "wall", expression: "2" },
-  { name: "wall", expression: "2", dimension: "length" },
-  { name: "wall", expression: "2", dimension: "angle", extra: true },
-  { name: "wall", expression: "", dimension: "length" },
-  { name: "wall", expression: "   ", dimension: "unitless" },
-  { name: "wall", expression: long, dimension: "unitless" },
-  { name: "wall", expression: `${long}1`, dimension: "unitless" },
-  { name: "wall", expression: "2", dimension: "bogus" },
-  { name: "wall", expression: null, dimension: "length" },
-  { expression: "2" },
-  { expression: "" },
-  { dimension: "angle" },
-  { dimension: "bogus" },
-  { expression: "2", dimension: "length" },
-  { expression: "2", other: 1 },
-];
-
-describe("parameter request checks", () => {
-  it("agree with the published POST and PATCH schemas", () => {
-    const create = schemaFor("POST /api/v1/parameters");
-    const change = schemaFor("PATCH /api/v1/parameters");
-    for (const body of bodies) {
-      expect(isApiParameterCreateRequest(body), `POST ${JSON.stringify(body).slice(0, 80)}`).toBe(validateApiV1Schema(body, create));
-      expect(isApiParameterChangeRequest(body), `PATCH ${JSON.stringify(body).slice(0, 80)}`).toBe(validateApiV1Schema(body, change));
+describe("request definitions", () => {
+  it("are the request schemas the contract publishes", () => {
+    for (const [operationId, definition] of Object.entries(API_REQUEST_BODIES)) {
+      const body = operation(operationId).requestBody as { schema?: unknown } | undefined;
+      expect(body?.schema, operationId).toBe(definition);
     }
   });
 
-  it("trims a query name and bounds its length as the contract does", () => {
-    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === "PATCH /api/v1/parameters")!.query!.properties.name as { minLength: number; maxLength: number };
-    expect(rule.maxLength).toBe(API_PARAMETER_NAME_MAX_LENGTH);
-    expect(apiParameterName(" wall ")).toBe("wall");
-    expect(apiParameterName("   ")).toBeUndefined();
-    expect(apiParameterName("x".repeat(rule.maxLength + 1))).toBeUndefined();
-  });
-
-  it("agree with the published sketch constraint body schema and constraintId rule", () => {
-    const key = "PATCH /api/v1/sketch-constraints";
-    const schema = schemaFor(key);
-    for (const body of [...bodies, { expression: null }, { expression: null, other: 1 }, { expression: 5 }, { expression: "w", name: "x" }]) {
-      expect(isApiSketchConstraintBindRequest(body), `${key} ${JSON.stringify(body).slice(0, 80)}`).toBe(validateApiV1Schema(body, schema));
-    }
-    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === key)!.query!.properties.constraintId as { maxLength: number };
-    expect(rule.maxLength).toBe(API_CONSTRAINT_ID_MAX_LENGTH);
-    expect(apiConstraintId(" width ")).toBe("width");
-    expect(apiConstraintId(" ")).toBeUndefined();
-    expect(apiConstraintId("x".repeat(rule.maxLength + 1))).toBeUndefined();
-  });
-
-  it("agree with the published configuration schemas", () => {
-    const create = schemaFor("POST /api/v1/parameter-configurations");
-    const change = schemaFor("PATCH /api/v1/parameter-configurations");
-    const activate = schemaFor("POST /api/v1/parameter-configurations/activate");
-    const configurationBodies: unknown[] = [
-      ...bodies,
-      [],
-      null,
-      { name: "x".repeat(API_CONFIGURATION_NAME_MAX_LENGTH) },
-      { name: "x".repeat(API_CONFIGURATION_NAME_MAX_LENGTH + 1) },
-      { name: null },
-      { name: "Large", overrides: {} },
-      { name: "Large", overrides: { wall: "4" } },
-      { name: "Large", overrides: { wall: 4 } },
-      { name: "Large", overrides: { wall: " " } },
-      { name: "Large", overrides: ["wall"] },
-      { name: "Large", overrides: null },
-      { name: "Large", extra: 1 },
-      { parameter: "wall", expression: "4" },
-      { parameter: "wall", expression: null },
-      { parameter: "wall", expression: " " },
-      { parameter: "wall", expression: 4 },
-      { parameter: "wall" },
-      { parameter: "", expression: "4" },
-      { parameter: "x".repeat(API_PARAMETER_NAME_MAX_LENGTH + 1), expression: "4" },
-      { parameter: "wall", expression: "4", name: "Large" },
-      { expression: "4" },
-    ];
-    for (const body of configurationBodies) {
-      const label = JSON.stringify(body)?.slice(0, 80);
-      expect(isApiConfigurationCreateRequest(body), `POST ${label}`).toBe(validateApiV1Schema(body, create));
-      expect(isApiConfigurationChangeRequest(body), `PATCH ${label}`).toBe(validateApiV1Schema(body, change));
-      expect(isApiConfigurationActivateRequest(body), `activate ${label}`).toBe(validateApiV1Schema(body, activate));
+  it("are the query rules the contract publishes", () => {
+    const rules = (operationId: string) => operation(operationId).query!.properties;
+    expect(rules("updateParameter").name).toBe(API_QUERY_RULES.parameterName);
+    expect(rules("deleteParameter").name).toBe(API_QUERY_RULES.parameterName);
+    expect(rules("updateParameterConfiguration").name).toBe(API_QUERY_RULES.configurationName);
+    expect(rules("deleteParameterConfiguration").name).toBe(API_QUERY_RULES.configurationName);
+    expect(rules("bindSketchConstraint").constraintId).toBe(API_QUERY_RULES.constraintId);
+    expect(rules("bindSketchConstraint").shapeId).toBe(API_QUERY_RULES.shapeId);
+    for (const item of API_V1_OPERATIONS) {
+      for (const name of ["projectId", "shapeId"] as const) {
+        const published = item.query?.properties[name];
+        if (!published) continue;
+        const { description: _description, ...rule } = published;
+        expect(rule, `${item.operationId} ${name}`).toEqual(API_QUERY_RULES[name]);
+      }
     }
   });
 
-  it("reads a configuration ?name= as the contract does: untrimmed, 1 to 100 characters", () => {
-    const rule = API_V1_OPERATIONS.find((item) => `${item.method} ${item.path}` === "PATCH /api/v1/parameter-configurations")!.query!.properties.name as { minLength: number; maxLength: number; trim?: boolean };
-    expect(rule.maxLength).toBe(API_CONFIGURATION_NAME_MAX_LENGTH);
-    expect(rule.trim).toBeUndefined();
-    expect(apiConfigurationName("big")).toBe("big");
-    expect(apiConfigurationName(" big ")).toBe(" big ");
-    expect(apiConfigurationName("")).toBeUndefined();
-    expect(apiConfigurationName("x".repeat(rule.maxLength))).toBe("x".repeat(rule.maxLength));
-    expect(apiConfigurationName("x".repeat(rule.maxLength + 1))).toBeUndefined();
+  it("are not restated in the contract source", () => {
+    // Equal copies pass the checks above; only the source shows they are copies.
+    const source = readFileSync(path.resolve(__dirname, "../../apps/web/src/lib/apiV1OperationContract.ts"), "utf8");
+    expect(source.match(/\btrim: true\b/g) ?? []).toEqual([]);
+  });
+
+  it("are frozen all the way down, so no importer can change a rule for the others", () => {
+    const unfrozen: string[] = [];
+    const visit = (value: unknown, at: string) => {
+      if (!value || typeof value !== "object") return;
+      if (!Object.isFrozen(value)) unfrozen.push(at);
+      for (const [key, child] of Object.entries(value)) visit(child, `${at}.${key}`);
+    };
+    const definitions = { API_ERROR_CODES, API_PARAMETER_DIMENSIONS, API_QUERY_RULES, API_REQUEST_BODIES, API_REQUEST_FIELDS };
+    for (const [name, value] of Object.entries(definitions)) visit(value, name);
+    expect(unfrozen).toEqual([]);
+  });
+
+  it("supply the error codes the contract publishes", () => {
+    const errorSchema = operation("createParameter").responseSchemas![401] as { properties: { code: { enum: unknown } } };
+    expect(errorSchema.properties.code.enum).toBe(API_ERROR_CODES);
   });
 });
