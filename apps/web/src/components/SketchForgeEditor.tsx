@@ -176,7 +176,8 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { hostProjectSync, hostSyncCancelsPendingPublish, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { createEditorPublisher } from "@/lib/editorPublish";
+import { mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
 import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, draftConstraintConflict, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
 import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
@@ -5545,15 +5546,34 @@ export function SketchForgeEditor({
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
   const sketchImageInputRef = useRef<HTMLInputElement | null>(null);
   const booleanAutomationRunRef = useRef<string | null>(null);
-  const projectHydratingRef = useRef(false);
   const projectInteractionActiveRef = useRef(false);
-  const pendingProjectShapesRef = useRef<WorkplaneShape[] | null>(null);
-  const projectSyncTimerRef = useRef<number | null>(null);
-  // The publish the timer holds, kept so a project switch can send it early.
-  const pendingPublishRef = useRef<{ projectId: string; publish: () => void } | null>(null);
-  const lastProjectShapesSyncRef = useRef("");
-  const lastProjectShapesEchoRef = useRef<string | null>(null);
-  const lastProjectIdRef = useRef<string | null>(null);
+  const onProjectShapesChangeRef = useRef(onProjectShapesChange);
+  onProjectShapesChangeRef.current = onProjectShapesChange;
+  // Owns the pending publish and how host props are taken; this component only forwards events.
+  const [publisher] = useState(() => createEditorPublisher({
+    initialTable: { parameters: initialParameters, configuration: initialConfiguration },
+    host: {
+      enabled: () => Boolean(onProjectShapesChangeRef.current),
+      table: () => ({ parameters: projectParametersRef.current, configuration: projectConfigurationRef.current }),
+      currentShapes: () => shapesRef.current,
+      send: (targetProjectId, nextShapes) => onProjectShapesChangeRef.current?.({
+        projectId: targetProjectId,
+        shapes: nextShapes,
+        history: historyRef.current,
+        historyIndex: historyIndexRef.current,
+        assets: projectAssetsRef.current,
+        parameters: projectParametersRef.current,
+        configuration: projectConfigurationRef.current,
+        projectName: projectInfoRef.current.projectName,
+        projectCreatedAt: projectInfoRef.current.projectCreatedAt,
+        workspace: workspaceSettingsRef.current,
+        snapGrid: snapGridRef.current,
+        placementElevation: placementElevationRef.current,
+        placementWorkplane: placementWorkplaneRef.current,
+        sketchPlacementWorkplane: placementWorkplaneRef.current,
+      }),
+    },
+  }));
   const projectSnapshotRunRef = useRef(0);
   const lastProjectSnapshotRef = useRef<ProjectThumbnailSceneKey | null>(null);
   const shapesRef = useRef(shapes);
@@ -5562,8 +5582,6 @@ export function SketchForgeEditor({
   const projectParametersRef = useRef(initialParameters);
   const projectConfigurationRef = useRef(initialConfiguration);
   const [projectParameters, setProjectParameters] = useState(initialParameters);
-  // The table and configurations the host last passed or was sent. An equal host prop is not a remote change.
-  const hostParametersKeyRef = useRef(parameterStateKey(initialParameters, initialConfiguration));
   const [parameterEditPending, setParameterEditPending] = useState(false);
   const parameterEditPendingRef = useRef(false);
   const adoptProjectParameters = useCallback((parameters: ProjectParameter[]) => {
@@ -6077,7 +6095,7 @@ export function SketchForgeEditor({
       return;
     }
     const sceneKey = { projectId, fingerprint: projectShapesFingerprint(shapes) };
-    if (lastProjectSnapshotRef.current?.projectId !== projectId || projectHydratingRef.current) {
+    if (lastProjectSnapshotRef.current?.projectId !== projectId || publisher.isHydrating()) {
       lastProjectSnapshotRef.current = sceneKey;
       return;
     }
@@ -6146,7 +6164,7 @@ export function SketchForgeEditor({
       if (retryTimer !== null) window.clearTimeout(retryTimer);
       if (idleId !== null && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
     };
-  }, [onProjectSnapshot, projectId, projectInteractionActive, shapes]);
+  }, [onProjectSnapshot, projectId, projectInteractionActive, publisher, shapes]);
 
   useEffect(() => {
     if (selectedShapes.length < 2) {
@@ -6164,67 +6182,10 @@ export function SketchForgeEditor({
     }
   }, [alignAnchorId, selectedIds, selectedShapes.length]);
 
-  const syncProjectShapes = useCallback(
-    (nextShapes: WorkplaneShape[], force = false, immediate = false) => {
-      if (!projectId || !onProjectShapesChange) {
-        return;
-      }
-      if (projectInteractionActiveRef.current) {
-        pendingProjectShapesRef.current = nextShapes;
-        if (projectSyncTimerRef.current !== null) {
-          window.clearTimeout(projectSyncTimerRef.current);
-          projectSyncTimerRef.current = null;
-        }
-        return;
-      }
-      const canonicalNext = nextShapes.map(canonicalizeShape);
-      const serialized = projectShapesFingerprint(canonicalNext);
-      if (!force && lastProjectShapesSyncRef.current === serialized) {
-        return;
-      }
-      if (projectSyncTimerRef.current !== null) {
-        window.clearTimeout(projectSyncTimerRef.current);
-      }
-      const publish = () => {
-        projectSyncTimerRef.current = null;
-        pendingPublishRef.current = null;
-        lastProjectShapesSyncRef.current = serialized;
-        lastProjectShapesEchoRef.current = serialized;
-        hostParametersKeyRef.current = parameterStateKey(projectParametersRef.current, projectConfigurationRef.current);
-        onProjectShapesChange({
-          projectId,
-          shapes: canonicalNext,
-          history: historyRef.current,
-          historyIndex: historyIndexRef.current,
-          assets: projectAssetsRef.current,
-          parameters: projectParametersRef.current,
-          configuration: projectConfigurationRef.current,
-          projectName: projectInfoRef.current.projectName,
-          projectCreatedAt: projectInfoRef.current.projectCreatedAt,
-          workspace: workspaceSettingsRef.current,
-          snapGrid: snapGridRef.current,
-          placementElevation: placementElevationRef.current,
-          placementWorkplane: placementWorkplaneRef.current,
-          sketchPlacementWorkplane: placementWorkplaneRef.current,
-        });
-      };
-      if (immediate) publish();
-      else {
-        projectSyncTimerRef.current = window.setTimeout(publish, 120);
-        pendingPublishRef.current = { projectId, publish };
-      }
-    },
-    [onProjectShapesChange, projectId],
-  );
-
-  // A layout effect runs before the passive effects that load the next project into these refs.
+  // Runs before the passive effects that load the next project into the refs a publish reads.
   useLayoutEffect(() => {
-    const pending = pendingPublishRef.current;
-    if (!projectId || !pending || pending.projectId === projectId || projectSyncTimerRef.current === null) return;
-    // Saves the project being left under its own id; the host refuses it if deleted (#668).
-    window.clearTimeout(projectSyncTimerRef.current);
-    pending.publish();
-  }, [projectId]);
+    publisher.projectChanged(projectId ?? null);
+  }, [projectId, publisher]);
 
   useEffect(() => {
     const limitChanged = historyLimitRef.current !== workspaceSettings.historyLimit;
@@ -6240,8 +6201,8 @@ export function SketchForgeEditor({
       setHistory(bounded.entries);
       setHistoryIndex(bounded.index);
     }
-    if (limitChanged) syncProjectShapes(shapesRef.current, true);
-  }, [syncProjectShapes, workspaceSettings.historyLimit]);
+    if (limitChanged) publisher.localEdit(shapesRef.current, { force: true });
+  }, [publisher, workspaceSettings.historyLimit]);
 
   const appendHistoryEntry = useCallback((entry: EditorHistoryEntry) => {
     const result = appendEditorHistorySnapshot(
@@ -6282,23 +6243,10 @@ export function SketchForgeEditor({
     appendHistoryEntry(entry);
   }, [appendHistoryEntry]);
 
-  useEffect(() => {
-    if (projectInteractionActive || !pendingProjectShapesRef.current) {
-      return;
-    }
-    pendingProjectShapesRef.current = null;
-    const timer = window.setTimeout(() => syncProjectShapes(shapesRef.current), 180);
-    return () => window.clearTimeout(timer);
-  }, [projectInteractionActive, syncProjectShapes]);
-
   const updateProjectInteractionActive = useCallback(
     (active: boolean) => {
       if (active) {
-        if (projectSyncTimerRef.current !== null) {
-          window.clearTimeout(projectSyncTimerRef.current);
-          projectSyncTimerRef.current = null;
-          pendingProjectShapesRef.current = shapesRef.current;
-        }
+        publisher.interactionStarted();
         if (interactionHistoryTimerRef.current !== null) {
           window.clearTimeout(interactionHistoryTimerRef.current);
           interactionHistoryTimerRef.current = null;
@@ -6314,6 +6262,7 @@ export function SketchForgeEditor({
       }
 
       projectInteractionActiveRef.current = false;
+      publisher.interactionEnded();
       setProjectInteractionActive((current) => (current ? false : current));
       if (interactionHistoryTimerRef.current !== null) {
         window.clearTimeout(interactionHistoryTimerRef.current);
@@ -6323,7 +6272,7 @@ export function SketchForgeEditor({
         finalizeInteractionHistory();
       }, 0);
     },
-    [finalizeInteractionHistory],
+    [finalizeInteractionHistory, publisher],
   );
 
   const cameraOrientationRef = useRef<CameraOrientation>(DEFAULT_CAMERA_ORIENTATION);
@@ -6348,7 +6297,7 @@ export function SketchForgeEditor({
       if (next === shapesRef.current) return;
       interactionHistoryChangedRef.current = true;
       shapesRef.current = next;
-      pendingProjectShapesRef.current = next;
+      publisher.localEdit(next);
       setShapes(next);
       setNotice(notice((t) => t("editor.notice.movedSelection")));
     },
@@ -6361,10 +6310,9 @@ export function SketchForgeEditor({
       // Unlike pointer updates, keyboard moves update shapesRef synchronously.
       // Commit before another tap/shortcut or navigation can observe the scene.
       finalizeInteractionHistory();
-      pendingProjectShapesRef.current = null;
-      syncProjectShapes(shapesRef.current, false, true);
+      publisher.publishInteraction();
     },
-  }), [finalizeInteractionHistory, syncProjectShapes, t, updateProjectInteractionActive]);
+  }), [finalizeInteractionHistory, publisher, t, updateProjectInteractionActive]);
 
   useEffect(() => {
     const keyUp = (event: KeyboardEvent) => keyboardMovement.keyUp(event.key);
@@ -6449,10 +6397,10 @@ export function SketchForgeEditor({
         setNotice(message);
       }
       if (changed) {
-        syncProjectShapes(canonicalNext);
+        publisher.localEdit(canonicalNext);
       }
     },
-    [appendHistorySnapshot, selectedIds, syncProjectShapes],
+    [appendHistorySnapshot, publisher, selectedIds],
   );
 
   const removeEdgeTreatment = useCallback(async (optionId: string) => {
@@ -7284,26 +7232,15 @@ export function SketchForgeEditor({
   }, [runFinishSketch]);
 
   useEffect(() => {
-    if (!projectId) {
-      lastProjectIdRef.current = null;
-      lastProjectShapesSyncRef.current = "";
-      lastProjectShapesEchoRef.current = null;
-      // The publish names the old project, which may be deleted (#665).
-      if (projectSyncTimerRef.current !== null) {
-        window.clearTimeout(projectSyncTimerRef.current);
-        projectSyncTimerRef.current = null;
-      }
-      pendingProjectShapesRef.current = null;
-      return;
-    }
-    if (projectInteractionActiveRef.current) {
-      return;
-    }
-    const projectChanged = lastProjectIdRef.current !== projectId;
-    if (projectChanged) {
-      lastProjectIdRef.current = projectId;
-      lastProjectShapesSyncRef.current = "";
-      lastProjectShapesEchoRef.current = null;
+    const decision = publisher.hostProps({
+      projectId: projectId ?? null,
+      shapes: initialShapes,
+      parameters: initialParameters,
+      configuration: initialConfiguration,
+      currentShapes: shapes,
+    });
+    if (decision.action === "ignored") return;
+    if (decision.projectChanged) {
       const nextAssets = dedupeProjectAssets(initialAssets);
       projectAssetsRef.current = nextAssets;
       setProjectAssets(nextAssets);
@@ -7311,34 +7248,13 @@ export function SketchForgeEditor({
       setPlacementElevation(nextPlacementElevation);
       setPlacementWorkplane(normalizePlacementWorkplane(initialPlacementWorkplane, nextPlacementElevation));
     }
-    const incoming = initialShapes.map(canonicalizeShape);
-    const incomingSerialized = projectShapesFingerprint(incoming);
-    const hostParametersKey = parameterStateKey(initialParameters, initialConfiguration);
-    const sync = hostProjectSync({
-      projectChanged,
-      hostTableKey: hostParametersKey,
-      knownTableKey: hostParametersKeyRef.current,
-      incomingShapesKey: incomingSerialized,
-      echoShapesKey: lastProjectShapesEchoRef.current,
-      syncedShapesKey: lastProjectShapesSyncRef.current,
-      currentShapesKey: projectShapesFingerprint(shapes),
-    });
-    if (sync.adoptTable) {
-      hostParametersKeyRef.current = hostParametersKey;
+    if (decision.adoptTable) {
       adoptProjectParameters(initialParameters);
       adoptProjectConfiguration(initialConfiguration);
     }
-    // The parent echoes shapes after a local save; rehydrating that echo can reset active transform state.
-    if (sync.action === "echo") {
-      lastProjectShapesSyncRef.current = incomingSerialized;
-      return;
-    }
-    lastProjectShapesSyncRef.current = incomingSerialized;
-    if (hostSyncCancelsPendingPublish(sync) && projectSyncTimerRef.current !== null) {
-      window.clearTimeout(projectSyncTimerRef.current);
-      projectSyncTimerRef.current = null;
-    }
-    if (sync.action === "unchanged") return;
+    // An echo of a local save is not rehydrated; that would reset active transform state.
+    if (decision.action !== "hydrate") return;
+    const incoming = decision.shapes;
     const hydratedHistory = hydrateEditorHistoryState(
       incoming,
       initialHistory,
@@ -7347,7 +7263,6 @@ export function SketchForgeEditor({
       projectParametersRef.current,
       projectConfigurationRef.current,
     );
-    projectHydratingRef.current = true;
     shapesRef.current = incoming;
     selectedIdsRef.current = [];
     historyRef.current = hydratedHistory.entries;
@@ -7357,33 +7272,22 @@ export function SketchForgeEditor({
     setHistory(hydratedHistory.entries);
     setHistoryIndex(hydratedHistory.index);
     setNotice(null);
-  }, [adoptProjectConfiguration, adoptProjectParameters, initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, initialAssets, initialConfiguration, initialHistory, initialHistoryIndex, initialParameters, initialPlacementElevation, initialPlacementWorkplane, initialShapes, projectId, projectRevision, publisher]);
 
   useEffect(() => {
-    if (!projectId || !onProjectShapesChange) {
-      return;
-    }
-    if (projectHydratingRef.current) {
-      projectHydratingRef.current = false;
-      return;
-    }
-    syncProjectShapes(shapes);
-  }, [onProjectShapesChange, projectId, shapes, syncProjectShapes]);
+    publisher.shapesRendered(shapes);
+  }, [onProjectShapesChange, projectId, publisher, shapes]);
 
   useEffect(() => {
     return () => {
-      if (projectSyncTimerRef.current !== null) {
-        window.clearTimeout(projectSyncTimerRef.current);
-        // The host unmounts the editor while it loads an uncached project (#668).
-        pendingPublishRef.current?.publish();
-      }
+      publisher.unmount();
       if (interactionHistoryTimerRef.current !== null) {
         window.clearTimeout(interactionHistoryTimerRef.current);
       }
       sketchRevolveUpdateTimerRef.current.forEach((timer) => window.clearTimeout(timer));
       sketchRevolveUpdateTimerRef.current.clear();
     };
-  }, []);
+  }, [publisher]);
 
   /**
    * Drop a ready-made thread on the workplane.
@@ -7727,9 +7631,9 @@ export function SketchForgeEditor({
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes, true); // Forced: a table-only step leaves the shapes fingerprint unchanged.
+    publisher.localEdit(nextShapes, { force: true }); // A table-only step leaves the shapes fingerprint unchanged.
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.undone")}` : t("editor.notice.undone")));
-  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, publisher, t]);
 
   const redo = useCallback(() => {
     if (projectInteractionActiveRef.current) {
@@ -7755,9 +7659,9 @@ export function SketchForgeEditor({
     setHistoryIndex(nextIndex);
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
-    syncProjectShapes(nextShapes, true);
+    publisher.localEdit(nextShapes, { force: true });
     setNotice(notice((t) => modifierCancelled ? `${t("editor.edgeModifier.cancelled")} · ${t("editor.notice.redone")}` : t("editor.notice.redone")));
-  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, syncProjectShapes, t]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, invalidateCadModifierSession, publisher, t]);
 
   /** Commits a table edit and its geometry recompute as one history entry. Resolves to the refusal, if any. */
   const applyParameterEdit = useCallback(async (edit: ParameterEdit): Promise<ParameterMessage | null> => {
@@ -7821,11 +7725,11 @@ export function SketchForgeEditor({
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
     // Forced: a table-only edit leaves the shapes fingerprint unchanged.
-    if (appendHistorySnapshot(nextShapes, nextSelection)) syncProjectShapes(nextShapes, true, true);
+    if (appendHistorySnapshot(nextShapes, nextSelection)) publisher.localEdit(nextShapes, { force: true, immediate: true });
     const committed = parameterEditNotice(edit);
     setNotice(notice((t) => t(committed.key, committed.values)));
     return null;
-  }, [adoptProjectConfiguration, adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
+  }, [adoptProjectConfiguration, adoptProjectParameters, appendHistorySnapshot, invalidateCadModifierSession, publisher]);
 
   /**
    * Binds or unbinds one shape field as one history entry, through the engine on the server.
@@ -7875,10 +7779,10 @@ export function SketchForgeEditor({
     selectedIdsRef.current = nextSelection;
     setShapes(nextShapes);
     setSelectedIds(nextSelection);
-    if (appendHistorySnapshot(nextShapes, nextSelection)) syncProjectShapes(nextShapes);
+    if (appendHistorySnapshot(nextShapes, nextSelection)) publisher.localEdit(nextShapes);
     if (expression !== null) setNotice(notice((t) => t("editor.expressionField.notice.bound", { expression })));
     return null;
-  }, [appendHistorySnapshot, invalidateCadModifierSession, syncProjectShapes]);
+  }, [appendHistorySnapshot, invalidateCadModifierSession, publisher]);
 
   /** Drops a binding inside the current interaction, so a typed literal and its unbind are one history entry. */
   const releaseShapeBinding = useCallback((shapeId: string, field: string) => {
