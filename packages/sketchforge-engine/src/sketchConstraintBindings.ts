@@ -12,7 +12,7 @@ import {
   type ExpressionError,
   type ExpressionQuantity,
 } from "./parameterExpressions.js";
-import { GROUP_SIZE_FIELDS, nestedRefitFields, parameterScope } from "./expressionBindings.js";
+import { parameterScope } from "./expressionBindings.js";
 import type { ProjectParameter, ProjectParameterDimension, SketchConstraint, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 
 export type BindableSketchConstraint = Extract<SketchConstraint, { expression?: string }>;
@@ -131,18 +131,10 @@ export function withSketchConstraintValues(
 }
 
 /**
- * Reports whether a profile edit can rebuild `shape`. A nested output is reached only by its source ID,
- * and a shell cannot be replayed from the recipe.
- */
-export function rebuildableSketch(shape: WorkplaneShape, topLevel: boolean): boolean {
-  return Boolean(shape.sketchProfile && shape.sketchOperation && !shape.shell && (shape.sketchSourceId || topLevel));
-}
-
-/**
  * Visits every shape with a sketch profile, pre-order, then its treatment `before` snapshots,
  * since reverting a treatment restores one. Rename walks the same set.
  */
-function visitSketches(
+export function visitSketches(
   shapes: readonly WorkplaneShape[],
   visit: (shape: WorkplaneShape, topLevel: boolean, ancestors: readonly WorkplaneShape[]) => void,
 ) {
@@ -155,80 +147,6 @@ function visitSketches(
   shapes.forEach((shape) => walk(shape, []));
 }
 
-/** Refuses a binding whose sketch no profile edit can rebuild. */
-export function sketchNotRebuildable(shapeId: string, constraintId: string): SketchConstraintBindingError {
-  return { code: "sketchNotRebuildable", shapeId, constraintId, message: `The sketch on ${shapeId} has no rebuild recipe, so its constraints cannot bind.` };
-}
-
-/**
- * Lists the size fields a sketch output's profile determines. Binding one rescales the
- * solved profile, so it conflicts with constraint bindings. Extrusion height is not in the profile.
- */
-export function profileSizeFields(shape: WorkplaneShape): readonly string[] {
-  if (!shape.sketchProfile) return [];
-  return shape.sketchOperation === "extrude" ? ["width", "depth"] : ["width", "depth", "height"];
-}
-
-/** Lists the bound profile size fields on `shape`. */
-export function boundProfileSizeFields(shape: WorkplaneShape): string[] {
-  return profileSizeFields(shape).filter((field) => typeof shape.expressions?.[field] === "string");
-}
-
-/** Refuses a constraint binding on an output whose profile size is already bound. */
-export function conflictingConstraintBinding(shape: WorkplaneShape, constraintId: string): SketchConstraintBindingError | undefined {
-  const fields = boundProfileSizeFields(shape);
-  if (!fields.length) return undefined;
-  return {
-    code: "conflictingBinding",
-    shapeId: shape.id,
-    constraintId,
-    fields,
-    message: `${constraintId} cannot bind: ${fields.join(", ")} on ${shape.id} is bound and rescales the sketch. Clear one binding first.`,
-  };
-}
-
-/** Lists bound size fields on a group. A refit around its children rewrites them. */
-export function boundGroupSizeFields(shape: WorkplaneShape): string[] {
-  if (!shape.groupedShapes?.length) return [];
-  return GROUP_SIZE_FIELDS.filter((field) => typeof shape.expressions?.[field] === "string");
-}
-
-/** Lists the bindings below `group` that rebuild a child, and so refit the group. */
-export function groupRefitBindings(group: WorkplaneShape): { constraintIds: string[]; fields: string[] } {
-  const constraintIds: string[] = [];
-  const walk = (shape: WorkplaneShape) => {
-    boundSketchConstraints(shape).forEach(({ constraint }) => constraintIds.push(constraint.id));
-    shape.groupedShapes?.forEach(walk);
-  };
-  group.groupedShapes?.forEach(walk);
-  return { constraintIds, fields: nestedRefitFields(group) };
-}
-
-/** Lists bound size fields on the groups that hold `shapeId`. */
-export function boundAncestorSizeFields(roots: readonly WorkplaneShape[], shapeId: string): string[] {
-  const search = (shapes: readonly WorkplaneShape[], ancestors: readonly WorkplaneShape[]): readonly WorkplaneShape[] | undefined => {
-    for (const shape of shapes) {
-      if (shape.id === shapeId) return ancestors;
-      const found = search(shape.groupedShapes ?? [], [...ancestors, shape]);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  return [...new Set((search(roots, []) ?? []).flatMap(boundGroupSizeFields))];
-}
-
-/** Refuses a constraint binding inside a group whose size is bound: the re-solve would refit that size. */
-export function conflictingGroupSizeBinding(shapeId: string, constraintId: string, fields: readonly string[]): SketchConstraintBindingError | undefined {
-  if (!fields.length) return undefined;
-  return {
-    code: "conflictingBinding",
-    shapeId,
-    constraintId,
-    fields,
-    message: `${constraintId} cannot bind: ${fields.join(", ")} is bound on a group that holds ${shapeId}, and a re-solve would refit that group. Clear one binding first.`,
-  };
-}
-
 /** Yields each bound constraint of `shape`'s profile. */
 export function boundSketchConstraints(shape: WorkplaneShape): Array<{ constraint: BindableSketchConstraint; expression: string }> {
   return (shape.sketchProfile?.constraints ?? []).flatMap((constraint) => {
@@ -237,36 +155,19 @@ export function boundSketchConstraints(shape: WorkplaneShape): Array<{ constrain
   });
 }
 
-/** Lists constraint bindings that do not resolve against `parameters`. Changes nothing. */
-export function sketchConstraintBindingIssues(
-  shapes: readonly WorkplaneShape[],
-  parameters: readonly ProjectParameter[],
-): SketchConstraintBindingIssue[] {
-  const scope = parameterScope(parameters);
-  const issues: SketchConstraintBindingIssue[] = [];
-  const seen = new Set<string>();
-  visitSketches(shapes, (shape, topLevel, ancestors) => {
-    const groupSizes = [...new Set(ancestors.flatMap(boundGroupSizeFields))];
-    for (const { constraint, expression } of boundSketchConstraints(shape)) {
-      // A snapshot shares its owner's ID, so one binding is reported once.
-      const key = JSON.stringify([shape.id, constraint.id, expression]);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (!rebuildableSketch(shape, topLevel)) {
-        issues.push(sketchNotRebuildable(shape.id, constraint.id));
-        continue;
-      }
-      const conflict = conflictingConstraintBinding(shape, constraint.id) ?? conflictingGroupSizeBinding(shape.id, constraint.id, groupSizes);
-      if (conflict) {
-        issues.push(conflict);
-        continue;
-      }
-      const result = resolveSketchConstraintBinding(shape.id, constraint, expression, scope);
-      if (!result.ok) issues.push(result.error);
-    }
-  });
-  return issues;
-}
+// Old import path for importers of the published package; the rules live in `bindingValidation`.
+export {
+  boundAncestorSizeFields,
+  boundGroupSizeFields,
+  boundProfileSizeFields,
+  conflictingConstraintBinding,
+  conflictingGroupSizeBinding,
+  groupRefitBindings,
+  profileSizeFields,
+  rebuildableSketch,
+  sketchConstraintBindingIssues,
+  sketchNotRebuildable,
+} from "./bindingValidation.js";
 
 export type SketchConstraintDependent = { readonly shapeId: string; readonly constraintIds: readonly string[] };
 

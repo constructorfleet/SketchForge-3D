@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { activateConfiguration, addConfiguration, resolveProjectParameters, type ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 import {
-  applyBindingsLocally,
   hostProjectSync,
   hostSyncCancelsPendingPublish,
   mergeRecomputedShapes,
@@ -12,6 +11,7 @@ import {
   planParameterEdit,
   recomputeScope,
 } from "@/lib/projectParameterEdits";
+import { applyKernelFreeBindings as applyBindingsLocally } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import type { ProjectConfiguration, WorkplaneShape } from "@/types/sketchforge";
 
 function table(entries: ProjectParameterInput[]) {

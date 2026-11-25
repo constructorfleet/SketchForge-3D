@@ -4,7 +4,8 @@ import { resolveProjectParameters, type ProjectParameterInput } from "@construct
 import type { WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { POST } from "@/app/api/editor/parameters/route";
 import { editorParameterRequest } from "@/lib/editorCadRequests";
-import { applyBindingsLocally, planParameterEdit, type ParameterEdit } from "@/lib/projectParameterEdits";
+import { planParameterEdit, type ParameterEdit } from "@/lib/projectParameterEdits";
+import { applyKernelFreeBindings as applyBindingsLocally } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 
 // The static build's fallback must give the engine's outcome, refusal or result, for the same input.
 

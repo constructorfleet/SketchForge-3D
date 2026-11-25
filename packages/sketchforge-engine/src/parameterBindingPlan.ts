@@ -1,15 +1,16 @@
 /**
  * Plans which bindings a parameter table change moves, with no CAD work.
  *
- * `Engine.updateParameter` and the editor's static-build fallback both run this,
- * so their refusals and resolved values cannot drift apart.
+ * `Engine.updateParameter` runs the plan; the editor's static build runs `applyKernelFreeBindings`,
+ * which applies the same plan. Their refusals and resolved values cannot drift apart.
  */
 
+import { rebuildableSketch } from "./bindingValidation.js";
 import { bindableField, boundFieldValue, resolveShapeBindings, type ShapeBindingError } from "./expressionBindings.js";
 import { expressionDependencies } from "./parameterExpressions.js";
+import { REQUESTABLE_SHAPE_KINDS, shapeWithRequestedChanges } from "./shapeRequests.js";
 import {
   boundSketchConstraints,
-  rebuildableSketch,
   resolveSketchConstraintBindings,
   sketchConstraintValue,
   withSketchConstraintValues,
@@ -162,4 +163,66 @@ export function planParameterBindings(
     };
   }
   return { ok: true, pending };
+}
+
+// Any of these means the shape's geometry comes from more than its own fields.
+const KERNEL_FIELDS = [
+  "importedMesh", "imagePlate", "sketchProfile", "sketchSourceId", "sketchRevolve", "draftPrismAngle", "faceDraft",
+  "edgeTreatments", "edgeTreatmentHistory", "shell", "cadBrep", "cadDisplayEdges", "groupedShapes", "stepAssembly", "stepComponent",
+  // A size change on these re-matches faces through the kernel.
+  "faceIds", "faceColors",
+] as const;
+
+/** Reports whether a shape's geometry follows from its own fields alone, with no kernel work. */
+export function plainPrimitive(shape: WorkplaneShape): boolean {
+  return (REQUESTABLE_SHAPE_KINDS as readonly string[]).includes(shape.kind)
+    && KERNEL_FIELDS.every((field) => shape[field] === undefined);
+}
+
+export type KernelFreeBindingFailure =
+  | ParameterBindingFailure
+  | {
+    reason: "binding_failed";
+    shapeId: string;
+    fields: string[];
+    failure: { reason: "unapplicable_fields"; kind: WorkplaneShape["kind"]; fields: string[]; because: "not_this_kind" };
+  };
+
+export type KernelFreeBindingResult =
+  | { ok: true; shapes: WorkplaneShape[] }
+  | { ok: false; failure: KernelFreeBindingFailure };
+
+/**
+ * Plans a table change and applies it with no kernel, when every shape it moves is a plain
+ * top-level primitive. Refuses as the engine does. Null when kernel work is needed.
+ */
+export function applyKernelFreeBindings(
+  shapes: readonly WorkplaneShape[],
+  previous: readonly ProjectParameter[],
+  next: readonly ProjectParameter[],
+): KernelFreeBindingResult | null {
+  const plan = planParameterBindings(shapes, previous, next);
+  if (!plan.ok) return { ok: false, failure: plan.failure };
+  let result = [...shapes];
+  for (const entry of plan.pending) {
+    const shape = result.find((candidate) => candidate.id === entry.id);
+    if (!entry.topLevel || !shape || entry.sketchProfile || !plainPrimitive(shape)) return null;
+    const fields = Object.keys(entry.values);
+    if (fields.some((field) => bindableField(shape, field)?.target !== "shape")) return null;
+    // The engine's own-field step for a plain primitive, refused the same way.
+    const changed = shapeWithRequestedChanges(shape, entry.values);
+    if (!changed.ok) {
+      return {
+        ok: false,
+        failure: {
+          reason: "binding_failed",
+          shapeId: entry.id,
+          fields,
+          failure: { reason: "unapplicable_fields", kind: shape.kind, fields: changed.unapplicable, because: "not_this_kind" },
+        },
+      };
+    }
+    result = result.map((candidate) => (candidate.id === entry.id ? changed.shape : candidate));
+  }
+  return { ok: true, shapes: result };
 }

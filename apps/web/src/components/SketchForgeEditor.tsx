@@ -176,11 +176,12 @@ import { exportMeshesTo3mf } from "@/lib/threeMfExport";
 import { importedShapeFromSvg, invalidSvgMeshError } from "@/lib/engine/svgImport";
 import { toSvgProjection, type SvgProjectionLayer } from "@/lib/svgExport";
 import { editorExportRequest, editorMeasureRequest, editorParameterRequest, type EditorSection } from "@/lib/editorCadRequests";
-import { applyBindingsLocally, hostProjectSync, hostSyncCancelsPendingPublish, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
+import { hostProjectSync, hostSyncCancelsPendingPublish, mergeRecomputedShapes, parameterEditFailureMessage, parameterEditNotice, parameterErrorMessage, parameterRecomputeResponseMessage, parameterStateKey, planParameterEdit, recomputeScope, type ParameterEdit, type ParameterEditFailure, type ParameterMessage } from "@/lib/projectParameterEdits";
 import { ProjectParametersPanel } from "@/components/ProjectParametersPanel";
-import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
+import { bindResponseMessage, bindScope, bindShapeFieldLocally, bindingFailureMessage, constraintBindingMessage, draftConstraintConflict, releaseEditedBindings, withRebuiltBindings, type EditorFieldBind } from "@/lib/expressionFields";
 import { withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
-import { conflictingConstraintBinding, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import { withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
+import { applyKernelFreeBindings } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import type { ShapeExpressionFields } from "@/components/workplane/ShapeInspector";
 import { toolbarDensityStyle, toolbarLayoutForWidth, toolbarMenuAnchor } from "@/lib/toolbarLayout";
 import { keyboardNudgeStep, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/engine/workplaneSettings";
@@ -7027,7 +7028,7 @@ export function SketchForgeEditor({
   /** Sets a dimensional constraint's value, binding it to `expression` or, with null, unbinding it. */
   const updateSketchConstraint = useCallback((constraintId: string, value: number, expression: string | null) => {
     const output = editingSketchShapeId ? shapesRef.current.find((shape) => shape.id === editingSketchShapeId) : undefined;
-    const conflict = expression !== null && output ? conflictingConstraintBinding(output, constraintId) : undefined;
+    const conflict = expression !== null && output ? draftConstraintConflict(output, constraintId, expression) : undefined;
     if (conflict) {
       const message = constraintBindingMessage(conflict);
       setNotice(notice((t) => t(message.key, message.values)));
@@ -7774,7 +7775,7 @@ export function SketchForgeEditor({
     };
     if (planned.recompute && STATIC_EXPORT_BUILD) {
       // No server: only plain primitive fields can follow, which needs no kernel.
-      const local = applyBindingsLocally(planned.project.shapes, startParameters, planned.project.parameters);
+      const local = applyKernelFreeBindings(planned.project.shapes, startParameters, planned.project.parameters);
       if (!local) return refuse(parameterEditFailureMessage(null, startShapes));
       if (!local.ok) return refuse(parameterEditFailureMessage(local.failure, startShapes));
       next = { ...planned.project, shapes: local.shapes };

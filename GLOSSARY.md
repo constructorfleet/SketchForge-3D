@@ -4,6 +4,10 @@ A local-first 3D design editor whose engine also serves a REST API and an MCP se
 
 ## Language
 
+**Binding validation**:
+The rules a new binding must pass before it is stored: the target's lock, where the binding may sit, the expression, and conflicts with bindings already in the tree. `validateBinding` in `packages/sketchforge-engine/src/bindingValidation.ts` holds them, and every bind path runs it. Stored bindings that break the same rules are reported as issues, not refused; they still load and recompute.
+_Avoid_: bind predicate, binding conflict check
+
 **Delete record**:
 The server's lasting note that a project was deleted, with the revisions it had then. While it exists, the dashboard cannot save the project again. The REST API does not read it.
 _Avoid_: tombstone (in prose)

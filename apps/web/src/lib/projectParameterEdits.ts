@@ -22,9 +22,8 @@ import {
   type ProjectParameterError,
   type ProjectParameterResult,
 } from "@constructorfleet/sketchforge-engine/projectParameters";
-import { bindableField, boundFieldValue, parameterShapeDependents, resolveShapeBindings, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
-import { REQUESTABLE_SHAPE_KINDS, shapeWithRequestedChanges } from "@constructorfleet/sketchforge-engine/shapeRequests";
-import { planParameterBindings } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
+import { parameterShapeDependents, withoutBindings } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { changedParameterNames } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import { boundSketchConstraints, parameterSketchConstraintDependents, withSketchConstraintValues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
 import { expressionDependencies, type ExpressionErrorCode } from "@constructorfleet/sketchforge-engine/parameterExpressions";
 import type { MessageKey } from "@/i18n/locales";
@@ -59,17 +58,6 @@ export type PlannedParameterEdit =
 
 /** `configuration` names the configuration a table error happened in; shown as a prefix. */
 export type ParameterMessage = { key: MessageKey; values: Record<string, string>; configuration?: string };
-
-/** Mirrors the engine's change test: `Object.is`, so an unresolved entry's NaN is not a change. */
-function changedNames(previous: readonly ProjectParameter[], next: readonly ProjectParameter[]) {
-  const before = new Map(previous.map((parameter) => [parameter.name, parameter]));
-  const after = new Map(next.map((parameter) => [parameter.name, parameter]));
-  return [...new Set([...before.keys(), ...after.keys()])].filter((name) => {
-    const left = before.get(name);
-    const right = after.get(name);
-    return !left || !right || !Object.is(left.value, right.value) || left.dimension !== right.dimension;
-  });
-}
 
 function releaseShapeBindings(shapes: readonly WorkplaneShape[], name: string): WorkplaneShape[] {
   const release = (shape: WorkplaneShape): WorkplaneShape => {
@@ -185,7 +173,7 @@ export function planParameterEdit(project: ParameterProject, edit: ParameterEdit
     parameterShapeDependents(shapes, name).length > 0 || parameterSketchConstraintDependents(shapes, name).length > 0;
   const recompute = edit.kind === "rename"
     ? edit.newName !== edit.name && bound(project.shapes, edit.newName)
-    : changedNames(project.parameters, next.parameters).some((name) => bound(next.shapes, name));
+    : [...changedParameterNames(project.parameters, next.parameters)].some((name) => bound(next.shapes, name));
   return { ok: true, project: next, recompute };
 }
 
@@ -405,7 +393,7 @@ export function recomputeScope(
   previous: readonly ProjectParameter[],
   next: readonly ProjectParameter[],
 ): WorkplaneShape[] {
-  const changed = new Set(changedNames(previous, next));
+  const changed = changedParameterNames(previous, next);
   const bound = shapes.filter((shape) => treeDependsOn(shape, changed));
   const sources = new Set(bound.flatMap((shape) => [...sketchSources(shape)]));
   return shapes.filter((shape) => bound.includes(shape) || [...sketchSources(shape)].some((source) => sources.has(source)));
@@ -430,59 +418,6 @@ export function parameterRecomputeResponseMessage(status: number, body: unknown,
   if (status === 400) return { key: "editor.parameters.error.requestRejected", values: {} };
   if (status === 422 && body && typeof body === "object") return { key: "editor.parameters.error.recomputeFailedGeneric", values: {} };
   return { key: "editor.parameters.error.serverError", values: {} };
-}
-
-// Any of these means the shape's geometry comes from more than its own fields.
-const KERNEL_FIELDS = [
-  "importedMesh", "imagePlate", "sketchProfile", "sketchSourceId", "sketchRevolve", "draftPrismAngle", "faceDraft",
-  "edgeTreatments", "edgeTreatmentHistory", "shell", "cadBrep", "cadDisplayEdges", "groupedShapes", "stepAssembly", "stepComponent",
-  // A size change on these re-matches faces through the kernel.
-  "faceIds", "faceColors",
-] as const;
-
-/** Reports whether a shape's geometry follows from its own fields alone, with no kernel work. */
-export function plainPrimitive(shape: WorkplaneShape) {
-  return (REQUESTABLE_SHAPE_KINDS as readonly string[]).includes(shape.kind)
-    && KERNEL_FIELDS.every((field) => shape[field] === undefined);
-}
-
-export type LocalBindingResult =
-  | { ok: true; shapes: WorkplaneShape[] }
-  | { ok: false; failure: ParameterEditFailure };
-
-/**
- * Applies a table change without the kernel when every shape it moves is a plain top-level
- * primitive. Plans with the engine's own planner, so refusals match. Null when kernel work is needed.
- */
-export function applyBindingsLocally(
-  shapes: readonly WorkplaneShape[],
-  previous: readonly ProjectParameter[],
-  next: readonly ProjectParameter[],
-): LocalBindingResult | null {
-  const plan = planParameterBindings(shapes, previous, next);
-  if (!plan.ok) return { ok: false, failure: plan.failure };
-  let result = [...shapes];
-  for (const entry of plan.pending) {
-    const shape = result.find((candidate) => candidate.id === entry.id);
-    if (!entry.topLevel || !shape || entry.sketchProfile || !plainPrimitive(shape)) return null;
-    const fields = Object.keys(entry.values);
-    if (fields.some((field) => bindableField(shape, field)?.target !== "shape")) return null;
-    // The engine's own-field step for a plain primitive, refused the same way.
-    const changed = shapeWithRequestedChanges(shape, entry.values);
-    if (!changed.ok) {
-      return {
-        ok: false,
-        failure: {
-          reason: "binding_failed",
-          shapeId: entry.id,
-          fields,
-          failure: { reason: "unapplicable_fields", kind: shape.kind, fields: changed.unapplicable, because: "not_this_kind" },
-        },
-      };
-    }
-    result = result.map((candidate) => (candidate.id === entry.id ? changed.shape : candidate));
-  }
-  return { ok: true, shapes: result };
 }
 
 export type HostProjectSync = { adoptTable: boolean; action: "echo" | "unchanged" | "hydrate" };
