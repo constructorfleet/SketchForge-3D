@@ -334,6 +334,22 @@ describe("deleted projects (#665, #667, #670, #672)", () => {
   });
 });
 
+describe("opening a project", () => {
+  it("changes nothing when the page abandons the read", async () => {
+    const browser = createMemoryBrowser();
+    const broken = project("p", 10);
+    browser.records.set("p", { id: "p", revision: 10, updatedAt: 10, skfPackage: new Uint8Array([1]) });
+    const { sync } = client(null, browser);
+    const abandoned = new AbortController();
+
+    const opening = sync.open(broken, undefined, abandoned.signal);
+    abandoned.abort();
+
+    expect(await opening).toEqual({ kind: "canceled" });
+    expect(sync.status("p")).toBe("synced");
+  });
+});
+
 describe("snapshot sequence numbers", () => {
   it("count each project's snapshots from 1 and never repeat", async () => {
     const { sync } = client(null);

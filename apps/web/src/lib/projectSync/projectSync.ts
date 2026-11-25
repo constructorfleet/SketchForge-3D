@@ -72,7 +72,9 @@ export type ProjectSyncEvent =
 
 export type OpenResult =
   | { kind: "loaded"; record: LoadedProjectRecord | null; entry: ProjectShapeCacheEntry; loadedRevision: number }
-  | { kind: "failed"; failureKind: ProjectLoadFailureKind; error: unknown };
+  | { kind: "failed"; failureKind: ProjectLoadFailureKind; error: unknown }
+  /** `signal` aborted while the read was in flight; nothing changed. */
+  | { kind: "canceled" };
 
 export type StartOptions = {
   signal: AbortSignal;
@@ -694,11 +696,13 @@ export function createProjectSync(adapters: ProjectSyncAdapters) {
    * Loads a project to open it. `cached` is the copy the page already holds. On success,
    * later writes are based on the loaded copy only when it replaces `cached`; newer local
    * edits kept over it are still based on the older copy. On failure, writes are refused.
+   * A read the page no longer wants, because the cache or the list changed, aborts `signal`.
    */
-  async function open(project: DashboardProject, cached: ProjectShapeCacheEntry | undefined): Promise<OpenResult> {
+  async function open(project: DashboardProject, cached: ProjectShapeCacheEntry | undefined, signal?: AbortSignal): Promise<OpenResult> {
     const projectId = project.id;
     try {
       const record = await loadRecord(projectId);
+      if (signal?.aborted) return { kind: "canceled" };
       release(projectId);
       const loadedRevision = record?.revision ?? 0;
       const revision = Math.max(project.revision ?? 0, loadedRevision, 1);
@@ -722,6 +726,7 @@ export function createProjectSync(adapters: ProjectSyncAdapters) {
       }
       return { kind: "loaded", record, entry, loadedRevision };
     } catch (error) {
+      if (signal?.aborted) return { kind: "canceled" };
       const failureKind = projectLoadFailureKind(error);
       // A read runs only when the stored revision is newer than the cached copy, so that copy
       // is stale. Writes stop so nothing autosaves over the stored bytes.
@@ -820,7 +825,9 @@ export function createProjectSync(adapters: ProjectSyncAdapters) {
     canWrite,
     subscribe(listener: (event: ProjectSyncEvent) => void) {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     /** The copy a refused save kept, for Download my copy and Save as new project. */
     keptCopy: (projectId: string) => keptCopies.get(projectId),

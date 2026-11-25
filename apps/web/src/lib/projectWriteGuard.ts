@@ -59,7 +59,7 @@ export function cacheWithEditorChange<T extends { revision: number }>(
   current: Record<string, T>,
   projectId: string,
   entry: T,
-  guard: ProjectWriteGuard,
+  guard: Pick<ProjectWriteGuard, "canWrite">,
 ): Record<string, T> {
   if (!guard.canWrite(projectId)) return current;
   const existing = current[projectId];
