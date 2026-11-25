@@ -45,6 +45,8 @@ const wall: ProjectParameter = { name: "wall", expression: "2", dimension: "leng
 function editor({ table = [] as ProjectParameter[] } = {}) {
   const clock = fakeClock();
   const sent: { projectId: string; shapes: string[]; table: string[] }[] = [];
+  /** The shapes of each send, in full. */
+  const sentScenes: WorkplaneShape[][] = [];
   const local = { shapes: [] as WorkplaneShape[], parameters: table, configuration: NO_CONFIGURATIONS as ProjectConfigurationState };
   const publisher = createEditorPublisher({
     scheduler: clock.scheduler,
@@ -53,7 +55,7 @@ function editor({ table = [] as ProjectParameter[] } = {}) {
       enabled: () => true,
       table: () => ({ parameters: local.parameters, configuration: local.configuration }),
       currentShapes: () => local.shapes,
-      send: (projectId, shapes) => sent.push({ projectId, shapes: shapes.map((shape) => shape.id), table: local.parameters.map((parameter) => parameter.name) }),
+      send: (projectId, shapes) => sentScenes.push(shapes) && sent.push({ projectId, shapes: shapes.map((shape) => shape.id), table: local.parameters.map((parameter) => parameter.name) }),
     },
   });
   /** Opens `projectId` with the host's copy, as the component does on a new project. */
@@ -72,7 +74,7 @@ function editor({ table = [] as ProjectParameter[] } = {}) {
     local.shapes = shapes;
     publisher.shapesRendered(shapes);
   };
-  return { publisher, clock, sent, local, open, props, edit };
+  return { publisher, clock, sent, sentScenes, local, open, props, edit };
 }
 
 describe("editor publish module", () => {
@@ -140,7 +142,7 @@ describe("editor publish module", () => {
     expect(props("a", scene, [wall])).toMatchObject({ action: "hydrate", adoptTable: true, projectChanged: false });
   });
 
-  it("drops the pending publish when the project closes: delete, conflict or load failure (#665)", () => {
+  it("drops the pending publish on projectChanged(null), as a delete, conflict or load failure closes the project (#665)", () => {
     const { publisher, clock, sent, open, edit, props } = editor();
     open("a", []);
     edit([box("box")]);
@@ -175,7 +177,7 @@ describe("editor publish module", () => {
   });
 
   it("holds edits during an interaction and publishes the scene 180 ms after it ends", () => {
-    const { publisher, clock, sent, open, edit, props, local } = editor();
+    const { publisher, clock, sent, sentScenes, open, edit, props } = editor();
     open("a", []);
     edit([box("box")]);
     publisher.interactionStarted();
@@ -188,7 +190,53 @@ describe("editor publish module", () => {
     expect(sent).toEqual([]);
     clock.advance(1 + 120);
     expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
-    expect(local.shapes[0]!.width).toBe(20);
+    expect(sentScenes[0]!.map((shape) => shape.width)).toEqual([20]);
+  });
+
+  it("sends a publish that was pending when a drag started, even when the drag moves nothing", () => {
+    const { publisher, clock, sentScenes, open, edit } = editor();
+    open("a", []);
+    edit([box("box", 30)]);
+    clock.advance(50);
+    publisher.interactionStarted();
+    publisher.interactionEnded();
+    clock.advance(180 + 120);
+    expect(sentScenes.map((scene) => scene.map((shape) => shape.width))).toEqual([[30]]);
+  });
+
+  it("takes back the table it sent as its own, so the next pending publish survives", () => {
+    const { publisher, clock, sent, open, edit, props, local } = editor();
+    const scene = [box("box")];
+    open("a", scene);
+    local.parameters = [wall];
+    publisher.localEdit(local.shapes, { force: true });
+    clock.advance(120);
+    edit([box("box"), box("next")]);
+    // The host passes back the table and shapes it was sent, before the next edit publishes.
+    expect(props("a", scene, [wall])).toMatchObject({ action: "echo", adoptTable: false });
+    clock.advance(120);
+    expect(sent.map((entry) => entry.shapes)).toEqual([["box"], ["box", "next"]]);
+  });
+
+  it("forgets the last project's echo when the host moves to another project", () => {
+    const { publisher, clock, open, edit, props, local } = editor();
+    open("a", []);
+    edit([box("shared")]);
+    clock.advance(120);
+    publisher.projectChanged("b");
+    expect(props("b", [])).toMatchObject({ action: "hydrate", projectChanged: true });
+    local.shapes = [];
+    publisher.shapesRendered([]);
+    // B's host copy now matches what A last sent; that is a change to B, not B's echo.
+    expect(props("b", [box("shared")]).action).toBe("hydrate");
+  });
+
+  it("treats the same project opened again after it closed as a new project", () => {
+    const { publisher, open, props } = editor();
+    open("a", [box("one")]);
+    publisher.projectChanged(null);
+    publisher.projectChanged("a");
+    expect(props("a", [box("one")])).toMatchObject({ action: "hydrate", projectChanged: true });
   });
 
   it("never resumes a held interaction under the next project", () => {
