@@ -9,8 +9,7 @@ import { apiShapeSummary } from "./apiShapeSummary.js";
 import { wireExpressionError } from "./apiErrors.js";
 import type { ProjectConfiguration, ProjectParameter, ProjectParameterDimension, WorkplaneShape } from "./domain/sketchforge.js";
 import type { ParametersWritten } from "./engine.js";
-import { shapeBindingIssues } from "./expressionBindings.js";
-import { sketchConstraintBindingIssues } from "./sketchConstraintBindings.js";
+import { shapeBindingIssues, sketchConstraintBindingIssues } from "./bindingValidation.js";
 import type { ExpressionError } from "./parameterExpressions.js";
 import { configurationIssues } from "./projectParameters.js";
 import {

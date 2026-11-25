@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createEngine, directoryProjectStore, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
+import { createEngine, directoryProjectStore, validateBinding, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import type { SketchConstraint, SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { resolveConstraintEntry } from "@/lib/expressionFields";
@@ -122,5 +122,30 @@ describe("the editor's constraint entry", () => {
     const locked = output("locked", { locked: true, shell: { thickness: 0.2 } } as Partial<WorkplaneShape>);
     expect(resolveConstraintEntry(widthConstraint(), "3", [], locked)).toEqual({ ok: true, value: 3, expression: null });
     expect(resolveConstraintEntry(widthConstraint(), "3 mm", [], locked)).toEqual({ ok: true, value: 3, expression: "3 mm" });
+  });
+});
+
+describe("validateBinding", () => {
+  const parameters = [{ name: "w", expression: "3", dimension: "length" as const, value: 3 }];
+  const sized = output("sized", { expressions: { width: "w" } });
+
+  it("refuses a clear only for a lock", () => {
+    const target = { shape: { ...sized, sketchProfile: rectangle("w") }, topLevel: true };
+    expect(validateBinding({ roots: [target.shape], target, parameters }, { field: "width", expression: null })).toEqual({ ok: true });
+    expect(validateBinding({ roots: [target.shape], target: { ...target, locked: "sized" } }, { field: "width", expression: null }))
+      .toEqual({ ok: false, failure: { reason: "shape_locked", ids: ["sized"] } });
+  });
+
+  it("returns the resolved value, and runs only the tree rules without a table", () => {
+    const target = { shape: output("free"), topLevel: true };
+    expect(validateBinding({ roots: [target.shape], target, parameters }, { field: "width", expression: "w * 2" })).toEqual({ ok: true, value: 6 });
+    expect(validateBinding({ roots: [target.shape], target }, { field: "width", expression: "nope" })).toEqual({ ok: true, value: undefined });
+  });
+
+  it("does not count a size binding the same request clears", () => {
+    const target = { shape: sized, topLevel: true };
+    const change = { constraintId: "width", constraint: widthConstraint(), expression: "w" };
+    expect(validateBinding({ roots: [sized], target }, change)).toMatchObject({ ok: false, failure: { error: { code: "conflictingBinding" } } });
+    expect(validateBinding({ roots: [sized], target }, { ...change, clearedFields: ["width"] })).toEqual({ ok: true, value: undefined });
   });
 });

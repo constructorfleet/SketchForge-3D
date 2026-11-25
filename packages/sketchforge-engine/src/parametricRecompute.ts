@@ -1,7 +1,7 @@
 import { buildGroupFromSelection } from "./serverShapeBooleans.js";
 import { groupChildFrame, refittedGroupRecord } from "./serverShapeGroups.js";
 import { boundFieldValue, withoutBindings } from "./expressionBindings.js";
-import { boundGroupSizeFields } from "./sketchConstraintBindings.js";
+import { boundGroupSizeFields } from "./bindingValidation.js";
 import { resizedShapeSize, shapeDepth, shapeWidth } from "./workplaneShapes.js";
 import {
   allEdgeTreatmentEdgeCount,

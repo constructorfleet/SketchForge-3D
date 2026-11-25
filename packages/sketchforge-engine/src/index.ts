@@ -232,7 +232,6 @@ export {
   renameShapeBindingReferences,
   resolveShapeBinding,
   resolveShapeBindings,
-  shapeBindingIssues,
   storedBindingValue,
   storedBindingValues,
   withoutBindings,
@@ -247,20 +246,15 @@ export {
 } from "./expressionBindings.js";
 export {
   bindableSketchConstraint,
-  boundProfileSizeFields,
   boundSketchConstraints,
-  conflictingConstraintBinding,
   literalSketchProfile,
   parameterSketchConstraintDependents,
-  profileSizeFields,
-  rebuildableSketch,
   renameSketchConstraintReferences,
   requestedSketchProfile,
   resolveSketchConstraintBinding,
   resolveSketchConstraintBindings,
   SKETCH_CONSTRAINT_BINDABLE_KINDS,
   echoesSketchConstraints,
-  sketchConstraintBindingIssues,
   sketchConstraintSummaries,
   sketchConstraintSummary,
   sketchConstraintValue,
@@ -276,6 +270,17 @@ export {
   type SketchConstraintSummary,
   type SketchConstraintDependent,
 } from "./sketchConstraintBindings.js";
+export {
+  profileSizeFields,
+  shapeBindingIssues,
+  sketchConstraintBindingIssues,
+  validateBinding,
+  type BindingChange,
+  type BindingCheck,
+  type BindingRefusal,
+  type BindingTarget,
+  type BindingValidation,
+} from "./bindingValidation.js";
 export {
   API_ERROR_CODES,
   API_ERROR_MESSAGES,

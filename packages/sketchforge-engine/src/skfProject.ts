@@ -18,12 +18,9 @@ import {
   type ProjectConfigurationIssue,
   type ProjectParameterInput,
 } from "./projectParameters.js";
-import { EXPRESSION_BINDABLE_FIELDS, shapeBindingIssues, type ShapeBindingIssue } from "./expressionBindings.js";
-import {
-  SKETCH_CONSTRAINT_BINDABLE_KINDS,
-  sketchConstraintBindingIssues,
-  type SketchConstraintBindingIssue,
-} from "./sketchConstraintBindings.js";
+import { EXPRESSION_BINDABLE_FIELDS, type ShapeBindingIssue } from "./expressionBindings.js";
+import { SKETCH_CONSTRAINT_BINDABLE_KINDS, type SketchConstraintBindingIssue } from "./sketchConstraintBindings.js";
+import { shapeBindingIssues, sketchConstraintBindingIssues } from "./bindingValidation.js";
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, ProjectConfiguration, ProjectParameter, ProjectParameterDimension, SketchOperation, SketchProfile, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "./domain/sketchforge.js";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";

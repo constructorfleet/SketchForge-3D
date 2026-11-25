@@ -7,14 +7,14 @@ import {
   EXPRESSION_BINDABLE_FIELDS,
   bindableField,
   boundFieldValue,
-  resolveShapeBinding,
   withoutBindings,
   type BindableFieldSpec,
   type ShapeBindingError,
 } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { validateBinding } from "@constructorfleet/sketchforge-engine/bindingValidation";
+import { plainPrimitive } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import {
   bindableSketchConstraint,
-  conflictingConstraintBinding,
   resolveSketchConstraintBinding,
   sketchConstraintValue,
   type BindableSketchConstraint,
@@ -29,7 +29,6 @@ import {
   parameterEditFailureMessage,
   parameterErrorMessage,
   parameterRecomputeResponseMessage,
-  plainPrimitive,
   type ParameterEditFailure,
   type ParameterMessage,
 } from "@/lib/projectParameterEdits";
@@ -169,11 +168,13 @@ export function bindShapeFieldLocally(
   if (expression === null) return { ok: true, shapes: replace(withoutBindings(shape, [field])) };
   const found = bindableField(shape, field);
   if (!plainPrimitive(shape) || !found || found.target !== "shape") return null;
-  const resolved = resolveShapeBinding(shape, field, expression, parameters);
-  if (!resolved.ok) return { ok: false, failure: { reason: "binding_invalid", error: { ...resolved.error } } };
+  // The lock is checked above, with the editor's own refusal.
+  const checked = validateBinding({ roots: shapes, target: { shape, topLevel: true }, parameters }, { field, expression });
+  if (!checked.ok) return { ok: false, failure: { ...checked.failure } };
+  const value = checked.value!;
   let next = shape;
-  if (boundFieldValue(shape, field) !== resolved.value) {
-    const changed = shapeWithRequestedChanges(shape, { [field]: resolved.value });
+  if (boundFieldValue(shape, field) !== value) {
+    const changed = shapeWithRequestedChanges(shape, { [field]: value });
     if (!changed.ok) return { ok: false, failure: { reason: "binding_failed", shapeId, fields: [field] } };
     next = changed.shape;
   }
@@ -227,6 +228,18 @@ export function constraintBindingMessage(error: SketchConstraintBindingError, di
   return { key: "editor.expressionField.error.fieldNotBindable", values: {} };
 }
 
+/**
+ * Refuses binding a constraint of the open sketch that the saved output's bindings forbid.
+ * The output's lock and rebuild recipe are checked when the sketch is finished.
+ */
+export function draftConstraintConflict(output: WorkplaneShape, constraintId: string, expression: string): SketchConstraintBindingError | undefined {
+  const checked = validateBinding(
+    { roots: [output], target: { shape: output, topLevel: true }, draft: true },
+    { constraintId, constraint: undefined, expression },
+  );
+  return checked.ok || checked.failure.reason !== "constraint_binding_invalid" ? undefined : checked.failure.error;
+}
+
 export type ConstraintEntry =
   | { ok: true; value: number; expression: string | null }
   | { ok: false; error: SketchConstraintBindingError };
@@ -241,7 +254,7 @@ export function resolveConstraintEntry(
 ): ConstraintEntry {
   const literal = isLiteralNumberEntry(text);
   const source = literal ? String(parseMeasurementInput(text)) : text.trim();
-  const conflict = !literal && output ? conflictingConstraintBinding(output, constraint.id) : undefined;
+  const conflict = !literal && output ? draftConstraintConflict(output, constraint.id, source) : undefined;
   if (conflict) return { ok: false, error: conflict };
   const resolved = resolveSketchConstraintBinding("sketch", constraint, source, parameters);
   if (!resolved.ok) return resolved;

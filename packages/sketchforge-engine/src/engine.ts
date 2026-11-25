@@ -118,27 +118,18 @@ import {
 import type { ProjectDocument, ProjectStore } from "./projectStore.js";
 import type { EdgeTreatmentFeature, ProjectAsset, ProjectConfiguration, ProjectParameter, SketchFaceDraft, SketchProfile, WorkplaneShape } from "./domain/sketchforge.js";
 import {
-  boundAncestorSizeFields,
   boundSketchConstraints,
-  conflictingConstraintBinding,
-  conflictingGroupSizeBinding,
-  groupRefitBindings,
   echoesSketchConstraints,
   requestedSketchProfile,
-  profileSizeFields,
-  rebuildableSketch,
-  resolveSketchConstraintBinding,
-  sketchNotRebuildable,
   sketchConstraintValue,
   withSketchConstraintValues,
   type BindableSketchConstraint,
   type SketchConstraintBindingError,
 } from "./sketchConstraintBindings.js";
+import { lockRefusal, resizedProfileFields, validateBinding } from "./bindingValidation.js";
 import { planParameterBindings, solvedSketchProfile as solveSharedSketchProfile } from "./parameterBindingPlan.js";
 import {
   bindableField,
-  GROUP_SIZE_FIELDS,
-  refitsParent,
   boundFieldsNamedBy,
   boundFieldValue,
   resolveShapeBinding,
@@ -710,31 +701,6 @@ function withoutAnyBindings(shape: WorkplaneShape): WorkplaneShape {
   return withoutBindings(shape, Object.keys(shape.expressions ?? {}));
 }
 
-/** Refuses a group size binding next to a nested binding that refits the group, either way round. */
-function groupSizeConflict(roots: readonly WorkplaneShape[], shape: WorkplaneShape, field: string, topLevel: boolean): ShapeBindingError | undefined {
-  if (shape.groupedShapes?.length && GROUP_SIZE_FIELDS.includes(field)) {
-    const { constraintIds, fields } = groupRefitBindings(shape);
-    if (constraintIds.length || fields.length) {
-      return {
-        code: "conflictingBinding",
-        shapeId: shape.id,
-        field,
-        ...(constraintIds.length ? { constraintIds } : {}),
-        message: `${field} cannot bind: ${[...constraintIds, ...fields].join(", ")} inside ${shape.id} is bound, and its rebuild refits the group. Clear one binding first.`,
-      };
-    }
-  }
-  if (topLevel || !refitsParent(field)) return undefined;
-  const sizes = boundAncestorSizeFields(roots, shape.id);
-  if (!sizes.length) return undefined;
-  return {
-    code: "conflictingBinding",
-    shapeId: shape.id,
-    field,
-    message: `${field} cannot bind: ${sizes.join(", ")} is bound on a group that holds ${shape.id}, and a rebuild would refit that group. Clear one binding first.`,
-  };
-}
-
 /** Lists bindings present in `before` and gone from `after`, on every shape but `changedId`. */
 function bindingsDropped(before: readonly WorkplaneShape[], after: readonly WorkplaneShape[], changedId: string): DroppedBinding[] {
   const kept = new Map<string, Record<string, string> | undefined>();
@@ -794,18 +760,6 @@ function conflictingLiteral(
   return undefined;
 }
 
-/** Returns the lock refusal naming the nearest locked shape. `locked: false` lifts only the shape's own lock. */
-function lockRefusal(
-  roots: readonly WorkplaneShape[],
-  found: { shape: WorkplaneShape; locked?: string } | undefined,
-  changes: ShapeRequest,
-): EngineFailure | undefined {
-  const locked = found?.locked;
-  if (!locked || (locked === found.shape.id && changes.locked === false)) return undefined;
-  if (roots.some((root) => root.id === locked)) return { reason: "shape_locked", ids: [locked] };
-  const topLevelId = roots.find((root) => findShapeInTree([root], locked))?.id;
-  return { reason: "shape_locked", ids: [locked], ...(topLevelId ? { topLevelId } : {}) };
-}
 
 /** Finds a sketch output by its own ID, or by a sketch source ID that names exactly one output. */
 function findSketchOutputShape(roots: readonly WorkplaneShape[], id: string): ReturnType<typeof findShapeInTree> {
@@ -1031,7 +985,7 @@ export function createEngine(store: ProjectStore): Engine {
     const existing = found.value;
     // `locked: false` may unlock in the same request as other changes.
     // A source ID reaches nested outputs, so a locked group refuses first.
-    const locked = lockRefusal(document.shapes, findShapeInTree(document.shapes, existing.id), changes);
+    const locked = lockRefusal(document.shapes, findShapeInTree(document.shapes, existing.id), changes.locked === false);
     if (locked) return failed(locked);
     if (sourceSketchTarget) {
       const isRevolveSource = isRevolveShape(existing);
@@ -1820,38 +1774,17 @@ export function createEngine(store: ProjectStore): Engine {
   ): Promise<EngineResult<WorkplaneShape[]>> {
     const found = findShapeInTree(document.shapes, shapeId);
     if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
-    if (found.locked) return failed({ reason: "shape_locked", ids: [found.locked] });
     let shape = found.shape;
     const values: Record<string, number> = {};
     for (const [field, expression] of Object.entries(expressions)) {
+      const checked = validateBinding({ roots: document.shapes, target: found, parameters: document.parameters ?? [] }, { field, expression });
+      if (!checked.ok) return failed(checked.failure);
       if (expression === null) {
         shape = withoutBindings(shape, [field]);
         continue;
       }
-      if (bindableField(found.shape, field)?.target === "shape" && !found.topLevel) {
-        return failed({ reason: "binding_invalid", error: { code: "fieldNotBindable", shapeId, field, message: `${field} binds on top-level shapes only.` } });
-      }
-      const resolved = resolveShapeBinding(found.shape, field, expression, document.parameters ?? []);
-      if (!resolved.ok) return failed({ reason: "binding_invalid", error: resolved.error });
-      const constraintIds = profileSizeFields(found.shape).includes(field)
-        ? boundSketchConstraints(found.shape).map(({ constraint }) => constraint.id)
-        : [];
-      if (constraintIds.length) {
-        return failed({
-          reason: "binding_invalid",
-          error: {
-            code: "conflictingBinding",
-            shapeId,
-            field,
-            constraintIds,
-            message: `${field} cannot bind: it would rescale the sketch on ${shapeId}, whose ${constraintIds.join(", ")} is bound. Clear one binding first.`,
-          },
-        });
-      }
-      const groupConflict = groupSizeConflict(document.shapes, found.shape, field, found.topLevel);
-      if (groupConflict) return failed({ reason: "binding_invalid", error: groupConflict });
       shape = { ...shape, expressions: { ...shape.expressions, [field]: expression } };
-      if (boundFieldValue(found.shape, field) !== resolved.value) values[field] = resolved.value;
+      if (boundFieldValue(found.shape, field) !== checked.value) values[field] = checked.value!;
     }
     if (shape === found.shape) return ok(document.shapes);
     const shapes = replaceShapeInTree(document.shapes, shape);
@@ -1874,10 +1807,13 @@ export function createEngine(store: ProjectStore): Engine {
       if (typeof expression !== "string" || !expression.trim()) {
         return invalid({ code: "invalidExpression", shapeId: shape.id, constraintId: constraint.id, message: `${constraint.id}: an expression must be a non-empty string.` });
       }
-      const resolved = resolveSketchConstraintBinding(shape.id, constraint, expression, document.parameters ?? []);
-      if (!resolved.ok) return invalid(resolved.error);
-      if (!rebuildableSketch(shape, true)) return invalid(sketchNotRebuildable(shape.id, constraint.id));
-      if (sketchConstraintValue(constraint as BindableSketchConstraint) !== resolved.value) values[constraint.id] = resolved.value;
+      // A new top-level shape: its own lock does not refuse its constraint values.
+      const checked = validateBinding(
+        { roots: document.shapes, target: { shape, topLevel: true }, parameters: document.parameters ?? [] },
+        { constraintId: constraint.id, constraint, expression },
+      );
+      if (!checked.ok) return failed(checked.failure);
+      if (sketchConstraintValue(constraint as BindableSketchConstraint) !== checked.value) values[constraint.id] = checked.value!;
     }
     if (!Object.keys(values).length) return ok(document.shapes);
     const solved = solvedSketchProfile(shape, values);
@@ -2046,7 +1982,7 @@ export function createEngine(store: ProjectStore): Engine {
       if (changes.sketchProfile && typeof changes.sketchProfile === "object") {
         const target = findSketchOutputShape(document.shapes, shapeId);
         // Refused before any planning or solve, as bindSketchConstraint refuses it.
-        const locked = lockRefusal(document.shapes, target, changes);
+        const locked = lockRefusal(document.shapes, target, changes.locked === false);
         if (locked) return failed(locked);
         const planned = requestedSketchProfile(
           target?.shape.id ?? shapeId,
@@ -2063,10 +1999,7 @@ export function createEngine(store: ProjectStore): Engine {
         if (target && planned.bound.length) {
           const constraintId = planned.bound[0]!;
           // A literal resize would unbind the constraint this request binds.
-          const resized = profileSizeFields(target.shape).find((field) => {
-            const requested = requestedBindingValue(changes, field);
-            return requested !== undefined && requested !== boundFieldValue(target.shape, field);
-          });
+          const resized = resizedProfileFields(target.shape, changes)[0];
           if (resized) {
             return failed({
               reason: "invalid_shape_request",
@@ -2076,13 +2009,15 @@ export function createEngine(store: ProjectStore): Engine {
               message: `${resized} resizes the sketch, which unbinds ${constraintId}. Send the size or the binding, not both.`,
             });
           }
-          if (!rebuildableSketch(target.shape, target.topLevel)) {
-            return failed({ reason: "constraint_binding_invalid", error: sketchNotRebuildable(target.shape.id, constraintId) });
-          }
-          const cleared = Object.keys(expressions).filter((field) => expressions[field] === null);
-          const conflict = conflictingConstraintBinding(withoutBindings(target.shape, cleared), constraintId)
-            ?? conflictingGroupSizeBinding(target.shape.id, constraintId, boundAncestorSizeFields(document.shapes, target.shape.id));
-          if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
+          // `requestedSketchProfile` resolved the expression, so only the tree rules run here.
+          const constraint = sketchProfile.constraints!.find((candidate) => candidate.id === constraintId)!;
+          const checked = validateBinding({ roots: document.shapes, target, unlocking: changes.locked === false }, {
+            constraintId,
+            constraint,
+            expression: (constraint as BindableSketchConstraint).expression!,
+            clearedFields: Object.keys(expressions).filter((field) => expressions[field] === null),
+          });
+          if (!checked.ok) return failed(checked.failure);
         }
         if (target && Object.keys(planned.values).length) {
           const solved = solvedSketchProfile({ ...target.shape, sketchProfile }, planned.values);
@@ -2124,10 +2059,7 @@ export function createEngine(store: ProjectStore): Engine {
       const literal = [...named.filter((field) => !echoed.includes(field)), ...drifted];
       let unbound = withoutBindings(rebuilt.shape, literal);
       // A literal resize rescales the solved sketch, so its constraint bindings no longer describe it.
-      const resized = previous ? profileSizeFields(previous).filter((field) => {
-        const requested = requestedBindingValue(changes, field);
-        return requested !== undefined && requested !== boundFieldValue(previous, field);
-      }) : [];
+      const resized = previous ? resizedProfileFields(previous, changes) : [];
       const loose = resized.length ? boundSketchConstraints(unbound).map(({ constraint }) => constraint.id) : [];
       if (loose.length) {
         unbound = {
@@ -2515,33 +2447,20 @@ export function createEngine(store: ProjectStore): Engine {
       const found = findSketchOutputShape(document.shapes, shapeId);
       if (!found) return failed({ reason: "shapes_not_found", ids: [shapeId] });
       const output = found.shape;
-      // A locked group refuses edits to the outputs it holds, as a manual edit is refused.
-      const locked = lockRefusal(document.shapes, found, {});
-      if (locked) return failed(locked);
       const constraint = output.sketchProfile!.constraints?.find((candidate) => candidate.id === constraintId);
-      if (!constraint) {
-        return failed({
-          reason: "constraint_binding_invalid",
-          error: { code: "constraintNotFound", shapeId: output.id, constraintId, message: `The sketch on ${output.id} has no constraint ${constraintId}.` },
-        });
-      }
+      // A locked group refuses edits to the outputs it holds, as a manual edit is refused.
+      const checked = validateBinding({ roots: document.shapes, target: found, parameters: document.parameters ?? [] }, { constraintId, constraint, expression });
+      if (!checked.ok) return failed(checked.failure);
       const write = async (shape: WorkplaneShape) =>
         ok({ shape, revision: await writeShapes(projectId, document, replaceShapeInTree(document.shapes, shape)) });
       if (expression === null) {
         if ((constraint as { expression?: string }).expression === undefined) return ok({ shape: output, revision: documentRevision(document) });
         return write({ ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: null }) });
       }
-      if (!rebuildableSketch(output, found.topLevel)) {
-        return failed({ reason: "constraint_binding_invalid", error: sketchNotRebuildable(output.id, constraintId) });
-      }
-      const resolved = resolveSketchConstraintBinding(output.id, constraint, expression, document.parameters ?? []);
-      if (!resolved.ok) return failed({ reason: "constraint_binding_invalid", error: resolved.error });
-      const conflict = conflictingConstraintBinding(output, constraintId)
-        ?? conflictingGroupSizeBinding(output.id, constraintId, boundAncestorSizeFields(document.shapes, output.id));
-      if (conflict) return failed({ reason: "constraint_binding_invalid", error: conflict });
+      const value = checked.value!;
       const tagged = { ...output, sketchProfile: withSketchConstraintValues(output.sketchProfile!, {}, { [constraintId]: expression }) };
-      if (sketchConstraintValue(constraint as BindableSketchConstraint) === resolved.value) return write(tagged);
-      const solved = solvedSketchProfile(tagged, { [constraintId]: resolved.value });
+      if (sketchConstraintValue(constraint as BindableSketchConstraint) === value) return write(tagged);
+      const solved = solvedSketchProfile(tagged, { [constraintId]: value });
       if (!solved.ok) return solved;
       const applied = await applyBindingValues(document, output.id, {}, solved.value);
       if (!applied.ok) return failed({ reason: "binding_failed", shapeId: output.id, fields: [], constraintIds: [constraintId], failure: applied.failure });

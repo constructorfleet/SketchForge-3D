@@ -330,56 +330,7 @@ export function visitBoundShapes(
   shapes.forEach((shape) => walk(shape, true));
 }
 
-export const GROUP_SIZE_FIELDS: readonly string[] = ["width", "depth", "height"];
-
-/** Reports whether a binding on a nested shape can rebuild it. Treatment amounts keep its bounds. */
-export function refitsParent(field: string): boolean {
-  return !field.startsWith("edgeTreatments.");
-}
-
-/** Lists bound fields below `group` that rebuild a child, as `shapeId.field`. */
-export function nestedRefitFields(group: WorkplaneShape): string[] {
-  const fields: string[] = [];
-  const walk = (shape: WorkplaneShape) => {
-    Object.keys(shape.expressions ?? {}).filter(refitsParent).forEach((field) => fields.push(`${shape.id}.${field}`));
-    shape.groupedShapes?.forEach(walk);
-  };
-  group.groupedShapes?.forEach(walk);
-  return fields;
-}
-
 export type ShapeBindingIssue = ShapeBindingError;
-
-/** Lists bindings that do not resolve against `parameters`, or bind a field the shape lacks. Changes nothing. */
-export function shapeBindingIssues(shapes: readonly WorkplaneShape[], parameters: readonly ProjectParameter[]): ShapeBindingIssue[] {
-  const scope = parameterScope(parameters);
-  const issues: ShapeBindingIssue[] = [];
-  visitBoundShapes(shapes, (shape, topLevel) => {
-    if (!shape.expressions) return;
-    const results = resolveShapeBindings(shape, scope);
-    for (const field of Object.keys(shape.expressions)) {
-      const found = bindableField(shape, field);
-      if (found && found.target === "shape" && !topLevel) {
-        issues.push({ code: "fieldNotBindable", shapeId: shape.id, field, message: `${field} binds on top-level shapes only.` });
-        continue;
-      }
-      const result = results.get(field);
-      if (result && !result.ok) issues.push(result.error);
-    }
-    // Nested constraint bindings are reported with the constraint issues.
-    const nested = shape.groupedShapes?.length ? nestedRefitFields(shape) : [];
-    if (!nested.length) return;
-    for (const field of GROUP_SIZE_FIELDS.filter((candidate) => typeof shape.expressions?.[candidate] === "string")) {
-      issues.push({
-        code: "conflictingBinding",
-        shapeId: shape.id,
-        field,
-        message: `${field} on ${shape.id} is bound, and ${nested.join(", ")} inside it rebuilds a child and refits the group. Clear one binding.`,
-      });
-    }
-  });
-  return issues;
-}
 
 export type ShapeBindingDependent = { readonly shapeId: string; readonly fields: readonly string[] };
 

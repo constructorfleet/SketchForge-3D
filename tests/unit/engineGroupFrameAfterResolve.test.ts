@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEngine, directoryProjectStore, type EngineResult, type ProjectStore } from "@constructorfleet/sketchforge-engine";
 import { writeProjectMetadata } from "@constructorfleet/sketchforge-engine/serverProjectFiles";
 import { boundsForShapes, groupedShapeFromSelection, refittedGroupRecord, restoreGroupedChildren } from "@constructorfleet/sketchforge-engine/serverShapeGroups";
-import { sketchConstraintBindingIssues } from "@constructorfleet/sketchforge-engine/sketchConstraintBindings";
-import { shapeBindingIssues } from "@constructorfleet/sketchforge-engine/expressionBindings";
+import { shapeBindingIssues, sketchConstraintBindingIssues } from "@constructorfleet/sketchforge-engine/bindingValidation";
 import type { SketchProfile, WorkplaneShape } from "@constructorfleet/sketchforge-engine/domain/sketchforge";
 import { CAD_TEST_TIMEOUT_MS } from "./support/cadTestTimeout";
 

@@ -3,7 +3,6 @@ import { shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 import { resolveProjectParameters, type ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { SOURCE_MESSAGES } from "@/i18n/locales";
 import {
-  applyBindingsLocally,
   configurationIssueMessages,
   parameterEditNotice,
   parameterErrorMessage,
@@ -11,6 +10,7 @@ import {
   planParameterEdit,
   type ParameterProject,
 } from "@/lib/projectParameterEdits";
+import { applyKernelFreeBindings as applyBindingsLocally } from "@constructorfleet/sketchforge-engine/parameterBindingPlan";
 import type { ProjectConfiguration, WorkplaneShape } from "@/types/sketchforge";
 
 function table(entries: ProjectParameterInput[]) {
