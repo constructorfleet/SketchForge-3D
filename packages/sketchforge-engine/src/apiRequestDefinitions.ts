@@ -53,7 +53,7 @@ export type ApiQueryRule = {
  * code a client has to match on the prose, which makes every wording change a
  * breaking one -- and both client libraries were doing exactly that.
  */
-export const API_ERROR_CODES = [
+export const API_ERROR_CODES = frozen([
   "api_disabled",
   "unauthorized",
   "storage_unconfigured",
@@ -81,7 +81,7 @@ export const API_ERROR_CODES = [
   "geometry_failed",
   "cad_failed",
   "internal_error",
-] as const;
+] as const);
 
 /** Same rule as the store: the id becomes a file name in the project directory. */
 export const API_PROJECT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9_-]*$";
@@ -91,16 +91,16 @@ export const API_PARAMETER_EXPRESSION_MAX_LENGTH = 10_000;
 /** Matches the engine's configuration name limit. */
 export const API_CONFIGURATION_NAME_MAX_LENGTH = 100;
 export const API_CONSTRAINT_ID_MAX_LENGTH = 200;
-export const API_PARAMETER_DIMENSIONS = ["length", "angle", "unitless"] as const;
+export const API_PARAMETER_DIMENSIONS = frozen(["length", "angle", "unitless"] as const);
 
-export const API_QUERY_RULES = {
+export const API_QUERY_RULES = frozen({
   projectId: { type: "string", trim: true, pattern: API_PROJECT_ID_PATTERN, maxLength: API_PROJECT_ID_MAX_LENGTH },
   shapeId: { type: "string", trim: true, minLength: 1 },
   parameterName: { type: "string", trim: true, minLength: 1, maxLength: API_PARAMETER_NAME_MAX_LENGTH, description: "The parameter to change or delete." },
   // Not trimmed: a configuration name keeps the characters it was created with.
   configurationName: { type: "string", minLength: 1, maxLength: API_CONFIGURATION_NAME_MAX_LENGTH, description: "The configuration to change or delete." },
   constraintId: { type: "string", trim: true, minLength: 1, maxLength: API_CONSTRAINT_ID_MAX_LENGTH },
-} as const satisfies Readonly<Record<string, ApiQueryRule>>;
+} as const satisfies Readonly<Record<string, ApiQueryRule>>);
 
 const parameterName = {
   type: "string",
@@ -117,10 +117,10 @@ const configurationName = {
   description: `1 to ${API_CONFIGURATION_NAME_MAX_LENGTH} characters, with no control characters or surrounding whitespace.`,
 } as const;
 
-export const API_REQUEST_FIELDS = { parameterName, parameterExpression, parameterDimension, configurationName } as const;
+export const API_REQUEST_FIELDS = frozen({ parameterName, parameterExpression, parameterDimension, configurationName } as const);
 
 /** Request bodies, keyed by REST operationId. */
-export const API_REQUEST_BODIES = {
+export const API_REQUEST_BODIES = frozen({
   createParameter: {
     type: "object",
     required: ["name", "expression", "dimension"],
@@ -169,7 +169,16 @@ export const API_REQUEST_BODIES = {
     properties: { name: { ...configurationName, nullable: true, description: "The configuration to activate, or null for the base table." } },
     additionalProperties: false,
   },
-} as const satisfies Readonly<Record<string, ApiSchema>>;
+} as const satisfies Readonly<Record<string, ApiSchema>>);
+
+/** Freezes a definition and everything it holds. Importers share these objects. */
+function frozen<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) frozen(child);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 /** Checks a value against a schema. `oneOf` needs exactly one match; `nullable` accepts null before any other rule. */
 export function matchesApiSchema(value: unknown, schema: ApiSchema): boolean {

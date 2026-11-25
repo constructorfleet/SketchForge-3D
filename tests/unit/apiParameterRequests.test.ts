@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
-import { API_ERROR_CODES, API_QUERY_RULES, API_REQUEST_BODIES } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
+import { API_ERROR_CODES, API_PARAMETER_DIMENSIONS, API_QUERY_RULES, API_REQUEST_BODIES, API_REQUEST_FIELDS } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
 
 /** The engine checks run the request definitions; the contract has to publish those same objects. */
 function operation(operationId: string) {
@@ -41,6 +41,18 @@ describe("request definitions", () => {
     // Equal copies pass the checks above; only the source shows they are copies.
     const source = readFileSync(path.resolve(__dirname, "../../apps/web/src/lib/apiV1OperationContract.ts"), "utf8");
     expect(source.match(/\btrim: true\b/g) ?? []).toEqual([]);
+  });
+
+  it("are frozen all the way down, so no importer can change a rule for the others", () => {
+    const unfrozen: string[] = [];
+    const visit = (value: unknown, at: string) => {
+      if (!value || typeof value !== "object") return;
+      if (!Object.isFrozen(value)) unfrozen.push(at);
+      for (const [key, child] of Object.entries(value)) visit(child, `${at}.${key}`);
+    };
+    const definitions = { API_ERROR_CODES, API_PARAMETER_DIMENSIONS, API_QUERY_RULES, API_REQUEST_BODIES, API_REQUEST_FIELDS };
+    for (const [name, value] of Object.entries(definitions)) visit(value, name);
+    expect(unfrozen).toEqual([]);
   });
 
   it("supply the error codes the contract publishes", () => {
