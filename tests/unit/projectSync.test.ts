@@ -4,7 +4,9 @@ import { createMemoryBrowser, createMemoryServer, memoryProjectSyncAdapters } fr
 import { PROJECTS_STORAGE_KEY, createProjectSync, projectShapeSaveContext, type DashboardProject, type ProjectSync, type ProjectSyncEvent } from "@/lib/projectSync";
 import { projectShapeCacheEntry, projectSkfPackage } from "@/lib/projectShapeCache";
 import { ProjectWriteRefusedError } from "@/lib/projectSync/storageErrors";
-import { ServerPackageRequestError, serverProjectRevision } from "@/lib/serverProjectStore";
+import { ServerPackageRequestError, ServerProjectConflictError, serverProjectRevision } from "@/lib/serverProjectStore";
+import { addProjectTombstone, readProjectTombstones } from "@/lib/projectSync/tombstones";
+import { SERVER_SYNCED_REVISIONS_STORAGE_KEY } from "@/lib/projectSync/syncedRevisions";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
 // Issue #678: the storage and sync scenarios of #622 to #672, run against the project sync
@@ -119,6 +121,44 @@ describe("a project whose stored copy cannot be read (#622, #648)", () => {
     expect(await shapeIdsIn(server.projects.get("p")?.packageBytes)).toEqual(["original", "edit"]);
   });
 
+  it("refuses Start over when another client saved the project after this one failed to read it (#656)", async () => {
+    const broken = project("p", 10);
+    const server = createMemoryServer();
+    await server.api.savePackage("p", new Uint8Array([1, 2, 3]), 10);
+    await server.api.saveMetadata("p", broken);
+    const a = client(server);
+    const b = client(server);
+    await switchToServer(a.sync);
+    await switchToServer(b.sync);
+    expect((await a.sync.open(broken, undefined)).kind).toBe("failed");
+
+    // Another client repairs it before this one confirms Start over.
+    await b.sync.write("p", projectShapeCacheEntry(20, [box("repaired")]), projectShapeSaveContext(broken));
+    const result = await a.sync.startOver(broken);
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? null : result.error).toBeInstanceOf(ServerProjectConflictError);
+    expect(await shapeIdsIn(server.projects.get("p")?.packageBytes)).toEqual(["repaired"]);
+    expect(a.sync.status("p")).toBe("unreadable");
+  });
+
+  it("starts over a project last saved by a client whose clock is ahead (#656)", async () => {
+    const listedEarlier = project("p", 10);
+    const server = createMemoryServer();
+    const ahead = Date.now() + 3_600_000;
+    await server.api.savePackage("p", new Uint8Array([1, 2, 3]), ahead);
+    await server.api.saveMetadata("p", { ...listedEarlier, revision: ahead });
+    const { sync } = client(server);
+    await switchToServer(sync);
+
+    // This client's list still holds the older revision.
+    expect((await sync.open(listedEarlier, undefined)).kind).toBe("failed");
+    const result = await sync.startOver(listedEarlier);
+
+    expect(result.ok).toBe(true);
+    expect(await shapeIdsIn(server.projects.get("p")?.packageBytes)).toEqual([]);
+  });
+
   it("does not open a listed server project whose package is missing as an empty one (#650)", async () => {
     const listedOnly = project("p", 10);
     const server = createMemoryServer();
@@ -208,9 +248,9 @@ describe("two clients sharing server storage (#650, #656)", () => {
     await switchToServer(b.sync);
     const aEvents = recordEvents(a.sync);
 
-    b.sync.persistList([{ ...listed[0], name: "Renamed by B" }]);
+    b.sync.persistList([{ ...listed[0], name: "Renamed by B" }], "server");
     await b.sync.idle();
-    a.sync.persistList([{ ...listed[0], thumbnailVersion: 4 }]);
+    a.sync.persistList([{ ...listed[0], thumbnailVersion: 4 }], "server");
     await a.sync.idle();
 
     expect(server.projects.get("p")?.metadata).toMatchObject({ name: "Renamed by B", thumbnailVersion: 4 });
@@ -224,7 +264,7 @@ describe("two clients sharing server storage (#650, #656)", () => {
     const b = client(server);
     const listed = await switchToServer(a.sync);
     await switchToServer(b.sync);
-    b.sync.persistList([{ ...listed[0], name: "Renamed by B" }]);
+    b.sync.persistList([{ ...listed[0], name: "Renamed by B" }], "server");
     await b.sync.idle();
 
     const updated = await new Promise<DashboardProject[]>((resolve) => a.sync.onVisible((update) => resolve(update(listed))));
@@ -263,6 +303,73 @@ describe("the move to server storage (#662)", () => {
 
     expect(await shapeIdsIn(server.projects.get("p")?.packageBytes)).toEqual(["original", "late"]);
     expect(serverProjectRevision(server.projects.get("p")?.metadata)).toBe(20);
+  });
+});
+
+describe("moving to server storage after another client deleted a project (#672)", () => {
+  async function browserHolding(revision: number, syncedRevision?: number) {
+    const browser = createMemoryBrowser();
+    const held = project("p", revision);
+    browser.records.set("p", { id: "p", revision, updatedAt: revision, skfPackage: await packageFor(held, revision, ["mine"]) });
+    browser.storage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify([held]));
+    if (syncedRevision !== undefined) browser.storage.setItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY, JSON.stringify({ p: syncedRevision }));
+    const server = createMemoryServer();
+    await server.api.saveMetadata("p", project("p", 10));
+    await server.api.remove("p");
+    return { browser, server };
+  }
+
+  it("keeps a browser copy with edits the server never received, and offers it", async () => {
+    const { browser, server } = await browserHolding(20, 10);
+    const { sync } = client(server, browser);
+    const events = recordEvents(sync);
+
+    const switched = await switchToServer(sync);
+
+    expect(switched.map((candidate) => candidate.id)).toEqual(["p"]);
+    expect(sync.status("p")).toBe("deleted");
+    expect(sync.keptCopy("p")?.revision).toBe(20);
+    expect(events.some((event) => event.type === "deletedElsewhere")).toBe(true);
+    expect(server.projects.has("p")).toBe(false);
+  });
+
+  it("drops a browser copy the server already held when it was deleted", async () => {
+    const { browser, server } = await browserHolding(10, 10);
+    const { sync } = client(server, browser);
+
+    const switched = await switchToServer(sync);
+
+    expect(switched).toEqual([]);
+    expect(sync.keptCopy("p")).toBeUndefined();
+    expect(readProjectTombstones(browser.storage).has("p")).toBe(true);
+  });
+});
+
+describe("the move's catch-up (#666)", () => {
+  it("uploads a later save to a moved project even after another tab removed the browser list", async () => {
+    const browser = createMemoryBrowser();
+    const moving = project("p", 10);
+    browser.records.set("p", { id: "p", revision: 10, updatedAt: 10, skfPackage: await packageFor(moving, 10, ["original"]) });
+    browser.storage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify([moving]));
+    const server = createMemoryServer();
+    const { sync } = client(server, browser);
+    const otherTab = browser.tab();
+
+    // After the first pass, another tab saves and its own switch removes the browser list.
+    const probe = server.api.probe.bind(server.api);
+    let probes = 0;
+    server.api.probe = async () => {
+      probes += 1;
+      if (probes === 2) {
+        browser.records.set("p", { id: "p", revision: 20, updatedAt: 20, skfPackage: await packageFor(moving, 20, ["original", "later"]) });
+        otherTab.removeItem(PROJECTS_STORAGE_KEY);
+      }
+      return probe();
+    };
+
+    await switchToServer(sync);
+
+    expect(await shapeIdsIn(server.projects.get("p")?.packageBytes)).toEqual(["original", "later"]);
   });
 });
 
@@ -316,7 +423,7 @@ describe("deleted projects (#665, #667, #670, #672)", () => {
     expect(tab2.status("p")).toBe("deleted");
 
     // Tab 2's list still holds the project.
-    tab2.persistList([deleted, kept]);
+    tab2.persistList([deleted, kept], "browser");
     expect(tab1.readBrowserList().projects.map((candidate) => candidate.id)).toEqual(["q"]);
     await expect(tab2.write("p", projectShapeCacheEntry(20, []), projectShapeSaveContext(deleted))).rejects.toBeInstanceOf(ProjectWriteRefusedError);
     // A tab whose storage event has not arrived yet still reads the shared delete record.
@@ -346,9 +453,74 @@ describe("deleted projects (#665, #667, #670, #672)", () => {
     expect(a.sync.keptCopy("p")).toBe(job);
 
     // A list write for it does not recreate it either (#672).
-    a.sync.persistList([{ ...listed[0], name: "Renamed late" }]);
+    a.sync.persistList([{ ...listed[0], name: "Renamed late" }], "server");
     await a.sync.idle();
     expect(server.projects.has("p")).toBe(false);
+  });
+});
+
+describe("delete records and server listings (#670)", () => {
+  it("keeps a delete when a visibility listing requested before it still lists the project", async () => {
+    const shared = project("p", 10);
+    const server = await serverWith(shared);
+    const { sync, browser } = client(server);
+    await switchToServer(sync);
+
+    // The listing is read before the delete and answers after it.
+    const probe = server.api.probe.bind(server.api);
+    let answer = () => {};
+    server.api.probe = async () => {
+      const listing = await probe();
+      await new Promise<void>((resolve) => { answer = resolve; });
+      return listing;
+    };
+    const updated = new Promise<DashboardProject[]>((resolve) => sync.onVisible((update) => resolve(update([]))));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await sync.deleteProject("p");
+    answer();
+    await updated;
+
+    expect(readProjectTombstones(browser.storage).has("p")).toBe(true);
+  });
+
+  it("keeps a delete made while the start-up listing was in flight", async () => {
+    const shared = project("p", 10);
+    const server = await serverWith(shared);
+    const browser = createMemoryBrowser();
+    const { sync } = client(server, browser);
+
+    const probe = server.api.probe.bind(server.api);
+    server.api.probe = async () => {
+      const listing = await probe();
+      // Another tab deletes it after the listing was requested.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      addProjectTombstone(browser.storage, "p");
+      return listing;
+    };
+    await switchToServer(sync);
+
+    expect(readProjectTombstones(browser.storage).has("p")).toBe(true);
+  });
+});
+
+describe("the list's storage mode", () => {
+  it("stores a list in the mode of the render that scheduled it, so a list from before the switch is not posted as server metadata", async () => {
+    const shared = project("p", 10);
+    const server = await serverWith(shared);
+    const { sync, browser } = client(server);
+    await switchToServer(sync);
+    const saveMetadata = server.api.saveMetadata.bind(server.api);
+    let posted = 0;
+    server.api.saveMetadata = async (...args) => {
+      posted += 1;
+      return saveMetadata(...args);
+    };
+
+    sync.persistList([{ ...shared, name: "From before the switch" }], "browser");
+    await sync.idle();
+
+    expect(posted).toBe(0);
+    expect(JSON.parse(browser.storage.getItem(PROJECTS_STORAGE_KEY) ?? "[]")[0]?.name).toBe("From before the switch");
   });
 });
 

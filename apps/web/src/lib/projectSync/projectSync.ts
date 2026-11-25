@@ -6,6 +6,9 @@
  * project, the revisions writes are based on, the package and metadata save
  * queues, and the delete records shared by this browser's tabs. The page calls
  * intent-level methods and renders what they return and emit.
+ *
+ * Its state lives as long as the instance. The dashboard makes one at module scope, so
+ * the state lasts for the page's lifetime, as the module-level maps it replaced did.
  */
 import { createCoalescingSaveQueue, type CoalescingSaveQueue } from "@/lib/saveQueue";
 import { projectShapeCacheEntry, type ProjectShapeCacheEntry, type ProjectShapeSaveContext } from "@/lib/projectShapeCache";
@@ -583,17 +586,19 @@ export function createProjectSync(adapters: ProjectSyncAdapters) {
   /**
    * Stores the dashboard's list: the browser list in browser mode, changed metadata
    * sidecars in server mode. Returns the normalised list when the page should show it instead.
+   * `listMode` is the mode of the render that produced `projects`, so a list from before
+   * the switch is not posted as server metadata.
    */
-  function persistList(projects: DashboardProject[]): { rewrite: DashboardProject[] | null; error?: unknown } {
+  function persistList(projects: DashboardProject[], listMode: ProjectStorageMode): { rewrite: DashboardProject[] | null; error?: unknown } {
     const localSerialized = JSON.stringify(projects);
     // In server mode there is no stored list to merge against: each project's metadata
     // sidecar is the record, and the server rejects a write older than the one it holds.
-    const storageProjects = mode === "server"
+    const storageProjects = listMode === "server"
       ? projects.map(projectForStorage)
       : withoutDeletedProjects(mergeProjectsForStorage(projects, preferences), tombstones());
     const serialized = JSON.stringify(storageProjects);
     if (projectsJson === serialized) return { rewrite: null };
-    if (mode === "server") {
+    if (listMode === "server") {
       storageProjects.forEach((project) => {
         const projectJson = JSON.stringify(project);
         if (serverMetadataJson.get(project.id) === projectJson) return;

@@ -165,12 +165,12 @@ export function createMemoryServer({ now = () => Date.now() }: { now?: () => num
       return writeProject(projectId, metadata as Record<string, unknown>, null, undefined, baseMetadataRevision);
     },
     async remove(projectId) {
+      // Recorded even when nothing is stored, as `deleteProjectFiles` does (#673).
       const stored = projects.get(projectId);
-      if (!stored) return;
       tombstones.set(projectId, {
         deletedAt: now(),
-        revision: serverProjectRevision(stored.metadata),
-        metadataRevision: serverMetadataRevision(stored.metadata),
+        revision: serverProjectRevision(stored?.metadata),
+        metadataRevision: serverMetadataRevision(stored?.metadata),
       });
       projects.delete(projectId);
     },

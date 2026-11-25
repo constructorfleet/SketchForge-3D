@@ -51,7 +51,6 @@ import {
   type DashboardProject,
   type ProjectLoadFailureKind,
   type ProjectStorageMode,
-  type ProjectSync,
   type ProjectSyncEvent,
 } from "@/lib/projectSync";
 import { browserProjectSyncAdapters } from "@/lib/projectSync/browserAdapters";
@@ -109,6 +108,9 @@ const STATIC_EXPORT_BUILD = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
 // is not what is running. Overridable for anyone running their own fork.
 const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL?.trim() || "https://github.com/constructorfleet/SketchForge-3D";
 const EDITOR_SKELETON_MIN_DURATION_MS = 320;
+// Every storage and sync rule lives in the project sync module (#678); the page renders what it
+// reports. Module scope keeps its state for the page's lifetime, as the module-level maps it replaced did.
+const sync = createProjectSync(browserProjectSyncAdapters({ staticExport: STATIC_EXPORT_BUILD }));
 
 function formatUpdated(t: Translator, locale: Locale, timestamp: number) {
   const age = Date.now() - timestamp;
@@ -200,10 +202,6 @@ export default function Home() {
   // Project id to load error, for projects whose stored copy could not be read.
   const [projectLoadFailures, setProjectLoadFailures] = useState<Record<string, ProjectLoadFailure>>({});
   const dashboardImportInputRef = useRef<HTMLInputElement | null>(null);
-  // Every storage and sync rule lives in the project sync module (#678); the page renders what it reports.
-  const syncRef = useRef<ProjectSync | null>(null);
-  if (syncRef.current === null) syncRef.current = createProjectSync(browserProjectSyncAdapters({ staticExport: STATIC_EXPORT_BUILD }));
-  const sync = syncRef.current;
   // Set every render, so a subscription made once still sees current state.
   const syncEventRef = useRef<((event: ProjectSyncEvent) => void) | null>(null);
   const editorLoadingStartedAtRef = useRef(0);
@@ -343,7 +341,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!mounted) return;
-    const { rewrite, error } = sync.persistList(projects);
+    const { rewrite, error } = sync.persistList(projects, projectStorageMode);
     if (error) {
       setDashboardNotice(errorText(currentTranslator(), error, "dashboard.storage.saveListFailed"));
       return;
