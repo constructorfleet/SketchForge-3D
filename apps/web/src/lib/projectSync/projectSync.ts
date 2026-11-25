@@ -16,7 +16,7 @@ import {
   readProjectTombstones,
   removeProjectTombstones,
   withoutDeletedProjects,
-} from "@/lib/projectTombstones";
+} from "./tombstones";
 import {
   ProjectWriteRefusedError,
   StoredProjectMissingError,
@@ -25,8 +25,8 @@ import {
   mergeNewerServerProjects,
   projectLoadFailureKind,
   type ProjectLoadFailureKind,
-} from "@/lib/projectWriteGuard";
-import { mergeMetadataFields } from "@/lib/serverMetadataMerge";
+} from "./storageErrors";
+import { mergeMetadataFields } from "./metadataMerge";
 import {
   ServerMetadataConflictError,
   ServerProjectConflictError,
@@ -34,7 +34,7 @@ import {
   serverMetadataRevision,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
-import { SERVER_SYNCED_REVISIONS_STORAGE_KEY, readServerSyncedRevisions } from "@/lib/serverSyncedRevisions";
+import { SERVER_SYNCED_REVISIONS_STORAGE_KEY, readServerSyncedRevisions } from "./syncedRevisions";
 import type { BrowserProjectRecord, ProjectSyncAdapters } from "./adapters";
 import {
   MIGRATED_PROJECTS_STORAGE_KEY,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeMetadataFields } from "@/lib/serverMetadataMerge";
+import { mergeMetadataFields } from "@/lib/projectSync/metadataMerge";
 
 // Issue #650: a client whose list is stale must not revert fields another client changed.
 describe("merging project metadata after a conflict", () => {

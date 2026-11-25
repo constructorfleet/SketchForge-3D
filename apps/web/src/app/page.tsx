@@ -30,7 +30,6 @@ import type { AppUpdateStatus } from "@/lib/appUpdates";
 import { isChallengeTutorialId, type ChallengeTutorialId } from "@/lib/challenges";
 import { NO_CONFIGURATIONS, type EditorHistoryEntry, type ProjectConfigurationState } from "@/lib/engine/editorHistory";
 import { createAutosaveNoticeController, type AutosaveNotice } from "@/lib/autosaveNotice";
-import { withoutDeletedProjects } from "@/lib/projectTombstones";
 import { createLocalId } from "@/lib/engine/localIds";
 import { publicAssetPath, withAppBasePath } from "@/lib/publicAssetPath";
 import {
@@ -42,16 +41,15 @@ import {
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/engine/projectAssets";
 import { reconcileLoadedProjectShapeCacheEntry } from "@/lib/projectShapePersistence";
 import {
+  PROJECT_ACCENTS,
   StoredProjectMissingError,
   cacheWithEditorChange,
-  projectLoadFailureCause,
-  type ProjectLoadFailureKind,
-} from "@/lib/projectWriteGuard";
-import {
-  PROJECT_ACCENTS,
   createProjectSync,
+  projectLoadFailureCause,
   projectShapeSaveContext,
+  withoutDeletedProjects,
   type DashboardProject,
+  type ProjectLoadFailureKind,
   type ProjectStorageMode,
   type ProjectSync,
   type ProjectSyncEvent,

@@ -4,7 +4,7 @@ import { importSkfProject } from "@/lib/engine/skfProject";
 import { translate } from "@/i18n";
 import { hydrateProjectShapeState, type ImportedMeshResource } from "@/lib/projectShapePersistence";
 import { projectSkfPackage } from "@/lib/projectShapeCache";
-import { StoredProjectUnreadableError } from "@/lib/projectWriteGuard";
+import { StoredProjectUnreadableError } from "./storageErrors";
 import {
   deleteServerProject,
   fetchServerProjectPackage,

@@ -2,8 +2,8 @@
 import { normalizePlacementWorkplane } from "@/lib/engine/placementWorkplane";
 import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/engine/workplaneSettings";
 import { projectShapeCacheEntry, type ProjectShapeCacheEntry, type ProjectShapeSaveContext } from "@/lib/projectShapeCache";
-import { readProjectTombstones } from "@/lib/projectTombstones";
-import { writeServerSyncedRevisions } from "@/lib/serverSyncedRevisions";
+import { readProjectTombstones } from "./tombstones";
+import { writeServerSyncedRevisions } from "./syncedRevisions";
 import type { WorkplaneShape } from "@/types/sketchforge";
 import type { KeyValueStore } from "./adapters";
 import type { DashboardProject, StoredDashboardProject } from "./types";

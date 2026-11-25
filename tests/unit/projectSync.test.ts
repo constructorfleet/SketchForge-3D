@@ -3,7 +3,7 @@ import { importSkfProject } from "@/lib/engine/skfProject";
 import { createMemoryBrowser, createMemoryServer, memoryProjectSyncAdapters } from "@/lib/projectSync/memoryAdapters";
 import { PROJECTS_STORAGE_KEY, createProjectSync, projectShapeSaveContext, type DashboardProject, type ProjectSync, type ProjectSyncEvent } from "@/lib/projectSync";
 import { projectShapeCacheEntry, projectSkfPackage } from "@/lib/projectShapeCache";
-import { ProjectWriteRefusedError } from "@/lib/projectWriteGuard";
+import { ProjectWriteRefusedError } from "@/lib/projectSync/storageErrors";
 import { ServerPackageRequestError, serverProjectRevision } from "@/lib/serverProjectStore";
 import type { WorkplaneShape } from "@/types/sketchforge";
 
@@ -281,6 +281,24 @@ describe("deleted projects (#665, #667, #670, #672)", () => {
 
     sync.listed([deleted]);
     expect(sync.status("p")).toBe("synced");
+  });
+
+  it("keeps a delete through a good load, and lifts only the delete when the project is listed again", async () => {
+    const browser = createMemoryBrowser();
+    const deleted = project("p", 10);
+    const { sync } = client(null, browser);
+
+    await sync.deleteProject("p");
+    // A read that finds nothing still leaves the project deleted.
+    expect((await sync.open(deleted, undefined)).kind).toBe("loaded");
+    expect(sync.status("p")).toBe("deleted");
+
+    // A listed project that then fails to load stays refused.
+    sync.listed([deleted]);
+    browser.records.set("p", { id: "p", revision: 10, updatedAt: 10, skfPackage: new Uint8Array([1]) });
+    expect((await sync.open(deleted, undefined)).kind).toBe("failed");
+    sync.listed([deleted]);
+    expect(sync.status("p")).toBe("unreadable");
   });
 
   it("keeps a delete across tabs: another tab's stale list and late save cannot bring it back", async () => {

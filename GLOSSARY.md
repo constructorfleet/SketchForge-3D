@@ -12,9 +12,17 @@ _Avoid_: bind predicate, binding conflict check
 The server's lasting note that a project was deleted, with the revisions it had then. While it exists, the dashboard cannot save the project again. The REST API does not read it.
 _Avoid_: tombstone (in prose)
 
+**Kept copy**:
+The newest unsaved copy of a project whose save was refused because it was conflicted or deleted. The dashboard offers it as Download my copy or Save as a new project.
+_Avoid_: conflicted copy, backup
+
 **Metadata revision**:
 The count of writes to a project's listed details (name, thumbnail, settings), kept apart from the revision.
 _Avoid_: metadata version
+
+**Project sync module**:
+The dashboard's single owner of project storage and sync, in `apps/web/src/lib/projectSync/`. It decides where projects are stored, moves them to server storage, queues their saves, and tracks each project's sync status. IndexedDB, `localStorage` and the server are adapters behind it.
+_Avoid_: storage layer, persistence helpers
 
 **Project write policy**:
 The rules that decide whether a write to a server-stored project is refused, and which revisions it leaves behind. The dashboard and the REST API apply the same policy with different options, so they do not refuse the same writes.
@@ -27,3 +35,7 @@ _Avoid_: request schema copy, contract rule
 **Revision**:
 The number that orders the stored versions of a project's package. A write based on an older revision is stale.
 _Avoid_: version, timestamp
+
+**Sync status**:
+One value per project saying whether this client may write it: synced, or held back as blocked, unreadable, unavailable, conflicted or deleted. Only a synced project is saved.
+_Avoid_: write guard, blocked flag
