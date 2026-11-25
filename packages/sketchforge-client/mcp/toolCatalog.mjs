@@ -9,8 +9,15 @@ import {
   STEP_KINDS,
   TAPER_KINDS,
 } from "./createShapeKinds.mjs";
-// Limits come from the engine's request definitions, a pure-data module.
-import { API_CONFIGURATION_NAME_MAX_LENGTH, API_PARAMETER_DIMENSIONS } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
+// Parameter tool arguments come from the engine's request definitions, a pure-data module.
+import {
+  API_CONFIGURATION_NAME_MAX_LENGTH,
+  API_QUERY_RULES,
+  API_REQUEST_BODIES,
+  API_REQUEST_FIELDS,
+  apiJsonSchema,
+  apiQueryJsonSchema,
+} from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
 
 /** What a drawing shows, as `POST /exports` and the engine name it. Kept in step by `localMcpEngine.test.ts`. */
 const PROJECTION_LAYOUTS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"];
@@ -36,7 +43,11 @@ const resultAttributeProperties = {
 
 const urlProperty = { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." };
 const projectIdProperty = { type: "string", description: "The project id." };
-const PARAMETER_DIMENSIONS = [...API_PARAMETER_DIMENSIONS];
+/** An argument sent in a request body, as the engine defines that field. */
+const bodyArgument = (schema, description) => ({ ...apiJsonSchema(schema), description });
+/** An argument sent as a query value, as the engine reads it. */
+const queryArgument = (rule, description) => ({ ...apiQueryJsonSchema(rule), description });
+const { parameterName, parameterExpression, parameterDimension, configurationName } = API_REQUEST_FIELDS;
 const CONFIGURATION_NAME_DESCRIPTION = `The configuration name, 1 to ${API_CONFIGURATION_NAME_MAX_LENGTH} characters.`;
 const WORKS_BOTH_WAYS = "Works offline or against a server when url is supplied.";
 const REFUSAL_FORMAT = "A refusal ends its first line with [code]; a second line, when present, is JSON detail.";
@@ -610,9 +621,9 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: "Parameter name: a letter or underscore, then letters, digits or underscores." },
-        expression: { type: "string", description: 'For example "2", "3 mm", "wall * 2 + 1" or "max(wall, 2)". Units: mm, cm, m, in, ft, deg, rad.' },
-        dimension: { type: "string", enum: PARAMETER_DIMENSIONS, description: "length values are in mm and angle values in degrees." },
+        name: bodyArgument(parameterName, "Parameter name: a letter or underscore, then letters, digits or underscores."),
+        expression: bodyArgument(parameterExpression, 'For example "2", "3 mm", "wall * 2 + 1" or "max(wall, 2)". Units: mm, cm, m, in, ft, deg, rad.'),
+        dimension: bodyArgument(parameterDimension, "length values are in mm and angle values in degrees."),
       },
     },
   },
@@ -625,8 +636,8 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: "The current name." },
-        newName: { type: "string", description: "The new name." },
+        name: queryArgument(API_QUERY_RULES.parameterName, "The current name."),
+        newName: bodyArgument(parameterName, "The new name."),
       },
     },
   },
@@ -636,7 +647,7 @@ export const engineTools = [
     inputSchema: {
       type: "object",
       required: ["projectId", "name"],
-      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The parameter to delete." } },
+      properties: { url: urlProperty, projectId: projectIdProperty, name: queryArgument(API_QUERY_RULES.parameterName, "The parameter to delete.") },
     },
   },
   {
@@ -678,8 +689,8 @@ export const engineTools = [
         url: urlProperty,
         projectId: projectIdProperty,
         shapeId: { type: "string", description: "The sketch output shape, or its sketchSourceId." },
-        constraintId: { type: "string", description: 'The constraint id in the sketch profile, such as "width".' },
-        expression: { type: ["string", "null"], description: 'For example "w * 2". null removes the binding.' },
+        constraintId: queryArgument(API_QUERY_RULES.constraintId, 'The constraint id in the sketch profile, such as "width".'),
+        expression: bodyArgument(API_REQUEST_BODIES.bindSketchConstraint.properties.expression, 'For example "w * 2". null removes the binding.'),
       },
     },
   },
@@ -703,8 +714,8 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION },
-        overrides: { type: "object", additionalProperties: { type: "string" }, description: 'Parameter name to expression, for example { "wall": "3 mm" }.' },
+        name: bodyArgument(configurationName, CONFIGURATION_NAME_DESCRIPTION),
+        overrides: bodyArgument(API_REQUEST_BODIES.createParameterConfiguration.properties.overrides, 'Parameter name to expression, for example { "wall": "3 mm" }.'),
       },
     },
   },
@@ -714,7 +725,7 @@ export const engineTools = [
     inputSchema: {
       type: "object",
       required: ["projectId", "name", "newName"],
-      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION }, newName: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION } },
+      properties: { url: urlProperty, projectId: projectIdProperty, name: queryArgument(API_QUERY_RULES.configurationName, CONFIGURATION_NAME_DESCRIPTION), newName: bodyArgument(configurationName, CONFIGURATION_NAME_DESCRIPTION) },
     },
   },
   {
@@ -732,16 +743,16 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION },
-        parameter: { type: "string", description: "The parameter to override." },
-        expression: { type: ["string", "null"], description: 'For example "3 mm". null removes the override.' },
+        name: queryArgument(API_QUERY_RULES.configurationName, CONFIGURATION_NAME_DESCRIPTION),
+        parameter: bodyArgument(parameterName, "The parameter to override."),
+        expression: bodyArgument(API_REQUEST_BODIES.updateParameterConfiguration.oneOf[1].properties.expression, 'For example "3 mm". null removes the override.'),
       },
     },
   },
   {
     name: "sketchforge_delete_parameter_configuration",
     description: `Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes, so it can be refused as an activation can. ${REFUSAL_FORMAT} Codes: configuration_not_found, invalid_request, and for the active one invalid_expression (a bound result out of range), shape_locked (a bound shape that would change is locked) and geometry_failed (a bound sketch cannot be solved). ${WORKS_BOTH_WAYS}`,
-    inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION } } },
+    inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: queryArgument(API_QUERY_RULES.configurationName, CONFIGURATION_NAME_DESCRIPTION) } },
   },
   {
     name: "sketchforge_activate_parameter_configuration",
@@ -755,7 +766,7 @@ export const engineTools = [
     inputSchema: {
       type: "object",
       required: ["projectId", "name"],
-      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: ["string", "null"], description: "The configuration to activate, or null for the base table." } },
+      properties: { url: urlProperty, projectId: projectIdProperty, name: bodyArgument(API_REQUEST_BODIES.activateParameterConfiguration.properties.name, "The configuration to activate, or null for the base table.") },
     },
   },
 ];

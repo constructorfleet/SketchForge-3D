@@ -320,6 +320,8 @@ export {
   API_QUERY_RULES,
   API_REQUEST_BODIES,
   API_REQUEST_FIELDS,
+  apiJsonSchema,
+  apiQueryJsonSchema,
   matchesApiSchema,
   readApiQueryValue,
   type ApiQueryRule,

@@ -218,3 +218,41 @@ export function readApiQueryValue(value: unknown, rule: ApiQueryRule): string | 
   if (rule.pattern && !new RegExp(rule.pattern).test(read)) return undefined;
   return read;
 }
+
+/** Writes a definition as standard JSON Schema: `nullable` joins `type`, lengths become `minLength`/`maxLength`. */
+export function apiJsonSchema(schema: ApiSchema): Record<string, unknown> {
+  if (schema.oneOf) return { oneOf: schema.oneOf.map(apiJsonSchema) };
+  const result: Record<string, unknown> = { type: schema.nullable ? [schema.type, "null"] : schema.type };
+  if (schema.not) result.not = apiJsonSchema(schema.not);
+  if (schema.required) result.required = [...schema.required];
+  if (schema.enum) result.enum = [...schema.enum, ...(schema.nullable ? [null] : [])];
+  if (schema.default !== undefined) result.default = schema.default;
+  if (schema.minimum !== undefined) result.minimum = schema.minimum;
+  if (schema.maximum !== undefined) result.maximum = schema.maximum;
+  if (schema.exclusiveMinimum !== undefined) result.exclusiveMinimum = schema.exclusiveMinimum;
+  if (schema.exclusiveMaximum !== undefined) result.exclusiveMaximum = schema.exclusiveMaximum;
+  if (schema.minimumLength !== undefined) result.minLength = schema.minimumLength;
+  if (schema.maximumLength !== undefined) result.maxLength = schema.maximumLength;
+  if (schema.pattern !== undefined) result.pattern = schema.pattern;
+  if (schema.minItems !== undefined) result.minItems = schema.minItems;
+  if (schema.maxItems !== undefined) result.maxItems = schema.maxItems;
+  if (schema.uniqueItems !== undefined) result.uniqueItems = schema.uniqueItems;
+  if (schema.description !== undefined) result.description = schema.description;
+  if (schema.format !== undefined) result.format = schema.format;
+  if (schema.properties) result.properties = Object.fromEntries(Object.entries(schema.properties).map(([name, child]) => [name, apiJsonSchema(child)]));
+  if (schema.patternProperties) result.patternProperties = Object.fromEntries(Object.entries(schema.patternProperties).map(([pattern, child]) => [pattern, apiJsonSchema(child)]));
+  if (schema.anyOf) result.anyOf = schema.anyOf.map(apiJsonSchema);
+  if (schema.items) result.items = apiJsonSchema(schema.items);
+  if (schema.additionalProperties !== undefined) result.additionalProperties = typeof schema.additionalProperties === "boolean" ? schema.additionalProperties : apiJsonSchema(schema.additionalProperties);
+  return result;
+}
+
+/** Writes a query rule as JSON Schema. JSON Schema cannot trim, so a trimmed rule's lengths bound the trimmed value. */
+export function apiQueryJsonSchema(rule: ApiQueryRule): Record<string, unknown> {
+  return {
+    type: rule.type,
+    ...(rule.pattern ? { pattern: rule.pattern } : {}),
+    ...(rule.minLength !== undefined ? { minLength: rule.minLength } : {}),
+    ...(rule.maxLength !== undefined ? { maxLength: rule.maxLength } : {}),
+  };
+}

@@ -13,6 +13,7 @@ const definitionsPath = path.join(root, "packages/sketchforge-engine/src/apiRequ
 const definitionsUrl = moduleUrl(await readFile(definitionsPath, "utf8"), definitionsPath, {});
 const contractUrl = moduleUrl(await readFile(contractPath, "utf8"), contractPath, { [definitionsSpecifier]: definitionsUrl });
 const { API_V1_OPERATIONS } = await import(contractUrl);
+const { apiJsonSchema: toJsonSchema, apiQueryJsonSchema } = await import(definitionsUrl);
 
 const paths = {};
 const omitted = [];
@@ -53,12 +54,7 @@ for (const operation of API_V1_OPERATIONS) {
       in: "query",
       required: operation.query.required.includes(name),
       ...(rule.description ? { description: rule.description } : {}),
-      schema: {
-        type: rule.type,
-        ...(rule.pattern ? { pattern: rule.pattern } : {}),
-        ...(rule.minLength !== undefined ? { minLength: rule.minLength } : {}),
-        ...(rule.maxLength !== undefined ? { maxLength: rule.maxLength } : {}),
-      },
+      schema: apiQueryJsonSchema(rule),
     }));
   }
   if (operation.ifMatch) {
@@ -145,33 +141,6 @@ function omissionReason(operation) {
   if (operation.response) return "The current metadata uses custom validation rules that are not fully expressible in its JSON Schema.";
   if (operation.requestBody && !operation.requestBody.schema && !operation.requestBody.content) return "Request body schema is not declared.";
   return undefined;
-}
-
-function toJsonSchema(schema) {
-  if (schema.oneOf) return { oneOf: schema.oneOf.map(toJsonSchema) };
-  const result = { type: schema.nullable ? [schema.type, "null"] : schema.type };
-  if (schema.not) result.not = toJsonSchema(schema.not);
-  if (schema.required) result.required = [...schema.required];
-  if (schema.enum) result.enum = [...schema.enum, ...(schema.nullable ? [null] : [])];
-  if (schema.default !== undefined) result.default = schema.default;
-  if (schema.minimum !== undefined) result.minimum = schema.minimum;
-  if (schema.maximum !== undefined) result.maximum = schema.maximum;
-  if (schema.exclusiveMinimum !== undefined) result.exclusiveMinimum = schema.exclusiveMinimum;
-  if (schema.exclusiveMaximum !== undefined) result.exclusiveMaximum = schema.exclusiveMaximum;
-  if (schema.minimumLength !== undefined) result.minLength = schema.minimumLength;
-  if (schema.maximumLength !== undefined) result.maxLength = schema.maximumLength;
-  if (schema.pattern !== undefined) result.pattern = schema.pattern;
-  if (schema.minItems !== undefined) result.minItems = schema.minItems;
-  if (schema.maxItems !== undefined) result.maxItems = schema.maxItems;
-  if (schema.uniqueItems !== undefined) result.uniqueItems = schema.uniqueItems;
-  if (schema.description !== undefined) result.description = schema.description;
-  if (schema.format !== undefined) result.format = schema.format;
-  if (schema.properties) result.properties = Object.fromEntries(Object.entries(schema.properties).map(([name, child]) => [name, toJsonSchema(child)]));
-  if (schema.patternProperties) result.patternProperties = Object.fromEntries(Object.entries(schema.patternProperties).map(([pattern, child]) => [pattern, toJsonSchema(child)]));
-  if (schema.anyOf) result.anyOf = schema.anyOf.map(toJsonSchema);
-  if (schema.items) result.items = toJsonSchema(schema.items);
-  if (schema.additionalProperties !== undefined) result.additionalProperties = typeof schema.additionalProperties === "boolean" ? schema.additionalProperties : toJsonSchema(schema.additionalProperties);
-  return result;
 }
 
 function responseDescription(status) {
