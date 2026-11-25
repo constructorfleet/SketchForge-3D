@@ -43,6 +43,7 @@ This page summarizes active tracked work. Issue status remains authoritative.
 
 - The [documentation suite specification](DOCUMENTATION_SUITE_SPEC.md) tracks partial source ownership diagnostics and broader task-workflow coverage as open work.
 - The [site migration status](site-migration.md) records unmapped editor/UI sources, examples, and content sources as open ownership work.
+- [#674: Keep the package-reference contract hook within the Windows CI budget](https://github.com/constructorfleet/SketchForge-3D/issues/674) — the generator now shares a TypeScript program across both API references, and the test hook allows 30 seconds. Local generation and the package contract tests pass; the PR's Windows unit job passed in 5m5s with the hook completing.
 
 ## Dependency maintenance
 

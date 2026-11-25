@@ -15,7 +15,7 @@ describe("package documentation contract", () => {
       encoding: "utf8",
     });
     if (result.status !== 0) throw new Error(result.stderr || "Package reference generation failed");
-  });
+  }, 30_000);
 
   afterAll(() => rmSync(generatedReferences, { recursive: true, force: true }));
 

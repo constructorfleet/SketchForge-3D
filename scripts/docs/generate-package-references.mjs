@@ -22,8 +22,7 @@ function engineApiArea(name) {
   return ENGINE_API_GROUPS.find((group) => group.test.test(name))?.title ?? "Geometry and CAD";
 }
 
-async function formatTypeScriptReference(entry, packageName, packagePath, sourcePath) {
-  const program = ts.createProgram([entry], { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, skipLibCheck: true });
+async function formatTypeScriptReference(program, entry, packageName, packagePath, sourcePath) {
   const checker = program.getTypeChecker();
   const moduleSymbol = checker.getSymbolAtLocation(program.getSourceFile(entry));
   if (!moduleSymbol) throw new Error(`Cannot read public declaration module: ${entry}`);
@@ -79,9 +78,18 @@ async function formatTypeScriptReference(entry, packageName, packagePath, source
 }
 
 const generated = new Map();
-for (const [pkg, stem] of [["sketchforge-client", "typescript-client"], ["sketchforge-engine", "typescript-engine"]]) {
-  const entry = path.join(root, "packages", pkg, "dist/index.d.ts");
-  const markdown = await formatTypeScriptReference(entry, pkg === "sketchforge-client" ? "TypeScript client" : "Engine", `packages/${pkg}`, `packages/${pkg}/dist/index.d.ts`);
+const typeScriptPackages = [
+  { pkg: "sketchforge-client", stem: "typescript-client", name: "TypeScript client" },
+  { pkg: "sketchforge-engine", stem: "typescript-engine", name: "Engine" },
+].map((item) => ({ ...item, entry: path.join(root, "packages", item.pkg, "dist/index.d.ts") }));
+const typeScriptProgram = ts.createProgram(typeScriptPackages.map(({ entry }) => entry), {
+  target: ts.ScriptTarget.ES2022,
+  module: ts.ModuleKind.NodeNext,
+  moduleResolution: ts.ModuleResolutionKind.NodeNext,
+  skipLibCheck: true,
+});
+for (const { pkg, stem, name, entry } of typeScriptPackages) {
+  const markdown = await formatTypeScriptReference(typeScriptProgram, entry, name, `packages/${pkg}`, `packages/${pkg}/dist/index.d.ts`);
   generated.set(`${stem}.md`, markdown);
 }
 
