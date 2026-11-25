@@ -6,7 +6,7 @@ import {
   readProjectTombstones,
   removeProjectTombstones,
   withoutDeletedProjects,
-} from "@/lib/projectTombstones";
+} from "@/lib/projectSync/tombstones";
 
 // Issue #670: every tab of this browser shares the projects deleted here.
 function memoryStorage(initial: Record<string, string> = {}) {

@@ -1,40 +1,6 @@
-/**
- * Holds back writes to projects whose stored copy could not be loaded (#622).
- * A stand-in copy would otherwise autosave over the bytes a repair needs.
- */
-export type ProjectWriteGuard = {
-  block(projectId: string): void;
-  /** Allows writes again, after a good read or a confirmed replacement. */
-  release(projectId: string): void;
-  /** Refuses writes until `restore`, so a late save cannot recreate a deleted project (#665). */
-  forget(projectId: string): void;
-  /** Lifts `forget` once the project is listed again, for example after another client saved it. */
-  restore(projectId: string): void;
-  canWrite(projectId: string): boolean;
-};
+/** Storage errors and their classification, and list merging, for the project sync module. */
 
-export function createProjectWriteGuard(): ProjectWriteGuard {
-  const blocked = new Set<string>();
-  const deleted = new Set<string>();
-  return {
-    block: (projectId) => {
-      blocked.add(projectId);
-    },
-    release: (projectId) => {
-      blocked.delete(projectId);
-    },
-    forget: (projectId) => {
-      blocked.delete(projectId);
-      deleted.add(projectId);
-    },
-    restore: (projectId) => {
-      deleted.delete(projectId);
-    },
-    canWrite: (projectId) => !blocked.has(projectId) && !deleted.has(projectId),
-  };
-}
-
-/** Marks a write the guard refused, which the banner that blocked the project already reports. */
+/** Marks a write a project's sync status refused, which the banner that set it already reports. */
 export class ProjectWriteRefusedError extends Error {
   constructor(message: string) {
     super(message);
@@ -42,24 +8,12 @@ export class ProjectWriteRefusedError extends Error {
   }
 }
 
-/** Wraps a project write so it is refused, before any packing, while the project is blocked. */
-export function guardProjectWrites<A extends unknown[], R>(
-  guard: ProjectWriteGuard,
-  write: (projectId: string, ...args: A) => Promise<R>,
-  refusal: () => Error,
-): (projectId: string, ...args: A) => Promise<R> {
-  return async (projectId, ...args) => {
-    if (!guard.canWrite(projectId)) throw refusal();
-    return write(projectId, ...args);
-  };
-}
-
 /** Returns the cache with an editor snapshot applied, unless the project is blocked or holds a newer entry. */
 export function cacheWithEditorChange<T extends { revision: number }>(
   current: Record<string, T>,
   projectId: string,
   entry: T,
-  guard: ProjectWriteGuard,
+  guard: { canWrite(projectId: string): boolean },
 ): Record<string, T> {
   if (!guard.canWrite(projectId)) return current;
   const existing = current[projectId];

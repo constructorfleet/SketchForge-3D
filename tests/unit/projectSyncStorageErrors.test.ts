@@ -1,82 +1,27 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   StoredProjectMissingError,
   StoredProjectUnreadableError,
   cacheWithEditorChange,
-  createProjectWriteGuard,
-  guardProjectWrites,
   indexedDbReadIsPermanent,
   mergeNewerServerProjects,
   projectLoadFailureCause,
   projectLoadFailureKind,
-} from "@/lib/projectWriteGuard";
+} from "@/lib/projectSync/storageErrors";
 
-// Issue #622: a project whose stored package fails to load must not be overwritten.
-describe("project write guard", () => {
-  it("refuses writes to a blocked project until it is released", () => {
-    const guard = createProjectWriteGuard();
-    guard.block("broken");
-    expect(guard.canWrite("broken")).toBe(false);
-    expect(guard.canWrite("other")).toBe(true);
-    guard.release("broken");
-    expect(guard.canWrite("broken")).toBe(true);
-  });
+// Issue #622: a late editor snapshot must not put a refused project back in the cache.
+describe("applying an editor snapshot to the cache", () => {
+  const refusing = (...ids: string[]) => ({ canWrite: (projectId: string) => !ids.includes(projectId) });
 
-  it("refuses a guarded write to a blocked project without calling the write", async () => {
-    const guard = createProjectWriteGuard();
-    const write = vi.fn(async (_projectId: string, bytes: number) => bytes);
-    const save = guardProjectWrites(guard, write, () => new Error("refused"));
-    guard.block("broken");
-    await expect(save("broken", 1)).rejects.toThrow("refused");
-    expect(write).not.toHaveBeenCalled();
-    await expect(save("other", 2)).resolves.toBe(2);
-    guard.release("broken");
-    await expect(save("broken", 3)).resolves.toBe(3);
-    expect(write).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not let a late editor snapshot put a blocked project back in the cache", () => {
-    const guard = createProjectWriteGuard();
+  it("leaves the cache alone for a project whose writes are refused", () => {
     const current = { other: { revision: 1 } };
-    guard.block("broken");
-    expect(cacheWithEditorChange(current, "broken", { revision: 9 }, guard)).toBe(current);
-    expect(cacheWithEditorChange(current, "fine", { revision: 9 }, guard)).toEqual({ other: { revision: 1 }, fine: { revision: 9 } });
-  });
-
-  // Issue #665: a save that publishes after a delete must not recreate the project.
-  it("refuses every later write to a deleted project, even after a release", async () => {
-    const guard = createProjectWriteGuard();
-    const write = vi.fn(async (_projectId: string) => "written");
-    const save = guardProjectWrites(guard, write, () => new Error("refused"));
-    guard.block("gone");
-    guard.forget("gone");
-    guard.release("gone");
-    expect(guard.canWrite("gone")).toBe(false);
-    await expect(save("gone")).rejects.toThrow("refused");
-    expect(write).not.toHaveBeenCalled();
-    const current = { other: { revision: 1 } };
-    expect(cacheWithEditorChange(current, "gone", { revision: 9 }, guard)).toBe(current);
-    expect(guard.canWrite("other")).toBe(true);
-  });
-
-  it("writes a deleted project again once another client brings it back into the list", async () => {
-    const guard = createProjectWriteGuard();
-    const write = vi.fn(async (_projectId: string) => "written");
-    const save = guardProjectWrites(guard, write, () => new Error("refused"));
-    guard.forget("gone");
-    guard.restore("gone");
-    expect(guard.canWrite("gone")).toBe(true);
-    await expect(save("gone")).resolves.toBe("written");
-    // A load failure still blocks a restored project.
-    guard.block("gone");
-    guard.restore("gone");
-    expect(guard.canWrite("gone")).toBe(false);
+    expect(cacheWithEditorChange(current, "broken", { revision: 9 }, refusing("broken"))).toBe(current);
+    expect(cacheWithEditorChange(current, "fine", { revision: 9 }, refusing("broken"))).toEqual({ other: { revision: 1 }, fine: { revision: 9 } });
   });
 
   it("keeps a newer cached entry over an older editor snapshot", () => {
-    const guard = createProjectWriteGuard();
     const current = { project: { revision: 5 } };
-    expect(cacheWithEditorChange(current, "project", { revision: 4 }, guard)).toBe(current);
+    expect(cacheWithEditorChange(current, "project", { revision: 4 }, refusing())).toBe(current);
   });
 });
 

@@ -3,7 +3,7 @@ import {
   SERVER_SYNCED_REVISIONS_STORAGE_KEY,
   readServerSyncedRevisions,
   writeServerSyncedRevisions,
-} from "@/lib/serverSyncedRevisions";
+} from "@/lib/projectSync/syncedRevisions";
 
 function memoryStorage(initial?: string) {
   const values = new Map<string, string>(initial === undefined ? [] : [[SERVER_SYNCED_REVISIONS_STORAGE_KEY, initial]]);
