@@ -863,7 +863,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       required: ["projectId", "shapeId"],
       properties: {
         projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -921,7 +921,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       required: ["projectId", "shapeId"],
       properties: {
         projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
         topology: { type: "string", pattern: "^(mesh|exact)$", description: "Optional. Use exact to list analytic B-rep faces on a supported plain full-turn sketch revolve; the default mesh listing keeps its existing indexes." },
       },
     },
@@ -1050,7 +1050,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       required: ["projectId", "shapeId"],
       properties: {
         projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -1149,7 +1149,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       required: ["projectId", "shapeId"],
       properties: {
         projectId: { ...API_QUERY_RULES.projectId, description: "Whitespace is trimmed before validation. ID starts with a letter or digit and contains only letters, digits, underscores, and hyphens." },
-        shapeId: { type: "string", trim: true, minLength: 1, description: "Whitespace is trimmed; the remaining value must not be empty." },
+        shapeId: { ...API_QUERY_RULES.shapeId, description: "Whitespace is trimmed; the remaining value must not be empty." },
       },
     },
     responseSchemas: {
@@ -1192,7 +1192,7 @@ const API_V1_OPERATIONS_BASE: readonly ApiV1Operation[] = [
       required: ["projectId", "shapeId"],
       properties: {
         projectId: API_QUERY_RULES.projectId,
-        shapeId: { type: "string", trim: true, minLength: 1 },
+        shapeId: API_QUERY_RULES.shapeId,
       },
     },
     responseSchemas: {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { API_V1_OPERATIONS } from "@/lib/apiV1OperationContract";
 import { API_ERROR_CODES, API_QUERY_RULES, API_REQUEST_BODIES } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
@@ -26,11 +28,19 @@ describe("request definitions", () => {
     expect(rules("bindSketchConstraint").constraintId).toBe(API_QUERY_RULES.constraintId);
     expect(rules("bindSketchConstraint").shapeId).toBe(API_QUERY_RULES.shapeId);
     for (const item of API_V1_OPERATIONS) {
-      const projectId = item.query?.properties.projectId;
-      if (!projectId) continue;
-      const { description: _description, ...rule } = projectId;
-      expect(rule, item.operationId).toEqual(API_QUERY_RULES.projectId);
+      for (const name of ["projectId", "shapeId"] as const) {
+        const published = item.query?.properties[name];
+        if (!published) continue;
+        const { description: _description, ...rule } = published;
+        expect(rule, `${item.operationId} ${name}`).toEqual(API_QUERY_RULES[name]);
+      }
     }
+  });
+
+  it("are not restated in the contract source", () => {
+    // Equal copies pass the checks above; only the source shows they are copies.
+    const source = readFileSync(path.resolve(__dirname, "../../apps/web/src/lib/apiV1OperationContract.ts"), "utf8");
+    expect(source.match(/\btrim: true\b/g) ?? []).toEqual([]);
   });
 
   it("supply the error codes the contract publishes", () => {
