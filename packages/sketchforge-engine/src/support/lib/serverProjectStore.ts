@@ -16,9 +16,10 @@
 // The route and the dashboard import this module, so it must not pull React in.
 import { LocalizedError, errorFromResponse, type ErrorKey, type ErrorResponseFields } from "../i18n/LocalizedError.js";
 import { apiProjectId } from "../../apiErrors.js";
-import { operatorSettingName } from "./operatorConfiguration.js";
+// Type-only: the registry JSON must stay out of the browser bundle.
+import type { OperatorSettingName } from "./operatorConfiguration.js";
 
-export const SERVER_PROJECTS_ENV = operatorSettingName("SKETCHFORGE_PROJECTS_DIR");
+export const SERVER_PROJECTS_ENV = "SKETCHFORGE_PROJECTS_DIR" satisfies OperatorSettingName;
 export const SERVER_PROJECTS_ENDPOINT = "/api/projects";
 
 /** A project id as the server will spell it on disk, or null when it cannot be one. */

@@ -112,4 +112,11 @@ describe("server project store imports", () => {
 
     expect(statements).toEqual(['export * from "@constructorfleet/sketchforge-engine/support/lib/serverProjectStore";']);
   });
+
+  it("keeps the operator configuration registry out of the browser bundle", async () => {
+    const source = await readFile(new URL("../../packages/sketchforge-engine/src/support/lib/serverProjectStore.ts", import.meta.url), "utf8");
+    const valueImports = [...source.matchAll(/^import (?!type ).*? from "(.+?)";$/gm)].map((match) => match[1]);
+
+    expect(valueImports.filter((specifier) => specifier.includes("operatorConfiguration") || specifier.endsWith(".json"))).toEqual([]);
+  });
 });

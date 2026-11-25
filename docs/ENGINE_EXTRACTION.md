@@ -308,6 +308,7 @@ classified by hand:
 | `WorkplaneViewport.tsx:8431-8630` | ~200 | **yes, extracted** | The eight pure builders. §6.1. |
 | `SketchForgeEditor.tsx:1966-2181` | ~215 | **deleted** | The duplicate. |
 | `types/sketchforge.ts` | 321 | **yes** | The shape union. |
+| `lib/serverProjectStore.ts` | 258 | **moved** (#677) | Listed under §2.2 when this was written. The engine's `support/lib/serverProjectStore.ts` is now the only copy, and this path re-exports it. It holds the shared names and revision readers, and the browser's `fetch` client for `/api/projects`. |
 
 ### 2.2 What stays
 
@@ -315,7 +316,6 @@ classified by hand:
 |---|---|---|
 | `components/WorkplaneViewport.tsx` | 8670 | Renderer, camera, overlays, pointer handling. Lines 5634–7505 are DOM- and `DOMRect`-coupled throughout. |
 | `components/SketchForgeEditor.tsx` | 11263 | React state, history wiring, the whole UI. |
-| `lib/serverProjectStore.ts` | 141 | Despite the name this is the **browser's** `fetch` client for `/api/projects`. Misleading; worth renaming independently of this work. Since #677 the only copy is the engine's `support/lib/serverProjectStore.ts`; this path re-exports it. |
 | `lib/useRotationMode.ts` | 91 | A React hook. |
 | `lib/appTheme.ts` | 47 | `window.matchMedia`, `document.documentElement`. |
 | `lib/sketchforgeMcpStore.ts`, `sketchforgeMcpProtocol.ts` | 200 / 138 | The live-editor bridge. Belongs to the app, not the engine. §9. |

@@ -60,7 +60,7 @@ test('public configuration registry agrees with server, container, client, MCP, 
       }
     }
   }
-  assert.match(await source('packages/sketchforge-engine/src/support/lib/serverProjectStore.ts'), /operatorSettingName\("SKETCHFORGE_PROJECTS_DIR"\)/);
+  assert.match(await source('packages/sketchforge-engine/src/support/lib/serverProjectStore.ts'), /"SKETCHFORGE_PROJECTS_DIR" satisfies OperatorSettingName/);
   assert.match(await source('apps/web/src/lib/apiTokens.ts'), /operatorSettingName\("SKETCHFORGE_API_TOKEN"\)/);
   assert.match(await source('apps/web/src/app/api/shared-projects/route.ts'), /operatorSettingName\("SKETCHFORGE_SHARED_PROJECTS_DIR"\)/);
 });

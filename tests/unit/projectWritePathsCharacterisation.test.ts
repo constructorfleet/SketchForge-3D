@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DELETE, POST } from "@/app/api/projects/route";
+import { DELETE, GET, POST } from "@/app/api/projects/route";
 import { POST as createApiProject } from "@/app/api/v1/projects/route";
 import { PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { API_TOKEN_ENV } from "@/lib/apiTokens";
@@ -684,6 +684,34 @@ describe("dashboard POST /api/projects revision rules", () => {
         "status": 200,
       }
     `);
+  });
+});
+
+describe("stored sidecar text and revision headers", () => {
+  it("writes the dashboard sidecar as indented JSON and serves the package with its revision", async () => {
+    await seed(stored, [1]);
+    await post({ project: bytes, revision: "30", baseRevision: "20" });
+    expect(await fs.readFile(path.join(root, "p1.json"), "utf8")).toBe(`${JSON.stringify({ ...stored, revision: 30 }, null, 2)}\n`);
+    const served = await GET(new Request("http://localhost/api/projects?projectId=p1"));
+    expect(served.headers.get("X-SketchForge-Revision")).toBe("30");
+  });
+
+  it("writes the REST sidecar as indented JSON and answers with the new revision as the ETag", async () => {
+    const authorized = (url: string, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+      headers.set("Authorization", `Bearer ${TOKEN}`);
+      headers.set("Content-Type", "application/json");
+      return new Request(`http://localhost${url}`, { ...init, headers });
+    };
+    const created = await createApiProject(authorized("/api/v1/projects", { method: "POST", body: JSON.stringify({ name: "Pinned" }) }));
+    const projectId = (await created.json() as { project: { id: string } }).project.id;
+    const shapes = await createShapes(authorized(`/api/v1/shapes?projectId=${projectId}`, { method: "POST", body: JSON.stringify({ kind: "cube", size: 10 }) }));
+    const { revision } = await shapes.json() as { revision: number };
+
+    expect(shapes.headers.get("etag")).toBe(`"${revision}"`);
+    const text = await fs.readFile(path.join(root, `${projectId}.json`), "utf8");
+    expect(text).toBe(`${JSON.stringify(JSON.parse(text), null, 2)}\n`);
+    expect(JSON.parse(text)).toMatchObject({ revision, updatedAt: revision, shapes: 1, metadataRevision: 1 });
   });
 });
 
