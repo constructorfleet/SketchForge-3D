@@ -151,6 +151,31 @@ describe("validateBinding", () => {
     expect(validateBinding({ roots: [sized], target }, change)).toMatchObject({ ok: false, failure: { error: { code: "conflictingBinding" } } });
     expect(validateBinding({ roots: [sized], target }, { ...change, clearedFields: ["width"] })).toEqual({ ok: true, value: undefined });
   });
+
+  it("looks up the constraint before the rebuild recipe, the expression and a clear", () => {
+    const recipeless = output("recipeless", { sketchOperation: undefined });
+    const target = { shape: recipeless, topLevel: true };
+    const missing = { constraintId: "missing", constraint: undefined };
+    expect(validateBinding({ roots: [recipeless], target, parameters }, { ...missing, expression: "nope" }))
+      .toMatchObject({ ok: false, failure: { reason: "constraint_binding_invalid", error: { code: "constraintNotFound", constraintId: "missing" } } });
+    expect(validateBinding({ roots: [recipeless], target, parameters }, { ...missing, expression: null }))
+      .toMatchObject({ ok: false, failure: { error: { code: "constraintNotFound" } } });
+  });
+
+  it("checks where a field binding may sit before its expression", () => {
+    const child = output("child", plain);
+    const group = { ...output("group", plain), groupedShapes: [child] };
+    expect(validateBinding({ roots: [group], target: { shape: child, topLevel: false }, parameters }, { field: "width", expression: "nope" }))
+      .toMatchObject({ ok: false, failure: { reason: "binding_invalid", error: { code: "fieldNotBindable", field: "width" } } });
+  });
+
+  it("reports the output's own bound size before a bound group size", () => {
+    const nested = output("nested", { expressions: { width: "w" } });
+    const group = { ...output("group", plain), expressions: { depth: "w" }, groupedShapes: [nested] };
+    const change = { constraintId: "width", constraint: widthConstraint(), expression: "w" };
+    expect(validateBinding({ roots: [group], target: { shape: nested, topLevel: false } }, change))
+      .toMatchObject({ ok: false, failure: { error: { code: "conflictingBinding", fields: ["width"] } } });
+  });
 });
 
 describe("deprecated binding predicates", () => {
