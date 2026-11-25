@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { activateConfiguration, addConfiguration, resolveProjectParameters, type ProjectParameterInput } from "@constructorfleet/sketchforge-engine/projectParameters";
 import { shapeFromRequest } from "@constructorfleet/sketchforge-engine";
 import {
-  hostProjectSync,
-  hostSyncCancelsPendingPublish,
   mergeRecomputedShapes,
   parameterDeleteWarning,
   parameterRecomputeResponseMessage,
@@ -94,40 +92,6 @@ describe("applyBindingsLocally", () => {
     // A shape-field binding inside a group is stale to the engine, so nothing moves.
     const group = box("g", { groupedShapes: [box("c", { expressions: { width: "h" } })] });
     expect(applyBindingsLocally([group], before, after)).toEqual({ ok: true, shapes: [group] });
-  });
-});
-
-describe("hostProjectSync", () => {
-  const base = { projectChanged: false, hostTableKey: "t1", knownTableKey: "t1", incomingShapesKey: "s1", echoShapesKey: "s1", syncedShapesKey: "s1", currentShapesKey: "s1" };
-
-  it("keeps an unpublished local edit when the host re-sends the shapes it already had (#657)", () => {
-    // A box added 120 ms before its save publishes; a host re-render repeats the empty scene.
-    expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "empty", syncedShapesKey: "empty", currentShapesKey: "box" }))
-      .toEqual({ adoptTable: false, action: "echo" });
-  });
-
-  it("ignores the echo of the editor's own save", () => {
-    expect(hostProjectSync(base)).toEqual({ adoptTable: false, action: "echo" });
-  });
-
-  it("adopts a remote table change and rehydrates history even when the shapes are unchanged", () => {
-    expect(hostProjectSync({ ...base, hostTableKey: "t2" })).toEqual({ adoptTable: true, action: "hydrate" });
-    expect(hostProjectSync({ ...base, hostTableKey: "t2", echoShapesKey: null })).toEqual({ adoptTable: true, action: "hydrate" });
-  });
-
-  it("skips unchanged shapes and hydrates changed ones or a new project", () => {
-    expect(hostProjectSync({ ...base, echoShapesKey: null })).toEqual({ adoptTable: false, action: "unchanged" });
-    expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" })).toEqual({ adoptTable: false, action: "hydrate" });
-    expect(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2", currentShapesKey: "s3" })).toEqual({ adoptTable: false, action: "hydrate" });
-    expect(hostProjectSync({ ...base, projectChanged: true })).toEqual({ adoptTable: true, action: "hydrate" });
-  });
-
-  it("cancels a pending publish only when the host state replaces the editor's (#663)", () => {
-    // An undone table waits 120 ms to publish; a host re-render with the old table is not newer.
-    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, echoShapesKey: null }))).toBe(false);
-    expect(hostSyncCancelsPendingPublish(hostProjectSync(base))).toBe(false);
-    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, echoShapesKey: null, incomingShapesKey: "s2" }))).toBe(true);
-    expect(hostSyncCancelsPendingPublish(hostProjectSync({ ...base, hostTableKey: "t2" }))).toBe(true);
   });
 });
 

@@ -12,6 +12,10 @@ _Avoid_: bind predicate, binding conflict check
 The server's lasting note that a project was deleted, with the revisions it had then. While it exists, the dashboard cannot save the project again. The REST API does not read it.
 _Avoid_: tombstone (in prose)
 
+**Editor publish module**:
+The editor's single owner of how its project reaches the dashboard, in `apps/web/src/lib/editorPublish.ts`. It holds the publish that waits 120 ms after an edit. It decides whether the dashboard's props are the editor's own echo, unchanged, or a change that replaces the scene. It sends a waiting publish early when the editor switches project or unmounts, and drops it when the project closes. The editor component only forwards events to it.
+_Avoid_: sync effect, publish timer
+
 **Kept copy**:
 The newest unsaved copy of a project whose save was refused because it was conflicted or deleted. The dashboard offers it as Download my copy or Save as a new project.
 _Avoid_: conflicted copy, backup
