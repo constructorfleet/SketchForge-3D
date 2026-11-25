@@ -96,11 +96,9 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
   /** Set by a hydrate, so its own render is not published back. */
   let hydrating = false;
   let interacting = false;
-  let interactionBaseline: WorkplaneShape[] | null = null;
   /** The scene held while an interaction runs, published once it ends. */
   let held: WorkplaneShape[] | null = null;
   let resume: unknown = null;
-  let resumeHasChanges = false;
 
   function cancelPending() {
     if (!pending) return;
@@ -112,7 +110,6 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
     if (resume === null) return;
     scheduler.clear(resume);
     resume = null;
-    resumeHasChanges = false;
   }
 
   function send(target: string, shapes: WorkplaneShape[], key: string) {
@@ -173,12 +170,11 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
    * No project drops it: it named a project that closed, perhaps deleted (#665).
    */
   function projectChanged(next: string | null) {
-    // A resumed interaction belongs to the project that was open when it ended. If another
-    // project loads before the settle timer, publish the old scene now under that old ID.
+    // A drag's settle belongs to the project it ended in: send it now, under that project.
+    // An unchanged scene is skipped by the synced key.
     if (next !== null && resume !== null) {
-      const changedDuringInteraction = resumeHasChanges;
       cancelResume();
-      if (changedDuringInteraction) localEdit(host.currentShapes(), { immediate: true });
+      localEdit(host.currentShapes(), { immediate: true });
     }
     projectId = next;
     // It would read the next project's scene.
@@ -186,7 +182,6 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
     if (next === null) {
       cancelPending();
       held = null;
-      interactionBaseline = null;
       hostProjectId = null;
       syncedKey = "";
       echoKey = null;
@@ -226,7 +221,6 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
 
   function interactionStarted() {
     cancelResume();
-    interactionBaseline = host.currentShapes();
     if (pending) {
       if (pending.force) flushPending();
       else cancelPending();
@@ -238,21 +232,11 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
   /** A pointer interaction ended: the held scene publishes after a short settle. */
   function interactionEnded() {
     interacting = false;
-    const baseline = interactionBaseline;
-    interactionBaseline = null;
-    const shapes = host.currentShapes();
-    const baselineKey = baseline && projectShapesFingerprint(baseline.map(canonicalizeShape));
-    const currentKey = projectShapesFingerprint(shapes.map(canonicalizeShape));
-    if (!held) {
-      held = null;
-      return;
-    }
+    if (!held) return;
     held = null;
     cancelResume();
-    resumeHasChanges = baselineKey !== currentKey;
     resume = scheduler.set(() => {
       resume = null;
-      resumeHasChanges = false;
       localEdit(host.currentShapes());
     }, INTERACTION_RESUME_MS);
   }

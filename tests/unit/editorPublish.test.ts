@@ -254,15 +254,16 @@ describe("editor publish module", () => {
     expect(props("a", [box("one")])).toMatchObject({ action: "hydrate", projectChanged: true });
   });
 
-  it("never resumes a held interaction under the next project", () => {
+  it("saves a held edit to its own project when another opens after a drag that moved nothing", () => {
     const { publisher, clock, sent, open, edit } = editor();
     open("a", []);
     edit([box("box")]);
     publisher.interactionStarted();
     publisher.interactionEnded();
     publisher.projectChanged("b");
+    expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
     clock.advance(500);
-    expect(sent).toEqual([]);
+    expect(sent).toHaveLength(1);
   });
 
   it("flushes a resumed drag publish to its original project when another project opens (#689)", () => {
