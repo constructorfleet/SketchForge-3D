@@ -6,9 +6,12 @@ import {
   deleteProjectFiles,
   ensureProjectsDirectory,
   listProjectRecords,
+  projectPackagePath,
   projectRecord,
   readProjectMetadata,
   readProjectPackage,
+  readProjectTombstone,
+  regularFileStat,
   withProjectLock,
   writeProjectMetadata,
   writeProjectPackage,
@@ -40,6 +43,11 @@ function disabledResponse() {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+/** `deletedRevision` lets a client tell whether the copy it holds is newer than the one deleted. */
+function deletedResponse(deletedRevision?: number) {
+  return errorResponse("errors.projects.deleted", 410, { conflict: "deleted", ...(deletedRevision !== undefined ? { deletedRevision } : {}) });
 }
 
 export async function GET(request: Request) {
@@ -129,8 +137,15 @@ export async function POST(request: Request) {
     const baseMetadataRevision = typeof baseMetadataField === "string" ? Number(baseMetadataField) : undefined;
 
     const locked = await withProjectLock(root, projectId, async () => {
+      // Deletes win (#672): a save sent before the delete, or from a client that still
+      // holds the project, must not recreate it. A new project gets a new id.
+      const tombstone = await readProjectTombstone(root, projectId);
+      if (tombstone) return deletedResponse(tombstone.revision);
       const stored = await readProjectMetadata(root, projectId);
       const storedRevision = serverProjectRevision(stored);
+      // Files removed without a delete record: a based metadata write must not bring back a list entry alone.
+      const basedMetadataOnly = metadata && !packageBytes && Number.isFinite(baseMetadataRevision);
+      if (basedMetadataOnly && !stored && !(await regularFileStat(projectPackagePath(root, projectId)))) return deletedResponse();
       // A later clock is not a later copy: another client may have saved since this one loaded.
       // Only this check is a conflict; the client offers the newer copy for it.
       if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {

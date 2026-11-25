@@ -130,6 +130,12 @@
       "packageMissing": "The request for this project's package found no package file.",
       "reloadNewerFor": "Open the newer copy: {name}",
       "downloadMineFor": "Download my copy: {name}",
+      "deletedTitle": "{name} was deleted elsewhere",
+      "deletedKept": "Another client deleted this project from the server, so your changes were not saved there. Download your copy, or save it as a new project.",
+      "saveAsNew": "Save as a new project",
+      "saveAsNewFor": "Save as a new project: {name}",
+      "savedAsNew": "Saved your copy of {name} as a new project.",
+      "removeDeleted": "Remove {name} from the list",
       "startOverRefused": "Someone else saved {name} after this client read it, so it was not replaced. Try again to open their copy."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "Server project storage is disabled",
       "invalidId": "Invalid project id",
       "notFound": "That project is not on the server",
+      "deleted": "This project was deleted from the server",
       "sameOrigin": "Server project storage only accepts same-origin writes",
       "busySaving": "This project is currently being saved",
       "missingMetadata": "Project upload is missing its details",

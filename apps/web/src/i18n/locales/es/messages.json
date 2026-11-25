@@ -281,6 +281,12 @@
       "packageMissing": "La solicitud del paquete de este proyecto no encontró ningún archivo de paquete.",
       "reloadNewerFor": "Abrir la copia más reciente: {name}",
       "downloadMineFor": "Descargar mi copia: {name}",
+      "deletedTitle": "{name} se eliminó en otro lugar",
+      "deletedKept": "Otro cliente eliminó este proyecto del servidor, así que tus cambios no se guardaron allí. Descarga tu copia o guárdala como un proyecto nuevo.",
+      "saveAsNew": "Guardar como proyecto nuevo",
+      "saveAsNewFor": "Guardar como proyecto nuevo: {name}",
+      "savedAsNew": "Tu copia de {name} se guardó como un proyecto nuevo.",
+      "removeDeleted": "Quitar {name} de la lista",
       "startOverRefused": "Otra persona guardó {name} después de que este cliente lo leyera, así que no se ha sustituido. Reinténtalo para abrir su copia."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "El almacenamiento de proyectos del servidor está desactivado",
       "invalidId": "Identificador de proyecto no válido",
       "notFound": "Ese proyecto no está en el servidor",
+      "deleted": "Este proyecto se eliminó del servidor",
       "sameOrigin": "El almacenamiento de proyectos del servidor solo acepta escrituras desde el mismo origen",
       "busySaving": "Este proyecto se está guardando en este momento",
       "missingMetadata": "A la carga del proyecto le faltan sus datos",

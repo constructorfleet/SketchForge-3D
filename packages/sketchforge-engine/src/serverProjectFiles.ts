@@ -118,9 +118,49 @@ export async function writeProjectPackage(root: string, projectId: string, bytes
   await writeFileAtomically(projectPackagePath(root, projectId), bytes);
 }
 
+/** Records that a project was deleted, and the revisions it had then. */
+export type ProjectTombstone = { deletedAt: number; revision: number; metadataRevision: number };
+
+/** Holds delete records; a directory, so the project listing never reads it. */
+export const PROJECT_TOMBSTONES_DIRECTORY = ".deleted";
+
+export function projectTombstonePath(root: string, projectId: string) {
+  return path.join(root, PROJECT_TOMBSTONES_DIRECTORY, `${projectId}.json`);
+}
+
+/**
+ * Returns the delete record for a project, or null.
+ * Records are kept: a few bytes each, and ids are random, so they never block a new project.
+ */
+export async function readProjectTombstone(root: string, projectId: string): Promise<ProjectTombstone | null> {
+  const filePath = projectTombstonePath(root, projectId);
+  if (!(await regularFileStat(filePath))) return null;
+  try {
+    const parsed = JSON.parse(await fs.readFile(filePath, "utf8")) as Partial<ProjectTombstone>;
+    const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+    return { deletedAt: number(parsed.deletedAt), revision: number(parsed.revision), metadataRevision: number(parsed.metadataRevision) };
+  } catch {
+    // Unreadable is still a record that the project was deleted.
+    return { deletedAt: 0, revision: 0, metadataRevision: 0 };
+  }
+}
+
+/**
+ * Deletes a project's files and records the delete, even when no file existed:
+ * a create sent before the delete may still arrive (#672). Call under the project lock.
+ */
 export async function deleteProjectFiles(root: string, projectId: string) {
   const paths = [projectMetadataPath(root, projectId), projectPackagePath(root, projectId)];
   const existed = (await Promise.all(paths.map(regularFileStat))).some(Boolean);
+  const metadata = await readProjectMetadata(root, projectId);
+  const numberField = (key: string) => {
+    const value = metadata?.[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  };
+  // Recorded before the files go, so a crash in between cannot let a late write recreate them.
+  await fs.mkdir(path.join(root, PROJECT_TOMBSTONES_DIRECTORY), { recursive: true });
+  const tombstone: ProjectTombstone = { deletedAt: Date.now(), revision: numberField("revision"), metadataRevision: numberField("metadataRevision") };
+  await writeFileAtomically(projectTombstonePath(root, projectId), `${JSON.stringify(tombstone)}\n`);
   await Promise.all(paths.map((filePath) => fs.unlink(filePath).catch((error) => {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   })));

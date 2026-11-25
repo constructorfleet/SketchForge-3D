@@ -218,7 +218,8 @@ describe("server project storage", () => {
     const response = await DELETE(new Request("http://localhost/api/projects?projectId=project-1", { method: "DELETE", headers: { Origin: "http://localhost" } }));
 
     expect(response.status).toBe(200);
-    expect(await fs.readdir(projectsRoot)).toEqual([]);
+    // Only the delete record stays (#672).
+    expect(await fs.readdir(projectsRoot)).toEqual([".deleted"]);
   });
 
   it("reports a project that is not there", async () => {
@@ -227,6 +228,89 @@ describe("server project storage", () => {
 
     const missing = await GET(new Request("http://localhost/api/projects?projectId=project-1"));
     expect(missing.status).toBe(404);
+  });
+
+  // Issue #672: a delete wins. A save sent before it can land after it, and another
+  // client may still hold the project; neither may put it back under the same id.
+  describe("deleted projects", () => {
+    async function deleteProject(projectId = "project-1") {
+      return DELETE(new Request(`http://localhost/api/projects?projectId=${projectId}`, { method: "DELETE", headers: { Origin: "http://localhost" } }));
+    }
+
+    async function refusedAsDeleted(response: Response) {
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ conflict: "deleted", errorKey: "errors.projects.deleted" });
+    }
+
+    it("refuses every later write to a deleted project, with or without a base", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await POST(saveRequest("project-1", { project: new Uint8Array([1, 2]), revision: 11, baseRevision: 10 }));
+      await deleteProject();
+
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata({ name: "Late" }), baseMetadataRevision: 1 })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata({ name: "Late create" }) })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { project: new Uint8Array([3]), revision: 12, baseRevision: 11 })));
+      await refusedAsDeleted(await POST(saveRequest("project-1", { project: new Uint8Array([4]), revision: 13 })));
+
+      expect((await listing()).projects).toEqual([]);
+      expect(await fs.readdir(projectsRoot)).toEqual([".deleted"]);
+    });
+
+    it("refuses a create that lands after the delete of a project the server never held", async () => {
+      expect((await deleteProject()).status).toBe(404);
+
+      await refusedAsDeleted(await POST(saveRequest("project-1", { metadata: metadata() })));
+      expect((await listing()).projects).toEqual([]);
+    });
+
+    it("names the revision the deleted copy had, so a client can tell whether its copy is newer", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 30, baseRevision: 10 }));
+      await deleteProject();
+
+      const response = await POST(saveRequest("project-1", { project: new Uint8Array([2]), revision: 40 }));
+
+      expect(response.status).toBe(410);
+      expect(await response.json()).toMatchObject({ conflict: "deleted", deletedRevision: 30 });
+    });
+
+    it("records the revisions the deleted project had", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata({ revision: 10 }) }));
+      await POST(saveRequest("project-1", { metadata: metadata({ name: "Renamed" }), baseMetadataRevision: 1 }));
+      const before = Date.now();
+      await deleteProject();
+
+      const tombstone = JSON.parse(await fs.readFile(path.join(projectsRoot, ".deleted", "project-1.json"), "utf8")) as Record<string, number>;
+      expect(tombstone).toMatchObject({ revision: 10, metadataRevision: 2 });
+      expect(tombstone.deletedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it("still creates projects under new ids, package first or metadata first", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await deleteProject();
+
+      // A migration upload sends the package first; a new project usually sends metadata first.
+      expect((await POST(saveRequest("project-2", { project: new Uint8Array([1]), revision: 11 }))).status).toBe(201);
+      expect((await POST(saveRequest("project-2", { metadata: metadata({ id: "project-2" }) }))).status).toBe(201);
+      expect((await POST(saveRequest("project-3", { metadata: metadata({ id: "project-3" }) }))).status).toBe(201);
+      expect((await listing()).projects.map((record) => record.projectId).sort()).toEqual(["project-2", "project-3"]);
+    });
+
+    it("refuses a based metadata write for a project whose files are gone without a delete record", async () => {
+      await POST(saveRequest("project-1", { metadata: metadata() }));
+      await fs.rm(path.join(projectsRoot, "project-1.json"));
+
+      const response = await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 1 }));
+
+      expect(response.status).toBe(410);
+      expect((await listing()).projects).toEqual([]);
+    });
+
+    it("accepts a based metadata write while only the package is stored", async () => {
+      await POST(saveRequest("project-1", { project: new Uint8Array([1]), revision: 11 }));
+
+      expect((await POST(saveRequest("project-1", { metadata: metadata(), baseMetadataRevision: 0 }))).status).toBe(201);
+    });
   });
 
   it("does not list a project whose package arrived without its metadata", async () => {

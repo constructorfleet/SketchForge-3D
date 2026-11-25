@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DELETE as deleteProject, GET as getProjects, POST as createProject } from "@/app/api/v1/projects/route";
+import { POST as postDashboardProject } from "@/app/api/projects/route";
 import { DELETE as deleteShape, GET as getShapes, PATCH as patchShape, POST as createShapes } from "@/app/api/v1/shapes/route";
 import { GET as edges } from "@/app/api/v1/edges/route";
 import { POST as treatments } from "@/app/api/v1/treatments/route";
@@ -515,7 +516,20 @@ describe("REST API v1", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("etag")).toBe(`"${current?.metadata.revision}"`);
     expect(await response.json()).toMatchObject({ deleted: true, id: projectId, revision: current?.metadata.revision });
-    expect(await fs.readdir(projectsRoot)).toEqual([]);
+    expect(await fs.readdir(projectsRoot)).toEqual([".deleted"]);
+  });
+
+  // Issue #672: a delete wins over every later write to the same id.
+  it("keeps a project it deleted from coming back through any write", async () => {
+    const projectId = await makeProject();
+    await deleteProject(authorized(`/api/v1/projects?projectId=${projectId}`, { method: "DELETE" }));
+
+    expect((await addShape(projectId, { kind: "cube", size: 10 })).status).toBe(404);
+    const form = new FormData();
+    form.append("metadata", JSON.stringify({ id: projectId, name: "Late" }));
+    const dashboardWrite = await postDashboardProject(new Request(`http://localhost/api/projects?projectId=${projectId}`, { method: "POST", headers: { Origin: "http://localhost" }, body: form }));
+    expect(dashboardWrite.status).toBe(410);
+    expect((await (await getProjects(authorized("/api/v1/projects"))).json()).projects).toEqual([]);
   });
 });
 

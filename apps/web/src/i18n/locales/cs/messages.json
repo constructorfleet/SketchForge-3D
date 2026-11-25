@@ -281,6 +281,12 @@
       "packageMissing": "Požadavek na balíček tohoto projektu nenašel žádný soubor balíčku.",
       "reloadNewerFor": "Otevřít novější kopii: {name}",
       "downloadMineFor": "Stáhnout mou kopii: {name}",
+      "deletedTitle": "{name} byl smazán jinde",
+      "deletedKept": "Jiný klient smazal tento projekt ze serveru, takže vaše změny se tam neuložily. Stáhněte si svou kopii nebo ji uložte jako nový projekt.",
+      "saveAsNew": "Uložit jako nový projekt",
+      "saveAsNewFor": "Uložit jako nový projekt: {name}",
+      "savedAsNew": "Vaše kopie projektu {name} byla uložena jako nový projekt.",
+      "removeDeleted": "Odebrat {name} ze seznamu",
       "startOverRefused": "Někdo jiný uložil projekt {name} poté, co ho tento klient načetl, proto nebyl nahrazen. Zkuste to znovu a otevřete jeho kopii."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "Úložiště projektů na serveru je vypnuté",
       "invalidId": "Neplatné ID projektu",
       "notFound": "Tento projekt na serveru není",
+      "deleted": "Tento projekt byl ze serveru smazán",
       "sameOrigin": "Projekty na server lze ukládat jen ze stránky SketchForge",
       "busySaving": "Tento projekt se právě ukládá",
       "missingMetadata": "U nahrávaného projektu chybějí údaje",

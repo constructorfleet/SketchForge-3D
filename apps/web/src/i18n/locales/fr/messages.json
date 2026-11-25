@@ -281,6 +281,12 @@
       "packageMissing": "La demande du paquet de ce projet n’a trouvé aucun fichier de paquet.",
       "reloadNewerFor": "Ouvrir la copie plus récente: {name}",
       "downloadMineFor": "Télécharger ma copie: {name}",
+      "deletedTitle": "{name} a été supprimé ailleurs",
+      "deletedKept": "Un autre client a supprimé ce projet du serveur, vos modifications n'y ont donc pas été enregistrées. Téléchargez votre copie ou enregistrez-la comme nouveau projet.",
+      "saveAsNew": "Enregistrer comme nouveau projet",
+      "saveAsNewFor": "Enregistrer comme nouveau projet : {name}",
+      "savedAsNew": "Votre copie de {name} a été enregistrée comme nouveau projet.",
+      "removeDeleted": "Retirer {name} de la liste",
       "startOverRefused": "Quelqu’un d’autre a enregistré {name} après sa lecture par ce client ; il n’a donc pas été remplacé. Réessayez pour ouvrir sa copie."
     },
     "storageWarning": {
@@ -2057,6 +2063,7 @@
       "disabled": "Le stockage des projets sur le serveur est désactivé",
       "invalidId": "Identifiant de projet non valide",
       "notFound": "Ce projet n’est pas sur le serveur",
+      "deleted": "Ce projet a été supprimé du serveur",
       "sameOrigin": "Le stockage des projets sur le serveur n’accepte que les enregistrements depuis la page SketchForge",
       "busySaving": "Ce projet est en cours d’enregistrement",
       "missingMetadata": "L’envoi du projet ne contient pas ses détails",

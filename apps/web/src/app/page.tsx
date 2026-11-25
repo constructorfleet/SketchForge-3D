@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, Download, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Clock3, CopyPlus, Download, EllipsisVertical, FileUp, FolderKanban, Grid3X3, HomeIcon, List, Palette, Pencil, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SketchForgeEditor, importedShapeFromObj, importedShapeFromStl, importedShapeFromSvg } from "@/components/SketchForgeEditor";
 import ChallengesDashboard from "@/components/official/ChallengesDashboard";
@@ -63,6 +63,7 @@ import {
 } from "@/lib/projectWriteGuard";
 import { storedRecordJson } from "@/lib/storedProjectCopy";
 import { mergeMetadataFields } from "@/lib/serverMetadataMerge";
+import { SERVER_SYNCED_REVISIONS_STORAGE_KEY, readServerSyncedRevisions, writeServerSyncedRevisions } from "@/lib/serverSyncedRevisions";
 import {
   projectShapeCacheEntry,
   projectShapeCacheEntryFromEditor,
@@ -80,6 +81,7 @@ import {
   ServerPackageRequestError,
   ServerMetadataConflictError,
   ServerProjectConflictError,
+  ServerProjectDeletedError,
   serverMetadataRevision,
   type ServerProjectRecord,
 } from "@/lib/serverProjectStore";
@@ -149,6 +151,7 @@ const LOAD_FAILURE_TEXT = {
   unavailable: { title: "dashboard.loadFailure.unavailableTitle", body: "dashboard.loadFailure.unavailableKept" },
   missing: { title: "dashboard.loadFailure.missingTitle", body: "dashboard.loadFailure.missingKept" },
   conflict: { title: "dashboard.loadFailure.conflictTitle", body: "dashboard.loadFailure.conflictKept" },
+  deleted: { title: "dashboard.loadFailure.deletedTitle", body: "dashboard.loadFailure.deletedKept" },
 } as const satisfies Record<ProjectLoadFailureKind, { title: string; body: string }>;
 
 type ProjectShapeRecord = {
@@ -679,7 +682,10 @@ function restoreProjectsFromBeforeServerStorage() {
     }
     window.localStorage.setItem(PROJECTS_STORAGE_KEY, backup);
     window.localStorage.removeItem(MIGRATED_PROJECTS_STORAGE_KEY);
-    return readStoredProjects().projects;
+    const restored = readStoredProjects().projects;
+    // Edits past these revisions never reached the server, so a later move must not drop them.
+    writeServerSyncedRevisions(window.localStorage, restored);
+    return restored;
   } catch {
     return null;
   }
@@ -821,6 +827,8 @@ export default function Home() {
     };
     metadataSaveQueueRef.current = createCoalescingSaveQueue<MetadataSaveJob>({
       run: async (projectId, job) => {
+        // Deleted while this job waited (#672).
+        if (browserTombstones().has(projectId)) return;
         let written: Record<string, unknown>;
         try {
           written = await post(projectId, job, syncedServerMetadata.get(projectId));
@@ -842,6 +850,11 @@ export default function Home() {
         setProjects((projects) => projects.map((project) => (project.id === projectId ? { ...adopted, accent: project.accent } : project)));
       },
       onError: (projectId, _job, error) => {
+        if (error instanceof ServerProjectDeletedError) {
+          // Deleted in this browser: the refusal is the expected outcome.
+          if (!browserTombstones().has(projectId)) projectDeletedRef.current?.(projectId);
+          return;
+        }
         serverProjectMetadataRef.current.delete(projectId);
         setDashboardNotice(errorText(currentTranslator(), error, "errors.projects.saveFailed"));
       },
@@ -849,6 +862,7 @@ export default function Home() {
   }
   // Set every render, so the queue created once still sees current state.
   const projectConflictRef = useRef<((projectId: string, job: ProjectSaveJob, error: ServerProjectConflictError) => void) | null>(null);
+  const projectDeletedRef = useRef<((projectId: string, job?: ProjectSaveJob) => void) | null>(null);
   // Copies a conflict kept from saving, so the user can still download them.
   const conflictedCopiesRef = useRef(new Map<string, ProjectSaveJob>());
   const latestEditorCopiesRef = useRef(new Map<string, ProjectSaveJob>());
@@ -870,6 +884,10 @@ export default function Home() {
         }
         // Already reported by the banner that blocked the project.
         if (error instanceof ProjectWriteRefusedError) return;
+        if (error instanceof ServerProjectDeletedError) {
+          if (!browserTombstones().has(projectId)) projectDeletedRef.current?.(projectId, job);
+          return;
+        }
         autosaveNoticeControllerRef.current?.failed(
           projectId,
           job.context.projectName,
@@ -1014,22 +1032,51 @@ export default function Home() {
       // means a half-migrated project is simply not there yet and is tried
       // again, rather than appearing on the server with no geometry behind it.
       const migrated = new Map<string, { recordRevision: number; serverRevision: number }>();
+      const migratedProjectIds = new Set<string>();
       const migratedEntries = new Map<string, DashboardProject>();
+      // Another client deleted it on the server, which refuses it for good (#672). Recording
+      // the delete here drops it from every later pass and from the switched list.
+      // Browser copies newer than the one the server deleted: offered to keep after the switch.
+      const deletedWithNewerCopy = new Map<string, { project: DashboardProject; record: NonNullable<Awaited<ReturnType<typeof loadProjectShapes>>> }>();
+      const deletedOnServer = (
+        projectId: string,
+        kept: { project: DashboardProject; record: Awaited<ReturnType<typeof loadProjectShapes>> },
+        syncedRevision: number | undefined,
+      ) => {
+        // Edits this browser never sent would otherwise vanish with no way back. Revisions are
+        // compared with this browser's own record, never the deleting client's clock.
+        if (kept.record && (syncedRevision === undefined || kept.record.revision > syncedRevision)) {
+          deletedWithNewerCopy.set(projectId, { project: kept.project, record: kept.record });
+        }
+        addProjectTombstone(window.localStorage, projectId);
+        projectsDeletedInBrowser.add(projectId);
+        migratedProjectIds.delete(projectId);
+        migrated.delete(projectId);
+        serverBaseRevisions.delete(projectId);
+      };
+      /** Returns false when the server refused the project as deleted. */
       const migrateProject = async (project: DashboardProject) => {
         migratedEntries.set(project.id, project);
-        const record = await loadProjectShapes(project.id);
-        if (record?.skfPackage) {
-          const serverRevision = project.revision ?? record.revision;
-          await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
-          migrated.set(project.id, { recordRevision: record.revision, serverRevision });
-          // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
-          serverBaseRevisions.set(project.id, serverRevision);
+        let record: Awaited<ReturnType<typeof loadProjectShapes>> = null;
+        try {
+          record = await loadProjectShapes(project.id);
+          if (record?.skfPackage) {
+            const serverRevision = project.revision ?? record.revision;
+            await saveServerProjectPackage(project.id, record.skfPackage, serverRevision);
+            migrated.set(project.id, { recordRevision: record.revision, serverRevision });
+            // Later saves are based on the uploaded copy, so they cannot overwrite a newer one (#650).
+            serverBaseRevisions.set(project.id, serverRevision);
+          }
+          await saveServerProjectMetadata(project.id, projectForStorage(project));
+          return true;
+        } catch (error) {
+          if (!(error instanceof ServerProjectDeletedError)) throw error;
+          deletedOnServer(project.id, { project, record }, readServerSyncedRevisions(window.localStorage)[project.id]);
+          return false;
         }
-        await saveServerProjectMetadata(project.id, projectForStorage(project));
       };
 
       let migratedCount = 0;
-      const migratedProjectIds = new Set<string>();
       const serverProjectIds = new Set(listing.projects.map((record) => record.projectId));
       // Re-reading the browser list between passes picks up a project created
       // while an earlier pass was still uploading, which would otherwise be
@@ -1038,14 +1085,16 @@ export default function Home() {
         const pending = readStoredProjects().projects.filter((project) => !serverProjectIds.has(project.id));
         if (pending.length === 0) break;
         for (const project of pending) {
+          let moved: boolean;
           try {
-            await migrateProject(project);
+            moved = await migrateProject(project);
           } catch (error) {
             if (canceled) return;
             setDashboardNotice(errorText(currentTranslator(), error, "dashboard.serverStorage.migrateFailed"));
             return;
           }
           if (canceled) return;
+          if (!moved) continue;
           migratedCount += 1;
           serverProjectIds.add(project.id);
           migratedProjectIds.add(project.id);
@@ -1093,7 +1142,10 @@ export default function Home() {
             if (canceled) return;
             if (serverProjectIds.has(project.id) || projectsDeletedInBrowser.has(project.id) || !projectWriteGuard.canWrite(project.id)) continue;
             // Created during the wait: not in the listing, so it would vanish at the switch.
-            await migrateProject(project);
+            if (!(await migrateProject(project))) {
+              changedAny = true;
+              continue;
+            }
             migratedCount += 1;
             serverProjectIds.add(project.id);
             migratedProjectIds.add(project.id);
@@ -1110,6 +1162,11 @@ export default function Home() {
             try {
               await saveServerProjectPackage(project.id, record.skfPackage, record.revision, upload.serverRevision);
             } catch (error) {
+              if (error instanceof ServerProjectDeletedError) {
+                deletedOnServer(project.id, { project, record }, upload.recordRevision);
+                changedAny = true;
+                continue;
+              }
               if (!(error instanceof ServerProjectConflictError)) throw error;
               // Another tab sharing this IndexedDB already uploaded this very record.
               if (error.storedRevision !== record.revision) {
@@ -1151,9 +1208,15 @@ export default function Home() {
       const serverProjects = [
         ...adoptedProjects.map((project) => (caughtUp.has(project.id) ? browserProjects.get(project.id) ?? project : project)),
         ...lateProjects,
+        // Listed only so the "deleted elsewhere" banner can offer the newer browser copy.
+        ...[...deletedWithNewerCopy.values()].map(({ project }) => project),
       ];
       setProjects(serverProjects);
       setProjectStorageMode("server");
+      deletedWithNewerCopy.forEach(({ project, record }, projectId) => {
+        const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
+        projectDeletedRef.current?.(projectId, { entry, context: projectShapeSaveContext(project), revision: record.revision, shapeCount: entry.shapes.length });
+      });
       conflicts.forEach(({ project, record, error }, projectId) => {
         projectWriteGuard.block(projectId);
         const entry = projectShapeCacheEntry(record.revision, record.shapes ?? [], record.history, record.historyIndex, record.assets, record.parameters, record.configuration);
@@ -1165,6 +1228,7 @@ export default function Home() {
           window.localStorage.setItem(MIGRATED_PROJECTS_STORAGE_KEY, browserList);
         }
         window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+        window.localStorage.removeItem(SERVER_SYNCED_REVISIONS_STORAGE_KEY);
       } catch {
         // The list is on the server either way; a browser that refuses to
         // forget its copy only leaves a stale one behind.
@@ -2066,7 +2130,77 @@ export default function Home() {
     if (activeProjectId === projectId) closeEditorForFailure();
   };
 
+  // Another client deleted it; the server refuses every write to that id (#672).
+  projectDeletedRef.current = (projectId, job) => {
+    projectWriteGuard.block(projectId);
+    const project = projects.find((candidate) => candidate.id === projectId);
+    const cached = projectShapesById[projectId];
+    const copies = [
+      job,
+      latestEditorCopiesRef.current.get(projectId),
+      cached && project ? { entry: cached, context: projectShapeSaveContext(project), revision: cached.revision, shapeCount: cached.shapes.length } : undefined,
+    ].filter((copy): copy is ProjectSaveJob => Boolean(copy));
+    const newest = copies.sort((a, b) => b.revision - a.revision)[0];
+    if (newest) conflictedCopiesRef.current.set(projectId, newest);
+    setProjectLoadFailures((current) => ({ ...current, [projectId]: { kind: "deleted", message: "" } }));
+    setProjectShapesById((current) => {
+      if (!(projectId in current)) return current;
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+    if (activeProjectId === projectId) closeEditorForFailure();
+  };
+
+  // Drops a project deleted elsewhere from this list, without a delete request.
+  const forgetDeletedProject = (projectId: string) => {
+    addProjectTombstone(window.localStorage, projectId);
+    clearProjectLoadFailure(projectId);
+    projectWriteGuard.forget(projectId);
+    conflictedCopiesRef.current.delete(projectId);
+    latestEditorCopiesRef.current.delete(projectId);
+    serverBaseRevisions.delete(projectId);
+    setProjects((current) => current.filter((project) => project.id !== projectId));
+    if (activeProjectId === projectId) setActiveProjectId(null);
+  };
+
+  const saveDeletedCopyAsNewProject = async (project: DashboardProject) => {
+    const job = conflictedCopiesRef.current.get(project.id);
+    if (!job) {
+      setDashboardNotice(t("dashboard.loadFailure.nothingStored"));
+      return;
+    }
+    const now = Math.max(Date.now(), nextProjectRevisionRef.current + 1);
+    nextProjectRevisionRef.current = now;
+    const copy: DashboardProject = {
+      ...project,
+      id: createLocalId("project"),
+      updatedAt: now,
+      revision: now,
+      shapes: job.shapeCount,
+      // The old thumbnail belongs to the deleted id.
+      thumbnailUrl: null,
+      sharedProject: undefined,
+    };
+    const entry = { ...job.entry, revision: now };
+    try {
+      // A new id has no base and no delete record, so the server creates it.
+      await saveProjectShapes(copy.id, entry, job.context);
+    } catch (error) {
+      setDashboardNotice(errorText(t, error, "dashboard.storage.saveFailed"));
+      return;
+    }
+    setProjectShapesById((current) => ({ ...current, [copy.id]: entry }));
+    forgetDeletedProject(project.id);
+    setProjects((current) => [copy, ...current]);
+    setDashboardNotice(t("dashboard.loadFailure.savedAsNew", { name: project.name }));
+  };
+
   const dismissProjectLoadFailure = (projectId: string) => {
+    if (projectLoadFailures[projectId]?.kind === "deleted") {
+      forgetDeletedProject(projectId);
+      return;
+    }
     clearProjectLoadFailure(projectId);
     // Leaving it active would retry the read straight away.
     if (activeProjectId === projectId) setActiveProjectId(null);
@@ -2160,6 +2294,7 @@ export default function Home() {
           onRetryLoad={(project) => openEditor(project.id)}
           onDownloadStoredProject={(project) => void downloadStoredProject(project)}
           onDownloadConflictedCopy={(project) => void downloadConflictedCopy(project)}
+          onSaveDeletedCopyAsNew={(project) => void saveDeletedCopyAsNewProject(project)}
           onStartProjectOver={(project) => void startProjectOver(project)}
           onDismissLoadFailure={(project) => dismissProjectLoadFailure(project.id)}
           downloadFolder={downloadFolder}
@@ -2343,6 +2478,7 @@ function Dashboard({
   onRetryLoad,
   onDownloadStoredProject,
   onDownloadConflictedCopy,
+  onSaveDeletedCopyAsNew,
   onStartProjectOver,
   onDismissLoadFailure,
   downloadFolder,
@@ -2392,6 +2528,7 @@ function Dashboard({
   onRetryLoad: (project: DashboardProject) => void;
   onDownloadStoredProject: (project: DashboardProject) => void;
   onDownloadConflictedCopy: (project: DashboardProject) => void;
+  onSaveDeletedCopyAsNew: (project: DashboardProject) => void;
   onStartProjectOver: (project: DashboardProject) => void;
   onDismissLoadFailure: (project: DashboardProject) => void;
   downloadFolder: string;
@@ -2837,7 +2974,7 @@ function Dashboard({
                   <div className="dashboard-load-failure-text">
                     <strong id={`load-failure-${project.id}`}>{t(LOAD_FAILURE_TEXT[kind].title, { name: project.name })}</strong>
                     <p>{t(LOAD_FAILURE_TEXT[kind].body)}</p>
-                    <p className="dashboard-load-failure-detail">{message}</p>
+                    {message ? <p className="dashboard-load-failure-detail">{message}</p> : null}
                   </div>
                   <div className="dashboard-load-failure-actions">
                     {/* A database from a newer release opens the same way every time. */}
@@ -2846,16 +2983,22 @@ function Dashboard({
                         <RefreshCw size={16} />
                         {t("dashboard.loadFailure.reloadNewer")}
                       </button>
-                    ) : kind !== "storageNewer" ? (
+                    ) : kind !== "storageNewer" && kind !== "deleted" ? (
                       <button type="button" aria-label={t("dashboard.loadFailure.retryFor", { name: project.name })} onClick={() => onRetryLoad(project)}>
                         <RefreshCw size={16} />
                         {t("dashboard.loadFailure.retry")}
                       </button>
                     ) : null}
-                    {kind === "conflict" ? (
+                    {kind === "conflict" || kind === "deleted" ? (
                       <button type="button" aria-label={t("dashboard.loadFailure.downloadMineFor", { name: project.name })} onClick={() => onDownloadConflictedCopy(project)}>
                         <Download size={16} />
                         {t("dashboard.loadFailure.downloadMine")}
+                      </button>
+                    ) : null}
+                    {kind === "deleted" ? (
+                      <button type="button" aria-label={t("dashboard.loadFailure.saveAsNewFor", { name: project.name })} onClick={() => onSaveDeletedCopyAsNew(project)}>
+                        <CopyPlus size={16} />
+                        {t("dashboard.loadFailure.saveAsNew")}
                       </button>
                     ) : null}
                     {/* Only a copy that was read has bytes to download. */}
@@ -2881,7 +3024,12 @@ function Dashboard({
                     ) : null}
                     {/* Dismissing would leave this client's unsaved copy with no way to download it. */}
                     {kind !== "conflict" ? (
-                      <button className="dashboard-load-failure-dismiss" type="button" aria-label={t("dashboard.loadFailure.dismiss", { name: project.name })} onClick={() => onDismissLoadFailure(project)}>
+                      <button
+                        className="dashboard-load-failure-dismiss"
+                        type="button"
+                        aria-label={t(kind === "deleted" ? "dashboard.loadFailure.removeDeleted" : "dashboard.loadFailure.dismiss", { name: project.name })}
+                        onClick={() => onDismissLoadFailure(project)}
+                      >
                         <X size={16} />
                       </button>
                     ) : null}

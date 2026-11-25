@@ -149,3 +149,212 @@ test("a project deleted just after an edit stays deleted in server storage", { t
     rmSync(projectsDir, { recursive: true, force: true });
   }
 });
+
+// Issue #672: a save sent before a delete can reach the server after it.
+// Holds the next project POST that carries `field` until released.
+async function holdNextPost(page, field) {
+  let release = () => {};
+  const released = new Promise((resolve) => { release = resolve; });
+  let markHeld = () => {};
+  const held = new Promise((resolve) => { markHeld = resolve; });
+  let armed = true;
+  await page.route("**/api/projects?*", async (route) => {
+    const request = route.request();
+    const body = request.method() === "POST" ? request.postDataBuffer()?.toString("latin1") ?? "" : "";
+    if (armed && body.includes(`name="${field}"`)) {
+      armed = false;
+      markHeld(new URL(request.url()).searchParams.get("projectId"));
+      await released;
+    }
+    // Lets other holds see the request; with none left, it goes to the network.
+    await route.fallback();
+  });
+  return { held, release };
+}
+
+async function deleteFromDashboard(page, options = /^Project options for /) {
+  const deleted = page.waitForResponse((response) => response.request().method() === "DELETE" && response.url().includes("/api/projects?"));
+  await page.getByRole("button", { name: options }).first().click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.locator(".dashboard-confirm-delete").click();
+  assert.equal((await deleted).status(), 200, "the delete must reach the server");
+}
+
+async function releaseAfterDelete(page, post, options) {
+  await deleteFromDashboard(page, options);
+  const late = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
+  post.release();
+  assert.equal((await late).status(), 410, "the server must refuse a save for a deleted project");
+  // Room for any write the late answer sets off.
+  await page.waitForTimeout(1_500);
+  // The user deleted it: a refused late save is expected, not a failure to report.
+  assert.equal(await page.getByText(/deleted before this save|not on the server|could not save|deleted elsewhere/i).count(), 0, "a refused late save was reported as an error");
+}
+
+async function withServerProject(run) {
+  const projectsDir = mkdtempSync(join(tmpdir(), "sketchforge-delete-held-"));
+  try {
+    await withEditor({ SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "delete-held-token" }, async ({ page, baseURL }) => {
+      const listed = async () => (await (await fetch(`${baseURL}/api/projects`)).json()).projects?.map((record) => record.projectId) ?? [];
+      const stored = () => readdirSync(projectsDir).filter((name) => name.endsWith(".skf") || name.endsWith(".json"));
+      await openNewDesign(page, baseURL);
+      await pollUntil(() => page.evaluate(() => window.localStorage.getItem("sketchForge.projects") === null), Boolean, 30_000);
+      await addBox(page);
+      assert.equal((await pollUntil(stored, (names) => names.length === 2)).length, 2, "the first edit was never stored on the server");
+      // Let the edit's own writes finish, so only the next one is held.
+      await page.waitForTimeout(2_000);
+      await run({ page, listed, stored });
+    });
+  } finally {
+    rmSync(projectsDir, { recursive: true, force: true });
+  }
+}
+
+test("a dashboard entry save held past a delete does not bring the project back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    const metadataPost = await holdNextPost(page, "metadata");
+    await page.getByRole("button", { name: /^Project options for / }).first().click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
+    await page.locator(".dashboard-confirm-save").click();
+    await metadataPost.held;
+
+    await releaseAfterDelete(page, metadataPost);
+
+    assert.deepEqual(await listed(), [], "the held metadata save recreated the deleted project");
+    assert.deepEqual(stored(), [], "a project file is back on disk");
+  });
+});
+
+test("a package save held past a delete does not bring the project back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    const packagePost = await holdNextPost(page, "project");
+    await addBox(page);
+    await packagePost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+
+    await releaseAfterDelete(page, packagePost);
+
+    assert.deepEqual(await listed(), [], "the held package save recreated the deleted project");
+    assert.deepEqual(stored(), [], "a project file is back on disk");
+  });
+});
+
+test("a new project's first save held past its delete does not bring it back", { timeout: 180_000 }, async () => {
+  await withServerProject(async ({ page, listed, stored }) => {
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    await page.getByRole("button", { name: /^Project options for / }).first().click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill("Kept project");
+    await page.locator(".dashboard-confirm-save").click();
+    const kept = await pollUntil(listed, (ids) => ids.length === 1);
+    await page.waitForTimeout(1_000);
+
+    // A create carries no base, so the server cannot tell it from a late one.
+    const createPost = await holdNextPost(page, "metadata");
+    await page.getByRole("button", { name: "Create new 3D design" }).click();
+    await createPost.held;
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+
+    await releaseAfterDelete(page, createPost, /^Project options for (?!Kept project)/);
+
+    assert.deepEqual(await listed(), kept, "the held first save recreated the deleted project");
+    assert.deepEqual(stored().filter((name) => !name.startsWith(kept[0])), [], "a file of the deleted project is back on disk");
+  });
+});
+
+for (const order of [["project", "metadata"], ["metadata", "project"]]) {
+  test(`two late saves from one tab, ${order.join(" then ")}, do not bring the project back`, { timeout: 180_000 }, async () => {
+    await withServerProject(async ({ page, listed, stored }) => {
+      const held = { project: await holdNextPost(page, "project") };
+      await addBox(page);
+      await held.project.held;
+      await page.getByRole("button", { name: "Home dashboard" }).click();
+      held.metadata = await holdNextPost(page, "metadata");
+      await page.getByRole("button", { name: /^Project options for / }).first().click();
+      await page.getByRole("menuitem", { name: "Rename" }).click();
+      await page.getByRole("textbox", { name: "Project name" }).fill("Renamed before delete");
+      await page.locator(".dashboard-confirm-save").click();
+      await held.metadata.held;
+      await deleteFromDashboard(page);
+
+      for (const field of order) {
+        const landed = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/api/projects?"));
+        held[field].release();
+        assert.equal((await landed).status(), 410, `the late ${field} save must be refused`);
+      }
+      await page.waitForTimeout(1_500);
+
+      assert.deepEqual(await listed(), [], "a late save left the deleted project listed");
+      assert.deepEqual(stored(), [], "a project file is back on disk");
+      assert.equal(await page.getByText(/deleted before this save|not on the server|could not save|deleted elsewhere/i).count(), 0, "a refused late save was reported as an error");
+    });
+  });
+}
+
+// Issue #672: a browser that falls back to its own storage remembers what the server held,
+// so a later move can tell its own unsynced edits from a synced copy.
+test("falling back from server storage records the revisions the server held", { timeout: 240_000 }, async () => {
+  const port = await unusedPort();
+  const baseURL = `http://127.0.0.1:${port}`;
+  const projectsDir = mkdtempSync(join(tmpdir(), "sketchforge-fallback-"));
+  const start = async (env) => {
+    const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "apps/web", "--port", String(port)], {
+      cwd: process.cwd(),
+      env: { ...process.env, ...env },
+      detached: process.platform !== "win32",
+      stdio: "ignore",
+    });
+    const deadline = Date.now() + 120_000;
+    for (;;) {
+      assert.ok(server.exitCode === null && Date.now() < deadline, "Next.js did not become ready");
+      try {
+        if ((await fetch(baseURL)).ok) break;
+      } catch {
+        // Still starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return async () => {
+      try {
+        if (process.platform === "win32") server.kill("SIGTERM");
+        else process.kill(-server.pid, "SIGTERM");
+      } catch {
+        // Already exited.
+      }
+      await new Promise((resolve) => (server.exitCode !== null ? resolve() : server.once("exit", resolve)));
+    };
+  };
+  const browser = await chromium.launch({ headless: true });
+  let stop;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/app-update**", (route) => route.abort());
+    stop = await start({});
+    await openNewDesign(page, baseURL);
+    const projectId = new URL(page.url()).searchParams.get("project");
+    await pollUntil(() => storedPackageIds(page), (ids) => ids.length === 1);
+    await stop();
+
+    stop = await start({ SKETCHFORGE_PROJECTS_DIR: projectsDir, SKETCHFORGE_API_TOKEN: "fallback-token" });
+    await page.goto(baseURL);
+    await pollUntil(() => page.evaluate(() => window.localStorage.getItem("sketchForge.projects.beforeServerStorage") !== null), Boolean, 30_000);
+    const moved = await page.evaluate((id) => JSON.parse(window.localStorage.getItem("sketchForge.projects.beforeServerStorage")).find((project) => project.id === id)?.revision, projectId);
+    assert.equal(typeof moved, "number", "the move kept the browser list");
+    await stop();
+
+    stop = await start({});
+    await page.goto(baseURL);
+    const synced = await pollUntil(
+      () => page.evaluate(() => JSON.parse(window.localStorage.getItem("sketchForge.projects.serverSyncedRevisions") ?? "{}")),
+      (revisions) => projectId in revisions,
+      30_000,
+    );
+    assert.deepEqual(synced, { [projectId]: moved }, "the fallback did not record what the server held");
+  } finally {
+    await stop?.();
+    await browser.close();
+    rmSync(projectsDir, { recursive: true, force: true });
+  }
+});

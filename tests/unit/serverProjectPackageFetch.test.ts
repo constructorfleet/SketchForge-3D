@@ -3,6 +3,8 @@ import {
   ServerMetadataConflictError,
   ServerPackageRequestError,
   ServerProjectConflictError,
+  ServerProjectDeletedError,
+  deleteServerProject,
   fetchServerProjectPackage,
   saveServerProjectMetadata,
   saveServerProjectPackage,
@@ -121,6 +123,23 @@ describe("server project metadata writes", () => {
   });
 });
 
+// Issue #672: deletes win; the server refuses every later write to a deleted project.
+describe("server project writes after a delete", () => {
+  const deleted = () => new Response(JSON.stringify({ error: "deleted", errorKey: "errors.projects.deleted", conflict: "deleted", deletedRevision: 30 }), { status: 410 });
+
+  it("turns the refusal of a package write into a deleted-project error", async () => {
+    answer(deleted());
+    const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ServerProjectDeletedError);
+    expect(error).toMatchObject({ key: "errors.projects.deleted", deletedRevision: 30 });
+  });
+
+  it("turns the refusal of a metadata write into a deleted-project error", async () => {
+    answer(deleted());
+    expect(await saveServerProjectMetadata("project-1", { name: "Bracket" }).catch((caught: unknown) => caught)).toBeInstanceOf(ServerProjectDeletedError);
+  });
+});
+
 // Issue #662: the server refuses one client's overlapping package and metadata writes as busy.
 describe("server project writes while another write holds the project", () => {
   function busyThenSaved(busyCount: number) {
@@ -166,5 +185,17 @@ describe("server project writes while another write holds the project", () => {
     const error = await saveServerProjectPackage("project-1", new Uint8Array([1]), 50, 42).catch((caught: unknown) => caught);
     expect(error).toMatchObject({ key: "errors.projects.busySaving" });
     expect(fetch.mock.calls.length).toBeGreaterThan(1);
+  });
+});
+
+describe("server project deletes while another write holds the project", () => {
+  it("sends a delete again once the project is free", async () => {
+    let calls = 0;
+    const fetch = vi.fn(async () => (calls++ < 2
+      ? new Response(JSON.stringify({ error: "busy", errorKey: "errors.projects.busySaving" }), { status: 409 })
+      : new Response("{}", { status: 200 })));
+    vi.stubGlobal("fetch", fetch);
+    await deleteServerProject("project-1");
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 });
