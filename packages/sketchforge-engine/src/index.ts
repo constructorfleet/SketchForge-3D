@@ -316,6 +316,15 @@ export {
   type ApiConfigurationChange,
   type ApiParameterChange,
 } from "./apiParameters.js";
+export {
+  API_QUERY_RULES,
+  API_REQUEST_BODIES,
+  API_REQUEST_FIELDS,
+  matchesApiSchema,
+  readApiQueryValue,
+  type ApiQueryRule,
+  type ApiSchema,
+} from "./apiRequestDefinitions.js";
 export { apiShapeChanged, apiShapeRequestKind, apiShapeSummary } from "./apiShapeSummary.js";
 export {
   API_CONSTRAINT_ID_MAX_LENGTH,

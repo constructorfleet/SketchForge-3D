@@ -9,6 +9,8 @@ import {
   STEP_KINDS,
   TAPER_KINDS,
 } from "./createShapeKinds.mjs";
+// Limits come from the engine's request definitions, a pure-data module.
+import { API_CONFIGURATION_NAME_MAX_LENGTH, API_PARAMETER_DIMENSIONS } from "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
 
 /** What a drawing shows, as `POST /exports` and the engine name it. Kept in step by `localMcpEngine.test.ts`. */
 const PROJECTION_LAYOUTS = ["multiview", "front", "back", "top", "bottom", "left", "right", "iso"];
@@ -34,7 +36,8 @@ const resultAttributeProperties = {
 
 const urlProperty = { type: "string", description: "Optional SketchForge server URL. Omit to work offline with local project files." };
 const projectIdProperty = { type: "string", description: "The project id." };
-const PARAMETER_DIMENSIONS = ["length", "angle", "unitless"];
+const PARAMETER_DIMENSIONS = [...API_PARAMETER_DIMENSIONS];
+const CONFIGURATION_NAME_DESCRIPTION = `The configuration name, 1 to ${API_CONFIGURATION_NAME_MAX_LENGTH} characters.`;
 const WORKS_BOTH_WAYS = "Works offline or against a server when url is supplied.";
 const REFUSAL_FORMAT = "A refusal ends its first line with [code]; a second line, when present, is JSON detail.";
 
@@ -700,7 +703,7 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: "The configuration name, 1 to 100 characters." },
+        name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION },
         overrides: { type: "object", additionalProperties: { type: "string" }, description: 'Parameter name to expression, for example { "wall": "3 mm" }.' },
       },
     },
@@ -711,7 +714,7 @@ export const engineTools = [
     inputSchema: {
       type: "object",
       required: ["projectId", "name", "newName"],
-      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The configuration name, 1 to 100 characters." }, newName: { type: "string", description: "The configuration name, 1 to 100 characters." } },
+      properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION }, newName: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION } },
     },
   },
   {
@@ -729,7 +732,7 @@ export const engineTools = [
       properties: {
         url: urlProperty,
         projectId: projectIdProperty,
-        name: { type: "string", description: "The configuration name, 1 to 100 characters." },
+        name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION },
         parameter: { type: "string", description: "The parameter to override." },
         expression: { type: ["string", "null"], description: 'For example "3 mm". null removes the override.' },
       },
@@ -738,7 +741,7 @@ export const engineTools = [
   {
     name: "sketchforge_delete_parameter_configuration",
     description: `Delete a parameter configuration. Deleting the active one returns the project to the base table and rebuilds bound shapes, so it can be refused as an activation can. ${REFUSAL_FORMAT} Codes: configuration_not_found, invalid_request, and for the active one invalid_expression (a bound result out of range), shape_locked (a bound shape that would change is locked) and geometry_failed (a bound sketch cannot be solved). ${WORKS_BOTH_WAYS}`,
-    inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: "The configuration name, 1 to 100 characters." } } },
+    inputSchema: { type: "object", required: ["projectId", "name"], properties: { url: urlProperty, projectId: projectIdProperty, name: { type: "string", description: CONFIGURATION_NAME_DESCRIPTION } } },
   },
   {
     name: "sketchforge_activate_parameter_configuration",

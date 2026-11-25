@@ -10,45 +10,9 @@ import type { ShapeBindingError } from "./expressionBindings.js";
 import type { ExpressionError } from "./parameterExpressions.js";
 import type { ProjectParameterError } from "./projectParameters.js";
 import type { SketchConstraintBindingError } from "./sketchConstraintBindings.js";
+import { API_QUERY_RULES, readApiQueryValue, type API_ERROR_CODES } from "./apiRequestDefinitions.js";
 
-/**
- * The machine-readable half of an error, alongside the sentence.
- *
- * A status code is too coarse to act on here. `404` covers a missing project, a
- * missing shape and an API that is switched off entirely; `409` covers both "the
- * project is busy, retry" and "that shape is locked, do not retry". Without a
- * code a client has to match on the prose, which makes every wording change a
- * breaking one -- and both client libraries were doing exactly that.
- */
-export const API_ERROR_CODES = [
-  "api_disabled",
-  "unauthorized",
-  "storage_unconfigured",
-  "invalid_project_id",
-  "invalid_shape_id",
-  "invalid_body",
-  "invalid_request",
-  "project_not_found",
-  "project_exists",
-  "project_busy",
-  "revision_mismatch",
-  "shape_not_found",
-  "shape_locked",
-  "parameter_not_found",
-  "parameter_exists",
-  "parameter_in_use",
-  "configuration_not_found",
-  "configuration_exists",
-  "invalid_expression",
-  "unsupported_kind",
-  "unsupported_format",
-  "unapplicable_fields",
-  "too_many_shapes",
-  "limit_exceeded",
-  "geometry_failed",
-  "cad_failed",
-  "internal_error",
-] as const;
+export { API_ERROR_CODES, API_PROJECT_ID_MAX_LENGTH, API_PROJECT_ID_PATTERN } from "./apiRequestDefinitions.js";
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
@@ -73,20 +37,14 @@ export const API_ERROR_MESSAGES = {
   shapeLocked: "That shape is locked.",
 } as const;
 
-/** Same rule as the store: the id becomes a file name in the project directory. */
-export const API_PROJECT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9_-]*$";
-export const API_PROJECT_ID_MAX_LENGTH = 120;
-
 /** Returns the trimmed project id, or undefined when a query could not carry it. */
 export function apiProjectId(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length <= API_PROJECT_ID_MAX_LENGTH && new RegExp(API_PROJECT_ID_PATTERN).test(trimmed) ? trimmed : undefined;
+  return readApiQueryValue(value, API_QUERY_RULES.projectId);
 }
 
 /** Returns the trimmed `?shapeId=`, or undefined when it is missing or blank. */
 export function apiShapeId(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  return readApiQueryValue(value, API_QUERY_RULES.shapeId);
 }
 
 /**

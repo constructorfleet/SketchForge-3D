@@ -6,11 +6,12 @@ import * as ts from "typescript-legacy";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contractPath = path.join(root, "apps/web/src/lib/apiV1OperationContract.ts");
 const outputPath = path.join(root, "docs/openapi-v1.json");
-const source = await readFile(contractPath, "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-}).outputText;
-const contractUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+// The contract may import only the engine's request definitions, which import nothing.
+// Both load from source, so the document never depends on a stale engine dist.
+const definitionsSpecifier = "@constructorfleet/sketchforge-engine/apiRequestDefinitions";
+const definitionsPath = path.join(root, "packages/sketchforge-engine/src/apiRequestDefinitions.ts");
+const definitionsUrl = moduleUrl(await readFile(definitionsPath, "utf8"), definitionsPath, {});
+const contractUrl = moduleUrl(await readFile(contractPath, "utf8"), contractPath, { [definitionsSpecifier]: definitionsUrl });
 const { API_V1_OPERATIONS } = await import(contractUrl);
 
 const paths = {};
@@ -111,6 +112,27 @@ if (process.argv.includes("--check")) {
 } else {
   await writeFile(outputPath, output);
   console.log("Generated docs/openapi-v1.json");
+}
+
+/** Transpiles one module to a data URL, mapping each runtime import through `imports`. Refuses any other import. */
+function moduleUrl(source, filePath, imports) {
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const file = ts.createSourceFile(filePath, compiled, ts.ScriptTarget.ES2022);
+  let output = "";
+  let cursor = 0;
+  for (const statement of file.statements) {
+    if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier) continue;
+    const specifier = statement.moduleSpecifier.text;
+    if (!Object.hasOwn(imports, specifier)) {
+      throw new Error(`${path.relative(root, filePath)} imports ${specifier}; the OpenAPI generator loads only ${Object.keys(imports).join(", ") || "import-free modules"}.`);
+    }
+    output += compiled.slice(cursor, statement.moduleSpecifier.getStart(file)) + JSON.stringify(imports[specifier]);
+    cursor = statement.moduleSpecifier.getEnd();
+  }
+  output += compiled.slice(cursor);
+  return `data:text/javascript;base64,${Buffer.from(output).toString("base64")}`;
 }
 
 function omissionReason(operation) {

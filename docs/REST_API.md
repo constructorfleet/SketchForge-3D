@@ -65,6 +65,17 @@ The PATCH schema describes stable face IDs and legacy numeric indexes as `faceCo
 
 The source-backed registry in `apps/web/src/lib/apiV1OperationContract.ts` lists every route. The project and shape CRUD operations, `GET /edges`, `/faces`, `/properties`, and `/thickness`, both measurement operations, all three arrangement operations, `POST` and `DELETE /groups`, `POST /mirrors`, `POST /interference`, `POST /explode`, `POST /imports`, and `POST /exports` carry request metadata and status-specific response schemas. Body-writing operations declare `maxRequestBytes` and a `413` response in that registry. Their handlers validate successful and error responses against those contracts; shape patches also validate `faceColors` against the pattern-key and color constraints while passing other engine-supported fields through. Export downloads validate their media type and URI-encoded metadata header, and unexpected exceptions or malformed responses become `500 internal_error`. Route handlers keep authentication before query and body processing. Every shape in `POST /shapes` requires an explicit `kind`; a missing kind returns `400 invalid_request`. The measurement request schemas reflect the route's `shape` default and require an index for `edge` and `face` endpoints. Grouping requires at least two distinct IDs; ungrouping takes `projectId` and `shapeId`. Both responses validate shape summaries and project revisions, as do their declared validation and engine errors. Interference trims IDs, rejects empty or duplicate IDs after trimming, accepts only finite nonnegative clearance, and reports whether pair measurements use exact or tessellated inputs. Patterns validate normalized IDs, linear/circular kind, integer count limits and finite numeric options; successful shape summaries and reachable errors are checked at the route boundary. Explosion validates normalized project and shape query IDs, STEP assembly summaries, revision, and reachable engine errors. All 38 non-OPTIONS operations have route-backed request and response schemas and are runtime-validated. The four read-only OPTIONS preflights remain inventory-only and are omitted from generated OpenAPI.
 
+The parameter, parameter configuration and sketch constraint request bodies, their query rules, the project ID rule and the error code list come from the engine's request definitions in `packages/sketchforge-engine/src/apiRequestDefinitions.ts`. The engine checks requests with those definitions, which is how MCP local mode refuses the same bodies as REST. The contract publishes the same objects, and the MCP tool catalog takes its parameter dimensions and configuration name limit from them. That module imports nothing, and it is the only import the contract may have: `scripts/generate-openapi.mjs` loads both from source and refuses any other import.
+
+```mermaid
+flowchart LR
+  definitions["Engine request definitions"] --> checks["Engine request checks (REST and MCP local mode)"]
+  definitions --> contract["REST operation contract"]
+  definitions --> catalog["MCP tool catalog"]
+  contract --> openapi["docs/openapi-v1.json"]
+  catalog --> reference["docs/mcp/TOOLS_REFERENCE.md"]
+```
+
 The project and shape are named in the query string rather than the path. That is not a style choice: a dynamic path segment makes the static-export build fail outright, because an exported build has no server to resolve one against. The dashboard's own routes are shaped this way for the same reason.
 
 ### Contract coverage
