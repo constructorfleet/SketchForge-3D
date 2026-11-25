@@ -37,7 +37,7 @@ Run the ones your change touches, and say which you ran. Never report a check as
 
 Three traps that cost real time:
 
-- **A stale engine `dist` is invisible to `npm run ci`**, because vitest resolves the engine from source while the dev server and integration suites resolve it from `dist`. Run `npm run engine:build` before anything that starts a server.
+- **Everything reads the engine from `dist`, including vitest.** `@constructorfleet/sketchforge-engine` resolves through the package `exports` to the built engine `dist`, so an engine source change is invisible to unit tests, the dev server and the integration suites until `npm run engine:build` runs. `npm run ci` and `npm test` build it first; running vitest directly does not.
 - **`npm run docs:check` needs `mypy` on `PATH`.** Create a venv from `packages/sketchforge-py/requirements-dev.txt` and prepend it, or the run dies partway with `No module named mypy`.
 - **The Python integration suite skips silently when misconfigured** — it reports `OK (skipped=1)`, which reads like success. The server needs `SKETCHFORGE_API_TOKEN` and `SKETCHFORGE_PROJECTS_DIR`; the client reads `SKETCHFORGE_URL` (not `SKETCHFORGE_BASE_URL`) and `SKETCHFORGE_API_TOKEN`. Confirm the test count is non-zero.
 

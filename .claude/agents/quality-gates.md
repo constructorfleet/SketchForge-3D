@@ -23,7 +23,7 @@ npm run test:e2e          # when the change touches editor or API behaviour
 npm run test:integration
 ```
 
-`npm run engine:build` goes first because vitest resolves `@constructorfleet/sketchforge-engine` from source while servers resolve it from `dist`. A stale `dist` passes every unit test and then fails at runtime with a module-not-found for a path that plainly exists.
+`npm run engine:build` goes first because vitest and the servers both resolve `@constructorfleet/sketchforge-engine` through its package `exports` to `dist`. A stale `dist` tests yesterday's engine: unit tests pass or fail against old code, and a server fails with a module-not-found for a path that plainly exists in source.
 
 ## Per-gate setup you will otherwise get wrong
 
