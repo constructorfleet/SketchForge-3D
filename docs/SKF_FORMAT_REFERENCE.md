@@ -22,7 +22,7 @@ For automated project export from a server-backed project, see [`POST /exports` 
 | Format written when the project has configurations | 4 |
 | Format written when the project has parameters | 3 |
 | Format written for other projects | 2 |
-| Created-with version | `1.33.1` | <!-- x-release-please-version -->
+| Created-with version | `1.33.2` | <!-- x-release-please-version -->
 | Media type | `application/vnd.sketchforge.project+zip` |
 
 A packaged file is a ZIP with a root `project.json` and binary or JSON payloads below `assets/`. The archive is validated before restoration. ZIP64 and encrypted entries are not supported.
