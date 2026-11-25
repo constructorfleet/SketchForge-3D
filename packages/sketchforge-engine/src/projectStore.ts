@@ -23,6 +23,7 @@ import {
   writeProjectDocument,
   type ProjectDocument,
 } from "./serverProjectDocument.js";
+import { projectWriteRefusal } from "./projectWritePolicy.js";
 import type { ServerProjectRecord } from "./support/lib/serverProjectStore.js";
 import type { WorkplaneShape } from "./domain/sketchforge.js";
 
@@ -65,15 +66,12 @@ export function directoryProjectStore(root: string, expectedRevision?: string): 
       const { revision } = await writeProjectDocument(root, projectId, document, shapes);
       return { revision };
     },
+    // `If-Match` is checked once the lock is held, before the engine edits; see `projectWritePolicy`.
     withLock: (projectId, work) => withProjectLock(root, projectId, async () => {
       if (expectedRevision !== undefined && expectedRevision !== "*") {
         const document = await readProjectDocument(root, projectId);
-        if (document) {
-          const revision = typeof document.metadata.revision === "number" && Number.isFinite(document.metadata.revision)
-            ? document.metadata.revision
-            : 0;
-          if (expectedRevision !== String(revision)) throw new ProjectRevisionMismatchError(revision);
-        }
+        const refusal = projectWriteRefusal({ metadata: document?.metadata ?? null }, { ifMatch: expectedRevision });
+        if (refusal?.reason === "revisionMismatch") throw new ProjectRevisionMismatchError(refusal.currentRevision);
       }
       return work();
     }),

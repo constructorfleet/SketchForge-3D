@@ -67,7 +67,7 @@
       "validation": "Filesystem path writable by the server. Enables server-backed project storage and must be paired with SKETCHFORGE_API_TOKEN to enable the scripting REST API.",
       "sensitive": false,
       "subsystem": "Server project storage and REST API",
-      "source": "../apps/web/src/lib/serverProjectStore.ts",
+      "source": "../packages/sketchforge-engine/src/support/lib/serverProjectStore.ts",
       "ownerPage": "guides/deployment.md#server-backed-projects",
       "additionalOwnerPages": ["guides/client-configuration.md#local-mcp-project-storage"],
       "additionalSources": ["../packages/sketchforge-client/mcp/localEngine.mjs", "../packages/sketchforge-client/mcp/localMacroRunner.mjs"]

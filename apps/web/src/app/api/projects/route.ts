@@ -6,25 +6,18 @@ import {
   deleteProjectFiles,
   ensureProjectsDirectory,
   listProjectRecords,
-  projectPackagePath,
   projectRecord,
   readProjectMetadata,
   readProjectPackage,
-  readProjectTombstone,
-  regularFileStat,
   withProjectLock,
-  writeProjectMetadata,
-  writeProjectPackage,
   type ProjectMetadata,
 } from "@/lib/engine/serverProjectFiles";
+import { applyProjectWrite, type ProjectWriteRefusal, type ProjectWriteRequest } from "@/lib/engine/projectWritePolicy";
 import {
   SERVER_PROJECTS_ENV,
   SERVER_PROJECT_REVISION_HEADER,
   safeServerProjectId,
-  serverMetadataRevision,
-  serverPackageBaseIsStale,
   serverProjectRevision,
-  serverProjectWriteIsStale,
 } from "@/lib/serverProjectStore";
 import { SKF_LIMITS, SKF_MEDIA_TYPE } from "@/lib/engine/skfProject";
 
@@ -45,9 +38,23 @@ function disabledResponse() {
   );
 }
 
-/** `deletedRevision` lets a client tell whether the copy it holds is newer than the one deleted. */
-function deletedResponse(deletedRevision?: number) {
-  return errorResponse("errors.projects.deleted", 410, { conflict: "deleted", ...(deletedRevision !== undefined ? { deletedRevision } : {}) });
+/** Maps a write-policy refusal to a response. The client offers the newer copy only for `newerRevision`. */
+function refusalResponse(refusal: ProjectWriteRefusal) {
+  switch (refusal.reason) {
+    case "deleted":
+      // `deletedRevision` lets a client tell whether the copy it holds is newer than the one deleted.
+      return errorResponse("errors.projects.deleted", 410, {
+        conflict: "deleted",
+        ...(refusal.deletedRevision !== undefined ? { deletedRevision: refusal.deletedRevision } : {}),
+      });
+    case "newerRevision":
+      return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerRevision", storedRevision: refusal.storedRevision });
+    case "newerMetadata":
+      return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerMetadata", storedMetadataRevision: refusal.storedMetadataRevision });
+    case "staleRevision":
+    case "revisionMismatch":
+      return errorResponse("errors.projects.changedBeforeSave", 409);
+  }
 }
 
 export async function GET(request: Request) {
@@ -130,53 +137,29 @@ export async function POST(request: Request) {
     if (!metadata && !packageBytes) return errorResponse("errors.projects.missingMetadata", 400);
 
     const revisionField = formData.get("revision");
-    const writtenRevision = metadata ?? (typeof revisionField === "string" ? { revision: Number(revisionField) } : null);
     const baseField = formData.get("baseRevision");
     const baseRevision = typeof baseField === "string" ? Number(baseField) : undefined;
     const baseMetadataField = formData.get("baseMetadataRevision");
     const baseMetadataRevision = typeof baseMetadataField === "string" ? Number(baseMetadataField) : undefined;
 
-    const locked = await withProjectLock(root, projectId, async () => {
+    const writeRequest: ProjectWriteRequest = {
+      metadata,
+      package: packageBytes ? { revision: typeof revisionField === "string" ? Number(revisionField) : undefined } : null,
       // Deletes win (#672): a save sent before the delete, or from a client that still
       // holds the project, must not recreate it. A new project gets a new id.
-      const tombstone = await readProjectTombstone(root, projectId);
-      if (tombstone) return deletedResponse(tombstone.revision);
-      const stored = await readProjectMetadata(root, projectId);
-      const storedRevision = serverProjectRevision(stored);
-      // Files removed without a delete record: a based metadata write must not bring back a list entry alone.
-      const basedMetadataOnly = metadata && !packageBytes && Number.isFinite(baseMetadataRevision);
-      if (basedMetadataOnly && !stored && !(await regularFileStat(projectPackagePath(root, projectId)))) return deletedResponse();
-      // A later clock is not a later copy: another client may have saved since this one loaded.
-      // Only this check is a conflict; the client offers the newer copy for it.
-      if (packageBytes && serverPackageBaseIsStale(stored, baseRevision)) {
-        return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerRevision", storedRevision });
-      }
-      if (packageBytes && serverProjectWriteIsStale(stored, writtenRevision)) {
-        return errorResponse("errors.projects.changedBeforeSave", 409);
-      }
-      // A list read before another client's rename or settings change would revert it.
-      const storedMetadataRevision = serverMetadataRevision(stored);
-      if (metadata && baseMetadataRevision !== undefined && Number.isFinite(baseMetadataRevision) && storedMetadataRevision > baseMetadataRevision) {
-        return errorResponse("errors.projects.changedBeforeSave", 409, { conflict: "newerMetadata", storedMetadataRevision });
-      }
-
-      if (packageBytes) await writeProjectPackage(root, projectId, packageBytes);
-      // The revision belongs to the package. A list write sent while a save was in flight
-      // carries an older one, and one sent before its save lands a newer one; neither may move it.
-      const writtenMetadata = metadata
-        ? { ...metadata, ...(!packageBytes && storedRevision > 0 ? { revision: storedRevision } : {}), metadataRevision: storedMetadataRevision + 1 }
-        : null;
-      if (writtenMetadata) await writeProjectMetadata(root, projectId, writtenMetadata);
-      // The sidecar revision is the package's, as REST v1 keeps it, so the next writer's base can be checked.
-      else if (packageBytes && stored && writtenRevision) {
-        const revision = serverProjectRevision(writtenRevision);
-        if (revision > serverProjectRevision(stored)) await writeProjectMetadata(root, projectId, { ...stored, revision });
-      }
-
-      const savedMetadata = writtenMetadata ?? stored;
+      refuseDeleted: true,
+      refuseOlderClock: true,
+      baseRevision,
+      baseMetadataRevision,
+      revisionRule: { kind: "package" },
+    };
+    const locked = await withProjectLock(root, projectId, async () => {
+      const plan = await applyProjectWrite(root, projectId, writeRequest, packageBytes);
+      if (!plan.accepted) return refusalResponse(plan.refusal);
+      const { reported, created } = plan.next;
       return NextResponse.json(
-        { project: savedMetadata ? await projectRecord(root, projectId, savedMetadata) : null },
-        { status: stored ? 200 : 201, headers: { "Cache-Control": "no-store" } },
+        { project: reported ? await projectRecord(root, projectId, reported) : null },
+        { status: created ? 201 : 200, headers: { "Cache-Control": "no-store" } },
       );
     });
     return locked.busy ? errorResponse("errors.projects.busySaving", 409) : locked.result;

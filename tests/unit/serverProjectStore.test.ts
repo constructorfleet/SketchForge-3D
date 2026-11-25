@@ -97,10 +97,19 @@ describe("server project store imports", () => {
     // `/api/projects` imports this module for the names and limits it shares
     // with the dashboard. Importing "@/i18n" here pulls in the React store and
     // the route fails to compile as a server module.
-    const source = await readFile(new URL("../../apps/web/src/lib/serverProjectStore.ts", import.meta.url), "utf8");
-    const imports = [...source.matchAll(/^import .*? from "(.+?)";$/gm)].map((match) => match[1]);
+    for (const file of ["../../apps/web/src/lib/serverProjectStore.ts", "../../packages/sketchforge-engine/src/support/lib/serverProjectStore.ts"]) {
+      const source = await readFile(new URL(file, import.meta.url), "utf8");
+      const imports = [...source.matchAll(/^(?:import|export) .*? from "(.+?)";$/gm)].map((match) => match[1]);
 
-    expect(imports).not.toContain("@/i18n");
-    expect(imports.filter((specifier) => specifier.startsWith("react"))).toEqual([]);
+      expect(imports).not.toContain("@/i18n");
+      expect(imports.filter((specifier) => specifier.startsWith("react"))).toEqual([]);
+    }
+  });
+
+  it("has one copy: the web module only re-exports the engine's", async () => {
+    const source = await readFile(new URL("../../apps/web/src/lib/serverProjectStore.ts", import.meta.url), "utf8");
+    const statements = source.split("\n").filter((line) => line.trim() && !line.trim().startsWith("//"));
+
+    expect(statements).toEqual(['export * from "@constructorfleet/sketchforge-engine/support/lib/serverProjectStore";']);
   });
 });

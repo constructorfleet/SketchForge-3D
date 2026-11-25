@@ -142,7 +142,7 @@ test('the tracked server, container, client, MCP, and desktop reader set has no 
     'deploy/docker/start-server.mjs',
     'deploy/docker/Dockerfile',
     'deploy/docker/compose.yaml',
-    'apps/web/src/lib/serverProjectStore.ts',
+    'packages/sketchforge-engine/src/support/lib/serverProjectStore.ts',
     'apps/web/src/lib/apiTokens.ts',
     'apps/web/src/app/api/shared-projects/route.ts',
     'apps/web/src/app/api/app-update/route.ts',
