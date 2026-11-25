@@ -121,6 +121,21 @@ describe("editor publish module", () => {
     expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
   });
 
+  it("publishes a pending forced table-only undo before a drag starts (#688)", () => {
+    const { publisher, clock, sent, sentScenes, open, edit, local } = editor({ table: [wall] });
+    open("a", [box("box")]);
+    local.parameters = [];
+    publisher.localEdit(local.shapes, { force: true });
+    publisher.interactionStarted();
+    expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
+
+    edit([box("box", 20)]);
+    publisher.interactionEnded();
+    clock.advance(180 + 120);
+    expect(sent.map((entry) => entry.shapes)).toEqual([["box"], ["box"]]);
+    expect(sentScenes.map((scene) => scene[0]!.width)).toEqual([10, 20]);
+  });
+
   it("tells its own echo from a real host change, which replaces the pending publish", () => {
     const { clock, sent, open, edit, props } = editor();
     open("a", []);
@@ -239,15 +254,32 @@ describe("editor publish module", () => {
     expect(props("a", [box("one")])).toMatchObject({ action: "hydrate", projectChanged: true });
   });
 
-  it("never resumes a held interaction under the next project", () => {
+  it("saves a held edit to its own project when another opens after a drag that moved nothing", () => {
     const { publisher, clock, sent, open, edit } = editor();
     open("a", []);
     edit([box("box")]);
     publisher.interactionStarted();
     publisher.interactionEnded();
     publisher.projectChanged("b");
+    expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
     clock.advance(500);
-    expect(sent).toEqual([]);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("flushes a resumed drag publish to its original project when another project opens (#689)", () => {
+    const { publisher, clock, sent, sentScenes, open, edit, props } = editor();
+    open("a", [box("box")]);
+    publisher.interactionStarted();
+    edit([box("box", 20)]);
+    publisher.interactionEnded();
+    clock.advance(179);
+    publisher.projectChanged("b");
+
+    expect(sent).toEqual([{ projectId: "a", shapes: ["box"], table: [] }]);
+    expect(sentScenes[0]![0]!.width).toBe(20);
+    expect(props("b", []).action).toBe("hydrate");
+    clock.advance(500);
+    expect(sent).toHaveLength(1);
   });
 
   it("publishes at once when a keyboard move ends", () => {

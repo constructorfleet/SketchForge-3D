@@ -76,7 +76,7 @@ export function classifyHostProps(keys: {
   return { adoptTable, action: keys.incoming === keys.synced ? "echo" : "hydrate" };
 }
 
-type Pending = { projectId: string; shapes: WorkplaneShape[]; key: string; handle: unknown };
+type Pending = { projectId: string; shapes: WorkplaneShape[]; key: string; force: boolean; handle: unknown };
 
 export function createEditorPublisher({ host, scheduler = windowScheduler, initialTable }: {
   host: EditorPublishHost;
@@ -151,7 +151,7 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
       pending = null;
       send(target, canonical, key);
     }, PUBLISH_DELAY_MS);
-    pending = { projectId: target, shapes: canonical, key, handle };
+    pending = { projectId: target, shapes: canonical, key, force, handle };
   }
 
   /** The scene a render committed; skipped once after a hydrate, which it came from. */
@@ -170,6 +170,12 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
    * No project drops it: it named a project that closed, perhaps deleted (#665).
    */
   function projectChanged(next: string | null) {
+    // A drag's settle belongs to the project it ended in: send it now, under that project.
+    // An unchanged scene is skipped by the synced key.
+    if (next !== null && resume !== null) {
+      cancelResume();
+      localEdit(host.currentShapes(), { immediate: true });
+    }
     projectId = next;
     // It would read the next project's scene.
     cancelResume();
@@ -216,7 +222,8 @@ export function createEditorPublisher({ host, scheduler = windowScheduler, initi
   function interactionStarted() {
     cancelResume();
     if (pending) {
-      cancelPending();
+      if (pending.force) flushPending();
+      else cancelPending();
       held = host.currentShapes();
     }
     interacting = true;

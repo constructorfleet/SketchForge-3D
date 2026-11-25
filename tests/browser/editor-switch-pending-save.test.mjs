@@ -85,6 +85,28 @@ async function storedRootCounts(page) {
   return counts;
 }
 
+async function storedRootPositions(page) {
+  const { names, packages } = await page.evaluate(() => new Promise((resolve) => {
+    const names = Object.fromEntries(JSON.parse(window.localStorage.getItem("sketchForge.projects") ?? "[]").map((project) => [project.id, project.name]));
+    const opened = indexedDB.open("sketchForge.projectShapes");
+    opened.onerror = () => resolve({ names, packages: [] });
+    opened.onsuccess = () => {
+      if (!opened.result.objectStoreNames.contains("projectShapes")) return resolve({ names, packages: [] });
+      const read = opened.result.transaction("projectShapes").objectStore("projectShapes").getAll();
+      read.onerror = () => resolve({ names, packages: [] });
+      read.onsuccess = () => resolve({ names, packages: read.result.map((record) => [record.id, Array.from(new Uint8Array(record.skfPackage))]) });
+    };
+  }));
+  const positions = {};
+  for (const [id, bytes] of packages) {
+    const document = JSON.parse(strFromU8(unzipSync(new Uint8Array(bytes))["project.json"]));
+    const scene = document.states.find((state) => state.id === document.sceneStateId);
+    const roots = new Set(scene.rootNodeIds);
+    positions[names[id]] = scene.nodes.filter((node) => roots.has(node.nodeId)).map((node) => ({ x: node.definition.x, z: node.definition.z }));
+  }
+  return positions;
+}
+
 async function addBox(page) {
   await page.getByRole("button", { name: "Add shape" }).click();
   await page.getByText("Box", { exact: true }).first().click();
@@ -160,4 +182,52 @@ test("an edit made just before opening another project is saved to the project i
 
 test("an edit made just before opening a project not loaded yet is saved to the project it was made in", { timeout: 180_000 }, async () => {
   await editAlphaThenOpenBeta({ betaLoaded: false });
+});
+
+test("a drag that ends just before opening another project saves its final position to the original project", { timeout: 180_000 }, async () => {
+  const { baseURL, stop } = await startNextServer();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.route("**/api/app-update**", (route) => route.abort());
+    await page.goto(baseURL);
+    await createAndName(page, "Alpha");
+    await open(page, "Alpha");
+    await page.getByRole("button", { name: "Add shape" }).waitFor({ state: "visible", timeout: 60_000 });
+    await addBox(page);
+    await pollUntil(() => storedRootCounts(page), (counts) => counts.Alpha === 1);
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    await createAndName(page, "Beta");
+    await open(page, "Alpha");
+    await page.locator(".scene-inspector-list > li.scene-row").first().waitFor({ timeout: 60_000 });
+
+    await page.clock.install();
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
+    const canvas = page.locator("canvas").first();
+    const bounds = await canvas.boundingBox();
+    assert.ok(bounds, "the editor viewport should be visible");
+    const start = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 45, start.y + 30, { steps: 8 });
+    await page.mouse.up();
+    const moved = await pollUntil(
+      () => page.locator("pre[data-codex-state]").evaluate((node) => JSON.parse(node.textContent).shapes[0]),
+      (shape) => Math.abs(shape.x) > 0.1 || Math.abs(shape.z) > 0.1,
+    );
+    assert.ok(Math.abs(moved.x) > 0.1 || Math.abs(moved.z) > 0.1, "the pointer drag should move the box");
+    await page.screenshot({ path: "docs/screenshots/editor-drag-before-project-switch.png" });
+
+    await page.getByRole("button", { name: "Home dashboard" }).click();
+    await open(page, "Beta");
+    await page.clock.resume();
+    const saved = await pollUntil(() => storedRootPositions(page), (positions) => positions.Alpha?.length === 1 && positions.Alpha[0].x === moved.x && positions.Alpha[0].z === moved.z, 10_000);
+    assert.equal(saved.Alpha[0].x, moved.x, "Alpha should retain the final dragged x position");
+    assert.equal(saved.Alpha[0].z, moved.z, "Alpha should retain the final dragged z position");
+    assert.ok(saved.Beta === undefined || saved.Beta.length === 0, "Beta must not receive Alpha's shape");
+  } finally {
+    await browser?.close();
+    stop();
+  }
 });
