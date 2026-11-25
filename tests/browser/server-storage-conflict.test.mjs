@@ -364,8 +364,17 @@ test("a client that saves a project another client deleted is told, and can save
   while (fs.existsSync(packagePath) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(fs.existsSync(packagePath), false, "client A deleted the package");
 
-  // Client B still has it open; its next edit is refused and it is told why.
+  // Client B still has it open; its next edit is refused and it is told why. The refusal
+  // closes the editor about 400 ms after the box appears; one slow frame can miss that, so
+  // the save is held until the box has been seen.
+  let releaseSave;
+  const saveHeld = new Promise((resolve) => { releaseSave = resolve; });
+  await clientB.route("**/api/projects?projectId=*", async (route) => {
+    if (route.request().method() === "POST") await saveHeld;
+    await route.continue();
+  });
   await addBox(clientB);
+  releaseSave();
   const banner = clientB.getByRole("alert").filter({ hasText: "square was deleted elsewhere" });
   await banner.waitFor({ state: "visible", timeout: 30_000 });
   await screenshot(clientB, "server-storage-deleted-elsewhere.png");
